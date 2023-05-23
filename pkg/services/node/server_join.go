@@ -180,12 +180,27 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	for i, p := range peers {
 		peer := p
 		resp.Peers[i] = &v1.WireguardPeer{
-			PublicKey:   peer.PublicKey.String(),
-			Asn:         peer.ASN,
-			Endpoint:    peer.Endpoint.String(),
-			AddressIpv4: peer.PrivateIPv4.String(),
-			AddressIpv6: peer.NetworkIPv6.String(),
-			AllowedIps:  peer.AllowedIPs,
+			PublicKey: peer.PublicKey.String(),
+			Asn:       peer.ASN,
+			Endpoint: func() string {
+				if peer.Endpoint.IsValid() {
+					return peer.Endpoint.String()
+				}
+				return ""
+			}(),
+			AddressIpv4: func() string {
+				if peer.PrivateIPv4.IsValid() {
+					return peer.PrivateIPv4.String()
+				}
+				return ""
+			}(),
+			AddressIpv6: func() string {
+				if peer.NetworkIPv6.IsValid() {
+					return peer.NetworkIPv6.String()
+				}
+				return ""
+			}(),
+			AllowedIps: peer.AllowedIPs,
 		}
 	}
 	return resp, nil
