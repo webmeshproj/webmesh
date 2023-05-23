@@ -30,33 +30,35 @@ import (
 )
 
 const (
-	NodeIDEnvVar              = "STORE_NODE_ID"
-	DataDirEnvVar             = "STORE_DATA_DIR"
-	AdvertiseAddressEnvVar    = "STORE_ADVERTISE_ADDRESS"
-	ConnectionPoolCountEnvVar = "STORE_CONNECTION_POOL_COUNT"
-	ConnectionTimeoutEnvVar   = "STORE_CONNECTION_TIMEOUT"
-	HeartbeatTimeoutEnvVar    = "STORE_HEARTBEAT_TIMEOUT"
-	ElectionTimeoutEnvVar     = "STORE_ELECTION_TIMEOUT"
-	ApplyTimeoutEnvVar        = "STORE_APPLY_TIMEOUT"
-	CommitTimeoutEnvVar       = "STORE_COMMIT_TIMEOUT"
-	MaxAppendEntriesEnvVar    = "STORE_MAX_APPEND_ENTRIES"
-	LeaderLeaseTimeoutEnvVar  = "STORE_LEADER_LEASE_TIMEOUT"
-	SnapshotIntervalEnvVar    = "STORE_SNAPSHOT_INTERVAL"
-	SnapshotThresholdEnvVar   = "STORE_SNAPSHOT_THRESHOLD"
-	SnapshotRetentionEnvVar   = "STORE_SNAPSHOT_RETENTION"
-	BootstrapEnvVar           = "STORE_BOOTSTRAP"
-	IPv4NetworkEnvVar         = "STORE_BOOTSTRAP_IPV4_NETWORK"
-	JoinEnvVar                = "STORE_JOIN"
-	JoinAsVoterEnvVar         = "STORE_JOIN_AS_VOTER"
-	MaxJoinRetriesEnvVar      = "STORE_MAX_JOIN_RETRIES"
-	JoinTimeoutEnvVar         = "STORE_JOIN_TIMEOUT"
-	ForceNewClusterEnvVar     = "STORE_FORCE_BOOTSTRAP"
-	RaftLogLevelEnvVar        = "STORE_RAFT_LOG_LEVEL"
-	RaftPreferIPv6EnvVar      = "STORE_RAFT_PREFER_IPV6"
-	ObserverChanBufferEnvVar  = "STORE_OBSERVER_CHAN_BUFFER"
-	GRPCAdvertisePortEnvVar   = "STORE_GRPC_ADVERTISE_PORT"
-	NoIPv4EnvVar              = "STORE_NO_IPV4"
-	NoIPv6EnvVar              = "STORE_NO_IPV6"
+	NodeIDEnvVar                    = "STORE_NODE_ID"
+	DataDirEnvVar                   = "STORE_DATA_DIR"
+	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
+	ConnectionPoolCountEnvVar       = "STORE_CONNECTION_POOL_COUNT"
+	ConnectionTimeoutEnvVar         = "STORE_CONNECTION_TIMEOUT"
+	HeartbeatTimeoutEnvVar          = "STORE_HEARTBEAT_TIMEOUT"
+	ElectionTimeoutEnvVar           = "STORE_ELECTION_TIMEOUT"
+	ApplyTimeoutEnvVar              = "STORE_APPLY_TIMEOUT"
+	CommitTimeoutEnvVar             = "STORE_COMMIT_TIMEOUT"
+	MaxAppendEntriesEnvVar          = "STORE_MAX_APPEND_ENTRIES"
+	LeaderLeaseTimeoutEnvVar        = "STORE_LEADER_LEASE_TIMEOUT"
+	SnapshotIntervalEnvVar          = "STORE_SNAPSHOT_INTERVAL"
+	SnapshotThresholdEnvVar         = "STORE_SNAPSHOT_THRESHOLD"
+	SnapshotRetentionEnvVar         = "STORE_SNAPSHOT_RETENTION"
+	BootstrapEnvVar                 = "STORE_BOOTSTRAP"
+	BootstrapServersEnvVar          = "STORE_BOOTSTRAP_SERVERS"
+	BootstrapServersGRPCPortsEnvVar = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
+	IPv4NetworkEnvVar               = "STORE_BOOTSTRAP_IPV4_NETWORK"
+	JoinEnvVar                      = "STORE_JOIN"
+	JoinAsVoterEnvVar               = "STORE_JOIN_AS_VOTER"
+	MaxJoinRetriesEnvVar            = "STORE_MAX_JOIN_RETRIES"
+	JoinTimeoutEnvVar               = "STORE_JOIN_TIMEOUT"
+	ForceNewClusterEnvVar           = "STORE_FORCE_BOOTSTRAP"
+	RaftLogLevelEnvVar              = "STORE_RAFT_LOG_LEVEL"
+	RaftPreferIPv6EnvVar            = "STORE_RAFT_PREFER_IPV6"
+	ObserverChanBufferEnvVar        = "STORE_OBSERVER_CHAN_BUFFER"
+	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
+	NoIPv4EnvVar                    = "STORE_NO_IPV4"
+	NoIPv6EnvVar                    = "STORE_NO_IPV6"
 
 	// LogFile is the raft log file.
 	LogFile = "raft-log.dat"
@@ -113,6 +115,18 @@ type Options struct {
 	// only bootstrap a new cluster if no data is found. To force
 	// bootstrap, set ForceBootstrap to true.
 	Bootstrap bool
+	// BootstrapServers is a comma separated list of servers to bootstrap with.
+	// This is only used if Bootstrap is true. If empty, the node will use
+	// the AdvertiseAddress as the bootstrap server. If not empty, all nodes in
+	// the list should be started with the same list and BootstrapIPv4Network. If the
+	// BootstrapIPv4Network is not the same, the first node to become leader will pick it.
+	// Servers should be in the form of <node-id>=<address> where address is the advertise address.
+	BootstrapServers string
+	// BootstrapServersGRPCPorts is a comma separated list of gRPC ports to bootstrap with.
+	// This is only used if Bootstrap is true. If empty, the node will use the advertise
+	// address and local gRPC port for every node in BootstrapServers. Ports should be
+	// in the form of <node-id>=<port>.
+	BootstrapServersGRPCPorts string
 	// BootstrapIPv4Network is the IPv4 network of the mesh to write to the database
 	// when bootstraping a new cluster.
 	BootstrapIPv4Network string
@@ -163,6 +177,25 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 	3. If the hostname is not available, the node ID is a random UUID (should only be used for testing).`)
 	fl.StringVar(&o.DataDir, "store.data-dir", util.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
 		"Store data directory.")
+	fl.BoolVar(&o.Bootstrap, "store.bootstrap", util.GetEnvDefault(BootstrapEnvVar, "false") == "true",
+		"Bootstrap the cluster.")
+
+	fl.StringVar(&o.BootstrapServers, "store.bootstrap-servers", util.GetEnvDefault(BootstrapServersEnvVar, ""),
+		`Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
+If empty, the node will use the advertise address as the bootstrap server. If not empty,
+all nodes in the list should be started with the same list and bootstrap-ipv4-network. If the
+bootstrap-ipv4-network is not the same, the first node to become leader will pick it.
+Servers should be in the form of <node-id>=<address> where address is the advertise address.`)
+	fl.StringVar(&o.BootstrapServersGRPCPorts, "store.bootstrap-servers-grpc-ports", util.GetEnvDefault(BootstrapServersGRPCPortsEnvVar, ""),
+		`Comma separated list of gRPC ports to bootstrap with. This is only used
+if bootstrap is true. If empty, the node will use the advertise address and
+locally configured gRPC port for every node in bootstrap-servers.
+Ports should be in the form of <node-id>=<port>.`)
+
+	fl.StringVar(&o.BootstrapIPv4Network, "store.bootstrap-ipv4-network", util.GetEnvDefault(IPv4NetworkEnvVar, "172.16.0.0/12"),
+		"IPv4 network of the mesh to write to the database when bootstraping a new cluster.")
+	fl.BoolVar(&o.ForceBootstrap, "store.force-bootstrap", util.GetEnvDefault(ForceNewClusterEnvVar, "false") == "true",
+		"Force bootstrapping a new cluster even if data is present.")
 	fl.StringVar(&o.AdvertiseAddress, "store.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, "localhost:9443"),
 		`Raft advertise address. Required when bootstrapping a new cluster,
 but will be replaced with the wireguard address after bootstrapping.`)
@@ -196,12 +229,6 @@ but will be replaced with the wireguard address after bootstrapping.`)
 		"Join timeout.")
 	fl.BoolVar(&o.JoinAsVoter, "store.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
 		"Join the cluster as a voter. Default behavior is to join as an observer.")
-	fl.BoolVar(&o.Bootstrap, "store.bootstrap", util.GetEnvDefault(BootstrapEnvVar, "false") == "true",
-		"Bootstrap the cluster.")
-	fl.StringVar(&o.BootstrapIPv4Network, "store.bootstrap-ipv4-network", util.GetEnvDefault(IPv4NetworkEnvVar, "172.16.0.0/12"),
-		"IPv4 network of the mesh to write to the database when bootstraping a new cluster.")
-	fl.BoolVar(&o.ForceBootstrap, "store.force-bootstrap", util.GetEnvDefault(ForceNewClusterEnvVar, "false") == "true",
-		"Force bootstrapping a new cluster even if data is present.")
 	fl.StringVar(&o.RaftLogLevel, "store.raft-log-level", util.GetEnvDefault(RaftLogLevelEnvVar, "info"),
 		"Raft log level.")
 	fl.BoolVar(&o.RaftPreferIPv6, "store.raft-prefer-ipv6", util.GetEnvDefault(RaftPreferIPv6EnvVar, "false") == "true",

@@ -7,13 +7,13 @@ networks:
       driver: default
       config:
         - subnet: 10.1.0.0/24
-          gateway: 10.1.0.1
+          gateway: 10.1.0.100
         # - subnet: 2001:db8:1::/64
         #   gateway: 2001:db8:1::1
 
 services:
 
-  bootstrap-node:
+  bootstrap-node-1:
     image: ${IMAGE:-gitlab.com/webmesh/node:latest}
     build:
       context: .
@@ -24,42 +24,68 @@ services:
       - --global.no-ipv6
       - --global.log-level=debug
       - --store.bootstrap
+      - --store.node-id=bootstrap-node-1
+      - --store.advertise-address=10.1.0.1:9443
+      - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.data-dir=/data
       - --store.raft-log-level=debug
-      - --wireguard.endpoint=10.1.0.2:51820
+      - --wireguard.endpoint=10.1.0.1:51820
       - --grpc.enable-metrics
     volumes:
       - /lib/modules:/lib/modules
-      - bootstrap:/data
+      - bootstrap-node-1:/data
     networks:
       bootstrap:
-        ipv4_address: 10.1.0.2
+        ipv4_address: 10.1.0.1
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-    hostname: bootstrap-node
 
-  join-node-1:
+  bootstrap-node-2:
     image: ${IMAGE:-gitlab.com/webmesh/node:latest}
     entrypoint:
       - /node
       - --global.insecure
       - --global.no-ipv6
       - --global.log-level=debug
-      - --store.join=10.1.0.2:8443
-      - --store.join-as-voter
+      - --store.bootstrap
+      - --store.node-id=bootstrap-node-2
+      - --store.advertise-address=10.1.0.2:9443
+      - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --store.data-dir=/data
+      - --store.raft-log-level=debug
+      - --wireguard.endpoint=10.1.0.2:51820
+      - --grpc.enable-metrics
+    volumes:
+      - /lib/modules:/lib/modules
+      - bootstrap-node-2:/data
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.2
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  bootstrap-node-3:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    entrypoint:
+      - /node
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.log-level=debug
+      - --store.bootstrap
+      - --store.node-id=bootstrap-node-3
+      - --store.advertise-address=10.1.0.3:9443
+      - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.data-dir=/data
       - --store.raft-log-level=debug
       - --wireguard.endpoint=10.1.0.3:51820
       - --grpc.enable-metrics
     volumes:
       - /lib/modules:/lib/modules
-      - join-node-1:/data
+      - bootstrap-node-3:/data
     networks:
       bootstrap:
         ipv4_address: 10.1.0.3
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-    depends_on: ["bootstrap-node"]
-    hostname: join-node-1
 
 volumes:
-  bootstrap:
-  join-node-1:
+  bootstrap-node-1:
+  bootstrap-node-2:
+  bootstrap-node-3:

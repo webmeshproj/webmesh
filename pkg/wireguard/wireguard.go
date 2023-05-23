@@ -145,6 +145,7 @@ func (w *wginterface) Configure(ctx context.Context, key wgtypes.Key, listenPort
 func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
+	w.log.Debug("put peer", slog.Any("peer", peer))
 	key, err := wgtypes.ParseKey(peer.PublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
@@ -152,16 +153,17 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	var keepAlive *time.Duration
 	var endpoint *net.UDPAddr
 	var allowedIPs []net.IPNet
-	if peer.PrivateIPv4.IsValid() {
-		allowedIPs = append(allowedIPs, net.IPNet{
-			IP:   peer.PrivateIPv4.Addr().AsSlice(),
-			Mask: net.CIDRMask(0, 32),
-		})
-	}
 	if peer.PrivateIPv6.IsValid() {
 		allowedIPs = append(allowedIPs, net.IPNet{
 			IP:   peer.PrivateIPv6.Addr().AsSlice(),
-			Mask: net.CIDRMask(0, peer.PrivateIPv6.Bits()),
+			Mask: net.CIDRMask(peer.PrivateIPv6.Bits(), 128),
+		})
+	}
+	if peer.PrivateIPv4.IsValid() {
+		// TODO: We force this to 32 for now, but we should make this configurable
+		allowedIPs = append(allowedIPs, net.IPNet{
+			IP:   peer.PrivateIPv4.Addr().AsSlice(),
+			Mask: net.CIDRMask(32, 32),
 		})
 	}
 	for _, ip := range peer.AllowedIPs {
@@ -184,13 +186,13 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			if w.opts.NetworkV6.IsValid() {
 				allowedIPs = append(allowedIPs, net.IPNet{
 					IP:   w.opts.NetworkV6.Addr().AsSlice(),
-					Mask: net.CIDRMask(0, w.opts.NetworkV6.Bits()),
+					Mask: net.CIDRMask(w.opts.NetworkV6.Bits(), 128),
 				})
 			}
 			if w.opts.NetworkV4.IsValid() {
 				allowedIPs = append(allowedIPs, net.IPNet{
 					IP:   w.opts.NetworkV4.Addr().AsSlice(),
-					Mask: net.CIDRMask(0, w.opts.NetworkV4.Bits()),
+					Mask: net.CIDRMask(w.opts.NetworkV4.Bits(), 32),
 				})
 			}
 			// Set the keepalive interval to 25 seconds
@@ -207,6 +209,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			allowedIPs = nil
 		}
 	}
+	w.log.Debug("computed allowed IPs for peer",
+		slog.String("peer-id", peer.ID),
+		slog.Any("allowed-ips", allowedIPs))
 	peerCfg := wgtypes.PeerConfig{
 		PublicKey:                   key,
 		UpdateOnly:                  false,

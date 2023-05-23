@@ -197,9 +197,12 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 		}
 		return nil, err
 	}
-	key, err := wgtypes.ParseKey(node.PublicKey.String)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse node public key: %w", err)
+	var key wgtypes.Key
+	if node.PublicKey.Valid {
+		key, err = wgtypes.ParseKey(node.PublicKey.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse node public key: %w", err)
+		}
 	}
 	var endpoint netip.AddrPort
 	if node.Endpoint.Valid {
@@ -311,9 +314,12 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 	}
 	out := make([]Node, len(nodes))
 	for i, node := range nodes {
-		key, err := wgtypes.ParseKey(node.PublicKey.String)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse node public key: %w", err)
+		var key wgtypes.Key
+		if node.PublicKey.Valid {
+			key, err = wgtypes.ParseKey(node.PublicKey.String)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse node public key: %w", err)
+			}
 		}
 		var endpoint netip.AddrPort
 		if node.Endpoint.Valid {
@@ -372,9 +378,12 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 	}
 	peers := make([]Node, len(nodePeers))
 	for i, peer := range nodePeers {
-		key, err := wgtypes.ParseKey(peer.PublicKey.String)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse node public key: %w", err)
+		var key wgtypes.Key
+		if peer.PublicKey.Valid {
+			key, err = wgtypes.ParseKey(peer.PublicKey.String)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse node public key: %w", err)
+			}
 		}
 		var endpoint netip.AddrPort
 		if peer.Endpoint.Valid {
@@ -426,10 +435,13 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 
 func nodeModelToNode(node *raftdb.Node) (*Node, error) {
 	var err error
+	var key wgtypes.Key
 	var endpoint netip.AddrPort
-	key, err := wgtypes.ParseKey(node.PublicKey.String)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse node public key: %w", err)
+	if node.PublicKey.Valid {
+		key, err = wgtypes.ParseKey(node.PublicKey.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse node public key: %w", err)
+		}
 	}
 	if node.Endpoint.Valid {
 		endpoint, err = netip.ParseAddrPort(node.Endpoint.String)

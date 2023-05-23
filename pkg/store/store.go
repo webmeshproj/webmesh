@@ -221,7 +221,7 @@ func (s *store) WeakDB() raftdb.DBTX {
 // intended for use with the node_local table which is not replicated
 // across the cluster.
 func (s *store) LocalDB() localdb.DBTX {
-	return &lockableDB{DB: s.localData, mux: s.dataMux.RLocker()}
+	return &lockableDB{DB: s.localData, mux: &s.dataMux}
 }
 
 // Raft returns the Raft interface.
@@ -266,7 +266,7 @@ func (s *store) ReadyNotify(ctx context.Context) <-chan struct{} {
 }
 
 // ReadyError returns a channel that will receive an error if the store
-// fails to become ready. This is only applicable during an initial
+// fails to become ready or nil. This is only applicable during an initial
 // bootstrap. If the store is already bootstrapped then this channel
 // will block until the store is ready and then return nil.
 func (s *store) ReadyError() <-chan error {

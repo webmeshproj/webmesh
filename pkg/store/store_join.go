@@ -35,8 +35,8 @@ import (
 )
 
 func (s *store) join(ctx context.Context, joinAddr string) error {
-	log := s.log.With(slog.String("join-addr", s.opts.Join))
-	// Fetch the last key we used (TODO: make these configurable)
+	log := s.log.With(slog.String("join-addr", joinAddr))
+	// Fetch the last key we used (TODO: make these rotatable)
 	var key wgtypes.Key
 	keyStr, err := localdb.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
 	if err != nil {
