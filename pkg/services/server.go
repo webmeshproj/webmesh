@@ -1,0 +1,87 @@
+/*
+Copyright 2023.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package services contains the gRPC server for inter-node communication.
+package services
+
+import (
+	"fmt"
+	"net"
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/exp/slog"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
+	"gitlab.com/webmesh/node/pkg/store"
+)
+
+// Server is the gRPC server.
+type Server struct {
+	srv  *grpc.Server
+	opts *Options
+	log  *slog.Logger
+}
+
+// NewServer returns a new Server.
+func NewServer(store store.Store, o *Options) (*Server, error) {
+	opts, err := o.ServerOptions(store)
+	if err != nil {
+		return nil, err
+	}
+	return &Server{
+		srv:  grpc.NewServer(opts...),
+		opts: o,
+		log:  slog.Default().With("component", "server"),
+	}, nil
+}
+
+// ListenAndServe starts the gRPC server and optional metrics server
+// then blocks until the gRPC server exits.
+func (s *Server) ListenAndServe() error {
+	reflection.Register(s.srv)
+	if s.opts.EnableMetrics {
+		go func() {
+			s.log.Info(fmt.Sprintf("Starting HTTP metrics server on %s", s.opts.MetricsListenAddress))
+			http.Handle(s.opts.MetricsPath, promhttp.Handler())
+			if err := http.ListenAndServe(s.opts.MetricsListenAddress, nil); err != nil {
+				s.log.Error("metrics server failed", slog.String("error", err.Error()))
+			}
+		}()
+	}
+	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
+	lis, err := net.Listen("tcp", s.opts.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("start TCP listener: %w", err)
+	}
+	defer lis.Close()
+	if err := s.srv.Serve(lis); err != nil {
+		return fmt.Errorf("grpc serve: %w", err)
+	}
+	return nil
+}
+
+// RegisterService implements grpc.RegistrarService.
+func (s *Server) RegisterService(desc *grpc.ServiceDesc, impl any) {
+	s.srv.RegisterService(desc, impl)
+}
+
+// Stop stops the gRPC server gracefully.
+func (s *Server) Stop() {
+	s.log.Info("Shutting down gRPC server")
+	s.srv.GracefulStop()
+}

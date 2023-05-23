@@ -1,0 +1,64 @@
+version: '3'
+
+networks:
+  bootstrap:
+    # enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.1.0.0/24
+          gateway: 10.1.0.1
+        # - subnet: 2001:db8:1::/64
+        #   gateway: 2001:db8:1::1
+
+services:
+
+  bootstrap-node:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint:
+     - /node
+     - --global.insecure
+     - --global.no-ipv6
+     - --global.log-level=debug
+     - --store.bootstrap
+     - --store.data-dir=/data
+     - --store.raft-log-level=debug
+     - --grpc.enable-metrics
+     - --wireguard.endpoint=10.1.0.2:51820
+    volumes:
+      - /lib/modules:/lib/modules
+      - bootstrap:/data
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.2
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    hostname: bootstrap-node
+
+  join-node-1:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    entrypoint:
+     - /node
+     - --global.insecure
+     - --global.no-ipv6
+     - --global.log-level=debug
+     - --store.join=10.1.0.2:8443
+     - --store.data-dir=/data
+     - --store.raft-log-level=debug
+     - --grpc.enable-metrics
+     - --wireguard.endpoint=10.1.0.3:51820
+    volumes:
+      - /lib/modules:/lib/modules
+      - join-node-1:/data
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.3
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    depends_on: ["bootstrap-node"]
+    hostname: join-node-1
+
+volumes:
+  bootstrap:
+  join-node-1:
