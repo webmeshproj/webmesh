@@ -19,12 +19,10 @@ UPDATE nodes SET
     allowed_ips = ?,
     network_ipv6 = ?,
     grpc_port = ?,
-    raft_port = ?
+    raft_port = ?,
+    updated_at = CURRENT_TIMESTAMP
 WHERE id = ?
 RETURNING *;
-
--- name: RecordHeartbeat :exec
-UPDATE nodes SET last_heartbeat_at = ? WHERE id = ?;
 
 -- name: GetNode :one
 SELECT
@@ -38,7 +36,7 @@ SELECT
     nodes.network_ipv6 AS network_ipv6,
     COALESCE(asns.asn, 0) AS asn,
     COALESCE(leases.ipv4, '') AS private_address_v4,
-    nodes.last_heartbeat_at AS last_heartbeat_at,
+    nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
 LEFT OUTER JOIN leases ON nodes.id = leases.node_id
@@ -57,7 +55,7 @@ SELECT
     nodes.network_ipv6 AS network_ipv6,
     COALESCE(asns.asn, 0) AS asn,
     COALESCE(leases.ipv4, '') AS private_address_v4,
-    nodes.last_heartbeat_at AS last_heartbeat_at,
+    nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
 LEFT OUTER JOIN leases ON nodes.id = leases.node_id
@@ -80,7 +78,7 @@ SELECT
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
-    nodes.last_heartbeat_at AS last_heartbeat_at,
+    nodes.updated_at AS updated_at,
     nodes.created_at AS created_at,
     COALESCE(leases.ipv4, '') AS private_address_v4
 FROM nodes

@@ -57,7 +57,7 @@ docker-push-gobgp: ## Push docker image with gobgp.
 	$(DOCKER) push $(GOBGP_IMAGE)
 
 compose-up: ## Run docker-compose stack.
-	IMAGE=$(IMAGE) docker-compose up bootstrap-node
+	IMAGE=$(IMAGE) docker-compose up
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.

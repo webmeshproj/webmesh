@@ -34,7 +34,8 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/db"
+	"gitlab.com/webmesh/node/pkg/db/localdb"
+	"gitlab.com/webmesh/node/pkg/db/raftdb"
 	"gitlab.com/webmesh/node/pkg/firewall"
 	"gitlab.com/webmesh/node/pkg/store/streamlayer"
 	"gitlab.com/webmesh/node/pkg/wireguard"
@@ -98,20 +99,19 @@ type Store interface {
 	// DB returns a DB interface for use by the application. This
 	// interface will ensure consistency with the Raft log. Transactions
 	// are executed in the order they are received by the leader node.
-	DB() db.DBTX
+	DB() raftdb.DBTX
 	// WeakDB returns a DB interface for use by the application. This
 	// interface will not ensure consistency with the Raft log. It is
 	// intended for use in read-only operations that do not require
 	// immediate consistency. It takes a read lock on the data store
 	// to ensure that no modifications are happening while the transaction
 	// is in progress and that SQLite itself is not busy.
-	WeakDB() db.DBTX
+	WeakDB() raftdb.DBTX
 	// LocalDB returns a DB interface for use by the application. This
 	// interface will not ensure consistency with the Raft log. It is
-	// intended for use with the node_local table which is not replicated
-	// across the cluster. This is semantically the same as WeakDB but
-	// is provided as a separate method for clarity.
-	LocalDB() db.DBTX
+	// intended for use with the node_local database which is not replicated
+	// across the cluster.
+	LocalDB() localdb.DBTX
 	// Raft returns the Raft interface. Note that the returned value
 	// may be nil if the store is not open.
 	Raft() *raft.Raft
@@ -174,9 +174,10 @@ type store struct {
 	observer                    *raft.Observer
 	observerClose, observerDone chan struct{}
 
-	data, raftData   *sql.DB
-	dataAppliedIndex atomic.Uint64
-	dataMux          sync.RWMutex
+	weakData, raftData *sql.DB
+	localData          *sql.DB
+	dataAppliedIndex   atomic.Uint64
+	dataMux            sync.RWMutex
 
 	wg       wireguard.Interface
 	wgroutes map[netip.Prefix]struct{}
@@ -194,7 +195,7 @@ func (s *store) IsOpen() bool {
 // DB returns a DB interface for use by the application. This
 // interface will ensure consistency with the Raft log. Transactions
 // are executed in the order they are received by the leader node.
-func (s *store) DB() db.DBTX {
+func (s *store) DB() raftdb.DBTX {
 	// Locks are taken during the application of log entries
 	return s.raftData
 }
@@ -205,16 +206,16 @@ func (s *store) DB() db.DBTX {
 // immediate consistency. It takes a read lock on the data store
 // to ensure that no modifications are happening while the transaction
 // is in progress and that SQLite itself is not busy.
-func (s *store) WeakDB() db.DBTX {
-	return &lockableDB{DB: s.data, mux: s.dataMux.RLocker()}
+func (s *store) WeakDB() raftdb.DBTX {
+	return &lockableDB{DB: s.weakData, mux: s.dataMux.RLocker()}
 }
 
 // LocalDB returns a DB interface for use by the application. This
 // interface will not ensure consistency with the Raft log. It is
 // intended for use with the node_local table which is not replicated
 // across the cluster.
-func (s *store) LocalDB() db.DBTX {
-	return &lockableDB{DB: s.data, mux: s.dataMux.RLocker()}
+func (s *store) LocalDB() localdb.DBTX {
+	return &lockableDB{DB: s.localData, mux: s.dataMux.RLocker()}
 }
 
 // Raft returns the Raft interface.

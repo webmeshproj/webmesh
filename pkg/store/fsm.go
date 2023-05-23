@@ -32,7 +32,7 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/proto"
 
-	"gitlab.com/webmesh/node/pkg/db"
+	"gitlab.com/webmesh/node/pkg/db/localdb"
 )
 
 // ApplyBatch implements the raft.BatchingFSM interface.
@@ -69,6 +69,9 @@ func (s *store) Apply(l *raft.Log) any {
 			},
 		}
 	}
+	log.Debug("last applied index",
+		slog.Int("last-term", int(dbTerm)),
+		slog.Int("last-index", int(dbIndex)))
 
 	if l.Term < dbTerm {
 		log.Debug("received log from old term")
@@ -79,7 +82,7 @@ func (s *store) Apply(l *raft.Log) any {
 		// This is a new term. We need to update the current term in the
 		// database.
 		log.Debug("new epoch, updating current term in db")
-		q := db.New(s.data)
+		q := localdb.New(s.LocalDB())
 		err := q.SetCurrentRaftTerm(context.Background(), strconv.Itoa(int(l.Term)))
 		if err != nil {
 			// Same as above, this is a fatal error that needs to be handled.
@@ -100,7 +103,7 @@ func (s *store) Apply(l *raft.Log) any {
 	}
 
 	defer func() {
-		q := db.New(s.data)
+		q := localdb.New(s.LocalDB())
 		if dbIndex != l.Index {
 			log.Debug("updating last applied index in db")
 			err := q.SetLastAppliedRaftIndex(context.Background(), strconv.Itoa(int(l.Index)))
@@ -153,8 +156,8 @@ func (s *store) Restore(r io.ReadCloser) error {
 	s.dataMux.Lock()
 	defer s.dataMux.Unlock()
 	// Close the database if it's open.
-	if s.data != nil {
-		err := s.data.Close()
+	if s.weakData != nil {
+		err := s.weakData.Close()
 		if err != nil {
 			return fmt.Errorf("close data file: %w", err)
 		}
@@ -174,7 +177,7 @@ func (s *store) Restore(r io.ReadCloser) error {
 		return fmt.Errorf("decompress data file: %w", err)
 	}
 	// Re-open the database.
-	s.data, err = sql.Open("sqlite", s.opts.DataFilePath())
+	s.weakData, err = sql.Open("sqlite", s.opts.DataFilePath())
 	return err
 }
 
@@ -233,7 +236,7 @@ func (s *snapshot) Release() {
 
 func (s *store) getDBTermAndIndex(l *raft.Log) (term, index uint64, err error) {
 	// Check if the current term and index is already applied.
-	raftState, err := db.New(s.data).GetRaftState(context.Background())
+	raftState, err := localdb.New(s.LocalDB()).GetRaftState(context.Background())
 	if err != nil {
 		err = fmt.Errorf("get raft state: %w", err)
 		return

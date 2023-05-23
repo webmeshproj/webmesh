@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/webmesh/node/pkg/db"
+	"gitlab.com/webmesh/node/pkg/db/raftdb"
 	"gitlab.com/webmesh/node/pkg/services/node/ipam"
 	"gitlab.com/webmesh/node/pkg/services/node/peers"
 	"gitlab.com/webmesh/node/pkg/util"
@@ -42,7 +42,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	if !s.ulaPrefix.IsValid() {
-		ula, err := db.New(s.store.WeakDB()).GetULAPrefix(ctx)
+		ula, err := raftdb.New(s.store.WeakDB()).GetULAPrefix(ctx)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
 		}

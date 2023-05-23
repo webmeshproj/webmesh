@@ -3,43 +3,27 @@
 //   sqlc v1.18.0
 // source: leases.sql
 
-package db
+package raftdb
 
 import (
 	"context"
-	"time"
 )
 
 const insertNodeLease = `-- name: InsertNodeLease :one
-INSERT INTO leases (
-    node_id, 
-    ipv4,
-    expires_at
-) VALUES (
-    ?, 
-    ?, 
-    ?
-) 
-ON CONFLICT(node_id) DO UPDATE SET
-    expires_at = EXCLUDED.expires_at
-RETURNING node_id, ipv4, created_at, expires_at
+INSERT INTO leases (node_id, ipv4) VALUES (?, ?) 
+ON CONFLICT(node_id) DO UPDATE SET ipv4 = EXCLUDED.ipv4
+RETURNING node_id, ipv4, created_at
 `
 
 type InsertNodeLeaseParams struct {
-	NodeID    string    `json:"node_id"`
-	Ipv4      string    `json:"ipv4"`
-	ExpiresAt time.Time `json:"expires_at"`
+	NodeID string `json:"node_id"`
+	Ipv4   string `json:"ipv4"`
 }
 
 func (q *Queries) InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error) {
-	row := q.db.QueryRowContext(ctx, insertNodeLease, arg.NodeID, arg.Ipv4, arg.ExpiresAt)
+	row := q.db.QueryRowContext(ctx, insertNodeLease, arg.NodeID, arg.Ipv4)
 	var i Lease
-	err := row.Scan(
-		&i.NodeID,
-		&i.Ipv4,
-		&i.CreatedAt,
-		&i.ExpiresAt,
-	)
+	err := row.Scan(&i.NodeID, &i.Ipv4, &i.CreatedAt)
 	return i, err
 }
 
@@ -76,19 +60,5 @@ DELETE FROM leases WHERE node_id = ?
 
 func (q *Queries) ReleaseNodeLease(ctx context.Context, nodeID string) error {
 	_, err := q.db.ExecContext(ctx, releaseNodeLease, nodeID)
-	return err
-}
-
-const renewNodeLease = `-- name: RenewNodeLease :exec
-UPDATE leases SET expires_at = ? WHERE node_id = ?
-`
-
-type RenewNodeLeaseParams struct {
-	ExpiresAt time.Time `json:"expires_at"`
-	NodeID    string    `json:"node_id"`
-}
-
-func (q *Queries) RenewNodeLease(ctx context.Context, arg RenewNodeLeaseParams) error {
-	_, err := q.db.ExecContext(ctx, renewNodeLease, arg.ExpiresAt, arg.NodeID)
 	return err
 }

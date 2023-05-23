@@ -28,7 +28,7 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"gitlab.com/webmesh/node/pkg/db"
+	"gitlab.com/webmesh/node/pkg/db/raftdb"
 )
 
 // apply executes the operations in a Raft log entry.
@@ -88,7 +88,7 @@ func (s *store) applyQuery(ctx context.Context, log *slog.Logger, cmd *v1.SQLQue
 		return errRes
 	}
 	defer conn.Close()
-	var querier db.DBTX
+	var querier raftdb.DBTX
 	var tx *sql.Tx
 	if cmd.Transaction {
 		tx, errRes = s.newTransaction(ctx, conn, startedAt)
@@ -124,7 +124,7 @@ func (s *store) applyExecute(ctx context.Context, log *slog.Logger, cmd *v1.SQLE
 		return errRes
 	}
 	defer conn.Close()
-	var querier db.DBTX
+	var querier raftdb.DBTX
 	var tx *sql.Tx
 	if cmd.Transaction {
 		tx, errRes = s.newTransaction(ctx, conn, startedAt)
@@ -153,7 +153,7 @@ func (s *store) applyExecute(ctx context.Context, log *slog.Logger, cmd *v1.SQLE
 	}
 }
 
-func (s *store) queryWithConn(ctx context.Context, querier db.DBTX, cmd *v1.SQLQuery, startedAt time.Time) *v1.SQLQueryResult {
+func (s *store) queryWithConn(ctx context.Context, querier raftdb.DBTX, cmd *v1.SQLQuery, startedAt time.Time) *v1.SQLQueryResult {
 	txStart := time.Now()
 	params, err := parametersToValues(cmd.GetStatement().GetParameters())
 	if err != nil {
@@ -209,7 +209,7 @@ func (s *store) queryWithConn(ctx context.Context, querier db.DBTX, cmd *v1.SQLQ
 }
 
 // executeWithConn executes an exec with a connection.
-func (s *store) executeWithConn(ctx context.Context, querier db.DBTX, cmd *v1.SQLExec, startedAt time.Time) *v1.SQLExecResult {
+func (s *store) executeWithConn(ctx context.Context, querier raftdb.DBTX, cmd *v1.SQLExec, startedAt time.Time) *v1.SQLExecResult {
 	txStart := time.Now()
 	params, err := parametersToValues(cmd.GetStatement().GetParameters())
 	if err != nil {
@@ -250,7 +250,7 @@ func (s *store) newTransaction(ctx context.Context, conn *sql.Conn, startedAt ti
 
 // acquireConn acquires a connection from the pool or returns a result with an error.
 func (s *store) acquireConn(ctx context.Context, startedAt time.Time) (*sql.Conn, *v1.RaftApplyResponse) {
-	conn, err := s.data.Conn(ctx)
+	conn, err := s.weakData.Conn(ctx)
 	if err != nil {
 		return nil, newErrorResponse(startedAt, fmt.Sprintf("acquire db connection: %s", err.Error()))
 	}

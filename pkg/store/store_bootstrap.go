@@ -30,24 +30,29 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/db"
+	"gitlab.com/webmesh/node/pkg/db/localdb"
+	"gitlab.com/webmesh/node/pkg/db/raftdb"
 	"gitlab.com/webmesh/node/pkg/util"
 )
 
 func (s *store) bootstrap() error {
 	ctx := context.TODO()
-	version, err := db.GetDBVersion(s.data)
+	version, err := db.GetDBVersion(s.weakData)
 	if err != nil {
-		return fmt.Errorf("get schema version: %w", err)
+		return fmt.Errorf("get raft schema version: %w", err)
 	}
-	s.log.Info("current schema version", slog.Int("version", int(version)))
+	s.log.Info("current raft schema version", slog.Int("version", int(version)))
 	if version != 0 {
 		// We have a version, so the cluster is already bootstrapped.
 		s.log.Info("cluster already bootstrapped, migrating schema to latest version")
-		if err = db.Migrate(s.data); err != nil {
-			return fmt.Errorf("db migrate: %w", err)
+		if err = db.MigrateRaftDB(s.weakData); err != nil {
+			return fmt.Errorf("raft db migrate: %w", err)
+		}
+		if err = db.MigrateLocalDB(s.localData); err != nil {
+			return fmt.Errorf("local db migrate: %w", err)
 		}
 		// We retrieve the last key we were using so we can re-establish raft communication.
-		q := db.New(s.LocalDB())
+		q := localdb.New(s.LocalDB())
 		keyStr, err := q.GetCurrentWireguardKey(ctx)
 		if err != nil {
 			// TODO: This is a problem, but only if the bootstrap flag is left on for a long
@@ -59,7 +64,7 @@ func (s *store) bootstrap() error {
 			return fmt.Errorf("parse wireguard key: %w", err)
 		}
 		s.log.Info("configuring wireguard")
-		thisPeer, err := db.New(s.WeakDB()).GetNode(ctx, string(s.nodeID))
+		thisPeer, err := raftdb.New(s.WeakDB()).GetNode(ctx, string(s.nodeID))
 		if err != nil {
 			return fmt.Errorf("get this peer: %w", err)
 		}
@@ -98,9 +103,12 @@ func (s *store) bootstrap() error {
 	if err := future.Error(); err != nil {
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
-	s.log.Info("migrating schema to latest version")
-	if err = db.Migrate(s.data); err != nil {
-		return fmt.Errorf("db migrate: %w", err)
+	s.log.Info("migrating raft schema to latest version")
+	if err = db.MigrateRaftDB(s.weakData); err != nil {
+		return fmt.Errorf("raft db migrate: %w", err)
+	}
+	if err = db.MigrateLocalDB(s.localData); err != nil {
+		return fmt.Errorf("local db migrate: %w", err)
 	}
 	go func() {
 		defer close(s.readyErr)
@@ -120,7 +128,7 @@ func (s *store) initialBootstrap(ctx context.Context) error {
 		return ctx.Err()
 	}
 	// Make sure everything we do is committed to the log.
-	q := db.New(s.DB())
+	q := raftdb.New(s.DB())
 
 	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
 		slog.String("ipv4-network", s.opts.BootstrapIPv4Network))
@@ -156,7 +164,7 @@ func (s *store) initialBootstrap(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("generate private key: %w", err)
 	}
-	params := db.CreateNodeParams{
+	params := raftdb.CreateNodeParams{
 		ID: string(s.nodeID),
 		PublicKey: sql.NullString{
 			String: key.PublicKey().String(),
@@ -189,10 +197,9 @@ func (s *store) initialBootstrap(ctx context.Context) error {
 		}
 		ip := networkcidrv4.Addr().Next()
 		networkv4 = netip.PrefixFrom(ip, networkcidrv4.Bits())
-		_, err = q.InsertNodeLease(ctx, db.InsertNodeLeaseParams{
-			NodeID:    string(s.nodeID),
-			Ipv4:      networkv4.String(),
-			ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
+		_, err = q.InsertNodeLease(ctx, raftdb.InsertNodeLeaseParams{
+			NodeID: string(s.nodeID),
+			Ipv4:   networkv4.String(),
 		})
 		if err != nil {
 			return fmt.Errorf("insert node lease: %w", err)
@@ -219,7 +226,7 @@ func (s *store) initialBootstrap(ctx context.Context) error {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
 	s.log.Info("successfully configured wireguard interface, recording current key in case of future reboots")
-	err = q.SetCurrentWireguardKey(ctx, key.String())
+	err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, key.String())
 	if err != nil {
 		return fmt.Errorf("set current wireguard key: %w", err)
 	}

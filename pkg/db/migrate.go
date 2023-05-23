@@ -25,11 +25,13 @@ import (
 
 // migrationFS is the filesystem containing the goose migrations.
 //
-//go:embed sql/migrations
+//go:embed sql/**/*
 var migrationFS embed.FS
 
-// migrationsPath is the path to the goose migrations.
-var migrationsPath = "sql/migrations"
+// raftMigrationsPath is the path to the raft db migrations.
+var raftMigrationsPath = "sql/raft/migrations"
+
+var localMigrationsPath = "sql/local/migrations"
 
 // schemaVersionTable is the name of the goose schema version table.
 var schemaVersionTable = "schema_version"
@@ -47,12 +49,17 @@ func init() {
 	}
 }
 
-// Migrate migrates the database to the latest version.
-func Migrate(db *sql.DB) error {
-	return goose.Up(db, migrationsPath)
+// MigrateRaftDB migrates the raft database to the latest version.
+func MigrateRaftDB(db *sql.DB) error {
+	return goose.Up(db, raftMigrationsPath)
 }
 
-// GetDBVersion returns the current version of the database.
+// MigrateLocalDB migrates the local database to the latest version.
+func MigrateLocalDB(db *sql.DB) error {
+	return goose.Up(db, localMigrationsPath)
+}
+
+// GetDBVersion returns the current version of the given database.
 func GetDBVersion(db *sql.DB) (int64, error) {
 	return goose.GetDBVersion(db)
 }

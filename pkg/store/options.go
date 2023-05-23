@@ -63,6 +63,8 @@ const (
 	StableStoreFile = "raft-stable-store.dat"
 	// DataFile is the data file.
 	DataFile = "data.sqlite"
+	// LocalDataFile is the local data file.
+	LocalDataFile = "local.sqlite"
 )
 
 // Options are the options for the store.
@@ -304,4 +306,9 @@ func (o *Options) StableStoreFilePath() string {
 // DataFilePath returns the data file path.
 func (o *Options) DataFilePath() string {
 	return filepath.Join(o.DataDir, DataFile)
+}
+
+// LocalDataFilePath returns the local file path.
+func (o *Options) LocalDataFilePath() string {
+	return filepath.Join(o.DataDir, LocalDataFile)
 }

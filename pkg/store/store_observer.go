@@ -26,7 +26,7 @@ import (
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/db"
+	"gitlab.com/webmesh/node/pkg/db/raftdb"
 	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 
@@ -93,7 +93,7 @@ func (s *store) handlePeerObservation(change any) {
 		return
 	}
 	// Lookup the peer from the database to get the full details.
-	peer, err := db.New(s.WeakDB()).GetNode(ctx, peerID)
+	peer, err := raftdb.New(s.WeakDB()).GetNode(ctx, peerID)
 	if err != nil {
 		s.log.Error("lookup peer", slog.String("error", err.Error()))
 		return

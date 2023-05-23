@@ -3,7 +3,7 @@
 //   sqlc v1.18.0
 // source: nodes.sql
 
-package db
+package raftdb
 
 import (
 	"context"
@@ -33,7 +33,7 @@ INSERT INTO nodes (
     grpc_port,
     raft_port
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, allowed_ips, available_zones, last_heartbeat_at, created_at
+RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, allowed_ips, available_zones, created_at, updated_at
 `
 
 type CreateNodeParams struct {
@@ -68,8 +68,8 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.NetworkIpv6,
 		&i.AllowedIps,
 		&i.AvailableZones,
-		&i.LastHeartbeatAt,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -86,7 +86,7 @@ SELECT
     nodes.network_ipv6 AS network_ipv6,
     COALESCE(asns.asn, 0) AS asn,
     COALESCE(leases.ipv4, '') AS private_address_v4,
-    nodes.last_heartbeat_at AS last_heartbeat_at,
+    nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
 LEFT OUTER JOIN leases ON nodes.id = leases.node_id
@@ -105,7 +105,7 @@ type GetNodeRow struct {
 	NetworkIpv6      sql.NullString `json:"network_ipv6"`
 	Asn              int64          `json:"asn"`
 	PrivateAddressV4 string         `json:"private_address_v4"`
-	LastHeartbeatAt  time.Time      `json:"last_heartbeat_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 	CreatedAt        time.Time      `json:"created_at"`
 }
 
@@ -123,7 +123,7 @@ func (q *Queries) GetNode(ctx context.Context, id string) (GetNodeRow, error) {
 		&i.NetworkIpv6,
 		&i.Asn,
 		&i.PrivateAddressV4,
-		&i.LastHeartbeatAt,
+		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -186,7 +186,7 @@ SELECT
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
-    nodes.last_heartbeat_at AS last_heartbeat_at,
+    nodes.updated_at AS updated_at,
     nodes.created_at AS created_at,
     COALESCE(leases.ipv4, '') AS private_address_v4
 FROM nodes
@@ -205,7 +205,7 @@ type ListNodePeersRow struct {
 	GrpcPort         int64          `json:"grpc_port"`
 	RaftPort         int64          `json:"raft_port"`
 	NetworkIpv6      sql.NullString `json:"network_ipv6"`
-	LastHeartbeatAt  time.Time      `json:"last_heartbeat_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 	CreatedAt        time.Time      `json:"created_at"`
 	PrivateAddressV4 string         `json:"private_address_v4"`
 }
@@ -229,7 +229,7 @@ func (q *Queries) ListNodePeers(ctx context.Context, id string) ([]ListNodePeers
 			&i.GrpcPort,
 			&i.RaftPort,
 			&i.NetworkIpv6,
-			&i.LastHeartbeatAt,
+			&i.UpdatedAt,
 			&i.CreatedAt,
 			&i.PrivateAddressV4,
 		); err != nil {
@@ -258,7 +258,7 @@ SELECT
     nodes.network_ipv6 AS network_ipv6,
     COALESCE(asns.asn, 0) AS asn,
     COALESCE(leases.ipv4, '') AS private_address_v4,
-    nodes.last_heartbeat_at AS last_heartbeat_at,
+    nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
 LEFT OUTER JOIN leases ON nodes.id = leases.node_id
@@ -276,7 +276,7 @@ type ListNodesRow struct {
 	NetworkIpv6      sql.NullString `json:"network_ipv6"`
 	Asn              int64          `json:"asn"`
 	PrivateAddressV4 string         `json:"private_address_v4"`
-	LastHeartbeatAt  time.Time      `json:"last_heartbeat_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 	CreatedAt        time.Time      `json:"created_at"`
 }
 
@@ -300,7 +300,7 @@ func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 			&i.NetworkIpv6,
 			&i.Asn,
 			&i.PrivateAddressV4,
-			&i.LastHeartbeatAt,
+			&i.UpdatedAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -314,20 +314,6 @@ func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 		return nil, err
 	}
 	return items, nil
-}
-
-const recordHeartbeat = `-- name: RecordHeartbeat :exec
-UPDATE nodes SET last_heartbeat_at = ? WHERE id = ?
-`
-
-type RecordHeartbeatParams struct {
-	LastHeartbeatAt time.Time `json:"last_heartbeat_at"`
-	ID              string    `json:"id"`
-}
-
-func (q *Queries) RecordHeartbeat(ctx context.Context, arg RecordHeartbeatParams) error {
-	_, err := q.db.ExecContext(ctx, recordHeartbeat, arg.LastHeartbeatAt, arg.ID)
-	return err
 }
 
 const unassignNodeASN = `-- name: UnassignNodeASN :exec
@@ -347,9 +333,10 @@ UPDATE nodes SET
     allowed_ips = ?,
     network_ipv6 = ?,
     grpc_port = ?,
-    raft_port = ?
+    raft_port = ?,
+    updated_at = CURRENT_TIMESTAMP
 WHERE id = ?
-RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, allowed_ips, available_zones, last_heartbeat_at, created_at
+RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, allowed_ips, available_zones, created_at, updated_at
 `
 
 type UpdateNodeParams struct {
@@ -384,8 +371,8 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.NetworkIpv6,
 		&i.AllowedIps,
 		&i.AvailableZones,
-		&i.LastHeartbeatAt,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

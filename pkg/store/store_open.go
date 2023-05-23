@@ -97,13 +97,17 @@ func (s *store) Open() error {
 	}
 	// Create the data stores.
 	s.log.Info("creating data stores", slog.String("data-dir", s.opts.DataDir))
-	s.data, err = sql.Open("sqlite", s.opts.DataFilePath())
+	s.weakData, err = sql.Open("sqlite", s.opts.DataFilePath())
 	if err != nil {
-		return handleErr(fmt.Errorf("open raw sqlite %q: %w", s.opts.DataFilePath(), err))
+		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.DataFilePath(), err))
 	}
 	s.raftData, err = sql.Open(raftDriverName, "")
 	if err != nil {
 		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
+	}
+	s.localData, err = sql.Open("sqlite", s.opts.LocalDataFilePath())
+	if err != nil {
+		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.LocalDataFilePath(), err))
 	}
 	// Create the raft instance.
 	s.log.Info("starting raft instance",
@@ -127,9 +131,13 @@ func (s *store) Open() error {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if s.opts.Join != "" {
-		s.log.Info("migrating database")
-		if err = db.Migrate(s.data); err != nil {
-			return fmt.Errorf("db migrate: %w", err)
+		s.log.Info("migrating raft database")
+		if err = db.MigrateRaftDB(s.weakData); err != nil {
+			return fmt.Errorf("raft db migrate: %w", err)
+		}
+		s.log.Info("migrating local database")
+		if err = db.MigrateLocalDB(s.localData); err != nil {
+			return fmt.Errorf("local db migrate: %w", err)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), s.opts.JoinTimeout)
 		defer cancel()

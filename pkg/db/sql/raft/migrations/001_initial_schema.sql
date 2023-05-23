@@ -1,7 +1,6 @@
 -- +goose Up
 
--- Tracks mesh state, such as indices and the current epoch.
--- Mesh wide configurations are also stored here, but these should be moved.
+-- Mesh wide configurations are stored here, but these should be moved.
 CREATE TABLE mesh_state (
     key   TEXT NOT NULL PRIMARY KEY,
     value TEXT NOT NULL
@@ -17,8 +16,8 @@ CREATE TABLE nodes (
     network_ipv6      TEXT UNIQUE,
     allowed_ips       TEXT,
     available_zones   TEXT,
-    last_heartbeat_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tracks BGP ASNs for nodes.
@@ -32,17 +31,7 @@ CREATE TABLE asns (
 CREATE TABLE leases (
     node_id     TEXT NOT NULL UNIQUE REFERENCES nodes (id) ON DELETE CASCADE,
     ipv4        TEXT NOT NULL UNIQUE,
-    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at  TIMESTAMP NOT NULL
-);
-
--- A table for node-local storage of arbitrary key/value pairs
--- Data in this table is not replicated to other nodes. This is
--- a stop-gap solution for data that should otherwise be handled
--- better.
-CREATE TABLE node_local (
-    key         TEXT NOT NULL PRIMARY KEY,
-    value       TEXT NOT NULL
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- +goose Down
@@ -51,4 +40,3 @@ DROP TABLE leases;
 DROP TABLE nodes;
 DROP TABLE asns;
 DROP TABLE mesh_state;
-DROP TABLE node_local;

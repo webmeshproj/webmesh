@@ -72,9 +72,14 @@ func (s *store) Close(ctx context.Context) error {
 			return fmt.Errorf("raft transport close: %w", err)
 		}
 	}
-	if s.data != nil {
-		if err := s.data.Close(); err != nil {
-			return fmt.Errorf("data close: %w", err)
+	if s.weakData != nil {
+		if err := s.weakData.Close(); err != nil {
+			return fmt.Errorf("raft data close: %w", err)
+		}
+	}
+	if s.localData != nil {
+		if err := s.localData.Close(); err != nil {
+			return fmt.Errorf("local data close: %w", err)
 		}
 	}
 	if s.logDB != nil {

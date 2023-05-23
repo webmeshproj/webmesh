@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"gitlab.com/webmesh/node/pkg/db"
+	"gitlab.com/webmesh/node/pkg/db/localdb"
 	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 
@@ -38,7 +38,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	log := s.log.With(slog.String("join-addr", s.opts.Join))
 	// Fetch the last key we used (TODO: make these configurable)
 	var key wgtypes.Key
-	keyStr, err := db.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
+	keyStr, err := localdb.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("get current wireguard key: %w", err)
@@ -50,7 +50,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			return fmt.Errorf("generate wireguard key: %w", err)
 		}
 		// Save it to the database.
-		if err = db.New(s.LocalDB()).SetCurrentWireguardKey(ctx, key.String()); err != nil {
+		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, key.String()); err != nil {
 			return fmt.Errorf("set current wireguard key: %w", err)
 		}
 	} else {
