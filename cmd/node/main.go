@@ -113,7 +113,6 @@ func main() {
 		if err != nil {
 			fatal("failed to decode configuration file", err)
 		}
-		f.Close()
 	}
 
 	if *printConfig {

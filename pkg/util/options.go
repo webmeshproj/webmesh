@@ -27,7 +27,8 @@ import (
 // DecodeOptions will attempt to decode the given reader into the given object.
 // The formatHint is used to select the format of the document. If the formatHint
 // is empty, the format is guessed from the document.
-func DecodeOptions(in io.Reader, formatHint string, out any) error {
+func DecodeOptions(in io.ReadCloser, formatHint string, out any) error {
+	defer in.Close()
 	data, err := io.ReadAll(in)
 	if err != nil {
 		return err
