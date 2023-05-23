@@ -311,7 +311,7 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 	config := s.raft.GetConfiguration().Configuration()
 	var advertiseAddress netip.AddrPort
 	for _, server := range config.Servers {
-		if string(server.ID) == leader {
+		if server.ID == leader {
 			advertiseAddress, err = netip.ParseAddrPort(string(server.Address))
 			if err != nil {
 				return fmt.Errorf("parse advertise address: %w", err)

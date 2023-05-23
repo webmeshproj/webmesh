@@ -50,7 +50,7 @@ func (s *store) IsVoter() (bool, error) {
 }
 
 // Leader returns the current Raft leader.
-func (s *store) Leader() (string, error) {
+func (s *store) Leader() (raft.ServerID, error) {
 	if s.raft == nil || !s.open.Load() {
 		return "", ErrNotOpen
 	}
@@ -58,7 +58,7 @@ func (s *store) Leader() (string, error) {
 	if id == "" {
 		return "", fmt.Errorf("no leader")
 	}
-	return string(id), nil
+	return id, nil
 }
 
 // LeaderAddr returns the address of the current leader. Returns a
@@ -77,7 +77,7 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	addr, err := raftdb.New(s.WeakDB()).GetNodePrivateRPCAddress(ctx, leader)
+	addr, err := raftdb.New(s.WeakDB()).GetNodePrivateRPCAddress(ctx, string(leader))
 	if err != nil {
 		return "", err
 	}

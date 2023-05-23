@@ -17,13 +17,14 @@ limitations under the License.
 package node
 
 import (
+	"github.com/hashicorp/raft"
 	v1 "gitlab.com/webmesh/api/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"gitlab.com/webmesh/node/pkg/services/node/peers"
 )
 
-func dbNodeToAPINode(node *peers.Node) *v1.MeshNode {
+func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Server) *v1.MeshNode {
 	return &v1.MeshNode{
 		Id: node.ID,
 		Endpoint: func() string {
@@ -52,6 +53,22 @@ func dbNodeToAPINode(node *peers.Node) *v1.MeshNode {
 				return node.NetworkIPv6.String()
 			}
 			return ""
+		}(),
+		Status: func() v1.ClusterStatus {
+			for _, srv := range servers {
+				if srv.ID == leader {
+					return v1.ClusterStatus_CLUSTER_LEADER
+				}
+				if string(srv.ID) == node.ID {
+					switch srv.Suffrage {
+					case raft.Voter:
+						return v1.ClusterStatus_CLUSTER_VOTER
+					case raft.Nonvoter:
+						return v1.ClusterStatus_CLUSTER_NON_VOTER
+					}
+				}
+			}
+			return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
 		}(),
 		UpdatedAt: timestamppb.New(node.UpdatedAt),
 		CreatedAt: timestamppb.New(node.CreatedAt),

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	v1 "gitlab.com/webmesh/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -30,9 +31,14 @@ func (s *Server) ListNodes(ctx context.Context, req *emptypb.Empty) (*v1.NodeLis
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get node: %v", err)
 	}
+	servers := s.store.Raft().GetConfiguration().Configuration().Servers
+	leader, err := s.store.Leader()
+	if err != nil {
+		s.log.Error("failed to get leader", slog.String("error", err.Error()))
+	}
 	out := make([]*v1.MeshNode, len(node))
 	for i, n := range node {
-		out[i] = dbNodeToAPINode(&n)
+		out[i] = dbNodeToAPINode(&n, leader, servers)
 	}
 	return &v1.NodeList{
 		Nodes: out,

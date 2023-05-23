@@ -20,6 +20,7 @@ import (
 	"context"
 
 	v1 "gitlab.com/webmesh/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -34,5 +35,10 @@ func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshN
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get node: %v", err)
 	}
-	return dbNodeToAPINode(node), nil
+	servers := s.store.Raft().GetConfiguration().Configuration().Servers
+	leader, err := s.store.Leader()
+	if err != nil {
+		s.log.Error("failed to get leader", slog.String("error", err.Error()))
+	}
+	return dbNodeToAPINode(node, leader, servers), nil
 }

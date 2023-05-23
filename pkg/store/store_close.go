@@ -54,50 +54,55 @@ func (s *store) Close(ctx context.Context) error {
 	if s.raft != nil {
 		wasLeader := s.IsLeader()
 		if wasLeader {
-			// If we are the leader, we need to step down
+			// If we were the leader, we need to step down
 			// and remove ourselves from the cluster.
 			if err := s.RemoveVoter(ctx, string(s.nodeID)); err != nil {
 				return fmt.Errorf("remove voter: %w", err)
 			}
 		}
+		// For good measure, step down again. This should be
+		// a no-op if we are not the leader.
 		if err := s.Stepdown(true); err != nil && err != ErrNotLeader {
 			return fmt.Errorf("stepdown: %w", err)
 		}
-		if (s.opts.Bootstrap || s.opts.JoinAsVoter) && !wasLeader {
-			// If we are a bootstrap node or a voter, we need to
-			// leave the cluster. If we were a bootstrap node,
-			// we have to restart as a non-bootstrap node.
+		if !wasLeader {
+			// If we were not the leader, we need to leave
 			if err := s.Leave(context.Background()); err != nil {
-				return fmt.Errorf("raft leave: %w", err)
+				// Make this non-fatal, but it will piss off the
+				// leader.
+				s.log.Error("error leaving cluster", slog.String("error", err.Error()))
 			}
 		}
+		// Finally, shutdown the raft node.
 		if err := s.raft.Shutdown().Error(); err != nil {
 			return fmt.Errorf("raft shutdown: %w", err)
 		}
 	}
+	// None of these are strictly necessary, but we do them for
+	// good measure.
 	if s.raftTransport != nil {
 		if err := s.raftTransport.Close(); err != nil {
-			return fmt.Errorf("raft transport close: %w", err)
+			s.log.Error("error closing raft transport", slog.String("error", err.Error()))
 		}
 	}
 	if s.weakData != nil {
 		if err := s.weakData.Close(); err != nil {
-			return fmt.Errorf("raft data close: %w", err)
+			s.log.Error("error closing raft db", slog.String("error", err.Error()))
 		}
 	}
 	if s.localData != nil {
 		if err := s.localData.Close(); err != nil {
-			return fmt.Errorf("local data close: %w", err)
+			s.log.Error("error closing local db", slog.String("error", err.Error()))
 		}
 	}
 	if s.logDB != nil {
 		if err := s.logDB.Close(); err != nil {
-			return fmt.Errorf("log db close: %w", err)
+			s.log.Error("error closing log db", slog.String("error", err.Error()))
 		}
 	}
 	if s.stableDB != nil {
 		if err := s.stableDB.Close(); err != nil {
-			return fmt.Errorf("stable db close: %w", err)
+			s.log.Error("error closing stable db", slog.String("error", err.Error()))
 		}
 	}
 	return nil

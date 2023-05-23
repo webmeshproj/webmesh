@@ -60,6 +60,8 @@ var (
 
 // Store is the store interface.
 type Store interface {
+	// ID returns the node ID.
+	ID() raft.ServerID
 	// Open opens the store.
 	Open() error
 	// IsOpen returns true if the store is open.
@@ -85,7 +87,7 @@ type Store interface {
 	// IsLeader returns true if this node is the Raft leader.
 	IsLeader() bool
 	// Leader returns the current Raft leader ID.
-	Leader() (string, error)
+	Leader() (raft.ServerID, error)
 	// LeaderAddr returns the current Raft leader's raft address.
 	LeaderAddr() (string, error)
 	// LeaderRPCAddr returns the current Raft leader's gRPC address.
@@ -194,6 +196,11 @@ type store struct {
 	wgmux    sync.Mutex
 
 	open atomic.Bool
+}
+
+// ID returns the node ID.
+func (s *store) ID() raft.ServerID {
+	return s.nodeID
 }
 
 // IsOpen returns true if the store is open.

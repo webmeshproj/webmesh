@@ -309,6 +309,12 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 gitlab.com/webmesh/api v0.0.0-20230523164600-6d1687a0855b h1:B0kAIp4to8uNCTJMEPrx9Yd2pA8zGNZ29jk7DhlgcTk=
 gitlab.com/webmesh/api v0.0.0-20230523164600-6d1687a0855b/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
+gitlab.com/webmesh/api v0.0.1 h1:CXw0+lN9mzfP2SoqmiaTK4mn5UyDGhsJ5XFoFpXY6zw=
+gitlab.com/webmesh/api v0.0.1/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
+gitlab.com/webmesh/api v0.0.2 h1:zRK1GqszQSG2hxTF9nV0M+FY/Y0pFv3JmctvYjy70pA=
+gitlab.com/webmesh/api v0.0.2/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
+gitlab.com/webmesh/api v0.0.3 h1:4Cymk0B1CuxErIQYHnnlclDuNYl97fgPBfyhCePm/r0=
+gitlab.com/webmesh/api v0.0.3/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
