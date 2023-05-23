@@ -249,13 +249,51 @@ func main() {
 func usage() {
 	fmt.Fprint(os.Stderr, "Webmesh Node\n\n")
 	fmt.Fprintf(os.Stderr, "Usage: %s [flags]\n", os.Args[0])
-	fmt.Fprint(os.Stderr, "\n")
 
-	util.FlagsUsage("Global Configurations", "global", "")
-	util.FlagsUsage("Raft Store Configurations", "store", "store.stream-layer")
-	util.FlagsUsage("Raft Stream Layer Configurations", "store.stream-layer", "")
-	util.FlagsUsage("gRPC Server Configurations", "grpc", "")
-	util.FlagsUsage("WireGuard Configurations", "wireguard", "")
+	fmt.Fprint(os.Stderr, `
+The webmesh node is a single node in a webmesh cluster. It is responsible for
+tracking the cluster state, managing network configurations, and providing a 
+gRPC API for other nodes to interact with the cluster. The API is also used by
+the webmesh CLI to interact with the cluster.
+
+The node can be configured to bootstrap a new cluster or join an existing
+cluster. When bootstrapping a new cluster, the node will become the leader of
+the cluster. When joining an existing cluster, the node will attempt to join
+the cluster by contacting the leader. Optionally, the node can be configured to
+bootstrap with a set of initial nodes. When bootstrapping with initial nodes,
+the node will become the leader of the cluster if the initial nodes are not
+already part of a cluster. If the initial nodes are already part of a cluster,
+the node will join the cluster by contacting the leader of the cluster.
+
+Configuration is available via command line flags, environment variables, and
+configuration files. The configuration is parsed in the following order:
+
+  - Environment Variables
+  - Command Line Flags
+  - Configuration File
+
+Environment variables match the command line flags where all characters are
+uppercased and dashes and dots are replaced with underscores. For example, the
+command line flag "store.stream-layer.listen-address" would be set via the
+environment variable "STORE_STREAM_LAYER_LISTEN_ADDRESS".
+
+Configuration files can be in YAML, JSON, or TOML. The configuration file is
+specified via the "--config" flag. The configuration file matches the structure 
+of the command line flags. For example, the following YAML configuration would 
+be equivalent to the shown command line flag:
+
+  # config.yaml
+  store:
+    stream-layer:
+      listen-address: 127.0.0.1  # --store.stream-layer.listen-address
+
+`)
+
+	util.FlagsUsage("Global Configurations:", "global", "")
+	util.FlagsUsage("Raft Store Configurations:", "store", "store.stream-layer")
+	util.FlagsUsage("Raft Stream Layer Configurations:", "store.stream-layer", "")
+	util.FlagsUsage("gRPC Server Configurations:", "grpc", "")
+	util.FlagsUsage("WireGuard Configurations:", "wireguard", "")
 
 	fmt.Fprint(os.Stderr, "General Flags\n\n")
 	fmt.Fprintf(os.Stderr, "  --config         Load flags from the given configuration file\n")
