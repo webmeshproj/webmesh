@@ -176,6 +176,9 @@ func main() {
 	if svcOpts.EnableMetrics {
 		features = append(features, v1.Feature_METRICS_GRPC)
 	}
+	if !svcOpts.DisableLeaderProxy {
+		features = append(features, v1.Feature_LEADER_PROXY)
+	}
 	v1.RegisterNodeServer(srv, node.NewServer(st, features...))
 
 	// Start the gRPC server

@@ -310,6 +310,8 @@ gitlab.com/webmesh/api v0.0.0-20230523115200-27945171ac08 h1:LCWnVL8gFwN5ChhLQGz
 gitlab.com/webmesh/api v0.0.0-20230523115200-27945171ac08/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
 gitlab.com/webmesh/api v0.0.0-20230523162153-f4ec58a8893a h1:V/rFExe81ZmgZWgWMxwj9qANJEYIW480xpS9FtAbwT4=
 gitlab.com/webmesh/api v0.0.0-20230523162153-f4ec58a8893a/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
+gitlab.com/webmesh/api v0.0.0-20230523164600-6d1687a0855b h1:B0kAIp4to8uNCTJMEPrx9Yd2pA8zGNZ29jk7DhlgcTk=
+gitlab.com/webmesh/api v0.0.0-20230523164600-6d1687a0855b/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
