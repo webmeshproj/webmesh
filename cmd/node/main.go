@@ -63,7 +63,6 @@ func init() {
 }
 
 func main() {
-
 	if *versionFlag {
 		fmt.Println("Webmesh Node")
 		fmt.Println("  Version:   ", version.Version)
