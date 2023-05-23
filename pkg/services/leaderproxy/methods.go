@@ -43,6 +43,7 @@ const (
 // MethodPolicyMap is a map of method names to their MethodPolicy.
 var MethodPolicyMap = map[string]MethodPolicy{
 	v1.Node_Join_FullMethodName:             RequireLeader,
+	v1.Node_Leave_FullMethodName:            RequireLeader,
 	v1.Node_GetNode_FullMethodName:          AllowNonLeader,
 	v1.Node_ListNodes_FullMethodName:        AllowNonLeader,
 	v1.Node_GetFeatures_FullMethodName:      RequireLocal,

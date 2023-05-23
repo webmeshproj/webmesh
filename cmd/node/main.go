@@ -172,7 +172,11 @@ func main() {
 
 	// Always register the node server
 	log.Debug("registering node server")
-	v1.RegisterNodeServer(srv, node.NewServer(st))
+	features := []v1.Feature{v1.Feature_NODES}
+	if svcOpts.EnableMetrics {
+		features = append(features, v1.Feature_METRICS_GRPC)
+	}
+	v1.RegisterNodeServer(srv, node.NewServer(st, features...))
 
 	// Start the gRPC server
 	go func() {

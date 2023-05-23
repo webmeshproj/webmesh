@@ -47,6 +47,8 @@ type Interface interface {
 	PutPeer(ctx context.Context, peer *Peer) error
 	// DeletePeer removes a peer from the wireguard configuration.
 	DeletePeer(ctx context.Context, peer *Peer) error
+	// Peers returns the list of peers in the wireguard configuration.
+	Peers() []string
 	// Metrics returns the metrics for the wireguard interface and the host.
 	Metrics() (*v1.NodeMetrics, error)
 	// Close closes the wireguard interface and all client connections.
@@ -265,6 +267,17 @@ func (w *wginterface) DeletePeer(ctx context.Context, peer *Peer) error {
 		})
 	}
 	return nil
+}
+
+// Peers returns the peers of the wireguard interface.
+func (w *wginterface) Peers() []string {
+	w.peersMux.Lock()
+	defer w.peersMux.Unlock()
+	out := make([]string, 0, len(w.peers))
+	for id := range w.peers {
+		out = append(out, id)
+	}
+	return out
 }
 
 // Close closes the wireguard interface.

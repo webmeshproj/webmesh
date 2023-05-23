@@ -19,6 +19,7 @@ package node
 
 import (
 	"net/netip"
+	"time"
 
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
@@ -36,16 +37,19 @@ type Server struct {
 	peers     peers.Peers
 	ipam      ipam.IPAM
 	ulaPrefix netip.Prefix
-
-	log *slog.Logger
+	features  []v1.Feature
+	startedAt time.Time
+	log       *slog.Logger
 }
 
 // NewServer returns a new Server.
-func NewServer(store store.Store) *Server {
+func NewServer(store store.Store, features ...v1.Feature) *Server {
 	return &Server{
-		store: store,
-		peers: peers.New(store),
-		ipam:  ipam.New(store),
-		log:   slog.Default().With("component", "node-server"),
+		store:     store,
+		peers:     peers.New(store),
+		ipam:      ipam.New(store),
+		features:  features,
+		startedAt: time.Now(),
+		log:       slog.Default().With("component", "node-server"),
 	}
 }

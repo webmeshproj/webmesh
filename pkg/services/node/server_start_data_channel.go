@@ -17,14 +17,11 @@ limitations under the License.
 package node
 
 import (
-	"context"
-
 	v1 "gitlab.com/webmesh/api/v1"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-func (s *Server) GetFeatures(context.Context, *emptypb.Empty) (*v1.Features, error) {
-	return &v1.Features{
-		Features: s.features,
-	}, nil
+func (s *Server) StartDataChannel(stream v1.Node_StartDataChannelServer) error {
+	return status.Errorf(codes.Unimplemented, "method StartDataChannel not implemented")
 }

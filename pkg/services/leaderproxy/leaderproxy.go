@@ -35,14 +35,22 @@ type Interceptor struct {
 	store     store.Store
 	tlsConfig *tls.Config
 	logger    *slog.Logger
+	dialOpts  []grpc.DialOption
 }
 
 // New returns a new leader proxy interceptor.
 func New(store store.Store, tlsConfig *tls.Config, logger *slog.Logger) *Interceptor {
+	var creds credentials.TransportCredentials
+	if tlsConfig == nil {
+		creds = insecure.NewCredentials()
+	} else {
+		creds = credentials.NewTLS(tlsConfig)
+	}
 	return &Interceptor{
 		store:     store,
 		tlsConfig: tlsConfig,
 		logger:    logger,
+		dialOpts:  []grpc.DialOption{grpc.WithTransportCredentials(creds)},
 	}
 }
 
@@ -94,13 +102,7 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	i.logger.Info("proxying request to leader",
 		slog.String("method", info.FullMethod),
 		slog.String("leader", leaderAddr))
-	var creds credentials.TransportCredentials
-	if i.tlsConfig == nil {
-		creds = insecure.NewCredentials()
-	} else {
-		creds = credentials.NewTLS(i.tlsConfig)
-	}
-	conn, err := grpc.DialContext(ctx, leaderAddr, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.DialContext(ctx, leaderAddr, i.dialOpts...)
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "could not connect to leader to serve the request: %s", err.Error())
 	}

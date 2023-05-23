@@ -121,6 +121,9 @@ type Store interface {
 	// Raft returns the Raft interface. Note that the returned value
 	// may be nil if the store is not open.
 	Raft() *raft.Raft
+	// Wireguard returns the Wireguard interface. Note that the returned value
+	// may be nil if the store is not open.
+	Wireguard() wireguard.Interface
 }
 
 // New creates a new store.
@@ -225,9 +228,11 @@ func (s *store) LocalDB() localdb.DBTX {
 }
 
 // Raft returns the Raft interface.
-func (s *store) Raft() *raft.Raft {
-	return s.raft
-}
+func (s *store) Raft() *raft.Raft { return s.raft }
+
+// Wireguard returns the Wireguard interface. Note that the returned value
+// may be nil if the store is not open.
+func (s *store) Wireguard() wireguard.Interface { return s.wg }
 
 // State returns the current Raft state.
 func (s *store) State() raft.RaftState {

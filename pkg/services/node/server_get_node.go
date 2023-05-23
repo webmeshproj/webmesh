@@ -20,11 +20,19 @@ import (
 	"context"
 
 	v1 "gitlab.com/webmesh/api/v1"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"gitlab.com/webmesh/node/pkg/services/node/peers"
 )
 
-func (s *Server) GetFeatures(context.Context, *emptypb.Empty) (*v1.Features, error) {
-	return &v1.Features{
-		Features: s.features,
-	}, nil
+func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshNode, error) {
+	node, err := s.peers.Get(ctx, req.GetId())
+	if err != nil {
+		if err == peers.ErrNodeNotFound {
+			return nil, status.Errorf(codes.NotFound, "node %s not found", req.GetId())
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get node: %v", err)
+	}
+	return dbNodeToAPINode(node), nil
 }

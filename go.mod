@@ -16,7 +16,7 @@ require (
 	github.com/pressly/goose/v3 v3.11.2
 	github.com/prometheus/client_golang v1.14.0
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
-	gitlab.com/webmesh/api v0.0.0-20230523115200-27945171ac08
+	gitlab.com/webmesh/api v0.0.0-20230523162153-f4ec58a8893a
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sys v0.8.0
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b
