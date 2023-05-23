@@ -136,11 +136,13 @@ func (s *store) bootstrap() error {
 		defer close(s.readyErr)
 		ctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
+		s.log.Info("waiting for raft to become ready")
 		<-s.ReadyNotify(ctx)
 		if ctx.Err() != nil {
 			s.readyErr <- ctx.Err()
 			return
 		}
+		s.log.Info("raft is ready")
 		grpcPorts := make(map[raft.ServerID]int64)
 		if s.opts.BootstrapServersGRPCPorts != "" {
 			ports := strings.Split(s.opts.BootstrapServersGRPCPorts, ",")
