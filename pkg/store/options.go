@@ -47,6 +47,7 @@ const (
 	BootstrapEnvVar           = "STORE_BOOTSTRAP"
 	IPv4NetworkEnvVar         = "STORE_BOOTSTRAP_IPV4_NETWORK"
 	JoinEnvVar                = "STORE_JOIN"
+	JoinAsVoterEnvVar         = "STORE_JOIN_AS_VOTER"
 	MaxJoinRetriesEnvVar      = "STORE_MAX_JOIN_RETRIES"
 	JoinTimeoutEnvVar         = "STORE_JOIN_TIMEOUT"
 	ForceNewClusterEnvVar     = "STORE_FORCE_BOOTSTRAP"
@@ -106,6 +107,8 @@ type Options struct {
 	MaxJoinRetries int
 	// JoinTimeout is the timeout for joining.
 	JoinTimeout time.Duration
+	// JoinAsVoter is the join as voter flag.
+	JoinAsVoter bool
 	// Bootstrap is the bootstrap flag. If true, the node will
 	// only bootstrap a new cluster if no data is found. To force
 	// bootstrap, set ForceBootstrap to true.
@@ -191,6 +194,8 @@ but will be replaced with the wireguard address after bootstrapping.`)
 		"Maximum number of join retries.")
 	fl.DurationVar(&o.JoinTimeout, "store.join-timeout", util.GetEnvDurationDefault(JoinTimeoutEnvVar, time.Minute),
 		"Join timeout.")
+	fl.BoolVar(&o.JoinAsVoter, "store.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
+		"Join the cluster as a voter. Default behavior is to join as an observer.")
 	fl.BoolVar(&o.Bootstrap, "store.bootstrap", util.GetEnvDefault(BootstrapEnvVar, "false") == "true",
 		"Bootstrap the cluster.")
 	fl.StringVar(&o.BootstrapIPv4Network, "store.bootstrap-ipv4-network", util.GetEnvDefault(IPv4NetworkEnvVar, "172.16.0.0/12"),

@@ -1,6 +1,5 @@
 -- name: InsertNodeLease :one
-INSERT INTO leases (node_id, ipv4) VALUES (?, ?) 
-ON CONFLICT(node_id) DO UPDATE SET ipv4 = EXCLUDED.ipv4
+INSERT OR REPLACE INTO leases (node_id, ipv4) VALUES (?, ?)
 RETURNING *;
 
 -- name: ReleaseNodeLease :exec

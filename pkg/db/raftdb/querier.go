@@ -14,6 +14,7 @@ type Querier interface {
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
 	GetNodePeer(ctx context.Context, id string) (GetNodePeerRow, error)
+	GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (NodeRpcAddress, error)
 	GetULAPrefix(ctx context.Context) (string, error)
 	InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error)
 	ListAllocatedIPv4(ctx context.Context) ([]string, error)

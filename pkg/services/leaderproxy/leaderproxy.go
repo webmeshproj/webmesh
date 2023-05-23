@@ -20,9 +20,6 @@ package leaderproxy
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
-	"net"
-	"strconv"
 
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
@@ -31,7 +28,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/webmesh/node/pkg/services/node/peers"
 	"gitlab.com/webmesh/node/pkg/store"
 )
 
@@ -90,7 +86,7 @@ func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 }
 
 func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	leaderAddr, err := i.getLeaderAddr(ctx)
+	leaderAddr, err := i.store.LeaderRPCAddr(ctx)
 	if err != nil {
 		i.logger.Error("could not get leader address", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Unavailable, "no leader available to serve the request: %s", err.Error())
@@ -115,26 +111,4 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return nil, status.Errorf(codes.Internal, "could not invoke RPC on the leader: %s", err.Error())
 	}
 	return out, nil
-}
-
-func (i *Interceptor) getLeaderAddr(ctx context.Context) (string, error) {
-	leader, err := i.store.Leader()
-	if err != nil {
-		return "", err
-	}
-	node, err := peers.New(i.store).Get(ctx, leader)
-	if err != nil {
-		return "", err
-	}
-	var leaderAddr string
-	// Prefer IPv4
-	if node.PrivateIPv4.IsValid() {
-		leaderAddr = node.PrivateIPv4.Addr().String()
-	} else if node.NetworkIPv6.IsValid() {
-		// Use IPv6 if IPv4 is not available
-		leaderAddr = node.NetworkIPv6.Addr().String()
-	} else {
-		return "", fmt.Errorf("no private IP address available for leader")
-	}
-	return net.JoinHostPort(leaderAddr, strconv.Itoa(node.GRPCPort)), nil
 }

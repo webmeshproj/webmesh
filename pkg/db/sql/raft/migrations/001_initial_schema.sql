@@ -34,6 +34,14 @@ CREATE TABLE leases (
     created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE VIEW node_rpc_addresses AS
+SELECT
+    nodes.id as node_id,
+    COALESCE(leases.ipv4, nodes.network_ipv6, '') AS address,
+    nodes.grpc_port AS port
+FROM nodes 
+LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
+
 -- +goose Down
 
 DROP TABLE leases;

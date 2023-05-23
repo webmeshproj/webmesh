@@ -24,6 +24,9 @@ UPDATE nodes SET
 WHERE id = ?
 RETURNING *;
 
+-- name: GetNodePrivateRPCAddress :one
+SELECT * FROM node_rpc_addresses WHERE node_id = ?;
+
 -- name: GetNode :one
 SELECT
     nodes.id AS id,

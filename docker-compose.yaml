@@ -19,15 +19,15 @@ services:
       context: .
       dockerfile: Dockerfile
     entrypoint:
-     - /node
-     - --global.insecure
-     - --global.no-ipv6
-     - --global.log-level=debug
-     - --store.bootstrap
-     - --store.data-dir=/data
-     - --store.raft-log-level=debug
-     - --grpc.enable-metrics
-     - --wireguard.endpoint=10.1.0.2:51820
+      - /node
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.log-level=debug
+      - --store.bootstrap
+      - --store.data-dir=/data
+      - --store.raft-log-level=debug
+      - --wireguard.endpoint=10.1.0.2:51820
+      - --grpc.enable-metrics
     volumes:
       - /lib/modules:/lib/modules
       - bootstrap:/data
@@ -40,15 +40,16 @@ services:
   join-node-1:
     image: ${IMAGE:-gitlab.com/webmesh/node:latest}
     entrypoint:
-     - /node
-     - --global.insecure
-     - --global.no-ipv6
-     - --global.log-level=debug
-     - --store.join=10.1.0.2:8443
-     - --store.data-dir=/data
-     - --store.raft-log-level=debug
-     - --grpc.enable-metrics
-     - --wireguard.endpoint=10.1.0.3:51820
+      - /node
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.log-level=debug
+      - --store.join=10.1.0.2:8443
+      - --store.join-as-voter
+      - --store.data-dir=/data
+      - --store.raft-log-level=debug
+      - --wireguard.endpoint=10.1.0.3:51820
+      - --grpc.enable-metrics
     volumes:
       - /lib/modules:/lib/modules
       - join-node-1:/data

@@ -93,6 +93,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			Endpoint:       s.wgopts.Endpoint,
 			AssignIpv4:     !s.opts.NoIPv4,
 			PreferRaftIpv6: s.opts.RaftPreferIPv6,
+			AsVoter:        s.opts.JoinAsVoter,
 			// TODO:
 			AllowedIps:     nil,
 			AvailableZones: nil,

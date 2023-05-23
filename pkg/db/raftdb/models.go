@@ -38,3 +38,9 @@ type Node struct {
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 }
+
+type NodeRpcAddress struct {
+	NodeID  string `json:"node_id"`
+	Address string `json:"address"`
+	Port    int64  `json:"port"`
+}

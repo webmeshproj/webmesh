@@ -25,6 +25,17 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (s *Server) GetFeatures(context.Context, *emptypb.Empty) (*v1.Features, error) {
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empty, error) {
+	if req.GetId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "id is required")
+	}
+	if !s.store.IsLeader() {
+		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
+	}
+	s.log.Info("removing voter", "id", req.GetId())
+	err := s.store.RemoveVoter(ctx, req.GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)
+	}
+	return nil, nil
 }

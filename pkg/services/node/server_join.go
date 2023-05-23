@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package node contains the webmesh node service.
 package node
 
 import (
@@ -150,7 +149,12 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Info("assigned IPv4 address to peer", slog.String("ipv4", lease.IPv4().String()))
 		resp.AddressIpv4 = lease.IPv4().String()
 	}
-	// Add the peer as a non-voter to the store.
+	// Fetch current wireguard peers for the new node
+	peers, err := s.peers.ListPeers(ctx, req.GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
+	}
+	// Add peer to the raft cluster
 	var raftAddress string
 	if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
 		// Prefer IPv4 for raft
@@ -161,14 +165,16 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Use IPv6
 		raftAddress = net.JoinHostPort(peer.NetworkIPv6.Addr().String(), strconv.Itoa(peer.RaftPort))
 	}
-	log.Info("adding non-voter to cluster", slog.String("raft_address", raftAddress))
-	if err := s.store.AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to add non-voter: %v", err)
-	}
-	// List all wireguard peers
-	peers, err := s.peers.ListPeers(ctx, req.GetId())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
+	if req.GetAsVoter() {
+		log.Info("adding candidate to cluster", slog.String("raft_address", raftAddress))
+		if err := s.store.AddVoter(ctx, req.GetId(), raftAddress); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to add candidate: %v", err)
+		}
+	} else {
+		log.Info("adding non-voter to cluster", slog.String("raft_address", raftAddress))
+		if err := s.store.AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to add non-voter: %v", err)
+		}
 	}
 	resp.Peers = make([]*v1.WireguardPeer, len(peers))
 	for i, p := range peers {

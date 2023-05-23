@@ -31,8 +31,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
+	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"gitlab.com/webmesh/node/pkg/db/localdb"
 	"gitlab.com/webmesh/node/pkg/db/raftdb"
@@ -82,8 +86,10 @@ type Store interface {
 	IsLeader() bool
 	// Leader returns the current Raft leader ID.
 	Leader() (string, error)
-	// LeaderAddr returns the current Raft leader's address.
+	// LeaderAddr returns the current Raft leader's raft address.
 	LeaderAddr() (string, error)
+	// LeaderRPCAddr returns the current Raft leader's gRPC address.
+	LeaderRPCAddr(ctx context.Context) (string, error)
 	// Stepdown forces this node to relinquish leadership to another node in
 	// the cluster. If wait is true then this method will block until the
 	// leadership transfer is complete and return any error that ocurred.
@@ -231,49 +237,6 @@ func (s *store) State() raft.RaftState {
 	return s.raft.State()
 }
 
-// IsLeader returns true if this node is the Raft leader.
-func (s *store) IsLeader() bool {
-	return s.State() == raft.Leader
-}
-
-// IsVoter returns true if the current node is a voter in the cluster. If there
-// is no reference to the current node in the current cluster configuration then
-// false will also be returned.
-func (s *store) IsVoter() (bool, error) {
-	cfg := s.raft.GetConfiguration()
-	if err := cfg.Error(); err != nil {
-		return false, err
-	}
-	for _, srv := range cfg.Configuration().Servers {
-		if srv.ID == s.nodeID {
-			return srv.Suffrage == raft.Voter, nil
-		}
-	}
-	return false, nil
-}
-
-// Leader returns the current Raft leader.
-func (s *store) Leader() (string, error) {
-	if s.raft == nil || !s.open.Load() {
-		return "", ErrNotOpen
-	}
-	leader, err := s.Leader()
-	if err != nil {
-		return "", err
-	}
-	return leader, nil
-}
-
-// LeaderAddr returns the address of the current leader. Returns a
-// blank string if there is no leader or if the Store is not open.
-func (s *store) LeaderAddr() (string, error) {
-	if !s.open.Load() {
-		return "", ErrNotOpen
-	}
-	addr, _ := s.raft.LeaderWithID()
-	return string(addr), nil
-}
-
 // Ready returns true if the store is ready to serve requests. Ready is
 // defined as having a leader.
 func (s *store) Ready() bool {
@@ -317,19 +280,27 @@ func (s *store) ReadyError() <-chan error {
 	return s.readyErr
 }
 
-// Stepdown forces this node to relinquish leadership to another node in
-// the cluster. If wait is true then this method will block until the
-// leadership transfer is complete and return any error that ocurred.
-func (s *store) Stepdown(wait bool) error {
-	if !s.open.Load() {
-		return ErrNotOpen
+// Leave attempts to remove this node from the cluster. The node must
+// have already relinquished leadership before calling this method.
+func (s *store) Leave(ctx context.Context) error {
+	addr, err := s.LeaderRPCAddr(ctx)
+	if err != nil {
+		return fmt.Errorf("get leader address: %w", err)
 	}
-	if !s.IsLeader() {
-		return ErrNotLeader
+	var creds credentials.TransportCredentials
+	if s.sl.Insecure() {
+		creds = insecure.NewCredentials()
+	} else {
+		creds = credentials.NewTLS(s.sl.TLSConfig())
 	}
-	f := s.raft.LeadershipTransfer()
-	if !wait {
-		return nil
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return fmt.Errorf("dial leader: %w", err)
 	}
-	return f.Error()
+	defer conn.Close()
+	client := v1.NewNodeClient(conn)
+	_, err = client.Leave(ctx, &v1.LeaveRequest{
+		Id: string(s.nodeID),
+	})
+	return err
 }

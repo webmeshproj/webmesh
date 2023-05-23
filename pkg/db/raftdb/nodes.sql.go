@@ -175,6 +175,17 @@ func (q *Queries) GetNodePeer(ctx context.Context, id string) (GetNodePeerRow, e
 	return i, err
 }
 
+const getNodePrivateRPCAddress = `-- name: GetNodePrivateRPCAddress :one
+SELECT node_id, address, port FROM node_rpc_addresses WHERE node_id = ?
+`
+
+func (q *Queries) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (NodeRpcAddress, error) {
+	row := q.db.QueryRowContext(ctx, getNodePrivateRPCAddress, nodeID)
+	var i NodeRpcAddress
+	err := row.Scan(&i.NodeID, &i.Address, &i.Port)
+	return i, err
+}
+
 const listNodePeers = `-- name: ListNodePeers :many
 SELECT
     nodes.id AS id,

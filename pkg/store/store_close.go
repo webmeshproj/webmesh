@@ -52,16 +52,24 @@ func (s *store) Close(ctx context.Context) error {
 		}()
 	}
 	if s.raft != nil {
-		if s.observerClose != nil {
-			close(s.observerClose)
-			select {
-			case <-ctx.Done():
-				// Fallthrough anyway
-			case <-s.observerDone:
+		wasLeader := s.IsLeader()
+		if wasLeader {
+			// If we are the leader, we need to step down
+			// and remove ourselves from the cluster.
+			if err := s.RemoveVoter(ctx, string(s.nodeID)); err != nil {
+				return fmt.Errorf("remove voter: %w", err)
 			}
 		}
 		if err := s.Stepdown(true); err != nil && err != ErrNotLeader {
 			return fmt.Errorf("stepdown: %w", err)
+		}
+		if (s.opts.Bootstrap || s.opts.JoinAsVoter) && !wasLeader {
+			// If we are a bootstrap node or a voter, we need to
+			// leave the cluster. If we were a bootstrap node,
+			// we have to restart as a non-bootstrap node.
+			if err := s.Leave(context.Background()); err != nil {
+				return fmt.Errorf("raft leave: %w", err)
+			}
 		}
 		if err := s.raft.Shutdown().Error(); err != nil {
 			return fmt.Errorf("raft shutdown: %w", err)
