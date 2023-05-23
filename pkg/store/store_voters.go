@@ -75,7 +75,7 @@ func (s *store) DemoteVoter(ctx context.Context, id string) error {
 }
 
 // RemoveVoter removes a voting node from the cluster.
-func (s *store) RemovePeer(ctx context.Context, id string) error {
+func (s *store) RemoveVoter(ctx context.Context, id string) error {
 	if !s.IsLeader() {
 		return ErrNotLeader
 	}

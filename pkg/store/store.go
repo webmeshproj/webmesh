@@ -94,8 +94,8 @@ type Store interface {
 	AddVoter(ctx context.Context, id string, addr string) error
 	// DemoteVoter demotes a voting node to a non-voting node with timeout enforced by the context.
 	DemoteVoter(ctx context.Context, id string) error
-	// RemovePeer removes a peer from the cluster with timeout enforced by the context.
-	RemovePeer(ctx context.Context, id string) error
+	// RemoveVoter removes a peer from the cluster with timeout enforced by the context.
+	RemoveVoter(ctx context.Context, id string) error
 	// DB returns a DB interface for use by the application. This
 	// interface will ensure consistency with the Raft log. Transactions
 	// are executed in the order they are received by the leader node.
