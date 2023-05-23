@@ -57,31 +57,31 @@ const (
 // Options contains the configuration for the gRPC server.
 type Options struct {
 	// ListenAddress is the address to listen on.
-	ListenAddress string
+	ListenAddress string `json:"listen-address" yaml:"listen-address" toml:"listen-address"`
 	// TLSCertFile is the path to the TLS certificate file.
-	TLSCertFile string
+	TLSCertFile string `json:"tls-cert-file" yaml:"tls-cert-file" toml:"tls-cert-file"`
 	// TLSKeyFile is the path to the TLS key file.
-	TLSKeyFile string
+	TLSKeyFile string `json:"tls-key-file" yaml:"tls-key-file" toml:"tls-key-file"`
 	// TLSCAFile is the path to the TLS CA file. If not set, client
 	// authentication is disabled.
-	TLSCAFile string
+	TLSCAFile string `json:"tls-ca-file" yaml:"tls-ca-file" toml:"tls-ca-file"`
 	// TLSClientCAFile is the path to the TLS client CA file.
 	// If empty, either TLSCAFile or the system CA pool is used.
-	TLSClientCAFile string
+	TLSClientCAFile string `json:"tls-client-ca-file" yaml:"tls-client-ca-file" toml:"tls-client-ca-file"`
 	// MTLS is true if mutual TLS is enabled.
-	MTLS bool
+	MTLS bool `json:"mtls" yaml:"mtls" toml:"mtls"`
 	// SkipVerifyHostname is true if the hostname should not be verified.
-	SkipVerifyHostname bool
+	SkipVerifyHostname bool `json:"skip-verify-hostname" yaml:"skip-verify-hostname" toml:"skip-verify-hostname"`
 	// Insecure is true if the transport is insecure.
-	Insecure bool
+	Insecure bool `json:"insecure" yaml:"insecure" toml:"insecure"`
 	// EnableMetrics is true if metrics should be enabled.
-	EnableMetrics bool
+	EnableMetrics bool `json:"enable-metrics" yaml:"enable-metrics" toml:"enable-metrics"`
 	// MetricsListenAddress is the address to listen on for metrics.
-	MetricsListenAddress string
+	MetricsListenAddress string `json:"metrics-listen-address" yaml:"metrics-listen-address" toml:"metrics-listen-address"`
 	// MetricsPath is the path to serve metrics on.
-	MetricsPath string
+	MetricsPath string `json:"metrics-path" yaml:"metrics-path" toml:"metrics-path"`
 	// DisableLeaderProxy disables the leader proxy.
-	DisableLeaderProxy bool
+	DisableLeaderProxy bool `json:"disable-leader-proxy" yaml:"disable-leader-proxy" toml:"disable-leader-proxy"`
 }
 
 // NewOptions returns new Options with sensible defaults.

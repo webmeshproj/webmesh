@@ -36,26 +36,26 @@ const (
 // Options are options for configuring the wireguard interface.
 type Options struct {
 	// ListenPort is the port to listen on.
-	ListenPort int
+	ListenPort int `yaml:"listen-port" json:"listen-port" toml:"listen-port"`
 	// Endpoint is the endpoint to use for the wireguard interface.
-	Endpoint string
+	Endpoint string `yaml:"endpoint" json:"endpoint" toml:"endpoint"`
 	// Name is the name of the interface.
-	Name string
+	Name string `yaml:"name" json:"name" toml:"name"`
 	// ForceName forces the use of the given name by deleting
 	// any pre-existing interface with the same name.
-	ForceName bool
+	ForceName bool `yaml:"force-name" json:"force-name" toml:"force-name"`
 	// NetworkV4 is the private IPv4 network of this interface.
 	// Leave empty to disable IPv4.
-	NetworkV4 netip.Prefix
+	NetworkV4 netip.Prefix `yaml:"-" json:"-" toml:"-"`
 	// NetworkV6 is the private IPv6 network of this interface.
 	// Leave empty to disable IPv6.
-	NetworkV6 netip.Prefix
+	NetworkV6 netip.Prefix `yaml:"-" json:"-" toml:"-"`
 	// ForceTUN forces the use of a TUN interface.
-	ForceTUN bool
+	ForceTUN bool `yaml:"force-tun" json:"force-tun" toml:"force-tun"`
 	// NoModprobe disables modprobe.
-	NoModprobe bool
+	NoModprobe bool `yaml:"no-modprobe" json:"no-modprobe" toml:"no-modprobe"`
 	// Masquerade enables masquerading of traffic from the wireguard interface.
-	Masquerade bool
+	Masquerade bool `yaml:"masquerade" json:"masquerade" toml:"masquerade"`
 }
 
 // NewOptions returns a new Options with sensible defaults.

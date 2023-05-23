@@ -44,23 +44,23 @@ const (
 // Options are the StreamLayer options.
 type Options struct {
 	// ListenAddress is the address to listen on.
-	ListenAddress string
+	ListenAddress string `yaml:"listen-address" json:"listen-address" toml:"listen-address"`
 	// TLSCertFile is the path to the TLS certificate file.
-	TLSCertFile string
+	TLSCertFile string `yaml:"tls-cert-file" json:"tls-cert-file" toml:"tls-cert-file"`
 	// TLSKeyFile is the path to the TLS key file.
-	TLSKeyFile string
+	TLSKeyFile string `yaml:"tls-key-file" json:"tls-key-file" toml:"tls-key-file"`
 	// TLSCAFile is the path to the TLS CA file. If empty,
 	// the system CA pool is used.
-	TLSCAFile string
+	TLSCAFile string `yaml:"tls-ca-file" json:"tls-ca-file" toml:"tls-ca-file"`
 	// TLSClientCAFile is the path to the TLS client CA file.
 	// If empty, either TLSCAFile or the system CA pool is used.
-	TLSClientCAFile string
+	TLSClientCAFile string `yaml:"tls-client-ca-file" json:"tls-client-ca-file" toml:"tls-client-ca-file"`
 	// MTLS is true if mutual TLS is enabled.
-	MTLS bool
+	MTLS bool `yaml:"mtls" json:"mtls" toml:"mtls"`
 	// SkipVerifyHostname is true if the hostname should not be verified.
-	SkipVerifyHostname bool
+	SkipVerifyHostname bool `yaml:"skip-verify-hostname" json:"skip-verify-hostname" toml:"skip-verify-hostname"`
 	// Insecure is true if the transport is insecure.
-	Insecure bool
+	Insecure bool `yaml:"insecure" json:"insecure" toml:"insecure"`
 }
 
 // NewOptions returns new StreamLayerOptions with sensible defaults.

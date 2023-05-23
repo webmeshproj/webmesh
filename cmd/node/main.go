@@ -19,10 +19,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -40,26 +42,57 @@ import (
 	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 
+// Options are the node options.
+type Options struct {
+	Global    *global.Options    `yaml:"global" json:"global" toml:"global"`
+	Store     *StoreOptions      `yaml:"store" json:"store" toml:"store"`
+	GRPC      *services.Options  `yaml:"grpc" json:"grpc" toml:"grpc"`
+	Wireguard *wireguard.Options `yaml:"wireguard" json:"wireguard" toml:"wireguard"`
+}
+
+type StoreOptions struct {
+	*store.Options `yaml:",inline" json:",inline" toml:",inline"`
+	StreamLayer    *streamlayer.Options `yaml:"stream-layer" json:"stream-layer" toml:"stream-layer"`
+}
+
+// BindFlags binds the flags.
+func (o *Options) BindFlags(fs *flag.FlagSet) {
+	o.Global.BindFlags(fs)
+	o.Store.BindFlags(fs)
+	o.Store.StreamLayer.BindFlags(fs)
+	o.GRPC.BindFlags(fs)
+	o.Wireguard.BindFlags(fs)
+}
+
 var (
 	versionFlag = flag.Bool("version", false, "Print version information and exit")
-	globalOpts  = global.NewOptions()
-	wgOpts      = wireguard.NewOptions()
-	storeOpts   = store.NewOptions()
-	slOpts      = streamlayer.NewOptions()
-	svcOpts     = services.NewOptions()
-	log         = slog.Default()
-	st          store.Store
+	configFlag  = flag.String("config", "", "Path to a configuration file")
+	printConfig = flag.Bool("print-config", false, "Print the configuration and exit")
+
+	opts = &Options{
+		Global: global.NewOptions(),
+		Store: &StoreOptions{
+			Options:     store.NewOptions(),
+			StreamLayer: streamlayer.NewOptions(),
+		},
+		GRPC:      services.NewOptions(),
+		Wireguard: wireguard.NewOptions(),
+	}
+
+	log = slog.Default()
+	st  store.Store
 )
 
 func init() {
-	globalOpts.BindFlags(flag.CommandLine)
-	storeOpts.BindFlags(flag.CommandLine)
-	slOpts.BindFlags(flag.CommandLine)
-	svcOpts.BindFlags(flag.CommandLine)
-	wgOpts.BindFlags(flag.CommandLine)
+	opts.BindFlags(flag.CommandLine)
 	flag.Usage = usage
 	flag.Parse()
-	globalOpts.Overlay(storeOpts, slOpts, svcOpts, wgOpts)
+	opts.Global.Overlay(
+		opts.Store,
+		opts.Store.StreamLayer,
+		opts.GRPC,
+		opts.Wireguard,
+	)
 }
 
 func main() {
@@ -71,8 +104,29 @@ func main() {
 		os.Exit(0)
 	}
 
-	if !storeOpts.Bootstrap && storeOpts.Join == "" {
-		if _, err := os.Stat(storeOpts.DataDir); os.IsNotExist(err) {
+	if *configFlag != "" {
+		f, err := os.Open(*configFlag)
+		if err != nil {
+			fatal("failed to open configuration file", err)
+		}
+		err = util.DecodeOptions(f, filepath.Ext(*configFlag), opts)
+		if err != nil {
+			fatal("failed to decode configuration file", err)
+		}
+		f.Close()
+	}
+
+	if *printConfig {
+		out, err := json.MarshalIndent(opts, "", "  ")
+		if err != nil {
+			fatal("failed to marshal configuration", err)
+		}
+		fmt.Println(string(out))
+		os.Exit(0)
+	}
+
+	if !opts.Store.Bootstrap && opts.Store.Join == "" {
+		if _, err := os.Stat(opts.Store.DataDir); os.IsNotExist(err) {
 			flag.Usage()
 			fmt.Fprintln(os.Stderr, "ERROR: Must specify either --store.bootstrap or --store.join when --store.data-dir does not exist")
 			os.Exit(1)
@@ -81,7 +135,7 @@ func main() {
 
 	log = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: func() slog.Level {
-			switch strings.ToLower(globalOpts.LogLevel) {
+			switch strings.ToLower(opts.Global.LogLevel) {
 			case "debug":
 				return slog.LevelDebug
 			case "info":
@@ -104,27 +158,22 @@ func main() {
 	)
 
 	// Log all options at debug level
-	log.Debug("options",
-		slog.Any("store", storeOpts),
-		slog.Any("streamLayer", slOpts),
-		slog.Any("services", svcOpts),
-		slog.Any("wireguard", wgOpts),
-	)
+	log.Debug("current configuration", slog.Any("options", opts))
 
-	if (globalOpts.NoIPv4 && globalOpts.NoIPv6) || (storeOpts.NoIPv4 && storeOpts.NoIPv6) {
+	if (opts.Global.NoIPv4 && opts.Global.NoIPv6) || (opts.Store.NoIPv4 && opts.Store.NoIPv6) {
 		fatal("cannot disable both IPv4 and IPv6", nil)
 	}
 
 	var err error
 
 	// Validate options
-	err = slOpts.Validate()
+	err = opts.Store.StreamLayer.Validate()
 	if err != nil {
 		fatal("failed to validate stream layer options", err)
 	}
 
 	// Validate remaining options
-	err = storeOpts.Validate()
+	err = opts.Store.Validate()
 	if err != nil {
 		fatal("failed to validate store options", err)
 	}
@@ -132,13 +181,13 @@ func main() {
 	log.Info("starting raft node")
 
 	// Create the stream layer
-	sl, err := streamlayer.New(slOpts)
+	sl, err := streamlayer.New(opts.Store.StreamLayer)
 	if err != nil {
 		fatal("failed to create stream layer", err)
 	}
 
 	// Create and open the store
-	st = store.New(sl, storeOpts, wgOpts)
+	st = store.New(sl, opts.Store.Options, opts.Wireguard)
 	err = st.Open()
 	if err != nil {
 		fatal("failed to open store", err)
@@ -165,7 +214,7 @@ func main() {
 	log.Info("raft store is ready, starting services")
 
 	// Create the services
-	srv, err := services.NewServer(st, svcOpts)
+	srv, err := services.NewServer(st, opts.GRPC)
 	if err != nil {
 		fatal("failed to create gRPC server", err)
 	}
@@ -173,10 +222,10 @@ func main() {
 	// Always register the node server
 	log.Debug("registering node server")
 	features := []v1.Feature{v1.Feature_NODES}
-	if svcOpts.EnableMetrics {
+	if opts.GRPC.EnableMetrics {
 		features = append(features, v1.Feature_METRICS_GRPC)
 	}
-	if !svcOpts.DisableLeaderProxy {
+	if !opts.GRPC.DisableLeaderProxy {
 		features = append(features, v1.Feature_LEADER_PROXY)
 	}
 	v1.RegisterNodeServer(srv, node.NewServer(st, features...))
@@ -210,6 +259,9 @@ func usage() {
 	util.FlagsUsage("WireGuard Configurations", "wireguard", "")
 
 	fmt.Fprint(os.Stderr, "General Flags\n\n")
+	fmt.Fprintf(os.Stderr, "  --config         Load flags from the given configuration file\n")
+	fmt.Fprintf(os.Stderr, "  --print-config   Print the configuration and exit\n")
+	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "  --help       Show this help message\n")
 	fmt.Fprintf(os.Stderr, "  --version    Show version information and exit\n")
 	fmt.Fprint(os.Stderr, "\n")

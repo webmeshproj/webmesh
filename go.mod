@@ -13,6 +13,7 @@ require (
 	github.com/hashicorp/raft v1.5.0
 	github.com/hashicorp/raft-boltdb v0.0.0-20230125174641-2a8082862702
 	github.com/jsimonetti/rtnetlink v1.3.3
+	github.com/pelletier/go-toml/v2 v2.0.7
 	github.com/pressly/goose/v3 v3.11.2
 	github.com/prometheus/client_golang v1.14.0
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
@@ -23,6 +24,7 @@ require (
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/grpc v1.55.0
 	google.golang.org/protobuf v1.30.0
+	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.22.1
 	pault.ag/go/modprobe v0.1.2
 )

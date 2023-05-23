@@ -39,39 +39,39 @@ const (
 	GlobalNoIPv6EnvVar             = "GLOBAL_NO_IPV6"
 )
 
-// Opts are the global options.
-type Opts struct {
+// Options are the global options.
+type Options struct {
 	// LogLevel is the log level.
-	LogLevel string
+	LogLevel string `yaml:"log-level" json:"log-level" toml:"log-level"`
 	// TLSCertFile is the TLS certificate file.
-	TLSCertFile string
+	TLSCertFile string `yaml:"tls-cert-file" json:"tls-cert-file" toml:"tls-cert-file"`
 	// TLSKeyFile is the TLS key file.
-	TLSKeyFile string
+	TLSKeyFile string `yaml:"tls-key-file" json:"tls-key-file" toml:"tls-key-file"`
 	// TLACAFile is the TLS CA file.
-	TLSCAFile string
+	TLSCAFile string `yaml:"tls-ca-file" json:"tls-ca-file" toml:"tls-ca-file"`
 	// TLSClientCAFile is the path to the TLS client CA file.
 	// If empty, either TLSCAFile or the system CA pool is used.
-	TLSClientCAFile string
+	TLSClientCAFile string `yaml:"tls-client-ca-file" json:"tls-client-ca-file" toml:"tls-client-ca-file"`
 	// MTLS is true if mutual TLS is enabled.
-	MTLS bool
+	MTLS bool `yaml:"mtls" json:"mtls" toml:"mtls"`
 	// SkipVerifyHostname is true if the hostname should not be verified.
-	SkipVerifyHostname bool
+	SkipVerifyHostname bool `yaml:"skip-verify-hostname" json:"skip-verify-hostname" toml:"skip-verify-hostname"`
 	// Insecure is true if TLS should be disabled.
-	Insecure bool
+	Insecure bool `yaml:"insecure" json:"insecure" toml:"insecure"`
 	// NoIPv4 is true if IPv4 should be disabled.
-	NoIPv4 bool
+	NoIPv4 bool `yaml:"no-ipv4" json:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is true if IPv6 should be disabled.
-	NoIPv6 bool
+	NoIPv6 bool `yaml:"no-ipv6" json:"no-ipv6" toml:"no-ipv6"`
 }
 
 // NewOptions creates new options.
-func NewOptions() *Opts {
-	return &Opts{
+func NewOptions() *Options {
+	return &Options{
 		LogLevel: "info",
 	}
 }
 
-func (o *Opts) BindFlags(fs *flag.FlagSet) {
+func (o *Options) BindFlags(fs *flag.FlagSet) {
 	fs.StringVar(&o.TLSCertFile, "global.tls-cert-file", util.GetEnvDefault(GlobalTLSCertEnvVar, ""),
 		"The certificate file for TLS connections.")
 	fs.StringVar(&o.TLSKeyFile, "global.tls-key-file", util.GetEnvDefault(GlobalTLSKeyEnvVar, ""),
@@ -95,7 +95,7 @@ func (o *Opts) BindFlags(fs *flag.FlagSet) {
 }
 
 // Overlay overlays the global options onto the given option sets.
-func (o *Opts) Overlay(opts ...any) {
+func (o *Options) Overlay(opts ...any) {
 	for _, opt := range opts {
 		switch v := opt.(type) {
 		case *store.Options:

@@ -73,75 +73,75 @@ const (
 // Options are the options for the store.
 type Options struct {
 	// NodeID is the node ID.
-	NodeID string
+	NodeID string `json:"node-id" yaml:"node-id" toml:"node-id"`
 	// DataDir is the directory to store data in.
-	DataDir string
+	DataDir string `json:"data-dir" yaml:"data-dir" toml:"data-dir"`
 	// AdvertiseAddress is the initial address to advertise for raft consensus.
-	AdvertiseAddress string
+	AdvertiseAddress string `json:"advertise-address" yaml:"advertise-address" toml:"advertise-address"`
 	// ConnectionPoolCount is the number of connections to pool.
 	// If 0, no connection pooling is used.
-	ConnectionPoolCount int
+	ConnectionPoolCount int `json:"connection-pool-count" yaml:"connection-pool-count" toml:"connection-pool-count"`
 	// ConnectionTimeout is the timeout for connections.
-	ConnectionTimeout time.Duration
+	ConnectionTimeout time.Duration `json:"connection-timeout" yaml:"connection-timeout" toml:"connection-timeout"`
 	// HeartbeatTimeout is the timeout for heartbeats.
-	HeartbeatTimeout time.Duration
+	HeartbeatTimeout time.Duration `json:"heartbeat-timeout" yaml:"heartbeat-timeout" toml:"heartbeat-timeout"`
 	// ElectionTimeout is the timeout for elections.
-	ElectionTimeout time.Duration
+	ElectionTimeout time.Duration `json:"election-timeout" yaml:"election-timeout" toml:"election-timeout"`
 	// ApplyTimeout is the timeout for applying.
-	ApplyTimeout time.Duration
+	ApplyTimeout time.Duration `json:"apply-timeout" yaml:"apply-timeout" toml:"apply-timeout"`
 	// CommitTimeout is the timeout for committing.
-	CommitTimeout time.Duration
+	CommitTimeout time.Duration `json:"commit-timeout" yaml:"commit-timeout" toml:"commit-timeout"`
 	// MaxAppendEntries is the maximum number of append entries.
-	MaxAppendEntries int
+	MaxAppendEntries int `json:"max-append-entries" yaml:"max-append-entries" toml:"max-append-entries"`
 	// LeaderLeaseTimeout is the timeout for leader leases.
-	LeaderLeaseTimeout time.Duration
+	LeaderLeaseTimeout time.Duration `json:"leader-lease-timeout" yaml:"leader-lease-timeout" toml:"leader-lease-timeout"`
 	// SnapshotInterval is the interval to take snapshots.
-	SnapshotInterval time.Duration
+	SnapshotInterval time.Duration `json:"snapshot-interval" yaml:"snapshot-interval" toml:"snapshot-interval"`
 	// SnapshotThreshold is the threshold to take snapshots.
-	SnapshotThreshold uint64
+	SnapshotThreshold uint64 `json:"snapshot-threshold" yaml:"snapshot-threshold" toml:"snapshot-threshold"`
 	// SnapshotRetention is the number of snapshots to retain.
-	SnapshotRetention uint64
+	SnapshotRetention uint64 `json:"snapshot-retention" yaml:"snapshot-retention" toml:"snapshot-retention"`
 	// ObserverChanBuffer is the buffer size for the observer channel.
-	ObserverChanBuffer int
+	ObserverChanBuffer int `json:"observer-chan-buffer" yaml:"observer-chan-buffer" toml:"observer-chan-buffer"`
 	// Join is the address of a node to join.
-	Join string
+	Join string `json:"join" yaml:"join" toml:"join"`
 	// MaxJoinRetries is the maximum number of join retries.
-	MaxJoinRetries int
+	MaxJoinRetries int `json:"max-join-retries" yaml:"max-join-retries" toml:"max-join-retries"`
 	// JoinTimeout is the timeout for joining.
-	JoinTimeout time.Duration
+	JoinTimeout time.Duration `json:"join-timeout" yaml:"join-timeout" toml:"join-timeout"`
 	// JoinAsVoter is the join as voter flag.
-	JoinAsVoter bool
+	JoinAsVoter bool `json:"join-as-voter" yaml:"join-as-voter" toml:"join-as-voter"`
 	// Bootstrap is the bootstrap flag. If true, the node will
 	// only bootstrap a new cluster if no data is found. To force
 	// bootstrap, set ForceBootstrap to true.
-	Bootstrap bool
+	Bootstrap bool `json:"bootstrap" yaml:"bootstrap" toml:"bootstrap"`
 	// BootstrapServers is a comma separated list of servers to bootstrap with.
 	// This is only used if Bootstrap is true. If empty, the node will use
 	// the AdvertiseAddress as the bootstrap server. If not empty, all nodes in
 	// the list should be started with the same list and BootstrapIPv4Network. If the
 	// BootstrapIPv4Network is not the same, the first node to become leader will pick it.
 	// Servers should be in the form of <node-id>=<address> where address is the advertise address.
-	BootstrapServers string
+	BootstrapServers string `json:"bootstrap-servers" yaml:"bootstrap-servers" toml:"bootstrap-servers"`
 	// BootstrapServersGRPCPorts is a comma separated list of gRPC ports to bootstrap with.
 	// This is only used if Bootstrap is true. If empty, the node will use the advertise
 	// address and local gRPC port for every node in BootstrapServers. Ports should be
 	// in the form of <node-id>=<port>.
-	BootstrapServersGRPCPorts string
+	BootstrapServersGRPCPorts string `json:"bootstrap-servers-grpc-ports" yaml:"bootstrap-servers-grpc-ports" toml:"bootstrap-servers-grpc-ports"`
 	// BootstrapIPv4Network is the IPv4 network of the mesh to write to the database
 	// when bootstraping a new cluster.
-	BootstrapIPv4Network string
+	BootstrapIPv4Network string `json:"bootstrap-ipv4-network" yaml:"bootstrap-ipv4-network" toml:"bootstrap-ipv4-network"`
 	// ForceBootstrap is the force new bootstrap.
-	ForceBootstrap bool
+	ForceBootstrap bool `json:"force-bootstrap" yaml:"force-bootstrap" toml:"force-bootstrap"`
 	// RaftLogLevel is the log level for the raft backend.
-	RaftLogLevel string
+	RaftLogLevel string `json:"raft-log-level" yaml:"raft-log-level" toml:"raft-log-level"`
 	// RaftPreferIPv6 is the prefer IPv6 flag.
-	RaftPreferIPv6 bool
+	RaftPreferIPv6 bool `json:"raft-prefer-ipv6" yaml:"raft-prefer-ipv6" toml:"raft-prefer-ipv6"`
 	// GRPCAdvertisePort is the port to advertise for gRPC.
-	GRPCAdvertisePort int
+	GRPCAdvertisePort int `json:"grpc-advertise-port" yaml:"grpc-advertise-port" toml:"grpc-advertise-port"`
 	// NoIPv4 is the no IPv4 flag.
-	NoIPv4 bool
+	NoIPv4 bool `json:"no-ipv4" yaml:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is the no IPv6 flag.
-	NoIPv6 bool
+	NoIPv6 bool `json:"no-ipv6" yaml:"no-ipv6" toml:"no-ipv6"`
 }
 
 // NewOptions returns new options with sensible defaults.
