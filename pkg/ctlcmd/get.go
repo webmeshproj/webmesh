@@ -100,6 +100,6 @@ func toNode(node *v1.MeshNode) map[string]any {
 		"allowed_ips":     node.GetAllowedIps(),
 		"created_at":      node.GetCreatedAt().AsTime(),
 		"updated_at":      node.GetUpdatedAt().AsTime(),
-		"status":          node.GetStatus().String(),
+		"cluster_status":  node.GetClusterStatus().String(),
 	}
 }

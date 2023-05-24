@@ -58,9 +58,9 @@ func outStatusJSON(cmd *cobra.Command, status *v1.Status) error {
 			}
 			return features
 		}(),
-		"peers":          status.Peers,
-		"status":         status.Status.String(),
-		"current_leader": status.CurrentLeader,
+		"wireguard_peers": status.WireguardPeers,
+		"cluster_status":  status.ClusterStatus.String(),
+		"current_leader":  status.CurrentLeader,
 	}, "", "  ")
 	if err != nil {
 		return err

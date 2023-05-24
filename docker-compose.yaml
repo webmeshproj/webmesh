@@ -61,6 +61,8 @@ services:
     volumes:
       - /lib/modules:/lib/modules
       - bootstrap-node-2:/data
+    ports:
+      - 8444:8443
     networks:
       bootstrap:
         ipv4_address: 10.1.0.2
@@ -85,6 +87,8 @@ services:
     volumes:
       - /lib/modules:/lib/modules
       - bootstrap-node-3:/data
+    ports:
+      - 8445:8443
     networks:
       bootstrap:
         ipv4_address: 10.1.0.3

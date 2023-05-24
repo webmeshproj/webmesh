@@ -37,14 +37,15 @@ func (s *Server) GetStatus(ctx context.Context, req *emptypb.Empty) (*v1.Status,
 		s.log.Error("failed to lookup current leader", slog.String("error", err.Error()))
 	}
 	return &v1.Status{
-		Version:   version.Version,
-		Commit:    version.Commit,
-		BuildDate: version.BuildDate,
-		Uptime:    time.Since(s.startedAt).String(),
-		StartedAt: timestamppb.New(s.startedAt),
-		Features:  s.features,
-		Peers:     uint32(len(s.store.Wireguard().Peers())),
-		Status: func() v1.ClusterStatus {
+		Id:             string(s.store.ID()),
+		Version:        version.Version,
+		Commit:         version.Commit,
+		BuildDate:      version.BuildDate,
+		Uptime:         time.Since(s.startedAt).String(),
+		StartedAt:      timestamppb.New(s.startedAt),
+		Features:       s.features,
+		WireguardPeers: uint32(len(s.store.Wireguard().Peers())),
+		ClusterStatus: func() v1.ClusterStatus {
 			if s.store.IsLeader() {
 				return v1.ClusterStatus_CLUSTER_LEADER
 			}

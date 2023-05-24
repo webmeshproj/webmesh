@@ -54,7 +54,7 @@ func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Serv
 			}
 			return ""
 		}(),
-		Status: func() v1.ClusterStatus {
+		ClusterStatus: func() v1.ClusterStatus {
 			for _, srv := range servers {
 				if string(srv.ID) == node.ID {
 					if srv.ID == leader {

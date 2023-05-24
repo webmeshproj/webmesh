@@ -376,6 +376,8 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 gitlab.com/webmesh/api v0.0.3 h1:4Cymk0B1CuxErIQYHnnlclDuNYl97fgPBfyhCePm/r0=
 gitlab.com/webmesh/api v0.0.3/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
+gitlab.com/webmesh/api v0.0.4 h1:Tl0Upl8mGyAnKkLfbCf8Y6lOptkPelwWlM8klXztihU=
+gitlab.com/webmesh/api v0.0.4/go.mod h1:Rn3fS6+vGeuZcghC4zeyPWmTj/nK9oDGaYL13N160gI=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
