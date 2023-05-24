@@ -67,7 +67,7 @@ type Store interface {
 	// IsOpen returns true if the store is open.
 	IsOpen() bool
 	// Close closes the store.
-	Close(ctx context.Context) error
+	Close() error
 	// Ready returns true if the store is ready to serve requests.
 	Ready() bool
 	// ConfigureWireguard configures the wireguard interface. This is normally called

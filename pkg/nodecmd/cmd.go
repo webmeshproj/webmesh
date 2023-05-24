@@ -165,7 +165,7 @@ func Execute() error {
 	}
 
 	handleErr := func(cause error) error {
-		if err := st.Close(context.Background()); err != nil {
+		if err := st.Close(); err != nil {
 			log.Error("failed to shutdown raft store", slog.String("error", err.Error()))
 		}
 		return fmt.Errorf("failed to start raft node: %w", cause)
@@ -186,7 +186,7 @@ func Execute() error {
 	// Shutdown the store on exit
 	defer func() {
 		log.Info("shutting down raft store")
-		if err = st.Close(context.Background()); err != nil {
+		if err = st.Close(); err != nil {
 			log.Error("failed to shutdown raft store", slog.String("error", err.Error()))
 		}
 	}()
