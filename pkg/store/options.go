@@ -58,6 +58,7 @@ const (
 	ObserverChanBufferEnvVar        = "STORE_OBSERVER_CHAN_BUFFER"
 	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
 	RaftLogFormatEnvVar             = "STORE_RAFT_LOG_FORMAT"
+	ShutdownTimeoutEnvVar           = "STORE_SHUTDOWN_TIMEOUT"
 	NoIPv4EnvVar                    = "STORE_NO_IPV4"
 	NoIPv6EnvVar                    = "STORE_NO_IPV6"
 
@@ -163,6 +164,8 @@ type Options struct {
 	GRPCAdvertisePort int `json:"grpc-advertise-port" yaml:"grpc-advertise-port" toml:"grpc-advertise-port"`
 	// RaftLogFormat is the log format for the raft backend.
 	RaftLogFormat string `json:"raft-log-format" yaml:"raft-log-format" toml:"raft-log-format"`
+	// ShutdownTimeout is the timeout for shutting down.
+	ShutdownTimeout time.Duration `json:"shutdown-timeout" yaml:"shutdown-timeout" toml:"shutdown-timeout"`
 	// NoIPv4 is the no IPv4 flag.
 	NoIPv4 bool `json:"no-ipv4" yaml:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is the no IPv6 flag.
@@ -188,6 +191,7 @@ func NewOptions() *Options {
 		JoinTimeout:          time.Minute,
 		ObserverChanBuffer:   100,
 		BootstrapIPv4Network: "172.16.0.0/12",
+		ShutdownTimeout:      time.Minute,
 	}
 }
 
@@ -265,6 +269,8 @@ but will be replaced with the wireguard address after bootstrapping.`)
 	fl.StringVar(&o.RaftLogFormat, "store.raft-log-format", util.GetEnvDefault(RaftLogFormatEnvVar, string(RaftLogFormatProtobufSnappy)),
 		`Raft log format. Valid options are 'json', 'protobuf', and 'protobuf+snappy'.
 All nodes must use the same log format for the lifetime of the cluster.`)
+	fl.DurationVar(&o.ShutdownTimeout, "store.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
+		"Timeout for graceful shutdown.")
 	fl.BoolVar(&o.NoIPv4, "store.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Disable IPv4 for the raft transport.")
 	fl.BoolVar(&o.NoIPv6, "store.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",

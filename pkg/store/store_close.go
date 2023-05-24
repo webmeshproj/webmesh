@@ -30,6 +30,11 @@ func (s *store) Close() error {
 		return ErrNotOpen
 	}
 	ctx := context.Background()
+	if s.opts.ShutdownTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.opts.ShutdownTimeout)
+		defer cancel()
+	}
 	defer s.open.Store(false)
 	if s.fw != nil {
 		// Clear the firewall rules after wireguard is shutdown
