@@ -315,8 +315,8 @@ func (o *Options) Validate() error {
 	if o.Bootstrap && o.BootstrapIPv4Network == "" {
 		return errors.New("bootstrap IPv4 network is required for bootstrapping")
 	}
-	if o.ConnectionPoolCount <= 0 {
-		return errors.New("connection pool count must be > 0")
+	if o.ConnectionPoolCount < 0 {
+		return errors.New("connection pool count must be >= 0")
 	}
 	if o.ConnectionTimeout <= 0 {
 		return errors.New("connection timeout must be > 0")
