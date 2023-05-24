@@ -20,6 +20,7 @@ package leaderproxy
 import (
 	"context"
 	"crypto/tls"
+	"io"
 
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
@@ -90,26 +91,31 @@ func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 			i.logger.Debug("currently the leader, handling stream locally", slog.String("method", info.FullMethod))
 			return handler(srv, ss)
 		}
-		// TODO: Implement if/when streams are being used
-		return status.Errorf(codes.Unavailable, "no leader available to serve the request")
+		policy, ok := MethodPolicyMap[info.FullMethod]
+		if ok {
+			switch policy {
+			case RequireLocal:
+				i.logger.Debug("stream requires local handling", slog.String("method", info.FullMethod))
+				return handler(srv, ss)
+			case AllowNonLeader:
+				i.logger.Debug("stream allows non-leader handling", slog.String("method", info.FullMethod))
+				if HasPreferLeaderMeta(ss.Context()) {
+					i.logger.Debug("requestor prefers leader handling of stream", slog.String("method", info.FullMethod))
+					return i.proxyStreamToLeader(srv, ss, info, handler)
+				}
+				return handler(srv, ss)
+			}
+		}
+		return i.proxyStreamToLeader(srv, ss, info, handler)
 	}
 }
 
 func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	leaderAddr, err := i.store.LeaderRPCAddr(ctx)
+	client, closer, err := i.newLeaderClient(ctx)
 	if err != nil {
-		i.logger.Error("could not get leader address", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.Unavailable, "no leader available to serve the request: %s", err.Error())
+		return nil, err
 	}
-	i.logger.Info("proxying request to leader",
-		slog.String("method", info.FullMethod),
-		slog.String("leader", leaderAddr))
-	conn, err := grpc.DialContext(ctx, leaderAddr, i.dialOpts...)
-	if err != nil {
-		return nil, status.Errorf(codes.Unavailable, "could not connect to leader to serve the request: %s", err.Error())
-	}
-	defer conn.Close()
-	client := v1.NewNodeClient(conn)
+	defer closer.Close()
 	switch info.FullMethod {
 	case v1.Node_Join_FullMethodName:
 		return client.Join(ctx, req.(*v1.JoinRequest))
@@ -126,4 +132,51 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}
+}
+
+func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	client, closer, err := i.newLeaderClient(ss.Context())
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+	switch info.FullMethod {
+	case v1.Node_StartDataChannel_FullMethodName:
+		stream, err := client.StartDataChannel(ss.Context())
+		if err != nil {
+			return err
+		}
+		return handler(srv, &proxyDataChannelStream{ServerStream: ss, leaderStream: stream})
+	default:
+		return status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
+	}
+}
+
+func (i *Interceptor) newLeaderClient(ctx context.Context) (v1.NodeClient, io.Closer, error) {
+	leaderAddr, err := i.store.LeaderRPCAddr(ctx)
+	if err != nil {
+		i.logger.Error("could not get leader address", slog.String("error", err.Error()))
+		return nil, nil, status.Errorf(codes.Unavailable, "no leader available to serve the request: %s", err.Error())
+	}
+	i.logger.Info("dialing leader to serve request", slog.String("leader", leaderAddr))
+	conn, err := grpc.DialContext(ctx, leaderAddr, i.dialOpts...)
+	if err != nil {
+		return nil, nil, status.Errorf(codes.Unavailable, "could not connect to leader to serve the request: %s", err.Error())
+	}
+	defer conn.Close()
+	client := v1.NewNodeClient(conn)
+	return client, conn, nil
+}
+
+type proxyDataChannelStream struct {
+	grpc.ServerStream
+	leaderStream v1.Node_StartDataChannelClient
+}
+
+func (s *proxyDataChannelStream) Send(m *v1.StartDataChannelRequest) error {
+	return s.leaderStream.Send(m)
+}
+
+func (s *proxyDataChannelStream) Recv() (*v1.DataChannelOffer, error) {
+	return s.leaderStream.Recv()
 }

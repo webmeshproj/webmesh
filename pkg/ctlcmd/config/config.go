@@ -151,11 +151,7 @@ func (c *Config) NewClient() (v1.NodeClient, io.Closer, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return v1.NewNodeClient(conn), &connCloser{conn}, nil
-}
-
-type connCloser struct {
-	io.Closer
+	return v1.NewNodeClient(conn), conn, nil
 }
 
 // DialCurrent connects to the current context.
