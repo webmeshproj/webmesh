@@ -39,7 +39,6 @@ func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Serv
 			}
 			return ""
 		}(),
-		Asn: node.ASN,
 		PrivateIpv4: func() string {
 			if node.PrivateIPv4.IsValid() {
 				return node.PrivateIPv4.String()

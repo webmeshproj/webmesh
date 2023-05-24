@@ -112,10 +112,19 @@ func (s *store) refreshWireguardPeers(ctx context.Context) error {
 				return err
 			}
 		}
+		var endpoint string
+		if peer.Endpoint.Valid {
+			addr, err := netip.ParseAddr(peer.Endpoint.String)
+			if err != nil {
+				s.log.Error("parse peer endpoint", slog.String("error", err.Error()))
+				return err
+			}
+			endpoint = netip.AddrPortFrom(addr, uint16(peer.WireguardPort)).String()
+		}
 		wgpeer := wireguard.Peer{
 			ID:          peer.ID,
 			PublicKey:   peer.PublicKey.String,
-			Endpoint:    peer.Endpoint.String,
+			Endpoint:    endpoint,
 			PrivateIPv4: privateIPv4,
 			PrivateIPv6: privateIPv6,
 		}

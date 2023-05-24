@@ -183,20 +183,23 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	if err != nil {
 		return fmt.Errorf("generate random IPv6: %w", err)
 	}
-	// Determine the wireguard endpoint
-	var wireguardEndpoint netip.AddrPort
-	if s.wgopts.Endpoint != "" {
-		wireguardEndpoint, err = netip.ParseAddrPort(s.wgopts.Endpoint)
+	var endpoint netip.Addr
+	if s.opts.NodeEndpoint != "" {
+		endpoint, err = netip.ParseAddr(s.opts.NodeEndpoint)
 		if err != nil {
-			return fmt.Errorf("parse endpoint: %w", err)
+			return fmt.Errorf("parse node endpoint: %w", err)
 		}
 	} else {
-		// Use our advertise address as the wireguard endpoint.
-		wireguardEndpoint, err = netip.ParseAddrPort(s.opts.AdvertiseAddress)
-		if err != nil {
-			return fmt.Errorf("parse advertise address: %w", err)
+		// We will use the address of our advertise interface.
+		listenAddr := s.sl.Addr()
+		if listenAddr == nil {
+			return fmt.Errorf("no advertise address available")
 		}
-		wireguardEndpoint = netip.AddrPortFrom(wireguardEndpoint.Addr(), uint16(s.wgopts.ListenPort))
+		listenEndpoint, err := netip.ParseAddrPort(listenAddr.String())
+		if err != nil {
+			return fmt.Errorf("parse listen address: %w", err)
+		}
+		endpoint = listenEndpoint.Addr()
 	}
 	params := raftdb.CreateNodeParams{
 		ID: string(s.nodeID),
@@ -204,8 +207,11 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 			String: networkIPv6.String(),
 			Valid:  true,
 		},
-		GrpcPort: int64(s.opts.GRPCAdvertisePort),
-		RaftPort: int64(s.sl.ListenPort()),
+		GrpcPort:      int64(s.opts.GRPCAdvertisePort),
+		RaftPort:      int64(s.sl.ListenPort()),
+		WireguardPort: int64(s.wgopts.ListenPort),
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
 	}
 	var wireguardKey wgtypes.Key
 	// Go ahead and generate our private key.
@@ -222,9 +228,9 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		String: wireguardKey.PublicKey().String(),
 		Valid:  true,
 	}
-	if wireguardEndpoint.IsValid() {
+	if endpoint.IsValid() {
 		params.Endpoint = sql.NullString{
-			String: wireguardEndpoint.String(),
+			String: endpoint.String(),
 			Valid:  true,
 		}
 	}

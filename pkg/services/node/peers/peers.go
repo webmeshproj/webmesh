@@ -38,10 +38,6 @@ var ErrNodeNotFound = errors.New("node not found")
 type Peers interface {
 	// Create creates a new node.
 	Create(ctx context.Context, opts *CreateOptions) (*Node, error)
-	// AssignASN assigns an ASN to a node.
-	AssignASN(ctx context.Context, id string) (uint32, error)
-	// UnassignASN unassigns an ASN from a node.
-	UnassignASN(ctx context.Context, id string) error
 	// Get gets a node by ID.
 	Get(ctx context.Context, id string) (*Node, error)
 	// Update updates a node.
@@ -62,9 +58,7 @@ type Node struct {
 	// PublicKey is the node's public key.
 	PublicKey wgtypes.Key
 	// Endpoint is the node's public endpoint.
-	Endpoint netip.AddrPort
-	// ASN is the node's ASN.
-	ASN uint32
+	Endpoint netip.Addr
 	// PrivateIPv4 is the node's private IPv4 address.
 	PrivateIPv4 netip.Prefix
 	// NetworkIPv6 is the node's IPv6 network.
@@ -73,6 +67,8 @@ type Node struct {
 	GRPCPort int
 	// RaftPort is the node's Raft port.
 	RaftPort int
+	// WireguardPort is the node's Wireguard port.
+	WireguardPort int
 	// CreatedAt is the time the node was created.
 	CreatedAt time.Time
 	// UpdatedAt is the time the node was last updated.
@@ -86,15 +82,15 @@ type CreateOptions struct {
 	// PublicKey is the node's public key.
 	PublicKey wgtypes.Key
 	// Endpoint is the public endpoint of the node.
-	Endpoint netip.AddrPort
+	Endpoint netip.Addr
 	// NetworkIPv6 is true if the node's network is IPv6.
 	NetworkIPv6 netip.Prefix
 	// GRPCPort is the node's GRPC port.
 	GRPCPort int
 	// RaftPort is the node's Raft port.
 	RaftPort int
-	// AssignASN is true if an ASN should be assigned to the node.
-	AssignASN bool
+	// WireguardPort is the node's Wireguard port.
+	WireguardPort int
 }
 
 // New returns a new Peers interface.
@@ -124,10 +120,11 @@ func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) 
 			String: opts.PublicKey.String(),
 			Valid:  true,
 		},
-		GrpcPort:  int64(opts.GRPCPort),
-		RaftPort:  int64(opts.RaftPort),
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		GrpcPort:      int64(opts.GRPCPort),
+		RaftPort:      int64(opts.RaftPort),
+		WireguardPort: int64(opts.WireguardPort),
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
 	}
 	if opts.NetworkIPv6.IsValid() {
 		params.NetworkIpv6 = sql.NullString{
@@ -149,37 +146,7 @@ func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) 
 	if err != nil {
 		return nil, fmt.Errorf("convert node model to node: %w", err)
 	}
-	if opts.AssignASN {
-		asn, err := p.AssignASN(ctx, opts.PublicKey.String())
-		if err != nil {
-			return nil, fmt.Errorf("assign node ASN: %w", err)
-		}
-		out.ASN = uint32(asn)
-	}
 	return out, nil
-}
-
-// AssignASN assigns an ASN to a node.
-func (p *peers) AssignASN(ctx context.Context, nodeID string) (uint32, error) {
-	q := raftdb.New(p.store.DB())
-	asn, err := q.AssignNodeASN(ctx, raftdb.AssignNodeASNParams{
-		NodeID:    nodeID,
-		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		return 0, fmt.Errorf("assign ASN: %w", err)
-	}
-	return uint32(asn.Asn), nil
-}
-
-// UnassignASN unassigns an ASN from a node.
-func (p *peers) UnassignASN(ctx context.Context, nodeID string) error {
-	q := raftdb.New(p.store.DB())
-	err := q.UnassignNodeASN(ctx, nodeID)
-	if err != nil {
-		return fmt.Errorf("unassign ASN: %w", err)
-	}
-	return nil
 }
 
 // Get gets a node by public key.
@@ -199,9 +166,9 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 			return nil, fmt.Errorf("parse node public key: %w", err)
 		}
 	}
-	var endpoint netip.AddrPort
+	var endpoint netip.Addr
 	if node.Endpoint.Valid {
-		endpoint, err = netip.ParseAddrPort(node.Endpoint.String)
+		endpoint, err = netip.ParseAddr(node.Endpoint.String)
 		if err != nil {
 			return nil, fmt.Errorf("parse node endpoint: %w", err)
 		}
@@ -220,16 +187,16 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 		}
 	}
 	return &Node{
-		ID:          node.ID,
-		PublicKey:   key,
-		Endpoint:    endpoint,
-		ASN:         uint32(node.Asn),
-		PrivateIPv4: privateIPv4,
-		NetworkIPv6: privateIPv6,
-		GRPCPort:    int(node.GrpcPort),
-		RaftPort:    int(node.RaftPort),
-		UpdatedAt:   node.UpdatedAt,
-		CreatedAt:   node.CreatedAt,
+		ID:            node.ID,
+		PublicKey:     key,
+		Endpoint:      endpoint,
+		PrivateIPv4:   privateIPv4,
+		NetworkIPv6:   privateIPv6,
+		GRPCPort:      int(node.GrpcPort),
+		RaftPort:      int(node.RaftPort),
+		WireguardPort: int(node.WireguardPort),
+		UpdatedAt:     node.UpdatedAt,
+		CreatedAt:     node.CreatedAt,
 	}, nil
 }
 
@@ -237,9 +204,10 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
 	q := raftdb.New(p.store.DB())
 	params := raftdb.UpdateNodeParams{
-		ID:       node.ID,
-		GrpcPort: int64(node.GRPCPort),
-		RaftPort: int64(node.RaftPort),
+		ID:            node.ID,
+		GrpcPort:      int64(node.GRPCPort),
+		RaftPort:      int64(node.RaftPort),
+		WireguardPort: int64(node.WireguardPort),
 		PublicKey: sql.NullString{
 			String: node.PublicKey.String(),
 			Valid:  true,
@@ -266,11 +234,6 @@ func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("convert node model to node: %w", err)
 	}
-	if node.ASN != 0 {
-		// Pass the ASN through if it was provided.
-		// We assign and remove these via other methods.
-		out.ASN = node.ASN
-	}
 	return out, nil
 }
 
@@ -293,9 +256,9 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
 		}
-		var endpoint netip.AddrPort
+		var endpoint netip.Addr
 		if node.Endpoint.Valid {
-			endpoint, err = netip.ParseAddrPort(node.Endpoint.String)
+			endpoint, err = netip.ParseAddr(node.Endpoint.String)
 			if err != nil {
 				return nil, fmt.Errorf("parse node endpoint: %w", err)
 			}
@@ -314,16 +277,16 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 			}
 		}
 		out[i] = Node{
-			ID:          node.ID,
-			PublicKey:   key,
-			Endpoint:    endpoint,
-			ASN:         uint32(node.Asn),
-			PrivateIPv4: networkv4,
-			NetworkIPv6: networkv6,
-			GRPCPort:    int(node.GrpcPort),
-			RaftPort:    int(node.RaftPort),
-			UpdatedAt:   node.UpdatedAt,
-			CreatedAt:   node.CreatedAt,
+			ID:            node.ID,
+			PublicKey:     key,
+			Endpoint:      endpoint,
+			PrivateIPv4:   networkv4,
+			NetworkIPv6:   networkv6,
+			GRPCPort:      int(node.GrpcPort),
+			RaftPort:      int(node.RaftPort),
+			WireguardPort: int(node.WireguardPort),
+			UpdatedAt:     node.UpdatedAt,
+			CreatedAt:     node.CreatedAt,
 		}
 	}
 	return out, nil
@@ -345,9 +308,9 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
 		}
-		var endpoint netip.AddrPort
+		var endpoint netip.Addr
 		if peer.Endpoint.Valid {
-			endpoint, err = netip.ParseAddrPort(peer.Endpoint.String)
+			endpoint, err = netip.ParseAddr(peer.Endpoint.String)
 			if err != nil {
 				return nil, fmt.Errorf("parse node endpoint: %w", err)
 			}
@@ -366,16 +329,16 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 			}
 		}
 		peers[i] = Node{
-			ID:          peer.ID,
-			PublicKey:   key,
-			Endpoint:    endpoint,
-			ASN:         uint32(peer.Asn),
-			PrivateIPv4: networkv4,
-			NetworkIPv6: networkv6,
-			GRPCPort:    int(peer.GrpcPort),
-			RaftPort:    int(peer.RaftPort),
-			UpdatedAt:   peer.UpdatedAt,
-			CreatedAt:   peer.CreatedAt,
+			ID:            peer.ID,
+			PublicKey:     key,
+			Endpoint:      endpoint,
+			PrivateIPv4:   networkv4,
+			NetworkIPv6:   networkv6,
+			GRPCPort:      int(peer.GrpcPort),
+			RaftPort:      int(peer.RaftPort),
+			WireguardPort: int(peer.WireguardPort),
+			UpdatedAt:     peer.UpdatedAt,
+			CreatedAt:     peer.CreatedAt,
 		}
 	}
 	return peers, nil
@@ -384,7 +347,7 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 func nodeModelToNode(node *raftdb.Node) (*Node, error) {
 	var err error
 	var key wgtypes.Key
-	var endpoint netip.AddrPort
+	var endpoint netip.Addr
 	if node.PublicKey.Valid {
 		key, err = wgtypes.ParseKey(node.PublicKey.String)
 		if err != nil {
@@ -392,7 +355,7 @@ func nodeModelToNode(node *raftdb.Node) (*Node, error) {
 		}
 	}
 	if node.Endpoint.Valid {
-		endpoint, err = netip.ParseAddrPort(node.Endpoint.String)
+		endpoint, err = netip.ParseAddr(node.Endpoint.String)
 		if err != nil {
 			return nil, fmt.Errorf("parse endpoint: %w", err)
 		}
@@ -405,12 +368,13 @@ func nodeModelToNode(node *raftdb.Node) (*Node, error) {
 		}
 	}
 	return &Node{
-		ID:          node.ID,
-		PublicKey:   key,
-		Endpoint:    endpoint,
-		NetworkIPv6: networkV6,
-		GRPCPort:    int(node.GrpcPort),
-		RaftPort:    int(node.RaftPort),
-		CreatedAt:   node.CreatedAt,
+		ID:            node.ID,
+		PublicKey:     key,
+		Endpoint:      endpoint,
+		NetworkIPv6:   networkV6,
+		GRPCPort:      int(node.GrpcPort),
+		RaftPort:      int(node.RaftPort),
+		WireguardPort: int(node.WireguardPort),
+		CreatedAt:     node.CreatedAt,
 	}, nil
 }

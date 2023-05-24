@@ -9,12 +9,6 @@ import (
 	"time"
 )
 
-type Asn struct {
-	Asn       int64     `json:"asn"`
-	NodeID    string    `json:"node_id"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
 type Lease struct {
 	NodeID    string    `json:"node_id"`
 	Ipv4      string    `json:"ipv4"`
@@ -27,14 +21,20 @@ type MeshState struct {
 }
 
 type Node struct {
-	ID          string         `json:"id"`
-	PublicKey   sql.NullString `json:"public_key"`
-	RaftPort    int64          `json:"raft_port"`
-	GrpcPort    int64          `json:"grpc_port"`
-	Endpoint    sql.NullString `json:"endpoint"`
-	NetworkIpv6 sql.NullString `json:"network_ipv6"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID            string         `json:"id"`
+	PublicKey     sql.NullString `json:"public_key"`
+	RaftPort      int64          `json:"raft_port"`
+	GrpcPort      int64          `json:"grpc_port"`
+	WireguardPort int64          `json:"wireguard_port"`
+	Endpoint      sql.NullString `json:"endpoint"`
+	NetworkIpv6   sql.NullString `json:"network_ipv6"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+}
+
+type NodePrivateRaftAddress struct {
+	NodeID  string       `json:"node_id"`
+	Address sql.NullBool `json:"address"`
 }
 
 type NodePrivateRpcAddress struct {
@@ -42,7 +42,17 @@ type NodePrivateRpcAddress struct {
 	Address sql.NullBool `json:"address"`
 }
 
+type NodePublicRaftAddress struct {
+	NodeID  string       `json:"node_id"`
+	Address sql.NullBool `json:"address"`
+}
+
 type NodePublicRpcAddress struct {
+	NodeID  string       `json:"node_id"`
+	Address sql.NullBool `json:"address"`
+}
+
+type NodePublicWireguardEndpoint struct {
 	NodeID  string       `json:"node_id"`
 	Address sql.NullBool `json:"address"`
 }

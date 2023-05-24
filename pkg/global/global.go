@@ -19,11 +19,15 @@ package global
 
 import (
 	"flag"
+	"net"
+	"net/netip"
+	"strconv"
 
 	"gitlab.com/webmesh/node/pkg/services"
 	"gitlab.com/webmesh/node/pkg/store"
 	"gitlab.com/webmesh/node/pkg/store/streamlayer"
 	"gitlab.com/webmesh/node/pkg/util"
+	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 
 const (
@@ -37,6 +41,7 @@ const (
 	GlobalInsecureEnvVar           = "GLOBAL_INSECURE"
 	GlobalNoIPv4EnvVar             = "GLOBAL_NO_IPV4"
 	GlobalNoIPv6EnvVar             = "GLOBAL_NO_IPV6"
+	GlobalEndpointEnvVar           = "GLOBAL_ENDPOINT"
 )
 
 // Options are the global options.
@@ -62,6 +67,10 @@ type Options struct {
 	NoIPv4 bool `yaml:"no-ipv4" json:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is true if IPv6 should be disabled.
 	NoIPv6 bool `yaml:"no-ipv6" json:"no-ipv6" toml:"no-ipv6"`
+	// Endpoint is the publicly routable address of this node. Setting this value
+	// will override the store advertise address and wireguard endpoints with their
+	// configured listen ports.
+	Endpoint string `yaml:"endpoint" json:"endpoint" toml:"endpoint"`
 }
 
 // NewOptions creates new options.
@@ -92,10 +101,19 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		"Disable use of IPv4 globally.")
 	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(GlobalLogLevelEnvVar, "info"),
 		"Log level (debug, info, warn, error)")
+	fs.StringVar(&o.Endpoint, "global.endpoint", util.GetEnvDefault(GlobalEndpointEnvVar, ""),
+		`The publicly routable address of this node. Setting this value
+will override the address portion of the store advertise address
+and wireguard endpoints. This is only necessary if you intend for
+this node's API to be reachable outside the network.`)
 }
 
 // Overlay overlays the global options onto the given option sets.
 func (o *Options) Overlay(opts ...any) {
+	var endpoint netip.Addr
+	if o.Endpoint != "" {
+		endpoint, _ = netip.ParseAddr(o.Endpoint)
+	}
 	for _, opt := range opts {
 		switch v := opt.(type) {
 		case *store.Options:
@@ -104,6 +122,27 @@ func (o *Options) Overlay(opts ...any) {
 			}
 			if !v.NoIPv6 {
 				v.NoIPv6 = o.NoIPv6
+			}
+			if endpoint.IsValid() {
+				var raftPort uint64
+				v.NodeEndpoint = endpoint.String()
+				for _, inOpts := range opts {
+					if vopt, ok := inOpts.(*streamlayer.Options); ok {
+						_, port, err := net.SplitHostPort(vopt.ListenAddress)
+						if err == nil {
+							raftPort, err = strconv.ParseUint(port, 10, 16)
+							break
+						}
+					}
+				}
+				if raftPort == 0 {
+					raftPort = 9443
+				}
+				v.AdvertiseAddress = netip.AddrPortFrom(endpoint, uint16(raftPort)).String()
+			}
+		case *wireguard.Options:
+			if endpoint.IsValid() {
+				v.Endpoint = netip.AddrPortFrom(endpoint, uint16(v.ListenPort)).String()
 			}
 		case *services.Options:
 			if !v.Insecure {

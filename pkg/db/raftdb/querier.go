@@ -9,7 +9,6 @@ import (
 )
 
 type Querier interface {
-	AssignNodeASN(ctx context.Context, arg AssignNodeASNParams) (Asn, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	DeleteNode(ctx context.Context, id string) error
 	GetIPv4Prefix(ctx context.Context) (string, error)
@@ -28,7 +27,6 @@ type Querier interface {
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
 	SetIPv4Prefix(ctx context.Context, value string) error
 	SetULAPrefix(ctx context.Context, value string) error
-	UnassignNodeASN(ctx context.Context, nodeID string) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 }
 

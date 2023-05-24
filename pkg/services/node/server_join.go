@@ -58,9 +58,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
-	var endpoint netip.AddrPort
+	var endpoint netip.Addr
 	if req.GetEndpoint() != "" {
-		endpoint, err = netip.ParseAddrPort(req.GetEndpoint())
+		endpoint, err = netip.ParseAddr(req.GetEndpoint())
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid endpoint: %v", err)
 		}
@@ -86,6 +86,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if peer.RaftPort != int(req.GetRaftPort()) {
 			peer.RaftPort = int(req.GetRaftPort())
 		}
+		if peer.WireguardPort != int(req.GetWireguardPort()) {
+			peer.WireguardPort = int(req.GetWireguardPort())
+		}
 		if peer.Endpoint != endpoint {
 			peer.Endpoint = endpoint
 		}
@@ -101,33 +104,22 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
 		}
 		peer, err = s.peers.Create(ctx, &peers.CreateOptions{
-			ID:          req.GetId(),
-			PublicKey:   publicKey,
-			Endpoint:    endpoint,
-			NetworkIPv6: networkIPv6,
-			GRPCPort:    int(req.GetGrpcPort()),
-			RaftPort:    int(req.GetRaftPort()),
-			AssignASN:   req.GetAssignAsn(),
+			ID:            req.GetId(),
+			PublicKey:     publicKey,
+			Endpoint:      endpoint,
+			NetworkIPv6:   networkIPv6,
+			GRPCPort:      int(req.GetGrpcPort()),
+			RaftPort:      int(req.GetRaftPort()),
+			WireguardPort: int(req.GetWireguardPort()),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
 		}
 	}
 
+	// Start building the response
 	resp := &v1.JoinResponse{
 		NetworkIpv6: peer.NetworkIPv6.String(),
-		Asn:         peer.ASN,
-	}
-
-	// Check if we need to assign an ASN to an existing node
-	if req.GetAssignAsn() && peer.ASN == 0 {
-		log.Info("assigning ASN to peer")
-		asn, err := s.peers.AssignASN(ctx, req.GetId())
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to assign ASN: %v", err)
-		}
-		log.Info("assigned ASN to peer", slog.Int("asn", int(asn)))
-		resp.Asn = asn
 	}
 	var lease netip.Prefix
 	if req.GetAssignIpv4() {
@@ -172,10 +164,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		resp.Peers[i] = &v1.WireguardPeer{
 			Id:        peer.ID,
 			PublicKey: peer.PublicKey.String(),
-			Asn:       peer.ASN,
 			Endpoint: func() string {
 				if peer.Endpoint.IsValid() {
-					return peer.Endpoint.String()
+					return netip.AddrPortFrom(peer.Endpoint, uint16(peer.WireguardPort)).String()
 				}
 				return ""
 			}(),

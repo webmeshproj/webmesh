@@ -90,11 +90,11 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			PublicKey:      key.PublicKey().String(),
 			RaftPort:       int32(s.sl.ListenPort()),
 			GrpcPort:       int32(s.opts.GRPCAdvertisePort),
-			Endpoint:       s.wgopts.Endpoint,
+			WireguardPort:  int32(s.wgopts.ListenPort),
+			Endpoint:       s.opts.NodeEndpoint,
 			AssignIpv4:     !s.opts.NoIPv4,
 			PreferRaftIpv6: s.opts.RaftPreferIPv6,
 			AsVoter:        s.opts.JoinAsVoter,
-			AssignAsn:      true, // TODO: Make this configurable
 		}
 		log.Info("sending join request to node", slog.Any("req", req))
 		resp, err = client.Join(ctx, req)

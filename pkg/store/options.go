@@ -31,6 +31,7 @@ import (
 
 const (
 	NodeIDEnvVar                    = "STORE_NODE_ID"
+	NodeEndpointEnvVar              = "STORE_NODE_ENDPOINT"
 	DataDirEnvVar                   = "STORE_DATA_DIR"
 	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
 	ConnectionPoolCountEnvVar       = "STORE_CONNECTION_POOL_COUNT"
@@ -98,6 +99,9 @@ func (r RaftLogFormat) IsValid() bool {
 type Options struct {
 	// NodeID is the node ID.
 	NodeID string `json:"node-id" yaml:"node-id" toml:"node-id"`
+	// NodeEndpoint is the endpoint to broadcast when joining a cluster.
+	// This is only necessary if the node intends on exposing it's API.
+	NodeEndpoint string `json:"node-endpoint" yaml:"node-endpoint" toml:"node-endpoint"`
 	// DataDir is the directory to store data in.
 	DataDir string `json:"data-dir" yaml:"data-dir" toml:"data-dir"`
 	// AdvertiseAddress is the initial address to advertise for raft consensus.
@@ -208,6 +212,12 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 		"Store data directory.")
 	fl.BoolVar(&o.Bootstrap, "store.bootstrap", util.GetEnvDefault(BootstrapEnvVar, "false") == "true",
 		"Bootstrap the cluster.")
+
+	fl.StringVar(&o.NodeEndpoint, "store.node-endpoint", util.GetEnvDefault(NodeEndpointEnvVar, ""),
+		`NodeEndpoint is the endpoint to broadcast when joining a cluster.
+This is only necessary if the node intends on exposing it's API. When
+bootstrapping a cluster with a node that has an empty NodeEndpoint, the
+node will use the AdvertiseAddress as the NodeEndpoint.`)
 
 	fl.StringVar(&o.BootstrapServers, "store.bootstrap-servers", util.GetEnvDefault(BootstrapServersEnvVar, ""),
 		`Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
