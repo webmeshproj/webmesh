@@ -16,22 +16,22 @@ CREATE TABLE nodes (
     network_ipv6      TEXT UNIQUE,
     allowed_ips       TEXT,
     available_zones   TEXT,
-    created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at        TIMESTAMP NOT NULL,
+    updated_at        TIMESTAMP NOT NULL
 );
 
 -- Tracks BGP ASNs for nodes.
 CREATE TABLE asns (
     asn         INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (asn > 0 AND asn < 65536),
     node_id     TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
-    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at  TIMESTAMP NOT NULL
 );
 
 -- Tracks IPv4 leases for nodes.
 CREATE TABLE leases (
     node_id     TEXT NOT NULL UNIQUE REFERENCES nodes (id) ON DELETE CASCADE,
     ipv4        TEXT NOT NULL UNIQUE,
-    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at  TIMESTAMP NOT NULL
 );
 
 CREATE VIEW node_rpc_addresses AS

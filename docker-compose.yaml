@@ -30,6 +30,7 @@ services:
       - --store.data-dir=/data
       - --store.raft-log-level=debug
       - --wireguard.endpoint=10.1.0.1:51820
+      - --wireguard.no-modprobe
       - --grpc.enable-metrics
     volumes:
       - /lib/modules:/lib/modules
@@ -53,6 +54,7 @@ services:
       - --store.data-dir=/data
       - --store.raft-log-level=debug
       - --wireguard.endpoint=10.1.0.2:51820
+      - --wireguard.no-modprobe
       - --grpc.enable-metrics
     volumes:
       - /lib/modules:/lib/modules
@@ -76,6 +78,7 @@ services:
       - --store.data-dir=/data
       - --store.raft-log-level=debug
       - --wireguard.endpoint=10.1.0.3:51820
+      - --wireguard.no-modprobe
       - --grpc.enable-metrics
     volumes:
       - /lib/modules:/lib/modules

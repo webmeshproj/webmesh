@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/netip"
 	"sync"
+	"time"
 
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
@@ -97,8 +98,9 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (Lease, error) {
 			return nil, fmt.Errorf("failed to generate random IPv4 prefix: %w", err)
 		}
 		dblease, err := raftdb.New(i.store.DB()).InsertNodeLease(ctx, raftdb.InsertNodeLeaseParams{
-			NodeID: nodeID,
-			Ipv4:   prefixv4.String(),
+			NodeID:    nodeID,
+			Ipv4:      prefixv4.String(),
+			CreatedAt: time.Now().UTC(),
 		})
 		if err != nil {
 			var sqlErr *sqlite.Error

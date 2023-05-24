@@ -9,7 +9,7 @@ import (
 )
 
 type Querier interface {
-	AssignNodeASN(ctx context.Context, nodeID string) (Asn, error)
+	AssignNodeASN(ctx context.Context, arg AssignNodeASNParams) (Asn, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)

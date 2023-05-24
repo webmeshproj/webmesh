@@ -88,7 +88,7 @@ func init() {
 	flag.Usage = usage
 	flag.Parse()
 	opts.Global.Overlay(
-		opts.Store,
+		opts.Store.Options,
 		opts.Store.StreamLayer,
 		opts.GRPC,
 		opts.Wireguard,

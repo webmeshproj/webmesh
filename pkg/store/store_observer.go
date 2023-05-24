@@ -67,6 +67,9 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 }
 
 func (s *store) handlePeerObservation(change any) {
+	if s.wg == nil {
+		return
+	}
 	// TODO: make configurable
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()

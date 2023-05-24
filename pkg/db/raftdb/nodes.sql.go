@@ -12,11 +12,16 @@ import (
 )
 
 const assignNodeASN = `-- name: AssignNodeASN :one
-INSERT INTO asns (node_id) VALUES (?) RETURNING asn, node_id, created_at
+INSERT INTO asns (node_id, created_at) VALUES (?, ?) RETURNING asn, node_id, created_at
 `
 
-func (q *Queries) AssignNodeASN(ctx context.Context, nodeID string) (Asn, error) {
-	row := q.db.QueryRowContext(ctx, assignNodeASN, nodeID)
+type AssignNodeASNParams struct {
+	NodeID    string    `json:"node_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) AssignNodeASN(ctx context.Context, arg AssignNodeASNParams) (Asn, error) {
+	row := q.db.QueryRowContext(ctx, assignNodeASN, arg.NodeID, arg.CreatedAt)
 	var i Asn
 	err := row.Scan(&i.Asn, &i.NodeID, &i.CreatedAt)
 	return i, err
@@ -31,8 +36,10 @@ INSERT INTO nodes (
     allowed_ips,
     network_ipv6,
     grpc_port,
-    raft_port
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    raft_port,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, allowed_ips, available_zones, created_at, updated_at
 `
 
@@ -45,6 +52,8 @@ type CreateNodeParams struct {
 	NetworkIpv6    sql.NullString `json:"network_ipv6"`
 	GrpcPort       int64          `json:"grpc_port"`
 	RaftPort       int64          `json:"raft_port"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error) {
@@ -57,6 +66,8 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		arg.NetworkIpv6,
 		arg.GrpcPort,
 		arg.RaftPort,
+		arg.CreatedAt,
+		arg.UpdatedAt,
 	)
 	var i Node
 	err := row.Scan(
@@ -345,7 +356,7 @@ UPDATE nodes SET
     network_ipv6 = ?,
     grpc_port = ?,
     raft_port = ?,
-    updated_at = CURRENT_TIMESTAMP
+    updated_at = ?
 WHERE id = ?
 RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, allowed_ips, available_zones, created_at, updated_at
 `
@@ -358,6 +369,7 @@ type UpdateNodeParams struct {
 	NetworkIpv6    sql.NullString `json:"network_ipv6"`
 	GrpcPort       int64          `json:"grpc_port"`
 	RaftPort       int64          `json:"raft_port"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 	ID             string         `json:"id"`
 }
 
@@ -370,6 +382,7 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		arg.NetworkIpv6,
 		arg.GrpcPort,
 		arg.RaftPort,
+		arg.UpdatedAt,
 		arg.ID,
 	)
 	var i Node

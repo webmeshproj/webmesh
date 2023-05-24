@@ -7,8 +7,10 @@ INSERT INTO nodes (
     allowed_ips,
     network_ipv6,
     grpc_port,
-    raft_port
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    raft_port,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: UpdateNode :one
@@ -20,7 +22,7 @@ UPDATE nodes SET
     network_ipv6 = ?,
     grpc_port = ?,
     raft_port = ?,
-    updated_at = CURRENT_TIMESTAMP
+    updated_at = ?
 WHERE id = ?
 RETURNING *;
 
@@ -65,7 +67,7 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id
 LEFT OUTER JOIN asns ON nodes.id = asns.node_id;
 
 -- name: AssignNodeASN :one
-INSERT INTO asns (node_id) VALUES (?) RETURNING *;
+INSERT INTO asns (node_id, created_at) VALUES (?, ?) RETURNING *;
 
 -- name: UnassignNodeASN :exec
 DELETE FROM asns WHERE node_id = ?;

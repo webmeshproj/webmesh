@@ -7,20 +7,22 @@ package raftdb
 
 import (
 	"context"
+	"time"
 )
 
 const insertNodeLease = `-- name: InsertNodeLease :one
-INSERT OR REPLACE INTO leases (node_id, ipv4) VALUES (?, ?)
+INSERT OR REPLACE INTO leases (node_id, ipv4, created_at) VALUES (?, ?, ?)
 RETURNING node_id, ipv4, created_at
 `
 
 type InsertNodeLeaseParams struct {
-	NodeID string `json:"node_id"`
-	Ipv4   string `json:"ipv4"`
+	NodeID    string    `json:"node_id"`
+	Ipv4      string    `json:"ipv4"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func (q *Queries) InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error) {
-	row := q.db.QueryRowContext(ctx, insertNodeLease, arg.NodeID, arg.Ipv4)
+	row := q.db.QueryRowContext(ctx, insertNodeLease, arg.NodeID, arg.Ipv4, arg.CreatedAt)
 	var i Lease
 	err := row.Scan(&i.NodeID, &i.Ipv4, &i.CreatedAt)
 	return i, err

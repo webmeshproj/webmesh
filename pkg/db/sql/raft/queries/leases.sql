@@ -1,5 +1,5 @@
 -- name: InsertNodeLease :one
-INSERT OR REPLACE INTO leases (node_id, ipv4) VALUES (?, ?)
+INSERT OR REPLACE INTO leases (node_id, ipv4, created_at) VALUES (?, ?, ?)
 RETURNING *;
 
 -- name: ReleaseNodeLease :exec

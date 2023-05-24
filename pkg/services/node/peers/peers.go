@@ -121,8 +121,10 @@ func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) 
 			String: opts.PublicKey.String(),
 			Valid:  true,
 		},
-		GrpcPort: int64(opts.GRPCPort),
-		RaftPort: int64(opts.RaftPort),
+		GrpcPort:  int64(opts.GRPCPort),
+		RaftPort:  int64(opts.RaftPort),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
 	if opts.NetworkIPv6.IsValid() {
 		params.NetworkIpv6 = sql.NullString{
@@ -168,9 +170,12 @@ func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) 
 }
 
 // AssignASN assigns an ASN to a node.
-func (p *peers) AssignASN(ctx context.Context, publicKey string) (uint32, error) {
+func (p *peers) AssignASN(ctx context.Context, nodeID string) (uint32, error) {
 	q := raftdb.New(p.store.DB())
-	asn, err := q.AssignNodeASN(ctx, publicKey)
+	asn, err := q.AssignNodeASN(ctx, raftdb.AssignNodeASNParams{
+		NodeID:    nodeID,
+		CreatedAt: time.Now().UTC(),
+	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to assign ASN: %w", err)
 	}
@@ -178,9 +183,9 @@ func (p *peers) AssignASN(ctx context.Context, publicKey string) (uint32, error)
 }
 
 // UnassignASN unassigns an ASN from a node.
-func (p *peers) UnassignASN(ctx context.Context, publicKey string) error {
+func (p *peers) UnassignASN(ctx context.Context, nodeID string) error {
 	q := raftdb.New(p.store.DB())
-	err := q.UnassignNodeASN(ctx, publicKey)
+	err := q.UnassignNodeASN(ctx, nodeID)
 	if err != nil {
 		return fmt.Errorf("failed to unassign ASN: %w", err)
 	}
@@ -260,6 +265,7 @@ func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
 			String: node.PublicKey.String(),
 			Valid:  true,
 		},
+		UpdatedAt: time.Now().UTC(),
 	}
 	if node.Endpoint.IsValid() {
 		params.Endpoint = sql.NullString{
