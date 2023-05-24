@@ -12,7 +12,7 @@ CREATE TABLE node_local_kv (
 
 CREATE TABLE wireguard_key (
     id          INTEGER NOT NULL PRIMARY KEY, -- Always 1
-    private_key TEXT NOT NULL PRIMARY KEY,
+    private_key TEXT NOT NULL,
     expires_at  TIMESTAMP
 );
 
