@@ -211,7 +211,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		// We are behind a NAT and the peer is too.
 		// No reason to track them
 		return nil
-	} else {
+	} else { // nolint:staticcheck
 		// We are publicly accessible and the peer isn't.
 		// We allow their private addresses to be routed to us (above).
 		// TODO: Make this configurable
