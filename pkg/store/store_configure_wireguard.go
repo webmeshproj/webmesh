@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
-	"strings"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -114,15 +113,9 @@ func (s *store) refreshWireguardPeers(ctx context.Context) error {
 			}
 		}
 		wgpeer := wireguard.Peer{
-			ID:        peer.ID,
-			PublicKey: peer.PublicKey.String,
-			Endpoint:  peer.Endpoint.String,
-			AllowedIPs: func() []string {
-				if peer.AllowedIps.Valid {
-					return strings.Split(peer.AllowedIps.String, ",")
-				}
-				return nil
-			}(),
+			ID:          peer.ID,
+			PublicKey:   peer.PublicKey.String,
+			Endpoint:    peer.Endpoint.String,
 			PrivateIPv4: privateIPv4,
 			PrivateIPv6: privateIPv6,
 		}

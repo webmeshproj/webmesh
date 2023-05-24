@@ -17,20 +17,27 @@ limitations under the License.
 package wireguard
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 	"net/netip"
+	"regexp"
+	"strings"
+	"time"
 
 	"gitlab.com/webmesh/node/pkg/util"
 )
 
 const (
-	WireguardListenPortEnvVar = "WIREGUARD_LISTEN_PORT"
-	WireguardEndpointEnvVar   = "WIREGUARD_ENDPOINT"
-	WireguardNameEnvVar       = "WIREGUARD_NAME"
-	WireguardForceNameEnvVar  = "WIREGUARD_FORCE_NAME"
-	WireguardForceTUNEnvVar   = "WIREGUARD_FORCE_TUN"
-	WireguardNoModprobeEnvVar = "WIREGUARD_NO_MODPROBE"
-	WireguardMasqueradeEnvVar = "WIREGUARD_MASQUERADE"
+	WireguardListenPortEnvVar          = "WIREGUARD_LISTEN_PORT"
+	WireguardEndpointEnvVar            = "WIREGUARD_ENDPOINT"
+	WireguardNameEnvVar                = "WIREGUARD_NAME"
+	WireguardForceNameEnvVar           = "WIREGUARD_FORCE_NAME"
+	WireguardForceTUNEnvVar            = "WIREGUARD_FORCE_TUN"
+	WireguardNoModprobeEnvVar          = "WIREGUARD_NO_MODPROBE"
+	WireguardMasqueradeEnvVar          = "WIREGUARD_MASQUERADE"
+	WireguardAllowedIPsEnvVar          = "WIREGUARD_ALLOWED_IPS"
+	WireguardPersistentKeepaliveEnvVar = "WIREGUARD_PERSISTENT_KEEPALIVE"
 )
 
 // Options are options for configuring the wireguard interface.
@@ -56,6 +63,26 @@ type Options struct {
 	NoModprobe bool `yaml:"no-modprobe" json:"no-modprobe" toml:"no-modprobe"`
 	// Masquerade enables masquerading of traffic from the wireguard interface.
 	Masquerade bool `yaml:"masquerade" json:"masquerade" toml:"masquerade"`
+	// AllowedIPs is a map of peers to allowed IPs. The peers can either be
+	// public keys  or regexes matching peer IDs.
+	//
+	// AllowedIPs in this context refers to the IP addresses that this instance
+	// will route to the peer. The peer will also need to configure AllowedIPs
+	// for this instance's IP address. IP addresses for a peer can also be requested
+	// dynamically by the peer using the inter-node API.
+	//
+	// The format is a whitespace separated list of key-value pairs, where the key is
+	// the peer to match and the value is a comman-separated list of IP CIDRs.
+	// For example:
+	//
+	//   "peer1=10.0.0.0/24,10.0.1.0/24 peer2="10.0.2.0/24"
+	//
+	AllowedIPs string `yaml:"allowed-ips" json:"allowed-ips" toml:"allowed-ips"`
+	// PersistentKeepAlive is the interval at which to send keepalive packets
+	// to peers. If unset, keepalive packets will automatically be sent to publicly
+	// accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
+	// packets are sent.
+	PersistentKeepAlive time.Duration `yaml:"persistent-keepalive" json:"persistent-keepalive" toml:"persistent-keepalive"`
 }
 
 // NewOptions returns a new Options with sensible defaults.
@@ -82,4 +109,100 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 		"Don't attempt to probe the wireguard module.")
 	fl.BoolVar(&o.Masquerade, "wireguard.masquerade", util.GetEnvDefault(WireguardMasqueradeEnvVar, "false") == "true",
 		"Masquerade traffic from the wireguard interface.")
+	fl.DurationVar(&o.PersistentKeepAlive, "wireguard.persistent-keepalive", util.GetEnvDurationDefault(WireguardPersistentKeepaliveEnvVar, 0),
+		`PersistentKeepAlive is the interval at which to send keepalive packets
+to peers. If unset, keepalive packets will automatically be sent to publicly
+accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
+packets are sent.`)
+	fl.StringVar(&o.AllowedIPs, "wireguard.allowed-ips", util.GetEnvDefault(WireguardAllowedIPsEnvVar, ""),
+		`AllowedIPs is a map of peers to allowed IPs. The peers can either be
+peer IDs or regexes matching peer IDs. These IP addresses should not overlap 
+with the private network of the wireguard interface. AllowedIPs in this context 
+refers to the IP addresses that this instance will route to the peer. The peer 
+will also need to configure AllowedIPs for this instance's IP address. IP 
+addresses for a peer can also be requested dynamically by the peer using the 
+inter-node API.
+
+The format is a whitespace separated list of key-value pairs, where the key is
+the peer to match and the value is a comman-separated list of IP CIDRs.
+For example:
+
+	# Peer names
+	--wireguard.allowed-ips="peer1=10.0.0.0/24,10.0.1.0/24 peer2="10.0.2.0/24"
+	# Peer regexes
+	--wireguard.allowed-ips="peer.*=10.0.0.0/16"
+`)
+}
+
+// Validate validates the options.
+func (o *Options) Validate() error {
+	if o.ListenPort <= 1024 {
+		return errors.New("wireguard.listen-port must be greater than 1024")
+	}
+	if o.Name == "" {
+		return errors.New("wireguard.name must not be empty")
+	}
+	if o.PersistentKeepAlive < 0 {
+		return errors.New("wireguard.persistent-keepalive must not be negative")
+	}
+	if o.AllowedIPs == "" {
+		return nil
+	}
+	_, err := parseAllowedIPsMap(o.AllowedIPs)
+	return err
+}
+
+func parseAllowedIPsMap(allowedIPs string) (*peerConfigs, error) {
+	spl := strings.Fields(allowedIPs)
+	peerMatchers := make([]*peerMatcher, len(spl))
+	for i, s := range spl {
+		matcherStr, ips, found := strings.Cut(s, "=")
+		if !found {
+			return nil, fmt.Errorf("invalid allowed-ips format: %s", s)
+		}
+		var matcher peerMatcher
+		peerNameRegex, err := regexp.Compile(matcherStr)
+		if err == nil {
+			matcher.peerNameRegex = peerNameRegex
+		} else {
+			matcher.peerName = matcherStr
+		}
+		for _, ipStr := range strings.Split(ips, ",") {
+			prefix, err := netip.ParsePrefix(ipStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid allowed-ips format: %s", s)
+			}
+			matcher.allowedIPs = append(matcher.allowedIPs, prefix)
+		}
+		peerMatchers[i] = &matcher
+	}
+	return &peerConfigs{
+		peerMatchers: peerMatchers,
+	}, nil
+}
+
+type peerConfigs struct {
+	peerMatchers []*peerMatcher
+}
+
+func (o *peerConfigs) AllowedIPs(peerName string) []netip.Prefix {
+	for _, matcher := range o.peerMatchers {
+		if matcher.Match(peerName) {
+			return matcher.allowedIPs
+		}
+	}
+	return nil
+}
+
+type peerMatcher struct {
+	peerName      string
+	peerNameRegex *regexp.Regexp
+	allowedIPs    []netip.Prefix
+}
+
+func (p *peerMatcher) Match(name string) bool {
+	if p.peerNameRegex != nil {
+		return p.peerNameRegex.MatchString(name)
+	}
+	return p.peerName == name
 }

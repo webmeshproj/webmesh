@@ -22,7 +22,6 @@ import (
 	"net/netip"
 	"strconv"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -90,12 +89,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if peer.Endpoint != endpoint {
 			peer.Endpoint = endpoint
 		}
-		if !cmp.Equal(peer.AllowedIPs, req.GetAllowedIps()) {
-			peer.AllowedIPs = req.GetAllowedIps()
-		}
-		if !cmp.Equal(peer.AvailableZones, req.GetAvailableZones()) {
-			peer.AvailableZones = req.GetAvailableZones()
-		}
 		peer, err = s.peers.Update(ctx, peer)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
@@ -108,15 +101,13 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
 		}
 		peer, err = s.peers.Create(ctx, &peers.CreateOptions{
-			ID:             req.GetId(),
-			PublicKey:      publicKey,
-			Endpoint:       endpoint,
-			NetworkIPv6:    networkIPv6,
-			GRPCPort:       int(req.GetGrpcPort()),
-			RaftPort:       int(req.GetRaftPort()),
-			AllowedIPs:     req.GetAllowedIps(),
-			AvailableZones: req.GetAvailableZones(),
-			AssignASN:      req.GetAssignAsn(),
+			ID:          req.GetId(),
+			PublicKey:   publicKey,
+			Endpoint:    endpoint,
+			NetworkIPv6: networkIPv6,
+			GRPCPort:    int(req.GetGrpcPort()),
+			RaftPort:    int(req.GetRaftPort()),
+			AssignASN:   req.GetAssignAsn(),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
@@ -200,7 +191,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 				return ""
 			}(),
-			AllowedIps: peer.AllowedIPs,
 		}
 	}
 	return resp, nil

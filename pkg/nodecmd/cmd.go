@@ -135,18 +135,19 @@ func Execute() error {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
 
-	var err error
-
 	// Validate options
+	var err error
 	err = opts.Store.StreamLayer.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate stream layer options: %w", err)
 	}
-
-	// Validate remaining options
 	err = opts.Store.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate store options: %w", err)
+	}
+	err = opts.Wireguard.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to validate wireguard options: %w", err)
 	}
 
 	log.Info("starting raft node")

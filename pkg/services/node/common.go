@@ -33,8 +33,6 @@ func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Serv
 			}
 			return ""
 		}(),
-		AllowedIps:     node.AllowedIPs,
-		AvailableZones: node.AvailableZones,
 		PublicKey: func() string {
 			if len(node.PublicKey) > 0 {
 				return node.PublicKey.String()

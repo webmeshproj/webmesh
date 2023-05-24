@@ -94,10 +94,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			AssignIpv4:     !s.opts.NoIPv4,
 			PreferRaftIpv6: s.opts.RaftPreferIPv6,
 			AsVoter:        s.opts.JoinAsVoter,
-			// TODO:
-			AllowedIps:     nil,
-			AvailableZones: nil,
-			AssignAsn:      true,
+			AssignAsn:      true, // TODO: Make this configurable
 		}
 		log.Info("sending join request to node", slog.Any("req", req))
 		resp, err = client.Join(ctx, req)
@@ -142,10 +139,9 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	}
 	for _, peer := range resp.GetPeers() {
 		wgpeer := wireguard.Peer{
-			ID:         peer.GetId(),
-			PublicKey:  peer.GetPublicKey(),
-			Endpoint:   peer.GetEndpoint(),
-			AllowedIPs: peer.GetAllowedIps(),
+			ID:        peer.GetId(),
+			PublicKey: peer.GetPublicKey(),
+			Endpoint:  peer.GetEndpoint(),
 		}
 		if peer.GetAddressIpv4() != "" && !s.opts.NoIPv4 {
 			wgpeer.PrivateIPv4, err = netip.ParsePrefix(peer.GetAddressIpv4())

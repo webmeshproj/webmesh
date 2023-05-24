@@ -3,22 +3,18 @@ INSERT INTO nodes (
     id,
     public_key,
     endpoint,
-    available_zones,
-    allowed_ips,
     network_ipv6,
     grpc_port,
     raft_port,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: UpdateNode :one
 UPDATE nodes SET
     public_key = ?,
     endpoint = ?,
-    available_zones = ?,
-    allowed_ips = ?,
     network_ipv6 = ?,
     grpc_port = ?,
     raft_port = ?,
@@ -49,8 +45,6 @@ SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
     nodes.endpoint AS endpoint,
-    nodes.allowed_ips AS allowed_ips,
-    nodes.available_zones AS available_zones,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
@@ -68,8 +62,6 @@ SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
     nodes.endpoint AS endpoint,
-    nodes.allowed_ips AS allowed_ips,
-    nodes.available_zones AS available_zones,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
@@ -93,8 +85,6 @@ SELECT
     nodes.public_key AS public_key,
     COALESCE(asns.asn, 0) AS asn,
     nodes.endpoint AS endpoint,
-    nodes.allowed_ips AS allowed_ips,
-    nodes.available_zones AS available_zones,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
@@ -112,7 +102,6 @@ SELECT
     nodes.public_key AS public_key,
     COALESCE(asns.asn, 0) AS asn,
     nodes.endpoint AS endpoint,
-    nodes.allowed_ips AS allowed_ips,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,

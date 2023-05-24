@@ -32,28 +32,24 @@ INSERT INTO nodes (
     id,
     public_key,
     endpoint,
-    available_zones,
-    allowed_ips,
     network_ipv6,
     grpc_port,
     raft_port,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, allowed_ips, available_zones, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, created_at, updated_at
 `
 
 type CreateNodeParams struct {
-	ID             string         `json:"id"`
-	PublicKey      sql.NullString `json:"public_key"`
-	Endpoint       sql.NullString `json:"endpoint"`
-	AvailableZones sql.NullString `json:"available_zones"`
-	AllowedIps     sql.NullString `json:"allowed_ips"`
-	NetworkIpv6    sql.NullString `json:"network_ipv6"`
-	GrpcPort       int64          `json:"grpc_port"`
-	RaftPort       int64          `json:"raft_port"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID          string         `json:"id"`
+	PublicKey   sql.NullString `json:"public_key"`
+	Endpoint    sql.NullString `json:"endpoint"`
+	NetworkIpv6 sql.NullString `json:"network_ipv6"`
+	GrpcPort    int64          `json:"grpc_port"`
+	RaftPort    int64          `json:"raft_port"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
 func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error) {
@@ -61,8 +57,6 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		arg.ID,
 		arg.PublicKey,
 		arg.Endpoint,
-		arg.AvailableZones,
-		arg.AllowedIps,
 		arg.NetworkIpv6,
 		arg.GrpcPort,
 		arg.RaftPort,
@@ -77,8 +71,6 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.GrpcPort,
 		&i.Endpoint,
 		&i.NetworkIpv6,
-		&i.AllowedIps,
-		&i.AvailableZones,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -99,8 +91,6 @@ SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
     nodes.endpoint AS endpoint,
-    nodes.allowed_ips AS allowed_ips,
-    nodes.available_zones AS available_zones,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
@@ -118,8 +108,6 @@ type GetNodeRow struct {
 	ID               string         `json:"id"`
 	PublicKey        sql.NullString `json:"public_key"`
 	Endpoint         sql.NullString `json:"endpoint"`
-	AllowedIps       sql.NullString `json:"allowed_ips"`
-	AvailableZones   sql.NullString `json:"available_zones"`
 	GrpcPort         int64          `json:"grpc_port"`
 	RaftPort         int64          `json:"raft_port"`
 	NetworkIpv6      sql.NullString `json:"network_ipv6"`
@@ -136,8 +124,6 @@ func (q *Queries) GetNode(ctx context.Context, id string) (GetNodeRow, error) {
 		&i.ID,
 		&i.PublicKey,
 		&i.Endpoint,
-		&i.AllowedIps,
-		&i.AvailableZones,
 		&i.GrpcPort,
 		&i.RaftPort,
 		&i.NetworkIpv6,
@@ -155,7 +141,6 @@ SELECT
     nodes.public_key AS public_key,
     COALESCE(asns.asn, 0) AS asn,
     nodes.endpoint AS endpoint,
-    nodes.allowed_ips AS allowed_ips,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
@@ -171,7 +156,6 @@ type GetNodePeerRow struct {
 	PublicKey        sql.NullString `json:"public_key"`
 	Asn              int64          `json:"asn"`
 	Endpoint         sql.NullString `json:"endpoint"`
-	AllowedIps       sql.NullString `json:"allowed_ips"`
 	GrpcPort         int64          `json:"grpc_port"`
 	RaftPort         int64          `json:"raft_port"`
 	NetworkIpv6      sql.NullString `json:"network_ipv6"`
@@ -186,7 +170,6 @@ func (q *Queries) GetNodePeer(ctx context.Context, id string) (GetNodePeerRow, e
 		&i.PublicKey,
 		&i.Asn,
 		&i.Endpoint,
-		&i.AllowedIps,
 		&i.GrpcPort,
 		&i.RaftPort,
 		&i.NetworkIpv6,
@@ -277,8 +260,6 @@ SELECT
     nodes.public_key AS public_key,
     COALESCE(asns.asn, 0) AS asn,
     nodes.endpoint AS endpoint,
-    nodes.allowed_ips AS allowed_ips,
-    nodes.available_zones AS available_zones,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
@@ -296,8 +277,6 @@ type ListNodePeersRow struct {
 	PublicKey        sql.NullString `json:"public_key"`
 	Asn              int64          `json:"asn"`
 	Endpoint         sql.NullString `json:"endpoint"`
-	AllowedIps       sql.NullString `json:"allowed_ips"`
-	AvailableZones   sql.NullString `json:"available_zones"`
 	GrpcPort         int64          `json:"grpc_port"`
 	RaftPort         int64          `json:"raft_port"`
 	NetworkIpv6      sql.NullString `json:"network_ipv6"`
@@ -320,8 +299,6 @@ func (q *Queries) ListNodePeers(ctx context.Context, id string) ([]ListNodePeers
 			&i.PublicKey,
 			&i.Asn,
 			&i.Endpoint,
-			&i.AllowedIps,
-			&i.AvailableZones,
 			&i.GrpcPort,
 			&i.RaftPort,
 			&i.NetworkIpv6,
@@ -347,8 +324,6 @@ SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
     nodes.endpoint AS endpoint,
-    nodes.allowed_ips AS allowed_ips,
-    nodes.available_zones AS available_zones,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.network_ipv6 AS network_ipv6,
@@ -365,8 +340,6 @@ type ListNodesRow struct {
 	ID               string         `json:"id"`
 	PublicKey        sql.NullString `json:"public_key"`
 	Endpoint         sql.NullString `json:"endpoint"`
-	AllowedIps       sql.NullString `json:"allowed_ips"`
-	AvailableZones   sql.NullString `json:"available_zones"`
 	GrpcPort         int64          `json:"grpc_port"`
 	RaftPort         int64          `json:"raft_port"`
 	NetworkIpv6      sql.NullString `json:"network_ipv6"`
@@ -389,8 +362,6 @@ func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 			&i.ID,
 			&i.PublicKey,
 			&i.Endpoint,
-			&i.AllowedIps,
-			&i.AvailableZones,
 			&i.GrpcPort,
 			&i.RaftPort,
 			&i.NetworkIpv6,
@@ -457,34 +428,28 @@ const updateNode = `-- name: UpdateNode :one
 UPDATE nodes SET
     public_key = ?,
     endpoint = ?,
-    available_zones = ?,
-    allowed_ips = ?,
     network_ipv6 = ?,
     grpc_port = ?,
     raft_port = ?,
     updated_at = ?
 WHERE id = ?
-RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, allowed_ips, available_zones, created_at, updated_at
+RETURNING id, public_key, raft_port, grpc_port, endpoint, network_ipv6, created_at, updated_at
 `
 
 type UpdateNodeParams struct {
-	PublicKey      sql.NullString `json:"public_key"`
-	Endpoint       sql.NullString `json:"endpoint"`
-	AvailableZones sql.NullString `json:"available_zones"`
-	AllowedIps     sql.NullString `json:"allowed_ips"`
-	NetworkIpv6    sql.NullString `json:"network_ipv6"`
-	GrpcPort       int64          `json:"grpc_port"`
-	RaftPort       int64          `json:"raft_port"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	ID             string         `json:"id"`
+	PublicKey   sql.NullString `json:"public_key"`
+	Endpoint    sql.NullString `json:"endpoint"`
+	NetworkIpv6 sql.NullString `json:"network_ipv6"`
+	GrpcPort    int64          `json:"grpc_port"`
+	RaftPort    int64          `json:"raft_port"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	ID          string         `json:"id"`
 }
 
 func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error) {
 	row := q.db.QueryRowContext(ctx, updateNode,
 		arg.PublicKey,
 		arg.Endpoint,
-		arg.AvailableZones,
-		arg.AllowedIps,
 		arg.NetworkIpv6,
 		arg.GrpcPort,
 		arg.RaftPort,
@@ -499,8 +464,6 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.GrpcPort,
 		&i.Endpoint,
 		&i.NetworkIpv6,
-		&i.AllowedIps,
-		&i.AvailableZones,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -14,8 +14,6 @@ CREATE TABLE nodes (
     grpc_port         INTEGER NOT NULL DEFAULT 8443,
     endpoint          TEXT UNIQUE,
     network_ipv6      TEXT UNIQUE,
-    allowed_ips       TEXT,
-    available_zones   TEXT,
     created_at        TIMESTAMP NOT NULL,
     updated_at        TIMESTAMP NOT NULL
 );

@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	"strings"
 	"time"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -64,10 +63,6 @@ type Node struct {
 	PublicKey wgtypes.Key
 	// Endpoint is the node's public endpoint.
 	Endpoint netip.AddrPort
-	// AllowedIPs is the node's allowed IPs.
-	AllowedIPs []string
-	// AvailableZones is the node's available zones.
-	AvailableZones []string
 	// ASN is the node's ASN.
 	ASN uint32
 	// PrivateIPv4 is the node's private IPv4 address.
@@ -98,10 +93,6 @@ type CreateOptions struct {
 	GRPCPort int
 	// RaftPort is the node's Raft port.
 	RaftPort int
-	// AllowedIPs is the node's allowed IPs.
-	AllowedIPs []string
-	// AvailableZones is the node's available zones.
-	AvailableZones []string
 	// AssignASN is true if an ASN should be assigned to the node.
 	AssignASN bool
 }
@@ -147,18 +138,6 @@ func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) 
 	if opts.Endpoint.IsValid() {
 		params.Endpoint = sql.NullString{
 			String: opts.Endpoint.String(),
-			Valid:  true,
-		}
-	}
-	if len(opts.AllowedIPs) > 0 {
-		params.AllowedIps = sql.NullString{
-			String: strings.Join(opts.AllowedIPs, ","),
-			Valid:  true,
-		}
-	}
-	if len(opts.AvailableZones) > 0 {
-		params.AvailableZones = sql.NullString{
-			String: strings.Join(opts.AvailableZones, ","),
 			Valid:  true,
 		}
 	}
@@ -241,21 +220,9 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 		}
 	}
 	return &Node{
-		ID:        node.ID,
-		PublicKey: key,
-		Endpoint:  endpoint,
-		AllowedIPs: func() []string {
-			if !node.AllowedIps.Valid {
-				return nil
-			}
-			return strings.Split(node.AllowedIps.String, ",")
-		}(),
-		AvailableZones: func() []string {
-			if !node.AvailableZones.Valid {
-				return nil
-			}
-			return strings.Split(node.AvailableZones.String, ",")
-		}(),
+		ID:          node.ID,
+		PublicKey:   key,
+		Endpoint:    endpoint,
 		ASN:         uint32(node.Asn),
 		PrivateIPv4: privateIPv4,
 		NetworkIPv6: privateIPv6,
@@ -282,18 +249,6 @@ func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
 	if node.Endpoint.IsValid() {
 		params.Endpoint = sql.NullString{
 			String: node.Endpoint.String(),
-			Valid:  true,
-		}
-	}
-	if len(node.AllowedIPs) > 0 {
-		params.AllowedIps = sql.NullString{
-			String: strings.Join(node.AllowedIPs, ","),
-			Valid:  true,
-		}
-	}
-	if len(node.AvailableZones) > 0 {
-		params.AvailableZones = sql.NullString{
-			String: strings.Join(node.AvailableZones, ","),
 			Valid:  true,
 		}
 	}
@@ -369,18 +324,6 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 			RaftPort:    int(node.RaftPort),
 			UpdatedAt:   node.UpdatedAt,
 			CreatedAt:   node.CreatedAt,
-			AllowedIPs: func() []string {
-				if !node.AllowedIps.Valid {
-					return nil
-				}
-				return strings.Split(node.AllowedIps.String, ",")
-			}(),
-			AvailableZones: func() []string {
-				if !node.AvailableZones.Valid {
-					return nil
-				}
-				return strings.Split(node.AvailableZones.String, ",")
-			}(),
 		}
 	}
 	return out, nil
@@ -433,18 +376,6 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 			RaftPort:    int(peer.RaftPort),
 			UpdatedAt:   peer.UpdatedAt,
 			CreatedAt:   peer.CreatedAt,
-			AllowedIPs: func() []string {
-				if !peer.AllowedIps.Valid {
-					return nil
-				}
-				return strings.Split(peer.AllowedIps.String, ",")
-			}(),
-			AvailableZones: func() []string {
-				if !peer.AvailableZones.Valid {
-					return nil
-				}
-				return strings.Split(peer.AvailableZones.String, ",")
-			}(),
 		}
 	}
 	return peers, nil
@@ -474,21 +405,9 @@ func nodeModelToNode(node *raftdb.Node) (*Node, error) {
 		}
 	}
 	return &Node{
-		ID:        node.ID,
-		PublicKey: key,
-		Endpoint:  endpoint,
-		AllowedIPs: func() []string {
-			if !node.AllowedIps.Valid {
-				return nil
-			}
-			return strings.Split(node.AllowedIps.String, ",")
-		}(),
-		AvailableZones: func() []string {
-			if !node.AvailableZones.Valid {
-				return nil
-			}
-			return strings.Split(node.AvailableZones.String, ",")
-		}(),
+		ID:          node.ID,
+		PublicKey:   key,
+		Endpoint:    endpoint,
 		NetworkIPv6: networkV6,
 		GRPCPort:    int(node.GrpcPort),
 		RaftPort:    int(node.RaftPort),

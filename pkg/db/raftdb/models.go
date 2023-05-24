@@ -27,16 +27,14 @@ type MeshState struct {
 }
 
 type Node struct {
-	ID             string         `json:"id"`
-	PublicKey      sql.NullString `json:"public_key"`
-	RaftPort       int64          `json:"raft_port"`
-	GrpcPort       int64          `json:"grpc_port"`
-	Endpoint       sql.NullString `json:"endpoint"`
-	NetworkIpv6    sql.NullString `json:"network_ipv6"`
-	AllowedIps     sql.NullString `json:"allowed_ips"`
-	AvailableZones sql.NullString `json:"available_zones"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID          string         `json:"id"`
+	PublicKey   sql.NullString `json:"public_key"`
+	RaftPort    int64          `json:"raft_port"`
+	GrpcPort    int64          `json:"grpc_port"`
+	Endpoint    sql.NullString `json:"endpoint"`
+	NetworkIpv6 sql.NullString `json:"network_ipv6"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
 type NodePrivateRpcAddress struct {
