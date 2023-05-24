@@ -97,8 +97,10 @@ func Execute() error {
 
 	if !opts.Store.Bootstrap && opts.Store.Join == "" {
 		if _, err := os.Stat(opts.Store.DataDir); os.IsNotExist(err) {
-			flag.Usage()
-			return fmt.Errorf("Must specify either --store.bootstrap or --store.join when --store.data-dir does not exist")
+			if !opts.Store.InMemory {
+				flag.Usage()
+				return fmt.Errorf("Must specify either --store.bootstrap or --store.join when --store.data-dir does not exist")
+			}
 		}
 	}
 

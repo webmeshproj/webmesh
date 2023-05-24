@@ -66,9 +66,11 @@ func (s *store) Open() error {
 		}
 	}
 	// Ensure the data and snapshots directory exists.
-	err = os.MkdirAll(s.opts.DataDir, 0755)
-	if err != nil {
-		return fmt.Errorf("mkdir %q: %w", s.opts.DataDir, err)
+	if !s.opts.InMemory {
+		err = os.MkdirAll(s.opts.DataDir, 0755)
+		if err != nil {
+			return fmt.Errorf("mkdir %q: %w", s.opts.DataDir, err)
+		}
 	}
 	// Create the raft network transport
 	s.log.Info("creating raft network transport")
@@ -77,27 +79,41 @@ func (s *store) Open() error {
 		s.opts.ConnectionTimeout,
 		&logWriter{log: s.log},
 	)
-	// Create the boltdb stores.
+	// Create the raft stores.
 	s.log.Info("creating boltdb stores", slog.String("data-dir", s.opts.DataDir))
-	s.logDB, err = boltdb.NewBoltStore(s.opts.LogFilePath())
-	if err != nil {
-		return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.LogFilePath(), err))
+	if s.opts.InMemory {
+		s.logDB = newInmemStore()
+		s.stableDB = newInmemStore()
+		s.raftSnapshots = raft.NewInmemSnapshotStore()
+	} else {
+		s.logDB, err = boltdb.NewBoltStore(s.opts.LogFilePath())
+		if err != nil {
+			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.LogFilePath(), err))
+		}
+		s.stableDB, err = boltdb.NewBoltStore(s.opts.StableStoreFilePath())
+		if err != nil {
+			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.StableStoreFilePath(), err))
+		}
+		s.raftSnapshots, err = raft.NewFileSnapshotStoreWithLogger(
+			s.opts.DataDir,
+			int(s.opts.SnapshotRetention),
+			s.opts.RaftLogger("snapshots"),
+		)
 	}
-	s.stableDB, err = boltdb.NewBoltStore(s.opts.StableStoreFilePath())
-	if err != nil {
-		return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.StableStoreFilePath(), err))
-	}
-	s.raftSnapshots, err = raft.NewFileSnapshotStoreWithLogger(
-		s.opts.DataDir,
-		int(s.opts.SnapshotRetention),
-		s.opts.RaftLogger("snapshots"),
-	)
 	if err != nil {
 		return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.DataDir, err))
 	}
 	// Create the data stores.
 	s.log.Info("creating data stores", slog.String("data-dir", s.opts.DataDir))
-	s.weakData, err = sql.Open("sqlite", s.opts.DataFilePath())
+	var dataPath, localDataPath string
+	if s.opts.InMemory {
+		dataPath = ":memory:"
+		localDataPath = ":memory:"
+	} else {
+		dataPath = s.opts.DataFilePath()
+		localDataPath = s.opts.LocalDataFilePath()
+	}
+	s.weakData, err = sql.Open("sqlite", dataPath)
 	if err != nil {
 		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.DataFilePath(), err))
 	}
@@ -105,7 +121,7 @@ func (s *store) Open() error {
 	if err != nil {
 		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
 	}
-	s.localData, err = sql.Open("sqlite", s.opts.LocalDataFilePath())
+	s.localData, err = sql.Open("sqlite", localDataPath)
 	if err != nil {
 		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.LocalDataFilePath(), err))
 	}
@@ -162,4 +178,16 @@ var _ = raft.MonotonicLogStore(&monotonicLogStore{})
 
 func (m *monotonicLogStore) IsMonotonic() bool {
 	return true
+}
+
+func newInmemStore() *inMemoryCloser {
+	return &inMemoryCloser{raft.NewInmemStore()}
+}
+
+type inMemoryCloser struct {
+	*raft.InmemStore
+}
+
+func (i *inMemoryCloser) Close() error {
+	return nil
 }

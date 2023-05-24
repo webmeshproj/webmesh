@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"io"
 	"net/netip"
 	"os"
 	"sync"
@@ -30,7 +31,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
-	boltdb "github.com/hashicorp/raft-boltdb"
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -180,12 +180,13 @@ type store struct {
 	readyErr       chan error
 	firstBootstrap bool
 
-	raft            *raft.Raft
-	raftIndex       atomic.Uint64
-	raftTransport   *raft.NetworkTransport
-	raftSnapshots   *raft.FileSnapshotStore
-	logDB, stableDB *boltdb.BoltStore
-	raftLogFormat   RaftLogFormat
+	raft          *raft.Raft
+	raftIndex     atomic.Uint64
+	raftTransport *raft.NetworkTransport
+	raftSnapshots raft.SnapshotStore
+	logDB         LogStoreCloser
+	stableDB      StableStoreCloser
+	raftLogFormat RaftLogFormat
 
 	observerChan                chan raft.Observation
 	observer                    *raft.Observer
@@ -321,4 +322,14 @@ func (s *store) Leave(ctx context.Context) error {
 		Id: string(s.nodeID),
 	})
 	return err
+}
+
+type LogStoreCloser interface {
+	io.Closer
+	raft.LogStore
+}
+
+type StableStoreCloser interface {
+	io.Closer
+	raft.StableStore
 }

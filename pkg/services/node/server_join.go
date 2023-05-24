@@ -136,11 +136,12 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	var raftAddress string
 	if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
 		// Prefer IPv4 for raft
-		// TODO: doesn't work when we are IPv4 only. Need to fix this.
-		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
 		raftAddress = net.JoinHostPort(lease.Addr().String(), strconv.Itoa(peer.RaftPort))
 	} else {
 		// Use IPv6
+		// TODO: doesn't work when we are IPv4 only. Need to fix this.
+		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
+		// We may as well use IPv4 for everything in that case.
 		raftAddress = net.JoinHostPort(peer.NetworkIPv6.Addr().String(), strconv.Itoa(peer.RaftPort))
 	}
 	if req.GetAsVoter() {

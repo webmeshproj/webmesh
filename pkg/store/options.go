@@ -33,6 +33,7 @@ const (
 	NodeIDEnvVar                    = "STORE_NODE_ID"
 	NodeEndpointEnvVar              = "STORE_NODE_ENDPOINT"
 	DataDirEnvVar                   = "STORE_DATA_DIR"
+	InMemoryEnvVar                  = "STORE_IN_MEMORY"
 	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
 	ConnectionPoolCountEnvVar       = "STORE_CONNECTION_POOL_COUNT"
 	ConnectionTimeoutEnvVar         = "STORE_CONNECTION_TIMEOUT"
@@ -106,6 +107,9 @@ type Options struct {
 	NodeEndpoint string `json:"node-endpoint" yaml:"node-endpoint" toml:"node-endpoint"`
 	// DataDir is the directory to store data in.
 	DataDir string `json:"data-dir" yaml:"data-dir" toml:"data-dir"`
+	// InMemory is if the store should be in memory. This should only be used for
+	// testing and ephemeral nodes.
+	InMemory bool `json:"in-memory" yaml:"in-memory" toml:"in-memory"`
 	// AdvertiseAddress is the initial address to advertise for raft consensus.
 	AdvertiseAddress string `json:"advertise-address" yaml:"advertise-address" toml:"advertise-address"`
 	// ConnectionPoolCount is the number of connections to pool.
@@ -220,6 +224,8 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 	3. If the hostname is not available, the node ID is a random UUID (should only be used for testing).`)
 	fl.StringVar(&o.DataDir, "store.data-dir", util.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
 		"Store data directory.")
+	fl.BoolVar(&o.InMemory, "store.in-memory", util.GetEnvDefault(InMemoryEnvVar, "false") == "true",
+		"Store data in memory. This should only be used for testing and ephemeral nodes.")
 	fl.BoolVar(&o.Bootstrap, "store.bootstrap", util.GetEnvDefault(BootstrapEnvVar, "false") == "true",
 		"Bootstrap the cluster.")
 
