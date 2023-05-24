@@ -21,12 +21,14 @@ import (
 	"context"
 	"crypto/tls"
 
+	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"gitlab.com/webmesh/node/pkg/store"
 )
@@ -107,10 +109,21 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return nil, status.Errorf(codes.Unavailable, "could not connect to leader to serve the request: %s", err.Error())
 	}
 	defer conn.Close()
-	var out any
-	err = conn.Invoke(ctx, info.FullMethod, req, &out)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not invoke RPC on the leader: %s", err.Error())
+	client := v1.NewNodeClient(conn)
+	switch info.FullMethod {
+	case v1.Node_Join_FullMethodName:
+		return client.Join(ctx, req.(*v1.JoinRequest))
+	case v1.Node_Leave_FullMethodName:
+		return client.Leave(ctx, req.(*v1.LeaveRequest))
+	case v1.Node_GetNode_FullMethodName:
+		return client.GetNode(ctx, req.(*v1.GetNodeRequest))
+	case v1.Node_ListNodes_FullMethodName:
+		return client.ListNodes(ctx, req.(*emptypb.Empty))
+	case v1.Node_GetFeatures_FullMethodName:
+		return client.GetFeatures(ctx, req.(*emptypb.Empty))
+	case v1.Node_GetStatus_FullMethodName:
+		return client.GetStatus(ctx, req.(*emptypb.Empty))
+	default:
+		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}
-	return out, nil
 }

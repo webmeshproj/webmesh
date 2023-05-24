@@ -109,6 +109,8 @@ type ClusterConfig struct {
 	TLSSkipVerify bool `yaml:"tls-skip-verify,omitempty" json:"tls-skip-verify,omitempty"`
 	// CertificateAuthorityData is the base64-encoded certificate authority data for the cluster.
 	CertificateAuthorityData string `yaml:"certificate-authority-data,omitempty" json:"certificate-authority-data,omitempty"`
+	// PreferLeader controls whether the client should prefer to connect to the cluster leader.
+	PreferLeader bool `yaml:"prefer-leader,omitempty" json:"prefer-leader,omitempty"`
 }
 
 // User is the named configuration for a user.
@@ -167,6 +169,10 @@ func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 			return nil, err
 		}
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(creds)))
+	}
+	if c.CurrentCluster().PreferLeader {
+		opts = append(opts, grpc.WithUnaryInterceptor(LeaderUnaryClientInterceptor()))
+		opts = append(opts, grpc.WithStreamInterceptor(LeaderStreamClientInterceptor()))
 	}
 	return grpc.Dial(c.CurrentCluster().Server, opts...)
 }
@@ -286,6 +292,7 @@ func bindFlags(c *Config, flags *pflag.FlagSet, usrIdx, clusterIdx int) {
 	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.TLSSkipVerify, "tls-skip-verify", c.Clusters[clusterIdx].Cluster.TLSSkipVerify, "Whether TLS verification should be skipped for the cluster connection")
 	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.Insecure, "insecure", c.Clusters[clusterIdx].Cluster.Insecure, "Whether TLS should be disabled for the cluster connection")
 	flags.StringVar(&c.Clusters[clusterIdx].Cluster.CertificateAuthorityData, "certificate-authority-data", c.Clusters[clusterIdx].Cluster.CertificateAuthorityData, "The base64-encoded certificate authority data for the cluster")
+	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.PreferLeader, "prefer-leader", c.Clusters[clusterIdx].Cluster.PreferLeader, "Whether to prefer the leader node for the cluster connection")
 	flags.StringVar(&c.Users[usrIdx].User.ClientCertificateData, "client-certificate-data", c.Users[usrIdx].User.ClientCertificateData, "The base64-encoded client certificate data for the user")
 	flags.StringVar(&c.Users[usrIdx].User.ClientKeyData, "client-key-data", c.Users[usrIdx].User.ClientKeyData, "The base64-encoded client key data for the user")
 }

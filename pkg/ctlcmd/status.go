@@ -46,6 +46,7 @@ var statusCmd = &cobra.Command{
 
 func outStatusJSON(cmd *cobra.Command, status *v1.Status) error {
 	out, err := json.MarshalIndent(map[string]any{
+		"id":         status.GetId(),
 		"version":    status.GetVersion(),
 		"commit":     status.GetCommit(),
 		"build_date": status.GetBuildDate(),
