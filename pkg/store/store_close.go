@@ -19,19 +19,20 @@ package store
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"golang.org/x/exp/slog"
 )
 
 // Close closes the store.
-func (s *store) Close(ctx context.Context) error {
+func (s *store) Close() error {
 	if !s.open.Load() {
 		return ErrNotOpen
 	}
+	ctx := context.Background()
 	defer s.open.Store(false)
 	if s.fw != nil {
-		// Clear the firewall rules last to not mess with the
-		// wireguard interface.
+		// Clear the firewall rules after wireguard is shutdown
 		defer func() {
 			s.wgmux.Lock()
 			defer s.wgmux.Unlock()
@@ -78,29 +79,15 @@ func (s *store) Close(ctx context.Context) error {
 	}
 	// None of these are strictly necessary, but we do them for
 	// good measure.
-	if s.raftTransport != nil {
-		if err := s.raftTransport.Close(); err != nil {
-			s.log.Error("error closing raft transport", slog.String("error", err.Error()))
-		}
-	}
-	if s.weakData != nil {
-		if err := s.weakData.Close(); err != nil {
-			s.log.Error("error closing raft db", slog.String("error", err.Error()))
-		}
-	}
-	if s.localData != nil {
-		if err := s.localData.Close(); err != nil {
-			s.log.Error("error closing local db", slog.String("error", err.Error()))
-		}
-	}
-	if s.logDB != nil {
-		if err := s.logDB.Close(); err != nil {
-			s.log.Error("error closing log db", slog.String("error", err.Error()))
-		}
-	}
-	if s.stableDB != nil {
-		if err := s.stableDB.Close(); err != nil {
-			s.log.Error("error closing stable db", slog.String("error", err.Error()))
+	for name, closer := range map[string]io.Closer{
+		"raft transport": s.raftTransport,
+		"raft database":  s.weakData,
+		"local database": s.localData,
+		"raft log db":    s.logDB,
+		"raft stable db": s.stableDB,
+	} {
+		if err := closer.Close(); err != nil {
+			s.log.Error("error closing "+name, slog.String("error", err.Error()))
 		}
 	}
 	return nil
