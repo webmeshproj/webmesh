@@ -42,13 +42,13 @@ const (
 
 // MethodPolicyMap is a map of method names to their MethodPolicy.
 var MethodPolicyMap = map[string]MethodPolicy{
-	v1.Node_Join_FullMethodName:             RequireLeader,
-	v1.Node_Leave_FullMethodName:            RequireLeader,
-	v1.Node_GetNode_FullMethodName:          AllowNonLeader,
-	v1.Node_ListNodes_FullMethodName:        AllowNonLeader,
-	v1.Node_GetFeatures_FullMethodName:      RequireLocal,
-	v1.Node_GetStatus_FullMethodName:        RequireLocal,
-	v1.Node_StartDataChannel_FullMethodName: AllowNonLeader,
+	v1.Node_Join_FullMethodName:               RequireLeader,
+	v1.Node_Leave_FullMethodName:              RequireLeader,
+	v1.Mesh_GetNode_FullMethodName:            AllowNonLeader,
+	v1.Mesh_ListNodes_FullMethodName:          AllowNonLeader,
+	v1.Node_GetFeatures_FullMethodName:        RequireLocal,
+	v1.Node_GetStatus_FullMethodName:          RequireLocal,
+	v1.WebRTC_StartDataChannel_FullMethodName: AllowNonLeader,
 }
 
 // HasPreferLeaderMeta returns true if the context has the Prefer-Leader header set to true.

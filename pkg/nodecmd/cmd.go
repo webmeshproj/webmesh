@@ -29,12 +29,10 @@ import (
 	"syscall"
 	"time"
 
-	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 
 	"gitlab.com/webmesh/node/pkg/global"
 	"gitlab.com/webmesh/node/pkg/services"
-	"gitlab.com/webmesh/node/pkg/services/node"
 	"gitlab.com/webmesh/node/pkg/store"
 	"gitlab.com/webmesh/node/pkg/store/streamlayer"
 	"gitlab.com/webmesh/node/pkg/util"
@@ -198,17 +196,6 @@ func Execute() error {
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to gRPC server: %w", err))
 	}
-
-	// Always register the node server
-	log.Debug("registering node server")
-	features := []v1.Feature{v1.Feature_NODES}
-	if opts.GRPC.EnableMetrics {
-		features = append(features, v1.Feature_METRICS_GRPC)
-	}
-	if !opts.GRPC.DisableLeaderProxy {
-		features = append(features, v1.Feature_LEADER_PROXY)
-	}
-	v1.RegisterNodeServer(srv, node.NewServer(st, features...))
 
 	// Start the gRPC server
 	go func() {

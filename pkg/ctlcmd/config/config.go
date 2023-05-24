@@ -119,37 +119,6 @@ type ClusterConfig struct {
 	RequestTimeout Duration `yaml:"request-timeout,omitempty" json:"request-timeout,omitempty"`
 }
 
-type Duration struct{ time.Duration }
-
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, d.String())), nil
-}
-
-func (d *Duration) UnmarshalJSON(data []byte) error {
-	duration, err := time.ParseDuration(string(data[1 : len(data)-1]))
-	if err != nil {
-		return err
-	}
-	*d = Duration{duration}
-	return nil
-}
-
-func (d Duration) MarshalYAML() (interface{}, error) {
-	return d.String(), nil
-}
-
-func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
-	if value.Kind != yaml.ScalarNode {
-		return fmt.Errorf("invalid duration: %s", value.Tag)
-	}
-	duration, err := time.ParseDuration(value.Value)
-	if err != nil {
-		return err
-	}
-	*d = Duration{duration}
-	return nil
-}
-
 // User is the named configuration for a user.
 type User struct {
 	// Name is the name of the user.
@@ -182,13 +151,31 @@ type ContextConfig struct {
 	User string `yaml:"user,omitempty" json:"user,omitempty"`
 }
 
-// NewClient creates a new gRPC client for the current context.
-func (c *Config) NewClient() (v1.NodeClient, io.Closer, error) {
+// NewNodeClient creates a new Node gRPC client for the current context.
+func (c *Config) NewNodeClient() (v1.NodeClient, io.Closer, error) {
 	conn, err := c.DialCurrent()
 	if err != nil {
 		return nil, nil, err
 	}
 	return v1.NewNodeClient(conn), conn, nil
+}
+
+// NewMeshClient creates a new Mesh gRPC client for the current context.
+func (c *Config) NewMeshClient() (v1.MeshClient, io.Closer, error) {
+	conn, err := c.DialCurrent()
+	if err != nil {
+		return nil, nil, err
+	}
+	return v1.NewMeshClient(conn), conn, nil
+}
+
+// NewWebRTCClient creates a new WebRTC gRPC client for the current context.
+func (c *Config) NewWebRTCClient() (v1.WebRTCClient, io.Closer, error) {
+	conn, err := c.DialCurrent()
+	if err != nil {
+		return nil, nil, err
+	}
+	return v1.NewWebRTCClient(conn), conn, nil
 }
 
 // DialCurrent connects to the current context.
@@ -344,4 +331,35 @@ func bindFlags(c *Config, flags *pflag.FlagSet, usrIdx, clusterIdx int) {
 func unmarshal(reader io.ReadCloser, config interface{}) error {
 	defer reader.Close()
 	return yaml.NewDecoder(reader).Decode(config)
+}
+
+type Duration struct{ time.Duration }
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, d.String())), nil
+}
+
+func (d *Duration) UnmarshalJSON(data []byte) error {
+	duration, err := time.ParseDuration(string(data[1 : len(data)-1]))
+	if err != nil {
+		return err
+	}
+	*d = Duration{duration}
+	return nil
+}
+
+func (d Duration) MarshalYAML() (interface{}, error) {
+	return d.String(), nil
+}
+
+func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.ScalarNode {
+		return fmt.Errorf("invalid duration: %s", value.Tag)
+	}
+	duration, err := time.ParseDuration(value.Value)
+	if err != nil {
+		return err
+	}
+	*d = Duration{duration}
+	return nil
 }

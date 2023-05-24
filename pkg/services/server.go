@@ -23,10 +23,13 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"gitlab.com/webmesh/node/pkg/services/mesh"
+	"gitlab.com/webmesh/node/pkg/services/node"
 	"gitlab.com/webmesh/node/pkg/store"
 )
 
@@ -39,15 +42,32 @@ type Server struct {
 
 // NewServer returns a new Server.
 func NewServer(store store.Store, o *Options) (*Server, error) {
+	log := slog.Default().With("component", "server")
 	opts, err := o.ServerOptions(store)
 	if err != nil {
 		return nil, err
 	}
-	return &Server{
+	server := &Server{
 		srv:  grpc.NewServer(opts...),
 		opts: o,
-		log:  slog.Default().With("component", "server"),
-	}, nil
+		log:  log,
+	}
+	features := []v1.Feature{v1.Feature_NODES}
+	if o.EnableMeshAPI {
+		log.Debug("registering mesh api")
+		v1.RegisterMeshServer(server, mesh.NewServer(store))
+		features = append(features, v1.Feature_MESH_API)
+	}
+	if o.EnableMetrics {
+		features = append(features, v1.Feature_METRICS_GRPC)
+	}
+	if !o.DisableLeaderProxy {
+		features = append(features, v1.Feature_LEADER_PROXY)
+	}
+	log.Debug("registering node server")
+	// Always register the node server
+	v1.RegisterNodeServer(server, node.NewServer(store, features...))
+	return server, nil
 }
 
 // ListenAndServe starts the gRPC server and optional metrics server

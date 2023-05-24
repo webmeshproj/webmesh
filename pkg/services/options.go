@@ -52,6 +52,7 @@ const (
 	GRPCMetricsListenAddressEnvVar = "GRPC_METRICS_LISTEN_ADDRESS"
 	GRPCMetricsPathEnvVar          = "GRPC_METRICS_PATH"
 	GRPCDisableLeaderProxyEnvVar   = "GRPC_DISABLE_LEADER_PROXY"
+	GRPCEnableMeshAPIEnvVar        = "GRPC_ENABLE_MESH_API"
 )
 
 // Options contains the configuration for the gRPC server.
@@ -82,6 +83,8 @@ type Options struct {
 	MetricsPath string `json:"metrics-path" yaml:"metrics-path" toml:"metrics-path"`
 	// DisableLeaderProxy disables the leader proxy.
 	DisableLeaderProxy bool `json:"disable-leader-proxy" yaml:"disable-leader-proxy" toml:"disable-leader-proxy"`
+	// EnableMeshAPI enables the mesh API.
+	EnableMeshAPI bool `json:"enable-mesh-api" yaml:"enable-mesh-api" toml:"enable-mesh-api"`
 }
 
 // NewOptions returns new Options with sensible defaults.
@@ -119,6 +122,8 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		"gRPC metrics path.")
 	fs.BoolVar(&o.DisableLeaderProxy, "grpc.disable-leader-proxy", util.GetEnvDefault(GRPCDisableLeaderProxyEnvVar, "false") == "true",
 		"Disable the leader proxy.")
+	fs.BoolVar(&o.EnableMeshAPI, "grpc.enable-mesh-api", util.GetEnvDefault(GRPCEnableMeshAPIEnvVar, "false") == "true",
+		"Enable the mesh API.")
 }
 
 // ListenPort returns the port the options are configured to listen on.

@@ -55,8 +55,6 @@ var portForwardCmd = &cobra.Command{
 	Use:               "port-forward NODE_ID [LOCAL_PORT:[REMOTE_ADDRESS]:]REMOTE_PORT",
 	Short:             "Forward ports to services running in the mesh",
 	Args:              cobra.ExactArgs(2),
-	PreRunE:           initClient,
-	PostRun:           closeClient,
 	ValidArgsFunction: completeNodes,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		nodeID, portForwardSpec := args[0], args[1]
@@ -74,7 +72,11 @@ func portForward(cmd *cobra.Command, nodeID string, portForwardSpec string) erro
 		return fmt.Errorf("failed to listen on %s:%d: %w", portForwardAddress, spec.LocalPort, err)
 	}
 	defer l.Close()
-
+	client, closer, err := cliConfig.NewWebRTCClient()
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
 	pc, err := portforward.NewPeerConnection(cmd.Context(), &portforward.Options{
 		Client:      client,
 		NodeID:      nodeID,

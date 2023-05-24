@@ -130,12 +130,22 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		_, bits := ip.Mask.Size()
 		prefix := netip.PrefixFrom(addr, bits)
 		if prefix.Addr().Is6() && w.opts.NetworkV6.IsValid() {
+			if w.opts.NetworkV6.Contains(addr) {
+				// Don't readd routes to our own network
+				continue
+			}
+			w.log.Debug("adding ipv6 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
 			}
 		}
 		if prefix.Addr().Is4() && w.opts.NetworkV4.IsValid() {
+			if w.opts.NetworkV4.Contains(addr) {
+				// Don't readd routes to our own network
+				continue
+			}
+			w.log.Debug("adding ipv4 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)

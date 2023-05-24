@@ -32,6 +32,7 @@ services:
       - --store.raft-log-level=debug
       - --wireguard.no-modprobe
       - --grpc.enable-metrics
+      - --grpc.enable-mesh-api
     ports:
       - 8443:8443
     volumes:
@@ -58,6 +59,7 @@ services:
       - --store.raft-log-level=debug
       - --wireguard.no-modprobe
       - --grpc.enable-metrics
+      - --grpc.enable-mesh-api
     volumes:
       - /lib/modules:/lib/modules
       - bootstrap-node-2:/data
@@ -84,6 +86,7 @@ services:
       - --store.raft-log-level=debug
       - --wireguard.no-modprobe
       - --grpc.enable-metrics
+      - --grpc.enable-mesh-api
     volumes:
       - /lib/modules:/lib/modules
       - bootstrap-node-3:/data

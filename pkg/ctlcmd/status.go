@@ -28,11 +28,14 @@ func init() {
 }
 
 var statusCmd = &cobra.Command{
-	Use:     "status",
-	Short:   "Retrieves the status of a node in the cluster",
-	PreRunE: initClient,
-	PostRun: closeClient,
+	Use:   "status",
+	Short: "Retrieves the status of a node in the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewNodeClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
 		status, err := client.GetStatus(context.Background(), &emptypb.Empty{})
 		if err != nil {
 			return err

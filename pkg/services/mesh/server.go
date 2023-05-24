@@ -14,14 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+// Package mesh contains the webmesh Mesh service.
+package mesh
 
 import (
 	v1 "gitlab.com/webmesh/api/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"golang.org/x/exp/slog"
+
+	"gitlab.com/webmesh/node/pkg/services/node/peers"
+	"gitlab.com/webmesh/node/pkg/store"
 )
 
-func (s *Server) StartDataChannel(stream v1.Node_StartDataChannelServer) error {
-	return status.Errorf(codes.Unimplemented, "method StartDataChannel not implemented")
+// Server is the webmesh Mesh service.
+type Server struct {
+	v1.UnimplementedMeshServer
+
+	store store.Store
+	peers peers.Peers
+	log   *slog.Logger
+}
+
+// NewServer returns a new Server.
+func NewServer(store store.Store) *Server {
+	return &Server{
+		store: store,
+		peers: peers.New(store),
+		log:   slog.Default().With("component", "mesh-server"),
+	}
 }

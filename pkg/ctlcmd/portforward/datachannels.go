@@ -45,7 +45,7 @@ func init() {
 // Options are options for configuring the peer connection.
 type Options struct {
 	// Client is the webmesh client for performing ICE negotiation.
-	Client v1.NodeClient
+	Client v1.WebRTCClient
 	// NodeID is the node ID to request for connection channels.
 	NodeID string
 	// Protocol is the protocol to request for connection channels.
@@ -69,7 +69,7 @@ type PeerConnection struct {
 	// closed is a channel for receiving a notification when the peer connection is closed.
 	closed chan struct{}
 	// neg is the negotiation stream
-	neg v1.Node_StartDataChannelClient
+	neg v1.WebRTC_StartDataChannelClient
 	// channels is the channel for negotiating new connections.
 	channels *datachannel.DataChannel
 	// count is the number of connections handled. It is used for

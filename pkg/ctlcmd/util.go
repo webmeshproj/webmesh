@@ -22,18 +22,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func initClient(cmd *cobra.Command, args []string) error {
-	var err error
-	client, clientClose, err = cliConfig.NewClient()
-	return err
-}
-
-func closeClient(cmd *cobra.Command, args []string) {
-	if clientClose != nil {
-		clientClose.Close()
-	}
-}
-
 func encodeToStdout(cmd *cobra.Command, resp proto.Message) error {
 	out, err := encoder.Marshal(resp)
 	if err != nil {
@@ -47,10 +35,11 @@ func completeNodes(cmd *cobra.Command, args []string, toComplete string) ([]stri
 	if len(args) != 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	if err := initClient(cmd, args); err != nil {
+	client, closer, err := cliConfig.NewMeshClient()
+	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
-	defer closeClient(cmd, args)
+	defer closer.Close()
 	resp, err := client.ListNodes(cmd.Context(), &emptypb.Empty{})
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError

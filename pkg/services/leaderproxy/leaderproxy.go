@@ -20,7 +20,6 @@ package leaderproxy
 import (
 	"context"
 	"crypto/tls"
-	"io"
 
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
@@ -111,37 +110,38 @@ func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 }
 
 func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	client, closer, err := i.newLeaderClient(ctx)
+	conn, err := i.newLeaderConn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer closer.Close()
+	defer conn.Close()
 	switch info.FullMethod {
 	case v1.Node_Join_FullMethodName:
-		return client.Join(ctx, req.(*v1.JoinRequest))
+		return v1.NewNodeClient(conn).Join(ctx, req.(*v1.JoinRequest))
 	case v1.Node_Leave_FullMethodName:
-		return client.Leave(ctx, req.(*v1.LeaveRequest))
-	case v1.Node_GetNode_FullMethodName:
-		return client.GetNode(ctx, req.(*v1.GetNodeRequest))
-	case v1.Node_ListNodes_FullMethodName:
-		return client.ListNodes(ctx, req.(*emptypb.Empty))
+		return v1.NewNodeClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
+	case v1.Mesh_GetNode_FullMethodName:
+		return v1.NewMeshClient(conn).GetNode(ctx, req.(*v1.GetNodeRequest))
+	case v1.Mesh_ListNodes_FullMethodName:
+		return v1.NewMeshClient(conn).ListNodes(ctx, req.(*emptypb.Empty))
 	case v1.Node_GetFeatures_FullMethodName:
-		return client.GetFeatures(ctx, req.(*emptypb.Empty))
+		return v1.NewNodeClient(conn).GetFeatures(ctx, req.(*emptypb.Empty))
 	case v1.Node_GetStatus_FullMethodName:
-		return client.GetStatus(ctx, req.(*emptypb.Empty))
+		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*emptypb.Empty))
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}
 }
 
 func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	client, closer, err := i.newLeaderClient(ss.Context())
+	conn, err := i.newLeaderConn(ss.Context())
 	if err != nil {
 		return err
 	}
-	defer closer.Close()
+	defer conn.Close()
 	switch info.FullMethod {
-	case v1.Node_StartDataChannel_FullMethodName:
+	case v1.WebRTC_StartDataChannel_FullMethodName:
+		client := v1.NewWebRTCClient(conn)
 		stream, err := client.StartDataChannel(ss.Context())
 		if err != nil {
 			return err
@@ -152,25 +152,23 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 	}
 }
 
-func (i *Interceptor) newLeaderClient(ctx context.Context) (v1.NodeClient, io.Closer, error) {
+func (i *Interceptor) newLeaderConn(ctx context.Context) (*grpc.ClientConn, error) {
 	leaderAddr, err := i.store.LeaderRPCAddr(ctx)
 	if err != nil {
 		i.logger.Error("could not get leader address", slog.String("error", err.Error()))
-		return nil, nil, status.Errorf(codes.Unavailable, "no leader available to serve the request: %s", err.Error())
+		return nil, status.Errorf(codes.Unavailable, "no leader available to serve the request: %s", err.Error())
 	}
 	i.logger.Info("dialing leader to serve request", slog.String("leader", leaderAddr))
 	conn, err := grpc.DialContext(ctx, leaderAddr, i.dialOpts...)
 	if err != nil {
-		return nil, nil, status.Errorf(codes.Unavailable, "could not connect to leader to serve the request: %s", err.Error())
+		return nil, status.Errorf(codes.Unavailable, "could not connect to leader to serve the request: %s", err.Error())
 	}
-	defer conn.Close()
-	client := v1.NewNodeClient(conn)
-	return client, conn, nil
+	return conn, nil
 }
 
 type proxyDataChannelStream struct {
 	grpc.ServerStream
-	leaderStream v1.Node_StartDataChannelClient
+	leaderStream v1.WebRTC_StartDataChannelClient
 }
 
 func (s *proxyDataChannelStream) Send(m *v1.StartDataChannelRequest) error {

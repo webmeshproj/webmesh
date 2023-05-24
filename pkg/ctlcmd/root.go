@@ -19,11 +19,9 @@ package ctlcmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/spf13/cobra"
-	v1 "gitlab.com/webmesh/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"gitlab.com/webmesh/node/pkg/ctlcmd/config"
@@ -32,8 +30,6 @@ import (
 var (
 	configFileFlag string
 	cliConfig      *config.Config
-	clientClose    io.Closer
-	client         v1.NodeClient
 
 	encoder = protojson.MarshalOptions{
 		Multiline: true,
