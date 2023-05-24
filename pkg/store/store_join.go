@@ -142,6 +142,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	}
 	for _, peer := range resp.GetPeers() {
 		wgpeer := wireguard.Peer{
+			ID:         peer.GetId(),
 			PublicKey:  peer.GetPublicKey(),
 			Endpoint:   peer.GetEndpoint(),
 			AllowedIPs: peer.GetAllowedIps(),

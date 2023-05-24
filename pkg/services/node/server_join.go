@@ -180,6 +180,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	for i, p := range peers {
 		peer := p
 		resp.Peers[i] = &v1.WireguardPeer{
+			Id:        peer.ID,
 			PublicKey: peer.PublicKey.String(),
 			Asn:       peer.ASN,
 			Endpoint: func() string {

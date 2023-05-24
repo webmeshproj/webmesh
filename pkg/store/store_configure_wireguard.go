@@ -88,6 +88,9 @@ func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, network
 }
 
 func (s *store) refreshWireguardPeers(ctx context.Context) error {
+	if s.wg == nil {
+		return nil
+	}
 	peers, err := raftdb.New(s.ReadDB()).ListNodePeers(ctx, string(s.nodeID))
 	if err != nil {
 		s.log.Error("list node peers", slog.String("error", err.Error()))
@@ -123,7 +126,7 @@ func (s *store) refreshWireguardPeers(ctx context.Context) error {
 			PrivateIPv4: privateIPv4,
 			PrivateIPv6: privateIPv6,
 		}
-		s.log.Info("configuring wireguard peer", slog.Any("peer", wgpeer))
+		s.log.Debug("configuring wireguard peer", slog.Any("peer", wgpeer))
 		if err := s.wg.PutPeer(ctx, &wgpeer); err != nil {
 			s.log.Error("wireguard put peer", slog.String("error", err.Error()))
 			return err

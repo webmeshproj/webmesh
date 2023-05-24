@@ -60,6 +60,21 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 			}
 		}
 	}()
+	go func() {
+		t := time.NewTicker(time.Minute) // TODO: Make this configurable
+		for {
+			select {
+			case <-closeCh:
+				t.Stop()
+				return
+			case <-t.C:
+				s.log.Debug("refreshing wireguard peers from db")
+				if err := s.refreshWireguardPeers(context.Background()); err != nil {
+					s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
+				}
+			}
+		}
+	}()
 	return closeCh, doneCh
 }
 

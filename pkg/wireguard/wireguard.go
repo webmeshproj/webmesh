@@ -133,6 +133,28 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	}, nil
 }
 
+// IsPublic returns true if the wireguard interface is publicly accessible.
+func (w *wginterface) IsPublic() bool {
+	return w.opts.Endpoint != ""
+}
+
+// Peers returns the peers of the wireguard interface.
+func (w *wginterface) Peers() []string {
+	w.peersMux.Lock()
+	defer w.peersMux.Unlock()
+	out := make([]string, 0)
+	for id := range w.peers {
+		out = append(out, id)
+	}
+	return out
+}
+
+// Close closes the wireguard interface.
+func (w *wginterface) Close(ctx context.Context) error {
+	w.cli.Close()
+	return w.Interface.Destroy(ctx)
+}
+
 // Configure configures the wireguard interface to use the given key and listen port.
 func (w *wginterface) Configure(ctx context.Context, key wgtypes.Key, listenPort int) error {
 	err := w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
@@ -273,28 +295,6 @@ func (w *wginterface) DeletePeer(ctx context.Context, peer *Peer) error {
 		})
 	}
 	return nil
-}
-
-// IsPublic returns true if the wireguard interface is publicly accessible.
-func (w *wginterface) IsPublic() bool {
-	return w.opts.Endpoint != ""
-}
-
-// Peers returns the peers of the wireguard interface.
-func (w *wginterface) Peers() []string {
-	w.peersMux.Lock()
-	defer w.peersMux.Unlock()
-	out := make([]string, 0)
-	for id := range w.peers {
-		out = append(out, id)
-	}
-	return out
-}
-
-// Close closes the wireguard interface.
-func (w *wginterface) Close(ctx context.Context) error {
-	w.cli.Close()
-	return w.Interface.Destroy(ctx)
 }
 
 // Metrics returns the metrics for the wireguard interface and the host.
