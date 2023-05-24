@@ -52,43 +52,55 @@ func (s *store) bootstrap() error {
 		if err = db.MigrateLocalDB(s.localData); err != nil {
 			return fmt.Errorf("local db migrate: %w", err)
 		}
-		// We retrieve the last key we were using so we can re-establish raft communication.
-		q := localdb.New(s.LocalDB())
-		keyStr, err := q.GetCurrentWireguardKey(ctx)
+		// // We retrieve the last key we were using so we can re-establish raft communication.
+		// q := localdb.New(s.LocalDB())
+		// keyStr, err := q.GetCurrentWireguardKey(ctx)
+		// if err != nil {
+		// 	// TODO: This is a problem, but only if the bootstrap flag is left on for a long
+		// 	// time with no other voters available.
+		// 	return fmt.Errorf("get current wireguard key: %w", err)
+		// }
+		// key, err := wgtypes.ParseKey(keyStr)
+		// if err != nil {
+		// 	return fmt.Errorf("parse wireguard key: %w", err)
+		// }
+		// s.log.Info("configuring wireguard")
+		// raft := raftdb.New(s.WeakDB())
+		// thisPeer, err := raft.GetNode(ctx, string(s.nodeID))
+		// if err != nil {
+		// 	return fmt.Errorf("get this peer: %w", err)
+		// }
+		// // TODO: If our IPv4 lease expired we have no means of acquiring a new
+		// // one until the store is ready. This is a problem, but only if the bootstrap
+		// // flag is left on for a long time with no other voters available.
+		// var networkv6, networkv4 netip.Prefix
+		// if thisPeer.PrivateAddressV4 != "" && !s.opts.NoIPv4 {
+		// 	networkv4, err = netip.ParsePrefix(thisPeer.PrivateAddressV4)
+		// 	if err != nil {
+		// 		return fmt.Errorf("parse private address: %w", err)
+		// 	}
+		// }
+		// if thisPeer.NetworkIpv6.Valid && !s.opts.NoIPv6 {
+		// 	networkv6, err = netip.ParsePrefix(thisPeer.NetworkIpv6.String)
+		// 	if err != nil {
+		// 		return fmt.Errorf("parse private address: %w", err)
+		// 	}
+		// }
+		// if err := s.ConfigureWireguard(ctx, key, networkv4, networkv6); err != nil {
+		// 	return fmt.Errorf("configure wireguard: %w", err)
+		// }
+		// if err := s.refreshWireguardPeers(ctx); err != nil {
+		// 	return fmt.Errorf("refresh wireguard peers: %w", err)
+		// }
+		// Pick an address to rejoin the cluster with.
+		addrs, err := raftdb.New(s.WeakDB()).GetPeerPublicRPCAddresses(ctx, string(s.nodeID))
 		if err != nil {
-			// TODO: This is a problem, but only if the bootstrap flag is left on for a long
-			// time with no other voters available.
-			return fmt.Errorf("get current wireguard key: %w", err)
+			return fmt.Errorf("get peer private rpc addresses: %w", err)
 		}
-		key, err := wgtypes.ParseKey(keyStr)
-		if err != nil {
-			return fmt.Errorf("parse wireguard key: %w", err)
+		if len(addrs) == 0 {
+			return fmt.Errorf("no private rpc addresses found")
 		}
-		s.log.Info("configuring wireguard")
-		thisPeer, err := raftdb.New(s.WeakDB()).GetNode(ctx, string(s.nodeID))
-		if err != nil {
-			return fmt.Errorf("get this peer: %w", err)
-		}
-		// TODO: If our IPv4 lease expired we have no means of acquiring a new
-		// one until the store is ready. This is a problem, but only if the bootstrap
-		// flag is left on for a long time with no other voters available.
-		var networkv6, networkv4 netip.Prefix
-		if thisPeer.PrivateAddressV4 != "" && !s.opts.NoIPv4 {
-			networkv4, err = netip.ParsePrefix(thisPeer.PrivateAddressV4)
-			if err != nil {
-				return fmt.Errorf("parse private address: %w", err)
-			}
-		}
-		if thisPeer.NetworkIpv6.Valid && !s.opts.NoIPv6 {
-			networkv6, err = netip.ParsePrefix(thisPeer.NetworkIpv6.String)
-			if err != nil {
-				return fmt.Errorf("parse private address: %w", err)
-			}
-		}
-		if err := s.ConfigureWireguard(ctx, key, networkv4, networkv6); err != nil {
-			return fmt.Errorf("configure wireguard: %w", err)
-		}
-		return nil
+		return s.join(ctx, addrs[0].(string))
 	}
 	s.firstBootstrap = true
 	cfg := raft.Configuration{

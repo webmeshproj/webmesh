@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"strings"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
+	"gitlab.com/webmesh/node/pkg/db/raftdb"
 	"gitlab.com/webmesh/node/pkg/firewall"
 	"gitlab.com/webmesh/node/pkg/wireguard"
 )
@@ -80,6 +82,51 @@ func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, network
 		err = s.fw.AddMasquerade(ctx, s.wg.Name())
 		if err != nil {
 			return fmt.Errorf("failed to add masquerade rule: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *store) refreshWireguardPeers(ctx context.Context) error {
+	peers, err := raftdb.New(s.WeakDB()).ListNodePeers(ctx, string(s.nodeID))
+	if err != nil {
+		s.log.Error("list node peers", slog.String("error", err.Error()))
+		return err
+	}
+	for _, peer := range peers {
+		var privateIPv4 netip.Prefix
+		var privateIPv6 netip.Prefix
+		if peer.PrivateAddressV4 != "" && !s.opts.NoIPv4 {
+			privateIPv4, err = netip.ParsePrefix(peer.PrivateAddressV4)
+			if err != nil {
+				s.log.Error("parse private ipv4", slog.String("error", err.Error()))
+				return err
+			}
+		}
+		if peer.NetworkIpv6.Valid && !s.opts.NoIPv6 {
+			privateIPv6, err = netip.ParsePrefix(peer.NetworkIpv6.String)
+			if err != nil {
+				s.log.Error("parse private ipv6", slog.String("error", err.Error()))
+				return err
+			}
+		}
+		wgpeer := wireguard.Peer{
+			ID:        peer.ID,
+			PublicKey: peer.PublicKey.String,
+			Endpoint:  peer.Endpoint.String,
+			AllowedIPs: func() []string {
+				if peer.AllowedIps.Valid {
+					return strings.Split(peer.AllowedIps.String, ",")
+				}
+				return nil
+			}(),
+			PrivateIPv4: privateIPv4,
+			PrivateIPv6: privateIPv6,
+		}
+		s.log.Info("configuring wireguard peer", slog.Any("peer", wgpeer))
+		if err := s.wg.PutPeer(ctx, &wgpeer); err != nil {
+			s.log.Error("wireguard put peer", slog.String("error", err.Error()))
+			return err
 		}
 	}
 	return nil

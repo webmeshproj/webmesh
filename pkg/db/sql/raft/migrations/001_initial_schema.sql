@@ -37,10 +37,27 @@ CREATE TABLE leases (
 CREATE VIEW node_rpc_addresses AS
 SELECT
     nodes.id as node_id,
-    COALESCE(leases.ipv4, nodes.network_ipv6, '') AS address,
-    nodes.grpc_port AS port
+    SUBSTR(
+        COALESCE(leases.ipv4, nodes.network_ipv6, ''),
+        0,
+        INSTR(COALESCE(leases.ipv4, nodes.network_ipv6, ''), '/')
+    )
+    || ':'
+    || CAST(nodes.grpc_port AS TEXT) AS address
 FROM nodes 
 LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
+
+CREATE VIEW node_public_rpc_addresses AS
+SELECT
+    nodes.id as node_id,
+    SUBSTR(
+        nodes.endpoint,
+        0,
+        INSTR(nodes.endpoint, ':')
+    )
+    || ':'
+    || CAST(nodes.grpc_port AS TEXT) AS address
+FROM nodes WHERE nodes.endpoint IS NOT NULL;
 
 -- +goose Down
 

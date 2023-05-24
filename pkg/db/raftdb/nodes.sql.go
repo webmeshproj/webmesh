@@ -187,14 +187,79 @@ func (q *Queries) GetNodePeer(ctx context.Context, id string) (GetNodePeerRow, e
 }
 
 const getNodePrivateRPCAddress = `-- name: GetNodePrivateRPCAddress :one
-SELECT node_id, address, port FROM node_rpc_addresses WHERE node_id = ?
+SELECT CAST(address AS TEXT) FROM node_rpc_addresses WHERE node_id = ?
 `
 
-func (q *Queries) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (NodeRpcAddress, error) {
+func (q *Queries) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
 	row := q.db.QueryRowContext(ctx, getNodePrivateRPCAddress, nodeID)
-	var i NodeRpcAddress
-	err := row.Scan(&i.NodeID, &i.Address, &i.Port)
-	return i, err
+	var column_1 interface{}
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getNodePublicRPCAddress = `-- name: GetNodePublicRPCAddress :one
+SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id = ?
+`
+
+func (q *Queries) GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getNodePublicRPCAddress, nodeID)
+	var column_1 interface{}
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getPeerPrivateRPCAddresses = `-- name: GetPeerPrivateRPCAddresses :many
+SELECT CAST(address AS TEXT) FROM node_rpc_addresses WHERE node_id <> ?
+`
+
+func (q *Queries) GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
+	rows, err := q.db.QueryContext(ctx, getPeerPrivateRPCAddresses, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []interface{}
+	for rows.Next() {
+		var column_1 interface{}
+		if err := rows.Scan(&column_1); err != nil {
+			return nil, err
+		}
+		items = append(items, column_1)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPeerPublicRPCAddresses = `-- name: GetPeerPublicRPCAddresses :many
+SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id <> ?
+`
+
+func (q *Queries) GetPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
+	rows, err := q.db.QueryContext(ctx, getPeerPublicRPCAddresses, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []interface{}
+	for rows.Next() {
+		var column_1 interface{}
+		if err := rows.Scan(&column_1); err != nil {
+			return nil, err
+		}
+		items = append(items, column_1)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listNodePeers = `-- name: ListNodePeers :many

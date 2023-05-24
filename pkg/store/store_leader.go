@@ -19,9 +19,6 @@ package store
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
-	"strings"
 
 	"github.com/hashicorp/raft"
 
@@ -81,8 +78,7 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	noCIDR := strings.Split(addr.Address, "/")[0]
-	return net.JoinHostPort(noCIDR, strconv.Itoa(int(addr.Port))), nil
+	return addr.(string), nil
 }
 
 // Stepdown forces this node to relinquish leadership to another node in

@@ -27,7 +27,16 @@ WHERE id = ?
 RETURNING *;
 
 -- name: GetNodePrivateRPCAddress :one
-SELECT * FROM node_rpc_addresses WHERE node_id = ?;
+SELECT CAST(address AS TEXT) FROM node_rpc_addresses WHERE node_id = ?;
+
+-- name: GetNodePublicRPCAddress :one
+SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id = ?;
+
+-- name: GetPeerPrivateRPCAddresses :many
+SELECT CAST(address AS TEXT) FROM node_rpc_addresses WHERE node_id <> ?;
+
+-- name: GetPeerPublicRPCAddresses :many
+SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id <> ?;
 
 -- name: GetNode :one
 SELECT
