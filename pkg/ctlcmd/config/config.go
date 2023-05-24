@@ -18,6 +18,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -25,6 +26,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/pflag"
 	v1 "gitlab.com/webmesh/api/v1"
@@ -111,6 +113,41 @@ type ClusterConfig struct {
 	CertificateAuthorityData string `yaml:"certificate-authority-data,omitempty" json:"certificate-authority-data,omitempty"`
 	// PreferLeader controls whether the client should prefer to connect to the cluster leader.
 	PreferLeader bool `yaml:"prefer-leader,omitempty" json:"prefer-leader,omitempty"`
+	// ConnectTimeout is the timeout for connecting to the cluster.
+	ConnectTimeout Duration `yaml:"connect-timeout,omitempty" json:"connect-timeout,omitempty"`
+	// RequestTimeout is the timeout for requests to the cluster.
+	RequestTimeout Duration `yaml:"request-timeout,omitempty" json:"request-timeout,omitempty"`
+}
+
+type Duration struct{ time.Duration }
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, d.String())), nil
+}
+
+func (d *Duration) UnmarshalJSON(data []byte) error {
+	duration, err := time.ParseDuration(string(data[1 : len(data)-1]))
+	if err != nil {
+		return err
+	}
+	*d = Duration{duration}
+	return nil
+}
+
+func (d Duration) MarshalYAML() (interface{}, error) {
+	return d.String(), nil
+}
+
+func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.ScalarNode {
+		return fmt.Errorf("invalid duration: %s", value.Tag)
+	}
+	duration, err := time.ParseDuration(value.Value)
+	if err != nil {
+		return err
+	}
+	*d = Duration{duration}
+	return nil
 }
 
 // User is the named configuration for a user.
@@ -170,7 +207,18 @@ func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 		opts = append(opts, grpc.WithUnaryInterceptor(LeaderUnaryClientInterceptor()))
 		opts = append(opts, grpc.WithStreamInterceptor(LeaderStreamClientInterceptor()))
 	}
-	return grpc.Dial(c.CurrentCluster().Server, opts...)
+	if c.CurrentCluster().RequestTimeout.Duration > 0 {
+		timeout := c.CurrentCluster().RequestTimeout.Duration
+		opts = append(opts, grpc.WithUnaryInterceptor(RequestTimeoutUnaryClientInterceptor(timeout)))
+		opts = append(opts, grpc.WithStreamInterceptor(RequestTimeoutStreamClientInterceptor(timeout)))
+	}
+	ctx := context.Background()
+	if c.CurrentCluster().ConnectTimeout.Duration > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.CurrentCluster().ConnectTimeout.Duration)
+		defer cancel()
+	}
+	return grpc.DialContext(ctx, c.CurrentCluster().Server, opts...)
 }
 
 // CurrentCluster returns the current cluster.

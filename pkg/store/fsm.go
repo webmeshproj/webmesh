@@ -27,9 +27,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/snappy"
 	"github.com/hashicorp/raft"
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	"gitlab.com/webmesh/node/pkg/db/localdb"
@@ -55,6 +57,8 @@ func (s *store) Apply(l *raft.Log) any {
 	}()
 	defer s.raftIndex.Store(l.Index)
 
+	// Validate and store the term/index to the local DB
+
 	dbTerm, dbIndex, err := s.getDBTermAndIndex(l)
 	if err != nil {
 		// This is a fatal error. We need to check the term and index of the
@@ -63,10 +67,8 @@ func (s *store) Apply(l *raft.Log) any {
 		// TODO: This should trigger some sort of recovery.
 		log.Error("error checking last applied index", slog.String("error", err.Error()))
 		return &v1.RaftApplyResponse{
-			Time: time.Since(start).String(),
-			Result: &v1.RaftApplyResponse_Error{
-				Error: fmt.Sprintf("check last applied index: %s", err.Error()),
-			},
+			Time:  time.Since(start).String(),
+			Error: fmt.Sprintf("check last applied index: %s", err.Error()),
 		}
 	}
 	log.Debug("last applied index",
@@ -88,10 +90,8 @@ func (s *store) Apply(l *raft.Log) any {
 			// Same as above, this is a fatal error that needs to be handled.
 			log.Error("error updating current term", slog.String("error", err.Error()))
 			return &v1.RaftApplyResponse{
-				Time: time.Since(start).String(),
-				Result: &v1.RaftApplyResponse_Error{
-					Error: fmt.Sprintf("update current term: %s", err.Error()),
-				},
+				Time:  time.Since(start).String(),
+				Error: fmt.Sprintf("update current term: %s", err.Error()),
 			}
 		}
 
@@ -102,6 +102,7 @@ func (s *store) Apply(l *raft.Log) any {
 		}
 	}
 
+	// Save the new index to the db when we are done
 	defer func() {
 		q := localdb.New(s.LocalDB())
 		if dbIndex != l.Index {
@@ -123,17 +124,29 @@ func (s *store) Apply(l *raft.Log) any {
 		}
 	}
 
+	// Decode the log entry
 	var cmd v1.RaftLogEntry
-	err = proto.Unmarshal(l.Data, &cmd)
+	switch s.raftLogFormat {
+	case RaftLogFormatJSON:
+		err = protojson.Unmarshal(l.Data, &cmd)
+	case RaftLogFormatProtobuf:
+		err = proto.Unmarshal(l.Data, &cmd)
+	case RaftLogFormatProtobufSnappy:
+		var decoded []byte
+		decoded, err = snappy.Decode(nil, l.Data)
+		if err == nil {
+			err = proto.Unmarshal(decoded, &cmd)
+		}
+	default:
+		err = fmt.Errorf("unknown raft log format: %s", s.raftLogFormat)
+	}
 	if err != nil {
 		// This is a fatal error. We can't apply the log entry if we can't
 		// decode it. This should never happen.
 		log.Error("error decoding raft log entry", slog.String("error", err.Error()))
 		return &v1.RaftApplyResponse{
-			Time: time.Since(start).String(),
-			Result: &v1.RaftApplyResponse_Error{
-				Error: fmt.Sprintf("unmarshal raft log entry: %s", err.Error()),
-			},
+			Time:  time.Since(start).String(),
+			Error: fmt.Sprintf("unmarshal raft log entry: %s", err.Error()),
 		}
 	}
 

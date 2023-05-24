@@ -28,6 +28,7 @@ services:
       - --store.advertise-address=10.1.0.1:9443
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.data-dir=/data
+      - --store.raft-log-format=json
       - --store.raft-log-level=debug
       - --wireguard.endpoint=10.1.0.1:51820
       - --wireguard.no-modprobe
@@ -54,6 +55,7 @@ services:
       - --store.advertise-address=10.1.0.2:9443
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.data-dir=/data
+      - --store.raft-log-format=json
       - --store.raft-log-level=debug
       - --wireguard.endpoint=10.1.0.2:51820
       - --wireguard.no-modprobe
@@ -80,6 +82,7 @@ services:
       - --store.advertise-address=10.1.0.3:9443
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.data-dir=/data
+      - --store.raft-log-format=json
       - --store.raft-log-level=debug
       - --wireguard.endpoint=10.1.0.3:51820
       - --wireguard.no-modprobe

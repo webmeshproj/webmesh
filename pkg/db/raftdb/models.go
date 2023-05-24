@@ -39,12 +39,12 @@ type Node struct {
 	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
-type NodePublicRpcAddress struct {
+type NodePrivateRpcAddress struct {
 	NodeID  string       `json:"node_id"`
 	Address sql.NullBool `json:"address"`
 }
 
-type NodeRpcAddress struct {
+type NodePublicRpcAddress struct {
 	NodeID  string       `json:"node_id"`
 	Address sql.NullBool `json:"address"`
 }

@@ -18,10 +18,10 @@ package ctlcmd
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/spf13/cobra"
 	v1 "gitlab.com/webmesh/api/v1"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -44,62 +44,18 @@ var getNodesCmd = &cobra.Command{
 	PostRun:           closeClient,
 	ValidArgsFunction: completeNodes,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var resp proto.Message
+		var err error
 		if len(args) == 1 {
-			node, err := client.GetNode(context.Background(), &v1.GetNodeRequest{
+			resp, err = client.GetNode(context.Background(), &v1.GetNodeRequest{
 				Id: args[0],
 			})
-			if err != nil {
-				return err
-			}
-			return outNodeJSON(cmd, node)
+		} else {
+			resp, err = client.ListNodes(context.Background(), &emptypb.Empty{})
 		}
-		nodes, err := client.ListNodes(context.Background(), &emptypb.Empty{})
 		if err != nil {
 			return err
 		}
-		return outNodeListJSON(cmd, nodes.Nodes)
+		return encodeToStdout(cmd, resp)
 	},
-}
-
-func outNodeListJSON(cmd *cobra.Command, v []*v1.MeshNode) error {
-	out, err := json.MarshalIndent(toNodeList(v), "", "  ")
-	if err != nil {
-		return err
-	}
-	cmd.Println(string(out))
-	return nil
-}
-
-func outNodeJSON(cmd *cobra.Command, v *v1.MeshNode) error {
-	out, err := json.MarshalIndent(toNode(v), "", "  ")
-	if err != nil {
-		return err
-	}
-	cmd.Println(string(out))
-	return nil
-}
-
-func toNodeList(nodes []*v1.MeshNode) []map[string]any {
-	out := make([]map[string]any, len(nodes))
-	for i, node := range nodes {
-		n := toNode(node)
-		out[i] = n
-	}
-	return out
-}
-
-func toNode(node *v1.MeshNode) map[string]any {
-	return map[string]any{
-		"id":              node.GetId(),
-		"endpoint":        node.GetEndpoint(),
-		"public_key":      node.GetPublicKey(),
-		"asn":             node.GetAsn(),
-		"private_ipv4":    node.GetPrivateIpv4(),
-		"private_ipv6":    node.GetPrivateIpv6(),
-		"available_zones": node.GetAvailableZones(),
-		"allowed_ips":     node.GetAllowedIps(),
-		"created_at":      node.GetCreatedAt().AsTime(),
-		"updated_at":      node.GetUpdatedAt().AsTime(),
-		"cluster_status":  node.GetClusterStatus().String(),
-	}
 }

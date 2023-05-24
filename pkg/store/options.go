@@ -57,18 +57,41 @@ const (
 	RaftPreferIPv6EnvVar            = "STORE_RAFT_PREFER_IPV6"
 	ObserverChanBufferEnvVar        = "STORE_OBSERVER_CHAN_BUFFER"
 	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
+	RaftLogFormatEnvVar             = "STORE_RAFT_LOG_FORMAT"
 	NoIPv4EnvVar                    = "STORE_NO_IPV4"
 	NoIPv6EnvVar                    = "STORE_NO_IPV6"
 
 	// LogFile is the raft log file.
-	LogFile = "raft-log.dat"
+	LogFile = "raft.log"
 	// StableStoreFile is the raft stable store file.
 	StableStoreFile = "raft-stable-store.dat"
 	// DataFile is the data file.
-	DataFile = "data.sqlite"
+	DataFile = "webmesh.sqlite"
 	// LocalDataFile is the local data file.
 	LocalDataFile = "local.sqlite"
 )
+
+// RaftLogFormat is the raft log format.
+type RaftLogFormat string
+
+const (
+	// RaftLogFormatJSON is the JSON raft log format.
+	RaftLogFormatJSON RaftLogFormat = "json"
+	// RaftLogFormatProtobuf is the protobuf raft log format.
+	RaftLogFormatProtobuf RaftLogFormat = "protobuf"
+	// RaftLogFormatProtobufSnappy is the protobuf snappy raft log format.
+	RaftLogFormatProtobufSnappy RaftLogFormat = "protobuf+snappy"
+)
+
+// IsValid returns if the raft log format is valid.
+func (r RaftLogFormat) IsValid() bool {
+	switch r {
+	case RaftLogFormatJSON, RaftLogFormatProtobuf, RaftLogFormatProtobufSnappy:
+		return true
+	default:
+		return false
+	}
+}
 
 // Options are the options for the store.
 type Options struct {
@@ -138,6 +161,8 @@ type Options struct {
 	RaftPreferIPv6 bool `json:"raft-prefer-ipv6" yaml:"raft-prefer-ipv6" toml:"raft-prefer-ipv6"`
 	// GRPCAdvertisePort is the port to advertise for gRPC.
 	GRPCAdvertisePort int `json:"grpc-advertise-port" yaml:"grpc-advertise-port" toml:"grpc-advertise-port"`
+	// RaftLogFormat is the log format for the raft backend.
+	RaftLogFormat string `json:"raft-log-format" yaml:"raft-log-format" toml:"raft-log-format"`
 	// NoIPv4 is the no IPv4 flag.
 	NoIPv4 bool `json:"no-ipv4" yaml:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is the no IPv6 flag.
@@ -237,6 +262,9 @@ but will be replaced with the wireguard address after bootstrapping.`)
 		"Raft observer channel buffer size.")
 	fl.IntVar(&o.GRPCAdvertisePort, "store.grpc-advertise-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
 		"GRPC advertise port.")
+	fl.StringVar(&o.RaftLogFormat, "store.raft-log-format", util.GetEnvDefault(RaftLogFormatEnvVar, string(RaftLogFormatProtobufSnappy)),
+		`Raft log format. Valid options are 'json', 'protobuf', and 'protobuf+snappy'.
+All nodes must use the same log format for the lifetime of the cluster.`)
 	fl.BoolVar(&o.NoIPv4, "store.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Disable IPv4 for the raft transport.")
 	fl.BoolVar(&o.NoIPv6, "store.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
@@ -283,6 +311,9 @@ func (o *Options) Validate() error {
 	}
 	if o.MaxJoinRetries <= 0 {
 		return errors.New("max join retries must be > 0")
+	}
+	if !RaftLogFormat(o.RaftLogFormat).IsValid() {
+		return errors.New("invalid raft log format")
 	}
 	return nil
 }

@@ -18,6 +18,7 @@ package ctlcmd
 
 import (
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -31,6 +32,15 @@ func closeClient(cmd *cobra.Command, args []string) {
 	if clientClose != nil {
 		clientClose.Close()
 	}
+}
+
+func encodeToStdout(cmd *cobra.Command, resp proto.Message) error {
+	out, err := encoder.Marshal(resp)
+	if err != nil {
+		return err
+	}
+	cmd.Println(string(out))
+	return nil
 }
 
 func completeNodes(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

@@ -74,7 +74,7 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (Lease, error) {
 	i.mux.Lock()
 	defer i.mux.Unlock()
 	if !i.prefixv4.IsValid() {
-		ipv4, err := raftdb.New(i.store.WeakDB()).GetIPv4Prefix(ctx)
+		ipv4, err := raftdb.New(i.store.ReadDB()).GetIPv4Prefix(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("get ipv4 prefix: %w", err)
 		}
@@ -85,7 +85,7 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (Lease, error) {
 		i.prefixv4 = prefix
 	}
 	for {
-		allocatedIPv4s, err := raftdb.New(i.store.WeakDB()).ListAllocatedIPv4(ctx)
+		allocatedIPv4s, err := raftdb.New(i.store.ReadDB()).ListAllocatedIPv4(ctx)
 		if err != nil && err != sql.ErrNoRows {
 			return nil, fmt.Errorf("failed to list allocated IPv4s: %w", err)
 		}

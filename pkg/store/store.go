@@ -108,13 +108,13 @@ type Store interface {
 	// interface will ensure consistency with the Raft log. Transactions
 	// are executed in the order they are received by the leader node.
 	DB() raftdb.DBTX
-	// WeakDB returns a DB interface for use by the application. This
+	// ReadDB returns a DB interface for use by the application. This
 	// interface will not ensure consistency with the Raft log. It is
 	// intended for use in read-only operations that do not require
 	// immediate consistency. It takes a read lock on the data store
 	// to ensure that no modifications are happening while the transaction
 	// is in progress and that SQLite itself is not busy.
-	WeakDB() raftdb.DBTX
+	ReadDB() raftdb.DBTX
 	// LocalDB returns a DB interface for use by the application. This
 	// interface will not ensure consistency with the Raft log. It is
 	// intended for use with the node_local database which is not replicated
@@ -154,13 +154,14 @@ func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) S
 		}
 	}
 	return &store{
-		sl:       sl,
-		opts:     opts,
-		wgopts:   wgOpts,
-		nodeID:   raft.ServerID(nodeID),
-		readyErr: make(chan error, 1),
-		wgroutes: make(map[netip.Prefix]struct{}),
-		log:      log.With(slog.String("node-id", string(nodeID))),
+		sl:            sl,
+		opts:          opts,
+		wgopts:        wgOpts,
+		nodeID:        raft.ServerID(nodeID),
+		raftLogFormat: RaftLogFormat(opts.RaftLogFormat),
+		readyErr:      make(chan error, 1),
+		wgroutes:      make(map[netip.Prefix]struct{}),
+		log:           log.With(slog.String("node-id", string(nodeID))),
 	}
 }
 
@@ -180,6 +181,7 @@ type store struct {
 	raftTransport   *raft.NetworkTransport
 	raftSnapshots   *raft.FileSnapshotStore
 	logDB, stableDB *boltdb.BoltStore
+	raftLogFormat   RaftLogFormat
 
 	observerChan                chan raft.Observation
 	observer                    *raft.Observer
@@ -216,13 +218,13 @@ func (s *store) DB() raftdb.DBTX {
 	return s.raftData
 }
 
-// WeakDB returns a DB interface for use by the application. This
+// ReadDB returns a DB interface for use by the application. This
 // interface will not ensure consistency with the Raft log. It is
 // intended for use in read-only operations that do not require
 // immediate consistency. It takes a read lock on the data store
 // to ensure that no modifications are happening while the transaction
 // is in progress and that SQLite itself is not busy.
-func (s *store) WeakDB() raftdb.DBTX {
+func (s *store) ReadDB() raftdb.DBTX {
 	return &lockableDB{DB: s.weakData, mux: s.dataMux.RLocker()}
 }
 

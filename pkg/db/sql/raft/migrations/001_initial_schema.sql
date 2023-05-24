@@ -34,7 +34,7 @@ CREATE TABLE leases (
     created_at  TIMESTAMP NOT NULL
 );
 
-CREATE VIEW node_rpc_addresses AS
+CREATE VIEW node_private_rpc_addresses AS
 SELECT
     nodes.id as node_id,
     SUBSTR(

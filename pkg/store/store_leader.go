@@ -74,7 +74,7 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	addr, err := raftdb.New(s.WeakDB()).GetNodePrivateRPCAddress(ctx, string(leader))
+	addr, err := raftdb.New(s.ReadDB()).GetNodePrivateRPCAddress(ctx, string(leader))
 	if err != nil {
 		return "", err
 	}

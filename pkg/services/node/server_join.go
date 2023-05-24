@@ -41,7 +41,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	if !s.ulaPrefix.IsValid() {
-		ula, err := raftdb.New(s.store.WeakDB()).GetULAPrefix(ctx)
+		ula, err := raftdb.New(s.store.ReadDB()).GetULAPrefix(ctx)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
 		}

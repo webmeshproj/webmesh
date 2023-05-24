@@ -194,7 +194,7 @@ func (p *peers) UnassignASN(ctx context.Context, nodeID string) error {
 
 // Get gets a node by public key.
 func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
-	q := raftdb.New(p.store.WeakDB())
+	q := raftdb.New(p.store.ReadDB())
 	node, err := q.GetNode(ctx, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -310,7 +310,7 @@ func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
 
 // List lists all nodes.
 func (p *peers) List(ctx context.Context) ([]Node, error) {
-	q := raftdb.New(p.store.WeakDB())
+	q := raftdb.New(p.store.ReadDB())
 	nodes, err := q.ListNodes(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -377,7 +377,7 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 
 // ListPeers lists all peers for a node.
 func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
-	q := raftdb.New(p.store.WeakDB())
+	q := raftdb.New(p.store.ReadDB())
 	nodePeers, err := q.ListNodePeers(ctx, nodeID)
 	if err != nil {
 		return nil, err

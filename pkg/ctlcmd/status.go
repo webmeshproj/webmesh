@@ -18,11 +18,8 @@ package ctlcmd
 
 import (
 	"context"
-	"encoding/json"
-	"time"
 
 	"github.com/spf13/cobra"
-	v1 "gitlab.com/webmesh/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -40,32 +37,6 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return outStatusJSON(cmd, status)
+		return encodeToStdout(cmd, status)
 	},
-}
-
-func outStatusJSON(cmd *cobra.Command, status *v1.Status) error {
-	out, err := json.MarshalIndent(map[string]any{
-		"id":         status.GetId(),
-		"version":    status.GetVersion(),
-		"commit":     status.GetCommit(),
-		"build_date": status.GetBuildDate(),
-		"uptime":     status.GetUptime(),
-		"started_at": status.GetStartedAt().AsTime().Format(time.RFC3339),
-		"features": func() []string {
-			var features []string
-			for _, feature := range status.GetFeatures() {
-				features = append(features, feature.String())
-			}
-			return features
-		}(),
-		"wireguard_peers": status.WireguardPeers,
-		"cluster_status":  status.ClusterStatus.String(),
-		"current_leader":  status.CurrentLeader,
-	}, "", "  ")
-	if err != nil {
-		return err
-	}
-	cmd.Println(string(out))
-	return nil
 }

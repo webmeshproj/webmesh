@@ -26,16 +26,19 @@ UPDATE nodes SET
 WHERE id = ?
 RETURNING *;
 
+-- name: ListPublicRPCAddresses :many
+SELECT node_id, CAST(address AS TEXT) FROM node_public_rpc_addresses;
+
 -- name: GetNodePrivateRPCAddress :one
-SELECT CAST(address AS TEXT) FROM node_rpc_addresses WHERE node_id = ?;
+SELECT CAST(address AS TEXT) FROM node_private_rpc_addresses WHERE node_id = ?;
 
 -- name: GetNodePublicRPCAddress :one
 SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id = ?;
 
--- name: GetPeerPrivateRPCAddresses :many
-SELECT CAST(address AS TEXT) FROM node_rpc_addresses WHERE node_id <> ?;
+-- name: GetNodePrivateRPCAddresses :many
+SELECT CAST(address AS TEXT) FROM node_private_rpc_addresses WHERE node_id <> ?;
 
--- name: GetPeerPublicRPCAddresses :many
+-- name: GetNodePublicRPCAddresses :many
 SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id <> ?;
 
 -- name: GetNode :one

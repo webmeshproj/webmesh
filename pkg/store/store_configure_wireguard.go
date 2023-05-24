@@ -88,7 +88,7 @@ func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, network
 }
 
 func (s *store) refreshWireguardPeers(ctx context.Context) error {
-	peers, err := raftdb.New(s.WeakDB()).ListNodePeers(ctx, string(s.nodeID))
+	peers, err := raftdb.New(s.ReadDB()).ListNodePeers(ctx, string(s.nodeID))
 	if err != nil {
 		s.log.Error("list node peers", slog.String("error", err.Error()))
 		return err

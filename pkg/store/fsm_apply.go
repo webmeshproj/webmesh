@@ -55,8 +55,8 @@ func (s *store) apply(l *raft.Log, cmd *v1.RaftLogEntry, log *slog.Logger, start
 		res := s.applyQuery(ctx, log, cmd.GetSqlQuery(), startedAt)
 		if res.GetError() != "" {
 			log.Error("apply query failed", slog.String("error", res.GetError()))
-		} else if res.GetRows().GetError() != "" {
-			log.Error("apply query failed", slog.String("error", res.GetRows().GetError()))
+		} else if res.GetQueryResult().GetError() != "" {
+			log.Error("apply query failed", slog.String("error", res.GetQueryResult().GetError()))
 		}
 		return res
 	case v1.RaftCommandType_EXECUTE:
@@ -65,18 +65,16 @@ func (s *store) apply(l *raft.Log, cmd *v1.RaftLogEntry, log *slog.Logger, start
 		res := s.applyExecute(ctx, log, cmd.GetSqlExec(), startedAt)
 		if res.GetError() != "" {
 			log.Error("apply query failed", slog.String("error", res.GetError()))
-		} else if res.GetExec().GetError() != "" {
-			log.Error("apply query failed", slog.String("error", res.GetExec().GetError()))
+		} else if res.GetExecResult().GetError() != "" {
+			log.Error("apply query failed", slog.String("error", res.GetExecResult().GetError()))
 		}
 		return res
 	default:
 		log.Error("unknown raft command type",
 			slog.String("type", cmd.GetType().String()))
 		return &v1.RaftApplyResponse{
-			Time: time.Since(startedAt).String(),
-			Result: &v1.RaftApplyResponse_Error{
-				Error: fmt.Sprintf("unknown raft command type: %s", cmd.GetType()),
-			},
+			Time:  time.Since(startedAt).String(),
+			Error: fmt.Sprintf("unknown raft command type: %s", cmd.GetType()),
 		}
 	}
 }
@@ -112,8 +110,8 @@ func (s *store) applyQuery(ctx context.Context, log *slog.Logger, cmd *v1.SQLQue
 		}
 	}
 	return &v1.RaftApplyResponse{
-		Time:   time.Since(startedAt).String(),
-		Result: &v1.RaftApplyResponse_Rows{Rows: result},
+		Time:        time.Since(startedAt).String(),
+		QueryResult: result,
 	}
 }
 
@@ -148,8 +146,8 @@ func (s *store) applyExecute(ctx context.Context, log *slog.Logger, cmd *v1.SQLE
 		}
 	}
 	return &v1.RaftApplyResponse{
-		Time:   time.Since(startedAt).String(),
-		Result: &v1.RaftApplyResponse_Exec{Exec: result},
+		Time:       time.Since(startedAt).String(),
+		ExecResult: result,
 	}
 }
 
@@ -259,10 +257,8 @@ func (s *store) acquireConn(ctx context.Context, startedAt time.Time) (*sql.Conn
 
 func newErrorResponse(startedAt time.Time, err string) *v1.RaftApplyResponse {
 	return &v1.RaftApplyResponse{
-		Time: time.Since(startedAt).String(),
-		Result: &v1.RaftApplyResponse_Error{
-			Error: err,
-		},
+		Time:  time.Since(startedAt).String(),
+		Error: err,
 	}
 }
 
@@ -286,24 +282,24 @@ func parametersToValues(parameters []*v1.SQLParameter) ([]interface{}, error) {
 		return nil, nil
 	}
 	values := make([]interface{}, len(parameters))
-	for i := range parameters {
-		switch w := parameters[i].GetValue().(type) {
-		case *v1.SQLParameter_Int64:
-			values[i] = sql.Named(parameters[i].GetName(), w.Int64)
-		case *v1.SQLParameter_Double:
-			values[i] = sql.Named(parameters[i].GetName(), w.Double)
-		case *v1.SQLParameter_Bool:
-			values[i] = sql.Named(parameters[i].GetName(), w.Bool)
-		case *v1.SQLParameter_Bytes:
-			values[i] = sql.Named(parameters[i].GetName(), w.Bytes)
-		case *v1.SQLParameter_Str:
-			values[i] = sql.Named(parameters[i].GetName(), w.Str)
-		case *v1.SQLParameter_Time:
-			values[i] = sql.Named(parameters[i].GetName(), w.Time.AsTime())
-		case nil:
-			values[i] = sql.Named(parameters[i].GetName(), nil)
+	for i, param := range parameters {
+		switch param.GetType() {
+		case v1.SQLParameterType_SQL_PARAM_INT64:
+			values[i] = sql.Named(param.GetName(), param.Int64)
+		case v1.SQLParameterType_SQL_PARAM_DOUBLE:
+			values[i] = sql.Named(param.GetName(), param.Double)
+		case v1.SQLParameterType_SQL_PARAM_BOOL:
+			values[i] = sql.Named(param.GetName(), param.Bool)
+		case v1.SQLParameterType_SQL_PARAM_BYTES:
+			values[i] = sql.Named(param.GetName(), param.Bytes)
+		case v1.SQLParameterType_SQL_PARAM_STRING:
+			values[i] = sql.Named(param.GetName(), param.Str)
+		case v1.SQLParameterType_SQL_PARAM_TIME:
+			values[i] = sql.Named(param.GetName(), param.Time.AsTime())
+		case v1.SQLParameterType_SQL_PARAM_NULL:
+			values[i] = sql.Named(param.GetName(), nil)
 		default:
-			return nil, fmt.Errorf("unsupported type: %T", w)
+			return nil, fmt.Errorf("unsupported type: %T", param.GetType())
 		}
 	}
 	return values, nil
@@ -319,55 +315,50 @@ func normalizeRowValues(data []interface{}, types []string) ([]*v1.SQLParameter,
 		switch val := v.(type) {
 		case int:
 			values[i] = &v1.SQLParameter{
-				Value: &v1.SQLParameter_Int64{
-					Int64: int64(val)},
+				Type:  v1.SQLParameterType_SQL_PARAM_INT64,
+				Int64: int64(val),
 			}
 		case int64:
 			values[i] = &v1.SQLParameter{
-				Value: &v1.SQLParameter_Int64{
-					Int64: val,
-				},
+				Type:  v1.SQLParameterType_SQL_PARAM_INT64,
+				Int64: val,
 			}
 		case float64:
 			values[i] = &v1.SQLParameter{
-				Value: &v1.SQLParameter_Double{
-					Double: val,
-				},
+				Type:   v1.SQLParameterType_SQL_PARAM_DOUBLE,
+				Double: val,
 			}
 		case bool:
 			values[i] = &v1.SQLParameter{
-				Value: &v1.SQLParameter_Bool{
-					Bool: val,
-				},
+				Type: v1.SQLParameterType_SQL_PARAM_BOOL,
+				Bool: val,
 			}
 		case string:
 			values[i] = &v1.SQLParameter{
-				Value: &v1.SQLParameter_Str{
-					Str: val,
-				},
+				Type: v1.SQLParameterType_SQL_PARAM_STRING,
+				Str:  val,
 			}
 		case []byte:
 			if types[i] == "TEXT" {
 				values[i] = &v1.SQLParameter{
-					Value: &v1.SQLParameter_Str{
-						Str: string(val),
-					},
+					Type: v1.SQLParameterType_SQL_PARAM_STRING,
+					Str:  string(val),
 				}
 			} else {
 				values[i] = &v1.SQLParameter{
-					Value: &v1.SQLParameter_Bytes{
-						Bytes: val,
-					},
+					Type:  v1.SQLParameterType_SQL_PARAM_BYTES,
+					Bytes: val,
 				}
 			}
 		case time.Time:
 			values[i] = &v1.SQLParameter{
-				Value: &v1.SQLParameter_Time{
-					Time: timestamppb.New(val),
-				},
+				Type: v1.SQLParameterType_SQL_PARAM_TIME,
+				Time: timestamppb.New(val),
 			}
 		case nil:
-			continue
+			values[i] = &v1.SQLParameter{
+				Type: v1.SQLParameterType_SQL_PARAM_NULL,
+			}
 		default:
 			return nil, fmt.Errorf("unhandled column type: %T %v", val, val)
 		}

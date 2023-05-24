@@ -187,7 +187,7 @@ func (q *Queries) GetNodePeer(ctx context.Context, id string) (GetNodePeerRow, e
 }
 
 const getNodePrivateRPCAddress = `-- name: GetNodePrivateRPCAddress :one
-SELECT CAST(address AS TEXT) FROM node_rpc_addresses WHERE node_id = ?
+SELECT CAST(address AS TEXT) FROM node_private_rpc_addresses WHERE node_id = ?
 `
 
 func (q *Queries) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
@@ -197,23 +197,12 @@ func (q *Queries) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (
 	return column_1, err
 }
 
-const getNodePublicRPCAddress = `-- name: GetNodePublicRPCAddress :one
-SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id = ?
+const getNodePrivateRPCAddresses = `-- name: GetNodePrivateRPCAddresses :many
+SELECT CAST(address AS TEXT) FROM node_private_rpc_addresses WHERE node_id <> ?
 `
 
-func (q *Queries) GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getNodePublicRPCAddress, nodeID)
-	var column_1 interface{}
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const getPeerPrivateRPCAddresses = `-- name: GetPeerPrivateRPCAddresses :many
-SELECT CAST(address AS TEXT) FROM node_rpc_addresses WHERE node_id <> ?
-`
-
-func (q *Queries) GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
-	rows, err := q.db.QueryContext(ctx, getPeerPrivateRPCAddresses, nodeID)
+func (q *Queries) GetNodePrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
+	rows, err := q.db.QueryContext(ctx, getNodePrivateRPCAddresses, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -235,12 +224,23 @@ func (q *Queries) GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string)
 	return items, nil
 }
 
-const getPeerPublicRPCAddresses = `-- name: GetPeerPublicRPCAddresses :many
+const getNodePublicRPCAddress = `-- name: GetNodePublicRPCAddress :one
+SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id = ?
+`
+
+func (q *Queries) GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getNodePublicRPCAddress, nodeID)
+	var column_1 interface{}
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getNodePublicRPCAddresses = `-- name: GetNodePublicRPCAddresses :many
 SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id <> ?
 `
 
-func (q *Queries) GetPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
-	rows, err := q.db.QueryContext(ctx, getPeerPublicRPCAddresses, nodeID)
+func (q *Queries) GetNodePublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
+	rows, err := q.db.QueryContext(ctx, getNodePublicRPCAddresses, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -390,6 +390,38 @@ func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 			&i.UpdatedAt,
 			&i.CreatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicRPCAddresses = `-- name: ListPublicRPCAddresses :many
+SELECT node_id, CAST(address AS TEXT) FROM node_public_rpc_addresses
+`
+
+type ListPublicRPCAddressesRow struct {
+	NodeID  string      `json:"node_id"`
+	Column2 interface{} `json:"column_2"`
+}
+
+func (q *Queries) ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPublicRPCAddresses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPublicRPCAddressesRow
+	for rows.Next() {
+		var i ListPublicRPCAddressesRow
+		if err := rows.Scan(&i.NodeID, &i.Column2); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

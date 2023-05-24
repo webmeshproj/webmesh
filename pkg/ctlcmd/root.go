@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	v1 "gitlab.com/webmesh/api/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"gitlab.com/webmesh/node/pkg/ctlcmd/config"
 )
@@ -33,6 +34,11 @@ var (
 	cliConfig      *config.Config
 	clientClose    io.Closer
 	client         v1.NodeClient
+
+	encoder = protojson.MarshalOptions{
+		Multiline: true,
+		Indent:    "  ",
+	}
 )
 
 func init() {

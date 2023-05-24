@@ -55,7 +55,7 @@ func (s *store) bootstrap() error {
 		// We rejoin as a voter no matter what
 		s.opts.JoinAsVoter = true
 		// Pick an address to rejoin the cluster with.
-		addrs, err := raftdb.New(s.WeakDB()).GetPeerPublicRPCAddresses(ctx, string(s.nodeID))
+		addrs, err := raftdb.New(s.ReadDB()).GetNodePublicRPCAddresses(ctx, string(s.nodeID))
 		if err != nil {
 			return fmt.Errorf("get peer private rpc addresses: %w", err)
 		}
