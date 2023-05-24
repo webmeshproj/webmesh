@@ -1,4 +1,5 @@
 NAME  ?= node
+CTL   ?= wmctl
 REPO  ?= gitlab.com/webmesh
 IMAGE ?= $(REPO)/$(NAME):latest
 GOBGP_IMAGE ?= gitlab.com/webmesh/gobgp:latest
@@ -20,6 +21,13 @@ build: fmt vet generate ## Build node binary.
 		-o dist/$(NAME)_$(OS)_$(ARCH) \
 		cmd/$(NAME)/main.go
 
+build-ctl: fmt vet ## Build wmctl binary.
+	CGO_ENABLED=0 go build \
+		-tags netgo \
+		-ldflags "$(LDFLAGS)" \
+		-o dist/$(CTL)_$(OS)_$(ARCH) \
+		cmd/$(CTL)/main.go
+
 PLATFORMS ?= linux/arm64 linux/amd64 linux/s390x linux/ppc64le
 DIST      := $(CURDIR)/dist
 
@@ -39,6 +47,15 @@ dist: fmt vet generate ## Build node binaries for all platforms.
 		-osarch="$(PLATFORMS)" \
 		-output="$(DIST)/$(NAME)_{{.OS}}_{{.Arch}}" \
 		gitlab.com/webmesh/$(NAME)/cmd/$(NAME)
+
+dist-ctl: fmt vet ## Build wmctl binaries for all platforms.
+	go install github.com/mitchellh/gox@latest
+	CGO_ENABLED=0 gox \
+		-tags netgo \
+		-ldflags "$(LDFLAGS)" \
+		-osarch="$(PLATFORMS)" \
+		-output="$(DIST)/$(CTL)_{{.OS}}_{{.Arch}}" \
+		gitlab.com/webmesh/$(NAME)/cmd/$(CTL)
 
 DOCKER ?= docker
 
@@ -70,3 +87,6 @@ vet: ## Run go vet against code.
 generate: ## Generate SQL code.
 	go install github.com/kyleconroy/sqlc/cmd/sqlc@latest
 	sqlc -f pkg/db/sql/sqlc.yaml generate
+
+install-ctl:
+	go install gitlab.com/webmesh/$(NAME)/cmd/$(CTL)

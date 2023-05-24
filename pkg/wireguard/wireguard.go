@@ -49,6 +49,8 @@ type Interface interface {
 	DeletePeer(ctx context.Context, peer *Peer) error
 	// Peers returns the list of peers in the wireguard configuration.
 	Peers() []string
+	// IsPublic returns true if this wireguard interface is publicly routable.
+	IsPublic() bool
 	// Metrics returns the metrics for the wireguard interface and the host.
 	Metrics() (*v1.NodeMetrics, error)
 	// Close closes the wireguard interface and all client connections.
@@ -72,6 +74,12 @@ type Peer struct {
 	PrivateIPv6 netip.Prefix `json:"privateIPv6"`
 }
 
+// IsPubliclyRoutable returns true if the given peer is publicly routable.
+func (p *Peer) IsPubliclyRoutable() bool {
+	return p.Endpoint != ""
+}
+
+// IsRouteExists returns true if the given error is a route exists error.
 func IsRouteExists(err error) bool {
 	return errors.Is(err, system.ErrRouteExists)
 }
@@ -128,12 +136,8 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 // Configure configures the wireguard interface to use the given key and listen port.
 func (w *wginterface) Configure(ctx context.Context, key wgtypes.Key, listenPort int) error {
 	err := w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
-		PrivateKey: &key,
-		ListenPort: &listenPort,
-		// TODO: May need to be configurable
-		// FirewallMark: new(int),
-		// TODO: This makes calls to Configure() idempotent with peers
-		// There may be situations where that is not wanted
+		PrivateKey:   &key,
+		ListenPort:   &listenPort,
 		ReplacePeers: false,
 		Peers:        nil,
 	})
@@ -175,16 +179,17 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		}
 		allowedIPs = append(allowedIPs, *net)
 	}
-	if peer.Endpoint != "" {
-		// Parse the public endpoint of the peer
+	if peer.IsPubliclyRoutable() {
+		// The peer is publicly accessible
 		udpAddr, err := net.ResolveUDPAddr("udp", peer.Endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to resolve peer endpoint: %w", err)
 		}
 		endpoint = udpAddr
-		if w.opts.Endpoint == "" {
+		if !w.IsPublic() {
 			// We are behind a NAT and the peer isn't.
 			// Allow all network traffic to the peer.
+			// TODO: Make this configurable
 			if w.opts.NetworkV6.IsValid() {
 				allowedIPs = append(allowedIPs, net.IPNet{
 					IP:   w.opts.NetworkV6.Addr().AsSlice(),
@@ -202,14 +207,14 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			keepAlive = new(time.Duration)
 			*keepAlive = 25 * time.Second
 		}
+	} else if !w.IsPublic() {
+		// We are behind a NAT and the peer is too.
+		// No reason to track them
+		return nil
 	} else {
-		// The peer is behind a NAT
-		if w.opts.Endpoint == "" {
-			// We are behind a NAT and the peer is too.
-			// Clear the allowed IPs, we can't reach the peer directly.
-			// TODO: Technically we don't even need to add the peer to the interface
-			allowedIPs = nil
-		}
+		// We are publicly accessible and the peer isn't.
+		// We allow their private addresses to be routed to us (above).
+		// TODO: Make this configurable
 	}
 	w.log.Debug("computed allowed IPs for peer",
 		slog.String("peer-id", peer.ID),
@@ -257,6 +262,7 @@ func (w *wginterface) DeletePeer(ctx context.Context, peer *Peer) error {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
 	if key, ok := w.peers[peer.ID]; ok {
+		delete(w.peers, peer.ID)
 		return w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 			Peers: []wgtypes.PeerConfig{
 				{
@@ -269,11 +275,16 @@ func (w *wginterface) DeletePeer(ctx context.Context, peer *Peer) error {
 	return nil
 }
 
+// IsPublic returns true if the wireguard interface is publicly accessible.
+func (w *wginterface) IsPublic() bool {
+	return w.opts.Endpoint != ""
+}
+
 // Peers returns the peers of the wireguard interface.
 func (w *wginterface) Peers() []string {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
-	out := make([]string, 0, len(w.peers))
+	out := make([]string, 0)
 	for id := range w.peers {
 		out = append(out, id)
 	}
@@ -287,7 +298,6 @@ func (w *wginterface) Close(ctx context.Context) error {
 }
 
 // Metrics returns the metrics for the wireguard interface and the host.
-// TODO: This method should be placed better.
 func (w *wginterface) Metrics() (*v1.NodeMetrics, error) {
 	device, err := w.cli.Device(w.Name())
 	if err != nil {

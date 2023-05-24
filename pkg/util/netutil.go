@@ -93,7 +93,7 @@ func GenerateULA() (netip.Prefix, error) {
 	ip = append(ip, sha.Sum(nil)[15:]...)
 	// subnet ID set to 0
 	ip = append(ip, 0x00, 0)
-	// 64 bits of zeroes, to be used for client addresses for each router
+	// 64 bits of zeroes, to be used for client addresses for each node
 	ip = append(ip, make([]byte, 8)...)
 
 	addr, _ := netip.AddrFromSlice(ip)

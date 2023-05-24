@@ -108,7 +108,7 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (Lease, error) {
 				// We generated a duplicate IPv4 address, try again.
 				continue
 			}
-			return nil, fmt.Errorf("failed to assign router lease: %w", err)
+			return nil, fmt.Errorf("failed to assign node lease: %w", err)
 		}
 		if dblease.Ipv4 != prefixv4.Addr().String() {
 			// The database assigned a different IPv4 address, use that

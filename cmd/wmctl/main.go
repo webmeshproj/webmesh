@@ -14,18 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Entrypoint for webmesh nodes.
+// Entrypoint for wmctl command.
 package main
 
 import (
 	"fmt"
 	"os"
 
-	"gitlab.com/webmesh/node/pkg/nodecmd"
+	"gitlab.com/webmesh/node/pkg/ctlcmd"
 )
 
 func main() {
-	if err := nodecmd.Execute(); err != nil {
+	if err := ctlcmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

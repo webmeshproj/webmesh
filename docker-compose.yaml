@@ -32,6 +32,8 @@ services:
       - --wireguard.endpoint=10.1.0.1:51820
       - --wireguard.no-modprobe
       - --grpc.enable-metrics
+    ports:
+      - 8443:8443
     volumes:
       - /lib/modules:/lib/modules
       - bootstrap-node-1:/data

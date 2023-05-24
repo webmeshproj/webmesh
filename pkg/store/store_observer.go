@@ -105,14 +105,14 @@ func (s *store) handlePeerObservation(change any) {
 	for _, peer := range peers {
 		var privateIPv4 netip.Prefix
 		var privateIPv6 netip.Prefix
-		if peer.PrivateAddressV4 != "" {
+		if peer.PrivateAddressV4 != "" && !s.opts.NoIPv4 {
 			privateIPv4, err = netip.ParsePrefix(peer.PrivateAddressV4)
 			if err != nil {
 				s.log.Error("parse private ipv4", slog.String("error", err.Error()))
 				return
 			}
 		}
-		if peer.NetworkIpv6.Valid {
+		if peer.NetworkIpv6.Valid && !s.opts.NoIPv6 {
 			privateIPv6, err = netip.ParsePrefix(peer.NetworkIpv6.String)
 			if err != nil {
 				s.log.Error("parse private ipv6", slog.String("error", err.Error()))
