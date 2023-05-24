@@ -4,9 +4,23 @@
 
 package localdb
 
-import ()
+import (
+	"database/sql"
+)
 
-type NodeLocal struct {
+type NodeLocalKv struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+}
+
+type RaftIndex struct {
+	ID    int64 `json:"id"`
+	Term  int64 `json:"term"`
+	Index int64 `json:"index"`
+}
+
+type WireguardKey struct {
+	ID         int64        `json:"id"`
+	PrivateKey string       `json:"private_key"`
+	ExpiresAt  sql.NullTime `json:"expires_at"`
 }

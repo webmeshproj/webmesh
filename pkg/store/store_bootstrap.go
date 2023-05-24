@@ -220,7 +220,16 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	if err != nil {
 		return fmt.Errorf("generate private key: %w", err)
 	}
-	err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, wireguardKey.String())
+	keyparams := localdb.SetCurrentWireguardKeyParams{
+		PrivateKey: wireguardKey.String(),
+	}
+	if s.opts.KeyRotationInterval > 0 {
+		keyparams.ExpiresAt = sql.NullTime{
+			Time:  time.Now().UTC().Add(s.opts.KeyRotationInterval),
+			Valid: true,
+		}
+	}
+	err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, keyparams)
 	if err != nil {
 		return fmt.Errorf("set current wireguard key: %w", err)
 	}

@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/golang/snappy"
@@ -59,7 +58,7 @@ func (s *store) Apply(l *raft.Log) any {
 
 	// Validate and store the term/index to the local DB
 
-	dbTerm, dbIndex, err := s.getDBTermAndIndex(l)
+	dbTerm, dbIndex, err := s.getDBTermAndIndex()
 	if err != nil {
 		// This is a fatal error. We need to check the term and index of the
 		// log entry against the database, but if we can't do that, we can't
@@ -80,21 +79,6 @@ func (s *store) Apply(l *raft.Log) any {
 		return &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
-	} else if l.Term > dbTerm {
-		// This is a new term. We need to update the current term in the
-		// database.
-		log.Debug("new epoch, updating current term in db")
-		q := localdb.New(s.LocalDB())
-		err := q.SetCurrentRaftTerm(context.Background(), strconv.Itoa(int(l.Term)))
-		if err != nil {
-			// Same as above, this is a fatal error that needs to be handled.
-			log.Error("error updating current term", slog.String("error", err.Error()))
-			return &v1.RaftApplyResponse{
-				Time:  time.Since(start).String(),
-				Error: fmt.Sprintf("update current term: %s", err.Error()),
-			}
-		}
-
 	} else if l.Index <= dbIndex {
 		log.Debug("log already applied to database")
 		return &v1.RaftApplyResponse{
@@ -107,7 +91,10 @@ func (s *store) Apply(l *raft.Log) any {
 		q := localdb.New(s.LocalDB())
 		if dbIndex != l.Index {
 			log.Debug("updating last applied index in db")
-			err := q.SetLastAppliedRaftIndex(context.Background(), strconv.Itoa(int(l.Index)))
+			err := q.SetCurrentRaftIndex(context.Background(), localdb.SetCurrentRaftIndexParams{
+				Index: int64(l.Index),
+				Term:  int64(l.Term),
+			})
 			if err != nil {
 				// We'll live. This isn't a fatal error, but it's not great.
 				// Next boot will just have to replay the log entries and might
@@ -247,29 +234,12 @@ func (s *snapshot) Release() {
 	s.data = nil
 }
 
-func (s *store) getDBTermAndIndex(l *raft.Log) (term, index uint64, err error) {
+func (s *store) getDBTermAndIndex() (term, index uint64, err error) {
 	// Check if the current term and index is already applied.
-	raftState, err := localdb.New(s.LocalDB()).GetRaftState(context.Background())
+	raftState, err := localdb.New(s.LocalDB()).GetCurrentRaftIndex(context.Background())
 	if err != nil {
 		err = fmt.Errorf("get raft state: %w", err)
 		return
 	}
-	var raftTerm, raftIndex uint64
-	termStr := raftState.CurrentRaftTerm.(string)
-	indexStr := raftState.LastAppliedRaftIndex.(string)
-	if raftState.CurrentRaftTerm != "" {
-		raftTerm, err = strconv.ParseUint(termStr, 10, 64)
-		if err != nil {
-			err = fmt.Errorf("parse raft term: %w", err)
-			return
-		}
-	}
-	if raftState.LastAppliedRaftIndex != "" {
-		raftIndex, err = strconv.ParseUint(indexStr, 10, 64)
-		if err != nil {
-			err = fmt.Errorf("parse raft index: %w", err)
-			return
-		}
-	}
-	return raftTerm, raftIndex, nil
+	return uint64(raftState.Term), uint64(raftState.Index), nil
 }

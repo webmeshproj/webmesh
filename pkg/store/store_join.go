@@ -38,7 +38,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	log := s.log.With(slog.String("join-addr", joinAddr))
 	// Fetch the last key we used (TODO: make these rotatable)
 	var key wgtypes.Key
-	keyStr, err := localdb.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
+	keyData, err := localdb.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("get current wireguard key: %w", err)
@@ -50,11 +50,40 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			return fmt.Errorf("generate wireguard key: %w", err)
 		}
 		// Save it to the database.
-		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, key.String()); err != nil {
+		params := localdb.SetCurrentWireguardKeyParams{
+			PrivateKey: key.String(),
+		}
+		if s.opts.KeyRotationInterval > 0 {
+			params.ExpiresAt = sql.NullTime{
+				Time:  time.Now().UTC().Add(s.opts.KeyRotationInterval),
+				Valid: true,
+			}
+		}
+		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
+			return fmt.Errorf("set current wireguard key: %w", err)
+		}
+	} else if keyData.ExpiresAt.Valid && keyData.ExpiresAt.Time.Before(time.Now()) {
+		// We have a key, but it's expired, so we generate a new one.
+		log.Info("wireguard key expired, generating new one")
+		key, err = wgtypes.GeneratePrivateKey()
+		if err != nil {
+			return fmt.Errorf("generate wireguard key: %w", err)
+		}
+		// Save it to the database.
+		params := localdb.SetCurrentWireguardKeyParams{
+			PrivateKey: key.String(),
+		}
+		if s.opts.KeyRotationInterval > 0 {
+			params.ExpiresAt = sql.NullTime{
+				Time:  time.Now().UTC().Add(s.opts.KeyRotationInterval),
+				Valid: true,
+			}
+		}
+		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
 			return fmt.Errorf("set current wireguard key: %w", err)
 		}
 	} else {
-		key, err = wgtypes.ParseKey(keyStr)
+		key, err = wgtypes.ParseKey(keyData.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("parse wireguard key: %w", err)
 		}

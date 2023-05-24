@@ -60,6 +60,8 @@ const (
 	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
 	RaftLogFormatEnvVar             = "STORE_RAFT_LOG_FORMAT"
 	ShutdownTimeoutEnvVar           = "STORE_SHUTDOWN_TIMEOUT"
+	PeerRefreshIntervalEnvVar       = "STORE_PEER_REFRESH_INTERVAL"
+	KeyRotationIntervalEnvVar       = "STORE_KEY_ROTATION_INTERVAL"
 	NoIPv4EnvVar                    = "STORE_NO_IPV4"
 	NoIPv6EnvVar                    = "STORE_NO_IPV6"
 
@@ -170,6 +172,12 @@ type Options struct {
 	RaftLogFormat string `json:"raft-log-format" yaml:"raft-log-format" toml:"raft-log-format"`
 	// ShutdownTimeout is the timeout for shutting down.
 	ShutdownTimeout time.Duration `json:"shutdown-timeout" yaml:"shutdown-timeout" toml:"shutdown-timeout"`
+	// PeerRefreshInterval is the interval to refresh wireguard peers.
+	// Notifications of new peers are automatically added to the peer list.
+	PeerRefreshInterval time.Duration `json:"peer-refresh-interval" yaml:"peer-refresh-interval" toml:"peer-refresh-interval"`
+	// KeyRotationInterval is the interval to rotate wireguard keys.
+	// Set this to 0 to disable key rotation.
+	KeyRotationInterval time.Duration `json:"key-rotation-interval" yaml:"key-rotation-interval" toml:"key-rotation-interval"`
 	// NoIPv4 is the no IPv4 flag.
 	NoIPv4 bool `json:"no-ipv4" yaml:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is the no IPv6 flag.
@@ -196,6 +204,8 @@ func NewOptions() *Options {
 		ObserverChanBuffer:   100,
 		BootstrapIPv4Network: "172.16.0.0/12",
 		ShutdownTimeout:      time.Minute,
+		PeerRefreshInterval:  time.Minute,
+		KeyRotationInterval:  time.Hour * 24 * 7,
 	}
 }
 
@@ -281,6 +291,10 @@ but will be replaced with the wireguard address after bootstrapping.`)
 All nodes must use the same log format for the lifetime of the cluster.`)
 	fl.DurationVar(&o.ShutdownTimeout, "store.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
 		"Timeout for graceful shutdown.")
+	fl.DurationVar(&o.PeerRefreshInterval, "store.peer-refresh-interval", util.GetEnvDurationDefault(PeerRefreshIntervalEnvVar, time.Minute),
+		"Interval to refresh wireguard peer list.")
+	fl.DurationVar(&o.KeyRotationInterval, "store.key-rotation-interval", util.GetEnvDurationDefault(KeyRotationIntervalEnvVar, time.Hour*24*7),
+		"Interval to rotate wireguard keys. Set this to 0 to disable key rotation.")
 	fl.BoolVar(&o.NoIPv4, "store.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Disable IPv4 for the raft transport.")
 	fl.BoolVar(&o.NoIPv6, "store.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
@@ -301,32 +315,38 @@ func (o *Options) Validate() error {
 	if o.Bootstrap && o.BootstrapIPv4Network == "" {
 		return errors.New("bootstrap IPv4 network is required for bootstrapping")
 	}
-	if o.ConnectionPoolCount < 0 {
-		return errors.New("connection pool count must be >= 0")
+	if o.ConnectionPoolCount <= 0 {
+		return errors.New("connection pool count must be > 0")
 	}
-	if o.ConnectionTimeout < 0 {
-		return errors.New("connection timeout must be >= 0")
+	if o.ConnectionTimeout <= 0 {
+		return errors.New("connection timeout must be > 0")
 	}
-	if o.HeartbeatTimeout < 0 {
-		return errors.New("heartbeat timeout must be >= 0")
+	if o.HeartbeatTimeout <= 0 {
+		return errors.New("heartbeat timeout must be > 0")
 	}
-	if o.ElectionTimeout < 0 {
-		return errors.New("election timeout must be >= 0")
+	if o.ElectionTimeout <= 0 {
+		return errors.New("election timeout must be > 0")
 	}
-	if o.CommitTimeout < 0 {
-		return errors.New("commit timeout must be >= 0")
+	if o.CommitTimeout <= 0 {
+		return errors.New("commit timeout must be > 0")
 	}
-	if o.MaxAppendEntries < 0 {
-		return errors.New("max append entries must be >= 0")
+	if o.MaxAppendEntries <= 0 {
+		return errors.New("max append entries must be > 0")
 	}
-	if o.LeaderLeaseTimeout < 0 {
-		return errors.New("leader lease timeout must be >= 0")
+	if o.LeaderLeaseTimeout <= 0 {
+		return errors.New("leader lease timeout must be > 0")
 	}
-	if o.SnapshotInterval < 0 {
-		return errors.New("snapshot interval must be >= 0")
+	if o.SnapshotInterval <= 0 {
+		return errors.New("snapshot interval must be > 0")
 	}
 	if o.MaxJoinRetries <= 0 {
 		return errors.New("max join retries must be > 0")
+	}
+	if o.PeerRefreshInterval <= 0 {
+		return errors.New("peer refresh interval must be > 0")
+	}
+	if o.KeyRotationInterval < 0 {
+		return errors.New("key rotation interval must be >= 0")
 	}
 	if !RaftLogFormat(o.RaftLogFormat).IsValid() {
 		return errors.New("invalid raft log format")

@@ -1,23 +1,19 @@
 -- name: SetCurrentWireguardKey :exec
-INSERT into node_local (key, value) VALUES ('WireguardKey', ?)
-ON CONFLICT (key) DO UPDATE SET value = excluded.value;
+INSERT OR REPLACE INTO wireguard_key (
+    id, 
+    private_key, 
+    expires_at
+) VALUES (1, ?, ?);
 
 -- name: GetCurrentWireguardKey :one
-SELECT value FROM node_local WHERE key = 'WireguardKey';
+SELECT * FROM wireguard_key LIMIT 1;
 
--- name: SetLastAppliedRaftIndex :exec
-INSERT into node_local (key, value) VALUES ('LastAppliedRaftIndex', ?)
-ON CONFLICT (key) DO UPDATE SET value = excluded.value;
+-- name: SetCurrentRaftIndex :exec
+INSERT OR REPLACE INTO raft_index (
+    id,
+    term,
+    index
+) VALUES (1, ?, ?);
 
--- name: SetCurrentRaftTerm :exec
-INSERT into node_local (key, value) VALUES ('CurrentRaftTerm', ?)
-ON CONFLICT (key) DO UPDATE SET value = excluded.value;
-
--- name: GetRaftState :one
-SELECT 
-    COALESCE((
-        SELECT value FROM node_local WHERE key = 'CurrentRaftTerm'
-    ), '') AS CurrentRaftTerm,
-    COALESCE((
-        SELECT value FROM node_local WHERE key = 'LastAppliedRaftIndex'
-    ), '') AS LastAppliedRaftIndex;
+-- name: GetCurrentRaftIndex :one
+SELECT * FROM raft_index LIMIT 1;

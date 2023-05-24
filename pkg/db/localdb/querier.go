@@ -9,11 +9,10 @@ import (
 )
 
 type Querier interface {
-	GetCurrentWireguardKey(ctx context.Context) (string, error)
-	GetRaftState(ctx context.Context) (GetRaftStateRow, error)
-	SetCurrentRaftTerm(ctx context.Context, value string) error
-	SetCurrentWireguardKey(ctx context.Context, value string) error
-	SetLastAppliedRaftIndex(ctx context.Context, value string) error
+	GetCurrentRaftIndex(ctx context.Context) (RaftIndex, error)
+	GetCurrentWireguardKey(ctx context.Context) (WireguardKey, error)
+	SetCurrentRaftIndex(ctx context.Context, arg SetCurrentRaftIndexParams) error
+	SetCurrentWireguardKey(ctx context.Context, arg SetCurrentWireguardKeyParams) error
 }
 
 var _ Querier = (*Queries)(nil)

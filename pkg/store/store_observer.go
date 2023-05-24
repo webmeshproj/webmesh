@@ -53,15 +53,12 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					s.log.Debug("ResumedHeartbeatObservation", slog.Any("data", data))
 				case raft.FailedHeartbeatObservation:
 					s.log.Debug("FailedHeartbeatObservation", slog.Any("data", data))
-					// This is our chance to check if the wireguard key changed, assuming its propogated
-					// to our node.
-					s.handlePeerObservation(data)
 				}
 			}
 		}
 	}()
 	go func() {
-		t := time.NewTicker(time.Minute) // TODO: Make this configurable
+		t := time.NewTicker(s.opts.PeerRefreshInterval)
 		for {
 			select {
 			case <-closeCh:
@@ -78,36 +75,20 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 	return closeCh, doneCh
 }
 
-func (s *store) handlePeerObservation(change any) {
+func (s *store) handlePeerObservation(change raft.PeerObservation) {
 	if s.wg == nil {
 		return
 	}
-	// TODO: make configurable
+	s.log.Info("handling peer observation", slog.Any("change", change))
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
-
-	var peerID string
-	var isRemoved bool
-	switch ev := change.(type) {
-	case raft.PeerObservation:
-		s.log.Info("handling peer observation", slog.Any("change", change))
-		peerID = string(ev.Peer.ID)
-		isRemoved = ev.Removed
-	case raft.FailedHeartbeatObservation:
-		// These are noisy
-		peerID = string(ev.PeerID)
-	default:
-		s.log.Warn("handlePeerObservation called with unknown type", slog.String("type", reflect.TypeOf(change).String()))
-	}
-
-	if isRemoved {
+	if change.Removed {
 		// Remove the peer from the wireguard interface.
-		if err := s.wg.DeletePeer(ctx, &wireguard.Peer{ID: peerID}); err != nil {
+		if err := s.wg.DeletePeer(ctx, &wireguard.Peer{ID: string(change.Peer.ID)}); err != nil {
 			s.log.Error("wireguard remove peer", slog.String("error", err.Error()))
 		}
 		return
 	}
-
 	// Take this opportunity to verify all peer details are correct.
 	if err := s.refreshWireguardPeers(ctx); err != nil {
 		s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))

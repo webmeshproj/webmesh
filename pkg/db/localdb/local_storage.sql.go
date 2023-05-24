@@ -7,67 +7,63 @@ package localdb
 
 import (
 	"context"
+	"database/sql"
 )
 
-const getCurrentWireguardKey = `-- name: GetCurrentWireguardKey :one
-SELECT value FROM node_local WHERE key = 'WireguardKey'
+const getCurrentRaftIndex = `-- name: GetCurrentRaftIndex :one
+SELECT id, term, "index" FROM raft_index LIMIT 1
 `
 
-func (q *Queries) GetCurrentWireguardKey(ctx context.Context) (string, error) {
-	row := q.db.QueryRowContext(ctx, getCurrentWireguardKey)
-	var value string
-	err := row.Scan(&value)
-	return value, err
-}
-
-const getRaftState = `-- name: GetRaftState :one
-SELECT 
-    COALESCE((
-        SELECT value FROM node_local WHERE key = 'CurrentRaftTerm'
-    ), '') AS CurrentRaftTerm,
-    COALESCE((
-        SELECT value FROM node_local WHERE key = 'LastAppliedRaftIndex'
-    ), '') AS LastAppliedRaftIndex
-`
-
-type GetRaftStateRow struct {
-	CurrentRaftTerm      interface{} `json:"CurrentRaftTerm"`
-	LastAppliedRaftIndex interface{} `json:"LastAppliedRaftIndex"`
-}
-
-func (q *Queries) GetRaftState(ctx context.Context) (GetRaftStateRow, error) {
-	row := q.db.QueryRowContext(ctx, getRaftState)
-	var i GetRaftStateRow
-	err := row.Scan(&i.CurrentRaftTerm, &i.LastAppliedRaftIndex)
+func (q *Queries) GetCurrentRaftIndex(ctx context.Context) (RaftIndex, error) {
+	row := q.db.QueryRowContext(ctx, getCurrentRaftIndex)
+	var i RaftIndex
+	err := row.Scan(&i.ID, &i.Term, &i.Index)
 	return i, err
 }
 
-const setCurrentRaftTerm = `-- name: SetCurrentRaftTerm :exec
-INSERT into node_local (key, value) VALUES ('CurrentRaftTerm', ?)
-ON CONFLICT (key) DO UPDATE SET value = excluded.value
+const getCurrentWireguardKey = `-- name: GetCurrentWireguardKey :one
+SELECT id, private_key, expires_at FROM wireguard_key LIMIT 1
 `
 
-func (q *Queries) SetCurrentRaftTerm(ctx context.Context, value string) error {
-	_, err := q.db.ExecContext(ctx, setCurrentRaftTerm, value)
+func (q *Queries) GetCurrentWireguardKey(ctx context.Context) (WireguardKey, error) {
+	row := q.db.QueryRowContext(ctx, getCurrentWireguardKey)
+	var i WireguardKey
+	err := row.Scan(&i.ID, &i.PrivateKey, &i.ExpiresAt)
+	return i, err
+}
+
+const setCurrentRaftIndex = `-- name: SetCurrentRaftIndex :exec
+INSERT OR REPLACE INTO raft_index (
+    id,
+    term,
+    index
+) VALUES (1, ?, ?)
+`
+
+type SetCurrentRaftIndexParams struct {
+	Term  int64 `json:"term"`
+	Index int64 `json:"index"`
+}
+
+func (q *Queries) SetCurrentRaftIndex(ctx context.Context, arg SetCurrentRaftIndexParams) error {
+	_, err := q.db.ExecContext(ctx, setCurrentRaftIndex, arg.Term, arg.Index)
 	return err
 }
 
 const setCurrentWireguardKey = `-- name: SetCurrentWireguardKey :exec
-INSERT into node_local (key, value) VALUES ('WireguardKey', ?)
-ON CONFLICT (key) DO UPDATE SET value = excluded.value
+INSERT OR REPLACE INTO wireguard_key (
+    id, 
+    private_key, 
+    expires_at
+) VALUES (1, ?, ?)
 `
 
-func (q *Queries) SetCurrentWireguardKey(ctx context.Context, value string) error {
-	_, err := q.db.ExecContext(ctx, setCurrentWireguardKey, value)
-	return err
+type SetCurrentWireguardKeyParams struct {
+	PrivateKey string       `json:"private_key"`
+	ExpiresAt  sql.NullTime `json:"expires_at"`
 }
 
-const setLastAppliedRaftIndex = `-- name: SetLastAppliedRaftIndex :exec
-INSERT into node_local (key, value) VALUES ('LastAppliedRaftIndex', ?)
-ON CONFLICT (key) DO UPDATE SET value = excluded.value
-`
-
-func (q *Queries) SetLastAppliedRaftIndex(ctx context.Context, value string) error {
-	_, err := q.db.ExecContext(ctx, setLastAppliedRaftIndex, value)
+func (q *Queries) SetCurrentWireguardKey(ctx context.Context, arg SetCurrentWireguardKeyParams) error {
+	_, err := q.db.ExecContext(ctx, setCurrentWireguardKey, arg.PrivateKey, arg.ExpiresAt)
 	return err
 }
