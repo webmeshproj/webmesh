@@ -40,19 +40,9 @@ type IPAM interface {
 	// is only populated after the first call to Acquire.
 	PrefixV4() netip.Prefix
 	// Acquire acquires a lease for the given node.
-	Acquire(ctx context.Context, nodeID string) (Lease, error)
-	// Release releases the lease.
-	Release(context.Context, Lease) error
-}
-
-// Lease represents a lease for a node.
-type Lease interface {
-	// NodeID returns the ID of the node.
-	NodeID() string
-	// IPv4 returns the IPv4 address of the lease.
-	IPv4() netip.Prefix
-	// Release releases the lease.
-	Release(context.Context) error
+	Acquire(ctx context.Context, nodeID string) (address netip.Prefix, err error)
+	// Release releases the lease for the given node ID.
+	Release(ctx context.Context, nodeID string) error
 }
 
 // New returns a new IPAM service.
@@ -70,36 +60,49 @@ type ipam struct {
 func (i *ipam) PrefixV4() netip.Prefix { return i.prefixv4 }
 
 // Acquire acquires a lease for the given node.
-func (i *ipam) Acquire(ctx context.Context, nodeID string) (Lease, error) {
+func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix, err error) {
 	i.mux.Lock()
 	defer i.mux.Unlock()
+	rdb := raftdb.New(i.store.ReadDB())
 	if !i.prefixv4.IsValid() {
-		ipv4, err := raftdb.New(i.store.ReadDB()).GetIPv4Prefix(ctx)
+		var ipv4 string
+		ipv4, err = raftdb.New(i.store.ReadDB()).GetIPv4Prefix(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("get ipv4 prefix: %w", err)
+			err = fmt.Errorf("get ipv4 prefix: %w", err)
+			return
 		}
-		prefix, err := netip.ParsePrefix(ipv4)
+		var prefix netip.Prefix
+		prefix, err = netip.ParsePrefix(ipv4)
 		if err != nil {
-			return nil, fmt.Errorf("parse prefix: %w", err)
+			err = fmt.Errorf("parse prefix: %w", err)
+			return
 		}
 		i.prefixv4 = prefix
 	}
 	for {
-		allocatedIPv4s, err := raftdb.New(i.store.ReadDB()).ListAllocatedIPv4(ctx)
+		var allocatedIPv4s []string
+		var prefixSet map[netip.Prefix]struct{}
+		var allocated netip.Prefix
+		var dblease raftdb.Lease
+
+		allocatedIPv4s, err = rdb.ListAllocatedIPv4(ctx)
 		if err != nil && err != sql.ErrNoRows {
-			return nil, fmt.Errorf("failed to list allocated IPv4s: %w", err)
+			err = fmt.Errorf("failed to list allocated IPv4s: %w", err)
+			return
 		}
-		prefixSet, err := util.ToPrefixSet(allocatedIPv4s)
+		prefixSet, err = util.ToPrefixSet(allocatedIPv4s)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert allocated IPv4s to set: %w", err)
+			err = fmt.Errorf("failed to convert allocated IPv4s to set: %w", err)
+			return
 		}
-		prefixv4, err := util.Next32(i.prefixv4, prefixSet)
+		allocated, err = util.Next32(i.prefixv4, prefixSet)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate random IPv4 prefix: %w", err)
+			err = fmt.Errorf("failed to generate random IPv4 prefix: %w", err)
+			return
 		}
-		dblease, err := raftdb.New(i.store.DB()).InsertNodeLease(ctx, raftdb.InsertNodeLeaseParams{
+		dblease, err = raftdb.New(i.store.DB()).InsertNodeLease(ctx, raftdb.InsertNodeLeaseParams{
 			NodeID:    nodeID,
-			Ipv4:      prefixv4.String(),
+			Ipv4:      allocated.String(),
 			CreatedAt: time.Now().UTC(),
 		})
 		if err != nil {
@@ -108,41 +111,26 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (Lease, error) {
 				// We generated a duplicate IPv4 address, try again.
 				continue
 			}
-			return nil, fmt.Errorf("failed to assign node lease: %w", err)
+			err = fmt.Errorf("failed to assign node lease: %w", err)
+			return
 		}
-		if dblease.Ipv4 != prefixv4.Addr().String() {
+		if dblease.Ipv4 != allocated.Addr().String() {
 			// The database assigned a different IPv4 address, use that
 			// instead.
-			prefixv4, err = netip.ParsePrefix(dblease.Ipv4)
+			allocated, err = netip.ParsePrefix(dblease.Ipv4)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse assigned prefix: %w", err)
+				err = fmt.Errorf("failed to parse assigned prefix: %w", err)
+				return
 			}
 		}
-		// The database will renew and return the lease if it already exists.
-		return &lease{
-			lease:    dblease,
-			prefixv4: prefixv4,
-			ipam:     i,
-		}, nil
+		// The database will update and return the lease if it already existed
+		return allocated, nil
 	}
 }
 
-// Release releases the lease for the given node.
-func (i *ipam) Release(ctx context.Context, lease Lease) error {
+// Release releases the lease for the given node ID.
+func (i *ipam) Release(ctx context.Context, nodeID string) error {
 	i.mux.Lock()
 	defer i.mux.Unlock()
-	return raftdb.New(i.store.DB()).ReleaseNodeLease(ctx, lease.NodeID())
-}
-
-type lease struct {
-	lease    raftdb.Lease
-	prefixv4 netip.Prefix
-	ipam     *ipam
-}
-
-func (l *lease) NodeID() string     { return l.lease.NodeID }
-func (l *lease) IPv4() netip.Prefix { return l.prefixv4 }
-
-func (l *lease) Release(ctx context.Context) error {
-	return l.ipam.Release(ctx, l)
+	return raftdb.New(i.store.DB()).ReleaseNodeLease(ctx, nodeID)
 }

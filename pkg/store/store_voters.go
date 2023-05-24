@@ -74,8 +74,8 @@ func (s *store) DemoteVoter(ctx context.Context, id string) error {
 	return err
 }
 
-// RemoveVoter removes a voting node from the cluster.
-func (s *store) RemoveVoter(ctx context.Context, id string) error {
+// RemoveServer removes a node from the cluster.
+func (s *store) RemoveServer(ctx context.Context, id string) error {
 	if !s.IsLeader() {
 		return ErrNotLeader
 	}

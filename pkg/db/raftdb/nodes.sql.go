@@ -85,6 +85,15 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 	return i, err
 }
 
+const deleteNode = `-- name: DeleteNode :exec
+DELETE FROM nodes WHERE id = ?
+`
+
+func (q *Queries) DeleteNode(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteNode, id)
+	return err
+}
+
 const getNode = `-- name: GetNode :one
 SELECT
     nodes.id AS id,

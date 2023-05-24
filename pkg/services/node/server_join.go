@@ -30,7 +30,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"gitlab.com/webmesh/node/pkg/db/raftdb"
-	"gitlab.com/webmesh/node/pkg/services/node/ipam"
 	"gitlab.com/webmesh/node/pkg/services/node/peers"
 	"gitlab.com/webmesh/node/pkg/util"
 )
@@ -139,15 +138,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Info("assigned ASN to peer", slog.Int("asn", int(asn)))
 		resp.Asn = asn
 	}
-	var lease ipam.Lease
+	var lease netip.Prefix
 	if req.GetAssignIpv4() {
 		log.Info("assigning IPv4 address to peer")
 		lease, err = s.ipam.Acquire(ctx, req.GetId())
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to assign IPv4: %v", err)
 		}
-		log.Info("assigned IPv4 address to peer", slog.String("ipv4", lease.IPv4().String()))
-		resp.AddressIpv4 = lease.IPv4().String()
+		log.Info("assigned IPv4 address to peer", slog.String("ipv4", lease.String()))
+		resp.AddressIpv4 = lease.String()
 	}
 	// Fetch current wireguard peers for the new node
 	peers, err := s.peers.ListPeers(ctx, req.GetId())
@@ -160,7 +159,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Prefer IPv4 for raft
 		// TODO: doesn't work when we are IPv4 only. Need to fix this.
 		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
-		raftAddress = net.JoinHostPort(lease.IPv4().Addr().String(), strconv.Itoa(peer.RaftPort))
+		raftAddress = net.JoinHostPort(lease.Addr().String(), strconv.Itoa(peer.RaftPort))
 	} else {
 		// Use IPv6
 		raftAddress = net.JoinHostPort(peer.NetworkIPv6.Addr().String(), strconv.Itoa(peer.RaftPort))

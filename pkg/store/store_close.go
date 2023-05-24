@@ -52,20 +52,18 @@ func (s *store) Close(ctx context.Context) error {
 		}()
 	}
 	if s.raft != nil {
-		wasLeader := s.IsLeader()
-		if wasLeader {
+		if s.IsLeader() {
 			// If we were the leader, we need to step down
 			// and remove ourselves from the cluster.
-			if err := s.RemoveVoter(ctx, string(s.nodeID)); err != nil {
+			if err := s.RemoveServer(ctx, string(s.nodeID)); err != nil {
 				return fmt.Errorf("remove voter: %w", err)
 			}
-		}
-		// For good measure, step down again. This should be
-		// a no-op if we are not the leader.
-		if err := s.Stepdown(true); err != nil && err != ErrNotLeader {
-			return fmt.Errorf("stepdown: %w", err)
-		}
-		if !wasLeader {
+			// For good measure, step down again. This should be
+			// a no-op if we are not the leader.
+			if err := s.Stepdown(true); err != nil && err != ErrNotLeader {
+				return fmt.Errorf("stepdown: %w", err)
+			}
+		} else {
 			// If we were not the leader, we need to leave
 			if err := s.Leave(context.Background()); err != nil {
 				// Make this non-fatal, but it will piss off the

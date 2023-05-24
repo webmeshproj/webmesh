@@ -103,7 +103,9 @@ func (c *raftDBConn) Ping(ctx context.Context) error {
 
 // Begin starts a transaction. Everything is a transaction in the Raft
 // log for now, but we provide a Begin method for completeness.
-// TODO: Batch queries together.
+// TODO: Potentially use this to batch queries in the raft log.
+// Would need to be able to parse read-only statements out to serve them
+// locally.
 func (c *raftDBConn) Begin() (driver.Tx, error) {
 	return c, nil
 }
@@ -112,6 +114,8 @@ func (c *raftDBConn) Begin() (driver.Tx, error) {
 func (c *raftDBConn) Close() error {
 	return nil
 }
+
+type raftDBTransaction struct{}
 
 // Commit is a noop because it is handled by the Raft log.
 func (c *raftDBConn) Commit() error {

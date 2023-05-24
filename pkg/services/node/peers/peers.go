@@ -47,6 +47,8 @@ type Peers interface {
 	Get(ctx context.Context, id string) (*Node, error)
 	// Update updates a node.
 	Update(ctx context.Context, node *Node) (*Node, error)
+	// Delete deletes a node.
+	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
 	List(ctx context.Context) ([]Node, error)
 	// ListPeers lists all peers for a node.
@@ -113,8 +115,18 @@ type peers struct {
 	store store.Store
 }
 
+// Delete deletes a node.
+func (p *peers) Delete(ctx context.Context, id string) error {
+	q := raftdb.New(p.store.DB())
+	if err := q.DeleteNode(ctx, id); err != nil {
+		return fmt.Errorf("delete node: %w", err)
+	}
+	return nil
+}
+
 // Create creates a new node.
 func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) {
+	q := raftdb.New(p.store.DB())
 	params := raftdb.CreateNodeParams{
 		ID: opts.ID,
 		PublicKey: sql.NullString{
@@ -150,19 +162,18 @@ func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) 
 			Valid:  true,
 		}
 	}
-	q := raftdb.New(p.store.DB())
 	node, err := q.CreateNode(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create node: %w", err)
+		return nil, fmt.Errorf("create node: %w", err)
 	}
 	out, err := nodeModelToNode(&node)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert node model to node: %w", err)
+		return nil, fmt.Errorf("convert node model to node: %w", err)
 	}
 	if opts.AssignASN {
 		asn, err := p.AssignASN(ctx, opts.PublicKey.String())
 		if err != nil {
-			return nil, fmt.Errorf("failed to assign node ASN: %w", err)
+			return nil, fmt.Errorf("assign node ASN: %w", err)
 		}
 		out.ASN = uint32(asn)
 	}
@@ -177,7 +188,7 @@ func (p *peers) AssignASN(ctx context.Context, nodeID string) (uint32, error) {
 		CreatedAt: time.Now().UTC(),
 	})
 	if err != nil {
-		return 0, fmt.Errorf("failed to assign ASN: %w", err)
+		return 0, fmt.Errorf("assign ASN: %w", err)
 	}
 	return uint32(asn.Asn), nil
 }
@@ -187,7 +198,7 @@ func (p *peers) UnassignASN(ctx context.Context, nodeID string) error {
 	q := raftdb.New(p.store.DB())
 	err := q.UnassignNodeASN(ctx, nodeID)
 	if err != nil {
-		return fmt.Errorf("failed to unassign ASN: %w", err)
+		return fmt.Errorf("unassign ASN: %w", err)
 	}
 	return nil
 }
@@ -206,27 +217,27 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 	if node.PublicKey.Valid {
 		key, err = wgtypes.ParseKey(node.PublicKey.String)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse node public key: %w", err)
+			return nil, fmt.Errorf("parse node public key: %w", err)
 		}
 	}
 	var endpoint netip.AddrPort
 	if node.Endpoint.Valid {
 		endpoint, err = netip.ParseAddrPort(node.Endpoint.String)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse node endpoint: %w", err)
+			return nil, fmt.Errorf("parse node endpoint: %w", err)
 		}
 	}
 	var privateIPv4, privateIPv6 netip.Prefix
 	if node.PrivateAddressV4 != "" {
 		privateIPv4, err = netip.ParsePrefix(node.PrivateAddressV4)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse node private IPv4: %w", err)
+			return nil, fmt.Errorf("parse node private IPv4: %w", err)
 		}
 	}
 	if node.NetworkIpv6.Valid {
 		privateIPv6, err = netip.ParsePrefix(node.NetworkIpv6.String)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse node private IPv6: %w", err)
+			return nil, fmt.Errorf("parse node private IPv6: %w", err)
 		}
 	}
 	return &Node{
@@ -257,6 +268,7 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 
 // Update updates a node.
 func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
+	q := raftdb.New(p.store.DB())
 	params := raftdb.UpdateNodeParams{
 		ID:       node.ID,
 		GrpcPort: int64(node.GRPCPort),
@@ -291,14 +303,13 @@ func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
 			Valid:  true,
 		}
 	}
-	q := raftdb.New(p.store.DB())
 	updated, err := q.UpdateNode(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update node: %w", err)
+		return nil, fmt.Errorf("update node: %w", err)
 	}
 	out, err := nodeModelToNode(&updated)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert node model to node: %w", err)
+		return nil, fmt.Errorf("convert node model to node: %w", err)
 	}
 	if node.ASN != 0 {
 		// Pass the ASN through if it was provided.
@@ -324,27 +335,27 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 		if node.PublicKey.Valid {
 			key, err = wgtypes.ParseKey(node.PublicKey.String)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node public key: %w", err)
+				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
 		}
 		var endpoint netip.AddrPort
 		if node.Endpoint.Valid {
 			endpoint, err = netip.ParseAddrPort(node.Endpoint.String)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node endpoint: %w", err)
+				return nil, fmt.Errorf("parse node endpoint: %w", err)
 			}
 		}
 		var networkv4, networkv6 netip.Prefix
 		if node.PrivateAddressV4 != "" {
 			networkv4, err = netip.ParsePrefix(node.PrivateAddressV4)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node network IPv4: %w", err)
+				return nil, fmt.Errorf("parse node network IPv4: %w", err)
 			}
 		}
 		if node.NetworkIpv6.Valid {
 			networkv6, err = netip.ParsePrefix(node.NetworkIpv6.String)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node network IPv6: %w", err)
+				return nil, fmt.Errorf("parse node network IPv6: %w", err)
 			}
 		}
 		out[i] = Node{
@@ -388,27 +399,27 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 		if peer.PublicKey.Valid {
 			key, err = wgtypes.ParseKey(peer.PublicKey.String)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node public key: %w", err)
+				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
 		}
 		var endpoint netip.AddrPort
 		if peer.Endpoint.Valid {
 			endpoint, err = netip.ParseAddrPort(peer.Endpoint.String)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node endpoint: %w", err)
+				return nil, fmt.Errorf("parse node endpoint: %w", err)
 			}
 		}
 		var networkv4, networkv6 netip.Prefix
 		if peer.PrivateAddressV4 != "" {
 			networkv4, err = netip.ParsePrefix(peer.PrivateAddressV4)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node network IPv4: %w", err)
+				return nil, fmt.Errorf("parse node network IPv4: %w", err)
 			}
 		}
 		if peer.NetworkIpv6.Valid {
 			networkv6, err = netip.ParsePrefix(peer.NetworkIpv6.String)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node network IPv6: %w", err)
+				return nil, fmt.Errorf("parse node network IPv6: %w", err)
 			}
 		}
 		peers[i] = Node{
@@ -446,20 +457,20 @@ func nodeModelToNode(node *raftdb.Node) (*Node, error) {
 	if node.PublicKey.Valid {
 		key, err = wgtypes.ParseKey(node.PublicKey.String)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse node public key: %w", err)
+			return nil, fmt.Errorf("parse node public key: %w", err)
 		}
 	}
 	if node.Endpoint.Valid {
 		endpoint, err = netip.ParseAddrPort(node.Endpoint.String)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse endpoint: %w", err)
+			return nil, fmt.Errorf("parse endpoint: %w", err)
 		}
 	}
 	var networkV6 netip.Prefix
 	if node.NetworkIpv6.Valid {
 		networkV6, err = netip.ParsePrefix(node.NetworkIpv6.String)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse network IPv6: %w", err)
+			return nil, fmt.Errorf("parse network IPv6: %w", err)
 		}
 	}
 	return &Node{

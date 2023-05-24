@@ -18,8 +18,10 @@ package node
 
 import (
 	"context"
+	"time"
 
 	v1 "gitlab.com/webmesh/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -33,9 +35,20 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.log.Info("removing voter", "id", req.GetId())
-	err := s.store.RemoveVoter(ctx, req.GetId())
+	err := s.store.RemoveServer(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)
 	}
+	// The most important thing is that we remove the voter. We should also remove the peer from
+	// the database and release leases, but we don't want this to negatively impact the caller.
+	// So we do it in the background.
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		err := s.peers.Delete(ctx, req.GetId())
+		if err != nil {
+			s.log.Error("failed to remove node from db", slog.String("error", err.Error()))
+		}
+	}()
 	return nil, nil
 }

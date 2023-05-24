@@ -11,6 +11,7 @@ import (
 type Querier interface {
 	AssignNodeASN(ctx context.Context, arg AssignNodeASNParams) (Asn, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
+	DeleteNode(ctx context.Context, id string) error
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
 	GetNodePeer(ctx context.Context, id string) (GetNodePeerRow, error)

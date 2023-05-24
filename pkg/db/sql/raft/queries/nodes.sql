@@ -26,6 +26,9 @@ UPDATE nodes SET
 WHERE id = ?
 RETURNING *;
 
+-- name: DeleteNode :exec
+DELETE FROM nodes WHERE id = ?;
+
 -- name: ListPublicRPCAddresses :many
 SELECT node_id, CAST(address AS TEXT) FROM node_public_rpc_addresses;
 
