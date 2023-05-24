@@ -43,7 +43,7 @@ type Server struct {
 // NewServer returns a new Server.
 func NewServer(store store.Store, o *Options) (*Server, error) {
 	log := slog.Default().With("component", "server")
-	opts, err := o.ServerOptions(store)
+	opts, tlsConfig, err := o.ServerOptions(store)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	}
 	log.Debug("registering node server")
 	// Always register the node server
-	v1.RegisterNodeServer(server, node.NewServer(store, features...))
+	v1.RegisterNodeServer(server, node.NewServer(store, tlsConfig, features...))
 	return server, nil
 }
 

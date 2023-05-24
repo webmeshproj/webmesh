@@ -31,22 +31,24 @@ func encodeToStdout(cmd *cobra.Command, resp proto.Message) error {
 	return nil
 }
 
-func completeNodes(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
+func completeNodes(maxNodes int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) >= maxNodes {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		client, closer, err := cliConfig.NewMeshClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		defer closer.Close()
+		resp, err := client.ListNodes(cmd.Context(), &emptypb.Empty{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var names []string
+		for _, node := range resp.Nodes {
+			names = append(names, node.GetId())
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
 	}
-	client, closer, err := cliConfig.NewMeshClient()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-	defer closer.Close()
-	resp, err := client.ListNodes(cmd.Context(), &emptypb.Empty{})
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-	var names []string
-	for _, node := range resp.Nodes {
-		names = append(names, node.GetId())
-	}
-	return names, cobra.ShellCompDirectiveNoFileComp
 }

@@ -23,13 +23,20 @@ import (
 	"github.com/hashicorp/raft"
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"gitlab.com/webmesh/node/pkg/version"
 )
 
-func (s *Server) GetStatus(ctx context.Context, req *emptypb.Empty) (*v1.Status, error) {
+func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.Status, error) {
+	if req.GetId() != "" {
+		return s.getRemoteNodeStatus(ctx, req.GetId())
+	}
 	var leader raft.ServerID
 	var err error
 	leader, err = s.store.Leader()
@@ -64,4 +71,22 @@ func (s *Server) GetStatus(ctx context.Context, req *emptypb.Empty) (*v1.Status,
 		}(),
 		CurrentLeader: string(leader),
 	}, nil
+}
+
+func (s *Server) getRemoteNodeStatus(ctx context.Context, nodeID string) (*v1.Status, error) {
+	addr, err := s.meshstate.GetNodePrivateRPCAddress(ctx, nodeID)
+	if err != nil {
+		return nil, status.Errorf(codes.FailedPrecondition, "could not find rpc address for node %s: %s", nodeID, err.Error())
+	}
+	var creds credentials.TransportCredentials
+	if s.tlsConfig == nil {
+		creds = insecure.NewCredentials()
+	} else {
+		creds = credentials.NewTLS(s.tlsConfig)
+	}
+	conn, err := grpc.DialContext(ctx, addr.String(), grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return nil, status.Errorf(codes.FailedPrecondition, "could not connect to node %s: %s", nodeID, err.Error())
+	}
+	return v1.NewNodeClient(conn).GetStatus(ctx, &v1.GetStatusRequest{})
 }

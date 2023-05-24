@@ -124,10 +124,8 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewMeshClient(conn).GetNode(ctx, req.(*v1.GetNodeRequest))
 	case v1.Mesh_ListNodes_FullMethodName:
 		return v1.NewMeshClient(conn).ListNodes(ctx, req.(*emptypb.Empty))
-	case v1.Node_GetFeatures_FullMethodName:
-		return v1.NewNodeClient(conn).GetFeatures(ctx, req.(*emptypb.Empty))
 	case v1.Node_GetStatus_FullMethodName:
-		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*emptypb.Empty))
+		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*v1.GetStatusRequest))
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}

@@ -40,7 +40,7 @@ var getNodesCmd = &cobra.Command{
 	Short:             "Get nodes from the mesh",
 	Aliases:           []string{"node"},
 	Args:              cobra.MaximumNArgs(1),
-	ValidArgsFunction: completeNodes,
+	ValidArgsFunction: completeNodes(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, closer, err := cliConfig.NewMeshClient()
 		if err != nil {

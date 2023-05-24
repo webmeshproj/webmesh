@@ -21,7 +21,7 @@ import (
 	v1 "gitlab.com/webmesh/api/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"gitlab.com/webmesh/node/pkg/services/node/peers"
+	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 )
 
 func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Server) *v1.MeshNode {

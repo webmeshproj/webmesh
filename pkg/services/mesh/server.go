@@ -21,7 +21,7 @@ import (
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/services/node/peers"
+	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 	"gitlab.com/webmesh/node/pkg/store"
 )
 

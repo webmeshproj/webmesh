@@ -55,7 +55,7 @@ var portForwardCmd = &cobra.Command{
 	Use:               "port-forward NODE_ID [LOCAL_PORT:[REMOTE_ADDRESS]:]REMOTE_PORT",
 	Short:             "Forward ports to services running in the mesh",
 	Args:              cobra.ExactArgs(2),
-	ValidArgsFunction: completeNodes,
+	ValidArgsFunction: completeNodes(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		nodeID, portForwardSpec := args[0], args[1]
 		return portForward(cmd, nodeID, portForwardSpec)

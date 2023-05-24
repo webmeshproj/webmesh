@@ -140,14 +140,14 @@ func (o *Options) ListenPort() (int, error) {
 }
 
 // ServerOptions converts the options to gRPC server options.
-func (o *Options) ServerOptions(store store.Store) ([]grpc.ServerOption, error) {
+func (o *Options) ServerOptions(store store.Store) ([]grpc.ServerOption, *tls.Config, error) {
 	var opts []grpc.ServerOption
 	var tlsConfig *tls.Config
 	var err error
 	if !o.Insecure {
 		tlsConfig, err = o.TLSConfig()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		opts = append(opts, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	} else {
@@ -177,7 +177,7 @@ func (o *Options) ServerOptions(store store.Store) ([]grpc.ServerOption, error) 
 	}
 	opts = append(opts, grpc.ChainUnaryInterceptor(unarymiddlewares...))
 	opts = append(opts, grpc.ChainStreamInterceptor(streammiddlewares...))
-	return opts, nil
+	return opts, tlsConfig, nil
 }
 
 // TLSConfig returns the TLS configuration.

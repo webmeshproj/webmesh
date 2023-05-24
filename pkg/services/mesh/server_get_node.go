@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/webmesh/node/pkg/services/node/peers"
+	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 )
 
 func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshNode, error) {

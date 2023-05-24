@@ -18,14 +18,16 @@ limitations under the License.
 package node
 
 import (
+	"crypto/tls"
 	"net/netip"
 	"time"
 
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/services/node/ipam"
-	"gitlab.com/webmesh/node/pkg/services/node/peers"
+	"gitlab.com/webmesh/node/pkg/meshdb/ipam"
+	"gitlab.com/webmesh/node/pkg/meshdb/peers"
+	"gitlab.com/webmesh/node/pkg/meshdb/state"
 	"gitlab.com/webmesh/node/pkg/store"
 )
 
@@ -36,18 +38,24 @@ type Server struct {
 	store     store.Store
 	peers     peers.Peers
 	ipam      ipam.IPAM
+	meshstate state.State
 	ulaPrefix netip.Prefix
 	features  []v1.Feature
 	startedAt time.Time
 	log       *slog.Logger
+	tlsConfig *tls.Config
 }
 
-// NewServer returns a new Server.
-func NewServer(store store.Store, features ...v1.Feature) *Server {
+// NewServer returns a new Server. The TLS config is optional and is used
+// for RPCs to other nodes in the cluster. Features are used for returning
+// what features are enabled. It is the callers responsibility to ensure
+// those servers are registered on the node.
+func NewServer(store store.Store, tlsConfig *tls.Config, features ...v1.Feature) *Server {
 	return &Server{
 		store:     store,
 		peers:     peers.New(store),
 		ipam:      ipam.New(store),
+		meshstate: state.New(store),
 		features:  features,
 		startedAt: time.Now(),
 		log:       slog.Default().With("component", "node-server"),

@@ -28,8 +28,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/webmesh/node/pkg/db/raftdb"
-	"gitlab.com/webmesh/node/pkg/services/node/peers"
+	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 	"gitlab.com/webmesh/node/pkg/util"
 )
 
@@ -39,15 +38,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	if !s.ulaPrefix.IsValid() {
-		ula, err := raftdb.New(s.store.ReadDB()).GetULAPrefix(ctx)
+		var err error
+		s.ulaPrefix, err = s.meshstate.GetULAPrefix(ctx)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
 		}
-		prefix, err := netip.ParsePrefix(ula)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to parse ULA prefix: %v", err)
-		}
-		s.ulaPrefix = prefix
 	}
 
 	// Validate inputs

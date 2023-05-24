@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	"google.golang.org/protobuf/types/known/emptypb"
+	v1 "gitlab.com/webmesh/api/v1"
 )
 
 func init() {
@@ -28,15 +28,21 @@ func init() {
 }
 
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Retrieves the status of a node in the cluster",
+	Use:               "status [NODE_ID]",
+	Short:             "Retrieves the status of a node in the cluster",
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeNodes(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, closer, err := cliConfig.NewNodeClient()
 		if err != nil {
 			return err
 		}
 		defer closer.Close()
-		status, err := client.GetStatus(context.Background(), &emptypb.Empty{})
+		var req v1.GetStatusRequest
+		if len(args) > 0 {
+			req.Id = args[0]
+		}
+		status, err := client.GetStatus(context.Background(), &req)
 		if err != nil {
 			return err
 		}
