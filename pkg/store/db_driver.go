@@ -115,8 +115,6 @@ func (c *raftDBConn) Close() error {
 	return nil
 }
 
-type raftDBTransaction struct{}
-
 // Commit is a noop because it is handled by the Raft log.
 func (c *raftDBConn) Commit() error {
 	return nil

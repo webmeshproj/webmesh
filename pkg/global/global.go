@@ -130,7 +130,7 @@ func (o *Options) Overlay(opts ...any) {
 					if vopt, ok := inOpts.(*streamlayer.Options); ok {
 						_, port, err := net.SplitHostPort(vopt.ListenAddress)
 						if err == nil {
-							raftPort, err = strconv.ParseUint(port, 10, 16)
+							raftPort, _ = strconv.ParseUint(port, 10, 16)
 							break
 						}
 					}
