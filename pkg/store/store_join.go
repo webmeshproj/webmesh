@@ -19,6 +19,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/netip"
 	"time"
@@ -40,7 +41,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	var key wgtypes.Key
 	keyData, err := localdb.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("get current wireguard key: %w", err)
 		}
 		// We don't have a key yet, so we generate one.
@@ -62,7 +63,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
 			return fmt.Errorf("set current wireguard key: %w", err)
 		}
-	} else if keyData.ExpiresAt.Valid && keyData.ExpiresAt.Time.Before(time.Now()) {
+	} else if keyData.ExpiresAt.Valid && keyData.ExpiresAt.Time.Before(time.Now().UTC()) {
 		// We have a key, but it's expired, so we generate a new one.
 		log.Info("wireguard key expired, generating new one")
 		key, err = wgtypes.GeneratePrivateKey()

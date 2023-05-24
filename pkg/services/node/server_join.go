@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
+	"time"
 
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
@@ -153,6 +154,13 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to add non-voter: %v", err)
 		}
 	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.store.RefreshWireguardPeers(ctx); err != nil {
+			log.Warn("failed to refresh wireguard peers", slog.String("error", err.Error()))
+		}
+	}()
 	resp.Peers = make([]*v1.WireguardPeer, len(peers))
 	for i, p := range peers {
 		peer := p

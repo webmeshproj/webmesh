@@ -86,7 +86,7 @@ func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, network
 	return nil
 }
 
-func (s *store) refreshWireguardPeers(ctx context.Context) error {
+func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	if s.wg == nil {
 		return nil
 	}

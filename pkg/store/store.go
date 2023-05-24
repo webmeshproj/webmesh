@@ -74,6 +74,10 @@ type Store interface {
 	// when the store is opened through joining a cluster, but can be called again to
 	// reconfigure the interface or after a bootstrap.
 	ConfigureWireguard(ctx context.Context, key wgtypes.Key, networkv4, networkv6 netip.Prefix) error
+	// RefreshWireguardPeers refreshes the wireguard peers. This is normally called
+	// on an interval or when peer observations happen on the cluster. It can also
+	// be called manually to force a refresh.
+	RefreshWireguardPeers(ctx context.Context) error
 	// ReadyNotify returns a channel that is closed when the store is ready
 	// to serve requests. Ready is defined as having a leader.
 	ReadyNotify(ctx context.Context) <-chan struct{}

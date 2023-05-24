@@ -14,9 +14,9 @@ type NodeLocalKv struct {
 }
 
 type RaftIndex struct {
-	ID    int64 `json:"id"`
-	Term  int64 `json:"term"`
-	Index int64 `json:"index"`
+	ID       int64 `json:"id"`
+	Term     int64 `json:"term"`
+	LogIndex int64 `json:"log_index"`
 }
 
 type WireguardKey struct {

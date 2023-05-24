@@ -12,7 +12,7 @@ SELECT * FROM wireguard_key LIMIT 1;
 INSERT OR REPLACE INTO raft_index (
     id,
     term,
-    index
+    log_index
 ) VALUES (1, ?, ?);
 
 -- name: GetCurrentRaftIndex :one

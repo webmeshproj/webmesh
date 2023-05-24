@@ -213,10 +213,9 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		CreatedAt:     time.Now().UTC(),
 		UpdatedAt:     time.Now().UTC(),
 	}
-	var wireguardKey wgtypes.Key
 	// Go ahead and generate our private key.
 	s.log.Info("generating wireguard key for ourselves")
-	wireguardKey, err = wgtypes.GeneratePrivateKey()
+	wireguardKey, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
 		return fmt.Errorf("generate private key: %w", err)
 	}

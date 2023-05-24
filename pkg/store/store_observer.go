@@ -66,7 +66,7 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 				return
 			case <-t.C:
 				s.log.Debug("refreshing wireguard peers from db")
-				if err := s.refreshWireguardPeers(context.Background()); err != nil {
+				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
 					s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
 				}
 			}
@@ -90,7 +90,7 @@ func (s *store) handlePeerObservation(change raft.PeerObservation) {
 		return
 	}
 	// Take this opportunity to verify all peer details are correct.
-	if err := s.refreshWireguardPeers(ctx); err != nil {
+	if err := s.RefreshWireguardPeers(ctx); err != nil {
 		s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
 	}
 }

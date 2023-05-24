@@ -11,13 +11,13 @@ import (
 )
 
 const getCurrentRaftIndex = `-- name: GetCurrentRaftIndex :one
-SELECT id, term, "index" FROM raft_index LIMIT 1
+SELECT id, term, log_index FROM raft_index LIMIT 1
 `
 
 func (q *Queries) GetCurrentRaftIndex(ctx context.Context) (RaftIndex, error) {
 	row := q.db.QueryRowContext(ctx, getCurrentRaftIndex)
 	var i RaftIndex
-	err := row.Scan(&i.ID, &i.Term, &i.Index)
+	err := row.Scan(&i.ID, &i.Term, &i.LogIndex)
 	return i, err
 }
 
@@ -36,17 +36,17 @@ const setCurrentRaftIndex = `-- name: SetCurrentRaftIndex :exec
 INSERT OR REPLACE INTO raft_index (
     id,
     term,
-    index
+    log_index
 ) VALUES (1, ?, ?)
 `
 
 type SetCurrentRaftIndexParams struct {
-	Term  int64 `json:"term"`
-	Index int64 `json:"index"`
+	Term     int64 `json:"term"`
+	LogIndex int64 `json:"log_index"`
 }
 
 func (q *Queries) SetCurrentRaftIndex(ctx context.Context, arg SetCurrentRaftIndexParams) error {
-	_, err := q.db.ExecContext(ctx, setCurrentRaftIndex, arg.Term, arg.Index)
+	_, err := q.db.ExecContext(ctx, setCurrentRaftIndex, arg.Term, arg.LogIndex)
 	return err
 }
 

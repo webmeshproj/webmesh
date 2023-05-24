@@ -19,7 +19,7 @@ CREATE TABLE wireguard_key (
 CREATE TABLE raft_index (
     id          INTEGER NOT NULL PRIMARY KEY, -- Always 1
     term        INTEGER NOT NULL,
-    index       INTEGER NOT NULL
+    log_index   INTEGER NOT NULL
 );
 
 -- +goose Down

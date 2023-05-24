@@ -21,6 +21,7 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -92,8 +93,8 @@ func (s *store) Apply(l *raft.Log) any {
 		if dbIndex != l.Index {
 			log.Debug("updating last applied index in db")
 			err := q.SetCurrentRaftIndex(context.Background(), localdb.SetCurrentRaftIndexParams{
-				Index: int64(l.Index),
-				Term:  int64(l.Term),
+				LogIndex: int64(l.Index),
+				Term:     int64(l.Term),
 			})
 			if err != nil {
 				// We'll live. This isn't a fatal error, but it's not great.
@@ -238,8 +239,12 @@ func (s *store) getDBTermAndIndex() (term, index uint64, err error) {
 	// Check if the current term and index is already applied.
 	raftState, err := localdb.New(s.LocalDB()).GetCurrentRaftIndex(context.Background())
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// No rows means we haven't applied any log entries yet.
+			return 0, 0, nil
+		}
 		err = fmt.Errorf("get raft state: %w", err)
 		return
 	}
-	return uint64(raftState.Term), uint64(raftState.Index), nil
+	return uint64(raftState.Term), uint64(raftState.LogIndex), nil
 }
