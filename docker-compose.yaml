@@ -27,21 +27,27 @@ services:
       - --store.bootstrap
       - --store.node-id=bootstrap-node-1
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
       - --store.raft-log-format=json
       - --store.raft-log-level=debug
       - --wireguard.no-modprobe
-      - --grpc.enable-metrics
-      - --grpc.enable-mesh-api
-      - --grpc.enable-webrtc-api
-      - --grpc.enable-turn-server
-      - --grpc.turn-server-public-ip=127.0.0.1
-      - --grpc.stun-port-range=50000-50008
-      - --grpc.exclusive-turn-server
+      - --services.enable-leader-proxy
+      - --services.enable-peer-discovery-api
+      - --services.enable-metrics
+      - --services.enable-mesh-api
+      - --services.enable-webrtc-api
+      - --services.enable-turn-server
+      - --services.enable-mesh-dns
+      - --services.turn-server-public-ip=127.0.0.1
+      - --services.stun-port-range=50000-50005
+      - --services.exclusive-turn-server
     ports:
       - 8443:8443
       - 3478:3478
-      - 50000-50008:50000-50008
+      - 5354:5353/udp
+      - 5354:5353/tcp
+      - 50000-50005:50000-50005
     volumes:
       - bootstrap-node-1:/data
     networks:
@@ -60,12 +66,14 @@ services:
       - --store.bootstrap
       - --store.node-id=bootstrap-node-2
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
       - --store.raft-log-format=json
       - --store.raft-log-level=debug
       - --wireguard.no-modprobe
-      - --grpc.enable-metrics
-      - --grpc.enable-mesh-api
+      - --services.enable-leader-proxy
+      - --services.enable-metrics
+      - --services.enable-mesh-api
     volumes:
       - bootstrap-node-2:/data
     networks:
@@ -84,12 +92,14 @@ services:
       - --store.bootstrap
       - --store.node-id=bootstrap-node-3
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
       - --store.raft-log-format=json
       - --store.raft-log-level=debug
       - --wireguard.no-modprobe
-      - --grpc.enable-metrics
-      - --grpc.enable-mesh-api
+      - --services.enable-leader-proxy
+      - --services.enable-metrics
+      - --services.enable-mesh-api
     volumes:
       - bootstrap-node-3:/data
     networks:

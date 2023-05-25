@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package mesh contains the webmesh Mesh service.
-package mesh
+// Package meshapi contains the webmesh Mesh API service.
+package meshapi
 
 import (
 	v1 "gitlab.com/webmesh/api/v1"

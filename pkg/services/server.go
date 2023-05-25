@@ -18,19 +18,23 @@ limitations under the License.
 package services
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"strings"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"gitlab.com/webmesh/node/pkg/services/mesh"
+	"gitlab.com/webmesh/node/pkg/services/meshapi"
+	"gitlab.com/webmesh/node/pkg/services/meshdns"
 	"gitlab.com/webmesh/node/pkg/services/node"
+	"gitlab.com/webmesh/node/pkg/services/peerdiscovery"
 	"gitlab.com/webmesh/node/pkg/services/turn"
 	"gitlab.com/webmesh/node/pkg/services/webrtc"
 	"gitlab.com/webmesh/node/pkg/store"
@@ -38,10 +42,11 @@ import (
 
 // Server is the gRPC server.
 type Server struct {
-	opts *Options
-	srv  *grpc.Server
-	turn *turn.Server
-	log  *slog.Logger
+	opts    *Options
+	srv     *grpc.Server
+	turn    *turn.Server
+	meshdns *meshdns.Server
+	log     *slog.Logger
 }
 
 // NewServer returns a new Server.
@@ -56,17 +61,15 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 		opts: o,
 		log:  log,
 	}
-	features := []v1.Feature{v1.Feature_NODES}
 	if o.EnableMeshAPI {
 		log.Debug("registering mesh api")
-		v1.RegisterMeshServer(server, mesh.NewServer(store))
-		features = append(features, v1.Feature_MESH_API)
+		v1.RegisterMeshServer(server, meshapi.NewServer(store))
 	}
-	if o.EnableMetrics {
-		features = append(features, v1.Feature_METRICS_GRPC)
+	if o.EnablePeerDiscoveryAPI {
+		log.Debug("registering peer discovery api")
+		v1.RegisterPeerDiscoveryServer(server, peerdiscovery.NewServer(store))
 	}
 	if o.EnableWebRTCAPI {
-		features = append(features, v1.Feature_ICE_NEGOTIATION)
 		var stunURLs []string
 		if (o.EnableTURNServer && !o.ExclusiveTURNServer) && o.STUNServers != "" {
 			stunURLs = strings.Split(o.STUNServers, ",")
@@ -80,12 +83,21 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 		}
 		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, tlsConfig, stunURLs))
 	}
-	if !o.DisableLeaderProxy {
-		features = append(features, v1.Feature_LEADER_PROXY)
+	if o.EnableMeshDNS {
+		log.Debug("registering mesh dns")
+		server.meshdns = meshdns.NewServer(store, &meshdns.Options{
+			UDPListenAddr:  o.MeshDNSListenUDP,
+			TCPListenAddr:  o.MeshDNSListenTCP,
+			TSIGKey:        o.MeshDNSTSIGKey,
+			ReusePort:      o.MeshDNSReusePort,
+			Compression:    o.MeshDNSCompression,
+			Domain:         o.MeshDNSDomain,
+			RequestTimeout: o.MeshDNSRequestTimeout,
+		})
 	}
 	log.Debug("registering node server")
 	// Always register the node server
-	v1.RegisterNodeServer(server, node.NewServer(store, tlsConfig, features...))
+	v1.RegisterNodeServer(server, node.NewServer(store, tlsConfig, o.ToFeatureSet()))
 	return server, nil
 }
 
@@ -116,8 +128,15 @@ func (s *Server) ListenAndServe() error {
 			return fmt.Errorf("create turn server: %w", err)
 		}
 	}
-	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
-	lis, err := net.Listen("tcp", s.opts.ListenAddress)
+	if s.meshdns != nil {
+		go func() {
+			if err := s.meshdns.ListenAndServe(); err != nil {
+				s.log.Error("meshdns server failed", slog.String("error", err.Error()))
+			}
+		}()
+	}
+	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.GRPCListenAddress))
+	lis, err := net.Listen("tcp", s.opts.GRPCListenAddress)
 	if err != nil {
 		return fmt.Errorf("start TCP listener: %w", err)
 	}
@@ -135,6 +154,25 @@ func (s *Server) RegisterService(desc *grpc.ServiceDesc, impl any) {
 
 // Stop stops the gRPC server gracefully.
 func (s *Server) Stop() {
+	if s.turn != nil {
+		s.log.Info("Shutting down TURN server")
+		if err := s.turn.Close(); err != nil {
+			s.log.Error("turn server shutdown failed", slog.String("error", err.Error()))
+		}
+	}
+	if s.meshdns != nil {
+		s.log.Info("Shutting down meshdns server")
+		if err := s.meshdns.Shutdown(); err != nil {
+			s.log.Error("meshdns server shutdown failed", slog.String("error", err.Error()))
+		}
+	}
 	s.log.Info("Shutting down gRPC server")
 	s.srv.GracefulStop()
+}
+
+// InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.
+func InterceptorLogger(l *slog.Logger) logging.Logger {
+	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
+		l.Log(ctx, slog.Level(lvl), msg, fields...)
+	})
 }

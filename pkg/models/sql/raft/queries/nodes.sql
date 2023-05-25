@@ -27,21 +27,6 @@ RETURNING *;
 -- name: DeleteNode :exec
 DELETE FROM nodes WHERE id = ?;
 
--- name: ListPublicRPCAddresses :many
-SELECT node_id, CAST(address AS TEXT) FROM node_public_rpc_addresses;
-
--- name: GetNodePrivateRPCAddress :one
-SELECT CAST(address AS TEXT) FROM node_private_rpc_addresses WHERE node_id = ?;
-
--- name: GetNodePublicRPCAddress :one
-SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id = ?;
-
--- name: GetNodePrivateRPCAddresses :many
-SELECT CAST(address AS TEXT) FROM node_private_rpc_addresses WHERE node_id <> ?;
-
--- name: GetNodePublicRPCAddresses :many
-SELECT CAST(address AS TEXT) FROM node_public_rpc_addresses WHERE node_id <> ?;
-
 -- name: GetNode :one
 SELECT
     nodes.id AS id,

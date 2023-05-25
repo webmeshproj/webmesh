@@ -13,6 +13,7 @@ require (
 	github.com/hashicorp/raft v1.5.0
 	github.com/hashicorp/raft-boltdb v0.0.0-20230125174641-2a8082862702
 	github.com/jsimonetti/rtnetlink v1.3.3
+	github.com/miekg/dns v1.1.54
 	github.com/pelletier/go-toml/v2 v2.0.7
 	github.com/pion/datachannel v1.5.5
 	github.com/pion/logging v0.2.2
@@ -24,8 +25,9 @@ require (
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	gitlab.com/webmesh/api v0.0.6-0.20230524215509-aea87c3fb0fa
+	gitlab.com/webmesh/api v0.0.6-0.20230525121308-7df7b60db26b
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
+	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.8.0
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
@@ -81,7 +83,6 @@ require (
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/tools v0.8.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect

@@ -19,6 +19,7 @@ package state
 
 import (
 	"context"
+	"database/sql"
 	"net/netip"
 
 	"gitlab.com/webmesh/node/pkg/models/raftdb"
@@ -33,6 +34,9 @@ type State interface {
 	GetIPv4Prefix(ctx context.Context) (netip.Prefix, error)
 	// GetNodePrivateRPCAddress returns the private gRPC address for a node.
 	GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (netip.AddrPort, error)
+	// ListPublicRPCAddresses returns all public gRPC addresses in the mesh.
+	// The map key is the node ID.
+	ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error)
 }
 
 type state struct {
@@ -66,4 +70,26 @@ func (s *state) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (ne
 		return netip.AddrPort{}, err
 	}
 	return netip.ParseAddrPort(addr.(string))
+}
+
+func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {
+	addrs, err := s.q.ListPublicRPCAddresses(ctx)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if len(addrs) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]netip.AddrPort, len(addrs))
+	for _, addr := range addrs {
+		a, err := netip.ParseAddrPort(addr.Address.(string))
+		if err != nil {
+			return nil, err
+		}
+		out[addr.NodeID] = a
+	}
+	return out, nil
 }

@@ -50,7 +50,7 @@ type Server struct {
 // for RPCs to other nodes in the cluster. Features are used for returning
 // what features are enabled. It is the callers responsibility to ensure
 // those servers are registered on the node.
-func NewServer(store store.Store, tlsConfig *tls.Config, features ...v1.Feature) *Server {
+func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature) *Server {
 	return &Server{
 		store:     store,
 		peers:     peers.New(store),

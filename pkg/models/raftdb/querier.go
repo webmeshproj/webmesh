@@ -24,6 +24,7 @@ type Querier interface {
 	ListNodePeers(ctx context.Context, id string) ([]ListNodePeersRow, error)
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)
 	ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error)
+	ListPublicWireguardEndpoints(ctx context.Context) ([]ListPublicWireguardEndpointsRow, error)
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
 	SetIPv4Prefix(ctx context.Context, value string) error
 	SetULAPrefix(ctx context.Context, value string) error

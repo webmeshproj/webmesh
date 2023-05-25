@@ -273,7 +273,7 @@ be equivalent to the shown command line flag:
 	util.FlagsUsage("Global Configurations:", "global", "")
 	util.FlagsUsage("Raft Store Configurations:", "store", "store.stream-layer")
 	util.FlagsUsage("Raft Stream Layer Configurations:", "store.stream-layer", "")
-	util.FlagsUsage("gRPC Server Configurations:", "grpc", "")
+	util.FlagsUsage("Service Configurations:", "services", "")
 	util.FlagsUsage("WireGuard Configurations:", "wireguard", "")
 
 	fmt.Fprint(os.Stderr, "General Flags\n\n")
