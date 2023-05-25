@@ -33,8 +33,15 @@ services:
       - --wireguard.no-modprobe
       - --grpc.enable-metrics
       - --grpc.enable-mesh-api
+      - --grpc.enable-webrtc-api
+      - --grpc.enable-turn-server
+      - --grpc.turn-server-public-ip=127.0.0.1
+      - --grpc.stun-port-range=50000-50008
+      - --grpc.exclusive-turn-server
     ports:
       - 8443:8443
+      - 3478:3478
+      - 50000-50008:50000-50008
     volumes:
       - bootstrap-node-1:/data
     networks:
@@ -61,8 +68,6 @@ services:
       - --grpc.enable-mesh-api
     volumes:
       - bootstrap-node-2:/data
-    ports:
-      - 8444:8443
     networks:
       bootstrap:
         ipv4_address: 10.1.0.2
@@ -87,8 +92,6 @@ services:
       - --grpc.enable-mesh-api
     volumes:
       - bootstrap-node-3:/data
-    ports:
-      - 8445:8443
     networks:
       bootstrap:
         ipv4_address: 10.1.0.3

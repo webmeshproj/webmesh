@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/webmesh/node/pkg/services/node/datachannels"
+	"gitlab.com/webmesh/node/pkg/services/datachannels"
 )
 
 func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer) error {
