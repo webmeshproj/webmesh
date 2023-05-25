@@ -64,6 +64,8 @@ type Peer struct {
 	PublicKey string `json:"publicKey"`
 	// Endpoint is the endpoint of this peer, if applicable.
 	Endpoint string `json:"endpoint"`
+	// AdditionalEndpoints are additional endpoints for this peer, if applicable.
+	AdditionalEndpoints []string `json:"additionalEndpoints"`
 	// PrivateIPv4 is the private IPv4 address of the peer.
 	PrivateIPv4 netip.Prefix `json:"privateIPv4"`
 	// PrivateIPv6 is the private IPv6 address of the peer.
@@ -141,7 +143,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 
 // IsPublic returns true if the wireguard interface is publicly accessible.
 func (w *wginterface) IsPublic() bool {
-	return w.opts.Endpoint != ""
+	return w.opts.IsPublic
 }
 
 // Peers returns the peers of the wireguard interface.

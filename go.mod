@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/elastic/go-sysinfo v1.10.1
 	github.com/golang/snappy v0.0.4
+	github.com/google/go-cmp v0.5.9
 	github.com/google/nftables v0.1.0
 	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.0-rc.0
@@ -25,7 +26,7 @@ require (
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	gitlab.com/webmesh/api v0.0.6-0.20230525121308-7df7b60db26b
+	gitlab.com/webmesh/api v0.0.6-0.20230525172810-77b0dd8fe506
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.8.0
@@ -48,7 +49,6 @@ require (
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.1 // indirect

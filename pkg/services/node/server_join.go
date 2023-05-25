@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -54,11 +55,21 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
-	var endpoint netip.Addr
-	if req.GetEndpoint() != "" {
-		endpoint, err = netip.ParseAddr(req.GetEndpoint())
+	var primaryEndpoint netip.Addr
+	if req.GetPrimaryEndpoint() != "" {
+		primaryEndpoint, err = netip.ParseAddr(req.GetPrimaryEndpoint())
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid endpoint: %v", err)
+			return nil, status.Errorf(codes.InvalidArgument, "invalid primary endpoint: %v", err)
+		}
+	}
+	var endpoints []netip.Addr
+	if len(req.GetEndpoints()) > 0 {
+		for _, endpointStr := range req.GetEndpoints() {
+			endpoint, err := netip.ParseAddr(endpointStr)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid endpoint: %v", err)
+			}
+			endpoints = append(endpoints, endpoint)
 		}
 	}
 
@@ -85,8 +96,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if peer.WireguardPort != int(req.GetWireguardPort()) {
 			peer.WireguardPort = int(req.GetWireguardPort())
 		}
-		if peer.Endpoint != endpoint {
-			peer.Endpoint = endpoint
+		if primaryEndpoint.IsValid() && primaryEndpoint.String() != peer.PrimaryEndpoint.String() {
+			peer.PrimaryEndpoint = primaryEndpoint
+		}
+		if !cmp.Equal(peer.Endpoints, endpoints) {
+			peer.Endpoints = endpoints
 		}
 		peer, err = s.peers.Update(ctx, peer)
 		if err != nil {
@@ -100,13 +114,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
 		}
 		peer, err = s.peers.Create(ctx, &peers.CreateOptions{
-			ID:            req.GetId(),
-			PublicKey:     publicKey,
-			Endpoint:      endpoint,
-			NetworkIPv6:   networkIPv6,
-			GRPCPort:      int(req.GetGrpcPort()),
-			RaftPort:      int(req.GetRaftPort()),
-			WireguardPort: int(req.GetWireguardPort()),
+			ID:              req.GetId(),
+			PublicKey:       publicKey,
+			PrimaryEndpoint: primaryEndpoint,
+			Endpoints:       endpoints,
+			NetworkIPv6:     networkIPv6,
+			GRPCPort:        int(req.GetGrpcPort()),
+			RaftPort:        int(req.GetRaftPort()),
+			WireguardPort:   int(req.GetWireguardPort()),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
@@ -168,11 +183,27 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		resp.Peers[i] = &v1.WireguardPeer{
 			Id:        peer.ID,
 			PublicKey: peer.PublicKey.String(),
-			Endpoint: func() string {
-				if peer.Endpoint.IsValid() {
-					return netip.AddrPortFrom(peer.Endpoint, uint16(peer.WireguardPort)).String()
+			// TODO: This still assumes fairly simple setups. We need to handle situations
+			// where two nodes wish to be bridged over NAT64 or ICE. If a single node provides
+			// NAT64 to the network, this becomes a lot easier.
+			//
+			// For now, when a peer behind a NAT receives an endpoint it can contact, it allows
+			// all traffic from that endpoint. This is not ideal, but it works.
+			PrimaryEndpoint: func() string {
+				if peer.PrimaryEndpoint.IsValid() {
+					return netip.AddrPortFrom(peer.PrimaryEndpoint, uint16(peer.WireguardPort)).String()
 				}
 				return ""
+			}(),
+			Endpoints: func() []string {
+				if len(peer.Endpoints) > 0 {
+					endpointStrs := make([]string, len(peer.Endpoints))
+					for i, endpoint := range peer.Endpoints {
+						endpointStrs[i] = netip.AddrPortFrom(endpoint, uint16(peer.WireguardPort)).String()
+					}
+					return endpointStrs
+				}
+				return nil
 			}(),
 			AddressIpv4: func() string {
 				if peer.PrivateIPv4.IsValid() {

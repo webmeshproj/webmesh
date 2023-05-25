@@ -13,7 +13,8 @@ CREATE TABLE nodes (
     raft_port         INTEGER NOT NULL DEFAULT 9444,
     grpc_port         INTEGER NOT NULL DEFAULT 8443,
     wireguard_port    INTEGER NOT NULL DEFAULT 51820,
-    endpoint          TEXT UNIQUE,
+    primary_endpoint  TEXT UNIQUE,
+    endpoints         TEXT UNIQUE,
     network_ipv6      TEXT UNIQUE,
     created_at        TIMESTAMP NOT NULL,
     updated_at        TIMESTAMP NOT NULL
@@ -42,10 +43,10 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 CREATE VIEW node_public_rpc_addresses AS
 SELECT
     nodes.id as node_id,
-    nodes.endpoint
+    nodes.primary_endpoint
     || ':'
     || CAST(nodes.grpc_port AS TEXT) AS address
-FROM nodes WHERE nodes.endpoint IS NOT NULL;
+FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
 
 CREATE VIEW node_private_raft_addresses AS
 SELECT
@@ -63,18 +64,18 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 CREATE VIEW node_public_raft_addresses AS
 SELECT
     nodes.id as node_id,
-    nodes.endpoint
+    nodes.primary_endpoint
     || ':'
     || CAST(nodes.raft_port AS TEXT) AS address
-FROM nodes WHERE nodes.endpoint IS NOT NULL;
+FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
 
 CREATE VIEW node_public_wireguard_endpoints AS
 SELECT
     nodes.id as node_id,
-    nodes.endpoint
+    nodes.primary_endpoint
     || ':'
     || CAST(nodes.wireguard_port AS TEXT) AS address
-FROM nodes WHERE nodes.endpoint IS NOT NULL;
+FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
 
 -- +goose Down
 

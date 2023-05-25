@@ -30,7 +30,6 @@ import (
 
 const (
 	WireguardListenPortEnvVar          = "WIREGUARD_LISTEN_PORT"
-	WireguardEndpointEnvVar            = "WIREGUARD_ENDPOINT"
 	WireguardNameEnvVar                = "WIREGUARD_NAME"
 	WireguardForceNameEnvVar           = "WIREGUARD_FORCE_NAME"
 	WireguardForceTUNEnvVar            = "WIREGUARD_FORCE_TUN"
@@ -44,19 +43,22 @@ const (
 type Options struct {
 	// ListenPort is the port to listen on.
 	ListenPort int `yaml:"listen-port" json:"listen-port" toml:"listen-port"`
-	// Endpoint is the endpoint to use for the wireguard interface.
-	Endpoint string `yaml:"endpoint" json:"endpoint" toml:"endpoint"`
 	// Name is the name of the interface.
 	Name string `yaml:"name" json:"name" toml:"name"`
 	// ForceName forces the use of the given name by deleting
 	// any pre-existing interface with the same name.
 	ForceName bool `yaml:"force-name" json:"force-name" toml:"force-name"`
 	// NetworkV4 is the private IPv4 network of this interface.
-	// Leave empty to disable IPv4.
+	// Leave empty to disable IPv4. These are set from the responses to
+	// joining a cluster.
 	NetworkV4 netip.Prefix `yaml:"-" json:"-" toml:"-"`
 	// NetworkV6 is the private IPv6 network of this interface.
-	// Leave empty to disable IPv6.
+	// Leave empty to disable IPv6. These are set from the responses to
+	// joining a cluster.
 	NetworkV6 netip.Prefix `yaml:"-" json:"-" toml:"-"`
+	// IsPublic is true if this interface is public. This is set by the
+	// store when joining a cluster.
+	IsPublic bool `yaml:"-" json:"-" toml:"-"`
 	// ForceTUN forces the use of a TUN interface.
 	ForceTUN bool `yaml:"force-tun" json:"force-tun" toml:"force-tun"`
 	// NoModprobe disables modprobe.
@@ -97,8 +99,6 @@ func NewOptions() *Options {
 func (o *Options) BindFlags(fl *flag.FlagSet) {
 	fl.IntVar(&o.ListenPort, "wireguard.listen-port", util.GetEnvIntDefault(WireguardListenPortEnvVar, 51820),
 		"The wireguard listen port.")
-	fl.StringVar(&o.Endpoint, "wireguard.endpoint", util.GetEnvDefault(WireguardEndpointEnvVar, ""),
-		"The wireguard endpoint. If unset, inbound tunnels will not be accepted.")
 	fl.StringVar(&o.Name, "wireguard.name", util.GetEnvDefault(WireguardNameEnvVar, "wg0"),
 		"The wireguard interface name.")
 	fl.BoolVar(&o.ForceName, "wireguard.force-name", util.GetEnvDefault(WireguardForceNameEnvVar, "false") == "true",

@@ -2,20 +2,22 @@
 INSERT INTO nodes (
     id,
     public_key,
-    endpoint,
+    primary_endpoint,
+    endpoints,
     network_ipv6,
     grpc_port,
     raft_port,
     wireguard_port,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: UpdateNode :one
 UPDATE nodes SET
     public_key = ?,
-    endpoint = ?,
+    primary_endpoint = ?,
+    endpoints = ?,
     network_ipv6 = ?,
     grpc_port = ?,
     raft_port = ?,
@@ -31,7 +33,8 @@ DELETE FROM nodes WHERE id = ?;
 SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
-    nodes.endpoint AS endpoint,
+    nodes.primary_endpoint AS primary_endpoint,
+    nodes.endpoints AS endpoints,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.wireguard_port AS wireguard_port,
@@ -47,7 +50,8 @@ WHERE nodes.id = ?;
 SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
-    nodes.endpoint AS endpoint,
+    nodes.primary_endpoint AS primary_endpoint,
+    nodes.endpoints AS endpoints,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.wireguard_port AS wireguard_port,
@@ -62,7 +66,8 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
-    nodes.endpoint AS endpoint,
+    nodes.primary_endpoint AS primary_endpoint,
+    nodes.endpoints AS endpoints,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.wireguard_port AS wireguard_port,
@@ -78,7 +83,8 @@ WHERE nodes.id <> ?;
 SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
-    nodes.endpoint AS endpoint,
+    nodes.primary_endpoint AS primary_endpoint,
+    nodes.endpoints AS endpoints,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
     nodes.wireguard_port AS wireguard_port,

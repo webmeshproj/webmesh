@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"strings"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -113,20 +114,25 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 			}
 		}
 		var endpoint string
-		if peer.Endpoint.Valid {
-			addr, err := netip.ParseAddr(peer.Endpoint.String)
+		if peer.PrimaryEndpoint.Valid {
+			addr, err := netip.ParseAddr(peer.PrimaryEndpoint.String)
 			if err != nil {
 				s.log.Error("parse peer endpoint", slog.String("error", err.Error()))
 				return err
 			}
 			endpoint = netip.AddrPortFrom(addr, uint16(peer.WireguardPort)).String()
 		}
+		var additionalEndpoints []string
+		if peer.Endpoints.Valid {
+			additionalEndpoints = strings.Split(peer.Endpoints.String, ",")
+		}
 		wgpeer := wireguard.Peer{
-			ID:          peer.ID,
-			PublicKey:   peer.PublicKey.String,
-			Endpoint:    endpoint,
-			PrivateIPv4: privateIPv4,
-			PrivateIPv6: privateIPv6,
+			ID:                  peer.ID,
+			PublicKey:           peer.PublicKey.String,
+			Endpoint:            endpoint,
+			AdditionalEndpoints: additionalEndpoints,
+			PrivateIPv4:         privateIPv4,
+			PrivateIPv6:         privateIPv6,
 		}
 		s.log.Debug("configuring wireguard peer", slog.Any("peer", wgpeer))
 		if err := s.wg.PutPeer(ctx, &wgpeer); err != nil {

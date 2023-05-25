@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"strings"
 	"time"
 
 	v1 "gitlab.com/webmesh/api/v1"
@@ -116,12 +117,18 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		defer conn.Close()
 		client := v1.NewNodeClient(conn)
 		req := &v1.JoinRequest{
-			Id:             string(s.nodeID),
-			PublicKey:      key.PublicKey().String(),
-			RaftPort:       int32(s.sl.ListenPort()),
-			GrpcPort:       int32(s.opts.GRPCAdvertisePort),
-			WireguardPort:  int32(s.wgopts.ListenPort),
-			Endpoint:       s.opts.NodeEndpoint,
+			Id:              string(s.nodeID),
+			PublicKey:       key.PublicKey().String(),
+			RaftPort:        int32(s.sl.ListenPort()),
+			GrpcPort:        int32(s.opts.GRPCAdvertisePort),
+			WireguardPort:   int32(s.wgopts.ListenPort),
+			PrimaryEndpoint: s.opts.NodeEndpoint,
+			Endpoints: func() []string {
+				if s.opts.NodeAdditionalEndpoints != "" {
+					return strings.Split(s.opts.NodeAdditionalEndpoints, ",")
+				}
+				return nil
+			}(),
 			AssignIpv4:     !s.opts.NoIPv4,
 			PreferRaftIpv6: s.opts.RaftPreferIPv6,
 			AsVoter:        s.opts.JoinAsVoter,
@@ -169,9 +176,10 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	}
 	for _, peer := range resp.GetPeers() {
 		wgpeer := wireguard.Peer{
-			ID:        peer.GetId(),
-			PublicKey: peer.GetPublicKey(),
-			Endpoint:  peer.GetEndpoint(),
+			ID:                  peer.GetId(),
+			PublicKey:           peer.GetPublicKey(),
+			Endpoint:            peer.GetPrimaryEndpoint(),
+			AdditionalEndpoints: peer.GetEndpoints(),
 		}
 		if peer.GetAddressIpv4() != "" && !s.opts.NoIPv4 {
 			wgpeer.PrivateIPv4, err = netip.ParsePrefix(peer.GetAddressIpv4())

@@ -237,8 +237,14 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		Valid:  true,
 	}
 	if endpoint.IsValid() {
-		params.Endpoint = sql.NullString{
+		params.PrimaryEndpoint = sql.NullString{
 			String: endpoint.String(),
+			Valid:  true,
+		}
+	}
+	if s.opts.NodeAdditionalEndpoints != "" {
+		params.Endpoints = sql.NullString{
+			String: s.opts.NodeAdditionalEndpoints,
 			Valid:  true,
 		}
 	}

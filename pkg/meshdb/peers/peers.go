@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"strings"
 	"time"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -57,8 +58,10 @@ type Node struct {
 	ID string
 	// PublicKey is the node's public key.
 	PublicKey wgtypes.Key
-	// Endpoint is the node's public endpoint.
-	Endpoint netip.Addr
+	// PrimaryEndpoint is the primary public endpoint of the node.
+	PrimaryEndpoint netip.Addr
+	// Endpoints are the node's public endpoints.
+	Endpoints []netip.Addr
 	// PrivateIPv4 is the node's private IPv4 address.
 	PrivateIPv4 netip.Prefix
 	// NetworkIPv6 is the node's IPv6 network.
@@ -81,8 +84,10 @@ type CreateOptions struct {
 	ID string
 	// PublicKey is the node's public key.
 	PublicKey wgtypes.Key
-	// Endpoint is the public endpoint of the node.
-	Endpoint netip.Addr
+	// PrimaryEndpoint is the primary public endpoint of the node.
+	PrimaryEndpoint netip.Addr
+	// Endpoints are the node's public endpoints.
+	Endpoints []netip.Addr
 	// NetworkIPv6 is true if the node's network is IPv6.
 	NetworkIPv6 netip.Prefix
 	// GRPCPort is the node's GRPC port.
@@ -132,9 +137,19 @@ func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) 
 			Valid:  true,
 		}
 	}
-	if opts.Endpoint.IsValid() {
-		params.Endpoint = sql.NullString{
-			String: opts.Endpoint.String(),
+	if opts.PrimaryEndpoint.IsValid() {
+		params.PrimaryEndpoint = sql.NullString{
+			String: opts.PrimaryEndpoint.String(),
+			Valid:  true,
+		}
+	}
+	if len(opts.Endpoints) > 0 {
+		var addrStrs []string
+		for _, addr := range opts.Endpoints {
+			addrStrs = append(addrStrs, addr.String())
+		}
+		params.Endpoints = sql.NullString{
+			String: strings.Join(addrStrs, ","),
 			Valid:  true,
 		}
 	}
@@ -166,11 +181,21 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 			return nil, fmt.Errorf("parse node public key: %w", err)
 		}
 	}
-	var endpoint netip.Addr
-	if node.Endpoint.Valid {
-		endpoint, err = netip.ParseAddr(node.Endpoint.String)
+	var primaryEndpoint netip.Addr
+	if node.PrimaryEndpoint.Valid {
+		primaryEndpoint, err = netip.ParseAddr(node.PrimaryEndpoint.String)
 		if err != nil {
 			return nil, fmt.Errorf("parse node endpoint: %w", err)
+		}
+	}
+	var endpoints []netip.Addr
+	if node.Endpoints.Valid {
+		for _, addrStr := range strings.Split(node.Endpoints.String, ",") {
+			addr, err := netip.ParseAddr(addrStr)
+			if err != nil {
+				return nil, fmt.Errorf("parse node endpoint: %w", err)
+			}
+			endpoints = append(endpoints, addr)
 		}
 	}
 	var privateIPv4, privateIPv6 netip.Prefix
@@ -187,16 +212,17 @@ func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
 		}
 	}
 	return &Node{
-		ID:            node.ID,
-		PublicKey:     key,
-		Endpoint:      endpoint,
-		PrivateIPv4:   privateIPv4,
-		NetworkIPv6:   privateIPv6,
-		GRPCPort:      int(node.GrpcPort),
-		RaftPort:      int(node.RaftPort),
-		WireguardPort: int(node.WireguardPort),
-		UpdatedAt:     node.UpdatedAt,
-		CreatedAt:     node.CreatedAt,
+		ID:              node.ID,
+		PublicKey:       key,
+		PrimaryEndpoint: primaryEndpoint,
+		Endpoints:       endpoints,
+		PrivateIPv4:     privateIPv4,
+		NetworkIPv6:     privateIPv6,
+		GRPCPort:        int(node.GrpcPort),
+		RaftPort:        int(node.RaftPort),
+		WireguardPort:   int(node.WireguardPort),
+		UpdatedAt:       node.UpdatedAt,
+		CreatedAt:       node.CreatedAt,
 	}, nil
 }
 
@@ -214,9 +240,19 @@ func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
 		},
 		UpdatedAt: time.Now().UTC(),
 	}
-	if node.Endpoint.IsValid() {
-		params.Endpoint = sql.NullString{
-			String: node.Endpoint.String(),
+	if node.PrimaryEndpoint.IsValid() {
+		params.PrimaryEndpoint = sql.NullString{
+			String: node.PrimaryEndpoint.String(),
+			Valid:  true,
+		}
+	}
+	if len(node.Endpoints) > 0 {
+		var addrStrs []string
+		for _, addr := range node.Endpoints {
+			addrStrs = append(addrStrs, addr.String())
+		}
+		params.Endpoints = sql.NullString{
+			String: strings.Join(addrStrs, ","),
 			Valid:  true,
 		}
 	}
@@ -256,11 +292,21 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
 		}
-		var endpoint netip.Addr
-		if node.Endpoint.Valid {
-			endpoint, err = netip.ParseAddr(node.Endpoint.String)
+		var primaryEndpoint netip.Addr
+		if node.PrimaryEndpoint.Valid {
+			primaryEndpoint, err = netip.ParseAddr(node.PrimaryEndpoint.String)
 			if err != nil {
 				return nil, fmt.Errorf("parse node endpoint: %w", err)
+			}
+		}
+		var endpoints []netip.Addr
+		if node.Endpoints.Valid {
+			for _, addrStr := range strings.Split(node.Endpoints.String, ",") {
+				addr, err := netip.ParseAddr(addrStr)
+				if err != nil {
+					return nil, fmt.Errorf("parse node endpoint: %w", err)
+				}
+				endpoints = append(endpoints, addr)
 			}
 		}
 		var networkv4, networkv6 netip.Prefix
@@ -277,16 +323,17 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 			}
 		}
 		out[i] = Node{
-			ID:            node.ID,
-			PublicKey:     key,
-			Endpoint:      endpoint,
-			PrivateIPv4:   networkv4,
-			NetworkIPv6:   networkv6,
-			GRPCPort:      int(node.GrpcPort),
-			RaftPort:      int(node.RaftPort),
-			WireguardPort: int(node.WireguardPort),
-			UpdatedAt:     node.UpdatedAt,
-			CreatedAt:     node.CreatedAt,
+			ID:              node.ID,
+			PublicKey:       key,
+			PrimaryEndpoint: primaryEndpoint,
+			Endpoints:       endpoints,
+			PrivateIPv4:     networkv4,
+			NetworkIPv6:     networkv6,
+			GRPCPort:        int(node.GrpcPort),
+			RaftPort:        int(node.RaftPort),
+			WireguardPort:   int(node.WireguardPort),
+			UpdatedAt:       node.UpdatedAt,
+			CreatedAt:       node.CreatedAt,
 		}
 	}
 	return out, nil
@@ -308,11 +355,21 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
 		}
-		var endpoint netip.Addr
-		if peer.Endpoint.Valid {
-			endpoint, err = netip.ParseAddr(peer.Endpoint.String)
+		var primaryEndpoint netip.Addr
+		if peer.PrimaryEndpoint.Valid {
+			primaryEndpoint, err = netip.ParseAddr(peer.PrimaryEndpoint.String)
 			if err != nil {
 				return nil, fmt.Errorf("parse node endpoint: %w", err)
+			}
+		}
+		var endpoints []netip.Addr
+		if peer.Endpoints.Valid {
+			for _, addrStr := range strings.Split(peer.Endpoints.String, ",") {
+				addr, err := netip.ParseAddr(addrStr)
+				if err != nil {
+					return nil, fmt.Errorf("parse node endpoint: %w", err)
+				}
+				endpoints = append(endpoints, addr)
 			}
 		}
 		var networkv4, networkv6 netip.Prefix
@@ -329,16 +386,17 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 			}
 		}
 		peers[i] = Node{
-			ID:            peer.ID,
-			PublicKey:     key,
-			Endpoint:      endpoint,
-			PrivateIPv4:   networkv4,
-			NetworkIPv6:   networkv6,
-			GRPCPort:      int(peer.GrpcPort),
-			RaftPort:      int(peer.RaftPort),
-			WireguardPort: int(peer.WireguardPort),
-			UpdatedAt:     peer.UpdatedAt,
-			CreatedAt:     peer.CreatedAt,
+			ID:              peer.ID,
+			PublicKey:       key,
+			PrimaryEndpoint: primaryEndpoint,
+			Endpoints:       endpoints,
+			PrivateIPv4:     networkv4,
+			NetworkIPv6:     networkv6,
+			GRPCPort:        int(peer.GrpcPort),
+			RaftPort:        int(peer.RaftPort),
+			WireguardPort:   int(peer.WireguardPort),
+			UpdatedAt:       peer.UpdatedAt,
+			CreatedAt:       peer.CreatedAt,
 		}
 	}
 	return peers, nil
@@ -347,17 +405,27 @@ func (p *peers) ListPeers(ctx context.Context, nodeID string) ([]Node, error) {
 func nodeModelToNode(node *raftdb.Node) (*Node, error) {
 	var err error
 	var key wgtypes.Key
-	var endpoint netip.Addr
+	var primaryEndpoint netip.Addr
+	var endpoints []netip.Addr
 	if node.PublicKey.Valid {
 		key, err = wgtypes.ParseKey(node.PublicKey.String)
 		if err != nil {
 			return nil, fmt.Errorf("parse node public key: %w", err)
 		}
 	}
-	if node.Endpoint.Valid {
-		endpoint, err = netip.ParseAddr(node.Endpoint.String)
+	if node.PrimaryEndpoint.Valid {
+		primaryEndpoint, err = netip.ParseAddr(node.PrimaryEndpoint.String)
 		if err != nil {
 			return nil, fmt.Errorf("parse endpoint: %w", err)
+		}
+	}
+	if node.Endpoints.Valid {
+		for _, addrStr := range strings.Split(node.Endpoints.String, ",") {
+			addr, err := netip.ParseAddr(addrStr)
+			if err != nil {
+				return nil, fmt.Errorf("parse node endpoint: %w", err)
+			}
+			endpoints = append(endpoints, addr)
 		}
 	}
 	var networkV6 netip.Prefix
@@ -368,13 +436,14 @@ func nodeModelToNode(node *raftdb.Node) (*Node, error) {
 		}
 	}
 	return &Node{
-		ID:            node.ID,
-		PublicKey:     key,
-		Endpoint:      endpoint,
-		NetworkIPv6:   networkV6,
-		GRPCPort:      int(node.GrpcPort),
-		RaftPort:      int(node.RaftPort),
-		WireguardPort: int(node.WireguardPort),
-		CreatedAt:     node.CreatedAt,
+		ID:              node.ID,
+		PublicKey:       key,
+		PrimaryEndpoint: primaryEndpoint,
+		Endpoints:       endpoints,
+		NetworkIPv6:     networkV6,
+		GRPCPort:        int(node.GrpcPort),
+		RaftPort:        int(node.RaftPort),
+		WireguardPort:   int(node.WireguardPort),
+		CreatedAt:       node.CreatedAt,
 	}, nil
 }

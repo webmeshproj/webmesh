@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.com/webmesh/node/pkg/services/meshdns"
 	"gitlab.com/webmesh/node/pkg/store"
 	"gitlab.com/webmesh/node/pkg/store/streamlayer"
 	"gitlab.com/webmesh/node/pkg/wireguard"
@@ -61,6 +62,10 @@ type Options struct {
 	NoIPv6 bool
 	// AllowedIPs is a map of peers to allowed IPs.
 	AllowedIPs map[string][]string
+	// LocalDNS is whether to start a local MeshDNS server.
+	LocalDNS bool
+	// LocalDNSPort is the port to use for the local MeshDNS server.
+	LocalDNSPort uint16
 }
 
 // Connect connects to the mesh as an ephemeral node. The context
@@ -82,14 +87,14 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	storeOpts.Join = opts.JoinServer
 	storeOpts.NoIPv4 = opts.NoIPv4
 	storeOpts.NoIPv6 = opts.NoIPv6
+	storeOpts.PeerRefreshInterval = time.Second * 10
 
 	// Configure the wireguard interface
 	wireguardOpts := wireguard.NewOptions()
 	wireguardOpts.Name = opts.InterfaceName
-	wireguardOpts.ForceName = true
 	wireguardOpts.ForceTUN = opts.ForceTUN
 	wireguardOpts.NoModprobe = opts.NoModprobe
-	wireguardOpts.PersistentKeepAlive = time.Second * 5
+	wireguardOpts.PersistentKeepAlive = time.Second * 10
 	var allowedIPs strings.Builder
 	for peer, ips := range opts.AllowedIPs {
 		allowedIPs.WriteString(fmt.Sprintf("%s=%s", peer, strings.Join(ips, ",")))
@@ -122,6 +127,26 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 			return err
 		}
 	}
+
+	if opts.LocalDNS {
+		// Start a local MeshDNS server
+		server := meshdns.NewServer(st, &meshdns.Options{
+			UDPListenAddr: fmt.Sprintf(":%d", opts.LocalDNSPort),
+			Domain:        "webmesh.internal.",
+		})
+		go func() {
+			go func() {
+				if err := server.ListenAndServe(); err != nil {
+					fmt.Printf("dns serve: %v\n", err)
+				}
+			}()
+			<-stopChan
+			if err := server.Shutdown(); err != nil {
+				fmt.Printf("dns shutdown: %v\n", err)
+			}
+		}()
+	}
+
 	<-stopChan
 	return st.Close()
 }

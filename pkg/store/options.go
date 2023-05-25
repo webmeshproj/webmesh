@@ -32,6 +32,7 @@ import (
 const (
 	NodeIDEnvVar                    = "STORE_NODE_ID"
 	NodeEndpointEnvVar              = "STORE_NODE_ENDPOINT"
+	NodeAdditionalEndpointsEnvVar   = "STORE_NODE_ADDITIONAL_ENDPOINTS"
 	DataDirEnvVar                   = "STORE_DATA_DIR"
 	InMemoryEnvVar                  = "STORE_IN_MEMORY"
 	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
@@ -105,6 +106,9 @@ type Options struct {
 	// NodeEndpoint is the endpoint to broadcast when joining a cluster.
 	// This is only necessary if the node intends on exposing it's API.
 	NodeEndpoint string `json:"node-endpoint" yaml:"node-endpoint" toml:"node-endpoint"`
+	// NodeAdditionalEndpoints are additional endpoints to broadcast when joining a cluster.
+	// This is only necessary if the node intends on exposing it's API.
+	NodeAdditionalEndpoints string `json:"node-additional-endpoints" yaml:"node-additional-endpoints" toml:"node-additional-endpoints"`
 	// DataDir is the directory to store data in.
 	DataDir string `json:"data-dir" yaml:"data-dir" toml:"data-dir"`
 	// InMemory is if the store should be in memory. This should only be used for
@@ -234,6 +238,9 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 This is only necessary if the node intends on exposing it's API. When
 bootstrapping a cluster with a node that has an empty NodeEndpoint, the
 node will use the AdvertiseAddress as the NodeEndpoint.`)
+
+	fl.StringVar(&o.NodeAdditionalEndpoints, "store.node-additional-endpoints", util.GetEnvDefault(NodeAdditionalEndpointsEnvVar, ""),
+		`Comma separated list of additional endpoints to broadcast to the cluster.`)
 
 	fl.StringVar(&o.BootstrapServers, "store.bootstrap-servers", util.GetEnvDefault(BootstrapServersEnvVar, ""),
 		`Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.

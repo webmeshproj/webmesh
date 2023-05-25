@@ -19,35 +19,36 @@ package global
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 
 	"gitlab.com/webmesh/node/pkg/services"
 	"gitlab.com/webmesh/node/pkg/store"
 	"gitlab.com/webmesh/node/pkg/store/streamlayer"
 	"gitlab.com/webmesh/node/pkg/util"
-	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 
 const (
-	GlobalLogLevelEnvVar           = "GLOBAL_LOG_LEVEL"
-	GlobalTLSCertEnvVar            = "GLOBAL_TLS_CERT_FILE"
-	GlobalTLSKeyEnvVar             = "GLOBAL_TLS_KEY_FILE"
-	GlobalTLACAEnvVar              = "GLOBAL_TLS_CA_FILE"
-	GlobalTLSClientCAEnvVar        = "GLOBAL_TLS_CLIENT_CA_FILE"
-	GlobalMTLSEnvVar               = "GLOBAL_MTLS"
-	GlobalSkipVerifyHostnameEnvVar = "GLOBAL_SKIP_VERIFY_HOSTNAME"
-	GlobalInsecureEnvVar           = "GLOBAL_INSECURE"
-	GlobalNoIPv4EnvVar             = "GLOBAL_NO_IPV4"
-	GlobalNoIPv6EnvVar             = "GLOBAL_NO_IPV6"
-	GlobalEndpointEnvVar           = "GLOBAL_ENDPOINT"
-	GlobalDetectEndpointEnvVar     = "GLOBAL_DETECT_ENDPOINT"
-	GlobalDetectPublicIPEnvVar     = "GLOBAL_DETECT_PUBLIC_IP"
-	GlobalDetectIPv6EnvVar         = "GLOBAL_DETECT_IPV6"
+	GlobalLogLevelEnvVar               = "GLOBAL_LOG_LEVEL"
+	GlobalTLSCertEnvVar                = "GLOBAL_TLS_CERT_FILE"
+	GlobalTLSKeyEnvVar                 = "GLOBAL_TLS_KEY_FILE"
+	GlobalTLACAEnvVar                  = "GLOBAL_TLS_CA_FILE"
+	GlobalTLSClientCAEnvVar            = "GLOBAL_TLS_CLIENT_CA_FILE"
+	GlobalMTLSEnvVar                   = "GLOBAL_MTLS"
+	GlobalSkipVerifyHostnameEnvVar     = "GLOBAL_SKIP_VERIFY_HOSTNAME"
+	GlobalInsecureEnvVar               = "GLOBAL_INSECURE"
+	GlobalNoIPv4EnvVar                 = "GLOBAL_NO_IPV4"
+	GlobalNoIPv6EnvVar                 = "GLOBAL_NO_IPV6"
+	GlobalPrimaryEndpointEnvVar        = "GLOBAL_PRIMARY_ENDPOINT"
+	GlobalEndpointsEnvVar              = "GLOBAL_ENDPOINTS"
+	GlobalDetectEndpointsEnvVar        = "GLOBAL_DETECT_ENDPOINTS"
+	GlobalDetectPrivateEndpointsEnvVar = "GLOBAL_DETECT_PRIVATE_ENDPOINTS"
+	GlobalAllowRemoteDetectionEnvVar   = "GLOBAL_ALLOW_REMOTE_DETECTION"
+	GlobalDetectIPv6EnvVar             = "GLOBAL_DETECT_IPV6"
 )
 
 // Options are the global options.
@@ -73,15 +74,20 @@ type Options struct {
 	NoIPv4 bool `yaml:"no-ipv4" json:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is true if IPv6 should be disabled.
 	NoIPv6 bool `yaml:"no-ipv6" json:"no-ipv6" toml:"no-ipv6"`
-	// Endpoint is the publicly routable address of this node. Setting this value
-	// will override the store advertise address and wireguard endpoints with their
-	// configured listen ports.
-	Endpoint string `yaml:"endpoint" json:"endpoint" toml:"endpoint"`
-	// DetectEndpoint is true if the endpoint should be detected.
-	DetectEndpoint bool `yaml:"detect-endpoint" json:"detect-endpoint" toml:"detect-endpoint"`
-	// DetectPublicIP is true if the public IP should be detected.
-	DetectPublicIP bool `yaml:"detect-public-ip" json:"detect-public-ip" toml:"detect-public-ip"`
-	// DetectIPv6 is true if IPv6 should be detected.
+	// PrimaryEndpoint is the preferred publicly routable address of this node.
+	// Setting this value will override the store advertise address and wireguard
+	// primary endpoints with their configured listen ports.
+	PrimaryEndpoint string `yaml:"primary-endpoint" json:"primary-endpoint" toml:"primary-endpoint"`
+	// Endpoints is a comma separated list of additional endpoints to advertise.
+	// These are merged with existing endpoints in the other configurations.
+	Endpoints string `yaml:"endpoints" json:"endpoints" toml:"endpoints"`
+	// DetectEndpoints is true if the endpoints should be detected.
+	DetectEndpoints bool `yaml:"detect-endpoints" json:"detect-endpoints" toml:"detect-endpoints"`
+	// DetectPrivateEndpoints is true if private IP addresses should be included in detection.
+	DetectPrivateEndpoints bool `yaml:"detect-private-endpoints" json:"detect-private-endpoints" toml:"detect-private-endpoints"`
+	// AllowRemoteDetection is true if remote detection is allowed.
+	AllowRemoteDetection bool `yaml:"allow-remote-detection" json:"allow-remote-detection" toml:"allow-remote-detection"`
+	// DetectIPv6 is true if IPv6 addresses should be included in detection.
 	DetectIPv6 bool `yaml:"detect-ipv6" json:"detect-ipv6" toml:"detect-ipv6"`
 }
 
@@ -113,33 +119,64 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		"Disable use of IPv4 globally.")
 	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(GlobalLogLevelEnvVar, "info"),
 		"Log level (debug, info, warn, error)")
-	fs.BoolVar(&o.DetectEndpoint, "global.detect-endpoint", util.GetEnvDefault(GlobalDetectEndpointEnvVar, "false") == "true",
-		"Detect the endpoint address.")
-	fs.BoolVar(&o.DetectPublicIP, "global.detect-public-ip", util.GetEnvDefault(GlobalDetectPublicIPEnvVar, "false") == "true",
-		"Detect the public IP address.")
-	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", util.GetEnvDefault(GlobalDetectIPv6EnvVar, "false") == "true",
-		"Detect the IPv6 address. Default is to detect IPv4.")
-	fs.StringVar(&o.Endpoint, "global.endpoint", util.GetEnvDefault(GlobalEndpointEnvVar, ""),
-		`The publicly routable address of this node. Setting this value
-will override the address portion of the store advertise address
+
+	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", util.GetEnvDefault(GlobalPrimaryEndpointEnvVar, ""),
+		`The preferred publicly routable address of this node. Setting this
+value will override the address portion of the store advertise address
 and wireguard endpoints. This is only necessary if you intend for
 this node's API to be reachable outside the network.`)
+
+	fs.StringVar(&o.Endpoints, "global.endpoints", util.GetEnvDefault(GlobalEndpointsEnvVar, ""),
+		`A comma separated list of additional endpoints to advertise. These
+are merged with existing endpoints in the other configurations.`)
+
+	fs.BoolVar(&o.DetectEndpoints, "global.detect-endpoints", util.GetEnvDefault(GlobalDetectEndpointsEnvVar, "false") == "true",
+		"Detect potential endpoints from the local interfaces.")
+
+	fs.BoolVar(&o.DetectPrivateEndpoints, "global.detect-private-endpoints", util.GetEnvDefault(GlobalDetectPrivateEndpointsEnvVar, "false") == "true",
+		"Include private IP addresses in detection.")
+
+	fs.BoolVar(&o.AllowRemoteDetection, "global.allow-remote-detection", util.GetEnvDefault(GlobalAllowRemoteDetectionEnvVar, "false") == "true",
+		"Allow remote detection of endpoints.")
+
+	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", util.GetEnvDefault(GlobalDetectIPv6EnvVar, "false") == "true",
+		"Detect IPv6 addresses. Default is to only detect IPv4.")
 }
 
 // Overlay overlays the global options onto the given option sets.
 func (o *Options) Overlay(opts ...any) error {
-	var endpoint netip.Addr
+	var primaryEndpoint netip.Addr
+	var additionalEndpoints []netip.Addr
 	var err error
-	if o.Endpoint != "" {
-		endpoint, err = netip.ParseAddr(o.Endpoint)
+	if o.PrimaryEndpoint != "" {
+		primaryEndpoint, err = netip.ParseAddr(o.PrimaryEndpoint)
 		if err != nil {
 			return fmt.Errorf("failed to parse endpoint: %w", err)
 		}
 	}
-	if o.DetectEndpoint {
-		endpoint, err = o.detectEndpoint()
+	if o.Endpoints != "" {
+		for _, endpoint := range strings.Split(o.Endpoints, ",") {
+			additionalEndpoint, err := netip.ParseAddr(endpoint)
+			if err != nil {
+				return fmt.Errorf("failed to parse endpoint: %w", err)
+			}
+			additionalEndpoints = append(additionalEndpoints, additionalEndpoint)
+		}
+	}
+	if o.DetectEndpoints {
+		detected, err := o.detectEndpoints()
 		if err != nil {
-			return fmt.Errorf("failed to detect endpoint: %w", err)
+			return fmt.Errorf("failed to detect endpoints: %w", err)
+		}
+		if len(detected) > 0 {
+			if !primaryEndpoint.IsValid() {
+				primaryEndpoint = detected[0]
+				if len(detected) > 1 {
+					additionalEndpoints = append(additionalEndpoints, detected[1:]...)
+				}
+			} else {
+				additionalEndpoints = append(additionalEndpoints, detected...)
+			}
 		}
 	}
 	for _, opt := range opts {
@@ -151,9 +188,9 @@ func (o *Options) Overlay(opts ...any) error {
 			if !v.NoIPv6 {
 				v.NoIPv6 = o.NoIPv6
 			}
-			if endpoint.IsValid() {
+			if primaryEndpoint.IsValid() {
 				var raftPort uint64
-				v.NodeEndpoint = endpoint.String()
+				v.NodeEndpoint = primaryEndpoint.String()
 				for _, inOpts := range opts {
 					if vopt, ok := inOpts.(*streamlayer.Options); ok {
 						_, port, err := net.SplitHostPort(vopt.ListenAddress)
@@ -167,11 +204,10 @@ func (o *Options) Overlay(opts ...any) error {
 				if raftPort == 0 {
 					raftPort = 9443
 				}
-				v.AdvertiseAddress = netip.AddrPortFrom(endpoint, uint16(raftPort)).String()
+				v.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
 			}
-		case *wireguard.Options:
-			if endpoint.IsValid() {
-				v.Endpoint = netip.AddrPortFrom(endpoint, uint16(v.ListenPort)).String()
+			if len(additionalEndpoints) > 0 {
+				v.NodeAdditionalEndpoints += "," + joinEndpoints(additionalEndpoints)
 			}
 		case *services.Options:
 			if !v.Insecure {
@@ -196,12 +232,12 @@ func (o *Options) Overlay(opts ...any) error {
 				v.TLSClientCAFile = o.TLSClientCAFile
 			}
 			if v.EnableTURNServer {
-				if v.TURNServerEndpoint == "" && endpoint.IsValid() {
+				if v.TURNServerEndpoint == "" && primaryEndpoint.IsValid() {
 					v.TURNServerEndpoint = fmt.Sprintf("stun:%s",
-						net.JoinHostPort(endpoint.String(), strconv.Itoa(v.TURNServerPort)))
+						net.JoinHostPort(primaryEndpoint.String(), strconv.Itoa(v.TURNServerPort)))
 				}
-				if v.TURNServerPublicIP == "" && endpoint.IsValid() {
-					v.TURNServerPublicIP = endpoint.String()
+				if v.TURNServerPublicIP == "" && primaryEndpoint.IsValid() {
+					v.TURNServerPublicIP = primaryEndpoint.String()
 				}
 			}
 		case *streamlayer.Options:
@@ -231,28 +267,36 @@ func (o *Options) Overlay(opts ...any) error {
 	return nil
 }
 
-func (o *Options) detectEndpoint() (netip.Addr, error) {
-	if o.DetectPublicIP {
+func (o *Options) detectEndpoints() ([]netip.Addr, error) {
+	addrs, err := o.detectFromInterfaces()
+	if err != nil {
+		return nil, err
+	}
+	if o.AllowRemoteDetection && len(addrs) == 0 {
 		var addr string
-		var err error
 		if o.DetectIPv6 {
 			addr, err = util.DetectPublicIPv6(context.Background())
 		} else {
 			addr, err = util.DetectPublicIPv4(context.Background())
 		}
 		if err != nil {
-			return netip.Addr{}, fmt.Errorf("failed to detect public IP: %w", err)
+			return nil, fmt.Errorf("failed to detect public address: %w", err)
 		}
-		return netip.ParseAddr(addr)
+		parsed, err := netip.ParseAddr(addr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse public address: %w", err)
+		}
+		addrs = append(addrs, parsed)
 	}
-	return o.detectPrivateIP()
+	return addrs, nil
 }
 
-func (o *Options) detectPrivateIP() (netip.Addr, error) {
+func (o *Options) detectFromInterfaces() ([]netip.Addr, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		return netip.Addr{}, fmt.Errorf("failed to list interfaces: %w", err)
+		return nil, fmt.Errorf("failed to list interfaces: %w", err)
 	}
+	var ips []netip.Addr
 	for _, iface := range interfaces {
 		if iface.Flags&net.FlagUp == 0 {
 			continue
@@ -265,27 +309,38 @@ func (o *Options) detectPrivateIP() (netip.Addr, error) {
 		}
 		addrs, err := iface.Addrs()
 		if err != nil {
-			return netip.Addr{}, fmt.Errorf("failed to list addresses for interface %s: %w", iface.Name, err)
+			return nil, fmt.Errorf("failed to list addresses for interface %s: %w", iface.Name, err)
 		}
 		for _, addr := range addrs {
 			ip, _, err := net.ParseCIDR(addr.String())
 			if err != nil {
-				return netip.Addr{}, fmt.Errorf("failed to parse address %s: %w", addr.String(), err)
+				return nil, fmt.Errorf("failed to parse address %s: %w", addr.String(), err)
 			}
 			addr, err := netip.ParseAddr(ip.String())
 			if err != nil {
-				return netip.Addr{}, fmt.Errorf("failed to parse address %s: %w", ip.String(), err)
+				return nil, fmt.Errorf("failed to parse address %s: %w", ip.String(), err)
+			}
+			if addr.IsPrivate() && !o.DetectPrivateEndpoints {
+				continue
 			}
 			if o.DetectIPv6 {
-				if addr.Is6() && addr.IsPrivate() {
-					return addr, nil
+				if addr.Is6() {
+					ips = append(ips, addr)
 				}
 			} else {
 				if addr.Is4() && addr.IsPrivate() {
-					return addr, nil
+					ips = append(ips, addr)
 				}
 			}
 		}
 	}
-	return netip.Addr{}, errors.New("no private IPv4 address found")
+	return ips, nil
+}
+
+func joinEndpoints(eps []netip.Addr) string {
+	var s []string
+	for _, ep := range eps {
+		s = append(s, ep.String())
+	}
+	return strings.Join(s, ",")
 }
