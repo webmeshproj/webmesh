@@ -26,7 +26,7 @@ import (
 	boltdb "github.com/hashicorp/raft-boltdb"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/db"
+	"gitlab.com/webmesh/node/pkg/models"
 )
 
 // Open opens the store.
@@ -148,11 +148,11 @@ func (s *store) Open() error {
 		}
 	} else if s.opts.Join != "" {
 		s.log.Info("migrating raft database")
-		if err = db.MigrateRaftDB(s.weakData); err != nil {
+		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
 		s.log.Info("migrating local database")
-		if err = db.MigrateLocalDB(s.localData); err != nil {
+		if err = models.MigrateLocalDB(s.localData); err != nil {
 			return fmt.Errorf("local db migrate: %w", err)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), s.opts.JoinTimeout)

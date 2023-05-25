@@ -24,8 +24,8 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/db/raftdb"
 	"gitlab.com/webmesh/node/pkg/firewall"
+	"gitlab.com/webmesh/node/pkg/models/raftdb"
 	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 

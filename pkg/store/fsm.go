@@ -34,7 +34,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"gitlab.com/webmesh/node/pkg/db/localdb"
+	"gitlab.com/webmesh/node/pkg/models/localdb"
 )
 
 // ApplyBatch implements the raft.BatchingFSM interface.

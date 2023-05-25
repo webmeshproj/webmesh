@@ -88,5 +88,6 @@ func (s *Server) getRemoteNodeStatus(ctx context.Context, nodeID string) (*v1.St
 	if err != nil {
 		return nil, status.Errorf(codes.FailedPrecondition, "could not connect to node %s: %s", nodeID, err.Error())
 	}
+	defer conn.Close()
 	return v1.NewNodeClient(conn).GetStatus(ctx, &v1.GetStatusRequest{})
 }

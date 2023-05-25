@@ -78,7 +78,7 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 				stunURLs = append(stunURLs, fmt.Sprintf("stun:%s:%d", o.TURNServerPublicIP, o.TURNServerPort))
 			}
 		}
-		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, stunURLs))
+		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, tlsConfig, stunURLs))
 	}
 	if !o.DisableLeaderProxy {
 		features = append(features, v1.Feature_LEADER_PROXY)

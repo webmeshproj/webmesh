@@ -31,7 +31,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"gitlab.com/webmesh/node/pkg/db/localdb"
+	"gitlab.com/webmesh/node/pkg/models/localdb"
 	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 

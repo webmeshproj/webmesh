@@ -16,8 +16,86 @@ limitations under the License.
 
 package node
 
-import v1 "gitlab.com/webmesh/api/v1"
+import (
+	"io"
+
+	v1 "gitlab.com/webmesh/api/v1"
+	"golang.org/x/exp/slog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"gitlab.com/webmesh/node/pkg/services/node/datachannels"
+)
 
 func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer) error {
-	return nil
+	// Pull the initial request from the stream
+	req, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+	// TODO: We trust what the other node is sending for now, but we could save
+	// some errors by doing some extra validation first. We should also check
+	// that the other node is who they say they are.
+	conn, err := datachannels.NewPeerConnection(&datachannels.OfferOptions{
+		Proto:       req.GetProto(),
+		SrcAddress:  req.GetSrc(),
+		DstAddress:  req.GetDst(),
+		STUNServers: req.GetStunServers(),
+	})
+	if err != nil {
+		return err
+	}
+	go func() {
+		defer conn.Close()
+	}()
+	// Send the offer back to the other node
+	err = stream.Send(&v1.DataChannelNegotiation{
+		Offer: conn.Offer(),
+	})
+	if err != nil {
+		return err
+	}
+	// Wait for the answer from the other node
+	resp, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+	err = conn.AnswerOffer(resp.GetAnswer())
+	if err != nil {
+		return err
+	}
+	// Handle ICE negotiation
+	go func() {
+		for candidate := range conn.Candidates() {
+			if candidate == "" {
+				continue
+			}
+			err := stream.Send(&v1.DataChannelNegotiation{
+				Candidate: candidate,
+			})
+			if err != nil {
+				if status.Code(err) != codes.Canceled {
+					return
+				}
+				s.log.Error("error sending ICE candidate", slog.String("error", err.Error()))
+				return
+			}
+		}
+	}()
+	for {
+		candidate, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		if candidate.GetCandidate() == "" {
+			continue
+		}
+		err = conn.AddCandidate(candidate.GetCandidate())
+		if err != nil {
+			return err
+		}
+	}
 }

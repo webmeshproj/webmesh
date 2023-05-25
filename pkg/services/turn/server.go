@@ -67,7 +67,7 @@ func NewServer(o *Options) (*Server, error) {
 		return nil, fmt.Errorf("failed to listen on UDP: %w", err)
 	}
 	log := slog.Default().With("component", "turn-server")
-	log.Info("Listening for STUN requests", slog.String("udpListenAddr", udpListenAddr))
+	log.Info("Listening for STUN requests", slog.String("listen-addr", udpListenAddr))
 	s, err := turn.NewServer(turn.ServerConfig{
 		Realm: o.Realm,
 		LoggerFactory: &loggerFactory{

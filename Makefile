@@ -86,7 +86,7 @@ vet: ## Run go vet against code.
 
 generate: ## Generate SQL code.
 	go install github.com/kyleconroy/sqlc/cmd/sqlc@latest
-	sqlc -f pkg/db/sql/sqlc.yaml generate
+	sqlc -f pkg/models/sql/sqlc.yaml generate
 
 install-ctl:
 	go install gitlab.com/webmesh/$(NAME)/cmd/$(CTL)

@@ -30,15 +30,15 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/db"
-	"gitlab.com/webmesh/node/pkg/db/localdb"
-	"gitlab.com/webmesh/node/pkg/db/raftdb"
+	"gitlab.com/webmesh/node/pkg/models"
+	"gitlab.com/webmesh/node/pkg/models/localdb"
+	"gitlab.com/webmesh/node/pkg/models/raftdb"
 	"gitlab.com/webmesh/node/pkg/util"
 )
 
 func (s *store) bootstrap() error {
 	ctx := context.TODO()
-	version, err := db.GetDBVersion(s.weakData)
+	version, err := models.GetDBVersion(s.weakData)
 	if err != nil {
 		return fmt.Errorf("get raft schema version: %w", err)
 	}
@@ -46,10 +46,10 @@ func (s *store) bootstrap() error {
 	if version != 0 {
 		// We have a version, so the cluster is already bootstrapped.
 		s.log.Info("cluster already bootstrapped, migrating schema to latest version")
-		if err = db.MigrateRaftDB(s.weakData); err != nil {
+		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
-		if err = db.MigrateLocalDB(s.localData); err != nil {
+		if err = models.MigrateLocalDB(s.localData); err != nil {
 			return fmt.Errorf("local db migrate: %w", err)
 		}
 		// We rejoin as a voter no matter what
@@ -100,10 +100,10 @@ func (s *store) bootstrap() error {
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
 	s.log.Info("migrating raft schema to latest version")
-	if err = db.MigrateRaftDB(s.weakData); err != nil {
+	if err = models.MigrateRaftDB(s.weakData); err != nil {
 		return fmt.Errorf("raft db migrate: %w", err)
 	}
-	if err = db.MigrateLocalDB(s.localData); err != nil {
+	if err = models.MigrateLocalDB(s.localData); err != nil {
 		return fmt.Errorf("local db migrate: %w", err)
 	}
 	go func() {

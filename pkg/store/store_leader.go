@@ -22,7 +22,7 @@ import (
 
 	"github.com/hashicorp/raft"
 
-	"gitlab.com/webmesh/node/pkg/db/raftdb"
+	"gitlab.com/webmesh/node/pkg/models/raftdb"
 )
 
 // IsLeader returns true if this node is the Raft leader.

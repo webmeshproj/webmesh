@@ -18,10 +18,12 @@ limitations under the License.
 package webrtc
 
 import (
+	"crypto/tls"
+
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/peers"
+	"gitlab.com/webmesh/node/pkg/meshdb/state"
 	"gitlab.com/webmesh/node/pkg/store"
 )
 
@@ -30,17 +32,19 @@ type Server struct {
 	v1.UnimplementedWebRTCServer
 
 	store       store.Store
-	peers       peers.Peers
+	meshstate   state.State
 	stunServers []string
+	tlsConfig   *tls.Config
 	log         *slog.Logger
 }
 
 // NewServer returns a new Server.
-func NewServer(store store.Store, stunServers []string) *Server {
+func NewServer(store store.Store, tlsConfig *tls.Config, stunServers []string) *Server {
 	return &Server{
 		store:       store,
-		peers:       peers.New(store),
+		meshstate:   state.New(store),
 		stunServers: stunServers,
+		tlsConfig:   tlsConfig,
 		log:         slog.Default().With("component", "webrtc-server"),
 	}
 }
