@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "gitlab.com/webmesh/api/v1"
@@ -30,13 +31,16 @@ import (
 
 	"gitlab.com/webmesh/node/pkg/services/mesh"
 	"gitlab.com/webmesh/node/pkg/services/node"
+	"gitlab.com/webmesh/node/pkg/services/turn"
+	"gitlab.com/webmesh/node/pkg/services/webrtc"
 	"gitlab.com/webmesh/node/pkg/store"
 )
 
 // Server is the gRPC server.
 type Server struct {
-	srv  *grpc.Server
 	opts *Options
+	srv  *grpc.Server
+	turn *turn.Server
 	log  *slog.Logger
 }
 
@@ -61,6 +65,21 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	if o.EnableMetrics {
 		features = append(features, v1.Feature_METRICS_GRPC)
 	}
+	if o.EnableWebRTCAPI {
+		features = append(features, v1.Feature_ICE_NEGOTIATION)
+		var stunURLs []string
+		if (o.EnableTURNServer && !o.ExclusiveTURNServer) && o.STUNServers != "" {
+			stunURLs = strings.Split(o.STUNServers, ",")
+		}
+		if o.EnableTURNServer {
+			if o.TURNServerEndpoint != "" {
+				stunURLs = append(stunURLs, o.TURNServerEndpoint)
+			} else {
+				stunURLs = append(stunURLs, fmt.Sprintf("stun:%s:%d", o.TURNServerPublicIP, o.TURNServerPort))
+			}
+		}
+		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, stunURLs))
+	}
 	if !o.DisableLeaderProxy {
 		features = append(features, v1.Feature_LEADER_PROXY)
 	}
@@ -82,6 +101,20 @@ func (s *Server) ListenAndServe() error {
 				s.log.Error("metrics server failed", slog.String("error", err.Error()))
 			}
 		}()
+	}
+	if s.opts.EnableTURNServer {
+		var err error
+		s.log.Info(fmt.Sprintf("Starting TURN server on %s:%d", s.opts.TURNServerListenAddress, s.opts.TURNServerPort))
+		s.turn, err = turn.NewServer(&turn.Options{
+			PublicIP:         s.opts.TURNServerPublicIP,
+			ListenAddressUDP: s.opts.TURNServerListenAddress,
+			ListenPortUDP:    s.opts.TURNServerPort,
+			Realm:            s.opts.TURNServerRealm,
+			PortRange:        s.opts.STUNPortRange,
+		})
+		if err != nil {
+			return fmt.Errorf("create turn server: %w", err)
+		}
 	}
 	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
 	lis, err := net.Listen("tcp", s.opts.ListenAddress)

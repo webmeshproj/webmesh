@@ -60,12 +60,6 @@ var (
 func Execute() error {
 	flag.Usage = usage
 	flag.Parse()
-	opts.Global.Overlay(
-		opts.Store.Options,
-		opts.Store.StreamLayer,
-		opts.GRPC,
-		opts.Wireguard,
-	)
 
 	if *versionFlag {
 		fmt.Println("Webmesh Node")
@@ -73,6 +67,16 @@ func Execute() error {
 		fmt.Println("  Commit:    ", version.Commit)
 		fmt.Println("  Build Date:", version.BuildDate)
 		return nil
+	}
+
+	err := opts.Global.Overlay(
+		opts.Store.Options,
+		opts.Store.StreamLayer,
+		opts.GRPC,
+		opts.Wireguard,
+	)
+	if err != nil {
+		return err
 	}
 
 	if *configFlag != "" {
@@ -136,7 +140,6 @@ func Execute() error {
 	}
 
 	// Validate options
-	var err error
 	err = opts.Store.StreamLayer.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate stream layer options: %w", err)
@@ -148,6 +151,10 @@ func Execute() error {
 	err = opts.Wireguard.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate wireguard options: %w", err)
+	}
+	err = opts.GRPC.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to validate grpc options: %w", err)
 	}
 
 	log.Info("starting raft node")

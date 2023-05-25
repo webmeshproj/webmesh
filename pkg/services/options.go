@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -40,19 +41,29 @@ import (
 )
 
 const (
-	GRPCListenAddressEnvVar        = "GRPC_LISTEN_ADDRESS"
-	GRPCCertFileEnvVar             = "GRPC_TLS_CERT_FILE"
-	GRPCKeyFileEnvVar              = "GRPC_TLS_KEY_FILE"
-	GRPCCAFileEnvVar               = "GRPC_TLS_CA_FILE"
-	GRPCClientCAFileEnvVar         = "GRPC_TLS_CLIENT_CA_FILE"
-	GRPCMTLSEnvVar                 = "GRPC_MTLS"
-	GRPCSkipVerifyHostnameEnvVar   = "GRPC_SKIP_VERIFY_HOSTNAME"
-	GRPCInsecureEnvVar             = "GRPC_INSECURE"
-	GRPCEnableMetricsEnvVar        = "GRPC_ENABLE_METRICS"
-	GRPCMetricsListenAddressEnvVar = "GRPC_METRICS_LISTEN_ADDRESS"
-	GRPCMetricsPathEnvVar          = "GRPC_METRICS_PATH"
-	GRPCDisableLeaderProxyEnvVar   = "GRPC_DISABLE_LEADER_PROXY"
-	GRPCEnableMeshAPIEnvVar        = "GRPC_ENABLE_MESH_API"
+	ListenAddressEnvVar           = "GRPC_LISTEN_ADDRESS"
+	CertFileEnvVar                = "GRPC_TLS_CERT_FILE"
+	KeyFileEnvVar                 = "GRPC_TLS_KEY_FILE"
+	CAFileEnvVar                  = "GRPC_TLS_CA_FILE"
+	ClientCAFileEnvVar            = "GRPC_TLS_CLIENT_CA_FILE"
+	MTLSEnvVar                    = "GRPC_MTLS"
+	SkipVerifyHostnameEnvVar      = "GRPC_SKIP_VERIFY_HOSTNAME"
+	InsecureEnvVar                = "GRPC_INSECURE"
+	EnableMetricsEnvVar           = "GRPC_ENABLE_METRICS"
+	MetricsListenAddressEnvVar    = "GRPC_METRICS_LISTEN_ADDRESS"
+	MetricsPathEnvVar             = "GRPC_METRICS_PATH"
+	DisableLeaderProxyEnvVar      = "GRPC_DISABLE_LEADER_PROXY"
+	EnableMeshAPIEnvVar           = "GRPC_ENABLE_MESH_API"
+	EnableWebRTCAPIEnvVar         = "GRPC_ENABLE_WEBRTC_API"
+	STUNServersEnvVar             = "GRPC_STUN_SERVERS"
+	EnableTURNServerEnvVar        = "GRPC_ENABLE_TURN_SERVER"
+	TURNServerEndpointEnvVar      = "GRPC_TURN_SERVER_ENDPOINT"
+	TURNServerPublicIPEnvVar      = "GRPC_TURN_SERVER_PUBLIC_IP"
+	TURNServerListenAddressEnvVar = "GRPC_TURN_SERVER_LISTEN_ADDRESS"
+	TURNServerPortEnvVar          = "GRPC_TURN_SERVER_PORT"
+	TURNServerRealmEnvVar         = "GRPC_TURN_SERVER_REALM"
+	STUNPortRangeEnvVar           = "GRPC_STUN_PORT_RANGE"
+	ExclusiveTURNServerEnvVar     = "GRPC_EXCLUSIVE_TURN_SERVER"
 )
 
 // Options contains the configuration for the gRPC server.
@@ -85,45 +96,114 @@ type Options struct {
 	DisableLeaderProxy bool `json:"disable-leader-proxy" yaml:"disable-leader-proxy" toml:"disable-leader-proxy"`
 	// EnableMeshAPI enables the mesh API.
 	EnableMeshAPI bool `json:"enable-mesh-api" yaml:"enable-mesh-api" toml:"enable-mesh-api"`
+	// EnableWebRTCAPI enables the WebRTC API.
+	EnableWebRTCAPI bool `json:"enable-webrtc-api" yaml:"enable-webrtc-api" toml:"enable-webrtc-api"`
+	// STUNServers is a list of STUN servers to use. Required
+	// if the WebRTC API is enabled and the TURN server is disabled.
+	STUNServers string `json:"stun-servers" yaml:"stun-servers" toml:"stun-servers"`
+	// EnableTURNServer enables the TURN server.
+	EnableTURNServer bool `json:"enable-turn-server" yaml:"enable-turn-server" toml:"enable-turn-server"`
+	// TURNServerEndpoint is the endpoint to advertise for the TURN server.
+	// If empty, the public IP and server port is used.
+	TURNServerEndpoint string `json:"turn-server-endpoint" yaml:"turn-server-endpoint" toml:"turn-server-endpoint"`
+	// TURNServerPublicIP is the address advertised for STUN requests.
+	TURNServerPublicIP string `json:"turn-server-public-ip" yaml:"turn-server-public-ip" toml:"turn-server-public-ip"`
+	// TURNServerListenAddress is the address to listen on for TURN connections.
+	TURNServerListenAddress string `json:"turn-server-listen-address" yaml:"turn-server-listen-address" toml:"turn-server-listen-address"`
+	// TURNServerPort is the port to listen on for TURN connections.
+	TURNServerPort int `json:"turn-server-port" yaml:"turn-server-port" toml:"turn-server-port"`
+	// TURNServerRealm is the realm used for TURN server authentication.
+	TURNServerRealm string `json:"turn-server-realm" yaml:"turn-server-realm" toml:"turn-server-realm"`
+	// STUNPortRange is the port range to use for STUN.
+	STUNPortRange string `json:"stun-port-range" yaml:"stun-port-range" toml:"stun-port-range"`
+	// ExclusiveTURNServer will replace all STUNServers with the local TURN server.
+	ExclusiveTURNServer bool `json:"exclusive-turn-server" yaml:"exclusive-turn-server" toml:"exclusive-turn-server"`
 }
 
 // NewOptions returns new Options with sensible defaults.
 func NewOptions() *Options {
 	return &Options{
-		ListenAddress:        ":8443",
-		MetricsListenAddress: ":8080",
-		MetricsPath:          "/metrics",
+		ListenAddress:           ":8443",
+		MetricsListenAddress:    ":8080",
+		MetricsPath:             "/metrics",
+		STUNServers:             "stun:stun.l.google.com:19302",
+		TURNServerListenAddress: "0.0.0.0",
+		TURNServerPort:          3478,
+		TURNServerRealm:         "webmesh.io",
+		STUNPortRange:           "49152-65535",
 	}
 }
 
 // BindFlags binds the gRPC options to the given flag set.
 func (o *Options) BindFlags(fs *flag.FlagSet) {
-	fs.StringVar(&o.ListenAddress, "grpc.listen-address", util.GetEnvDefault(GRPCListenAddressEnvVar, ":8443"),
+	fs.StringVar(&o.ListenAddress, "grpc.listen-address", util.GetEnvDefault(ListenAddressEnvVar, ":8443"),
 		"gRPC server listen address.")
-	fs.StringVar(&o.TLSCertFile, "grpc.tls-cert-file", util.GetEnvDefault(GRPCCertFileEnvVar, ""),
+	fs.StringVar(&o.TLSCertFile, "grpc.tls-cert-file", util.GetEnvDefault(CertFileEnvVar, ""),
 		"gRPC server TLS certificate file.")
-	fs.StringVar(&o.TLSKeyFile, "grpc.tls-key-file", util.GetEnvDefault(GRPCKeyFileEnvVar, ""),
+	fs.StringVar(&o.TLSKeyFile, "grpc.tls-key-file", util.GetEnvDefault(KeyFileEnvVar, ""),
 		"gRPC server TLS key file.")
-	fs.StringVar(&o.TLSCAFile, "grpc.tls-ca-file", util.GetEnvDefault(GRPCCAFileEnvVar, ""),
+	fs.StringVar(&o.TLSCAFile, "grpc.tls-ca-file", util.GetEnvDefault(CAFileEnvVar, ""),
 		"gRPC server TLS CA file.")
-	fs.StringVar(&o.TLSClientCAFile, "grpc.tls-client-ca-file", util.GetEnvDefault(GRPCClientCAFileEnvVar, ""),
+	fs.StringVar(&o.TLSClientCAFile, "grpc.tls-client-ca-file", util.GetEnvDefault(ClientCAFileEnvVar, ""),
 		"gRPC server TLS client CA file.")
-	fs.BoolVar(&o.MTLS, "grpc.mtls", util.GetEnvDefault(GRPCMTLSEnvVar, "false") == "true",
+	fs.BoolVar(&o.MTLS, "grpc.mtls", util.GetEnvDefault(MTLSEnvVar, "false") == "true",
 		"Enable mutual TLS.")
-	fs.BoolVar(&o.SkipVerifyHostname, "grpc.skip-verify-hostname", util.GetEnvDefault(GRPCSkipVerifyHostnameEnvVar, "false") == "true",
+	fs.BoolVar(&o.SkipVerifyHostname, "grpc.skip-verify-hostname", util.GetEnvDefault(SkipVerifyHostnameEnvVar, "false") == "true",
 		"Skip hostname verification.")
-	fs.BoolVar(&o.Insecure, "grpc.insecure", util.GetEnvDefault(GRPCInsecureEnvVar, "false") == "true",
+	fs.BoolVar(&o.Insecure, "grpc.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Don't use TLS for the gRPC server.")
-	fs.BoolVar(&o.EnableMetrics, "grpc.enable-metrics", util.GetEnvDefault(GRPCEnableMetricsEnvVar, "false") == "true",
+	fs.BoolVar(&o.EnableMetrics, "grpc.enable-metrics", util.GetEnvDefault(EnableMetricsEnvVar, "false") == "true",
 		"Enable gRPC metrics.")
-	fs.StringVar(&o.MetricsListenAddress, "grpc.metrics-listen-address", util.GetEnvDefault(GRPCMetricsListenAddressEnvVar, ":8080"),
+	fs.StringVar(&o.MetricsListenAddress, "grpc.metrics-listen-address", util.GetEnvDefault(MetricsListenAddressEnvVar, ":8080"),
 		"gRPC metrics listen address.")
-	fs.StringVar(&o.MetricsPath, "grpc.metrics-path", util.GetEnvDefault(GRPCMetricsPathEnvVar, "/metrics"),
+	fs.StringVar(&o.MetricsPath, "grpc.metrics-path", util.GetEnvDefault(MetricsPathEnvVar, "/metrics"),
 		"gRPC metrics path.")
-	fs.BoolVar(&o.DisableLeaderProxy, "grpc.disable-leader-proxy", util.GetEnvDefault(GRPCDisableLeaderProxyEnvVar, "false") == "true",
+	fs.BoolVar(&o.DisableLeaderProxy, "grpc.disable-leader-proxy", util.GetEnvDefault(DisableLeaderProxyEnvVar, "false") == "true",
 		"Disable the leader proxy.")
-	fs.BoolVar(&o.EnableMeshAPI, "grpc.enable-mesh-api", util.GetEnvDefault(GRPCEnableMeshAPIEnvVar, "false") == "true",
+	fs.BoolVar(&o.EnableMeshAPI, "grpc.enable-mesh-api", util.GetEnvDefault(EnableMeshAPIEnvVar, "false") == "true",
 		"Enable the mesh API.")
+	fs.BoolVar(&o.EnableWebRTCAPI, "grpc.enable-webrtc-api", util.GetEnvDefault(EnableWebRTCAPIEnvVar, "false") == "true",
+		"Enable the WebRTC API.")
+	fs.StringVar(&o.STUNServers, "grpc.stun-servers", util.GetEnvDefault(STUNServersEnvVar, "stun:stun.l.google.com:19302"),
+		"STUN servers to use.")
+	fs.BoolVar(&o.EnableTURNServer, "grpc.enable-turn-server", util.GetEnvDefault(EnableTURNServerEnvVar, "false") == "true",
+		"Enable the TURN server.")
+	fs.StringVar(&o.TURNServerEndpoint, "grpc.turn-server-endpoint", util.GetEnvDefault(TURNServerEndpointEnvVar, ""),
+		"The TURN server endpoint. If empty, the public IP will be used.")
+	fs.StringVar(&o.TURNServerPublicIP, "grpc.turn-server-public-ip", util.GetEnvDefault(TURNServerPublicIPEnvVar, ""),
+		"The address advertised for STUN requests.")
+	fs.StringVar(&o.TURNServerListenAddress, "grpc.turn-server-listen-address", util.GetEnvDefault(TURNServerListenAddressEnvVar, "0.0.0.0"),
+		"Address to listen on for TURN connections.")
+	fs.IntVar(&o.TURNServerPort, "grpc.turn-server-port", util.GetEnvIntDefault(TURNServerPortEnvVar, 3478),
+		"Port to listen on for TURN connections.")
+	fs.StringVar(&o.TURNServerRealm, "grpc.turn-server-realm", util.GetEnvDefault(TURNServerRealmEnvVar, "webmesh.io"),
+		"Realm used for TURN server authentication.")
+	fs.StringVar(&o.STUNPortRange, "grpc.stun-port-range", util.GetEnvDefault(STUNPortRangeEnvVar, "49152-65535"),
+		"Port range to use for STUN.")
+	fs.BoolVar(&o.ExclusiveTURNServer, "grpc.exclusive-turn-server", util.GetEnvDefault(ExclusiveTURNServerEnvVar, "false") == "true",
+		"Replace all STUNServers with the local TURN server. The equivalent of --grpc.stun-servers=stun:<public-ip>:<port>.")
+}
+
+// Validate validates the options.
+func (o *Options) Validate() error {
+	if o.Insecure && o.MTLS {
+		return errors.New("cannot use both insecure and mutual TLS")
+	}
+	if o.EnableTURNServer && o.TURNServerPublicIP == "" {
+		return errors.New("must specify a public IP for the TURN server")
+	}
+	if o.EnableTURNServer && o.TURNServerPort <= 0 {
+		return errors.New("must specify a port for the TURN server")
+	}
+	if o.EnableTURNServer && o.STUNPortRange == "" {
+		return errors.New("must specify STUN port range")
+	}
+	if o.EnableWebRTCAPI && !o.EnableTURNServer {
+		if o.STUNServers == "" {
+			return errors.New("must specify STUN servers")
+		}
+	}
+	return nil
 }
 
 // ListenPort returns the port the options are configured to listen on.

@@ -18,7 +18,10 @@ limitations under the License.
 package global
 
 import (
+	"context"
+	"errors"
 	"flag"
+	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
@@ -42,6 +45,9 @@ const (
 	GlobalNoIPv4EnvVar             = "GLOBAL_NO_IPV4"
 	GlobalNoIPv6EnvVar             = "GLOBAL_NO_IPV6"
 	GlobalEndpointEnvVar           = "GLOBAL_ENDPOINT"
+	GlobalDetectEndpointEnvVar     = "GLOBAL_DETECT_ENDPOINT"
+	GlobalDetectPublicIPEnvVar     = "GLOBAL_DETECT_PUBLIC_IP"
+	GlobalDetectIPv6EnvVar         = "GLOBAL_DETECT_IPV6"
 )
 
 // Options are the global options.
@@ -71,6 +77,12 @@ type Options struct {
 	// will override the store advertise address and wireguard endpoints with their
 	// configured listen ports.
 	Endpoint string `yaml:"endpoint" json:"endpoint" toml:"endpoint"`
+	// DetectEndpoint is true if the endpoint should be detected.
+	DetectEndpoint bool `yaml:"detect-endpoint" json:"detect-endpoint" toml:"detect-endpoint"`
+	// DetectPublicIP is true if the public IP should be detected.
+	DetectPublicIP bool `yaml:"detect-public-ip" json:"detect-public-ip" toml:"detect-public-ip"`
+	// DetectIPv6 is true if IPv6 should be detected.
+	DetectIPv6 bool `yaml:"detect-ipv6" json:"detect-ipv6" toml:"detect-ipv6"`
 }
 
 // NewOptions creates new options.
@@ -101,6 +113,12 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		"Disable use of IPv4 globally.")
 	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(GlobalLogLevelEnvVar, "info"),
 		"Log level (debug, info, warn, error)")
+	fs.BoolVar(&o.DetectEndpoint, "global.detect-endpoint", util.GetEnvDefault(GlobalDetectEndpointEnvVar, "false") == "true",
+		"Detect the endpoint address.")
+	fs.BoolVar(&o.DetectPublicIP, "global.detect-public-ip", util.GetEnvDefault(GlobalDetectPublicIPEnvVar, "false") == "true",
+		"Detect the public IP address.")
+	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", util.GetEnvDefault(GlobalDetectIPv6EnvVar, "false") == "true",
+		"Detect the IPv6 address. Default is to detect IPv4.")
 	fs.StringVar(&o.Endpoint, "global.endpoint", util.GetEnvDefault(GlobalEndpointEnvVar, ""),
 		`The publicly routable address of this node. Setting this value
 will override the address portion of the store advertise address
@@ -109,10 +127,20 @@ this node's API to be reachable outside the network.`)
 }
 
 // Overlay overlays the global options onto the given option sets.
-func (o *Options) Overlay(opts ...any) {
+func (o *Options) Overlay(opts ...any) error {
 	var endpoint netip.Addr
+	var err error
 	if o.Endpoint != "" {
-		endpoint, _ = netip.ParseAddr(o.Endpoint)
+		endpoint, err = netip.ParseAddr(o.Endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to parse endpoint: %w", err)
+		}
+	}
+	if o.DetectEndpoint {
+		endpoint, err = o.detectEndpoint()
+		if err != nil {
+			return fmt.Errorf("failed to detect endpoint: %w", err)
+		}
 	}
 	for _, opt := range opts {
 		switch v := opt.(type) {
@@ -129,10 +157,11 @@ func (o *Options) Overlay(opts ...any) {
 				for _, inOpts := range opts {
 					if vopt, ok := inOpts.(*streamlayer.Options); ok {
 						_, port, err := net.SplitHostPort(vopt.ListenAddress)
-						if err == nil {
-							raftPort, _ = strconv.ParseUint(port, 10, 16)
-							break
+						if err != nil {
+							return fmt.Errorf("failed to parse raft listen address: %w", err)
 						}
+						raftPort, _ = strconv.ParseUint(port, 10, 16)
+						break
 					}
 				}
 				if raftPort == 0 {
@@ -166,6 +195,15 @@ func (o *Options) Overlay(opts ...any) {
 			if v.TLSClientCAFile == "" {
 				v.TLSClientCAFile = o.TLSClientCAFile
 			}
+			if v.EnableTURNServer {
+				if v.TURNServerEndpoint == "" && endpoint.IsValid() {
+					v.TURNServerEndpoint = fmt.Sprintf("stun:%s",
+						net.JoinHostPort(endpoint.String(), strconv.Itoa(v.TURNServerPort)))
+				}
+				if v.TURNServerPublicIP == "" && endpoint.IsValid() {
+					v.TURNServerPublicIP = endpoint.String()
+				}
+			}
 		case *streamlayer.Options:
 			if !v.Insecure {
 				v.Insecure = o.Insecure
@@ -190,4 +228,64 @@ func (o *Options) Overlay(opts ...any) {
 			}
 		}
 	}
+	return nil
+}
+
+func (o *Options) detectEndpoint() (netip.Addr, error) {
+	if o.DetectPublicIP {
+		var addr string
+		var err error
+		if o.DetectIPv6 {
+			addr, err = util.DetectPublicIPv6(context.Background())
+		} else {
+			addr, err = util.DetectPublicIPv4(context.Background())
+		}
+		if err != nil {
+			return netip.Addr{}, fmt.Errorf("failed to detect public IP: %w", err)
+		}
+		return netip.ParseAddr(addr)
+	}
+	return o.detectPrivateIP()
+}
+
+func (o *Options) detectPrivateIP() (netip.Addr, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return netip.Addr{}, fmt.Errorf("failed to list interfaces: %w", err)
+	}
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		if iface.Flags&net.FlagPointToPoint != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return netip.Addr{}, fmt.Errorf("failed to list addresses for interface %s: %w", iface.Name, err)
+		}
+		for _, addr := range addrs {
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				return netip.Addr{}, fmt.Errorf("failed to parse address %s: %w", addr.String(), err)
+			}
+			addr, err := netip.ParseAddr(ip.String())
+			if err != nil {
+				return netip.Addr{}, fmt.Errorf("failed to parse address %s: %w", ip.String(), err)
+			}
+			if o.DetectIPv6 {
+				if addr.Is6() && addr.IsPrivate() {
+					return addr, nil
+				}
+			} else {
+				if addr.Is4() && addr.IsPrivate() {
+					return addr, nil
+				}
+			}
+		}
+	}
+	return netip.Addr{}, errors.New("no private IPv4 address found")
 }

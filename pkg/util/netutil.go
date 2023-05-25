@@ -17,13 +17,18 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"crypto/sha1"
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
+	"net/http"
 	"net/netip"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -223,4 +228,65 @@ func RandomLocalMAC() (net.HardwareAddr, error) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ri := r.Intn(len(addrs))
 	return addrs[ri], nil
+}
+
+// ParsePortRange parses a port range string.
+func ParsePortRange(s string) (start int, end int, err error) {
+	spl := strings.Split(s, "-")
+	if len(spl) > 2 {
+		return 0, 0, fmt.Errorf("invalid port range: %s", s)
+	}
+	start, err = strconv.Atoi(spl[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid port range: %s", s)
+	}
+	end = start
+	if len(spl) == 2 {
+		end, err = strconv.Atoi(spl[1])
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid port range: %s", s)
+		}
+	}
+	return start, end, nil
+}
+
+// DetectPublicIPv4 detects the public IPv4 address of the machine
+// using the ifconfig.me service.
+func DetectPublicIPv4(ctx context.Context) (string, error) {
+	s, err := httpGetToString(ctx, "https://ifconfig.me")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(s), nil
+}
+
+// DetectPublicIPv6 detects the public IPv6 address of the machine
+// using the ifconfig.co service.
+func DetectPublicIPv6(ctx context.Context) (string, error) {
+	s, err := httpGetToString(ctx, "https://ifconfig.co")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(s), nil
+}
+
+func httpGetToString(ctx context.Context, url string) (string, error) {
+	r, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	r.Header.Set("User-Agent", "curl/7.64.1")
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }

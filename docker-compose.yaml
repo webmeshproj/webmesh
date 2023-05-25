@@ -23,7 +23,7 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --global.log-level=debug
-      - --global.endpoint=10.1.0.1
+      - --global.detect-endpoint
       - --store.bootstrap
       - --store.node-id=bootstrap-node-1
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
@@ -49,7 +49,7 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --global.log-level=debug
-      - --global.endpoint=10.1.0.2
+      - --global.detect-endpoint
       - --store.bootstrap
       - --store.node-id=bootstrap-node-2
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
@@ -75,7 +75,7 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --global.log-level=debug
-      - --global.endpoint=10.1.0.3
+      - --global.detect-endpoint
       - --store.bootstrap
       - --store.node-id=bootstrap-node-3
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
