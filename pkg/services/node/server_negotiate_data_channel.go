@@ -33,9 +33,11 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 	if err != nil {
 		return err
 	}
+	log := s.log.With(slog.Any("request", req))
 	// TODO: We trust what the other node is sending for now, but we could save
 	// some errors by doing some extra validation first. We should also check
 	// that the other node is who they say they are.
+	log.Info("creating new webrtc peer connection")
 	conn, err := datachannels.NewPeerConnection(&datachannels.OfferOptions{
 		Proto:       req.GetProto(),
 		SrcAddress:  req.GetSrc(),
@@ -47,10 +49,10 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 	}
 	go func() {
 		<-conn.Closed()
-		s.log.Info("data channel closed",
-			slog.String("src", req.GetSrc()), slog.String("dst", req.GetDst()))
+		log.Info("webrtc connection closed")
 	}()
 	// Send the offer back to the other node
+	log.Info("sending offer to other node")
 	err = stream.Send(&v1.DataChannelNegotiation{
 		Offer: conn.Offer(),
 	})
@@ -64,6 +66,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 		defer conn.Close()
 		return err
 	}
+	log.Info("answering offer from other node")
 	err = conn.AnswerOffer(resp.GetAnswer())
 	if err != nil {
 		defer conn.Close()
@@ -75,6 +78,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 			if candidate == "" {
 				continue
 			}
+			log.Info("sending ICE candidate", slog.String("candidate", candidate))
 			err := stream.Send(&v1.DataChannelNegotiation{
 				Candidate: candidate,
 			})
@@ -82,7 +86,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 				if status.Code(err) != codes.Canceled {
 					return
 				}
-				s.log.Error("error sending ICE candidate", slog.String("error", err.Error()))
+				log.Error("error sending ICE candidate", slog.String("error", err.Error()))
 				return
 			}
 		}
@@ -93,13 +97,16 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 			if err == io.EOF {
 				return nil
 			}
+			log.Error("error receiving ICE candidate", slog.String("error", err.Error()))
 			return err
 		}
 		if candidate.GetCandidate() == "" {
 			continue
 		}
+		log.Info("received ICE candidate", slog.String("candidate", candidate.GetCandidate()))
 		err = conn.AddCandidate(candidate.GetCandidate())
 		if err != nil {
+			log.Error("error adding ICE candidate", slog.String("error", err.Error()))
 			return err
 		}
 	}

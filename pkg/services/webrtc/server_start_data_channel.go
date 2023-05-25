@@ -39,8 +39,10 @@ func (s *Server) StartDataChannel(clientStream v1.WebRTC_StartDataChannelServer)
 		remoteAddr = p.Addr.String()
 	}
 
+	log := s.log.With(slog.String("remote_addr", remoteAddr))
+
 	// Pull the initial request from the stream in a goroutine to avoid blocking
-	// forever
+	// forever if the client never sends anything.
 	ctx, cancel := context.WithTimeout(clientStream.Context(), 10*time.Second)
 	errs := make(chan error, 1)
 	req := make(chan *v1.StartDataChannelRequest, 1)
@@ -63,13 +65,14 @@ func (s *Server) StartDataChannel(clientStream v1.WebRTC_StartDataChannelServer)
 		return err
 	case r = <-req:
 	}
-	s.log.Info("received data channel request", slog.Any("request", r))
+	log = log.With(slog.Any("request", r))
+	log.Info("received data channel request")
 	if r.GetNodeId() == "" {
-		s.log.Error("request has empty node ID")
+		log.Error("request has empty node ID")
 		return status.Error(codes.InvalidArgument, "node ID must be provided in request")
 	}
 	if r.GetPort() == 0 || r.GetPort() > 65535 {
-		s.log.Error("request has invalid port", slog.Int("port", int(r.GetPort())))
+		log.Error("request has invalid port")
 		return status.Error(codes.InvalidArgument, "invalid port provided in request")
 	}
 	// Set defaults.
@@ -81,6 +84,7 @@ func (s *Server) StartDataChannel(clientStream v1.WebRTC_StartDataChannelServer)
 	}
 
 	// Start a negotiation with the peer.
+	log.Info("negotiating data channel with peer")
 	client, closer, err := s.newPeerClient(clientStream.Context(), r.GetNodeId())
 	if err != nil {
 		return err
@@ -114,7 +118,7 @@ func (s *Server) StartDataChannel(clientStream v1.WebRTC_StartDataChannelServer)
 	if resp.GetOffer() == "" {
 		return status.Error(codes.FailedPrecondition, "peer did not send an offer")
 	}
-	s.log.Info("received offer from peer", slog.String("offer", resp.GetOffer()))
+	log.Info("received offer from peer", slog.String("offer", resp.GetOffer()))
 	// Forward the offer to the client
 	err = clientStream.Send(&v1.DataChannelOffer{
 		Offer:       resp.GetOffer(),
@@ -149,6 +153,7 @@ func (s *Server) StartDataChannel(clientStream v1.WebRTC_StartDataChannelServer)
 		return status.Error(codes.InvalidArgument, "client did not send an answer")
 	}
 	// Send the answer to the peer
+	log.Info("sending answer to peer", slog.String("answer", r.GetAnswer()))
 	err = negotiateStream.Send(&v1.DataChannelNegotiation{
 		Answer: r.GetAnswer(),
 	})
@@ -160,7 +165,7 @@ func (s *Server) StartDataChannel(clientStream v1.WebRTC_StartDataChannelServer)
 		nodeCandidate, err := negotiateStream.Recv()
 		if err != nil {
 			if err != io.EOF {
-				s.log.Error("failed to receive candidate from node", slog.String("error", err.Error()))
+				log.Error("failed to receive candidate from node", slog.String("error", err.Error()))
 			}
 			return
 		}
@@ -168,12 +173,13 @@ func (s *Server) StartDataChannel(clientStream v1.WebRTC_StartDataChannelServer)
 			s.log.Error("received empty candidate from node")
 			return
 		}
+		log.Info("received candidate from node", slog.String("candidate", nodeCandidate.GetCandidate()))
 		err = clientStream.Send(&v1.DataChannelOffer{
 			Candidate: nodeCandidate.GetCandidate(),
 		})
 		if err != nil {
 			if status.Code(err) != codes.Canceled {
-				s.log.Error("failed to send candidate to client", slog.String("error", err.Error()))
+				log.Error("failed to send candidate to client", slog.String("error", err.Error()))
 			}
 			return
 		}
@@ -182,21 +188,22 @@ func (s *Server) StartDataChannel(clientStream v1.WebRTC_StartDataChannelServer)
 		clientCandidate, err := clientStream.Recv()
 		if err != nil {
 			if err != io.EOF {
-				s.log.Error("failed to receive candidate from client", slog.String("error", err.Error()))
+				log.Error("failed to receive candidate from client", slog.String("error", err.Error()))
 				return status.Errorf(codes.Internal, "failed to receive candidate from client: %s", err.Error())
 			}
 			return nil
 		}
 		if clientCandidate.GetCandidate() == "" {
-			s.log.Error("received empty candidate from client")
+			log.Error("received empty candidate from client")
 			return status.Error(codes.InvalidArgument, "received empty candidate from client")
 		}
+		log.Info("received candidate from client", slog.String("candidate", clientCandidate.GetCandidate()))
 		err = negotiateStream.Send(&v1.DataChannelNegotiation{
 			Candidate: clientCandidate.GetCandidate(),
 		})
 		if err != nil {
 			if status.Code(err) != codes.Canceled {
-				s.log.Error("failed to send candidate to node", slog.String("error", err.Error()))
+				log.Error("failed to send candidate to node", slog.String("error", err.Error()))
 				return status.Errorf(codes.Internal, "failed to send candidate to node: %s", err.Error())
 			}
 			return nil
