@@ -61,6 +61,6 @@ type Options struct {
 	DefaultGateway netip.Addr
 	// ForceTUN forces the use of a TUN interface.
 	ForceTUN bool
-	// NoModprobe disables modprobe.
-	NoModprobe bool
+	// Modprobe attempts to load the wireguard kernel module.
+	Modprobe bool
 }

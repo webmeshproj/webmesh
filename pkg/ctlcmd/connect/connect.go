@@ -37,10 +37,12 @@ import (
 type Options struct {
 	// InterfaceName is the name of the wireguard interface to use.
 	InterfaceName string
+	// ListenPort is the port for wireguard to listen on.
+	ListenPort uint16
 	// ForceTUN is whether to force the use of a TUN interface.
 	ForceTUN bool
-	// NoModprobe is whether to not attempt to load the wireguard kernel module.
-	NoModprobe bool
+	// Modprobe is whether to attempt to load the wireguard kernel module.
+	Modprobe bool
 	// JoinServer is the address of the join server to use.
 	JoinServer string
 	// RaftPort is the port to use for the Raft transport.
@@ -62,6 +64,8 @@ type Options struct {
 	NoIPv6 bool
 	// AllowedIPs is a map of peers to allowed IPs.
 	AllowedIPs map[string][]string
+	// EndpointOverrides is a map of peer to endpoint overrides.
+	EndpointOverrides string
 	// LocalDNS is whether to start a local MeshDNS server.
 	LocalDNS bool
 	// LocalDNSPort is the port to use for the local MeshDNS server.
@@ -87,14 +91,15 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	storeOpts.Join = opts.JoinServer
 	storeOpts.NoIPv4 = opts.NoIPv4
 	storeOpts.NoIPv6 = opts.NoIPv6
-	storeOpts.PeerRefreshInterval = time.Second * 10
 
 	// Configure the wireguard interface
 	wireguardOpts := wireguard.NewOptions()
 	wireguardOpts.Name = opts.InterfaceName
+	wireguardOpts.ListenPort = int(opts.ListenPort)
 	wireguardOpts.ForceTUN = opts.ForceTUN
-	wireguardOpts.NoModprobe = opts.NoModprobe
+	wireguardOpts.Modprobe = opts.Modprobe
 	wireguardOpts.PersistentKeepAlive = time.Second * 10
+	wireguardOpts.EndpointOverrides = opts.EndpointOverrides
 	var allowedIPs strings.Builder
 	for peer, ips := range opts.AllowedIPs {
 		allowedIPs.WriteString(fmt.Sprintf("%s=%s", peer, strings.Join(ips, ",")))
@@ -116,7 +121,12 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	case <-stopChan:
 		return st.Close()
 	case <-ctx.Done():
-		return ctx.Err()
+		err = ctx.Err()
+		closeErr := st.Close()
+		if closeErr != nil {
+			err = fmt.Errorf("%w: %w", ctx.Err(), closeErr)
+		}
+		return err
 	case <-st.ReadyNotify(ctx):
 		if ctx.Err() != nil {
 			err = fmt.Errorf("wait for store ready: %w", ctx.Err())

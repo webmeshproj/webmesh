@@ -36,6 +36,9 @@ func (s *store) Close() error {
 		defer cancel()
 	}
 	defer s.open.Store(false)
+	// Stop the observers
+	close(s.observerClose)
+	<-s.observerDone
 	if s.fw != nil {
 		// Clear the firewall rules after wireguard is shutdown
 		defer func() {
@@ -59,9 +62,10 @@ func (s *store) Close() error {
 	}
 	if s.raft != nil {
 		if s.IsLeader() {
+			s.log.Debug("currently the leader, removing ourselves and stepping down")
 			// If we were the leader, we need to step down
 			// and remove ourselves from the cluster.
-			if err := s.RemoveServer(ctx, string(s.nodeID)); err != nil {
+			if err := s.RemoveServer(ctx, string(s.nodeID), true); err != nil {
 				return fmt.Errorf("remove voter: %w", err)
 			}
 			// For good measure, step down again. This should be
@@ -70,8 +74,9 @@ func (s *store) Close() error {
 				return fmt.Errorf("stepdown: %w", err)
 			}
 		} else {
+			s.log.Debug("not leader, leaving cluster")
 			// If we were not the leader, we need to leave
-			if err := s.Leave(context.Background()); err != nil {
+			if err := s.leaveCluster(context.Background()); err != nil {
 				// Make this non-fatal, but it will piss off the
 				// leader.
 				// TODO: The leader should run a separate goroutine
@@ -80,10 +85,12 @@ func (s *store) Close() error {
 			}
 		}
 		// Finally, shutdown the raft node.
+		s.log.Debug("shutting down raft")
 		if err := s.raft.Shutdown().Error(); err != nil {
 			return fmt.Errorf("raft shutdown: %w", err)
 		}
 	}
+	s.log.Debug("all services shut down, closing databases")
 	// None of these are strictly necessary, but we do them for
 	// good measure.
 	for name, closer := range map[string]io.Closer{
@@ -93,6 +100,7 @@ func (s *store) Close() error {
 		"raft log db":    s.logDB,
 		"raft stable db": s.stableDB,
 	} {
+		s.log.Debug("closing " + name)
 		if err := closer.Close(); err != nil {
 			s.log.Error("error closing "+name, slog.String("error", err.Error()))
 		}

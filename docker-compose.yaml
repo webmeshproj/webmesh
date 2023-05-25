@@ -2,14 +2,11 @@ version: '3'
 
 networks:
   bootstrap:
-    # enable_ipv6: true
     ipam:
       driver: default
       config:
         - subnet: 10.1.0.0/24
           gateway: 10.1.0.100
-        # - subnet: 2001:db8:1::/64
-        #   gateway: 2001:db8:1::1
 
 services:
 
@@ -18,6 +15,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.1
+    hostname: bootstrap-node-1
     entrypoint:
       - /node
       - --global.insecure
@@ -25,14 +26,12 @@ services:
       - --global.log-level=debug
       - --global.detect-endpoints
       - --global.detect-private-endpoints
+      - --store.node-additional-endpoints=127.0.0.1
       - --store.bootstrap
-      - --store.node-id=bootstrap-node-1
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
-      - --store.raft-log-format=json
       - --store.raft-log-level=debug
-      - --wireguard.no-modprobe
       - --services.enable-leader-proxy
       - --services.enable-peer-discovery-api
       - --services.enable-metrics
@@ -41,23 +40,25 @@ services:
       - --services.enable-turn-server
       - --services.enable-mesh-dns
       - --services.turn-server-public-ip=127.0.0.1
-      - --services.stun-port-range=50000-50005
+      - --services.stun-port-range=60000-60001
       - --services.exclusive-turn-server
     ports:
       - 8443:8443
       - 3478:3478
       - 5354:5353/udp
       - 5354:5353/tcp
-      - 50000-50005:50000-50005
+      - 60000-60001:60000-60001
+      - 51820:51820/udp
     volumes:
       - bootstrap-node-1:/data
-    networks:
-      bootstrap:
-        ipv4_address: 10.1.0.1
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   bootstrap-node-2:
     image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.2
+    hostname: bootstrap-node-2
     entrypoint:
       - /node
       - --global.insecure
@@ -66,25 +67,23 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --store.bootstrap
-      - --store.node-id=bootstrap-node-2
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
-      - --store.raft-log-format=json
       - --store.raft-log-level=debug
-      - --wireguard.no-modprobe
       - --services.enable-leader-proxy
       - --services.enable-metrics
       - --services.enable-mesh-api
     volumes:
       - bootstrap-node-2:/data
-    networks:
-      bootstrap:
-        ipv4_address: 10.1.0.2
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   bootstrap-node-3:
     image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.3
+    hostname: bootstrap-node-3
     entrypoint:
       - /node
       - --global.insecure
@@ -93,21 +92,15 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --store.bootstrap
-      - --store.node-id=bootstrap-node-3
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
-      - --store.raft-log-format=json
       - --store.raft-log-level=debug
-      - --wireguard.no-modprobe
       - --services.enable-leader-proxy
       - --services.enable-metrics
       - --services.enable-mesh-api
     volumes:
       - bootstrap-node-3:/data
-    networks:
-      bootstrap:
-        ipv4_address: 10.1.0.3
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
 volumes:

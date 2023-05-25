@@ -33,10 +33,11 @@ const (
 	WireguardNameEnvVar                = "WIREGUARD_NAME"
 	WireguardForceNameEnvVar           = "WIREGUARD_FORCE_NAME"
 	WireguardForceTUNEnvVar            = "WIREGUARD_FORCE_TUN"
-	WireguardNoModprobeEnvVar          = "WIREGUARD_NO_MODPROBE"
+	WireguardModprobeEnvVar            = "WIREGUARD_MODPROBE"
 	WireguardMasqueradeEnvVar          = "WIREGUARD_MASQUERADE"
 	WireguardAllowedIPsEnvVar          = "WIREGUARD_ALLOWED_IPS"
 	WireguardPersistentKeepaliveEnvVar = "WIREGUARD_PERSISTENT_KEEPALIVE"
+	WireguardEndpointOverridesEnvVar   = "WIREGUARD_ENDPOINT_OVERRIDES"
 )
 
 // Options are options for configuring the wireguard interface.
@@ -48,30 +49,18 @@ type Options struct {
 	// ForceName forces the use of the given name by deleting
 	// any pre-existing interface with the same name.
 	ForceName bool `yaml:"force-name" json:"force-name" toml:"force-name"`
-	// NetworkV4 is the private IPv4 network of this interface.
-	// Leave empty to disable IPv4. These are set from the responses to
-	// joining a cluster.
-	NetworkV4 netip.Prefix `yaml:"-" json:"-" toml:"-"`
-	// NetworkV6 is the private IPv6 network of this interface.
-	// Leave empty to disable IPv6. These are set from the responses to
-	// joining a cluster.
-	NetworkV6 netip.Prefix `yaml:"-" json:"-" toml:"-"`
-	// IsPublic is true if this interface is public. This is set by the
-	// store when joining a cluster.
-	IsPublic bool `yaml:"-" json:"-" toml:"-"`
 	// ForceTUN forces the use of a TUN interface.
 	ForceTUN bool `yaml:"force-tun" json:"force-tun" toml:"force-tun"`
-	// NoModprobe disables modprobe.
-	NoModprobe bool `yaml:"no-modprobe" json:"no-modprobe" toml:"no-modprobe"`
+	// Modprobe attempts to probe the wireguard module.
+	Modprobe bool `yaml:"modprobe" json:"modprobe" toml:"modprobe"`
 	// Masquerade enables masquerading of traffic from the wireguard interface.
 	Masquerade bool `yaml:"masquerade" json:"masquerade" toml:"masquerade"`
 	// AllowedIPs is a map of peers to allowed IPs. The peers can either be
-	// public keys  or regexes matching peer IDs.
+	// public keys or regexes matching peer IDs.
 	//
 	// AllowedIPs in this context refers to the IP addresses that this instance
 	// will route to the peer. The peer will also need to configure AllowedIPs
-	// for this instance's IP address. IP addresses for a peer can also be requested
-	// dynamically by the peer using the inter-node API.
+	// for this instance's IP address.
 	//
 	// The format is a whitespace separated list of key-value pairs, where the key is
 	// the peer to match and the value is a comman-separated list of IP CIDRs.
@@ -85,6 +74,19 @@ type Options struct {
 	// accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
 	// packets are sent.
 	PersistentKeepAlive time.Duration `yaml:"persistent-keepalive" json:"persistent-keepalive" toml:"persistent-keepalive"`
+	// EndpointOverrides is a map of peer IDs to endpoint overrides.
+	EndpointOverrides string `yaml:"endpoint-overrides" json:"endpoint-overrides" toml:"endpoint-overrides"`
+
+	// Below fields are set by the store when joining a cluster.
+
+	// NetworkV4 is the private IPv4 network of this interface.
+	// Leave empty to disable IPv4.
+	NetworkV4 netip.Prefix `yaml:"-" json:"-" toml:"-"`
+	// NetworkV6 is the private IPv6 network of this interface.
+	// Leave empty to disable IPv6.
+	NetworkV6 netip.Prefix `yaml:"-" json:"-" toml:"-"`
+	// IsPublic is true if this interface is public.
+	IsPublic bool `yaml:"-" json:"-" toml:"-"`
 }
 
 // NewOptions returns a new Options with sensible defaults.
@@ -105,8 +107,8 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 		"Force the use of the given name by deleting any pre-existing interface with the same name.")
 	fl.BoolVar(&o.ForceTUN, "wireguard.force-tun", util.GetEnvDefault(WireguardForceTUNEnvVar, "false") == "true",
 		"Force the use of a TUN interface.")
-	fl.BoolVar(&o.NoModprobe, "wireguard.no-modprobe", util.GetEnvDefault(WireguardNoModprobeEnvVar, "false") == "true",
-		"Don't attempt to probe the wireguard module.")
+	fl.BoolVar(&o.Modprobe, "wireguard.modprobe", util.GetEnvDefault(WireguardModprobeEnvVar, "false") == "true",
+		"Attempt to load the wireguard kernel module.")
 	fl.BoolVar(&o.Masquerade, "wireguard.masquerade", util.GetEnvDefault(WireguardMasqueradeEnvVar, "false") == "true",
 		"Masquerade traffic from the wireguard interface.")
 	fl.DurationVar(&o.PersistentKeepAlive, "wireguard.persistent-keepalive", util.GetEnvDurationDefault(WireguardPersistentKeepaliveEnvVar, 0),
@@ -114,14 +116,13 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 to peers. If unset, keepalive packets will automatically be sent to publicly
 accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
 packets are sent.`)
+
 	fl.StringVar(&o.AllowedIPs, "wireguard.allowed-ips", util.GetEnvDefault(WireguardAllowedIPsEnvVar, ""),
 		`AllowedIPs is a map of peers to allowed IPs. The peers can either be
 peer IDs or regexes matching peer IDs. These IP addresses should not overlap 
 with the private network of the wireguard interface. AllowedIPs in this context 
 refers to the IP addresses that this instance will route to the peer. The peer 
-will also need to configure AllowedIPs for this instance's IP address. IP 
-addresses for a peer can also be requested dynamically by the peer using the 
-inter-node API.
+will also need to configure AllowedIPs for this instance's IP address.
 
 The format is a whitespace separated list of key-value pairs, where the key is
 the peer to match and the value is a comman-separated list of IP CIDRs.
@@ -132,6 +133,10 @@ For example:
 	# Peer regexes
 	--wireguard.allowed-ips="peer.*=10.0.0.0/16"
 `)
+
+	fl.StringVar(&o.EndpointOverrides, "wireguard.endpoint-overrides", util.GetEnvDefault(WireguardEndpointOverridesEnvVar, ""),
+		`EndpointOverrides is a map of peer IDs to endpoint overrides.
+The format is similar to allowed-ips, but the value is a single endpoint.`)
 }
 
 // Validate validates the options.
@@ -145,11 +150,19 @@ func (o *Options) Validate() error {
 	if o.PersistentKeepAlive < 0 {
 		return errors.New("wireguard.persistent-keepalive must not be negative")
 	}
-	if o.AllowedIPs == "" {
-		return nil
+	if o.AllowedIPs != "" {
+		_, err := parseAllowedIPsMap(o.AllowedIPs)
+		if err != nil {
+			return err
+		}
 	}
-	_, err := parseAllowedIPsMap(o.AllowedIPs)
-	return err
+	if o.EndpointOverrides != "" {
+		_, err := parseEndpointOverrides(o.EndpointOverrides)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func parseAllowedIPsMap(allowedIPs string) (*peerConfigs, error) {
@@ -179,6 +192,19 @@ func parseAllowedIPsMap(allowedIPs string) (*peerConfigs, error) {
 	return &peerConfigs{
 		peerMatchers: peerMatchers,
 	}, nil
+}
+
+func parseEndpointOverrides(overrides string) (map[string]string, error) {
+	spl := strings.Fields(overrides)
+	m := make(map[string]string, len(spl))
+	for _, s := range spl {
+		peerName, endpoint, found := strings.Cut(s, "=")
+		if !found {
+			return nil, fmt.Errorf("invalid endpoint-overrides format: %s", s)
+		}
+		m[peerName] = endpoint
+	}
+	return m, nil
 }
 
 type peerConfigs struct {

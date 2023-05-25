@@ -13,19 +13,38 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value;
 SELECT value FROM mesh_state WHERE key = 'IPv4Prefix';
 
 -- name: ListPublicRPCAddresses :many
-SELECT node_id, CAST(address AS TEXT) AS address FROM node_public_rpc_addresses;
+SELECT
+    node_id AS node_id,
+    CAST(address AS TEXT) AS address
+FROM node_public_rpc_addresses;
 
 -- name: ListPublicWireguardEndpoints :many
-SELECT node_id, CAST(address AS TEXT) AS address FROM node_public_wireguard_endpoints;
+SELECT
+    node_id AS node_id,
+    CAST(endpoints AS TEXT) AS endpoints,
+    CAST(port AS INTEGER) AS port
+FROM node_all_wireguard_endpoints;
 
 -- name: GetNodePrivateRPCAddress :one
-SELECT CAST(address AS TEXT) AS address FROM node_private_rpc_addresses WHERE node_id = ?;
+SELECT
+    CAST(address AS TEXT) AS address
+FROM node_private_rpc_addresses
+WHERE node_id = ?;
 
 -- name: GetNodePublicRPCAddress :one
-SELECT CAST(address AS TEXT) AS address FROM node_public_rpc_addresses WHERE node_id = ?;
+SELECT
+    CAST(address AS TEXT) AS address
+FROM node_public_rpc_addresses
+WHERE node_id = ?;
 
--- name: GetNodePrivateRPCAddresses :many
-SELECT CAST(address AS TEXT) AS address FROM node_private_rpc_addresses WHERE node_id <> ?;
+-- name: GetPeerPrivateRPCAddresses :many
+SELECT
+    CAST(address AS TEXT) AS address
+FROM node_private_rpc_addresses
+WHERE node_id <> ?;
 
--- name: GetNodePublicRPCAddresses :many
-SELECT CAST(address AS TEXT) AS address FROM node_public_rpc_addresses WHERE node_id <> ?;
+-- name: GetPeerPublicRPCAddresses :many
+SELECT
+    CAST(address AS TEXT) AS address
+FROM node_public_rpc_addresses
+WHERE node_id <> ?;

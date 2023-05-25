@@ -75,7 +75,7 @@ func (s *store) DemoteVoter(ctx context.Context, id string) error {
 }
 
 // RemoveServer removes a node from the cluster.
-func (s *store) RemoveServer(ctx context.Context, id string) error {
+func (s *store) RemoveServer(ctx context.Context, id string, wait bool) error {
 	if !s.IsLeader() {
 		return ErrNotLeader
 	}
@@ -84,6 +84,9 @@ func (s *store) RemoveServer(ctx context.Context, id string) error {
 		timeout = time.Until(deadline)
 	}
 	f := s.raft.RemoveServer(raft.ServerID(id), 0, timeout)
+	if !wait {
+		return nil
+	}
 	err := f.Error()
 	if err != nil && err == raft.ErrNotLeader {
 		return ErrNotLeader

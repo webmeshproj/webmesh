@@ -18,6 +18,7 @@ package wireguard
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/netip"
@@ -29,15 +30,15 @@ import (
 
 // PutPeer updates a peer in the wireguard configuration.
 func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
-	w.peersMux.Lock()
-	defer w.peersMux.Unlock()
 	w.log.Debug("put peer", slog.Any("peer", peer))
 	key, err := wgtypes.ParseKey(peer.PublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
 	}
+	if override, ok := w.epOverrides[peer.ID]; ok {
+		peer.Endpoint = override
+	}
 	var keepAlive *time.Duration
-	var endpoint *net.UDPAddr
 	var allowedIPs []net.IPNet
 	if w.opts.PersistentKeepAlive != 0 {
 		keepAlive = &w.opts.PersistentKeepAlive
@@ -73,12 +74,6 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		}
 	}
 	if peer.IsPubliclyRoutable() {
-		// The peer is publicly accessible
-		udpAddr, err := net.ResolveUDPAddr("udp", peer.Endpoint)
-		if err != nil {
-			return fmt.Errorf("failed to resolve peer endpoint: %w", err)
-		}
-		endpoint = udpAddr
 		if !w.IsPublic() {
 			// We are behind a NAT and the peer isn't.
 			// Allow all network traffic to the peer.
@@ -104,26 +99,27 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		// No reason to track them
 		return nil
 	}
-	w.log.Debug("computed allowed IPs for peer",
-		slog.String("peer-id", peer.ID),
-		slog.Any("allowed-ips", allowedIPs))
 	peerCfg := wgtypes.PeerConfig{
 		PublicKey:                   key,
 		UpdateOnly:                  false,
 		ReplaceAllowedIPs:           true,
-		Endpoint:                    endpoint,
 		AllowedIPs:                  allowedIPs,
 		PersistentKeepaliveInterval: keepAlive,
 	}
-	w.log.Debug("configuring peer", slog.Any("peer", peerCfg))
+	if peer.Endpoint != "" {
+		peerCfg.Endpoint, err = net.ResolveUDPAddr("udp", peer.Endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to resolve endpoint: %w", err)
+		}
+	}
+	w.log.Debug("configuring peer", slog.Any("peer", peerConfigMarshaler{peerCfg}))
 	err = w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 		Peers: []wgtypes.PeerConfig{peerCfg},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to configure wireguard interface: %w", err)
+		return err
 	}
-	// Add the peer to our map
-	w.peers[peer.ID] = key
+	w.registerPeer(peerCfg.PublicKey, peer)
 	// Add routes to the allowed IPs
 	for _, ip := range allowedIPs {
 		addr, _ := netip.AddrFromSlice(ip.IP)
@@ -171,4 +167,29 @@ func (w *wginterface) DeletePeer(ctx context.Context, peer *Peer) error {
 		})
 	}
 	return nil
+}
+
+func (w *wginterface) registerPeer(key wgtypes.Key, peer *Peer) {
+	w.peersMux.Lock()
+	defer w.peersMux.Unlock()
+	w.peers[peer.ID] = key
+}
+
+type peerConfigMarshaler struct {
+	wgtypes.PeerConfig
+}
+
+func (m *peerConfigMarshaler) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"public_key":         m.PublicKey.String(),
+		"endpoint":           m.Endpoint.String(),
+		"keepalive_interval": m.PersistentKeepaliveInterval,
+		"allowed_ips": func() []string {
+			var ips []string
+			for _, ip := range m.AllowedIPs {
+				ips = append(ips, ip.String())
+			}
+			return ips
+		}(),
+	})
 }

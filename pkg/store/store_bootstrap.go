@@ -55,7 +55,7 @@ func (s *store) bootstrap() error {
 		// We rejoin as a voter no matter what
 		s.opts.JoinAsVoter = true
 		// Pick an address to rejoin the cluster with.
-		addrs, err := raftdb.New(s.ReadDB()).GetNodePublicRPCAddresses(ctx, string(s.nodeID))
+		addrs, err := raftdb.New(s.ReadDB()).GetPeerPublicRPCAddresses(ctx, string(s.nodeID))
 		if err != nil {
 			return fmt.Errorf("get peer private rpc addresses: %w", err)
 		}
@@ -140,15 +140,20 @@ func (s *store) bootstrap() error {
 				s.log.Error("initial leader bootstrap failed", slog.String("error", err.Error()))
 			}
 			s.readyErr <- err
-			return
 		} else {
 			err := s.initialBootstrapNonLeader(ctx, grpcPorts)
 			if err != nil {
 				s.log.Error("initial non-leader bootstrap failed", slog.String("error", err.Error()))
 			}
 			s.readyErr <- err
-			return
 		}
+		// Do an initial refresh of the wireguard peers in a few seconds.
+		go func() {
+			time.Sleep(3 * time.Second)
+			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+				s.log.Error("refresh wireguard peers", slog.String("error", err.Error()))
+			}
+		}()
 	}()
 	return nil
 }

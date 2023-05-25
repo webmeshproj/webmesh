@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 	"sync"
 
 	v1 "gitlab.com/webmesh/api/v1"
@@ -55,28 +54,6 @@ type Interface interface {
 	Close(ctx context.Context) error
 }
 
-// Peer contains configurations for a wireguard peer. When removing,
-// only the PublicKey is required.
-type Peer struct {
-	// ID is the ID of the peer.
-	ID string `json:"id"`
-	// PublicKey is the public key of the peer.
-	PublicKey string `json:"publicKey"`
-	// Endpoint is the endpoint of this peer, if applicable.
-	Endpoint string `json:"endpoint"`
-	// AdditionalEndpoints are additional endpoints for this peer, if applicable.
-	AdditionalEndpoints []string `json:"additionalEndpoints"`
-	// PrivateIPv4 is the private IPv4 address of the peer.
-	PrivateIPv4 netip.Prefix `json:"privateIPv4"`
-	// PrivateIPv6 is the private IPv6 address of the peer.
-	PrivateIPv6 netip.Prefix `json:"privateIPv6"`
-}
-
-// IsPubliclyRoutable returns true if the given peer is publicly routable.
-func (p *Peer) IsPubliclyRoutable() bool {
-	return p.Endpoint != ""
-}
-
 // IsRouteExists returns true if the given error is a route exists error.
 func IsRouteExists(err error) bool {
 	return errors.Is(err, system.ErrRouteExists)
@@ -88,6 +65,7 @@ type wginterface struct {
 	cli         *wgctrl.Client
 	log         *slog.Logger
 	peerConfigs *peerConfigs
+	epOverrides map[string]string
 	// A map of peer ID's to public keys.
 	peers    map[string]wgtypes.Key
 	peersMux sync.Mutex
@@ -117,12 +95,20 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			return nil, fmt.Errorf("failed to parse allowed IPs: %w", err)
 		}
 	}
+	epOverrides := make(map[string]string)
+	if opts.EndpointOverrides != "" {
+		var err error
+		epOverrides, err = parseEndpointOverrides(opts.EndpointOverrides)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse endpoint overrides: %w", err)
+		}
+	}
 	iface, err := system.New(ctx, &system.Options{
-		Name:       opts.Name,
-		NetworkV4:  opts.NetworkV4,
-		NetworkV6:  opts.NetworkV6,
-		ForceTUN:   opts.ForceTUN,
-		NoModprobe: opts.NoModprobe,
+		Name:      opts.Name,
+		NetworkV4: opts.NetworkV4,
+		NetworkV6: opts.NetworkV6,
+		ForceTUN:  opts.ForceTUN,
+		Modprobe:  opts.Modprobe,
 	})
 	if err != nil {
 		return nil, err
@@ -136,6 +122,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		opts:        opts,
 		cli:         cli,
 		peerConfigs: peerConfigs,
+		epOverrides: epOverrides,
 		peers:       make(map[string]wgtypes.Key),
 		log:         slog.Default().With("component", "wireguard"),
 	}, nil

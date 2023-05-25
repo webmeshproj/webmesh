@@ -27,6 +27,7 @@ import (
 
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
+	"golang.org/x/sync/errgroup"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -174,30 +175,35 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
-	for _, peer := range resp.GetPeers() {
-		wgpeer := wireguard.Peer{
-			ID:                  peer.GetId(),
-			PublicKey:           peer.GetPublicKey(),
-			Endpoint:            peer.GetPrimaryEndpoint(),
-			AdditionalEndpoints: peer.GetEndpoints(),
-		}
-		if peer.GetAddressIpv4() != "" && !s.opts.NoIPv4 {
-			wgpeer.PrivateIPv4, err = netip.ParsePrefix(peer.GetAddressIpv4())
-			if err != nil {
-				return fmt.Errorf("parse ipv4 address: %w", err)
+	g, ctx := errgroup.WithContext(ctx)
+	for _, rpeer := range resp.GetPeers() {
+		peer := rpeer
+		g.Go(func() error {
+			wgpeer := wireguard.Peer{
+				ID:                  peer.GetId(),
+				PublicKey:           peer.GetPublicKey(),
+				Endpoint:            peer.GetPrimaryEndpoint(),
+				AdditionalEndpoints: peer.GetEndpoints(),
 			}
-		}
-		if peer.GetAddressIpv6() != "" && !s.opts.NoIPv6 {
-			wgpeer.PrivateIPv6, err = netip.ParsePrefix(peer.GetAddressIpv6())
-			if err != nil {
-				return fmt.Errorf("parse ipv6 network: %w", err)
+			if peer.GetAddressIpv4() != "" && !s.opts.NoIPv4 {
+				wgpeer.PrivateIPv4, err = netip.ParsePrefix(peer.GetAddressIpv4())
+				if err != nil {
+					return fmt.Errorf("parse ipv4 address: %w", err)
+				}
 			}
-		}
-		log.Info("adding wireguard peer", slog.Any("peer", wgpeer))
-		err = s.wg.PutPeer(ctx, &wgpeer)
-		if err != nil {
-			return fmt.Errorf("add peer: %w", err)
-		}
+			if peer.GetAddressIpv6() != "" && !s.opts.NoIPv6 {
+				wgpeer.PrivateIPv6, err = netip.ParsePrefix(peer.GetAddressIpv6())
+				if err != nil {
+					return fmt.Errorf("parse ipv6 network: %w", err)
+				}
+			}
+			log.Info("adding wireguard peer", slog.Any("peer", wgpeer))
+			err = s.wg.PutPeer(ctx, &wgpeer)
+			if err != nil {
+				return fmt.Errorf("add peer: %w", err)
+			}
+			return nil
+		})
 	}
-	return nil
+	return g.Wait()
 }

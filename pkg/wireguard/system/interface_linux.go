@@ -45,7 +45,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		slog.String("component", "wireguard"),
 		slog.String("type", "kernel"),
 		slog.String("facility", "device"))
-	if !opts.NoModprobe {
+	if opts.Modprobe {
 		err := util.Modprobe("wireguard", "")
 		if err != nil {
 			// Try to fallback to TUN

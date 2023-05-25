@@ -35,6 +35,7 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 		for {
 			select {
 			case <-closeCh:
+				s.log.Debug("stopping raft observer")
 				return
 			case ev := <-s.observerChan:
 				s.log.Debug("received observation event",
@@ -59,12 +60,16 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 	}()
 	go func() {
 		t := time.NewTicker(s.opts.PeerRefreshInterval)
+		defer t.Stop()
 		for {
 			select {
 			case <-closeCh:
-				t.Stop()
+				s.log.Debug("stopping peer observer")
 				return
 			case <-t.C:
+				if s.wg == nil {
+					continue
+				}
 				s.log.Debug("refreshing wireguard peers from db")
 				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
 					s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"golang.org/x/exp/slog"
+	"golang.org/x/sync/errgroup"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/firewall"
@@ -35,6 +36,7 @@ func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, network
 	defer s.wgmux.Unlock()
 	s.wgopts.NetworkV4 = networkv4
 	s.wgopts.NetworkV6 = networkv6
+	s.wgopts.IsPublic = s.opts.NodeEndpoint != ""
 	s.log.Info("configuring wireguard interface", slog.Any("options", s.wgopts))
 	var err error
 	if s.fw == nil {
@@ -91,54 +93,61 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	if s.wg == nil {
 		return nil
 	}
+	s.wgmux.Lock()
+	defer s.wgmux.Unlock()
 	peers, err := raftdb.New(s.ReadDB()).ListNodePeers(ctx, string(s.nodeID))
 	if err != nil {
 		s.log.Error("list node peers", slog.String("error", err.Error()))
 		return err
 	}
-	for _, peer := range peers {
-		var privateIPv4 netip.Prefix
-		var privateIPv6 netip.Prefix
-		if peer.PrivateAddressV4 != "" && !s.opts.NoIPv4 {
-			privateIPv4, err = netip.ParsePrefix(peer.PrivateAddressV4)
-			if err != nil {
-				s.log.Error("parse private ipv4", slog.String("error", err.Error()))
+	g, ctx := errgroup.WithContext(ctx)
+	for _, rpeer := range peers {
+		peer := rpeer
+		g.Go(func() error {
+			var privateIPv4 netip.Prefix
+			var privateIPv6 netip.Prefix
+			if peer.PrivateAddressV4 != "" && !s.opts.NoIPv4 {
+				privateIPv4, err = netip.ParsePrefix(peer.PrivateAddressV4)
+				if err != nil {
+					s.log.Error("parse private ipv4", slog.String("error", err.Error()))
+					return err
+				}
+			}
+			if peer.NetworkIpv6.Valid && !s.opts.NoIPv6 {
+				privateIPv6, err = netip.ParsePrefix(peer.NetworkIpv6.String)
+				if err != nil {
+					s.log.Error("parse private ipv6", slog.String("error", err.Error()))
+					return err
+				}
+			}
+			var endpoint string
+			if peer.PrimaryEndpoint.Valid {
+				addr, err := netip.ParseAddr(peer.PrimaryEndpoint.String)
+				if err != nil {
+					s.log.Error("parse peer endpoint", slog.String("error", err.Error()))
+					return err
+				}
+				endpoint = netip.AddrPortFrom(addr, uint16(peer.WireguardPort)).String()
+			}
+			var additionalEndpoints []string
+			if peer.Endpoints.Valid {
+				additionalEndpoints = strings.Split(peer.Endpoints.String, ",")
+			}
+			wgpeer := wireguard.Peer{
+				ID:                  peer.ID,
+				PublicKey:           peer.PublicKey.String,
+				Endpoint:            endpoint,
+				AdditionalEndpoints: additionalEndpoints,
+				PrivateIPv4:         privateIPv4,
+				PrivateIPv6:         privateIPv6,
+			}
+			s.log.Debug("configuring wireguard peer", slog.Any("peer", wgpeer))
+			if err := s.wg.PutPeer(ctx, &wgpeer); err != nil {
+				s.log.Error("wireguard put peer", slog.String("error", err.Error()))
 				return err
 			}
-		}
-		if peer.NetworkIpv6.Valid && !s.opts.NoIPv6 {
-			privateIPv6, err = netip.ParsePrefix(peer.NetworkIpv6.String)
-			if err != nil {
-				s.log.Error("parse private ipv6", slog.String("error", err.Error()))
-				return err
-			}
-		}
-		var endpoint string
-		if peer.PrimaryEndpoint.Valid {
-			addr, err := netip.ParseAddr(peer.PrimaryEndpoint.String)
-			if err != nil {
-				s.log.Error("parse peer endpoint", slog.String("error", err.Error()))
-				return err
-			}
-			endpoint = netip.AddrPortFrom(addr, uint16(peer.WireguardPort)).String()
-		}
-		var additionalEndpoints []string
-		if peer.Endpoints.Valid {
-			additionalEndpoints = strings.Split(peer.Endpoints.String, ",")
-		}
-		wgpeer := wireguard.Peer{
-			ID:                  peer.ID,
-			PublicKey:           peer.PublicKey.String,
-			Endpoint:            endpoint,
-			AdditionalEndpoints: additionalEndpoints,
-			PrivateIPv4:         privateIPv4,
-			PrivateIPv6:         privateIPv6,
-		}
-		s.log.Debug("configuring wireguard peer", slog.Any("peer", wgpeer))
-		if err := s.wg.PutPeer(ctx, &wgpeer); err != nil {
-			s.log.Error("wireguard put peer", slog.String("error", err.Error()))
-			return err
-		}
+			return nil
+		})
 	}
-	return nil
+	return g.Wait()
 }

@@ -33,6 +33,17 @@ type Node struct {
 	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
+type NodeAllWireguardEndpoint struct {
+	NodeID    string       `json:"node_id"`
+	Endpoints sql.NullBool `json:"endpoints"`
+	Port      int64        `json:"port"`
+}
+
+type NodePrimaryWireguardEndpoint struct {
+	NodeID  string       `json:"node_id"`
+	Address sql.NullBool `json:"address"`
+}
+
 type NodePrivateRaftAddress struct {
 	NodeID  string       `json:"node_id"`
 	Address sql.NullBool `json:"address"`
@@ -49,11 +60,6 @@ type NodePublicRaftAddress struct {
 }
 
 type NodePublicRpcAddress struct {
-	NodeID  string       `json:"node_id"`
-	Address sql.NullBool `json:"address"`
-}
-
-type NodePublicWireguardEndpoint struct {
 	NodeID  string       `json:"node_id"`
 	Address sql.NullBool `json:"address"`
 }

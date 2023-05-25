@@ -69,13 +69,23 @@ SELECT
     || CAST(nodes.raft_port AS TEXT) AS address
 FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
 
-CREATE VIEW node_public_wireguard_endpoints AS
+CREATE VIEW node_primary_wireguard_endpoints AS
 SELECT
-    nodes.id as node_id,
+    nodes.id AS node_id,
     nodes.primary_endpoint
     || ':'
     || CAST(nodes.wireguard_port AS TEXT) AS address
 FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
+
+CREATE VIEW node_all_wireguard_endpoints AS
+SELECT
+    nodes.id AS node_id,
+    nodes.primary_endpoint
+    || ','
+    || COALESCE(nodes.endpoints || ',', '') AS endpoints,
+    nodes.wireguard_port AS port
+FROM nodes
+WHERE nodes.primary_endpoint IS NOT NULL;
 
 -- +goose Down
 
@@ -83,3 +93,9 @@ DROP TABLE leases;
 DROP TABLE nodes;
 DROP TABLE asns;
 DROP TABLE mesh_state;
+DROP VIEW node_private_rpc_addresses;
+DROP VIEW node_public_rpc_addresses;
+DROP VIEW node_private_raft_addresses;
+DROP VIEW node_public_raft_addresses;
+DROP VIEW node_primary_wireguard_endpoints;
+DROP VIEW node_all_wireguard_endpoints;

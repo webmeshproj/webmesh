@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/raft"
+	"golang.org/x/exp/slog"
 
 	"gitlab.com/webmesh/node/pkg/models/raftdb"
 )
@@ -74,6 +75,7 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	s.log.Debug("looking up rpc address for leader", slog.String("leader", string(leader)))
 	addr, err := raftdb.New(s.ReadDB()).GetNodePrivateRPCAddress(ctx, string(leader))
 	if err != nil {
 		return "", err

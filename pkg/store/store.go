@@ -31,12 +31,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
-	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"gitlab.com/webmesh/node/pkg/firewall"
 	"gitlab.com/webmesh/node/pkg/models/localdb"
@@ -107,7 +103,7 @@ type Store interface {
 	// DemoteVoter demotes a voting node to a non-voting node with timeout enforced by the context.
 	DemoteVoter(ctx context.Context, id string) error
 	// RemoveServer removes a peer from the cluster with timeout enforced by the context.
-	RemoveServer(ctx context.Context, id string) error
+	RemoveServer(ctx context.Context, id string, wait bool) error
 	// DB returns a DB interface for use by the application. This
 	// interface will ensure consistency with the Raft log. Transactions
 	// are executed in the order they are received by the leader node.
@@ -163,7 +159,7 @@ func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) S
 		wgopts:        wgOpts,
 		nodeID:        raft.ServerID(nodeID),
 		raftLogFormat: RaftLogFormat(opts.RaftLogFormat),
-		readyErr:      make(chan error, 1),
+		readyErr:      make(chan error, 2),
 		wgroutes:      make(map[netip.Prefix]struct{}),
 		log:           log.With(slog.String("node-id", string(nodeID))),
 	}
@@ -297,31 +293,6 @@ func (s *store) ReadyError() <-chan error {
 		}()
 	}
 	return s.readyErr
-}
-
-// Leave attempts to remove this node from the cluster. The node must
-// have already relinquished leadership before calling this method.
-func (s *store) Leave(ctx context.Context) error {
-	addr, err := s.LeaderRPCAddr(ctx)
-	if err != nil {
-		return fmt.Errorf("get leader address: %w", err)
-	}
-	var creds credentials.TransportCredentials
-	if s.sl.Insecure() {
-		creds = insecure.NewCredentials()
-	} else {
-		creds = credentials.NewTLS(s.sl.TLSConfig())
-	}
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(creds))
-	if err != nil {
-		return fmt.Errorf("dial leader: %w", err)
-	}
-	defer conn.Close()
-	client := v1.NewNodeClient(conn)
-	_, err = client.Leave(ctx, &v1.LeaveRequest{
-		Id: string(s.nodeID),
-	})
-	return err
 }
 
 type LogStoreCloser interface {

@@ -21,7 +21,10 @@ func (q *Queries) GetIPv4Prefix(ctx context.Context) (string, error) {
 }
 
 const getNodePrivateRPCAddress = `-- name: GetNodePrivateRPCAddress :one
-SELECT CAST(address AS TEXT) AS address FROM node_private_rpc_addresses WHERE node_id = ?
+SELECT
+    CAST(address AS TEXT) AS address
+FROM node_private_rpc_addresses
+WHERE node_id = ?
 `
 
 func (q *Queries) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
@@ -31,12 +34,29 @@ func (q *Queries) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (
 	return address, err
 }
 
-const getNodePrivateRPCAddresses = `-- name: GetNodePrivateRPCAddresses :many
-SELECT CAST(address AS TEXT) AS address FROM node_private_rpc_addresses WHERE node_id <> ?
+const getNodePublicRPCAddress = `-- name: GetNodePublicRPCAddress :one
+SELECT
+    CAST(address AS TEXT) AS address
+FROM node_public_rpc_addresses
+WHERE node_id = ?
 `
 
-func (q *Queries) GetNodePrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
-	rows, err := q.db.QueryContext(ctx, getNodePrivateRPCAddresses, nodeID)
+func (q *Queries) GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getNodePublicRPCAddress, nodeID)
+	var address interface{}
+	err := row.Scan(&address)
+	return address, err
+}
+
+const getPeerPrivateRPCAddresses = `-- name: GetPeerPrivateRPCAddresses :many
+SELECT
+    CAST(address AS TEXT) AS address
+FROM node_private_rpc_addresses
+WHERE node_id <> ?
+`
+
+func (q *Queries) GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
+	rows, err := q.db.QueryContext(ctx, getPeerPrivateRPCAddresses, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,23 +78,15 @@ func (q *Queries) GetNodePrivateRPCAddresses(ctx context.Context, nodeID string)
 	return items, nil
 }
 
-const getNodePublicRPCAddress = `-- name: GetNodePublicRPCAddress :one
-SELECT CAST(address AS TEXT) AS address FROM node_public_rpc_addresses WHERE node_id = ?
+const getPeerPublicRPCAddresses = `-- name: GetPeerPublicRPCAddresses :many
+SELECT
+    CAST(address AS TEXT) AS address
+FROM node_public_rpc_addresses
+WHERE node_id <> ?
 `
 
-func (q *Queries) GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getNodePublicRPCAddress, nodeID)
-	var address interface{}
-	err := row.Scan(&address)
-	return address, err
-}
-
-const getNodePublicRPCAddresses = `-- name: GetNodePublicRPCAddresses :many
-SELECT CAST(address AS TEXT) AS address FROM node_public_rpc_addresses WHERE node_id <> ?
-`
-
-func (q *Queries) GetNodePublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
-	rows, err := q.db.QueryContext(ctx, getNodePublicRPCAddresses, nodeID)
+func (q *Queries) GetPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
+	rows, err := q.db.QueryContext(ctx, getPeerPublicRPCAddresses, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +120,10 @@ func (q *Queries) GetULAPrefix(ctx context.Context) (string, error) {
 }
 
 const listPublicRPCAddresses = `-- name: ListPublicRPCAddresses :many
-SELECT node_id, CAST(address AS TEXT) AS address FROM node_public_rpc_addresses
+SELECT
+    node_id AS node_id,
+    CAST(address AS TEXT) AS address
+FROM node_public_rpc_addresses
 `
 
 type ListPublicRPCAddressesRow struct {
@@ -140,12 +155,17 @@ func (q *Queries) ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAd
 }
 
 const listPublicWireguardEndpoints = `-- name: ListPublicWireguardEndpoints :many
-SELECT node_id, CAST(address AS TEXT) AS address FROM node_public_wireguard_endpoints
+SELECT
+    node_id AS node_id,
+    CAST(endpoints AS TEXT) AS endpoints,
+    CAST(port AS INTEGER) AS port
+FROM node_all_wireguard_endpoints
 `
 
 type ListPublicWireguardEndpointsRow struct {
-	NodeID  string      `json:"node_id"`
-	Address interface{} `json:"address"`
+	NodeID    string      `json:"node_id"`
+	Endpoints interface{} `json:"endpoints"`
+	Port      interface{} `json:"port"`
 }
 
 func (q *Queries) ListPublicWireguardEndpoints(ctx context.Context) ([]ListPublicWireguardEndpointsRow, error) {
@@ -157,7 +177,7 @@ func (q *Queries) ListPublicWireguardEndpoints(ctx context.Context) ([]ListPubli
 	var items []ListPublicWireguardEndpointsRow
 	for rows.Next() {
 		var i ListPublicWireguardEndpointsRow
-		if err := rows.Scan(&i.NodeID, &i.Address); err != nil {
+		if err := rows.Scan(&i.NodeID, &i.Endpoints, &i.Port); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
