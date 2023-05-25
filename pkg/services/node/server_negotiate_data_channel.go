@@ -46,22 +46,27 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 		return err
 	}
 	go func() {
-		defer conn.Close()
+		<-conn.Closed()
+		s.log.Info("data channel closed",
+			slog.String("src", req.GetSrc()), slog.String("dst", req.GetDst()))
 	}()
 	// Send the offer back to the other node
 	err = stream.Send(&v1.DataChannelNegotiation{
 		Offer: conn.Offer(),
 	})
 	if err != nil {
+		defer conn.Close()
 		return err
 	}
 	// Wait for the answer from the other node
 	resp, err := stream.Recv()
 	if err != nil {
+		defer conn.Close()
 		return err
 	}
 	err = conn.AnswerOffer(resp.GetAnswer())
 	if err != nil {
+		defer conn.Close()
 		return err
 	}
 	// Handle ICE negotiation
