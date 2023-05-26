@@ -27,6 +27,19 @@ CREATE TABLE leases (
     created_at  TIMESTAMP NOT NULL
 );
 
+-- Network ACLs for nodes.
+CREATE TABLE network_acls (
+    name        TEXT NOT NULL PRIMARY KEY,
+    proto       TEXT NOT NULL,
+    src_cidrs   TEXT,
+    dst_cidrs   TEXT,
+    src_nodes   TEXT,
+    dst_nodes   TEXT,
+    action      TEXT NOT NULL,
+    created_at  TIMESTAMP NOT NULL,
+    updated_at  TIMESTAMP NOT NULL
+);
+
 CREATE VIEW node_private_rpc_addresses AS
 SELECT
     nodes.id as node_id,

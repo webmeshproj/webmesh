@@ -260,7 +260,7 @@ Ports should be in the form of <node-id>=<port>.`)
 		"Force bootstrapping a new cluster even if data is present.")
 	fl.StringVar(&o.AdvertiseAddress, "store.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, "localhost:9443"),
 		`Raft advertise address. Required when bootstrapping a new cluster,
-but will be replaced with the wireguard address after bootstrapping.`)
+but will be replaced with the WireGuard address after bootstrapping.`)
 	fl.IntVar(&o.ConnectionPoolCount, "store.connection-pool-count", util.GetEnvIntDefault(ConnectionPoolCountEnvVar, 0),
 		"Raft connection pool count.")
 	fl.DurationVar(&o.ConnectionTimeout, "store.connection-timeout", util.GetEnvDurationDefault(ConnectionTimeoutEnvVar, time.Second*2),
@@ -305,9 +305,9 @@ All nodes must use the same log format for the lifetime of the cluster.`)
 	fl.DurationVar(&o.ShutdownTimeout, "store.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
 		"Timeout for graceful shutdown.")
 	fl.DurationVar(&o.PeerRefreshInterval, "store.peer-refresh-interval", util.GetEnvDurationDefault(PeerRefreshIntervalEnvVar, time.Minute),
-		"Interval to refresh wireguard peer list.")
+		"Interval to refresh WireGuard peer list.")
 	fl.DurationVar(&o.KeyRotationInterval, "store.key-rotation-interval", util.GetEnvDurationDefault(KeyRotationIntervalEnvVar, time.Hour*24*7),
-		"Interval to rotate wireguard keys. Set this to 0 to disable key rotation.")
+		"Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.")
 	fl.BoolVar(&o.NoIPv4, "store.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Disable IPv4 for the raft transport.")
 	fl.BoolVar(&o.NoIPv6, "store.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",

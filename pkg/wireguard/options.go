@@ -100,17 +100,17 @@ func NewOptions() *Options {
 // BindFlags binds the options to the given flag set.
 func (o *Options) BindFlags(fl *flag.FlagSet) {
 	fl.IntVar(&o.ListenPort, "wireguard.listen-port", util.GetEnvIntDefault(WireguardListenPortEnvVar, 51820),
-		"The wireguard listen port.")
+		"The WireGuard listen port.")
 	fl.StringVar(&o.Name, "wireguard.name", util.GetEnvDefault(WireguardNameEnvVar, "wg0"),
-		"The wireguard interface name.")
+		"The WireGuard interface name.")
 	fl.BoolVar(&o.ForceName, "wireguard.force-name", util.GetEnvDefault(WireguardForceNameEnvVar, "false") == "true",
 		"Force the use of the given name by deleting any pre-existing interface with the same name.")
 	fl.BoolVar(&o.ForceTUN, "wireguard.force-tun", util.GetEnvDefault(WireguardForceTUNEnvVar, "false") == "true",
 		"Force the use of a TUN interface.")
 	fl.BoolVar(&o.Modprobe, "wireguard.modprobe", util.GetEnvDefault(WireguardModprobeEnvVar, "false") == "true",
-		"Attempt to load the wireguard kernel module.")
+		"Attempt to load the WireGuard kernel module.")
 	fl.BoolVar(&o.Masquerade, "wireguard.masquerade", util.GetEnvDefault(WireguardMasqueradeEnvVar, "false") == "true",
-		"Masquerade traffic from the wireguard interface.")
+		"Masquerade traffic from the WireGuard interface.")
 	fl.DurationVar(&o.PersistentKeepAlive, "wireguard.persistent-keepalive", util.GetEnvDurationDefault(WireguardPersistentKeepaliveEnvVar, 0),
 		`PersistentKeepAlive is the interval at which to send keepalive packets
 to peers. If unset, keepalive packets will automatically be sent to publicly
@@ -120,7 +120,7 @@ packets are sent.`)
 	fl.StringVar(&o.AllowedIPs, "wireguard.allowed-ips", util.GetEnvDefault(WireguardAllowedIPsEnvVar, ""),
 		`AllowedIPs is a map of peers to allowed IPs. The peers can either be
 peer IDs or regexes matching peer IDs. These IP addresses should not overlap 
-with the private network of the wireguard interface. AllowedIPs in this context 
+with the private network of the WireGuard interface. AllowedIPs in this context 
 refers to the IP addresses that this instance will route to the peer. The peer 
 will also need to configure AllowedIPs for this instance's IP address.
 

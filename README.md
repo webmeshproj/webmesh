@@ -47,14 +47,28 @@ store:
     listen-address: 127.0.0.1
 ```
 
-```bsh
+```bash
 Global Configurations:
 
-    --global.insecure                (default: false)    Disable use of TLS globally.
-    --global.log-level               (default: info)     Log level (debug, info, warn, error)
-    --global.mtls                    (default: false)    Enable mutual TLS globally.
-    --global.no-ipv4                 (default: false)    Disable use of IPv4 globally.
-    --global.no-ipv6                 (default: false)    Disable use of IPv6 globally.
+    --global.allow-remote-detection      (default: false)    Allow remote detection of endpoints.
+    --global.detect-endpoints            (default: false)    Detect potential endpoints from the local interfaces.
+    --global.detect-ipv6                 (default: false)    Detect IPv6 addresses. Default is to only detect IPv4.
+    --global.detect-private-endpoints    (default: false)    Include private IP addresses in detection.
+
+    --global.endpoints        A comma separated list of additional endpoints to advertise. These
+                              are merged with existing endpoints in the other configurations.
+
+    --global.insecure     (default: false)    Disable use of TLS globally.
+    --global.log-level    (default: info)     Log level (debug, info, warn, error)
+    --global.mtls         (default: false)    Enable mutual TLS globally.
+    --global.no-ipv4      (default: false)    Disable use of IPv4 globally.
+    --global.no-ipv6      (default: false)    Disable use of IPv6 globally.
+
+    --global.primary-endpoint        The preferred publicly routable address of this node. Setting this
+                                     value will override the address portion of the store advertise address
+                                     and wireguard endpoints. This is only necessary if you intend for
+                                     this node's API to be reachable outside the network.
+
     --global.skip-verify-hostname    (default: false)    Disable hostname verification globally.
     --global.tls-ca-file                                 The CA file for TLS connections.
     --global.tls-cert-file                               The certificate file for TLS connections.
@@ -83,34 +97,49 @@ Raft Store Configurations:
                                                 locally configured gRPC port for every node in bootstrap-servers.
                                                 Ports should be in the form of <node-id>=<port>.
 
-    --store.commit-timeout           (default: 15s)                       Raft commit timeout.
-    --store.connection-pool-count    (default: 0)                         Raft connection pool count.
-    --store.connection-timeout       (default: 2s)                        Raft connection timeout.
-    --store.data-dir                 (default: /var/lib/webmesh/store)    Store data directory.
-    --store.election-timeout         (default: 2s)                        Raft election timeout.
-    --store.force-bootstrap          (default: false)                     Force bootstrapping a new cluster even if data is present.
-    --store.grpc-advertise-port      (default: 8443)                      GRPC advertise port.
-    --store.heartbeat-timeout        (default: 2s)                        Raft heartbeat timeout.
-    --store.join                                                          Address of a node to join.
-    --store.join-as-voter            (default: false)                     Join the cluster as a voter. Default behavior is to join as an observer.
-    --store.join-timeout             (default: 1m0s)                      Join timeout.
-    --store.leader-lease-timeout     (default: 2s)                        Raft leader lease timeout.
-    --store.max-append-entries       (default: 16)                        Raft max append entries.
-    --store.max-join-retries         (default: 10)                        Maximum number of join retries.
-    --store.no-ipv4                  (default: false)                     Disable IPv4 for the raft transport.
-    --store.no-ipv6                  (default: false)                     Disable IPv6 for the raft transport.
+    --store.commit-timeout               (default: 15s)                       Raft commit timeout.
+    --store.connection-pool-count        (default: 0)                         Raft connection pool count.
+    --store.connection-timeout           (default: 2s)                        Raft connection timeout.
+    --store.data-dir                     (default: /var/lib/webmesh/store)    Store data directory.
+    --store.election-timeout             (default: 2s)                        Raft election timeout.
+    --store.force-bootstrap              (default: false)                     Force bootstrapping a new cluster even if data is present.
+    --store.grpc-advertise-port          (default: 8443)                      GRPC advertise port.
+    --store.heartbeat-timeout            (default: 2s)                        Raft heartbeat timeout.
+    --store.in-memory                    (default: false)                     Store data in memory. This should only be used for testing and ephemeral nodes.
+    --store.join                                                              Address of a node to join.
+    --store.join-as-voter                (default: false)                     Join the cluster as a voter. Default behavior is to join as an observer.
+    --store.join-timeout                 (default: 1m0s)                      Join timeout.
+    --store.key-rotation-interval        (default: 168h0m0s)                  Interval to rotate wireguard keys. Set this to 0 to disable key rotation.
+    --store.leader-lease-timeout         (default: 2s)                        Raft leader lease timeout.
+    --store.max-append-entries           (default: 16)                        Raft max append entries.
+    --store.max-join-retries             (default: 10)                        Maximum number of join retries.
+    --store.no-ipv4                      (default: false)                     Disable IPv4 for the raft transport.
+    --store.no-ipv6                      (default: false)                     Disable IPv6 for the raft transport.
+    --store.node-additional-endpoints                                         Comma separated list of additional endpoints to broadcast to the cluster.
+
+    --store.node-endpoint        NodeEndpoint is the endpoint to broadcast when joining a cluster.
+                                 This is only necessary if the node intends on exposing it's API. When
+                                 bootstrapping a cluster with a node that has an empty NodeEndpoint, the
+                                 node will use the AdvertiseAddress as the NodeEndpoint.
+
 
     --store.node-id    (default: <hostname>)    Store node ID. If not set, the ID comes from the following decision tree.
                                                     1. If mTLS is enabled, the node ID is the CN of the client certificate.
                                                     2. If mTLS is not enabled, the node ID is the hostname of the machine.
                                                     3. If the hostname is not available, the node ID is a random UUID (should only be used for testing).
 
-    --store.observer-chan-buffer    (default: 100)      Raft observer channel buffer size.
-    --store.raft-log-level          (default: info)     Raft log level.
-    --store.raft-prefer-ipv6        (default: false)    Prefer IPv6 when connecting to raft peers.
-    --store.snapshot-interval       (default: 5m0s)     Raft snapshot interval.
-    --store.snapshot-retention      (default: 3)        Raft snapshot retention.
-    --store.snapshot-threshold      (default: 50)       Raft snapshot threshold.
+    --store.observer-chan-buffer     (default: 100)     Raft observer channel buffer size.
+    --store.peer-refresh-interval    (default: 1m0s)    Interval to refresh wireguard peer list.
+
+    --store.raft-log-format    (default: protobuf+snappy)    Raft log format. Valid options are 'json', 'protobuf', and 'protobuf+snappy'.
+                                                             All nodes must use the same log format for the lifetime of the cluster.
+
+    --store.raft-log-level        (default: info)     Raft log level.
+    --store.raft-prefer-ipv6      (default: false)    Prefer IPv6 when connecting to raft peers.
+    --store.shutdown-timeout      (default: 1m0s)     Timeout for graceful shutdown.
+    --store.snapshot-interval     (default: 5m0s)     Raft snapshot interval.
+    --store.snapshot-retention    (default: 3)        Raft snapshot retention.
+    --store.snapshot-threshold    (default: 50)       Raft snapshot threshold.
 
 Raft Stream Layer Configurations:
 
@@ -123,30 +152,79 @@ Raft Stream Layer Configurations:
     --store.stream-layer.tls-client-ca-file                          Stream layer TLS client CA file.
     --store.stream-layer.tls-key-file                                Stream layer TLS key file.
 
-gRPC Server Configurations:
+Service Configurations:
 
-    --grpc.disable-leader-proxy      (default: false)       Disable the leader proxy.
-    --grpc.enable-metrics            (default: false)       Enable gRPC metrics.
-    --grpc.insecure                  (default: false)       Don't use TLS for the gRPC server.
-    --grpc.listen-address            (default: :8443)       gRPC server listen address.
-    --grpc.metrics-listen-address    (default: :8080)       gRPC metrics listen address.
-    --grpc.metrics-path              (default: /metrics)    gRPC metrics path.
-    --grpc.mtls                      (default: false)       Enable mutual TLS.
-    --grpc.skip-verify-hostname      (default: false)       Skip hostname verification.
-    --grpc.tls-ca-file                                      gRPC server TLS CA file.
-    --grpc.tls-cert-file                                    gRPC server TLS certificate file.
-    --grpc.tls-client-ca-file                               gRPC server TLS client CA file.
-    --grpc.tls-key-file                                     gRPC server TLS key file.
+    --services.enable-leader-proxy          (default: false)    Enable the leader proxy.
+    --services.enable-mesh-api              (default: false)    Enable the mesh API.
+    --services.enable-mesh-dns              (default: false)    Enable the mesh DNS server.
+    --services.enable-metrics               (default: false)    Enable gRPC metrics.
+    --services.enable-peer-discovery-api    (default: false)    Enable the peer discovery API.
+    --services.enable-turn-server           (default: false)    Enable the TURN server.
+    --services.enable-webrtc-api            (default: false)    Enable the WebRTC API.
+
+    --services.exclusive-turn-server    (default: false)    Replace all stun-servers with the local TURN server.
+                                                            The equivalent of stun-servers=stun:<turn-server-public-ip>:<turn-server-port>.
+
+    --services.grpc-listen-address           (default: :8443)                           gRPC server listen address.
+    --services.insecure                      (default: false)                           Don't use TLS for the gRPC server.
+    --services.mesh-dns-compression          (default: true)                            Enable DNS compression for mesh DNS.
+    --services.mesh-dns-domain               (default: webmesh.internal)                Domain to use for mesh DNS.
+    --services.mesh-dns-listen-tcp           (default: :5353)                           TCP address to listen on for DNS requests.
+    --services.mesh-dns-listen-udp           (default: :5353)                           UDP address to listen on for DNS requests.
+    --services.mesh-dns-request-timeout      (default: 5s)                              Timeout for mesh DNS requests.
+    --services.mesh-dns-reuse-port           (default: 0)                               Enable SO_REUSEPORT for mesh DNS.
+    --services.mesh-dns-tsig-key                                                        TSIG key to use for mesh DNS.
+    --services.metrics-listen-address        (default: :8080)                           gRPC metrics listen address.
+    --services.metrics-path                  (default: /metrics)                        gRPC metrics path.
+    --services.mtls                          (default: false)                           Enable mutual TLS.
+    --services.skip-verify-hostname          (default: false)                           Skip hostname verification.
+    --services.stun-port-range               (default: 49152-65535)                     Port range to use for STUN.
+    --services.stun-servers                  (default: stun:stun.l.google.com:19302)    STUN servers to use.
+    --services.tls-ca-file                                                              gRPC server TLS CA file.
+    --services.tls-cert-file                                                            gRPC server TLS certificate file.
+    --services.tls-client-ca-file                                                       gRPC server TLS client CA file.
+    --services.tls-key-file                                                             gRPC server TLS key file.
+    --services.turn-server-endpoint                                                     The TURN server endpoint. If empty, the public IP will be used.
+    --services.turn-server-listen-address    (default: 0.0.0.0)                         Address to listen on for TURN connections.
+    --services.turn-server-port              (default: 3478)                            Port to listen on for TURN connections.
+    --services.turn-server-public-ip                                                    The address advertised for STUN requests.
+    --services.turn-server-realm             (default: webmesh.io)                      Realm used for TURN server authentication.
 
 WireGuard Configurations:
 
-    --wireguard.endpoint                           The wireguard endpoint. If unset, inbound tunnels will not be accepted.
+
+    --wireguard.allowed-ips        AllowedIPs is a map of peers to allowed IPs. The peers can either be
+                                   peer IDs or regexes matching peer IDs. These IP addresses should not overlap
+                                   with the private network of the wireguard interface. AllowedIPs in this context
+                                   refers to the IP addresses that this instance will route to the peer. The peer
+                                   will also need to configure AllowedIPs for this instance's IP address.
+
+                                   The format is a whitespace separated list of key-value pairs, where the key is
+                                   the peer to match and the value is a comman-separated list of IP CIDRs.
+                                   For example:
+
+                                       # Peer names
+                                       --wireguard.allowed-ips="peer1=10.0.0.0/24,10.0.1.0/24 peer2="10.0.2.0/24"
+                                       # Peer regexes
+                                       --wireguard.allowed-ips="peer.*=10.0.0.0/16"
+
+
+
+    --wireguard.endpoint-overrides        EndpointOverrides is a map of peer IDs to endpoint overrides.
+                                          The format is similar to allowed-ips, but the value is a single endpoint.
+
     --wireguard.force-name     (default: false)    Force the use of the given name by deleting any pre-existing interface with the same name.
     --wireguard.force-tun      (default: false)    Force the use of a TUN interface.
     --wireguard.listen-port    (default: 51820)    The wireguard listen port.
     --wireguard.masquerade     (default: false)    Masquerade traffic from the wireguard interface.
+    --wireguard.modprobe       (default: false)    Attempt to load the wireguard kernel module.
     --wireguard.name           (default: wg0)      The wireguard interface name.
-    --wireguard.no-modprobe    (default: false)    Don't attempt to probe the wireguard module.
+
+    --wireguard.persistent-keepalive    (default: 0s)    PersistentKeepAlive is the interval at which to send keepalive packets
+                                                         to peers. If unset, keepalive packets will automatically be sent to publicly
+                                                         accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
+                                                         packets are sent.
+
 
 General Flags
 
@@ -156,3 +234,11 @@ General Flags
   --help       Show this help message
   --version    Show version information and exit
 ```
+
+## Special Thanks
+
+The developers of [rqlite](https://github.com/rqlite/rqlite) for inspiration on managing a distributed to SQLite.
+
+## Legal
+
+WireGuard is a registered trademark of Jason A. Donenfeld.

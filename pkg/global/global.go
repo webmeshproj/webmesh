@@ -123,7 +123,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", util.GetEnvDefault(GlobalPrimaryEndpointEnvVar, ""),
 		`The preferred publicly routable address of this node. Setting this
 value will override the address portion of the store advertise address
-and wireguard endpoints. This is only necessary if you intend for
+and WireGuard endpoints. This is only necessary if you intend for
 this node's API to be reachable outside the network.`)
 
 	fs.StringVar(&o.Endpoints, "global.endpoints", util.GetEnvDefault(GlobalEndpointsEnvVar, ""),

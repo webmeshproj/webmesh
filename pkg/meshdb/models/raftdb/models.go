@@ -20,6 +20,18 @@ type MeshState struct {
 	Value string `json:"value"`
 }
 
+type NetworkAcl struct {
+	Name      string         `json:"name"`
+	Proto     string         `json:"proto"`
+	SrcCidrs  sql.NullString `json:"src_cidrs"`
+	DstCidrs  sql.NullString `json:"dst_cidrs"`
+	SrcNodes  sql.NullString `json:"src_nodes"`
+	DstNodes  sql.NullString `json:"dst_nodes"`
+	Action    string         `json:"action"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
 type Node struct {
 	ID              string         `json:"id"`
 	PublicKey       sql.NullString `json:"public_key"`
