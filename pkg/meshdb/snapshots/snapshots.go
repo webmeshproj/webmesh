@@ -19,6 +19,7 @@ package snapshots
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -29,7 +30,7 @@ import (
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/models/raftdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 )
 
 // Snapshotter is an interface for taking and restoring snapshots.
@@ -60,7 +61,7 @@ type snapshotModel struct {
 }
 
 func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
-	s.log.Info("creating new snapshot")
+	s.log.Info("creating new db snapshot")
 	start := time.Now()
 	q := raftdb.New(s.db)
 	var model snapshotModel
@@ -78,18 +79,32 @@ func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 		return nil, fmt.Errorf("dump leases: %w", err)
 	}
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(model); err != nil {
+	gzw := gzip.NewWriter(&buf)
+	if err := json.NewEncoder(gzw).Encode(model); err != nil {
 		return nil, fmt.Errorf("encode snapshot model: %w", err)
 	}
-	s.log.Info("snapshot complete", slog.String("duration", time.Since(start).String()))
-	return &snapshot{&buf}, nil
+	if err := gzw.Close(); err != nil {
+		return nil, fmt.Errorf("close gzip writer: %w", err)
+	}
+	snapshot := &snapshot{&buf}
+	s.log.Info("db snapshot complete",
+		slog.String("duration", time.Since(start).String()),
+		slog.String("size", snapshot.size()),
+	)
+	return snapshot, nil
 }
 
 func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
-	s.log.Info("restoring snapshot")
+	defer r.Close()
+	s.log.Info("restoring db snapshot")
 	start := time.Now()
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("gzip reader: %w", err)
+	}
+	defer gzr.Close()
 	var model snapshotModel
-	if err := json.NewDecoder(r).Decode(&model); err != nil {
+	if err := json.NewDecoder(gzr).Decode(&model); err != nil {
 		return fmt.Errorf("decode snapshot model: %w", err)
 	}
 	tx, err := s.db.Begin()
@@ -161,7 +176,7 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	if err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
-	s.log.Info("restored snapshot", slog.String("duration", time.Since(start).String()))
+	s.log.Info("restored db snapshot", slog.String("duration", time.Since(start).String()))
 	return nil
 }
 
@@ -188,4 +203,19 @@ func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 func (s *snapshot) Release() {
 	s.data.Reset()
 	s.data = nil
+}
+
+func (s *snapshot) size() string {
+	b := int64(s.data.Len())
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB",
+		float64(b)/float64(div), "KMGTPE"[exp])
 }

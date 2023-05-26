@@ -28,7 +28,7 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"gitlab.com/webmesh/node/pkg/models/raftdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 )
 
 // apply executes the operations in a Raft log entry.

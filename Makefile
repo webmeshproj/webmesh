@@ -84,9 +84,10 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+SQLC_CONFIG := pkg/meshdb/models/sql/sqlc.yaml
 generate: ## Generate SQL code.
 	go install github.com/kyleconroy/sqlc/cmd/sqlc@latest
-	sqlc -f pkg/models/sql/sqlc.yaml generate
+	sqlc -f $(SQLC_CONFIG) generate
 
 install-ctl:
 	go install gitlab.com/webmesh/$(NAME)/cmd/$(CTL)

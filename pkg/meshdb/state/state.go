@@ -22,7 +22,7 @@ import (
 	"database/sql"
 	"net/netip"
 
-	"gitlab.com/webmesh/node/pkg/models/raftdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 	"gitlab.com/webmesh/node/pkg/store"
 )
 

@@ -30,9 +30,9 @@ import (
 var migrationFS embed.FS
 
 // raftMigrationsPath is the path to the raft db migrations.
-var raftMigrationsPath = "sql/raft/migrations"
+var raftMigrationsPath = "sql/raftdb/migrations"
 
-var localMigrationsPath = "sql/local/migrations"
+var localMigrationsPath = "sql/localdb/migrations"
 
 // schemaVersionTable is the name of the goose schema version table.
 var schemaVersionTable = "schema_version"

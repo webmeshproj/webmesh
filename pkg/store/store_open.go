@@ -26,8 +26,8 @@ import (
 	boltdb "github.com/hashicorp/raft-boltdb"
 	"golang.org/x/exp/slog"
 
+	"gitlab.com/webmesh/node/pkg/meshdb/models"
 	"gitlab.com/webmesh/node/pkg/meshdb/snapshots"
-	"gitlab.com/webmesh/node/pkg/models"
 )
 
 // Open opens the store.

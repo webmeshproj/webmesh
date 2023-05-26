@@ -46,9 +46,9 @@ services:
       - 8443:8443
       - 3478:3478
       - 5354:5353/udp
-      - 5354:5353/tcp
-      - 60000-60001:60000-60001
       - 51820:51820/udp
+      - 60000-60001:60000-60001/udp
+      - 60000-60001:60000-60001/tcp
     volumes:
       - bootstrap-node-1:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -72,8 +72,6 @@ services:
       - --store.raft-log-level=debug
       - --store.snapshot-threshold=10
       - --services.enable-leader-proxy
-      - --services.enable-metrics
-      - --services.enable-mesh-api
     volumes:
       - bootstrap-node-2:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -97,8 +95,6 @@ services:
       - --store.raft-log-level=debug
       - --store.snapshot-threshold=10
       - --services.enable-leader-proxy
-      - --services.enable-metrics
-      - --services.enable-mesh-api
     volumes:
       - bootstrap-node-3:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

@@ -28,7 +28,7 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/models/raftdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 	"gitlab.com/webmesh/node/pkg/store"
 )
 

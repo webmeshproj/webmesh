@@ -29,7 +29,7 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"gitlab.com/webmesh/node/pkg/models/raftdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 	"gitlab.com/webmesh/node/pkg/store"
 	"gitlab.com/webmesh/node/pkg/util"
 )

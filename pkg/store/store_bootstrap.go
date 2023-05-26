@@ -30,9 +30,9 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/models"
-	"gitlab.com/webmesh/node/pkg/models/localdb"
-	"gitlab.com/webmesh/node/pkg/models/raftdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/models"
+	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 	"gitlab.com/webmesh/node/pkg/util"
 )
 
