@@ -81,7 +81,7 @@ func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 	if err := json.NewEncoder(&buf).Encode(model); err != nil {
 		return nil, fmt.Errorf("encode snapshot model: %w", err)
 	}
-	s.log.Info("created snapshot", slog.Duration("duration", time.Since(start)))
+	s.log.Info("snapshot complete", slog.String("duration", time.Since(start).String()))
 	return &snapshot{&buf}, nil
 }
 
@@ -161,7 +161,7 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	if err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
-	s.log.Info("restored snapshot", slog.Duration("duration", time.Since(start)))
+	s.log.Info("restored snapshot", slog.String("duration", time.Since(start).String()))
 	return nil
 }
 

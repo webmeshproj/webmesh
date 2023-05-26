@@ -23,7 +23,6 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --global.log-level=debug
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --store.node-additional-endpoints=127.0.0.1
@@ -64,7 +63,6 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --global.log-level=debug
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --store.bootstrap
@@ -90,7 +88,6 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --global.log-level=debug
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --store.bootstrap
