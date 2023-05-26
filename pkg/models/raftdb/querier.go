@@ -11,6 +11,12 @@ import (
 type Querier interface {
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	DeleteNode(ctx context.Context, id string) error
+	DropLeases(ctx context.Context) error
+	DropMeshState(ctx context.Context) error
+	DropNodes(ctx context.Context) error
+	DumpLeases(ctx context.Context) ([]Lease, error)
+	DumpMeshState(ctx context.Context) ([]MeshState, error)
+	DumpNodes(ctx context.Context) ([]Node, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
 	GetNodePeer(ctx context.Context, id string) (GetNodePeerRow, error)
@@ -26,6 +32,9 @@ type Querier interface {
 	ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error)
 	ListPublicWireguardEndpoints(ctx context.Context) ([]ListPublicWireguardEndpointsRow, error)
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
+	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error
+	RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error
+	RestoreNode(ctx context.Context, arg RestoreNodeParams) error
 	SetIPv4Prefix(ctx context.Context, value string) error
 	SetULAPrefix(ctx context.Context, value string) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)

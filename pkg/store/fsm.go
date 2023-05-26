@@ -17,14 +17,11 @@ limitations under the License.
 package store
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/golang/snappy"
@@ -143,96 +140,16 @@ func (s *store) Apply(l *raft.Log) any {
 
 // Snapshot returns a Raft snapshot.
 func (s *store) Snapshot() (raft.FSMSnapshot, error) {
-	return s.newSnapshot()
+	s.dataMux.Lock()
+	defer s.dataMux.Unlock()
+	return s.snapshotter.Snapshot(context.Background())
 }
 
 // Restore restores a Raft snapshot.
 func (s *store) Restore(r io.ReadCloser) error {
-	s.log.Debug("restoring snapshot")
-	start := time.Now()
-	defer func() {
-		s.log.Debug("finished restoring snapshot", slog.String("took", time.Since(start).String()))
-	}()
-	defer r.Close()
 	s.dataMux.Lock()
 	defer s.dataMux.Unlock()
-	// Close the database if it's open.
-	if s.weakData != nil {
-		err := s.weakData.Close()
-		if err != nil {
-			return fmt.Errorf("close data file: %w", err)
-		}
-	}
-	f, err := os.OpenFile(s.opts.DataFilePath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("open data file for writing: %w", err)
-	}
-	defer f.Close()
-	// Decompress the data from the snapshot.
-	zr, err := gzip.NewReader(r)
-	if err != nil {
-		return fmt.Errorf("create gzip reader: %w", err)
-	}
-	defer zr.Close()
-	if _, err := io.Copy(f, zr); err != nil {
-		return fmt.Errorf("decompress data file: %w", err)
-	}
-	// Re-open the database.
-	s.weakData, err = sql.Open("sqlite", s.opts.DataFilePath())
-	return err
-}
-
-// newSnapshot creates a new Raft snapshot.
-func (s *store) newSnapshot() (raft.FSMSnapshot, error) {
-	s.log.Debug("creating new snapshot")
-	start := time.Now()
-	s.dataMux.Lock()
-	defer s.dataMux.Unlock()
-	f, err := os.Open(s.opts.DataFilePath())
-	if err != nil {
-		return nil, fmt.Errorf("open data file for reading: %w", err)
-	}
-	defer f.Close()
-	// Compress the data to in-memory buffer.
-	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-	defer zw.Close()
-	if _, err := io.Copy(zw, f); err != nil {
-		return nil, fmt.Errorf("compress data file: %w", err)
-	}
-	s.log.Debug("created new snapshot",
-		slog.Int("size", buf.Len()),
-		slog.String("took", time.Since(start).String()))
-	// Return the snapshot.
-	return &snapshot{data: &buf, log: s.log}, nil
-}
-
-// snapshot is a Raft snapshot.
-type snapshot struct {
-	data *bytes.Buffer
-	log  *slog.Logger
-}
-
-// Persist persists the snapshot to a sink.
-func (s *snapshot) Persist(sink raft.SnapshotSink) error {
-	defer sink.Close()
-	if s.data == nil {
-		return fmt.Errorf("snapshot data is nil")
-	}
-	s.log.Debug("persisting snapshot", slog.Int("size", s.data.Len()))
-	var buf bytes.Buffer
-	if _, err := io.Copy(sink, io.TeeReader(s.data, &buf)); err != nil {
-		return fmt.Errorf("write snapshot data to sink: %w", err)
-	}
-	s.data = &buf
-	return nil
-}
-
-// Release releases the snapshot.
-func (s *snapshot) Release() {
-	s.log.Debug("releasing snapshot")
-	s.data.Reset()
-	s.data = nil
+	return s.snapshotter.Restore(context.Background(), r)
 }
 
 func (s *store) getDBTermAndIndex() (term, index uint64, err error) {

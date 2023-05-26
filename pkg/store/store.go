@@ -35,6 +35,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/firewall"
+	"gitlab.com/webmesh/node/pkg/meshdb/snapshots"
 	"gitlab.com/webmesh/node/pkg/models/localdb"
 	"gitlab.com/webmesh/node/pkg/models/raftdb"
 	"gitlab.com/webmesh/node/pkg/store/streamlayer"
@@ -183,6 +184,7 @@ type store struct {
 	logDB         LogStoreCloser
 	stableDB      StableStoreCloser
 	raftLogFormat RaftLogFormat
+	snapshotter   snapshots.Snapshotter
 
 	observerChan                chan raft.Observation
 	observer                    *raft.Observer

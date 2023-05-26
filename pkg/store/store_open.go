@@ -26,6 +26,7 @@ import (
 	boltdb "github.com/hashicorp/raft-boltdb"
 	"golang.org/x/exp/slog"
 
+	"gitlab.com/webmesh/node/pkg/meshdb/snapshots"
 	"gitlab.com/webmesh/node/pkg/models"
 )
 
@@ -117,6 +118,7 @@ func (s *store) Open() error {
 	if err != nil {
 		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.DataFilePath(), err))
 	}
+	s.snapshotter = snapshots.New(s.weakData)
 	s.raftData, err = sql.Open(raftDriverName, "")
 	if err != nil {
 		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
