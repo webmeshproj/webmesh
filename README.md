@@ -66,7 +66,7 @@ Global Configurations:
 
     --global.primary-endpoint        The preferred publicly routable address of this node. Setting this
                                      value will override the address portion of the store advertise address
-                                     and wireguard endpoints. This is only necessary if you intend for
+                                     and WireGuard endpoints. This is only necessary if you intend for
                                      this node's API to be reachable outside the network.
 
     --global.skip-verify-hostname    (default: false)    Disable hostname verification globally.
@@ -79,7 +79,7 @@ Raft Store Configurations:
 
 
     --store.advertise-address    (default: localhost:9443)    Raft advertise address. Required when bootstrapping a new cluster,
-                                                              but will be replaced with the wireguard address after bootstrapping.
+                                                              but will be replaced with the WireGuard address after bootstrapping.
 
     --store.apply-timeout             (default: 10s)              Raft apply timeout.
     --store.bootstrap                 (default: false)            Bootstrap the cluster.
@@ -109,7 +109,7 @@ Raft Store Configurations:
     --store.join                                                              Address of a node to join.
     --store.join-as-voter                (default: false)                     Join the cluster as a voter. Default behavior is to join as an observer.
     --store.join-timeout                 (default: 1m0s)                      Join timeout.
-    --store.key-rotation-interval        (default: 168h0m0s)                  Interval to rotate wireguard keys. Set this to 0 to disable key rotation.
+    --store.key-rotation-interval        (default: 168h0m0s)                  Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.
     --store.leader-lease-timeout         (default: 2s)                        Raft leader lease timeout.
     --store.max-append-entries           (default: 16)                        Raft max append entries.
     --store.max-join-retries             (default: 10)                        Maximum number of join retries.
@@ -129,7 +129,7 @@ Raft Store Configurations:
                                                     3. If the hostname is not available, the node ID is a random UUID (should only be used for testing).
 
     --store.observer-chan-buffer     (default: 100)     Raft observer channel buffer size.
-    --store.peer-refresh-interval    (default: 1m0s)    Interval to refresh wireguard peer list.
+    --store.peer-refresh-interval    (default: 1m0s)    Interval to refresh WireGuard peer list.
 
     --store.raft-log-format    (default: protobuf+snappy)    Raft log format. Valid options are 'json', 'protobuf', and 'protobuf+snappy'.
                                                              All nodes must use the same log format for the lifetime of the cluster.
@@ -195,7 +195,7 @@ WireGuard Configurations:
 
     --wireguard.allowed-ips        AllowedIPs is a map of peers to allowed IPs. The peers can either be
                                    peer IDs or regexes matching peer IDs. These IP addresses should not overlap
-                                   with the private network of the wireguard interface. AllowedIPs in this context
+                                   with the private network of the WireGuard interface. AllowedIPs in this context
                                    refers to the IP addresses that this instance will route to the peer. The peer
                                    will also need to configure AllowedIPs for this instance's IP address.
 
@@ -215,10 +215,10 @@ WireGuard Configurations:
 
     --wireguard.force-name     (default: false)    Force the use of the given name by deleting any pre-existing interface with the same name.
     --wireguard.force-tun      (default: false)    Force the use of a TUN interface.
-    --wireguard.listen-port    (default: 51820)    The wireguard listen port.
-    --wireguard.masquerade     (default: false)    Masquerade traffic from the wireguard interface.
-    --wireguard.modprobe       (default: false)    Attempt to load the wireguard kernel module.
-    --wireguard.name           (default: wg0)      The wireguard interface name.
+    --wireguard.listen-port    (default: 51820)    The WireGuard listen port.
+    --wireguard.masquerade     (default: false)    Masquerade traffic from the WireGuard interface.
+    --wireguard.modprobe       (default: false)    Attempt to load the WireGuard kernel module.
+    --wireguard.name           (default: wg0)      The WireGuard interface name.
 
     --wireguard.persistent-keepalive    (default: 0s)    PersistentKeepAlive is the interval at which to send keepalive packets
                                                          to peers. If unset, keepalive packets will automatically be sent to publicly
