@@ -6,7 +6,6 @@ GOBGP_IMAGE ?= gitlab.com/webmesh/gobgp:latest
 
 ARCH ?= $(shell go env GOARCH)
 OS   ?= $(shell go env GOOS)
-GOPRIVATE := gitlab.com/webmesh
 
 VERSION_PKG := gitlab.com/webmesh/$(NAME)/pkg/version
 VERSION     := $(shell git describe --tags --always --dirty)
@@ -32,7 +31,7 @@ PLATFORMS ?= linux/arm64 linux/amd64 linux/s390x linux/ppc64le
 DIST      := $(CURDIR)/dist
 
 tidy:
-	GOPRIVATE=$(GOPRIVATE) go mod tidy
+	go mod tidy
 
 lint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest

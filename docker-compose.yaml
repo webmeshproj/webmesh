@@ -30,7 +30,6 @@ services:
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
-      - --store.raft-log-level=debug
       - --store.snapshot-threshold=10
       - --services.enable-leader-proxy
       - --services.enable-peer-discovery-api
@@ -69,8 +68,6 @@ services:
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
-      - --store.raft-log-level=debug
-      - --store.snapshot-threshold=10
       - --services.enable-leader-proxy
     volumes:
       - bootstrap-node-2:/data
@@ -92,8 +89,6 @@ services:
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
-      - --store.raft-log-level=debug
-      - --store.snapshot-threshold=10
       - --services.enable-leader-proxy
     volumes:
       - bootstrap-node-3:/data
