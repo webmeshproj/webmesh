@@ -28,6 +28,7 @@ type NetworkAcl struct {
 	SrcNodes  sql.NullString `json:"src_nodes"`
 	DstNodes  sql.NullString `json:"dst_nodes"`
 	Action    string         `json:"action"`
+	Priority  int64          `json:"priority"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 }
@@ -74,4 +75,13 @@ type NodePublicRaftAddress struct {
 type NodePublicRpcAddress struct {
 	NodeID  string       `json:"node_id"`
 	Address sql.NullBool `json:"address"`
+}
+
+type RaftAcl struct {
+	Name      string    `json:"name"`
+	Nodes     string    `json:"nodes"`
+	Voter     bool      `json:"voter"`
+	Observer  bool      `json:"observer"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

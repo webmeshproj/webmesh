@@ -30,42 +30,44 @@ import (
 )
 
 const (
-	NodeIDEnvVar                    = "STORE_NODE_ID"
-	NodeEndpointEnvVar              = "STORE_NODE_ENDPOINT"
-	NodeAdditionalEndpointsEnvVar   = "STORE_NODE_ADDITIONAL_ENDPOINTS"
-	DataDirEnvVar                   = "STORE_DATA_DIR"
-	InMemoryEnvVar                  = "STORE_IN_MEMORY"
-	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
-	ConnectionPoolCountEnvVar       = "STORE_CONNECTION_POOL_COUNT"
-	ConnectionTimeoutEnvVar         = "STORE_CONNECTION_TIMEOUT"
-	HeartbeatTimeoutEnvVar          = "STORE_HEARTBEAT_TIMEOUT"
-	ElectionTimeoutEnvVar           = "STORE_ELECTION_TIMEOUT"
-	ApplyTimeoutEnvVar              = "STORE_APPLY_TIMEOUT"
-	CommitTimeoutEnvVar             = "STORE_COMMIT_TIMEOUT"
-	MaxAppendEntriesEnvVar          = "STORE_MAX_APPEND_ENTRIES"
-	LeaderLeaseTimeoutEnvVar        = "STORE_LEADER_LEASE_TIMEOUT"
-	SnapshotIntervalEnvVar          = "STORE_SNAPSHOT_INTERVAL"
-	SnapshotThresholdEnvVar         = "STORE_SNAPSHOT_THRESHOLD"
-	SnapshotRetentionEnvVar         = "STORE_SNAPSHOT_RETENTION"
-	BootstrapEnvVar                 = "STORE_BOOTSTRAP"
-	BootstrapServersEnvVar          = "STORE_BOOTSTRAP_SERVERS"
-	BootstrapServersGRPCPortsEnvVar = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
-	IPv4NetworkEnvVar               = "STORE_BOOTSTRAP_IPV4_NETWORK"
-	JoinEnvVar                      = "STORE_JOIN"
-	JoinAsVoterEnvVar               = "STORE_JOIN_AS_VOTER"
-	MaxJoinRetriesEnvVar            = "STORE_MAX_JOIN_RETRIES"
-	JoinTimeoutEnvVar               = "STORE_JOIN_TIMEOUT"
-	ForceNewClusterEnvVar           = "STORE_FORCE_BOOTSTRAP"
-	RaftLogLevelEnvVar              = "STORE_RAFT_LOG_LEVEL"
-	RaftPreferIPv6EnvVar            = "STORE_RAFT_PREFER_IPV6"
-	ObserverChanBufferEnvVar        = "STORE_OBSERVER_CHAN_BUFFER"
-	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
-	RaftLogFormatEnvVar             = "STORE_RAFT_LOG_FORMAT"
-	ShutdownTimeoutEnvVar           = "STORE_SHUTDOWN_TIMEOUT"
-	PeerRefreshIntervalEnvVar       = "STORE_PEER_REFRESH_INTERVAL"
-	KeyRotationIntervalEnvVar       = "STORE_KEY_ROTATION_INTERVAL"
-	NoIPv4EnvVar                    = "STORE_NO_IPV4"
-	NoIPv6EnvVar                    = "STORE_NO_IPV6"
+	NodeIDEnvVar                     = "STORE_NODE_ID"
+	NodeEndpointEnvVar               = "STORE_NODE_ENDPOINT"
+	NodeAdditionalEndpointsEnvVar    = "STORE_NODE_ADDITIONAL_ENDPOINTS"
+	DataDirEnvVar                    = "STORE_DATA_DIR"
+	InMemoryEnvVar                   = "STORE_IN_MEMORY"
+	AdvertiseAddressEnvVar           = "STORE_ADVERTISE_ADDRESS"
+	ConnectionPoolCountEnvVar        = "STORE_CONNECTION_POOL_COUNT"
+	ConnectionTimeoutEnvVar          = "STORE_CONNECTION_TIMEOUT"
+	HeartbeatTimeoutEnvVar           = "STORE_HEARTBEAT_TIMEOUT"
+	ElectionTimeoutEnvVar            = "STORE_ELECTION_TIMEOUT"
+	ApplyTimeoutEnvVar               = "STORE_APPLY_TIMEOUT"
+	CommitTimeoutEnvVar              = "STORE_COMMIT_TIMEOUT"
+	MaxAppendEntriesEnvVar           = "STORE_MAX_APPEND_ENTRIES"
+	LeaderLeaseTimeoutEnvVar         = "STORE_LEADER_LEASE_TIMEOUT"
+	SnapshotIntervalEnvVar           = "STORE_SNAPSHOT_INTERVAL"
+	SnapshotThresholdEnvVar          = "STORE_SNAPSHOT_THRESHOLD"
+	SnapshotRetentionEnvVar          = "STORE_SNAPSHOT_RETENTION"
+	BootstrapEnvVar                  = "STORE_BOOTSTRAP"
+	BootstrapServersEnvVar           = "STORE_BOOTSTRAP_SERVERS"
+	BootstrapServersGRPCPortsEnvVar  = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
+	BootstrapIPv4NetworkEnvVar       = "STORE_BOOTSTRAP_IPV4_NETWORK"
+	BootstrapWithRaftACLsEnvVar      = "STORE_BOOTSTRAP_WITH_RAFT_ACLS"
+	BootstrapAllowAllNonVotersEnvVar = "STORE_BOOTSTRAP_ALLOW_ALL_NON_VOTERS"
+	JoinEnvVar                       = "STORE_JOIN"
+	JoinAsVoterEnvVar                = "STORE_JOIN_AS_VOTER"
+	MaxJoinRetriesEnvVar             = "STORE_MAX_JOIN_RETRIES"
+	JoinTimeoutEnvVar                = "STORE_JOIN_TIMEOUT"
+	ForceNewClusterEnvVar            = "STORE_FORCE_BOOTSTRAP"
+	RaftLogLevelEnvVar               = "STORE_RAFT_LOG_LEVEL"
+	RaftPreferIPv6EnvVar             = "STORE_RAFT_PREFER_IPV6"
+	ObserverChanBufferEnvVar         = "STORE_OBSERVER_CHAN_BUFFER"
+	GRPCAdvertisePortEnvVar          = "STORE_GRPC_ADVERTISE_PORT"
+	RaftLogFormatEnvVar              = "STORE_RAFT_LOG_FORMAT"
+	ShutdownTimeoutEnvVar            = "STORE_SHUTDOWN_TIMEOUT"
+	PeerRefreshIntervalEnvVar        = "STORE_PEER_REFRESH_INTERVAL"
+	KeyRotationIntervalEnvVar        = "STORE_KEY_ROTATION_INTERVAL"
+	NoIPv4EnvVar                     = "STORE_NO_IPV4"
+	NoIPv6EnvVar                     = "STORE_NO_IPV6"
 
 	// LogFile is the raft log file.
 	LogFile = "raft.log"
@@ -168,7 +170,11 @@ type Options struct {
 	// BootstrapIPv4Network is the IPv4 network of the mesh to write to the database
 	// when bootstraping a new cluster.
 	BootstrapIPv4Network string `json:"bootstrap-ipv4-network" yaml:"bootstrap-ipv4-network" toml:"bootstrap-ipv4-network"`
-	// ForceBootstrap is the force new bootstrap.
+	// BoostrapWithRaftACLs is the flag to bootstrap with Raft ACLs.
+	BootstrapWithRaftACLs bool `json:"bootstrap-with-raft-acls" yaml:"bootstrap-with-raft-acls" toml:"bootstrap-with-raft-acls"`
+	// BootstrapAllowAllNonVoters is the flag to bootstrap with an allow all non-voters policy.
+	BootstrapAllowAllNonVoters bool `json:"bootstrap-allow-all-non-voters" yaml:"bootstrap-allow-all-non-voters" toml:"bootstrap-allow-all-non-voters"`
+	// ForceBootstrap is the force new bootstrap flag.
 	ForceBootstrap bool `json:"force-bootstrap" yaml:"force-bootstrap" toml:"force-bootstrap"`
 	// RaftLogLevel is the log level for the raft backend.
 	RaftLogLevel string `json:"raft-log-level" yaml:"raft-log-level" toml:"raft-log-level"`
@@ -233,6 +239,10 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 	fl.BoolVar(&o.Bootstrap, "store.bootstrap", util.GetEnvDefault(BootstrapEnvVar, "false") == "true",
 		"Bootstrap the cluster.")
 
+	fl.StringVar(&o.AdvertiseAddress, "store.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, "localhost:9443"),
+		`Raft advertise address. Required when bootstrapping a new cluster,
+but will be replaced with the WireGuard address after bootstrapping.`)
+
 	fl.StringVar(&o.NodeEndpoint, "store.node-endpoint", util.GetEnvDefault(NodeEndpointEnvVar, ""),
 		`NodeEndpoint is the endpoint to broadcast when joining a cluster.
 This is only necessary if the node intends on exposing it's API. When
@@ -245,22 +255,30 @@ node will use the AdvertiseAddress as the NodeEndpoint.`)
 	fl.StringVar(&o.BootstrapServers, "store.bootstrap-servers", util.GetEnvDefault(BootstrapServersEnvVar, ""),
 		`Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
 If empty, the node will use the advertise address as the bootstrap server. If not empty,
-all nodes in the list should be started with the same list and bootstrap-ipv4-network. If the
-bootstrap-ipv4-network is not the same, the first node to become leader will pick it.
-Servers should be in the form of <node-id>=<address> where address is the advertise address.`)
+all nodes in the list should be started with the same list configurations. If any are 
+different then the first node to become leader will pick them. This can cause bootstrap
+to fail when using ACLs. Servers should be in the form of <node-id>=<address> where 
+address is the raft advertise address.`)
+
 	fl.StringVar(&o.BootstrapServersGRPCPorts, "store.bootstrap-servers-grpc-ports", util.GetEnvDefault(BootstrapServersGRPCPortsEnvVar, ""),
 		`Comma separated list of gRPC ports to bootstrap with. This is only used
 if bootstrap is true. If empty, the node will use the advertise address and
 locally configured gRPC port for every node in bootstrap-servers.
 Ports should be in the form of <node-id>=<port>.`)
 
-	fl.StringVar(&o.BootstrapIPv4Network, "store.bootstrap-ipv4-network", util.GetEnvDefault(IPv4NetworkEnvVar, "172.16.0.0/12"),
+	fl.StringVar(&o.BootstrapIPv4Network, "store.bootstrap-ipv4-network", util.GetEnvDefault(BootstrapIPv4NetworkEnvVar, "172.16.0.0/12"),
 		"IPv4 network of the mesh to write to the database when bootstraping a new cluster.")
+
+	fl.BoolVar(&o.BootstrapWithRaftACLs, "store.bootstrap-with-raft-acls", util.GetEnvDefault(BootstrapWithRaftACLsEnvVar, "false") == "true",
+		"Bootstrap the cluster with Raft ACLs enabled.")
+
+	fl.BoolVar(&o.BootstrapAllowAllNonVoters, "store.bootstrap-allow-all-non-voters", util.GetEnvDefault(BootstrapAllowAllNonVotersEnvVar, "false") == "true",
+		`Bootstrap the cluster with all non-voters allowed to join.
+Only makes sense when bootstrap-with-raft-acls is true.`)
+
 	fl.BoolVar(&o.ForceBootstrap, "store.force-bootstrap", util.GetEnvDefault(ForceNewClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
-	fl.StringVar(&o.AdvertiseAddress, "store.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, "localhost:9443"),
-		`Raft advertise address. Required when bootstrapping a new cluster,
-but will be replaced with the WireGuard address after bootstrapping.`)
+
 	fl.IntVar(&o.ConnectionPoolCount, "store.connection-pool-count", util.GetEnvIntDefault(ConnectionPoolCountEnvVar, 0),
 		"Raft connection pool count.")
 	fl.DurationVar(&o.ConnectionTimeout, "store.connection-timeout", util.GetEnvDurationDefault(ConnectionTimeoutEnvVar, time.Second*2),

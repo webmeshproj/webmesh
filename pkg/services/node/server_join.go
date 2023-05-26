@@ -51,6 +51,29 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node id required")
 	}
+
+	// TODO: When using mTLS, we should verify the peer certificate
+	// matches the node ID
+
+	// We can go ahead and check here if the node is allowed to do what
+	// they want
+	var allowed bool
+	var err error
+	if req.GetAsVoter() {
+		allowed, err = s.raftacls.CanVote(ctx, req.GetId())
+	} else {
+		allowed, err = s.raftacls.CanObserve(ctx, req.GetId())
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to check ACLs: %v", err)
+	}
+	if !allowed {
+		s.log.Warn("Node not allowed to join",
+			"id", req.GetId(),
+			"voter", req.GetAsVoter())
+		return nil, status.Error(codes.PermissionDenied, "not allowed")
+	}
+
 	publicKey, err := wgtypes.ParseKey(req.GetPublicKey())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)

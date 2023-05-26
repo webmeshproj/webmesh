@@ -27,7 +27,20 @@ CREATE TABLE leases (
     created_at  TIMESTAMP NOT NULL
 );
 
--- Network ACLs for nodes.
+-- Raft ACLs determine who can join the cluster as what.
+CREATE TABLE raft_acls (
+    name        TEXT NOT NULL PRIMARY KEY,
+    nodes       TEXT NOT NULL,
+    voter       BOOLEAN NOT NULL DEFAULT FALSE,
+    observer    BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMP NOT NULL,
+    updated_at  TIMESTAMP NOT NULL
+);
+
+-- Network ACLs determine traffic policies for non-voting nodes.
+-- Voting nodes have to be able to communicate with each other.
+-- In the future nodes should handle leaving tunnels for raft 
+-- traffic open.
 CREATE TABLE network_acls (
     name        TEXT NOT NULL PRIMARY KEY,
     proto       TEXT NOT NULL,
@@ -36,6 +49,7 @@ CREATE TABLE network_acls (
     src_nodes   TEXT,
     dst_nodes   TEXT,
     action      TEXT NOT NULL,
+    priority    INTEGER NOT NULL,
     created_at  TIMESTAMP NOT NULL,
     updated_at  TIMESTAMP NOT NULL
 );

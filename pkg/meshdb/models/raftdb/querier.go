@@ -11,6 +11,7 @@ import (
 type Querier interface {
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	DeleteNode(ctx context.Context, id string) error
+	DeleteRaftACL(ctx context.Context, name string) error
 	DropLeases(ctx context.Context) error
 	DropMeshState(ctx context.Context) error
 	DropNodes(ctx context.Context) error
@@ -24,6 +25,7 @@ type Querier interface {
 	GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
 	GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error)
 	GetPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error)
+	GetRaftACL(ctx context.Context, name string) (RaftAcl, error)
 	GetULAPrefix(ctx context.Context) (string, error)
 	InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error)
 	ListAllocatedIPv4(ctx context.Context) ([]string, error)
@@ -31,6 +33,8 @@ type Querier interface {
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)
 	ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error)
 	ListPublicWireguardEndpoints(ctx context.Context) ([]ListPublicWireguardEndpointsRow, error)
+	ListRaftACLs(ctx context.Context) ([]RaftAcl, error)
+	PutRaftACL(ctx context.Context, arg PutRaftACLParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
 	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error
 	RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error

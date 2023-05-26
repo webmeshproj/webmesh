@@ -29,6 +29,8 @@ services:
       - --store.bootstrap
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
+      - --store.bootstrap-with-raft-acls
+      - --store.bootstrap-allow-all-non-voters
       - --store.data-dir=/data
       - --store.snapshot-threshold=10
       - --services.enable-leader-proxy
@@ -67,6 +69,8 @@ services:
       - --store.bootstrap
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
+      - --store.bootstrap-with-raft-acls
+      - --store.bootstrap-allow-all-non-voters
       - --store.data-dir=/data
       - --services.enable-leader-proxy
     volumes:
@@ -88,6 +92,8 @@ services:
       - --store.bootstrap
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
+      - --store.bootstrap-with-raft-acls
+      - --store.bootstrap-allow-all-non-voters
       - --store.data-dir=/data
       - --services.enable-leader-proxy
     volumes:

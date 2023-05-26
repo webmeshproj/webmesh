@@ -27,6 +27,7 @@ import (
 
 	"gitlab.com/webmesh/node/pkg/meshdb/ipam"
 	"gitlab.com/webmesh/node/pkg/meshdb/peers"
+	"gitlab.com/webmesh/node/pkg/meshdb/raftacls"
 	"gitlab.com/webmesh/node/pkg/meshdb/state"
 	"gitlab.com/webmesh/node/pkg/store"
 )
@@ -39,6 +40,8 @@ type Server struct {
 	peers     peers.Peers
 	ipam      ipam.IPAM
 	meshstate state.State
+	raftacls  raftacls.RaftACLs
+
 	ulaPrefix netip.Prefix
 	features  []v1.Feature
 	startedAt time.Time
@@ -56,6 +59,7 @@ func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature) 
 		peers:     peers.New(store),
 		ipam:      ipam.New(store),
 		meshstate: state.New(store),
+		raftacls:  raftacls.New(store),
 		features:  features,
 		startedAt: time.Now(),
 		log:       slog.Default().With("component", "node-server"),

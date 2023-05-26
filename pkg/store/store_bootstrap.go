@@ -148,6 +148,7 @@ func (s *store) bootstrap() error {
 			s.readyErr <- err
 		}
 		// Do an initial refresh of the wireguard peers in a few seconds.
+		// TODO: This should be handled by the Join method.
 		go func() {
 			time.Sleep(3 * time.Second)
 			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
@@ -161,13 +162,14 @@ func (s *store) bootstrap() error {
 func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.ServerID]int64) error {
 	q := raftdb.New(s.DB())
 
+	// Set initial cluster configurations to the raft log
 	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
 		slog.String("ipv4-network", s.opts.BootstrapIPv4Network))
 	ula, err := util.GenerateULA()
 	if err != nil {
 		return fmt.Errorf("generate ULA: %w", err)
 	}
-	s.log.Info("generated ULA", slog.String("ula", ula.String()))
+	s.log.Info("generated IPv6 ULA", slog.String("ula", ula.String()))
 	err = q.SetULAPrefix(ctx, ula.String())
 	if err != nil {
 		return fmt.Errorf("set ULA prefix to db: %w", err)
@@ -175,6 +177,44 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	err = q.SetIPv4Prefix(ctx, s.opts.BootstrapIPv4Network)
 	if err != nil {
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
+	}
+
+	if s.opts.BootstrapWithRaftACLs {
+		s.log.Info("Bootstrapping with Raft ACLs enabled")
+		// Write ACLs for all the bootstrap servers.
+		cfg := s.raft.GetConfiguration().Configuration()
+		var nodeIDs []string
+		for _, server := range cfg.Servers {
+			nodeIDs = append(nodeIDs, string(server.ID))
+		}
+		s.log.Info("writing bootstrap servers raft acl",
+			slog.String("nodes", strings.Join(nodeIDs, ",")),
+		)
+		err = q.PutRaftACL(ctx, raftdb.PutRaftACLParams{
+			Name:      "bootstrap-servers",
+			Nodes:     strings.Join(nodeIDs, ","),
+			Voter:     true,
+			Observer:  true,
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
+		})
+		if err != nil {
+			return fmt.Errorf("put bootstrap servers raft acl: %w", err)
+		}
+		if s.opts.BootstrapAllowAllNonVoters {
+			s.log.Info("allowing all non-voters to join the cluster")
+			err = q.PutRaftACL(ctx, raftdb.PutRaftACLParams{
+				Name:      "allow-all-non-voters",
+				Nodes:     "*",
+				Voter:     false,
+				Observer:  true,
+				CreatedAt: time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
+			})
+			if err != nil {
+				return fmt.Errorf("put allow all non-voters raft acl: %w", err)
+			}
+		}
 	}
 
 	// We need to officially "join" ourselves to the cluster with a wireguard
