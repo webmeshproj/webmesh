@@ -61,6 +61,8 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 
 // Apply applies a Raft log entry to the store.
 func (s *store) Apply(l *raft.Log) any {
+	ctx := context.Background()
+
 	log := s.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
 	log.Debug("applying log", "type", l.Type.String())
 	start := time.Now()
@@ -151,12 +153,23 @@ func (s *store) Apply(l *raft.Log) any {
 	}
 
 	if cmd.GetType() == v1.RaftCommandType_EXECUTE {
-		if cmd.GetSqlExec().GetStatement().GetSql() == raftdb.InsertNodeEdge {
+		sql := cmd.GetSqlExec().GetStatement().GetSql()
+		if sql == raftdb.InsertNodeEdge || sql == raftdb.DeleteNode || sql == raftdb.DeleteNodeEdge {
 			// This might be a bit of a hack, but the code is generated
 			// and we know exactly what's coming over the wire. We can check
-			// here if an edge is being added and refresh the wireguard peers
+			// here if an edge is being changed and refresh the wireguard peers
+			if sql == raftdb.DeleteNodeEdge {
+				// If we are deleting a node edge, grab their public key
+				// so we can remove it from the wireguard config
+				nodeID := cmd.GetSqlExec().GetStatement().GetParameters()[0].GetStr()
+				log.Info("node edge being deleted", slog.String("node", nodeID))
+				err := s.wg.DeletePeer(ctx, nodeID)
+				if err != nil {
+					log.Error("error deleting wireguard peer", slog.String("node", nodeID), slog.String("error", err.Error()))
+				}
+			}
 			defer func() {
-				log.Debug("applied new node edge, refreshing wireguard peers")
+				log.Debug("applied node edge change, refreshing wireguard peers")
 				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
 					log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
 				}

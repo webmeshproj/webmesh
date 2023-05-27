@@ -123,6 +123,9 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 			err = fmt.Errorf("parse node private IPv4: %w", err)
 			return
 		}
+		// We are saving the full prefix length to the database so we need to
+		// truncate it to 32 bits here.
+		node.PrivateIPv4 = netip.PrefixFrom(node.PrivateIPv4.Addr(), 32)
 	}
 	if dbnode.NetworkIpv6.Valid {
 		node.NetworkIPv6, err = netip.ParsePrefix(dbnode.NetworkIpv6.String)
@@ -138,6 +141,23 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 // exist, ErrVertexNotFound should be returned. If the vertex has edges to other vertices,
 // ErrVertexHasEdges should be returned.
 func (g *GraphStore) RemoveVertex(nodeID string) error {
+	qr := raftdb.New(g.store.ReadDB())
+	_, err := qr.GetNode(context.Background(), nodeID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = graph.ErrVertexNotFound
+		}
+		return err
+	}
+	_, err = qr.NodeHasEdges(context.Background(), raftdb.NodeHasEdgesParams{
+		SrcNodeID: nodeID,
+		DstNodeID: nodeID,
+	})
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check node edges: %w", err)
+	} else if err == nil {
+		return graph.ErrVertexHasEdges
+	}
 	q := raftdb.New(g.store.DB())
 	if err := q.DeleteNode(context.Background(), nodeID); err != nil {
 		return fmt.Errorf("delete node: %w", err)
@@ -152,7 +172,7 @@ func (g *GraphStore) ListVertices() ([]string, error) {
 	ids, err := q.ListNodeIDs(context.Background())
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return []string{}, nil
 		}
 		return nil, fmt.Errorf("list node IDs: %w", err)
 	}
@@ -175,6 +195,21 @@ func (g *GraphStore) VertexCount() (int, error) {
 // If either vertex doesn't exit, ErrVertexNotFound should be returned for the respective
 // vertex. If the edge already exists, ErrEdgeAlreadyExists should be returned.
 func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
+	qr := raftdb.New(g.store.ReadDB())
+	_, err := qr.GetNode(context.Background(), sourceNode)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = graph.ErrVertexNotFound
+		}
+		return err
+	}
+	_, err = qr.GetNode(context.Background(), targetNode)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = graph.ErrVertexNotFound
+		}
+		return err
+	}
 	q := raftdb.New(g.store.DB())
 	params := raftdb.InsertNodeEdgeParams{
 		SrcNodeID: sourceNode,
@@ -191,7 +226,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 			Valid:  true,
 		}
 	}
-	err := q.InsertNodeEdge(context.Background(), params)
+	err = q.InsertNodeEdge(context.Background(), params)
 	if err != nil {
 		var sqlerr *sqlite.Error
 		if errors.As(err, &sqlerr) && sqlerr.Code() == sqlite3.SQLITE_CONSTRAINT {
@@ -296,7 +331,7 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[string], error) {
 	edges, err := q.ListNodeEdges(context.Background())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return []graph.Edge[string]{}, nil
 		}
 		return nil, fmt.Errorf("list node edges: %w", err)
 	}

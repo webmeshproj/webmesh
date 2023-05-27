@@ -15,3 +15,6 @@ SELECT * FROM node_edges;
 
 -- name: GetNodeEdge :one
 SELECT * FROM node_edges WHERE src_node_id = ? AND dst_node_id = ?;
+
+-- name: NodeHasEdges :one
+SELECT 1 FROM node_edges WHERE src_node_id = ? OR dst_node_id = ? LIMIT 1;

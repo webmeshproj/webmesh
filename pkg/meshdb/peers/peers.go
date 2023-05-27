@@ -189,7 +189,19 @@ func (p *peers) Update(ctx context.Context, node Node) (Node, error) {
 }
 
 func (p *peers) Delete(ctx context.Context, id string) error {
-	err := p.graph.RemoveVertex(id)
+	edges, err := p.graph.Edges()
+	if err != nil {
+		return fmt.Errorf("get edges: %w", err)
+	}
+	for _, edge := range edges {
+		if edge.Source == id || edge.Target == id {
+			err := p.graph.RemoveEdge(edge.Source, edge.Target)
+			if err != nil {
+				return fmt.Errorf("remove edge: %w", err)
+			}
+		}
+	}
+	err = p.graph.RemoveVertex(id)
 	if err != nil {
 		if errors.Is(err, graph.ErrVertexNotFound) {
 			// We don't return this error in the graph store

@@ -51,7 +51,9 @@ func (s *store) apply(l *raft.Log, cmd *v1.RaftLogEntry, log *slog.Logger, start
 	switch cmd.GetType() {
 	case v1.RaftCommandType_QUERY:
 		log.Debug("applying query",
-			slog.String("query", cmd.GetSqlQuery().GetStatement().GetSql()))
+			slog.String("query", cmd.GetSqlQuery().GetStatement().GetSql()),
+			slog.Any("params", cmd.GetSqlExec().GetStatement().GetParameters()),
+		)
 		res := s.applyQuery(ctx, log, cmd.GetSqlQuery(), startedAt)
 		if res.GetError() != "" {
 			log.Error("apply query failed", slog.String("error", res.GetError()))
@@ -61,7 +63,9 @@ func (s *store) apply(l *raft.Log, cmd *v1.RaftLogEntry, log *slog.Logger, start
 		return res
 	case v1.RaftCommandType_EXECUTE:
 		log.Debug("applying execute",
-			slog.String("execute", cmd.GetSqlExec().GetStatement().GetSql()))
+			slog.String("execute", cmd.GetSqlExec().GetStatement().GetSql()),
+			slog.Any("params", cmd.GetSqlExec().GetStatement().GetParameters()),
+		)
 		res := s.applyExecute(ctx, log, cmd.GetSqlExec(), startedAt)
 		if res.GetError() != "" {
 			log.Error("apply query failed", slog.String("error", res.GetError()))

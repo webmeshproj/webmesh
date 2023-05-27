@@ -22,8 +22,6 @@ import (
 
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
-
-	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 
 func (s *store) observe() (closeCh, doneCh chan struct{}) {
@@ -46,28 +44,15 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					s.log.Debug("RaftState", slog.String("data", data.String()))
 				case raft.PeerObservation:
 					s.log.Debug("PeerObservation", slog.Any("data", data))
-					if data.Removed {
-						// Remove the peer from the wireguard interface.
-						if err := s.wg.DeletePeer(ctx, &wireguard.Peer{ID: string(data.Peer.ID)}); err != nil {
-							s.log.Error("wireguard remove peer", slog.String("error", err.Error()))
-						}
-						return
-					}
 					if err := s.RefreshWireguardPeers(ctx); err != nil {
 						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
 					}
 				case raft.LeaderObservation:
 					s.log.Debug("LeaderObservation", slog.Any("data", data))
-					if err := s.RefreshWireguardPeers(ctx); err != nil {
-						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
-					}
 				case raft.ResumedHeartbeatObservation:
 					s.log.Debug("ResumedHeartbeatObservation", slog.Any("data", data))
 				case raft.FailedHeartbeatObservation:
 					s.log.Debug("FailedHeartbeatObservation", slog.Any("data", data))
-					if err := s.RefreshWireguardPeers(ctx); err != nil {
-						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
-					}
 				}
 			}
 		}

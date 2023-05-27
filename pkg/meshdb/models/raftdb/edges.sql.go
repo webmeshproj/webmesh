@@ -114,6 +114,22 @@ func (q *Queries) NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) 
 	return column_1, err
 }
 
+const NodeHasEdges = `-- name: NodeHasEdges :one
+SELECT 1 FROM node_edges WHERE src_node_id = ? OR dst_node_id = ? LIMIT 1
+`
+
+type NodeHasEdgesParams struct {
+	SrcNodeID string `json:"src_node_id"`
+	DstNodeID string `json:"dst_node_id"`
+}
+
+func (q *Queries) NodeHasEdges(ctx context.Context, arg NodeHasEdgesParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, NodeHasEdges, arg.SrcNodeID, arg.DstNodeID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const UpdateNodeEdge = `-- name: UpdateNodeEdge :exec
 UPDATE node_edges SET weight = ?, attrs = ? WHERE src_node_id = ? AND dst_node_id = ?
 `

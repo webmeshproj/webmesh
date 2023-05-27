@@ -91,7 +91,7 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	}
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
-	err := s.walkMeshDescendants(peers.New(s).Graph())
+	err := s.walkMeshDescendants(s.meshGraph)
 	if err != nil {
 		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
 		return nil
@@ -100,6 +100,8 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 }
 
 func (s *store) walkMeshDescendants(graph peers.Graph) error {
+	// TODO: Check for peers no longer in the mesh and remove them
+	// This is currently hacked into the FSM apply function
 	adjacencyMap, err := graph.AdjacencyMap()
 	if err != nil {
 		return fmt.Errorf("adjacency map: %w", err)

@@ -37,6 +37,7 @@ import (
 	"gitlab.com/webmesh/node/pkg/firewall"
 	"gitlab.com/webmesh/node/pkg/meshdb"
 	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 	"gitlab.com/webmesh/node/pkg/meshdb/snapshots"
 	"gitlab.com/webmesh/node/pkg/store/streamlayer"
 	"gitlab.com/webmesh/node/pkg/wireguard"
@@ -194,9 +195,10 @@ type store struct {
 	dataAppliedIndex   atomic.Uint64
 	dataMux            sync.RWMutex
 
-	wg    wireguard.Interface
-	fw    firewall.Firewall
-	wgmux sync.Mutex
+	meshGraph peers.Graph
+	wg        wireguard.Interface
+	fw        firewall.Firewall
+	wgmux     sync.Mutex
 
 	open atomic.Bool
 }

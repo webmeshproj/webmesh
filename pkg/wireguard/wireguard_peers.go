@@ -86,10 +86,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	}
 	peerCfg := wgtypes.PeerConfig{
 		PublicKey:                   peer.PublicKey,
-		UpdateOnly:                  false,
-		ReplaceAllowedIPs:           true,
 		AllowedIPs:                  allowedIPs,
 		PersistentKeepaliveInterval: keepAlive,
+		ReplaceAllowedIPs:           true,
 	}
 	var err error
 	if peer.Endpoint.IsValid() {
@@ -139,11 +138,11 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 }
 
 // DeletePeer removes a peer from the wireguard configuration.
-func (w *wginterface) DeletePeer(ctx context.Context, peer *Peer) error {
+func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
-	if key, ok := w.peers[peer.ID]; ok {
-		delete(w.peers, peer.ID)
+	if key, ok := w.peers[id]; ok {
+		delete(w.peers, id)
 		return w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 			Peers: []wgtypes.PeerConfig{
 				{

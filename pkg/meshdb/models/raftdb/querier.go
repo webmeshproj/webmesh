@@ -43,6 +43,7 @@ type Querier interface {
 	ListPublicWireguardEndpoints(ctx context.Context) ([]ListPublicWireguardEndpointsRow, error)
 	ListRaftACLs(ctx context.Context) ([]RaftAcl, error)
 	NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) (int64, error)
+	NodeHasEdges(ctx context.Context, arg NodeHasEdgesParams) (int64, error)
 	PutRaftACL(ctx context.Context, arg PutRaftACLParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
 	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error

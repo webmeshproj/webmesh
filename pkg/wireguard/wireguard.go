@@ -44,7 +44,7 @@ type Interface interface {
 	// PutPeer updates a peer in the wireguard configuration.
 	PutPeer(ctx context.Context, peer *Peer) error
 	// DeletePeer removes a peer from the wireguard configuration.
-	DeletePeer(ctx context.Context, peer *Peer) error
+	DeletePeer(ctx context.Context, id string) error
 	// Peers returns the list of peers in the wireguard configuration.
 	Peers() []string
 	// IsPublic returns true if this wireguard interface is publicly routable.
