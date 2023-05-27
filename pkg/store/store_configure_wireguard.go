@@ -25,7 +25,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/firewall"
-	"gitlab.com/webmesh/node/pkg/meshdb/meshgraph"
+	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 
@@ -91,12 +91,7 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	}
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
-	dag, err := meshgraph.New(s).Build(ctx)
-	if err != nil {
-		s.log.Error("build dag", slog.String("error", err.Error()))
-		return err
-	}
-	err = s.walkMeshDescendants(dag)
+	err := s.walkMeshDescendants(peers.New(s).Graph())
 	if err != nil {
 		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
 		return nil
@@ -104,7 +99,7 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	return nil
 }
 
-func (s *store) walkMeshDescendants(graph meshgraph.Graph) error {
+func (s *store) walkMeshDescendants(graph peers.Graph) error {
 	adjacencyMap, err := graph.AdjacencyMap()
 	if err != nil {
 		return fmt.Errorf("adjacency map: %w", err)
@@ -121,14 +116,14 @@ func (s *store) walkMeshDescendants(graph meshgraph.Graph) error {
 		peer := wireguard.Peer{
 			ID:         desc.ID,
 			PublicKey:  desc.PublicKey,
-			Endpoint:   desc.PublicEndpoint,
+			Endpoint:   netip.AddrPortFrom(desc.PublicEndpoint, uint16(desc.WireguardPort)),
 			AllowedIPs: make([]netip.Prefix, 0),
 		}
 		if desc.PrivateIPv4.IsValid() {
 			peer.AllowedIPs = append(peer.AllowedIPs, desc.PrivateIPv4)
 		}
-		if desc.PrivateIPv6.IsValid() {
-			peer.AllowedIPs = append(peer.AllowedIPs, desc.PrivateIPv6)
+		if desc.NetworkIPv6.IsValid() {
+			peer.AllowedIPs = append(peer.AllowedIPs, desc.NetworkIPv6)
 		}
 		descTargets := adjacencyMap[edge.Target]
 		if len(descTargets) > 0 {
@@ -138,8 +133,8 @@ func (s *store) walkMeshDescendants(graph meshgraph.Graph) error {
 					if target.PrivateIPv4.IsValid() {
 						peer.AllowedIPs = append(peer.AllowedIPs, target.PrivateIPv4)
 					}
-					if target.PrivateIPv6.IsValid() {
-						peer.AllowedIPs = append(peer.AllowedIPs, target.PrivateIPv6)
+					if target.NetworkIPv6.IsValid() {
+						peer.AllowedIPs = append(peer.AllowedIPs, target.NetworkIPv6)
 					}
 				}
 			}

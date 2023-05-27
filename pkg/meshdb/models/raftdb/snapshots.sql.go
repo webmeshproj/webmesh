@@ -29,12 +29,30 @@ func (q *Queries) DropMeshState(ctx context.Context) error {
 	return err
 }
 
+const DropNodeEdges = `-- name: DropNodeEdges :exec
+DELETE FROM node_edges
+`
+
+func (q *Queries) DropNodeEdges(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropNodeEdges)
+	return err
+}
+
 const DropNodes = `-- name: DropNodes :exec
 DELETE FROM nodes
 `
 
 func (q *Queries) DropNodes(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, DropNodes)
+	return err
+}
+
+const DropRaftACLs = `-- name: DropRaftACLs :exec
+DELETE FROM raft_acls
+`
+
+func (q *Queries) DropRaftACLs(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropRaftACLs)
 	return err
 }
 
@@ -92,6 +110,38 @@ func (q *Queries) DumpMeshState(ctx context.Context) ([]MeshState, error) {
 	return items, nil
 }
 
+const DumpNodeEdges = `-- name: DumpNodeEdges :many
+SELECT src_node_id, dst_node_id, weight, attrs FROM node_edges
+`
+
+func (q *Queries) DumpNodeEdges(ctx context.Context) ([]NodeEdge, error) {
+	rows, err := q.db.QueryContext(ctx, DumpNodeEdges)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NodeEdge
+	for rows.Next() {
+		var i NodeEdge
+		if err := rows.Scan(
+			&i.SrcNodeID,
+			&i.DstNodeID,
+			&i.Weight,
+			&i.Attrs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const DumpNodes = `-- name: DumpNodes :many
 SELECT id, public_key, raft_port, grpc_port, wireguard_port, public_endpoint, network_ipv6, created_at, updated_at FROM nodes
 `
@@ -113,6 +163,39 @@ func (q *Queries) DumpNodes(ctx context.Context) ([]Node, error) {
 			&i.WireguardPort,
 			&i.PublicEndpoint,
 			&i.NetworkIpv6,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const DumpRaftACLs = `-- name: DumpRaftACLs :many
+SELECT name, nodes, "action", created_at, updated_at FROM raft_acls
+`
+
+func (q *Queries) DumpRaftACLs(ctx context.Context) ([]RaftAcl, error) {
+	rows, err := q.db.QueryContext(ctx, DumpRaftACLs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RaftAcl
+	for rows.Next() {
+		var i RaftAcl
+		if err := rows.Scan(
+			&i.Name,
+			&i.Nodes,
+			&i.Action,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -197,6 +280,49 @@ func (q *Queries) RestoreNode(ctx context.Context, arg RestoreNodeParams) error 
 		arg.WireguardPort,
 		arg.PublicEndpoint,
 		arg.NetworkIpv6,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const RestoreNodeEdge = `-- name: RestoreNodeEdge :exec
+INSERT INTO node_edges (src_node_id, dst_node_id) VALUES (?, ?)
+`
+
+type RestoreNodeEdgeParams struct {
+	SrcNodeID string `json:"src_node_id"`
+	DstNodeID string `json:"dst_node_id"`
+}
+
+func (q *Queries) RestoreNodeEdge(ctx context.Context, arg RestoreNodeEdgeParams) error {
+	_, err := q.db.ExecContext(ctx, RestoreNodeEdge, arg.SrcNodeID, arg.DstNodeID)
+	return err
+}
+
+const RestoreRaftACL = `-- name: RestoreRaftACL :exec
+INSERT INTO raft_acls (
+    name,
+    nodes,
+    action,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?)
+`
+
+type RestoreRaftACLParams struct {
+	Name      string    `json:"name"`
+	Nodes     string    `json:"nodes"`
+	Action    int64     `json:"action"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) RestoreRaftACL(ctx context.Context, arg RestoreRaftACLParams) error {
+	_, err := q.db.ExecContext(ctx, RestoreRaftACL,
+		arg.Name,
+		arg.Nodes,
+		arg.Action,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)

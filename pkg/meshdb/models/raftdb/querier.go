@@ -15,13 +15,18 @@ type Querier interface {
 	DeleteRaftACL(ctx context.Context, name string) error
 	DropLeases(ctx context.Context) error
 	DropMeshState(ctx context.Context) error
+	DropNodeEdges(ctx context.Context) error
 	DropNodes(ctx context.Context) error
+	DropRaftACLs(ctx context.Context) error
 	DumpLeases(ctx context.Context) ([]Lease, error)
 	DumpMeshState(ctx context.Context) ([]MeshState, error)
+	DumpNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	DumpNodes(ctx context.Context) ([]Node, error)
+	DumpRaftACLs(ctx context.Context) ([]RaftAcl, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
-	GetNodeEdges(ctx context.Context, srcNodeID string) ([]string, error)
+	GetNodeCount(ctx context.Context) (int64, error)
+	GetNodeEdge(ctx context.Context, arg GetNodeEdgeParams) (NodeEdge, error)
 	GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
 	GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
 	GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error)
@@ -43,9 +48,12 @@ type Querier interface {
 	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error
 	RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error
 	RestoreNode(ctx context.Context, arg RestoreNodeParams) error
+	RestoreNodeEdge(ctx context.Context, arg RestoreNodeEdgeParams) error
+	RestoreRaftACL(ctx context.Context, arg RestoreRaftACLParams) error
 	SetIPv4Prefix(ctx context.Context, value string) error
 	SetULAPrefix(ctx context.Context, value string) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
+	UpdateNodeEdge(ctx context.Context, arg UpdateNodeEdgeParams) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -75,6 +75,9 @@ docker-push-gobgp: ## Push docker image with gobgp.
 compose-up: ## Run docker-compose stack.
 	IMAGE=$(IMAGE) docker-compose up
 
+pull-db:
+	docker-compose cp bootstrap-node-1:/data/webmesh.sqlite ./webmesh.sqlite
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...

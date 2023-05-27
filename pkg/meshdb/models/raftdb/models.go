@@ -33,8 +33,10 @@ type Node struct {
 }
 
 type NodeEdge struct {
-	SrcNodeID string `json:"src_node_id"`
-	DstNodeID string `json:"dst_node_id"`
+	SrcNodeID string         `json:"src_node_id"`
+	DstNodeID string         `json:"dst_node_id"`
+	Weight    int64          `json:"weight"`
+	Attrs     sql.NullString `json:"attrs"`
 }
 
 type NodePrivateRaftAddress struct {

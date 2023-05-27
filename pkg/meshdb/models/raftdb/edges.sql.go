@@ -7,6 +7,7 @@ package raftdb
 
 import (
 	"context"
+	"database/sql"
 )
 
 const DeleteNodeEdge = `-- name: DeleteNodeEdge :exec
@@ -23,49 +24,50 @@ func (q *Queries) DeleteNodeEdge(ctx context.Context, arg DeleteNodeEdgeParams) 
 	return err
 }
 
-const GetNodeEdges = `-- name: GetNodeEdges :many
-SELECT dst_node_id FROM node_edges WHERE src_node_id = ?
+const GetNodeEdge = `-- name: GetNodeEdge :one
+SELECT src_node_id, dst_node_id, weight, attrs FROM node_edges WHERE src_node_id = ? AND dst_node_id = ?
 `
 
-func (q *Queries) GetNodeEdges(ctx context.Context, srcNodeID string) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, GetNodeEdges, srcNodeID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var dst_node_id string
-		if err := rows.Scan(&dst_node_id); err != nil {
-			return nil, err
-		}
-		items = append(items, dst_node_id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const InsertNodeEdge = `-- name: InsertNodeEdge :exec
-INSERT OR REPLACE INTO node_edges (src_node_id, dst_node_id) VALUES (?, ?)
-`
-
-type InsertNodeEdgeParams struct {
+type GetNodeEdgeParams struct {
 	SrcNodeID string `json:"src_node_id"`
 	DstNodeID string `json:"dst_node_id"`
 }
 
+func (q *Queries) GetNodeEdge(ctx context.Context, arg GetNodeEdgeParams) (NodeEdge, error) {
+	row := q.db.QueryRowContext(ctx, GetNodeEdge, arg.SrcNodeID, arg.DstNodeID)
+	var i NodeEdge
+	err := row.Scan(
+		&i.SrcNodeID,
+		&i.DstNodeID,
+		&i.Weight,
+		&i.Attrs,
+	)
+	return i, err
+}
+
+const InsertNodeEdge = `-- name: InsertNodeEdge :exec
+INSERT INTO node_edges (src_node_id, dst_node_id, weight, attrs) VALUES (?, ?, ?, ?)
+`
+
+type InsertNodeEdgeParams struct {
+	SrcNodeID string         `json:"src_node_id"`
+	DstNodeID string         `json:"dst_node_id"`
+	Weight    int64          `json:"weight"`
+	Attrs     sql.NullString `json:"attrs"`
+}
+
 func (q *Queries) InsertNodeEdge(ctx context.Context, arg InsertNodeEdgeParams) error {
-	_, err := q.db.ExecContext(ctx, InsertNodeEdge, arg.SrcNodeID, arg.DstNodeID)
+	_, err := q.db.ExecContext(ctx, InsertNodeEdge,
+		arg.SrcNodeID,
+		arg.DstNodeID,
+		arg.Weight,
+		arg.Attrs,
+	)
 	return err
 }
 
 const ListNodeEdges = `-- name: ListNodeEdges :many
-SELECT src_node_id, dst_node_id FROM node_edges
+SELECT src_node_id, dst_node_id, weight, attrs FROM node_edges
 `
 
 func (q *Queries) ListNodeEdges(ctx context.Context) ([]NodeEdge, error) {
@@ -77,7 +79,12 @@ func (q *Queries) ListNodeEdges(ctx context.Context) ([]NodeEdge, error) {
 	var items []NodeEdge
 	for rows.Next() {
 		var i NodeEdge
-		if err := rows.Scan(&i.SrcNodeID, &i.DstNodeID); err != nil {
+		if err := rows.Scan(
+			&i.SrcNodeID,
+			&i.DstNodeID,
+			&i.Weight,
+			&i.Attrs,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -105,4 +112,25 @@ func (q *Queries) NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) 
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const UpdateNodeEdge = `-- name: UpdateNodeEdge :exec
+UPDATE node_edges SET weight = ?, attrs = ? WHERE src_node_id = ? AND dst_node_id = ?
+`
+
+type UpdateNodeEdgeParams struct {
+	Weight    int64          `json:"weight"`
+	Attrs     sql.NullString `json:"attrs"`
+	SrcNodeID string         `json:"src_node_id"`
+	DstNodeID string         `json:"dst_node_id"`
+}
+
+func (q *Queries) UpdateNodeEdge(ctx context.Context, arg UpdateNodeEdgeParams) error {
+	_, err := q.db.ExecContext(ctx, UpdateNodeEdge,
+		arg.Weight,
+		arg.Attrs,
+		arg.SrcNodeID,
+		arg.DstNodeID,
+	)
+	return err
 }

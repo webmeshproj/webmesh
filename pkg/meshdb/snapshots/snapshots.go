@@ -55,9 +55,11 @@ func New(db *sql.DB) Snapshotter {
 }
 
 type snapshotModel struct {
-	State  []raftdb.MeshState `json:"state"`
-	Nodes  []raftdb.Node      `json:"nodes"`
-	Leases []raftdb.Lease     `json:"leases"`
+	State     []raftdb.MeshState `json:"state"`
+	Nodes     []raftdb.Node      `json:"nodes"`
+	Leases    []raftdb.Lease     `json:"leases"`
+	RaftACLs  []raftdb.RaftAcl   `json:"raft_acls"`
+	NodeEdges []raftdb.NodeEdge  `json:"node_edges"`
 }
 
 func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
@@ -77,6 +79,14 @@ func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 	model.Leases, err = q.DumpLeases(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("dump leases: %w", err)
+	}
+	model.RaftACLs, err = q.DumpRaftACLs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("dump raft acls: %w", err)
+	}
+	model.NodeEdges, err = q.DumpNodeEdges(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("dump node edges: %w", err)
 	}
 	var buf bytes.Buffer
 	gzw := gzip.NewWriter(&buf)
@@ -130,6 +140,14 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	if err != nil {
 		return fmt.Errorf("drop leases: %w", err)
 	}
+	err = q.DropRaftACLs(ctx)
+	if err != nil {
+		return fmt.Errorf("drop raft acls: %w", err)
+	}
+	err = q.DropNodeEdges(ctx)
+	if err != nil {
+		return fmt.Errorf("drop node edges: %w", err)
+	}
 	for _, state := range model.State {
 		s.log.Debug("restoring mesh state", slog.Any("state", state))
 		// nolint:gosimple
@@ -169,6 +187,31 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 		})
 		if err != nil {
 			return fmt.Errorf("restore lease: %w", err)
+		}
+	}
+	for _, acl := range model.RaftACLs {
+		s.log.Debug("restoring raft acl", slog.Any("acl", acl))
+		// nolint:gosimple
+		err = q.RestoreRaftACL(ctx, raftdb.RestoreRaftACLParams{
+			Name:      acl.Name,
+			Nodes:     acl.Nodes,
+			Action:    acl.Action,
+			CreatedAt: acl.CreatedAt,
+			UpdatedAt: acl.UpdatedAt,
+		})
+		if err != nil {
+			return fmt.Errorf("restore raft acl: %w", err)
+		}
+	}
+	for _, edge := range model.NodeEdges {
+		s.log.Debug("restoring node edge", slog.Any("edge", edge))
+		// nolint:gosimple
+		err = q.RestoreNodeEdge(ctx, raftdb.RestoreNodeEdgeParams{
+			SrcNodeID: edge.SrcNodeID,
+			DstNodeID: edge.DstNodeID,
+		})
+		if err != nil {
+			return fmt.Errorf("restore node edge: %w", err)
 		}
 	}
 	err = tx.Commit()

@@ -184,7 +184,7 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 	switch q.Qtype {
 	case dns.TypeTXT:
 		s.log.Debug("handling TXT question")
-		m.Answer = append(m.Answer, s.newPeerTXTRecord(fqdn, peer))
+		m.Answer = append(m.Answer, s.newPeerTXTRecord(fqdn, &peer))
 		if peer.PrivateIPv4.IsValid() {
 			m.Extra = append(m.Extra, &dns.A{
 				Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
@@ -204,7 +204,7 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 				Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
 				A:   peer.PrivateIPv4.Addr().AsSlice(),
 			})
-			m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, peer))
+			m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, &peer))
 		} else {
 			s.log.Debug("no private IPv4 address for peer")
 			m.SetRcode(r, dns.RcodeNameError)
@@ -222,7 +222,7 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 				Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
 				AAAA: peer.NetworkIPv6.Addr().AsSlice(),
 			})
-			m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, peer))
+			m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, &peer))
 		} else {
 			s.log.Debug("no network IPv6 address for peer")
 			m.SetRcode(r, dns.RcodeNameError)

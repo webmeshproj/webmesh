@@ -3,6 +3,7 @@ module gitlab.com/webmesh/node
 go 1.20
 
 require (
+	github.com/dominikbraun/graph v0.22.0
 	github.com/elastic/go-sysinfo v1.10.1
 	github.com/golang/snappy v0.0.4
 	github.com/google/nftables v0.1.0
@@ -12,7 +13,6 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/raft v1.5.0
 	github.com/hashicorp/raft-boltdb v0.0.0-20230125174641-2a8082862702
-	github.com/heimdalr/dag v1.2.1
 	github.com/jsimonetti/rtnetlink v1.3.3
 	github.com/miekg/dns v1.1.54
 	github.com/pelletier/go-toml/v2 v2.0.7
@@ -45,10 +45,8 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dominikbraun/graph v0.22.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
-	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect

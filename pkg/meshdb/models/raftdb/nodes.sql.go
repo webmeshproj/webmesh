@@ -122,6 +122,17 @@ func (q *Queries) GetNode(ctx context.Context, id string) (GetNodeRow, error) {
 	return i, err
 }
 
+const GetNodeCount = `-- name: GetNodeCount :one
+SELECT COUNT(*) AS count FROM nodes
+`
+
+func (q *Queries) GetNodeCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, GetNodeCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const ListNodeIDs = `-- name: ListNodeIDs :many
 SELECT nodes.id AS id FROM nodes
 `

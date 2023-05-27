@@ -25,6 +25,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/dominikbraun/graph"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/meshdb"
@@ -36,16 +37,22 @@ var ErrNodeNotFound = errors.New("node not found")
 
 // Peers is the peers interface.
 type Peers interface {
+	// Graph returns the graph of nodes.
+	Graph() Graph
 	// Create creates a new node.
-	Create(ctx context.Context, opts *CreateOptions) (*Node, error)
+	Create(ctx context.Context, opts *CreateOptions) (Node, error)
 	// Get gets a node by ID.
-	Get(ctx context.Context, id string) (*Node, error)
+	Get(ctx context.Context, id string) (Node, error)
 	// Update updates a node.
-	Update(ctx context.Context, node *Node) (*Node, error)
+	Update(ctx context.Context, node Node) (Node, error)
 	// Delete deletes a node.
 	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
 	List(ctx context.Context) ([]Node, error)
+	// AddEdge adds an edge between two nodes.
+	AddEdge(ctx context.Context, from, to string) error
+	// RemoveEdge removes an edge between two nodes.
+	RemoveEdge(ctx context.Context, from, to string) error
 }
 
 // Node represents a node. Not all fields are populated in all contexts.
@@ -93,109 +100,59 @@ type CreateOptions struct {
 
 // New returns a new Peers interface.
 func New(store meshdb.Store) Peers {
-	return &peers{store}
+	return &peers{
+		store: store,
+		graph: graph.NewWithStore(graphHasher, graph.Store[string, Node](&GraphStore{
+			store: store,
+		})),
+	}
 }
 
 type peers struct {
 	store meshdb.Store
+	graph Graph
 }
 
-func (p *peers) Delete(ctx context.Context, id string) error {
-	q := raftdb.New(p.store.DB())
-	if err := q.DeleteNode(ctx, id); err != nil {
-		return fmt.Errorf("delete node: %w", err)
-	}
-	return nil
-}
+func (p *peers) Graph() Graph { return p.graph }
 
-func (p *peers) Create(ctx context.Context, opts *CreateOptions) (*Node, error) {
-	q := raftdb.New(p.store.DB())
-	params := raftdb.CreateNodeParams{
-		ID: opts.ID,
-		PublicKey: sql.NullString{
-			String: opts.PublicKey.String(),
-			Valid:  true,
-		},
-		GrpcPort:      int64(opts.GRPCPort),
-		RaftPort:      int64(opts.RaftPort),
-		WireguardPort: int64(opts.WireguardPort),
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
-	}
-	if opts.NetworkIPv6.IsValid() {
-		params.NetworkIpv6 = sql.NullString{
-			String: opts.NetworkIPv6.String(),
-			Valid:  true,
-		}
-	}
-	if opts.PublicEndpoint.IsValid() {
-		params.PublicEndpoint = sql.NullString{
-			String: opts.PublicEndpoint.String(),
-			Valid:  true,
-		}
-	}
-	node, err := q.CreateNode(ctx, params)
+func (p *peers) Create(ctx context.Context, opts *CreateOptions) (Node, error) {
+	key, err := wgtypes.ParseKey(opts.PublicKey.String())
 	if err != nil {
-		return nil, fmt.Errorf("create node: %w", err)
+		return Node{}, fmt.Errorf("parse public key: %w", err)
 	}
-	out, err := nodeModelToNode(&node)
+	err = p.graph.AddVertex(Node{
+		ID:             opts.ID,
+		PublicKey:      key,
+		PublicEndpoint: opts.PublicEndpoint,
+		NetworkIPv6:    opts.NetworkIPv6,
+		GRPCPort:       opts.GRPCPort,
+		RaftPort:       opts.RaftPort,
+		WireguardPort:  opts.WireguardPort,
+		CreatedAt:      time.Now().UTC(),
+		UpdatedAt:      time.Now().UTC(),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("convert node model to node: %w", err)
+		return Node{}, fmt.Errorf("add vertex: %w", err)
+	}
+	out, err := p.graph.Vertex(opts.ID)
+	if err != nil {
+		return Node{}, fmt.Errorf("get vertex: %w", err)
 	}
 	return out, nil
 }
 
-func (p *peers) Get(ctx context.Context, id string) (*Node, error) {
-	q := raftdb.New(p.store.ReadDB())
-	node, err := q.GetNode(ctx, id)
+func (p *peers) Get(ctx context.Context, id string) (Node, error) {
+	node, err := p.graph.Vertex(id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNodeNotFound
+		if errors.Is(err, graph.ErrVertexNotFound) {
+			return Node{}, ErrNodeNotFound
 		}
-		return nil, err
+		return Node{}, fmt.Errorf("get node: %w", err)
 	}
-	var key wgtypes.Key
-	if node.PublicKey.Valid {
-		key, err = wgtypes.ParseKey(node.PublicKey.String)
-		if err != nil {
-			return nil, fmt.Errorf("parse node public key: %w", err)
-		}
-	}
-	var primaryEndpoint netip.Addr
-	if node.PublicEndpoint.Valid {
-		primaryEndpoint, err = netip.ParseAddr(node.PublicEndpoint.String)
-		if err != nil {
-			return nil, fmt.Errorf("parse node endpoint: %w", err)
-		}
-	}
-	var privateIPv4, privateIPv6 netip.Prefix
-	if node.PrivateAddressV4 != "" {
-		privateIPv4, err = netip.ParsePrefix(node.PrivateAddressV4)
-		if err != nil {
-			return nil, fmt.Errorf("parse node private IPv4: %w", err)
-		}
-	}
-	if node.NetworkIpv6.Valid {
-		privateIPv6, err = netip.ParsePrefix(node.NetworkIpv6.String)
-		if err != nil {
-			return nil, fmt.Errorf("parse node private IPv6: %w", err)
-		}
-	}
-	return &Node{
-		ID:             node.ID,
-		PublicKey:      key,
-		PublicEndpoint: primaryEndpoint,
-		PrivateIPv4:    privateIPv4,
-		NetworkIPv6:    privateIPv6,
-		GRPCPort:       int(node.GrpcPort),
-		RaftPort:       int(node.RaftPort),
-		WireguardPort:  int(node.WireguardPort),
-		UpdatedAt:      node.UpdatedAt,
-		CreatedAt:      node.CreatedAt,
-	}, nil
+	return node, nil
 }
 
-func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
+func (p *peers) Update(ctx context.Context, node Node) (Node, error) {
 	q := raftdb.New(p.store.DB())
 	params := raftdb.UpdateNodeParams{
 		ID:            node.ID,
@@ -222,13 +179,26 @@ func (p *peers) Update(ctx context.Context, node *Node) (*Node, error) {
 	}
 	updated, err := q.UpdateNode(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("update node: %w", err)
+		return Node{}, fmt.Errorf("update node: %w", err)
 	}
 	out, err := nodeModelToNode(&updated)
 	if err != nil {
-		return nil, fmt.Errorf("convert node model to node: %w", err)
+		return Node{}, fmt.Errorf("convert node model to node: %w", err)
 	}
 	return out, nil
+}
+
+func (p *peers) Delete(ctx context.Context, id string) error {
+	err := p.graph.RemoveVertex(id)
+	if err != nil {
+		if errors.Is(err, graph.ErrVertexNotFound) {
+			// We don't return this error in the graph store
+			// implementation, so we don't return it here either.
+			return nil
+		}
+		return fmt.Errorf("remove vertex: %w", err)
+	}
+	return nil
 }
 
 func (p *peers) List(ctx context.Context) ([]Node, error) {
@@ -285,30 +255,56 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 	return out, nil
 }
 
-func nodeModelToNode(node *raftdb.Node) (*Node, error) {
+// AddEdge adds an edge between two nodes.
+func (p *peers) AddEdge(ctx context.Context, from, to string) error {
+	// Save the raft log some trouble by checking if the edge already exists.
+	err := p.graph.AddEdge(from, to)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, graph.ErrEdgeAlreadyExists) {
+		return fmt.Errorf("add edge: %w", err)
+	}
+	// If the edge already exists, we can just return.
+	return nil
+}
+
+// RemoveEdge removes an edge between two nodes.
+func (p *peers) RemoveEdge(ctx context.Context, from, to string) error {
+	err := p.graph.RemoveEdge(from, to)
+	if err != nil {
+		if err == graph.ErrEdgeNotFound {
+			return nil
+		}
+		return fmt.Errorf("remove edge: %w", err)
+	}
+	return nil
+}
+
+func nodeModelToNode(node *raftdb.Node) (Node, error) {
 	var err error
 	var key wgtypes.Key
 	var primaryEndpoint netip.Addr
 	if node.PublicKey.Valid {
 		key, err = wgtypes.ParseKey(node.PublicKey.String)
 		if err != nil {
-			return nil, fmt.Errorf("parse node public key: %w", err)
+			return Node{}, fmt.Errorf("parse node public key: %w", err)
 		}
 	}
 	if node.PublicEndpoint.Valid {
 		primaryEndpoint, err = netip.ParseAddr(node.PublicEndpoint.String)
 		if err != nil {
-			return nil, fmt.Errorf("parse endpoint: %w", err)
+			return Node{}, fmt.Errorf("parse endpoint: %w", err)
 		}
 	}
 	var networkV6 netip.Prefix
 	if node.NetworkIpv6.Valid {
 		networkV6, err = netip.ParsePrefix(node.NetworkIpv6.String)
 		if err != nil {
-			return nil, fmt.Errorf("parse network IPv6: %w", err)
+			return Node{}, fmt.Errorf("parse network IPv6: %w", err)
 		}
 	}
-	return &Node{
+	return Node{
 		ID:             node.ID,
 		PublicKey:      key,
 		PublicEndpoint: primaryEndpoint,

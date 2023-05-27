@@ -35,10 +35,13 @@ CREATE TABLE raft_acls (
     updated_at  TIMESTAMP NOT NULL
 );
 
--- Tracks edges between nodes so a DAG can be constructed.
+-- Tracks edges between nodes for the mesh graph.
 CREATE TABLE node_edges (
-    src_node_id TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
-    dst_node_id TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE
+    src_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
+    dst_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
+    weight       INTEGER NOT NULL DEFAULT 1,
+    attrs        TEXT,
+    CONSTRAINT   node_edges_pkey PRIMARY KEY (src_node_id, dst_node_id)
 );
 
 -- Views for more convenient querying.

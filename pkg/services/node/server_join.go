@@ -86,7 +86,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	log := s.log.With("id", req.GetId())
 
 	// Check if the peer already exists
-	var peer *peers.Node
+	var peer peers.Node
 	peer, err = s.peers.Get(ctx, req.GetId())
 	if err != nil && err != peers.ErrNodeNotFound {
 		// Database error
@@ -157,7 +157,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 	log.Debug("adding edge from joining server to caller", slog.String("joining_server", joiningServer))
-	err = s.meshgraph.AddEdge(ctx, joiningServer, req.GetId())
+	err = s.peers.AddEdge(ctx, joiningServer, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 	}
@@ -167,7 +167,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		for _, server := range config.Servers {
 			if server.Suffrage == raft.Voter {
 				log.Debug("adding edge from caller to voter", slog.String("voter", string(server.ID)))
-				err = s.meshgraph.AddEdge(ctx, req.GetId(), string(server.ID))
+				err = s.peers.AddEdge(ctx, req.GetId(), string(server.ID))
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 				}
@@ -199,12 +199,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
-	// Get the newly updated mesh graph
-	graph, err := s.meshgraph.Build(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to build mesh DAG: %v", err)
-	}
-
 	// Start building the response
 	resp := &v1.JoinResponse{
 		NetworkIpv6: peer.NetworkIPv6.String(),
@@ -217,6 +211,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// Build current peers for the new node
+	graph := s.peers.Graph()
 	adjacencyMap, err := graph.AdjacencyMap()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get adjacency map: %v", err)
@@ -232,7 +227,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			PublicKey: desc.PublicKey.String(),
 			PublicEndpoint: func() string {
 				if desc.PublicEndpoint.IsValid() {
-					return desc.PublicEndpoint.String()
+					return netip.AddrPortFrom(desc.PublicEndpoint, uint16(desc.WireguardPort)).String()
 				}
 				return ""
 			}(),
@@ -243,8 +238,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				return ""
 			}(),
 			AddressIpv6: func() string {
-				if desc.PrivateIPv6.IsValid() {
-					return desc.PrivateIPv6.String()
+				if desc.NetworkIPv6.IsValid() {
+					return desc.NetworkIPv6.String()
 				}
 				return ""
 			}(),
@@ -253,8 +248,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if desc.PrivateIPv4.IsValid() {
 			peer.AllowedIps = append(peer.AllowedIps, desc.PrivateIPv4.String())
 		}
-		if desc.PrivateIPv6.IsValid() {
-			peer.AllowedIps = append(peer.AllowedIps, desc.PrivateIPv6.String())
+		if desc.NetworkIPv6.IsValid() {
+			peer.AllowedIps = append(peer.AllowedIps, desc.NetworkIPv6.String())
 		}
 		descTargets := adjacencyMap[edge.Target]
 		if len(descTargets) > 0 {
@@ -264,8 +259,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 					if target.PrivateIPv4.IsValid() {
 						peer.AllowedIps = append(peer.AllowedIps, target.PrivateIPv4.String())
 					}
-					if target.PrivateIPv6.IsValid() {
-						peer.AllowedIps = append(peer.AllowedIps, target.PrivateIPv6.String())
+					if target.NetworkIPv6.IsValid() {
+						peer.AllowedIps = append(peer.AllowedIps, target.NetworkIPv6.String())
 					}
 				}
 			}

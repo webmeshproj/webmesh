@@ -38,3 +38,27 @@ INSERT INTO leases (
     ipv4,
     created_at
 ) VALUES ( ?, ?, ? );
+
+-- name: DumpRaftACLs :many
+SELECT * FROM raft_acls;
+
+-- name: DropRaftACLs :exec
+DELETE FROM raft_acls;
+
+-- name: RestoreRaftACL :exec
+INSERT INTO raft_acls (
+    name,
+    nodes,
+    action,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?);
+
+-- name: DumpNodeEdges :many
+SELECT * FROM node_edges;
+
+-- name: DropNodeEdges :exec
+DELETE FROM node_edges;
+
+-- name: RestoreNodeEdge :exec
+INSERT INTO node_edges (src_node_id, dst_node_id) VALUES (?, ?);

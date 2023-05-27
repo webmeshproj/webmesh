@@ -35,6 +35,20 @@ import (
 	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 )
 
+// Snapshot returns a Raft snapshot.
+func (s *store) Snapshot() (raft.FSMSnapshot, error) {
+	s.dataMux.Lock()
+	defer s.dataMux.Unlock()
+	return s.snapshotter.Snapshot(context.Background())
+}
+
+// Restore restores a Raft snapshot.
+func (s *store) Restore(r io.ReadCloser) error {
+	s.dataMux.Lock()
+	defer s.dataMux.Unlock()
+	return s.snapshotter.Restore(context.Background(), r)
+}
+
 // ApplyBatch implements the raft.BatchingFSM interface.
 func (s *store) ApplyBatch(logs []*raft.Log) []any {
 	s.log.Debug("applying batch", slog.Int("count", len(logs)))
@@ -151,20 +165,6 @@ func (s *store) Apply(l *raft.Log) any {
 	}
 
 	return s.apply(l, &cmd, log, start)
-}
-
-// Snapshot returns a Raft snapshot.
-func (s *store) Snapshot() (raft.FSMSnapshot, error) {
-	s.dataMux.Lock()
-	defer s.dataMux.Unlock()
-	return s.snapshotter.Snapshot(context.Background())
-}
-
-// Restore restores a Raft snapshot.
-func (s *store) Restore(r io.ReadCloser) error {
-	s.dataMux.Lock()
-	defer s.dataMux.Unlock()
-	return s.snapshotter.Restore(context.Background(), r)
 }
 
 func (s *store) getDBTermAndIndex() (term, index uint64, err error) {

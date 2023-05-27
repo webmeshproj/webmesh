@@ -1,5 +1,8 @@
 -- name: InsertNodeEdge :exec
-INSERT OR REPLACE INTO node_edges (src_node_id, dst_node_id) VALUES (?, ?);
+INSERT INTO node_edges (src_node_id, dst_node_id, weight, attrs) VALUES (?, ?, ?, ?);
+
+-- name: UpdateNodeEdge :exec
+UPDATE node_edges SET weight = ?, attrs = ? WHERE src_node_id = ? AND dst_node_id = ?;
 
 -- name: NodeEdgeExists :one
 SELECT 1 FROM node_edges WHERE src_node_id = ? AND dst_node_id = ?;
@@ -10,5 +13,5 @@ DELETE FROM node_edges WHERE src_node_id = ? AND dst_node_id = ?;
 -- name: ListNodeEdges :many
 SELECT * FROM node_edges;
 
--- name: GetNodeEdges :many
-SELECT dst_node_id FROM node_edges WHERE src_node_id = ?;
+-- name: GetNodeEdge :one
+SELECT * FROM node_edges WHERE src_node_id = ? AND dst_node_id = ?;

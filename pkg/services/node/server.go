@@ -26,7 +26,6 @@ import (
 	"golang.org/x/exp/slog"
 
 	"gitlab.com/webmesh/node/pkg/meshdb/ipam"
-	"gitlab.com/webmesh/node/pkg/meshdb/meshgraph"
 	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 	"gitlab.com/webmesh/node/pkg/meshdb/raftacls"
 	"gitlab.com/webmesh/node/pkg/meshdb/state"
@@ -42,7 +41,6 @@ type Server struct {
 	ipam      ipam.IPAM
 	meshstate state.State
 	raftacls  raftacls.RaftACLs
-	meshgraph meshgraph.MeshGraph
 
 	ulaPrefix netip.Prefix
 	features  []v1.Feature
@@ -62,7 +60,6 @@ func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature) 
 		ipam:      ipam.New(store),
 		meshstate: state.New(store),
 		raftacls:  raftacls.New(store),
-		meshgraph: meshgraph.New(store),
 		features:  features,
 		startedAt: time.Now(),
 		log:       slog.Default().With("component", "node-server"),

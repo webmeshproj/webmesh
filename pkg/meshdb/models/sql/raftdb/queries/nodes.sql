@@ -1,3 +1,6 @@
+-- name: GetNodeCount :one
+SELECT COUNT(*) AS count FROM nodes;
+
 -- name: CreateNode :one
 INSERT INTO nodes (
     id,

@@ -40,5 +40,5 @@ func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshN
 	if err != nil {
 		s.log.Error("failed to get leader", slog.String("error", err.Error()))
 	}
-	return dbNodeToAPINode(node, leader, servers), nil
+	return dbNodeToAPINode(&node, leader, servers), nil
 }
