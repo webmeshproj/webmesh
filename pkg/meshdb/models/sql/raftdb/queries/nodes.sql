@@ -1,6 +1,12 @@
 -- name: GetNodeCount :one
 SELECT COUNT(*) AS count FROM nodes;
 
+-- name: NodeExists :one
+SELECT 1 FROM nodes WHERE id = ?;
+
+-- name: EitherNodeExists :one
+SELECT 1 FROM nodes WHERE id = ? OR id = ?;
+
 -- name: InsertNode :one
 INSERT INTO nodes (
     id,

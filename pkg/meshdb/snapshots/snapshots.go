@@ -209,7 +209,7 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 		err = q.RestoreNodeEdge(ctx, raftdb.RestoreNodeEdgeParams{
 			SrcNodeID: edge.SrcNodeID,
 			DstNodeID: edge.DstNodeID,
-			// TODO: Weight is not being restore, but it's not used anywhere.
+			// TODO: Weight is not being restored, but it's not used anywhere yet.
 		})
 		if err != nil {
 			return fmt.Errorf("restore node edge: %w", err)

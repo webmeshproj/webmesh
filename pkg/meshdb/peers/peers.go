@@ -35,6 +35,11 @@ import (
 // ErrNodeNotFound is returned when a node is not found.
 var ErrNodeNotFound = errors.New("node not found")
 
+// Graph is the graph.Graph implementation for the mesh network.
+type Graph graph.Graph[string, Node]
+
+func graphHasher(n Node) string { return n.ID }
+
 // Peers is the peers interface.
 type Peers interface {
 	// Graph returns the graph of nodes.
@@ -100,9 +105,7 @@ type PutOptions struct {
 func New(store meshdb.Store) Peers {
 	return &peers{
 		store: store,
-		graph: graph.NewWithStore(graphHasher, graph.Store[string, Node](&GraphStore{
-			store: store,
-		})),
+		graph: NewGraph(store),
 	}
 }
 
@@ -114,13 +117,9 @@ type peers struct {
 func (p *peers) Graph() Graph { return p.graph }
 
 func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
-	key, err := wgtypes.ParseKey(opts.PublicKey.String())
-	if err != nil {
-		return Node{}, fmt.Errorf("parse public key: %w", err)
-	}
-	err = p.graph.AddVertex(Node{
+	err := p.graph.AddVertex(Node{
 		ID:             opts.ID,
-		PublicKey:      key,
+		PublicKey:      opts.PublicKey,
 		PublicEndpoint: opts.PublicEndpoint,
 		NetworkIPv6:    opts.NetworkIPv6,
 		GRPCPort:       opts.GRPCPort,

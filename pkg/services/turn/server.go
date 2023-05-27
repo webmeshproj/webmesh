@@ -77,7 +77,7 @@ func NewServer(o *Options) (*Server, error) {
 		// This is called every time a user tries to authenticate with the TURN server
 		// Return the key for that user, or false when no user is found
 		AuthHandler: func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
-			// TODO: Negotiate one-time credentials with the controller
+			// TODO: Negotiate one-time credentials with the client
 			return nil, true
 		},
 		// PacketConnConfigs is a list of UDP Listeners and the configuration around them

@@ -20,6 +20,22 @@ func (q *Queries) DeleteNode(ctx context.Context, id string) error {
 	return err
 }
 
+const EitherNodeExists = `-- name: EitherNodeExists :one
+SELECT 1 FROM nodes WHERE id = ? OR id = ?
+`
+
+type EitherNodeExistsParams struct {
+	ID   string `json:"id"`
+	ID_2 string `json:"id_2"`
+}
+
+func (q *Queries) EitherNodeExists(ctx context.Context, arg EitherNodeExistsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, EitherNodeExists, arg.ID, arg.ID_2)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const GetNode = `-- name: GetNode :one
 SELECT
     nodes.id AS id,
@@ -229,6 +245,17 @@ func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const NodeExists = `-- name: NodeExists :one
+SELECT 1 FROM nodes WHERE id = ?
+`
+
+func (q *Queries) NodeExists(ctx context.Context, id string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, NodeExists, id)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const UpdateNode = `-- name: UpdateNode :one

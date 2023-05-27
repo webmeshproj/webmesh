@@ -39,7 +39,7 @@ import (
 )
 
 func (s *store) bootstrap() error {
-	ctx := context.TODO()
+	ctx := context.Background()
 	version, err := models.GetDBVersion(s.weakData)
 	if err != nil {
 		return fmt.Errorf("get raft schema version: %w", err)
@@ -149,14 +149,6 @@ func (s *store) bootstrap() error {
 			}
 			s.readyErr <- err
 		}
-		// Do an initial refresh of the wireguard peers in a few seconds.
-		// TODO: This should be handled by the Join method.
-		go func() {
-			time.Sleep(3 * time.Second)
-			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
-				s.log.Error("refresh wireguard peers", slog.String("error", err.Error()))
-			}
-		}()
 	}()
 	return nil
 }

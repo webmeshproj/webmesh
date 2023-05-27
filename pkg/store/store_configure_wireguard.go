@@ -91,7 +91,7 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	}
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
-	err := s.walkMeshDescendants(s.meshGraph)
+	err := s.walkMeshDescendants(peers.NewGraph(s))
 	if err != nil {
 		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
 		return nil

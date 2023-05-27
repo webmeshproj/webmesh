@@ -78,7 +78,7 @@ func (s *store) Close() error {
 			if err := s.leaveCluster(context.Background()); err != nil {
 				// Make this non-fatal, but it will piss off the leader.
 				// TODO: The leader should run a separate goroutine
-				// to remove servers that have left the cluster.
+				// to remove servers that haven't been contacted in a while.
 				s.log.Error("error leaving cluster", slog.String("error", err.Error()))
 			}
 		}

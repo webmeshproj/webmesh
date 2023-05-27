@@ -27,7 +27,6 @@ import (
 	"golang.org/x/exp/slog"
 
 	"gitlab.com/webmesh/node/pkg/meshdb/models"
-	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 	"gitlab.com/webmesh/node/pkg/meshdb/snapshots"
 )
 
@@ -128,7 +127,6 @@ func (s *store) Open() error {
 	if err != nil {
 		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.LocalDataFilePath(), err))
 	}
-	s.meshGraph = peers.New(s).Graph()
 	// Create the raft instance.
 	s.log.Info("starting raft instance",
 		slog.String("listen-addr", string(s.raftTransport.LocalAddr())),

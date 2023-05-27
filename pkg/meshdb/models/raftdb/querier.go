@@ -23,6 +23,7 @@ type Querier interface {
 	DumpNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	DumpNodes(ctx context.Context) ([]Node, error)
 	DumpRaftACLs(ctx context.Context) ([]RaftAcl, error)
+	EitherNodeExists(ctx context.Context, arg EitherNodeExistsParams) (int64, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
 	GetNodeCount(ctx context.Context) (int64, error)
@@ -44,6 +45,7 @@ type Querier interface {
 	ListPublicWireguardEndpoints(ctx context.Context) ([]ListPublicWireguardEndpointsRow, error)
 	ListRaftACLs(ctx context.Context) ([]RaftAcl, error)
 	NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) (int64, error)
+	NodeExists(ctx context.Context, id string) (int64, error)
 	NodeHasEdges(ctx context.Context, arg NodeHasEdgesParams) (int64, error)
 	PutRaftACL(ctx context.Context, arg PutRaftACLParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
