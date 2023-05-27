@@ -39,12 +39,10 @@ var ErrNodeNotFound = errors.New("node not found")
 type Peers interface {
 	// Graph returns the graph of nodes.
 	Graph() Graph
-	// Create creates a new node.
-	Create(ctx context.Context, opts *CreateOptions) (Node, error)
+	// Put creates or updates a node.
+	Put(ctx context.Context, opts *PutOptions) (Node, error)
 	// Get gets a node by ID.
 	Get(ctx context.Context, id string) (Node, error)
-	// Update updates a node.
-	Update(ctx context.Context, node Node) (Node, error)
 	// Delete deletes a node.
 	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
@@ -81,7 +79,7 @@ type Node struct {
 }
 
 // CreateOptions are options for creating a node.
-type CreateOptions struct {
+type PutOptions struct {
 	// ID is the node's ID.
 	ID string
 	// PublicKey is the node's public key.
@@ -115,7 +113,7 @@ type peers struct {
 
 func (p *peers) Graph() Graph { return p.graph }
 
-func (p *peers) Create(ctx context.Context, opts *CreateOptions) (Node, error) {
+func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
 	key, err := wgtypes.ParseKey(opts.PublicKey.String())
 	if err != nil {
 		return Node{}, fmt.Errorf("parse public key: %w", err)
@@ -152,53 +150,19 @@ func (p *peers) Get(ctx context.Context, id string) (Node, error) {
 	return node, nil
 }
 
-func (p *peers) Update(ctx context.Context, node Node) (Node, error) {
-	q := raftdb.New(p.store.DB())
-	params := raftdb.UpdateNodeParams{
-		ID:            node.ID,
-		GrpcPort:      int64(node.GRPCPort),
-		RaftPort:      int64(node.RaftPort),
-		WireguardPort: int64(node.WireguardPort),
-		PublicKey: sql.NullString{
-			String: node.PublicKey.String(),
-			Valid:  true,
-		},
-		UpdatedAt: time.Now().UTC(),
-	}
-	if node.PublicEndpoint.IsValid() {
-		params.PublicEndpoint = sql.NullString{
-			String: node.PublicEndpoint.String(),
-			Valid:  true,
-		}
-	}
-	if node.NetworkIPv6.IsValid() {
-		params.NetworkIpv6 = sql.NullString{
-			String: node.NetworkIPv6.String(),
-			Valid:  true,
-		}
-	}
-	updated, err := q.UpdateNode(ctx, params)
-	if err != nil {
-		return Node{}, fmt.Errorf("update node: %w", err)
-	}
-	out, err := nodeModelToNode(&updated)
-	if err != nil {
-		return Node{}, fmt.Errorf("convert node model to node: %w", err)
-	}
-	return out, nil
-}
-
 func (p *peers) Delete(ctx context.Context, id string) error {
 	edges, err := p.graph.Edges()
 	if err != nil {
 		return fmt.Errorf("get edges: %w", err)
 	}
-	for _, edge := range edges {
-		if edge.Source == id || edge.Target == id {
-			err := p.graph.RemoveEdge(edge.Source, edge.Target)
-			if err != nil {
-				return fmt.Errorf("remove edge: %w", err)
-			}
+	if len(edges) > 0 {
+		q := raftdb.New(p.store.DB())
+		err = q.DeleteNodeEdges(ctx, raftdb.DeleteNodeEdgesParams{
+			SrcNodeID: id,
+			DstNodeID: id,
+		})
+		if err != nil {
+			return fmt.Errorf("delete node edges: %w", err)
 		}
 	}
 	err = p.graph.RemoveVertex(id)
@@ -291,39 +255,4 @@ func (p *peers) RemoveEdge(ctx context.Context, from, to string) error {
 		return fmt.Errorf("remove edge: %w", err)
 	}
 	return nil
-}
-
-func nodeModelToNode(node *raftdb.Node) (Node, error) {
-	var err error
-	var key wgtypes.Key
-	var primaryEndpoint netip.Addr
-	if node.PublicKey.Valid {
-		key, err = wgtypes.ParseKey(node.PublicKey.String)
-		if err != nil {
-			return Node{}, fmt.Errorf("parse node public key: %w", err)
-		}
-	}
-	if node.PublicEndpoint.Valid {
-		primaryEndpoint, err = netip.ParseAddr(node.PublicEndpoint.String)
-		if err != nil {
-			return Node{}, fmt.Errorf("parse endpoint: %w", err)
-		}
-	}
-	var networkV6 netip.Prefix
-	if node.NetworkIpv6.Valid {
-		networkV6, err = netip.ParsePrefix(node.NetworkIpv6.String)
-		if err != nil {
-			return Node{}, fmt.Errorf("parse network IPv6: %w", err)
-		}
-	}
-	return Node{
-		ID:             node.ID,
-		PublicKey:      key,
-		PublicEndpoint: primaryEndpoint,
-		NetworkIPv6:    networkV6,
-		GRPCPort:       int(node.GrpcPort),
-		RaftPort:       int(node.RaftPort),
-		WireguardPort:  int(node.WireguardPort),
-		CreatedAt:      node.CreatedAt,
-	}, nil
 }

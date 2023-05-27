@@ -9,9 +9,9 @@ import (
 )
 
 type Querier interface {
-	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	DeleteNode(ctx context.Context, id string) error
 	DeleteNodeEdge(ctx context.Context, arg DeleteNodeEdgeParams) error
+	DeleteNodeEdges(ctx context.Context, arg DeleteNodeEdgesParams) error
 	DeleteRaftACL(ctx context.Context, name string) error
 	DropLeases(ctx context.Context) error
 	DropMeshState(ctx context.Context) error
@@ -33,6 +33,7 @@ type Querier interface {
 	GetPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error)
 	GetRaftACL(ctx context.Context, name string) (RaftAcl, error)
 	GetULAPrefix(ctx context.Context) (string, error)
+	InsertNode(ctx context.Context, arg InsertNodeParams) (Node, error)
 	InsertNodeEdge(ctx context.Context, arg InsertNodeEdgeParams) error
 	InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error)
 	ListAllocatedIPv4(ctx context.Context) ([]string, error)

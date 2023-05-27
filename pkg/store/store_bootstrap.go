@@ -34,6 +34,7 @@ import (
 	"gitlab.com/webmesh/node/pkg/meshdb/models"
 	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
 	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/peers"
 	"gitlab.com/webmesh/node/pkg/util"
 )
 
@@ -232,17 +233,16 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		}
 		endpoint = listenEndpoint.Addr()
 	}
-	params := raftdb.CreateNodeParams{
-		ID: string(s.nodeID),
-		NetworkIpv6: sql.NullString{
-			String: networkIPv6.String(),
-			Valid:  true,
-		},
-		GrpcPort:      int64(s.opts.GRPCAdvertisePort),
-		RaftPort:      int64(s.sl.ListenPort()),
-		WireguardPort: int64(s.wgopts.ListenPort),
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
+	p := peers.New(s)
+	params := &peers.PutOptions{
+		ID:            string(s.nodeID),
+		NetworkIPv6:   networkIPv6,
+		GRPCPort:      s.opts.GRPCAdvertisePort,
+		RaftPort:      s.sl.ListenPort(),
+		WireguardPort: s.wgopts.ListenPort,
+	}
+	if endpoint.IsValid() {
+		params.PublicEndpoint = endpoint
 	}
 	// Go ahead and generate our private key.
 	s.log.Info("generating wireguard key for ourselves")
@@ -250,6 +250,13 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	if err != nil {
 		return fmt.Errorf("generate private key: %w", err)
 	}
+	params.PublicKey = wireguardKey.PublicKey()
+	s.log.Debug("creating node in database", slog.Any("params", params))
+	_, err = p.Put(ctx, params)
+	if err != nil {
+		return fmt.Errorf("create node: %w", err)
+	}
+	s.log.Debug("saving wireguard key to database")
 	keyparams := localdb.SetCurrentWireguardKeyParams{
 		PrivateKey: wireguardKey.String(),
 	}
@@ -262,21 +269,6 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, keyparams)
 	if err != nil {
 		return fmt.Errorf("set current wireguard key: %w", err)
-	}
-	params.PublicKey = sql.NullString{
-		String: wireguardKey.PublicKey().String(),
-		Valid:  true,
-	}
-	if endpoint.IsValid() {
-		params.PublicEndpoint = sql.NullString{
-			String: endpoint.String(),
-			Valid:  true,
-		}
-	}
-	s.log.Debug("creating node in database", slog.Any("params", params))
-	_, err = q.CreateNode(ctx, params)
-	if err != nil {
-		return fmt.Errorf("create node: %w", err)
 	}
 	var networkv4 netip.Prefix
 	var raftAddr string

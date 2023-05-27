@@ -51,7 +51,7 @@ type GraphStore struct {
 // error should be returned.
 func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexProperties) error {
 	q := raftdb.New(g.store.DB())
-	params := raftdb.CreateNodeParams{
+	params := raftdb.InsertNodeParams{
 		ID: node.ID,
 		PublicKey: sql.NullString{
 			String: node.PublicKey.String(),
@@ -75,7 +75,7 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 			Valid:  true,
 		}
 	}
-	_, err := q.CreateNode(context.Background(), params)
+	_, err := q.InsertNode(context.Background(), params)
 	if err != nil {
 		var sqliteErr *sqlite.Error
 		if errors.As(err, &sqliteErr) && sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT {

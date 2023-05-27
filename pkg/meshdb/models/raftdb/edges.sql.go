@@ -24,6 +24,20 @@ func (q *Queries) DeleteNodeEdge(ctx context.Context, arg DeleteNodeEdgeParams) 
 	return err
 }
 
+const DeleteNodeEdges = `-- name: DeleteNodeEdges :exec
+DELETE FROM node_edges WHERE src_node_id = ? OR dst_node_id = ?
+`
+
+type DeleteNodeEdgesParams struct {
+	SrcNodeID string `json:"src_node_id"`
+	DstNodeID string `json:"dst_node_id"`
+}
+
+func (q *Queries) DeleteNodeEdges(ctx context.Context, arg DeleteNodeEdgesParams) error {
+	_, err := q.db.ExecContext(ctx, DeleteNodeEdges, arg.SrcNodeID, arg.DstNodeID)
+	return err
+}
+
 const GetNodeEdge = `-- name: GetNodeEdge :one
 SELECT src_node_id, dst_node_id, weight, attrs FROM node_edges WHERE src_node_id = ? AND dst_node_id = ?
 `

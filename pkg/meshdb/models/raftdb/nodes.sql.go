@@ -11,60 +11,6 @@ import (
 	"time"
 )
 
-const CreateNode = `-- name: CreateNode :one
-INSERT INTO nodes (
-    id,
-    public_key,
-    public_endpoint,
-    network_ipv6,
-    grpc_port,
-    raft_port,
-    wireguard_port,
-    created_at,
-    updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, public_key, raft_port, grpc_port, wireguard_port, public_endpoint, network_ipv6, created_at, updated_at
-`
-
-type CreateNodeParams struct {
-	ID             string         `json:"id"`
-	PublicKey      sql.NullString `json:"public_key"`
-	PublicEndpoint sql.NullString `json:"public_endpoint"`
-	NetworkIpv6    sql.NullString `json:"network_ipv6"`
-	GrpcPort       int64          `json:"grpc_port"`
-	RaftPort       int64          `json:"raft_port"`
-	WireguardPort  int64          `json:"wireguard_port"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-}
-
-func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error) {
-	row := q.db.QueryRowContext(ctx, CreateNode,
-		arg.ID,
-		arg.PublicKey,
-		arg.PublicEndpoint,
-		arg.NetworkIpv6,
-		arg.GrpcPort,
-		arg.RaftPort,
-		arg.WireguardPort,
-		arg.CreatedAt,
-		arg.UpdatedAt,
-	)
-	var i Node
-	err := row.Scan(
-		&i.ID,
-		&i.PublicKey,
-		&i.RaftPort,
-		&i.GrpcPort,
-		&i.WireguardPort,
-		&i.PublicEndpoint,
-		&i.NetworkIpv6,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const DeleteNode = `-- name: DeleteNode :exec
 DELETE FROM nodes WHERE id = ?
 `
@@ -131,6 +77,68 @@ func (q *Queries) GetNodeCount(ctx context.Context) (int64, error) {
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const InsertNode = `-- name: InsertNode :one
+INSERT INTO nodes (
+    id,
+    public_key,
+    public_endpoint,
+    network_ipv6,
+    grpc_port,
+    raft_port,
+    wireguard_port,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET
+    public_key = EXCLUDED.public_key,
+    public_endpoint = EXCLUDED.public_endpoint,
+    network_ipv6 = EXCLUDED.network_ipv6,
+    grpc_port = EXCLUDED.grpc_port,
+    raft_port = EXCLUDED.raft_port,
+    wireguard_port = EXCLUDED.wireguard_port,
+    updated_at = EXCLUDED.updated_at
+RETURNING id, public_key, raft_port, grpc_port, wireguard_port, public_endpoint, network_ipv6, created_at, updated_at
+`
+
+type InsertNodeParams struct {
+	ID             string         `json:"id"`
+	PublicKey      sql.NullString `json:"public_key"`
+	PublicEndpoint sql.NullString `json:"public_endpoint"`
+	NetworkIpv6    sql.NullString `json:"network_ipv6"`
+	GrpcPort       int64          `json:"grpc_port"`
+	RaftPort       int64          `json:"raft_port"`
+	WireguardPort  int64          `json:"wireguard_port"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) InsertNode(ctx context.Context, arg InsertNodeParams) (Node, error) {
+	row := q.db.QueryRowContext(ctx, InsertNode,
+		arg.ID,
+		arg.PublicKey,
+		arg.PublicEndpoint,
+		arg.NetworkIpv6,
+		arg.GrpcPort,
+		arg.RaftPort,
+		arg.WireguardPort,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i Node
+	err := row.Scan(
+		&i.ID,
+		&i.PublicKey,
+		&i.RaftPort,
+		&i.GrpcPort,
+		&i.WireguardPort,
+		&i.PublicEndpoint,
+		&i.NetworkIpv6,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const ListNodeIDs = `-- name: ListNodeIDs :many

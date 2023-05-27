@@ -92,24 +92,17 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Database error
 		return nil, status.Errorf(codes.Internal, "failed to get peer: %v", err)
 	} else if err == nil {
-		log.Info("peer already exists, checking for updates")
+		log.Info("peer already exists, updating")
 		// Peer already exists, update it
-		if peer.PublicKey.String() != publicKey.String() {
-			peer.PublicKey = publicKey
-		}
-		if peer.GRPCPort != int(req.GetGrpcPort()) {
-			peer.GRPCPort = int(req.GetGrpcPort())
-		}
-		if peer.RaftPort != int(req.GetRaftPort()) {
-			peer.RaftPort = int(req.GetRaftPort())
-		}
-		if peer.WireguardPort != int(req.GetWireguardPort()) {
-			peer.WireguardPort = int(req.GetWireguardPort())
-		}
-		if primaryEndpoint.IsValid() && primaryEndpoint.String() != peer.PublicEndpoint.String() {
-			peer.PublicEndpoint = primaryEndpoint
-		}
-		peer, err = s.peers.Update(ctx, peer)
+		peer, err = s.peers.Put(ctx, &peers.PutOptions{
+			ID:             req.GetId(),
+			PublicKey:      publicKey,
+			PublicEndpoint: primaryEndpoint,
+			NetworkIPv6:    peer.NetworkIPv6,
+			GRPCPort:       int(req.GetGrpcPort()),
+			RaftPort:       int(req.GetRaftPort()),
+			WireguardPort:  int(req.GetWireguardPort()),
+		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
 		}
@@ -120,7 +113,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
 		}
-		peer, err = s.peers.Create(ctx, &peers.CreateOptions{
+		peer, err = s.peers.Put(ctx, &peers.PutOptions{
 			ID:             req.GetId(),
 			PublicKey:      publicKey,
 			PublicEndpoint: primaryEndpoint,

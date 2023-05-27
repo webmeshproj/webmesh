@@ -1,7 +1,7 @@
 -- name: GetNodeCount :one
 SELECT COUNT(*) AS count FROM nodes;
 
--- name: CreateNode :one
+-- name: InsertNode :one
 INSERT INTO nodes (
     id,
     public_key,
@@ -13,6 +13,14 @@ INSERT INTO nodes (
     created_at,
     updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET
+    public_key = EXCLUDED.public_key,
+    public_endpoint = EXCLUDED.public_endpoint,
+    network_ipv6 = EXCLUDED.network_ipv6,
+    grpc_port = EXCLUDED.grpc_port,
+    raft_port = EXCLUDED.raft_port,
+    wireguard_port = EXCLUDED.wireguard_port,
+    updated_at = EXCLUDED.updated_at
 RETURNING *;
 
 -- name: UpdateNode :one
