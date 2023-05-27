@@ -234,14 +234,20 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 // AddEdge adds an edge between two nodes.
 func (p *peers) AddEdge(ctx context.Context, from, to string) error {
 	// Save the raft log some trouble by checking if the edge already exists.
-	err := p.graph.AddEdge(from, to)
+	_, err := p.graph.Edge(from, to)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, graph.ErrEdgeNotFound) {
+		return fmt.Errorf("get edge: %w", err)
+	}
+	err = p.graph.AddEdge(from, to)
 	if err == nil {
 		return nil
 	}
 	if !errors.Is(err, graph.ErrEdgeAlreadyExists) {
 		return fmt.Errorf("add edge: %w", err)
 	}
-	// If the edge already exists, we can just return.
 	return nil
 }
 

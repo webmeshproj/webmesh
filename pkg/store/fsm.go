@@ -152,29 +152,25 @@ func (s *store) Apply(l *raft.Log) any {
 		}
 	}
 
-	if cmd.GetType() == v1.RaftCommandType_EXECUTE {
-		sql := cmd.GetSqlExec().GetStatement().GetSql()
-		if sql == raftdb.InsertNodeEdge || sql == raftdb.DeleteNode || sql == raftdb.DeleteNodeEdge {
-			// This might be a bit of a hack, but the code is generated
-			// and we know exactly what's coming over the wire. We can check
-			// here if an edge is being changed and refresh the wireguard peers
-			if sql == raftdb.DeleteNodeEdge {
-				// If we are deleting a node edge, grab their public key
-				// so we can remove it from the wireguard config
-				nodeID := cmd.GetSqlExec().GetStatement().GetParameters()[0].GetStr()
-				log.Info("node edge being deleted", slog.String("node", nodeID))
-				err := s.wg.DeletePeer(ctx, nodeID)
-				if err != nil {
-					log.Error("error deleting wireguard peer", slog.String("node", nodeID), slog.String("error", err.Error()))
-				}
+	if isEdgeChangeCmd(&cmd) {
+		// This might be a bit of a hack, but the code is generated
+		// and we know exactly what's coming over the wire. We can check
+		// here if an edge is being changed and refresh the wireguard peers
+		if nodeID, ok := isDeleteEdgeCmd(&cmd); ok {
+			// If we are deleting a node edge, grab their public key
+			// so we can remove it from the wireguard config
+			log.Info("node edge being deleted", slog.String("node", nodeID))
+			err := s.wg.DeletePeer(ctx, nodeID)
+			if err != nil {
+				log.Error("error deleting wireguard peer", slog.String("node", nodeID), slog.String("error", err.Error()))
 			}
-			defer func() {
-				log.Debug("applied node edge change, refreshing wireguard peers")
-				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
-					log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
-				}
-			}()
 		}
+		defer func() {
+			log.Debug("applied node edge change, refreshing wireguard peers")
+			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+				log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
+			}
+		}()
 	}
 
 	return s.apply(l, &cmd, log, start)
@@ -192,4 +188,27 @@ func (s *store) getDBTermAndIndex() (term, index uint64, err error) {
 		return
 	}
 	return uint64(raftState.Term), uint64(raftState.LogIndex), nil
+}
+
+func isEdgeChangeCmd(cmd *v1.RaftLogEntry) bool {
+	if cmd.GetType() != v1.RaftCommandType_EXECUTE {
+		return false
+	}
+	sql := cmd.GetSqlExec().GetStatement().GetSql()
+	return sql == raftdb.InsertNodeEdge ||
+		sql == raftdb.DeleteNode ||
+		sql == raftdb.DeleteNodeEdge ||
+		sql == raftdb.DeleteNodeEdges
+}
+
+func isDeleteEdgeCmd(cmd *v1.RaftLogEntry) (nodeId string, ok bool) {
+	if cmd.GetType() != v1.RaftCommandType_EXECUTE {
+		return
+	}
+	sql := cmd.GetSqlExec().GetStatement().GetSql()
+	ok = sql == raftdb.DeleteNodeEdge || sql == raftdb.DeleteNodeEdges
+	if ok {
+		nodeId = cmd.GetSqlExec().GetStatement().GetParameters()[0].GetStr()
+	}
+	return
 }
