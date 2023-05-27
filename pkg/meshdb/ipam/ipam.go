@@ -29,8 +29,8 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
+	"gitlab.com/webmesh/node/pkg/meshdb"
 	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
-	"gitlab.com/webmesh/node/pkg/store"
 	"gitlab.com/webmesh/node/pkg/util"
 )
 
@@ -46,12 +46,12 @@ type IPAM interface {
 }
 
 // New returns a new IPAM service.
-func New(store store.Store) IPAM {
+func New(store meshdb.Store) IPAM {
 	return &ipam{store: store}
 }
 
 type ipam struct {
-	store    store.Store
+	store    meshdb.Store
 	prefixv4 netip.Prefix
 	mux      sync.Mutex
 }

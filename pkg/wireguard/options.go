@@ -194,15 +194,19 @@ func parseAllowedIPsMap(allowedIPs string) (*peerConfigs, error) {
 	}, nil
 }
 
-func parseEndpointOverrides(overrides string) (map[string]string, error) {
+func parseEndpointOverrides(overrides string) (map[string]netip.AddrPort, error) {
 	spl := strings.Fields(overrides)
-	m := make(map[string]string, len(spl))
+	m := make(map[string]netip.AddrPort, len(spl))
 	for _, s := range spl {
 		peerName, endpoint, found := strings.Cut(s, "=")
 		if !found {
 			return nil, fmt.Errorf("invalid endpoint-overrides format: %s", s)
 		}
-		m[peerName] = endpoint
+		endpointAddr, err := netip.ParseAddrPort(endpoint)
+		if err != nil {
+			return nil, fmt.Errorf("invalid endpoint-overrides format: %s", s)
+		}
+		m[peerName] = endpointAddr
 	}
 	return m, nil
 }

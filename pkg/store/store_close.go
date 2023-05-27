@@ -63,22 +63,20 @@ func (s *store) Close() error {
 	if s.raft != nil {
 		if s.IsLeader() {
 			s.log.Debug("currently the leader, removing ourselves and stepping down")
-			// If we were the leader, we need to step down
-			// and remove ourselves from the cluster.
-			if err := s.RemoveServer(ctx, string(s.nodeID), true); err != nil {
-				return fmt.Errorf("remove voter: %w", err)
+			if s.opts.LeaveOnShutdown {
+				if err := s.RemoveServer(ctx, string(s.nodeID), true); err != nil {
+					return fmt.Errorf("remove voter: %w", err)
+				}
 			}
-			// For good measure, step down again. This should be
-			// a no-op if we are not the leader.
+			// Try to step down again for good measure.
 			if err := s.Stepdown(true); err != nil && err != ErrNotLeader {
 				return fmt.Errorf("stepdown: %w", err)
 			}
-		} else {
-			s.log.Debug("not leader, leaving cluster")
+		} else if s.opts.LeaveOnShutdown {
+			s.log.Debug("leaving cluster")
 			// If we were not the leader, we need to leave
 			if err := s.leaveCluster(context.Background()); err != nil {
-				// Make this non-fatal, but it will piss off the
-				// leader.
+				// Make this non-fatal, but it will piss off the leader.
 				// TODO: The leader should run a separate goroutine
 				// to remove servers that have left the cluster.
 				s.log.Error("error leaving cluster", slog.String("error", err.Error()))

@@ -11,39 +11,39 @@ import (
 	"time"
 )
 
-const dropLeases = `-- name: DropLeases :exec
+const DropLeases = `-- name: DropLeases :exec
 DELETE FROM leases
 `
 
 func (q *Queries) DropLeases(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, dropLeases)
+	_, err := q.db.ExecContext(ctx, DropLeases)
 	return err
 }
 
-const dropMeshState = `-- name: DropMeshState :exec
+const DropMeshState = `-- name: DropMeshState :exec
 DELETE FROM mesh_state
 `
 
 func (q *Queries) DropMeshState(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, dropMeshState)
+	_, err := q.db.ExecContext(ctx, DropMeshState)
 	return err
 }
 
-const dropNodes = `-- name: DropNodes :exec
+const DropNodes = `-- name: DropNodes :exec
 DELETE FROM nodes
 `
 
 func (q *Queries) DropNodes(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, dropNodes)
+	_, err := q.db.ExecContext(ctx, DropNodes)
 	return err
 }
 
-const dumpLeases = `-- name: DumpLeases :many
+const DumpLeases = `-- name: DumpLeases :many
 SELECT node_id, ipv4, created_at FROM leases
 `
 
 func (q *Queries) DumpLeases(ctx context.Context) ([]Lease, error) {
-	rows, err := q.db.QueryContext(ctx, dumpLeases)
+	rows, err := q.db.QueryContext(ctx, DumpLeases)
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +65,12 @@ func (q *Queries) DumpLeases(ctx context.Context) ([]Lease, error) {
 	return items, nil
 }
 
-const dumpMeshState = `-- name: DumpMeshState :many
+const DumpMeshState = `-- name: DumpMeshState :many
 SELECT "key", value FROM mesh_state
 `
 
 func (q *Queries) DumpMeshState(ctx context.Context) ([]MeshState, error) {
-	rows, err := q.db.QueryContext(ctx, dumpMeshState)
+	rows, err := q.db.QueryContext(ctx, DumpMeshState)
 	if err != nil {
 		return nil, err
 	}
@@ -92,12 +92,12 @@ func (q *Queries) DumpMeshState(ctx context.Context) ([]MeshState, error) {
 	return items, nil
 }
 
-const dumpNodes = `-- name: DumpNodes :many
-SELECT id, public_key, raft_port, grpc_port, wireguard_port, primary_endpoint, endpoints, network_ipv6, created_at, updated_at FROM nodes
+const DumpNodes = `-- name: DumpNodes :many
+SELECT id, public_key, raft_port, grpc_port, wireguard_port, public_endpoint, network_ipv6, created_at, updated_at FROM nodes
 `
 
 func (q *Queries) DumpNodes(ctx context.Context) ([]Node, error) {
-	rows, err := q.db.QueryContext(ctx, dumpNodes)
+	rows, err := q.db.QueryContext(ctx, DumpNodes)
 	if err != nil {
 		return nil, err
 	}
@@ -111,8 +111,7 @@ func (q *Queries) DumpNodes(ctx context.Context) ([]Node, error) {
 			&i.RaftPort,
 			&i.GrpcPort,
 			&i.WireguardPort,
-			&i.PrimaryEndpoint,
-			&i.Endpoints,
+			&i.PublicEndpoint,
 			&i.NetworkIpv6,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -130,16 +129,12 @@ func (q *Queries) DumpNodes(ctx context.Context) ([]Node, error) {
 	return items, nil
 }
 
-const restoreLease = `-- name: RestoreLease :exec
+const RestoreLease = `-- name: RestoreLease :exec
 INSERT INTO leases (
     node_id,
     ipv4,
     created_at
-) VALUES (
-    :node_id,
-    :ipv4,
-    :created_at
-)
+) VALUES ( ?, ?, ? )
 `
 
 type RestoreLeaseParams struct {
@@ -149,12 +144,12 @@ type RestoreLeaseParams struct {
 }
 
 func (q *Queries) RestoreLease(ctx context.Context, arg RestoreLeaseParams) error {
-	_, err := q.db.ExecContext(ctx, restoreLease, arg.NodeID, arg.Ipv4, arg.CreatedAt)
+	_, err := q.db.ExecContext(ctx, RestoreLease, arg.NodeID, arg.Ipv4, arg.CreatedAt)
 	return err
 }
 
-const restoreMeshState = `-- name: RestoreMeshState :exec
-INSERT INTO mesh_state (key, value) VALUES (:key, :value)
+const RestoreMeshState = `-- name: RestoreMeshState :exec
+INSERT INTO mesh_state (key, value) VALUES (?, ?)
 `
 
 type RestoreMeshStateParams struct {
@@ -163,58 +158,44 @@ type RestoreMeshStateParams struct {
 }
 
 func (q *Queries) RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error {
-	_, err := q.db.ExecContext(ctx, restoreMeshState, arg.Key, arg.Value)
+	_, err := q.db.ExecContext(ctx, RestoreMeshState, arg.Key, arg.Value)
 	return err
 }
 
-const restoreNode = `-- name: RestoreNode :exec
+const RestoreNode = `-- name: RestoreNode :exec
 INSERT INTO nodes (
     id,
     public_key,
     raft_port,
     grpc_port,
     wireguard_port,
-    primary_endpoint,
-    endpoints,
+    public_endpoint,
     network_ipv6,
     created_at,
     updated_at
-) VALUES (
-    :id,
-    :public_key,
-    :raft_port,
-    :grpc_port,
-    :wireguard_port,
-    :primary_endpoint,
-    :endpoints,
-    :network_ipv6,
-    :created_at,
-    :updated_at
-)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type RestoreNodeParams struct {
-	ID              string         `json:"id"`
-	PublicKey       sql.NullString `json:"public_key"`
-	RaftPort        int64          `json:"raft_port"`
-	GrpcPort        int64          `json:"grpc_port"`
-	WireguardPort   int64          `json:"wireguard_port"`
-	PrimaryEndpoint sql.NullString `json:"primary_endpoint"`
-	Endpoints       sql.NullString `json:"endpoints"`
-	NetworkIpv6     sql.NullString `json:"network_ipv6"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID             string         `json:"id"`
+	PublicKey      sql.NullString `json:"public_key"`
+	RaftPort       int64          `json:"raft_port"`
+	GrpcPort       int64          `json:"grpc_port"`
+	WireguardPort  int64          `json:"wireguard_port"`
+	PublicEndpoint sql.NullString `json:"public_endpoint"`
+	NetworkIpv6    sql.NullString `json:"network_ipv6"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 func (q *Queries) RestoreNode(ctx context.Context, arg RestoreNodeParams) error {
-	_, err := q.db.ExecContext(ctx, restoreNode,
+	_, err := q.db.ExecContext(ctx, RestoreNode,
 		arg.ID,
 		arg.PublicKey,
 		arg.RaftPort,
 		arg.GrpcPort,
 		arg.WireguardPort,
-		arg.PrimaryEndpoint,
-		arg.Endpoints,
+		arg.PublicEndpoint,
 		arg.NetworkIpv6,
 		arg.CreatedAt,
 		arg.UpdatedAt,

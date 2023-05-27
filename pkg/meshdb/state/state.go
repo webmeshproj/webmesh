@@ -22,8 +22,8 @@ import (
 	"database/sql"
 	"net/netip"
 
+	"gitlab.com/webmesh/node/pkg/meshdb"
 	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
-	"gitlab.com/webmesh/node/pkg/store"
 )
 
 // State is the interface for querying mesh state.
@@ -44,7 +44,7 @@ type state struct {
 }
 
 // New returns a new State.
-func New(st store.Store) State {
+func New(st meshdb.Store) State {
 	return &state{q: raftdb.New(st.ReadDB())}
 }
 

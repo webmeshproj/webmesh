@@ -58,7 +58,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 			}
 			config := s.store.Raft().GetConfiguration().Configuration()
 			for _, srv := range config.Servers {
-				if srv.ID == s.store.ID() {
+				if string(srv.ID) == s.store.ID() {
 					switch srv.Suffrage {
 					case raft.Voter:
 						return v1.ClusterStatus_CLUSTER_VOTER

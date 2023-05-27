@@ -5,7 +5,7 @@ SELECT * FROM mesh_state;
 DELETE FROM mesh_state;
 
 -- name: RestoreMeshState :exec
-INSERT INTO mesh_state (key, value) VALUES (:key, :value);
+INSERT INTO mesh_state (key, value) VALUES (?, ?);
 
 -- name: DumpNodes :many
 SELECT * FROM nodes;
@@ -20,23 +20,11 @@ INSERT INTO nodes (
     raft_port,
     grpc_port,
     wireguard_port,
-    primary_endpoint,
-    endpoints,
+    public_endpoint,
     network_ipv6,
     created_at,
     updated_at
-) VALUES (
-    :id,
-    :public_key,
-    :raft_port,
-    :grpc_port,
-    :wireguard_port,
-    :primary_endpoint,
-    :endpoints,
-    :network_ipv6,
-    :created_at,
-    :updated_at
-);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: DumpLeases :many
 SELECT * FROM leases;
@@ -49,8 +37,4 @@ INSERT INTO leases (
     node_id,
     ipv4,
     created_at
-) VALUES (
-    :node_id,
-    :ipv4,
-    :created_at
-);
+) VALUES ( ?, ?, ? );

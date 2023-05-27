@@ -282,7 +282,8 @@ func parametersToValues(parameters []*v1.SQLParameter) ([]interface{}, error) {
 		return nil, nil
 	}
 	values := make([]interface{}, len(parameters))
-	for i, param := range parameters {
+	for idx, param := range parameters {
+		i := idx
 		switch param.GetType() {
 		case v1.SQLParameterType_SQL_PARAM_INT64:
 			values[i] = sql.Named(param.GetName(), param.Int64)
@@ -305,13 +306,10 @@ func parametersToValues(parameters []*v1.SQLParameter) ([]interface{}, error) {
 	return values, nil
 }
 
-// normalizeRowValues performs some normalization of values in the returned rows.
-// Text values come over (from sqlite-go) as []byte instead of strings
-// for some reason, so we have explicitly converted (but only when type
-// is "text" so we don't affect BLOB types)
 func normalizeRowValues(data []interface{}, types []string) ([]*v1.SQLParameter, error) {
 	values := make([]*v1.SQLParameter, len(types))
-	for i, v := range data {
+	for idx, v := range data {
+		i := idx
 		switch val := v.(type) {
 		case int:
 			values[i] = &v1.SQLParameter{

@@ -5,7 +5,6 @@ go 1.20
 require (
 	github.com/elastic/go-sysinfo v1.10.1
 	github.com/golang/snappy v0.0.4
-	github.com/google/go-cmp v0.5.9
 	github.com/google/nftables v0.1.0
 	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.0-rc.0
@@ -13,6 +12,7 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/raft v1.5.0
 	github.com/hashicorp/raft-boltdb v0.0.0-20230125174641-2a8082862702
+	github.com/heimdalr/dag v1.2.1
 	github.com/jsimonetti/rtnetlink v1.3.3
 	github.com/miekg/dns v1.1.54
 	github.com/pelletier/go-toml/v2 v2.0.7
@@ -26,7 +26,7 @@ require (
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	gitlab.com/webmesh/api v0.0.6-0.20230525172810-77b0dd8fe506
+	gitlab.com/webmesh/api v0.0.7-0.20230526212734-c45942bab54a
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.8.0
@@ -45,10 +45,13 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dominikbraun/graph v0.22.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
+	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.1 // indirect

@@ -20,14 +20,12 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
-	"strings"
 
 	"golang.org/x/exp/slog"
-	"golang.org/x/sync/errgroup"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/firewall"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/meshgraph"
 	"gitlab.com/webmesh/node/pkg/wireguard"
 )
 
@@ -67,14 +65,12 @@ func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, network
 		if err != nil && !wireguard.IsRouteExists(err) {
 			return fmt.Errorf("wireguard add ipv4 route: %w", err)
 		}
-		s.wgroutes[networkv4] = struct{}{}
 	}
 	if networkv6.IsValid() {
 		err = s.wg.AddRoute(ctx, networkv6)
 		if err != nil && !wireguard.IsRouteExists(err) {
 			return fmt.Errorf("wireguard add ipv6 route: %w", err)
 		}
-		s.wgroutes[networkv6] = struct{}{}
 	}
 	err = s.fw.AddWireguardForwarding(ctx, s.wg.Name())
 	if err != nil {
@@ -95,59 +91,64 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	}
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
-	peers, err := raftdb.New(s.ReadDB()).ListNodePeers(ctx, string(s.nodeID))
+	dag, err := meshgraph.New(s).Build(ctx)
 	if err != nil {
-		s.log.Error("list node peers", slog.String("error", err.Error()))
+		s.log.Error("build dag", slog.String("error", err.Error()))
 		return err
 	}
-	g, ctx := errgroup.WithContext(ctx)
-	for _, rpeer := range peers {
-		peer := rpeer
-		g.Go(func() error {
-			var privateIPv4 netip.Prefix
-			var privateIPv6 netip.Prefix
-			if peer.PrivateAddressV4 != "" && !s.opts.NoIPv4 {
-				privateIPv4, err = netip.ParsePrefix(peer.PrivateAddressV4)
-				if err != nil {
-					s.log.Error("parse private ipv4", slog.String("error", err.Error()))
-					return err
-				}
-			}
-			if peer.NetworkIpv6.Valid && !s.opts.NoIPv6 {
-				privateIPv6, err = netip.ParsePrefix(peer.NetworkIpv6.String)
-				if err != nil {
-					s.log.Error("parse private ipv6", slog.String("error", err.Error()))
-					return err
-				}
-			}
-			var endpoint string
-			if peer.PrimaryEndpoint.Valid {
-				addr, err := netip.ParseAddr(peer.PrimaryEndpoint.String)
-				if err != nil {
-					s.log.Error("parse peer endpoint", slog.String("error", err.Error()))
-					return err
-				}
-				endpoint = netip.AddrPortFrom(addr, uint16(peer.WireguardPort)).String()
-			}
-			var additionalEndpoints []string
-			if peer.Endpoints.Valid {
-				additionalEndpoints = strings.Split(peer.Endpoints.String, ",")
-			}
-			wgpeer := wireguard.Peer{
-				ID:                  peer.ID,
-				PublicKey:           peer.PublicKey.String,
-				Endpoint:            endpoint,
-				AdditionalEndpoints: additionalEndpoints,
-				PrivateIPv4:         privateIPv4,
-				PrivateIPv6:         privateIPv6,
-			}
-			s.log.Debug("configuring wireguard peer", slog.Any("peer", wgpeer))
-			if err := s.wg.PutPeer(ctx, &wgpeer); err != nil {
-				s.log.Error("wireguard put peer", slog.String("error", err.Error()))
-				return err
-			}
-			return nil
-		})
+	err = s.walkMeshDescendants(dag)
+	if err != nil {
+		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
+		return nil
 	}
-	return g.Wait()
+	return nil
+}
+
+func (s *store) walkMeshDescendants(graph meshgraph.Graph) error {
+	adjacencyMap, err := graph.AdjacencyMap()
+	if err != nil {
+		return fmt.Errorf("adjacency map: %w", err)
+	}
+	slog.Debug("current adjacency map", slog.Any("map", adjacencyMap))
+	ourDescendants := adjacencyMap[string(s.nodeID)]
+	if len(ourDescendants) == 0 {
+		s.log.Debug("no descendants found in mesh DAG")
+		return nil
+	}
+	for descendant, edge := range ourDescendants {
+		desc, _ := graph.Vertex(descendant)
+		// Each direct child is a wireguard peer
+		peer := wireguard.Peer{
+			ID:         desc.ID,
+			PublicKey:  desc.PublicKey,
+			Endpoint:   desc.PublicEndpoint,
+			AllowedIPs: make([]netip.Prefix, 0),
+		}
+		if desc.PrivateIPv4.IsValid() {
+			peer.AllowedIPs = append(peer.AllowedIPs, desc.PrivateIPv4)
+		}
+		if desc.PrivateIPv6.IsValid() {
+			peer.AllowedIPs = append(peer.AllowedIPs, desc.PrivateIPv6)
+		}
+		descTargets := adjacencyMap[edge.Target]
+		if len(descTargets) > 0 {
+			for descTarget := range descTargets {
+				if _, ok := ourDescendants[descTarget]; !ok && descTarget != string(s.nodeID) {
+					target, _ := graph.Vertex(descTarget)
+					if target.PrivateIPv4.IsValid() {
+						peer.AllowedIPs = append(peer.AllowedIPs, target.PrivateIPv4)
+					}
+					if target.PrivateIPv6.IsValid() {
+						peer.AllowedIPs = append(peer.AllowedIPs, target.PrivateIPv6)
+					}
+				}
+			}
+		}
+		slog.Debug("allowed ips for descendant",
+			slog.Any("allowed_ips", peer.AllowedIPs), slog.String("descendant", desc.ID))
+		if err := s.wg.PutPeer(context.Background(), &peer); err != nil {
+			return fmt.Errorf("put peer: %w", err)
+		}
+	}
+	return nil
 }

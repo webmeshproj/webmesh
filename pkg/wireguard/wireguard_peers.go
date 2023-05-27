@@ -28,13 +28,22 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+// Peer contains configurations for a wireguard peer. When removing,
+// only the PublicKey is required.
+type Peer struct {
+	// ID is the ID of the peer.
+	ID string `json:"id"`
+	// PublicKey is the public key of the peer.
+	PublicKey wgtypes.Key `json:"publicKey"`
+	// Endpoint is the endpoint of this peer, if applicable.
+	Endpoint netip.AddrPort `json:"endpoint"`
+	// AllowedIPs is the list of allowed IPs for this peer.
+	AllowedIPs []netip.Prefix `json:"allowedIPs"`
+}
+
 // PutPeer updates a peer in the wireguard configuration.
 func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	w.log.Debug("put peer", slog.Any("peer", peer))
-	key, err := wgtypes.ParseKey(peer.PublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to parse public key: %w", err)
-	}
 	if override, ok := w.epOverrides[peer.ID]; ok {
 		peer.Endpoint = override
 	}
@@ -43,18 +52,20 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	if w.opts.PersistentKeepAlive != 0 {
 		keepAlive = &w.opts.PersistentKeepAlive
 	}
-	if peer.PrivateIPv6.IsValid() {
-		allowedIPs = append(allowedIPs, net.IPNet{
-			IP:   peer.PrivateIPv6.Addr().AsSlice(),
-			Mask: net.CIDRMask(peer.PrivateIPv6.Bits(), 128),
-		})
-	}
-	if peer.PrivateIPv4.IsValid() {
-		// TODO: We force this to 32 for now, but we should make this configurable
-		allowedIPs = append(allowedIPs, net.IPNet{
-			IP:   peer.PrivateIPv4.Addr().AsSlice(),
-			Mask: net.CIDRMask(32, 32),
-		})
+	for _, ip := range peer.AllowedIPs {
+		var ipnet net.IPNet
+		if ip.Addr().Is4() {
+			ipnet = net.IPNet{
+				IP:   ip.Addr().AsSlice(),
+				Mask: net.CIDRMask(ip.Bits(), 32),
+			}
+		} else {
+			ipnet = net.IPNet{
+				IP:   ip.Addr().AsSlice(),
+				Mask: net.CIDRMask(ip.Bits(), 128),
+			}
+		}
+		allowedIPs = append(allowedIPs, ipnet)
 	}
 	if w.peerConfigs != nil {
 		for _, ip := range w.peerConfigs.AllowedIPs(peer.ID) {
@@ -73,46 +84,22 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			allowedIPs = append(allowedIPs, ipnet)
 		}
 	}
-	if peer.IsPubliclyRoutable() {
-		if !w.IsPublic() {
-			// We are behind a NAT and the peer isn't.
-			// Allow all network traffic to the peer.
-			if w.opts.NetworkV6.IsValid() {
-				allowedIPs = append(allowedIPs, net.IPNet{
-					IP:   w.opts.NetworkV6.Addr().AsSlice(),
-					Mask: net.CIDRMask(w.opts.NetworkV6.Bits(), 128),
-				})
-			}
-			if w.opts.NetworkV4.IsValid() {
-				allowedIPs = append(allowedIPs, net.IPNet{
-					IP:   w.opts.NetworkV4.Addr().AsSlice(),
-					Mask: net.CIDRMask(w.opts.NetworkV4.Bits(), 32),
-				})
-			}
-			// Set the keepalive interval to 25 seconds (maybe make this configurable)
-			if keepAlive != nil {
-				*keepAlive = 25 * time.Second
-			}
-		}
-	} else if !w.IsPublic() {
-		// We are behind a NAT and the peer is too.
-		// No reason to track them
-		return nil
-	}
 	peerCfg := wgtypes.PeerConfig{
-		PublicKey:                   key,
+		PublicKey:                   peer.PublicKey,
 		UpdateOnly:                  false,
 		ReplaceAllowedIPs:           true,
 		AllowedIPs:                  allowedIPs,
 		PersistentKeepaliveInterval: keepAlive,
 	}
-	if peer.Endpoint != "" {
-		peerCfg.Endpoint, err = net.ResolveUDPAddr("udp", peer.Endpoint)
+	var err error
+	if peer.Endpoint.IsValid() {
+		peerCfg.Endpoint, err = net.ResolveUDPAddr("udp", peer.Endpoint.String())
 		if err != nil {
 			return fmt.Errorf("failed to resolve endpoint: %w", err)
 		}
 	}
-	w.log.Debug("configuring peer", slog.Any("peer", peerConfigMarshaler{peerCfg}))
+	w.log.Debug("configuring device with peer",
+		slog.Any("peer", &peerConfigMarshaler{peerCfg}))
 	err = w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 		Peers: []wgtypes.PeerConfig{peerCfg},
 	})

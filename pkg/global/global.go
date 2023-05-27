@@ -24,7 +24,6 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
-	"strings"
 
 	"gitlab.com/webmesh/node/pkg/services"
 	"gitlab.com/webmesh/node/pkg/store"
@@ -43,8 +42,7 @@ const (
 	GlobalInsecureEnvVar               = "GLOBAL_INSECURE"
 	GlobalNoIPv4EnvVar                 = "GLOBAL_NO_IPV4"
 	GlobalNoIPv6EnvVar                 = "GLOBAL_NO_IPV6"
-	GlobalPrimaryEndpointEnvVar        = "GLOBAL_PRIMARY_ENDPOINT"
-	GlobalEndpointsEnvVar              = "GLOBAL_ENDPOINTS"
+	GlobalEndpointEnvVar               = "GLOBAL_ENDPOINT"
 	GlobalDetectEndpointsEnvVar        = "GLOBAL_DETECT_ENDPOINTS"
 	GlobalDetectPrivateEndpointsEnvVar = "GLOBAL_DETECT_PRIVATE_ENDPOINTS"
 	GlobalAllowRemoteDetectionEnvVar   = "GLOBAL_ALLOW_REMOTE_DETECTION"
@@ -74,13 +72,10 @@ type Options struct {
 	NoIPv4 bool `yaml:"no-ipv4" json:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is true if IPv6 should be disabled.
 	NoIPv6 bool `yaml:"no-ipv6" json:"no-ipv6" toml:"no-ipv6"`
-	// PrimaryEndpoint is the preferred publicly routable address of this node.
-	// Setting this value will override the store advertise address and wireguard
+	// Endpoint is the preferred publicly routable address of this node.
+	// Setting this value will override the store advertise address and WireGuard
 	// primary endpoints with their configured listen ports.
-	PrimaryEndpoint string `yaml:"primary-endpoint" json:"primary-endpoint" toml:"primary-endpoint"`
-	// Endpoints is a comma separated list of additional endpoints to advertise.
-	// These are merged with existing endpoints in the other configurations.
-	Endpoints string `yaml:"endpoints" json:"endpoints" toml:"endpoints"`
+	Endpoint string `yaml:"endpoints" json:"endpoints" toml:"endpoints"`
 	// DetectEndpoints is true if the endpoints should be detected.
 	DetectEndpoints bool `yaml:"detect-endpoints" json:"detect-endpoints" toml:"detect-endpoints"`
 	// DetectPrivateEndpoints is true if private IP addresses should be included in detection.
@@ -120,15 +115,11 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(GlobalLogLevelEnvVar, "info"),
 		"Log level (debug, info, warn, error)")
 
-	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", util.GetEnvDefault(GlobalPrimaryEndpointEnvVar, ""),
+	fs.StringVar(&o.Endpoint, "global.primary-endpoint", util.GetEnvDefault(GlobalEndpointEnvVar, ""),
 		`The preferred publicly routable address of this node. Setting this
 value will override the address portion of the store advertise address
 and WireGuard endpoints. This is only necessary if you intend for
 this node's API to be reachable outside the network.`)
-
-	fs.StringVar(&o.Endpoints, "global.endpoints", util.GetEnvDefault(GlobalEndpointsEnvVar, ""),
-		`A comma separated list of additional endpoints to advertise. These
-are merged with existing endpoints in the other configurations.`)
 
 	fs.BoolVar(&o.DetectEndpoints, "global.detect-endpoints", util.GetEnvDefault(GlobalDetectEndpointsEnvVar, "false") == "true",
 		"Detect potential endpoints from the local interfaces.")
@@ -146,21 +137,11 @@ are merged with existing endpoints in the other configurations.`)
 // Overlay overlays the global options onto the given option sets.
 func (o *Options) Overlay(opts ...any) error {
 	var primaryEndpoint netip.Addr
-	var additionalEndpoints []netip.Addr
 	var err error
-	if o.PrimaryEndpoint != "" {
-		primaryEndpoint, err = netip.ParseAddr(o.PrimaryEndpoint)
+	if o.Endpoint != "" {
+		primaryEndpoint, err = netip.ParseAddr(o.Endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to parse endpoint: %w", err)
-		}
-	}
-	if o.Endpoints != "" {
-		for _, endpoint := range strings.Split(o.Endpoints, ",") {
-			additionalEndpoint, err := netip.ParseAddr(endpoint)
-			if err != nil {
-				return fmt.Errorf("failed to parse endpoint: %w", err)
-			}
-			additionalEndpoints = append(additionalEndpoints, additionalEndpoint)
 		}
 	}
 	if o.DetectEndpoints {
@@ -171,11 +152,6 @@ func (o *Options) Overlay(opts ...any) error {
 		if len(detected) > 0 {
 			if !primaryEndpoint.IsValid() {
 				primaryEndpoint = detected[0]
-				if len(detected) > 1 {
-					additionalEndpoints = append(additionalEndpoints, detected[1:]...)
-				}
-			} else {
-				additionalEndpoints = append(additionalEndpoints, detected...)
 			}
 		}
 	}
@@ -205,9 +181,6 @@ func (o *Options) Overlay(opts ...any) error {
 					raftPort = 9443
 				}
 				v.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
-			}
-			if len(additionalEndpoints) > 0 {
-				v.NodeAdditionalEndpoints += "," + joinEndpoints(additionalEndpoints)
 			}
 		case *services.Options:
 			if !v.Insecure {
@@ -335,12 +308,4 @@ func (o *Options) detectFromInterfaces() ([]netip.Addr, error) {
 		}
 	}
 	return ips, nil
-}
-
-func joinEndpoints(eps []netip.Addr) string {
-	var s []string
-	for _, ep := range eps {
-		s = append(s, ep.String())
-	}
-	return strings.Join(s, ",")
 }

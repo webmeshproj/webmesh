@@ -273,19 +273,9 @@ func (m *Server) newPeerTXTRecord(name string, peer *peers.Node) *dns.TXT {
 			fmt.Sprintf("raft_port=%d", peer.RaftPort),
 			fmt.Sprintf("grpc_port=%d", peer.GRPCPort),
 			fmt.Sprintf("wireguard_port=%d", peer.WireguardPort),
-			fmt.Sprintf("primary_endpoint=%s", func() string {
-				if peer.PrimaryEndpoint.IsValid() {
-					return peer.PrimaryEndpoint.String()
-				}
-				return "<none>"
-			}()),
-			fmt.Sprintf("endpoints=%s", func() string {
-				if len(peer.Endpoints) > 0 {
-					endpointStrs := make([]string, len(peer.Endpoints))
-					for i, endpoint := range peer.Endpoints {
-						endpointStrs[i] = endpoint.String()
-					}
-					return strings.Join(endpointStrs, ",")
+			fmt.Sprintf("public_endpoint=%s", func() string {
+				if peer.PublicEndpoint.IsValid() {
+					return peer.PublicEndpoint.String()
 				}
 				return "<none>"
 			}()),

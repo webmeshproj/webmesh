@@ -30,44 +30,43 @@ import (
 )
 
 const (
-	NodeIDEnvVar                     = "STORE_NODE_ID"
-	NodeEndpointEnvVar               = "STORE_NODE_ENDPOINT"
-	NodeAdditionalEndpointsEnvVar    = "STORE_NODE_ADDITIONAL_ENDPOINTS"
-	DataDirEnvVar                    = "STORE_DATA_DIR"
-	InMemoryEnvVar                   = "STORE_IN_MEMORY"
-	AdvertiseAddressEnvVar           = "STORE_ADVERTISE_ADDRESS"
-	ConnectionPoolCountEnvVar        = "STORE_CONNECTION_POOL_COUNT"
-	ConnectionTimeoutEnvVar          = "STORE_CONNECTION_TIMEOUT"
-	HeartbeatTimeoutEnvVar           = "STORE_HEARTBEAT_TIMEOUT"
-	ElectionTimeoutEnvVar            = "STORE_ELECTION_TIMEOUT"
-	ApplyTimeoutEnvVar               = "STORE_APPLY_TIMEOUT"
-	CommitTimeoutEnvVar              = "STORE_COMMIT_TIMEOUT"
-	MaxAppendEntriesEnvVar           = "STORE_MAX_APPEND_ENTRIES"
-	LeaderLeaseTimeoutEnvVar         = "STORE_LEADER_LEASE_TIMEOUT"
-	SnapshotIntervalEnvVar           = "STORE_SNAPSHOT_INTERVAL"
-	SnapshotThresholdEnvVar          = "STORE_SNAPSHOT_THRESHOLD"
-	SnapshotRetentionEnvVar          = "STORE_SNAPSHOT_RETENTION"
-	BootstrapEnvVar                  = "STORE_BOOTSTRAP"
-	BootstrapServersEnvVar           = "STORE_BOOTSTRAP_SERVERS"
-	BootstrapServersGRPCPortsEnvVar  = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
-	BootstrapIPv4NetworkEnvVar       = "STORE_BOOTSTRAP_IPV4_NETWORK"
-	BootstrapWithRaftACLsEnvVar      = "STORE_BOOTSTRAP_WITH_RAFT_ACLS"
-	BootstrapAllowAllNonVotersEnvVar = "STORE_BOOTSTRAP_ALLOW_ALL_NON_VOTERS"
-	JoinEnvVar                       = "STORE_JOIN"
-	JoinAsVoterEnvVar                = "STORE_JOIN_AS_VOTER"
-	MaxJoinRetriesEnvVar             = "STORE_MAX_JOIN_RETRIES"
-	JoinTimeoutEnvVar                = "STORE_JOIN_TIMEOUT"
-	ForceNewClusterEnvVar            = "STORE_FORCE_BOOTSTRAP"
-	RaftLogLevelEnvVar               = "STORE_RAFT_LOG_LEVEL"
-	RaftPreferIPv6EnvVar             = "STORE_RAFT_PREFER_IPV6"
-	ObserverChanBufferEnvVar         = "STORE_OBSERVER_CHAN_BUFFER"
-	GRPCAdvertisePortEnvVar          = "STORE_GRPC_ADVERTISE_PORT"
-	RaftLogFormatEnvVar              = "STORE_RAFT_LOG_FORMAT"
-	ShutdownTimeoutEnvVar            = "STORE_SHUTDOWN_TIMEOUT"
-	PeerRefreshIntervalEnvVar        = "STORE_PEER_REFRESH_INTERVAL"
-	KeyRotationIntervalEnvVar        = "STORE_KEY_ROTATION_INTERVAL"
-	NoIPv4EnvVar                     = "STORE_NO_IPV4"
-	NoIPv6EnvVar                     = "STORE_NO_IPV6"
+	NodeIDEnvVar                    = "STORE_NODE_ID"
+	NodeEndpointEnvVar              = "STORE_NODE_ENDPOINT"
+	DataDirEnvVar                   = "STORE_DATA_DIR"
+	InMemoryEnvVar                  = "STORE_IN_MEMORY"
+	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
+	ConnectionPoolCountEnvVar       = "STORE_CONNECTION_POOL_COUNT"
+	ConnectionTimeoutEnvVar         = "STORE_CONNECTION_TIMEOUT"
+	HeartbeatTimeoutEnvVar          = "STORE_HEARTBEAT_TIMEOUT"
+	ElectionTimeoutEnvVar           = "STORE_ELECTION_TIMEOUT"
+	ApplyTimeoutEnvVar              = "STORE_APPLY_TIMEOUT"
+	CommitTimeoutEnvVar             = "STORE_COMMIT_TIMEOUT"
+	MaxAppendEntriesEnvVar          = "STORE_MAX_APPEND_ENTRIES"
+	LeaderLeaseTimeoutEnvVar        = "STORE_LEADER_LEASE_TIMEOUT"
+	SnapshotIntervalEnvVar          = "STORE_SNAPSHOT_INTERVAL"
+	SnapshotThresholdEnvVar         = "STORE_SNAPSHOT_THRESHOLD"
+	SnapshotRetentionEnvVar         = "STORE_SNAPSHOT_RETENTION"
+	BootstrapEnvVar                 = "STORE_BOOTSTRAP"
+	BootstrapServersEnvVar          = "STORE_BOOTSTRAP_SERVERS"
+	BootstrapServersGRPCPortsEnvVar = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
+	BootstrapIPv4NetworkEnvVar      = "STORE_BOOTSTRAP_IPV4_NETWORK"
+	BootstrapWithRaftACLsEnvVar     = "STORE_BOOTSTRAP_WITH_RAFT_ACLS"
+	JoinEnvVar                      = "STORE_JOIN"
+	JoinAsVoterEnvVar               = "STORE_JOIN_AS_VOTER"
+	MaxJoinRetriesEnvVar            = "STORE_MAX_JOIN_RETRIES"
+	JoinTimeoutEnvVar               = "STORE_JOIN_TIMEOUT"
+	ForceNewClusterEnvVar           = "STORE_FORCE_BOOTSTRAP"
+	RaftLogLevelEnvVar              = "STORE_RAFT_LOG_LEVEL"
+	RaftPreferIPv6EnvVar            = "STORE_RAFT_PREFER_IPV6"
+	ObserverChanBufferEnvVar        = "STORE_OBSERVER_CHAN_BUFFER"
+	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
+	RaftLogFormatEnvVar             = "STORE_RAFT_LOG_FORMAT"
+	ShutdownTimeoutEnvVar           = "STORE_SHUTDOWN_TIMEOUT"
+	PeerRefreshIntervalEnvVar       = "STORE_PEER_REFRESH_INTERVAL"
+	KeyRotationIntervalEnvVar       = "STORE_KEY_ROTATION_INTERVAL"
+	NoIPv4EnvVar                    = "STORE_NO_IPV4"
+	NoIPv6EnvVar                    = "STORE_NO_IPV6"
+	LeaveOnShutdownEnvVar           = "STORE_LEAVE_ON_SHUTDOWN"
 
 	// LogFile is the raft log file.
 	LogFile = "raft.log"
@@ -106,11 +105,7 @@ type Options struct {
 	// NodeID is the node ID.
 	NodeID string `json:"node-id" yaml:"node-id" toml:"node-id"`
 	// NodeEndpoint is the endpoint to broadcast when joining a cluster.
-	// This is only necessary if the node intends on exposing it's API.
 	NodeEndpoint string `json:"node-endpoint" yaml:"node-endpoint" toml:"node-endpoint"`
-	// NodeAdditionalEndpoints are additional endpoints to broadcast when joining a cluster.
-	// This is only necessary if the node intends on exposing it's API.
-	NodeAdditionalEndpoints string `json:"node-additional-endpoints" yaml:"node-additional-endpoints" toml:"node-additional-endpoints"`
 	// DataDir is the directory to store data in.
 	DataDir string `json:"data-dir" yaml:"data-dir" toml:"data-dir"`
 	// InMemory is if the store should be in memory. This should only be used for
@@ -172,8 +167,6 @@ type Options struct {
 	BootstrapIPv4Network string `json:"bootstrap-ipv4-network" yaml:"bootstrap-ipv4-network" toml:"bootstrap-ipv4-network"`
 	// BoostrapWithRaftACLs is the flag to bootstrap with Raft ACLs.
 	BootstrapWithRaftACLs bool `json:"bootstrap-with-raft-acls" yaml:"bootstrap-with-raft-acls" toml:"bootstrap-with-raft-acls"`
-	// BootstrapAllowAllNonVoters is the flag to bootstrap with an allow all non-voters policy.
-	BootstrapAllowAllNonVoters bool `json:"bootstrap-allow-all-non-voters" yaml:"bootstrap-allow-all-non-voters" toml:"bootstrap-allow-all-non-voters"`
 	// ForceBootstrap is the force new bootstrap flag.
 	ForceBootstrap bool `json:"force-bootstrap" yaml:"force-bootstrap" toml:"force-bootstrap"`
 	// RaftLogLevel is the log level for the raft backend.
@@ -196,6 +189,8 @@ type Options struct {
 	NoIPv4 bool `json:"no-ipv4" yaml:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is the no IPv6 flag.
 	NoIPv6 bool `json:"no-ipv6" yaml:"no-ipv6" toml:"no-ipv6"`
+	// LeaveOnShutdown is the leave on shutdown flag.
+	LeaveOnShutdown bool `json:"leave-on-shutdown" yaml:"leave-on-shutdown" toml:"leave-on-shutdown"`
 }
 
 // NewOptions returns new options with sensible defaults.
@@ -203,12 +198,12 @@ func NewOptions() *Options {
 	return &Options{
 		DataDir:              "/var/lib/webmesh/store",
 		AdvertiseAddress:     "localhost:9443",
-		ConnectionTimeout:    time.Second * 2,
-		HeartbeatTimeout:     time.Second * 2,
-		ElectionTimeout:      time.Second * 2,
+		ConnectionTimeout:    time.Second * 3,
+		HeartbeatTimeout:     time.Second * 3,
+		ElectionTimeout:      time.Second * 3,
 		ApplyTimeout:         time.Second * 10,
 		CommitTimeout:        time.Second * 15,
-		LeaderLeaseTimeout:   time.Second * 2,
+		LeaderLeaseTimeout:   time.Second * 3,
 		SnapshotInterval:     time.Minute * 5,
 		SnapshotThreshold:    50,
 		MaxAppendEntries:     16,
@@ -249,9 +244,6 @@ This is only necessary if the node intends on exposing it's API. When
 bootstrapping a cluster with a node that has an empty NodeEndpoint, the
 node will use the AdvertiseAddress as the NodeEndpoint.`)
 
-	fl.StringVar(&o.NodeAdditionalEndpoints, "store.node-additional-endpoints", util.GetEnvDefault(NodeAdditionalEndpointsEnvVar, ""),
-		`Comma separated list of additional endpoints to broadcast to the cluster.`)
-
 	fl.StringVar(&o.BootstrapServers, "store.bootstrap-servers", util.GetEnvDefault(BootstrapServersEnvVar, ""),
 		`Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
 If empty, the node will use the advertise address as the bootstrap server. If not empty,
@@ -272,20 +264,16 @@ Ports should be in the form of <node-id>=<port>.`)
 	fl.BoolVar(&o.BootstrapWithRaftACLs, "store.bootstrap-with-raft-acls", util.GetEnvDefault(BootstrapWithRaftACLsEnvVar, "false") == "true",
 		"Bootstrap the cluster with Raft ACLs enabled.")
 
-	fl.BoolVar(&o.BootstrapAllowAllNonVoters, "store.bootstrap-allow-all-non-voters", util.GetEnvDefault(BootstrapAllowAllNonVotersEnvVar, "false") == "true",
-		`Bootstrap the cluster with all non-voters allowed to join.
-Only makes sense when bootstrap-with-raft-acls is true.`)
-
 	fl.BoolVar(&o.ForceBootstrap, "store.force-bootstrap", util.GetEnvDefault(ForceNewClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
 
 	fl.IntVar(&o.ConnectionPoolCount, "store.connection-pool-count", util.GetEnvIntDefault(ConnectionPoolCountEnvVar, 0),
 		"Raft connection pool count.")
-	fl.DurationVar(&o.ConnectionTimeout, "store.connection-timeout", util.GetEnvDurationDefault(ConnectionTimeoutEnvVar, time.Second*2),
+	fl.DurationVar(&o.ConnectionTimeout, "store.connection-timeout", util.GetEnvDurationDefault(ConnectionTimeoutEnvVar, time.Second*3),
 		"Raft connection timeout.")
-	fl.DurationVar(&o.HeartbeatTimeout, "store.heartbeat-timeout", util.GetEnvDurationDefault(HeartbeatTimeoutEnvVar, time.Second*2),
+	fl.DurationVar(&o.HeartbeatTimeout, "store.heartbeat-timeout", util.GetEnvDurationDefault(HeartbeatTimeoutEnvVar, time.Second*3),
 		"Raft heartbeat timeout.")
-	fl.DurationVar(&o.ElectionTimeout, "store.election-timeout", util.GetEnvDurationDefault(ElectionTimeoutEnvVar, time.Second*2),
+	fl.DurationVar(&o.ElectionTimeout, "store.election-timeout", util.GetEnvDurationDefault(ElectionTimeoutEnvVar, time.Second*3),
 		"Raft election timeout.")
 	fl.DurationVar(&o.ApplyTimeout, "store.apply-timeout", util.GetEnvDurationDefault(ApplyTimeoutEnvVar, time.Second*10),
 		"Raft apply timeout.")
@@ -293,7 +281,7 @@ Only makes sense when bootstrap-with-raft-acls is true.`)
 		"Raft commit timeout.")
 	fl.IntVar(&o.MaxAppendEntries, "store.max-append-entries", util.GetEnvIntDefault(MaxAppendEntriesEnvVar, 16),
 		"Raft max append entries.")
-	fl.DurationVar(&o.LeaderLeaseTimeout, "store.leader-lease-timeout", util.GetEnvDurationDefault(LeaderLeaseTimeoutEnvVar, time.Second*2),
+	fl.DurationVar(&o.LeaderLeaseTimeout, "store.leader-lease-timeout", util.GetEnvDurationDefault(LeaderLeaseTimeoutEnvVar, time.Second*3),
 		"Raft leader lease timeout.")
 	fl.DurationVar(&o.SnapshotInterval, "store.snapshot-interval", util.GetEnvDurationDefault(SnapshotIntervalEnvVar, time.Minute*5),
 		"Raft snapshot interval.")
@@ -330,6 +318,8 @@ All nodes must use the same log format for the lifetime of the cluster.`)
 		"Disable IPv4 for the raft transport.")
 	fl.BoolVar(&o.NoIPv6, "store.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
 		"Disable IPv6 for the raft transport.")
+	fl.BoolVar(&o.LeaveOnShutdown, "store.leave-on-shutdown", util.GetEnvDefault(LeaveOnShutdownEnvVar, "false") == "true",
+		"Leave the cluster when the server shuts down.")
 }
 
 // Validate validates the options.

@@ -25,8 +25,10 @@ import (
 	"strings"
 	"time"
 
+	v1 "gitlab.com/webmesh/api/v1"
+
+	"gitlab.com/webmesh/node/pkg/meshdb"
 	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
-	"gitlab.com/webmesh/node/pkg/store"
 )
 
 // ErrACLNotFound is returned when an ACL is not found.
@@ -36,8 +38,6 @@ var ErrACLNotFound = sql.ErrNoRows
 type RaftACLs interface {
 	// CanVote returns true if the node is allowed to vote in the cluster.
 	CanVote(ctx context.Context, nodeID string) (bool, error)
-	// CanObserve returns true if the node is allowed to observe the cluster.
-	CanObserve(ctx context.Context, nodeID string) (bool, error)
 	// PutACL add or updates a Raft ACL.
 	PutACL(ctx context.Context, acl *ACL) error
 	// DeleteACL deletes a Raft ACL.
@@ -56,8 +56,6 @@ type ACL struct {
 	NodePatterns []string
 	// CanVote is true if the node is allowed to vote in the cluster.
 	CanVote bool
-	// CanObserve is true if the node is allowed to observe the cluster.
-	CanObserve bool
 	// CreatedAt is the time the ACL was created.
 	CreatedAt time.Time
 	// UpdatedAt is the time the ACL was last updated.
@@ -76,14 +74,14 @@ func (a *ACL) Matches(nodeID string) bool {
 }
 
 // New creates a new Raft ACLs.
-func New(store store.Store) RaftACLs {
+func New(store meshdb.Store) RaftACLs {
 	return &raftACLs{
 		store: store,
 	}
 }
 
 type raftACLs struct {
-	store store.Store
+	store meshdb.Store
 }
 
 // CanVote returns true if the node is allowed to vote in the cluster.
@@ -103,30 +101,17 @@ func (r *raftACLs) CanVote(ctx context.Context, nodeID string) (bool, error) {
 	return false, nil
 }
 
-// CanObserve returns true if the node is allowed to observe the cluster.
-func (r *raftACLs) CanObserve(ctx context.Context, nodeID string) (bool, error) {
-	acls, err := r.ListACLs(ctx)
-	if err != nil {
-		return false, err
-	}
-	if len(acls) == 0 {
-		return true, nil
-	}
-	for _, acl := range acls {
-		if acl.Matches(nodeID) {
-			return acl.CanObserve, nil
-		}
-	}
-	return false, nil
-}
-
 // PutACL add or updates a Raft ACL.
 func (r *raftACLs) PutACL(ctx context.Context, acl *ACL) error {
 	return raftdb.New(r.store.DB()).PutRaftACL(ctx, raftdb.PutRaftACLParams{
-		Name:      acl.Name,
-		Nodes:     strings.Join(acl.NodePatterns, ","),
-		Voter:     acl.CanVote,
-		Observer:  acl.CanObserve,
+		Name:  acl.Name,
+		Nodes: strings.Join(acl.NodePatterns, ","),
+		Action: func() int64 {
+			if acl.CanVote {
+				return int64(v1.ACLAction_ALLOW.Number())
+			}
+			return int64(v1.ACLAction_DENY.Number())
+		}(),
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	})
@@ -169,8 +154,7 @@ func dbACLtoACL(acl raftdb.RaftAcl) *ACL {
 	return &ACL{
 		Name:         acl.Name,
 		NodePatterns: strings.Split(acl.Nodes, ","),
-		CanVote:      acl.Voter,
-		CanObserve:   acl.Observer,
+		CanVote:      acl.Action == int64(v1.ACLAction_ALLOW.Number()),
 		CreatedAt:    acl.CreatedAt,
 		UpdatedAt:    acl.UpdatedAt,
 	}

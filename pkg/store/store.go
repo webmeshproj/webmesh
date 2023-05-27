@@ -35,8 +35,8 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/firewall"
+	"gitlab.com/webmesh/node/pkg/meshdb"
 	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 	"gitlab.com/webmesh/node/pkg/meshdb/snapshots"
 	"gitlab.com/webmesh/node/pkg/store/streamlayer"
 	"gitlab.com/webmesh/node/pkg/wireguard"
@@ -58,7 +58,7 @@ var (
 // Store is the store interface.
 type Store interface {
 	// ID returns the node ID.
-	ID() raft.ServerID
+	ID() string
 	// Open opens the store.
 	Open() error
 	// IsOpen returns true if the store is open.
@@ -108,14 +108,14 @@ type Store interface {
 	// DB returns a DB interface for use by the application. This
 	// interface will ensure consistency with the Raft log. Transactions
 	// are executed in the order they are received by the leader node.
-	DB() raftdb.DBTX
+	DB() meshdb.DBTX
 	// ReadDB returns a DB interface for use by the application. This
 	// interface will not ensure consistency with the Raft log. It is
 	// intended for use in read-only operations that do not require
 	// immediate consistency. It takes a read lock on the data store
 	// to ensure that no modifications are happening while the transaction
 	// is in progress and that SQLite itself is not busy.
-	ReadDB() raftdb.DBTX
+	ReadDB() meshdb.DBTX
 	// LocalDB returns a DB interface for use by the application. This
 	// interface will not ensure consistency with the Raft log. It is
 	// intended for use with the node_local database which is not replicated
@@ -161,7 +161,6 @@ func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) S
 		nodeID:        raft.ServerID(nodeID),
 		raftLogFormat: RaftLogFormat(opts.RaftLogFormat),
 		readyErr:      make(chan error, 2),
-		wgroutes:      make(map[netip.Prefix]struct{}),
 		log:           log.With(slog.String("node-id", string(nodeID))),
 	}
 }
@@ -195,17 +194,16 @@ type store struct {
 	dataAppliedIndex   atomic.Uint64
 	dataMux            sync.RWMutex
 
-	wg       wireguard.Interface
-	wgroutes map[netip.Prefix]struct{}
-	fw       firewall.Firewall
-	wgmux    sync.Mutex
+	wg    wireguard.Interface
+	fw    firewall.Firewall
+	wgmux sync.Mutex
 
 	open atomic.Bool
 }
 
 // ID returns the node ID.
-func (s *store) ID() raft.ServerID {
-	return s.nodeID
+func (s *store) ID() string {
+	return string(s.nodeID)
 }
 
 // IsOpen returns true if the store is open.
@@ -216,7 +214,7 @@ func (s *store) IsOpen() bool {
 // DB returns a DB interface for use by the application. This
 // interface will ensure consistency with the Raft log. Transactions
 // are executed in the order they are received by the leader node.
-func (s *store) DB() raftdb.DBTX {
+func (s *store) DB() meshdb.DBTX {
 	// Locks are taken during the application of log entries
 	return s.raftData
 }
@@ -227,7 +225,7 @@ func (s *store) DB() raftdb.DBTX {
 // immediate consistency. It takes a read lock on the data store
 // to ensure that no modifications are happening while the transaction
 // is in progress and that SQLite itself is not busy.
-func (s *store) ReadDB() raftdb.DBTX {
+func (s *store) ReadDB() meshdb.DBTX {
 	return &lockableDB{DB: s.weakData, mux: s.dataMux.RLocker()}
 }
 

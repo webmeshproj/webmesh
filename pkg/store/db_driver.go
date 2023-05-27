@@ -290,7 +290,8 @@ func toNamedValues(args []driver.Value) []driver.NamedValue {
 
 func toSQLParameters(args []driver.NamedValue) ([]*v1.SQLParameter, error) {
 	params := make([]*v1.SQLParameter, len(args))
-	for i, arg := range args {
+	for i, argz := range args {
+		arg := argz
 		sqlParam := &v1.SQLParameter{Name: arg.Name}
 		switch v := arg.Value.(type) {
 		case nil:

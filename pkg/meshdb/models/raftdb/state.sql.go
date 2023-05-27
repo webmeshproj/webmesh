@@ -9,204 +9,44 @@ import (
 	"context"
 )
 
-const getIPv4Prefix = `-- name: GetIPv4Prefix :one
+const GetIPv4Prefix = `-- name: GetIPv4Prefix :one
 SELECT value FROM mesh_state WHERE key = 'IPv4Prefix'
 `
 
 func (q *Queries) GetIPv4Prefix(ctx context.Context) (string, error) {
-	row := q.db.QueryRowContext(ctx, getIPv4Prefix)
+	row := q.db.QueryRowContext(ctx, GetIPv4Prefix)
 	var value string
 	err := row.Scan(&value)
 	return value, err
 }
 
-const getNodePrivateRPCAddress = `-- name: GetNodePrivateRPCAddress :one
-SELECT
-    CAST(address AS TEXT) AS address
-FROM node_private_rpc_addresses
-WHERE node_id = ?
-`
-
-func (q *Queries) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getNodePrivateRPCAddress, nodeID)
-	var address interface{}
-	err := row.Scan(&address)
-	return address, err
-}
-
-const getNodePublicRPCAddress = `-- name: GetNodePublicRPCAddress :one
-SELECT
-    CAST(address AS TEXT) AS address
-FROM node_public_rpc_addresses
-WHERE node_id = ?
-`
-
-func (q *Queries) GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getNodePublicRPCAddress, nodeID)
-	var address interface{}
-	err := row.Scan(&address)
-	return address, err
-}
-
-const getPeerPrivateRPCAddresses = `-- name: GetPeerPrivateRPCAddresses :many
-SELECT
-    CAST(address AS TEXT) AS address
-FROM node_private_rpc_addresses
-WHERE node_id <> ?
-`
-
-func (q *Queries) GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
-	rows, err := q.db.QueryContext(ctx, getPeerPrivateRPCAddresses, nodeID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []interface{}
-	for rows.Next() {
-		var address interface{}
-		if err := rows.Scan(&address); err != nil {
-			return nil, err
-		}
-		items = append(items, address)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getPeerPublicRPCAddresses = `-- name: GetPeerPublicRPCAddresses :many
-SELECT
-    CAST(address AS TEXT) AS address
-FROM node_public_rpc_addresses
-WHERE node_id <> ?
-`
-
-func (q *Queries) GetPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
-	rows, err := q.db.QueryContext(ctx, getPeerPublicRPCAddresses, nodeID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []interface{}
-	for rows.Next() {
-		var address interface{}
-		if err := rows.Scan(&address); err != nil {
-			return nil, err
-		}
-		items = append(items, address)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getULAPrefix = `-- name: GetULAPrefix :one
+const GetULAPrefix = `-- name: GetULAPrefix :one
 SELECT value FROM mesh_state WHERE key = 'ULAPrefix'
 `
 
 func (q *Queries) GetULAPrefix(ctx context.Context) (string, error) {
-	row := q.db.QueryRowContext(ctx, getULAPrefix)
+	row := q.db.QueryRowContext(ctx, GetULAPrefix)
 	var value string
 	err := row.Scan(&value)
 	return value, err
 }
 
-const listPublicRPCAddresses = `-- name: ListPublicRPCAddresses :many
-SELECT
-    node_id AS node_id,
-    CAST(address AS TEXT) AS address
-FROM node_public_rpc_addresses
-`
-
-type ListPublicRPCAddressesRow struct {
-	NodeID  string      `json:"node_id"`
-	Address interface{} `json:"address"`
-}
-
-func (q *Queries) ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPublicRPCAddresses)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListPublicRPCAddressesRow
-	for rows.Next() {
-		var i ListPublicRPCAddressesRow
-		if err := rows.Scan(&i.NodeID, &i.Address); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPublicWireguardEndpoints = `-- name: ListPublicWireguardEndpoints :many
-SELECT
-    node_id AS node_id,
-    CAST(endpoints AS TEXT) AS endpoints,
-    CAST(port AS INTEGER) AS port
-FROM node_all_wireguard_endpoints
-`
-
-type ListPublicWireguardEndpointsRow struct {
-	NodeID    string      `json:"node_id"`
-	Endpoints interface{} `json:"endpoints"`
-	Port      interface{} `json:"port"`
-}
-
-func (q *Queries) ListPublicWireguardEndpoints(ctx context.Context) ([]ListPublicWireguardEndpointsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPublicWireguardEndpoints)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListPublicWireguardEndpointsRow
-	for rows.Next() {
-		var i ListPublicWireguardEndpointsRow
-		if err := rows.Scan(&i.NodeID, &i.Endpoints, &i.Port); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const setIPv4Prefix = `-- name: SetIPv4Prefix :exec
+const SetIPv4Prefix = `-- name: SetIPv4Prefix :exec
 INSERT into mesh_state (key, value) VALUES ('IPv4Prefix', ?)
 ON CONFLICT (key) DO UPDATE SET value = excluded.value
 `
 
 func (q *Queries) SetIPv4Prefix(ctx context.Context, value string) error {
-	_, err := q.db.ExecContext(ctx, setIPv4Prefix, value)
+	_, err := q.db.ExecContext(ctx, SetIPv4Prefix, value)
 	return err
 }
 
-const setULAPrefix = `-- name: SetULAPrefix :exec
+const SetULAPrefix = `-- name: SetULAPrefix :exec
 INSERT into mesh_state (key, value) VALUES ('ULAPrefix', ?)
 ON CONFLICT (key) DO UPDATE SET value = excluded.value
 `
 
 func (q *Queries) SetULAPrefix(ctx context.Context, value string) error {
-	_, err := q.db.ExecContext(ctx, setULAPrefix, value)
+	_, err := q.db.ExecContext(ctx, SetULAPrefix, value)
 	return err
 }

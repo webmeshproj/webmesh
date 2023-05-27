@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const insertNodeLease = `-- name: InsertNodeLease :one
+const InsertNodeLease = `-- name: InsertNodeLease :one
 INSERT OR REPLACE INTO leases (node_id, ipv4, created_at) VALUES (?, ?, ?)
 RETURNING node_id, ipv4, created_at
 `
@@ -22,18 +22,18 @@ type InsertNodeLeaseParams struct {
 }
 
 func (q *Queries) InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error) {
-	row := q.db.QueryRowContext(ctx, insertNodeLease, arg.NodeID, arg.Ipv4, arg.CreatedAt)
+	row := q.db.QueryRowContext(ctx, InsertNodeLease, arg.NodeID, arg.Ipv4, arg.CreatedAt)
 	var i Lease
 	err := row.Scan(&i.NodeID, &i.Ipv4, &i.CreatedAt)
 	return i, err
 }
 
-const listAllocatedIPv4 = `-- name: ListAllocatedIPv4 :many
+const ListAllocatedIPv4 = `-- name: ListAllocatedIPv4 :many
 SELECT ipv4 FROM leases WHERE ipv4 IS NOT NULL
 `
 
 func (q *Queries) ListAllocatedIPv4(ctx context.Context) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listAllocatedIPv4)
+	rows, err := q.db.QueryContext(ctx, ListAllocatedIPv4)
 	if err != nil {
 		return nil, err
 	}
@@ -55,11 +55,11 @@ func (q *Queries) ListAllocatedIPv4(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
-const releaseNodeLease = `-- name: ReleaseNodeLease :exec
+const ReleaseNodeLease = `-- name: ReleaseNodeLease :exec
 DELETE FROM leases WHERE node_id = ?
 `
 
 func (q *Queries) ReleaseNodeLease(ctx context.Context, nodeID string) error {
-	_, err := q.db.ExecContext(ctx, releaseNodeLease, nodeID)
+	_, err := q.db.ExecContext(ctx, ReleaseNodeLease, nodeID)
 	return err
 }

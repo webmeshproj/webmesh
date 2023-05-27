@@ -32,6 +32,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
+	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
 )
 
 // ApplyBatch implements the raft.BatchingFSM interface.
@@ -47,7 +48,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 // Apply applies a Raft log entry to the store.
 func (s *store) Apply(l *raft.Log) any {
 	log := s.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
-	log.Debug("applying log")
+	log.Debug("applying log", "type", l.Type.String())
 	start := time.Now()
 	defer func() {
 		log.Debug("finished applying log", slog.String("took", time.Since(start).String()))
@@ -103,7 +104,7 @@ func (s *store) Apply(l *raft.Log) any {
 	}()
 
 	if l.Type != raft.LogCommand {
-		log.Debug("not a data query log", slog.String("type", l.Type.String()))
+		// We only care about command logs.
 		return &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
@@ -132,6 +133,20 @@ func (s *store) Apply(l *raft.Log) any {
 		return &v1.RaftApplyResponse{
 			Time:  time.Since(start).String(),
 			Error: fmt.Sprintf("unmarshal raft log entry: %s", err.Error()),
+		}
+	}
+
+	if cmd.GetType() == v1.RaftCommandType_EXECUTE {
+		if cmd.GetSqlExec().GetStatement().GetSql() == raftdb.InsertNodeEdge {
+			// This might be a bit of a hack, but the code is generated
+			// and we know exactly what's coming over the wire. We can check
+			// here if an edge is being added and refresh the wireguard peers
+			defer func() {
+				log.Debug("applied new node edge, refreshing wireguard peers")
+				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+					log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
+				}
+			}()
 		}
 	}
 

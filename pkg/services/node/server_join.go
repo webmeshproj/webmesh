@@ -21,30 +21,23 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
-	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/raft"
 	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"gitlab.com/webmesh/node/pkg/meshdb/peers"
+	"gitlab.com/webmesh/node/pkg/services/leaderproxy"
 	"gitlab.com/webmesh/node/pkg/util"
 )
 
 func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
 	if !s.store.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
-	}
-
-	if !s.ulaPrefix.IsValid() {
-		var err error
-		s.ulaPrefix, err = s.meshstate.GetULAPrefix(ctx)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
-		}
 	}
 
 	// Validate inputs
@@ -57,21 +50,25 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// We can go ahead and check here if the node is allowed to do what
 	// they want
-	var allowed bool
-	var err error
 	if req.GetAsVoter() {
-		allowed, err = s.raftacls.CanVote(ctx, req.GetId())
-	} else {
-		allowed, err = s.raftacls.CanObserve(ctx, req.GetId())
+		allowed, err := s.raftacls.CanVote(ctx, req.GetId())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to check ACLs: %v", err)
+		}
+		if !allowed {
+			s.log.Warn("Node not allowed to join",
+				"id", req.GetId(),
+				"voter", req.GetAsVoter())
+			return nil, status.Error(codes.PermissionDenied, "not allowed")
+		}
 	}
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to check ACLs: %v", err)
-	}
-	if !allowed {
-		s.log.Warn("Node not allowed to join",
-			"id", req.GetId(),
-			"voter", req.GetAsVoter())
-		return nil, status.Error(codes.PermissionDenied, "not allowed")
+
+	if !s.ulaPrefix.IsValid() {
+		var err error
+		s.ulaPrefix, err = s.meshstate.GetULAPrefix(ctx)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
+		}
 	}
 
 	publicKey, err := wgtypes.ParseKey(req.GetPublicKey())
@@ -79,20 +76,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
 	var primaryEndpoint netip.Addr
-	if req.GetPrimaryEndpoint() != "" {
-		primaryEndpoint, err = netip.ParseAddr(req.GetPrimaryEndpoint())
+	if req.GetPublicEndpoint() != "" {
+		primaryEndpoint, err = netip.ParseAddr(req.GetPublicEndpoint())
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid primary endpoint: %v", err)
-		}
-	}
-	var endpoints []netip.Addr
-	if len(req.GetEndpoints()) > 0 {
-		for _, endpointStr := range req.GetEndpoints() {
-			endpoint, err := netip.ParseAddr(endpointStr)
-			if err != nil {
-				return nil, status.Errorf(codes.InvalidArgument, "invalid endpoint: %v", err)
-			}
-			endpoints = append(endpoints, endpoint)
 		}
 	}
 
@@ -119,11 +106,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if peer.WireguardPort != int(req.GetWireguardPort()) {
 			peer.WireguardPort = int(req.GetWireguardPort())
 		}
-		if primaryEndpoint.IsValid() && primaryEndpoint.String() != peer.PrimaryEndpoint.String() {
-			peer.PrimaryEndpoint = primaryEndpoint
-		}
-		if !cmp.Equal(peer.Endpoints, endpoints) {
-			peer.Endpoints = endpoints
+		if primaryEndpoint.IsValid() && primaryEndpoint.String() != peer.PublicEndpoint.String() {
+			peer.PublicEndpoint = primaryEndpoint
 		}
 		peer, err = s.peers.Update(ctx, peer)
 		if err != nil {
@@ -137,39 +121,60 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
 		}
 		peer, err = s.peers.Create(ctx, &peers.CreateOptions{
-			ID:              req.GetId(),
-			PublicKey:       publicKey,
-			PrimaryEndpoint: primaryEndpoint,
-			Endpoints:       endpoints,
-			NetworkIPv6:     networkIPv6,
-			GRPCPort:        int(req.GetGrpcPort()),
-			RaftPort:        int(req.GetRaftPort()),
-			WireguardPort:   int(req.GetWireguardPort()),
+			ID:             req.GetId(),
+			PublicKey:      publicKey,
+			PublicEndpoint: primaryEndpoint,
+			NetworkIPv6:    networkIPv6,
+			GRPCPort:       int(req.GetGrpcPort()),
+			RaftPort:       int(req.GetRaftPort()),
+			WireguardPort:  int(req.GetWireguardPort()),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
 		}
 	}
 
-	// Start building the response
-	resp := &v1.JoinResponse{
-		NetworkIpv6: peer.NetworkIPv6.String(),
-	}
+	// Acquire an IPv4 address for the peer if requested
 	var lease netip.Prefix
 	if req.GetAssignIpv4() {
-		log.Info("assigning IPv4 address to peer")
+		log.Debug("assigning IPv4 address to peer")
 		lease, err = s.ipam.Acquire(ctx, req.GetId())
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to assign IPv4: %v", err)
 		}
 		log.Info("assigned IPv4 address to peer", slog.String("ipv4", lease.String()))
-		resp.AddressIpv4 = lease.String()
 	}
-	// Fetch current wireguard peers for the new node
-	peers, err := s.peers.ListPeers(ctx, req.GetId())
+
+	// Add an edge from the joining server to the caller
+	joiningServer := string(s.store.ID())
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		proxiedFrom := md.Get(leaderproxy.ProxiedFromMeta)
+		if len(proxiedFrom) > 0 {
+			// The request was proxied, so the joining server is the
+			// server that proxied the request
+			joiningServer = proxiedFrom[0]
+		}
+	}
+	log.Debug("adding edge from joining server to caller", slog.String("joining_server", joiningServer))
+	err = s.meshgraph.AddEdge(ctx, joiningServer, req.GetId())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 	}
+	if req.GetAsVoter() {
+		// Add an edge from the caller to all other voters (including ourselves in the process)
+		config := s.store.Raft().GetConfiguration().Configuration()
+		for _, server := range config.Servers {
+			if server.Suffrage == raft.Voter {
+				log.Debug("adding edge from caller to voter", slog.String("voter", string(server.ID)))
+				err = s.meshgraph.AddEdge(ctx, req.GetId(), string(server.ID))
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+				}
+			}
+		}
+	}
+
 	// Add peer to the raft cluster
 	var raftAddress string
 	if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
@@ -193,54 +198,79 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to add non-voter: %v", err)
 		}
 	}
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := s.store.RefreshWireguardPeers(ctx); err != nil {
-			log.Warn("failed to refresh wireguard peers", slog.String("error", err.Error()))
-		}
-	}()
-	resp.Peers = make([]*v1.WireguardPeer, len(peers))
-	for i, p := range peers {
-		peer := p
-		resp.Peers[i] = &v1.WireguardPeer{
-			Id:        peer.ID,
-			PublicKey: peer.PublicKey.String(),
-			// TODO: This still assumes fairly simple setups. We need to handle situations
-			// where two nodes wish to be bridged over NAT64 or ICE. If a single node provides
-			// NAT64 to the network, this becomes a lot easier.
-			//
-			// For now, when a peer behind a NAT receives an endpoint it can contact, it allows
-			// all traffic from that endpoint. This is not ideal, but it works.
-			PrimaryEndpoint: func() string {
-				if peer.PrimaryEndpoint.IsValid() {
-					return netip.AddrPortFrom(peer.PrimaryEndpoint, uint16(peer.WireguardPort)).String()
+
+	// Get the newly updated mesh graph
+	graph, err := s.meshgraph.Build(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to build mesh DAG: %v", err)
+	}
+
+	// Start building the response
+	resp := &v1.JoinResponse{
+		NetworkIpv6: peer.NetworkIPv6.String(),
+		AddressIpv4: func() string {
+			if lease.IsValid() {
+				return lease.String()
+			}
+			return ""
+		}(),
+	}
+
+	// Build current peers for the new node
+	adjacencyMap, err := graph.AdjacencyMap()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get adjacency map: %v", err)
+	}
+	ourDescendants := adjacencyMap[req.GetId()]
+	resp.Peers = make([]*v1.WireguardPeer, 0)
+	for descendant, edge := range ourDescendants {
+		desc, _ := graph.Vertex(descendant)
+		slog.Debug("found descendant", slog.Any("descendant", desc))
+		// Each direct child is a wireguard peer
+		peer := &v1.WireguardPeer{
+			Id:        desc.ID,
+			PublicKey: desc.PublicKey.String(),
+			PublicEndpoint: func() string {
+				if desc.PublicEndpoint.IsValid() {
+					return desc.PublicEndpoint.String()
 				}
 				return ""
 			}(),
-			Endpoints: func() []string {
-				if len(peer.Endpoints) > 0 {
-					endpointStrs := make([]string, len(peer.Endpoints))
-					for i, endpoint := range peer.Endpoints {
-						endpointStrs[i] = netip.AddrPortFrom(endpoint, uint16(peer.WireguardPort)).String()
-					}
-					return endpointStrs
-				}
-				return nil
-			}(),
 			AddressIpv4: func() string {
-				if peer.PrivateIPv4.IsValid() {
-					return peer.PrivateIPv4.String()
+				if desc.PrivateIPv4.IsValid() {
+					return desc.PrivateIPv4.String()
 				}
 				return ""
 			}(),
 			AddressIpv6: func() string {
-				if peer.NetworkIPv6.IsValid() {
-					return peer.NetworkIPv6.String()
+				if desc.PrivateIPv6.IsValid() {
+					return desc.PrivateIPv6.String()
 				}
 				return ""
 			}(),
+			AllowedIps: make([]string, 0),
 		}
+		if desc.PrivateIPv4.IsValid() {
+			peer.AllowedIps = append(peer.AllowedIps, desc.PrivateIPv4.String())
+		}
+		if desc.PrivateIPv6.IsValid() {
+			peer.AllowedIps = append(peer.AllowedIps, desc.PrivateIPv6.String())
+		}
+		descTargets := adjacencyMap[edge.Target]
+		if len(descTargets) > 0 {
+			for descTarget := range descTargets {
+				if _, ok := ourDescendants[descTarget]; !ok && descTarget != req.GetId() {
+					target, _ := graph.Vertex(descTarget)
+					if target.PrivateIPv4.IsValid() {
+						peer.AllowedIps = append(peer.AllowedIps, target.PrivateIPv4.String())
+					}
+					if target.PrivateIPv6.IsValid() {
+						peer.AllowedIps = append(peer.AllowedIps, target.PrivateIPv6.String())
+					}
+				}
+			}
+		}
+		resp.Peers = append(resp.Peers, peer)
 	}
 	return resp, nil
 }

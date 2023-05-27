@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	"strings"
 	"time"
 
 	v1 "gitlab.com/webmesh/api/v1"
@@ -118,18 +117,12 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		defer conn.Close()
 		client := v1.NewNodeClient(conn)
 		req := &v1.JoinRequest{
-			Id:              string(s.nodeID),
-			PublicKey:       key.PublicKey().String(),
-			RaftPort:        int32(s.sl.ListenPort()),
-			GrpcPort:        int32(s.opts.GRPCAdvertisePort),
-			WireguardPort:   int32(s.wgopts.ListenPort),
-			PrimaryEndpoint: s.opts.NodeEndpoint,
-			Endpoints: func() []string {
-				if s.opts.NodeAdditionalEndpoints != "" {
-					return strings.Split(s.opts.NodeAdditionalEndpoints, ",")
-				}
-				return nil
-			}(),
+			Id:             string(s.nodeID),
+			PublicKey:      key.PublicKey().String(),
+			RaftPort:       int32(s.sl.ListenPort()),
+			GrpcPort:       int32(s.opts.GRPCAdvertisePort),
+			WireguardPort:  int32(s.wgopts.ListenPort),
+			PublicEndpoint: s.opts.NodeEndpoint,
 			AssignIpv4:     !s.opts.NoIPv4,
 			PreferRaftIpv6: s.opts.RaftPreferIPv6,
 			AsVoter:        s.opts.JoinAsVoter,
@@ -179,31 +172,37 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	for _, rpeer := range resp.GetPeers() {
 		peer := rpeer
 		g.Go(func() error {
+			key, err := wgtypes.ParseKey(peer.GetPublicKey())
+			if err != nil {
+				return fmt.Errorf("parse peer key: %w", err)
+			}
+			endpoint, err := netip.ParseAddrPort(peer.GetPublicEndpoint())
+			if err != nil {
+				return fmt.Errorf("parse peer endpoint: %w", err)
+			}
+			allowedIPs := make([]netip.Prefix, len(peer.GetAllowedIps()))
+			for i, ip := range peer.GetAllowedIps() {
+				allowedIPs[i], err = netip.ParsePrefix(ip)
+				if err != nil {
+					return fmt.Errorf("parse peer allowed ip: %w", err)
+				}
+			}
 			wgpeer := wireguard.Peer{
-				ID:                  peer.GetId(),
-				PublicKey:           peer.GetPublicKey(),
-				Endpoint:            peer.GetPrimaryEndpoint(),
-				AdditionalEndpoints: peer.GetEndpoints(),
-			}
-			if peer.GetAddressIpv4() != "" && !s.opts.NoIPv4 {
-				wgpeer.PrivateIPv4, err = netip.ParsePrefix(peer.GetAddressIpv4())
-				if err != nil {
-					return fmt.Errorf("parse ipv4 address: %w", err)
-				}
-			}
-			if peer.GetAddressIpv6() != "" && !s.opts.NoIPv6 {
-				wgpeer.PrivateIPv6, err = netip.ParsePrefix(peer.GetAddressIpv6())
-				if err != nil {
-					return fmt.Errorf("parse ipv6 network: %w", err)
-				}
+				ID:         peer.GetId(),
+				PublicKey:  key,
+				Endpoint:   endpoint,
+				AllowedIPs: allowedIPs,
 			}
 			log.Info("adding wireguard peer", slog.Any("peer", wgpeer))
 			err = s.wg.PutPeer(ctx, &wgpeer)
 			if err != nil {
-				return fmt.Errorf("add peer: %w", err)
+				return err
 			}
 			return nil
 		})
 	}
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("add peers: %w", err)
+	}
+	return nil
 }

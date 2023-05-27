@@ -10,39 +10,38 @@ import (
 	"time"
 )
 
-const deleteRaftACL = `-- name: DeleteRaftACL :exec
+const DeleteRaftACL = `-- name: DeleteRaftACL :exec
 DELETE FROM raft_acls WHERE name = ?
 `
 
 func (q *Queries) DeleteRaftACL(ctx context.Context, name string) error {
-	_, err := q.db.ExecContext(ctx, deleteRaftACL, name)
+	_, err := q.db.ExecContext(ctx, DeleteRaftACL, name)
 	return err
 }
 
-const getRaftACL = `-- name: GetRaftACL :one
-SELECT name, nodes, voter, observer, created_at, updated_at FROM raft_acls WHERE name = ?
+const GetRaftACL = `-- name: GetRaftACL :one
+SELECT name, nodes, "action", created_at, updated_at FROM raft_acls WHERE name = ?
 `
 
 func (q *Queries) GetRaftACL(ctx context.Context, name string) (RaftAcl, error) {
-	row := q.db.QueryRowContext(ctx, getRaftACL, name)
+	row := q.db.QueryRowContext(ctx, GetRaftACL, name)
 	var i RaftAcl
 	err := row.Scan(
 		&i.Name,
 		&i.Nodes,
-		&i.Voter,
-		&i.Observer,
+		&i.Action,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const listRaftACLs = `-- name: ListRaftACLs :many
-SELECT name, nodes, voter, observer, created_at, updated_at FROM raft_acls
+const ListRaftACLs = `-- name: ListRaftACLs :many
+SELECT name, nodes, "action", created_at, updated_at FROM raft_acls
 `
 
 func (q *Queries) ListRaftACLs(ctx context.Context) ([]RaftAcl, error) {
-	rows, err := q.db.QueryContext(ctx, listRaftACLs)
+	rows, err := q.db.QueryContext(ctx, ListRaftACLs)
 	if err != nil {
 		return nil, err
 	}
@@ -53,8 +52,7 @@ func (q *Queries) ListRaftACLs(ctx context.Context) ([]RaftAcl, error) {
 		if err := rows.Scan(
 			&i.Name,
 			&i.Nodes,
-			&i.Voter,
-			&i.Observer,
+			&i.Action,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -71,44 +69,33 @@ func (q *Queries) ListRaftACLs(ctx context.Context) ([]RaftAcl, error) {
 	return items, nil
 }
 
-const putRaftACL = `-- name: PutRaftACL :exec
+const PutRaftACL = `-- name: PutRaftACL :exec
 INSERT INTO raft_acls (
     name,
     nodes,
-    voter,
-    observer,
+    action,
     created_at,
     updated_at
-) VALUES (
-    ?,
-    ?,
-    ?,
-    ?,
-    ?,
-    ?
-) 
+) VALUES (?, ?, ?, ?, ?) 
 ON CONFLICT (name) DO UPDATE SET
     nodes = EXCLUDED.nodes,
-    voter = EXCLUDED.voter,
-    observer = EXCLUDED.observer,
+    action = EXCLUDED.action,
     updated_at = EXCLUDED.updated_at
 `
 
 type PutRaftACLParams struct {
 	Name      string    `json:"name"`
 	Nodes     string    `json:"nodes"`
-	Voter     bool      `json:"voter"`
-	Observer  bool      `json:"observer"`
+	Action    int64     `json:"action"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (q *Queries) PutRaftACL(ctx context.Context, arg PutRaftACLParams) error {
-	_, err := q.db.ExecContext(ctx, putRaftACL,
+	_, err := q.db.ExecContext(ctx, PutRaftACL,
 		arg.Name,
 		arg.Nodes,
-		arg.Voter,
-		arg.Observer,
+		arg.Action,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)

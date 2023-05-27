@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"sync"
 
 	v1 "gitlab.com/webmesh/api/v1"
@@ -65,7 +66,7 @@ type wginterface struct {
 	cli         *wgctrl.Client
 	log         *slog.Logger
 	peerConfigs *peerConfigs
-	epOverrides map[string]string
+	epOverrides map[string]netip.AddrPort
 	// A map of peer ID's to public keys.
 	peers    map[string]wgtypes.Key
 	peersMux sync.Mutex
@@ -95,7 +96,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			return nil, fmt.Errorf("failed to parse allowed IPs: %w", err)
 		}
 	}
-	epOverrides := make(map[string]string)
+	epOverrides := make(map[string]netip.AddrPort)
 	if opts.EndpointOverrides != "" {
 		var err error
 		epOverrides, err = parseEndpointOverrides(opts.EndpointOverrides)

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
+	v1 "gitlab.com/webmesh/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
@@ -193,27 +194,12 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		err = q.PutRaftACL(ctx, raftdb.PutRaftACLParams{
 			Name:      "bootstrap-servers",
 			Nodes:     strings.Join(nodeIDs, ","),
-			Voter:     true,
-			Observer:  true,
+			Action:    int64(v1.ACLAction_ALLOW.Number()),
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
 		})
 		if err != nil {
 			return fmt.Errorf("put bootstrap servers raft acl: %w", err)
-		}
-		if s.opts.BootstrapAllowAllNonVoters {
-			s.log.Info("allowing all non-voters to join the cluster")
-			err = q.PutRaftACL(ctx, raftdb.PutRaftACLParams{
-				Name:      "allow-all-non-voters",
-				Nodes:     "*",
-				Voter:     false,
-				Observer:  true,
-				CreatedAt: time.Now().UTC(),
-				UpdatedAt: time.Now().UTC(),
-			})
-			if err != nil {
-				return fmt.Errorf("put allow all non-voters raft acl: %w", err)
-			}
 		}
 	}
 
@@ -282,14 +268,8 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		Valid:  true,
 	}
 	if endpoint.IsValid() {
-		params.PrimaryEndpoint = sql.NullString{
+		params.PublicEndpoint = sql.NullString{
 			String: endpoint.String(),
-			Valid:  true,
-		}
-	}
-	if s.opts.NodeAdditionalEndpoints != "" {
-		params.Endpoints = sql.NullString{
-			String: s.opts.NodeAdditionalEndpoints,
 			Valid:  true,
 		}
 	}

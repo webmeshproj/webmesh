@@ -91,6 +91,7 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	storeOpts.Join = opts.JoinServer
 	storeOpts.NoIPv4 = opts.NoIPv4
 	storeOpts.NoIPv6 = opts.NoIPv6
+	storeOpts.LeaveOnShutdown = true
 
 	// Configure the wireguard interface
 	wireguardOpts := wireguard.NewOptions()

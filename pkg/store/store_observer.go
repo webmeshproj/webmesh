@@ -19,7 +19,6 @@ package store
 import (
 	"context"
 	"reflect"
-	"time"
 
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
@@ -38,8 +37,8 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 				s.log.Debug("stopping raft observer")
 				return
 			case ev := <-s.observerChan:
-				s.log.Debug("received observation event",
-					slog.String("type", reflect.TypeOf(ev.Data).String()))
+				s.log.Debug("received observation event", slog.String("type", reflect.TypeOf(ev.Data).String()))
+				ctx := context.Background()
 				switch data := ev.Data.(type) {
 				case raft.RequestVoteRequest:
 					s.log.Debug("RequestVoteRequest", slog.Any("data", data))
@@ -47,55 +46,31 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					s.log.Debug("RaftState", slog.String("data", data.String()))
 				case raft.PeerObservation:
 					s.log.Debug("PeerObservation", slog.Any("data", data))
-					s.handlePeerObservation(data)
+					if data.Removed {
+						// Remove the peer from the wireguard interface.
+						if err := s.wg.DeletePeer(ctx, &wireguard.Peer{ID: string(data.Peer.ID)}); err != nil {
+							s.log.Error("wireguard remove peer", slog.String("error", err.Error()))
+						}
+						return
+					}
+					if err := s.RefreshWireguardPeers(ctx); err != nil {
+						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
+					}
 				case raft.LeaderObservation:
 					s.log.Debug("LeaderObservation", slog.Any("data", data))
+					if err := s.RefreshWireguardPeers(ctx); err != nil {
+						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
+					}
 				case raft.ResumedHeartbeatObservation:
 					s.log.Debug("ResumedHeartbeatObservation", slog.Any("data", data))
 				case raft.FailedHeartbeatObservation:
 					s.log.Debug("FailedHeartbeatObservation", slog.Any("data", data))
-				}
-			}
-		}
-	}()
-	go func() {
-		t := time.NewTicker(s.opts.PeerRefreshInterval)
-		defer t.Stop()
-		for {
-			select {
-			case <-closeCh:
-				s.log.Debug("stopping peer observer")
-				return
-			case <-t.C:
-				if s.wg == nil {
-					continue
-				}
-				s.log.Debug("refreshing wireguard peers from db")
-				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
-					s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
+					if err := s.RefreshWireguardPeers(ctx); err != nil {
+						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
+					}
 				}
 			}
 		}
 	}()
 	return closeCh, doneCh
-}
-
-func (s *store) handlePeerObservation(change raft.PeerObservation) {
-	if s.wg == nil {
-		return
-	}
-	s.log.Info("handling peer observation", slog.Any("change", change))
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
-	defer cancel()
-	if change.Removed {
-		// Remove the peer from the wireguard interface.
-		if err := s.wg.DeletePeer(ctx, &wireguard.Peer{ID: string(change.Peer.ID)}); err != nil {
-			s.log.Error("wireguard remove peer", slog.String("error", err.Error()))
-		}
-		return
-	}
-	// Take this opportunity to verify all peer details are correct.
-	if err := s.RefreshWireguardPeers(ctx); err != nil {
-		s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
-	}
 }

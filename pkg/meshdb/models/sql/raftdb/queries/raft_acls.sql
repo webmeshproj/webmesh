@@ -2,22 +2,13 @@
 INSERT INTO raft_acls (
     name,
     nodes,
-    voter,
-    observer,
+    action,
     created_at,
     updated_at
-) VALUES (
-    ?,
-    ?,
-    ?,
-    ?,
-    ?,
-    ?
-) 
+) VALUES (?, ?, ?, ?, ?) 
 ON CONFLICT (name) DO UPDATE SET
     nodes = EXCLUDED.nodes,
-    voter = EXCLUDED.voter,
-    observer = EXCLUDED.observer,
+    action = EXCLUDED.action,
     updated_at = EXCLUDED.updated_at;
 
 -- name: DeleteRaftACL :exec

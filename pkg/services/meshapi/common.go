@@ -27,21 +27,11 @@ import (
 func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Server) *v1.MeshNode {
 	return &v1.MeshNode{
 		Id: node.ID,
-		PrimaryEndpoint: func() string {
-			if node.PrimaryEndpoint.IsValid() {
-				return node.PrimaryEndpoint.String()
+		PublicEndpoint: func() string {
+			if node.PublicEndpoint.IsValid() {
+				return node.PublicEndpoint.String()
 			}
 			return ""
-		}(),
-		Endpoints: func() []string {
-			if len(node.Endpoints) == 0 {
-				return nil
-			}
-			endpointsStrs := make([]string, len(node.Endpoints))
-			for i, endpoint := range node.Endpoints {
-				endpointsStrs[i] = endpoint.String()
-			}
-			return endpointsStrs
 		}(),
 		PublicKey: func() string {
 			if len(node.PublicKey) > 0 {

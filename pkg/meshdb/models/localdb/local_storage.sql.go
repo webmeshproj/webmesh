@@ -10,29 +10,29 @@ import (
 	"database/sql"
 )
 
-const getCurrentRaftIndex = `-- name: GetCurrentRaftIndex :one
+const GetCurrentRaftIndex = `-- name: GetCurrentRaftIndex :one
 SELECT id, term, log_index FROM raft_index LIMIT 1
 `
 
 func (q *Queries) GetCurrentRaftIndex(ctx context.Context) (RaftIndex, error) {
-	row := q.db.QueryRowContext(ctx, getCurrentRaftIndex)
+	row := q.db.QueryRowContext(ctx, GetCurrentRaftIndex)
 	var i RaftIndex
 	err := row.Scan(&i.ID, &i.Term, &i.LogIndex)
 	return i, err
 }
 
-const getCurrentWireguardKey = `-- name: GetCurrentWireguardKey :one
+const GetCurrentWireguardKey = `-- name: GetCurrentWireguardKey :one
 SELECT id, private_key, expires_at FROM wireguard_key LIMIT 1
 `
 
 func (q *Queries) GetCurrentWireguardKey(ctx context.Context) (WireguardKey, error) {
-	row := q.db.QueryRowContext(ctx, getCurrentWireguardKey)
+	row := q.db.QueryRowContext(ctx, GetCurrentWireguardKey)
 	var i WireguardKey
 	err := row.Scan(&i.ID, &i.PrivateKey, &i.ExpiresAt)
 	return i, err
 }
 
-const setCurrentRaftIndex = `-- name: SetCurrentRaftIndex :exec
+const SetCurrentRaftIndex = `-- name: SetCurrentRaftIndex :exec
 INSERT OR REPLACE INTO raft_index (
     id,
     term,
@@ -46,11 +46,11 @@ type SetCurrentRaftIndexParams struct {
 }
 
 func (q *Queries) SetCurrentRaftIndex(ctx context.Context, arg SetCurrentRaftIndexParams) error {
-	_, err := q.db.ExecContext(ctx, setCurrentRaftIndex, arg.Term, arg.LogIndex)
+	_, err := q.db.ExecContext(ctx, SetCurrentRaftIndex, arg.Term, arg.LogIndex)
 	return err
 }
 
-const setCurrentWireguardKey = `-- name: SetCurrentWireguardKey :exec
+const SetCurrentWireguardKey = `-- name: SetCurrentWireguardKey :exec
 INSERT OR REPLACE INTO wireguard_key (
     id, 
     private_key, 
@@ -64,6 +64,6 @@ type SetCurrentWireguardKeyParams struct {
 }
 
 func (q *Queries) SetCurrentWireguardKey(ctx context.Context, arg SetCurrentWireguardKeyParams) error {
-	_, err := q.db.ExecContext(ctx, setCurrentWireguardKey, arg.PrivateKey, arg.ExpiresAt)
+	_, err := q.db.ExecContext(ctx, SetCurrentWireguardKey, arg.PrivateKey, arg.ExpiresAt)
 	return err
 }

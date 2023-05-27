@@ -13,8 +13,7 @@ CREATE TABLE nodes (
     raft_port         INTEGER NOT NULL DEFAULT 9444,
     grpc_port         INTEGER NOT NULL DEFAULT 8443,
     wireguard_port    INTEGER NOT NULL DEFAULT 51820,
-    primary_endpoint  TEXT UNIQUE,
-    endpoints         TEXT UNIQUE,
+    public_endpoint   TEXT UNIQUE,
     network_ipv6      TEXT UNIQUE,
     created_at        TIMESTAMP NOT NULL,
     updated_at        TIMESTAMP NOT NULL
@@ -27,32 +26,22 @@ CREATE TABLE leases (
     created_at  TIMESTAMP NOT NULL
 );
 
--- Raft ACLs determine who can join the cluster as what.
+-- Raft ACLs determine who can vote in elections.
 CREATE TABLE raft_acls (
     name        TEXT NOT NULL PRIMARY KEY,
     nodes       TEXT NOT NULL,
-    voter       BOOLEAN NOT NULL DEFAULT FALSE,
-    observer    BOOLEAN NOT NULL DEFAULT FALSE,
+    action      INTEGER NOT NULL DEFAULT 0,
     created_at  TIMESTAMP NOT NULL,
     updated_at  TIMESTAMP NOT NULL
 );
 
--- Network ACLs determine traffic policies for non-voting nodes.
--- Voting nodes have to be able to communicate with each other.
--- In the future nodes should handle leaving tunnels for raft 
--- traffic open.
-CREATE TABLE network_acls (
-    name        TEXT NOT NULL PRIMARY KEY,
-    proto       TEXT NOT NULL,
-    src_cidrs   TEXT,
-    dst_cidrs   TEXT,
-    src_nodes   TEXT,
-    dst_nodes   TEXT,
-    action      TEXT NOT NULL,
-    priority    INTEGER NOT NULL,
-    created_at  TIMESTAMP NOT NULL,
-    updated_at  TIMESTAMP NOT NULL
+-- Tracks edges between nodes so a DAG can be constructed.
+CREATE TABLE node_edges (
+    src_node_id TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
+    dst_node_id TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE
 );
+
+-- Views for more convenient querying.
 
 CREATE VIEW node_private_rpc_addresses AS
 SELECT
@@ -70,10 +59,10 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 CREATE VIEW node_public_rpc_addresses AS
 SELECT
     nodes.id as node_id,
-    nodes.primary_endpoint
+    nodes.public_endpoint
     || ':'
     || CAST(nodes.grpc_port AS TEXT) AS address
-FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
+FROM nodes WHERE nodes.public_endpoint IS NOT NULL;
 
 CREATE VIEW node_private_raft_addresses AS
 SELECT
@@ -91,38 +80,20 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 CREATE VIEW node_public_raft_addresses AS
 SELECT
     nodes.id as node_id,
-    nodes.primary_endpoint
+    nodes.public_endpoint
     || ':'
     || CAST(nodes.raft_port AS TEXT) AS address
-FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
-
-CREATE VIEW node_primary_wireguard_endpoints AS
-SELECT
-    nodes.id AS node_id,
-    nodes.primary_endpoint
-    || ':'
-    || CAST(nodes.wireguard_port AS TEXT) AS address
-FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
-
-CREATE VIEW node_all_wireguard_endpoints AS
-SELECT
-    nodes.id AS node_id,
-    nodes.primary_endpoint
-    || ','
-    || COALESCE(nodes.endpoints || ',', '') AS endpoints,
-    nodes.wireguard_port AS port
-FROM nodes
-WHERE nodes.primary_endpoint IS NOT NULL;
+FROM nodes WHERE nodes.public_endpoint IS NOT NULL;
 
 -- +goose Down
 
+DROP TABLE node_edges;
+DROP TABLE raft_acls;
 DROP TABLE leases;
 DROP TABLE nodes;
-DROP TABLE asns;
 DROP TABLE mesh_state;
+
 DROP VIEW node_private_rpc_addresses;
 DROP VIEW node_public_rpc_addresses;
 DROP VIEW node_private_raft_addresses;
 DROP VIEW node_public_raft_addresses;
-DROP VIEW node_primary_wireguard_endpoints;
-DROP VIEW node_all_wireguard_endpoints;

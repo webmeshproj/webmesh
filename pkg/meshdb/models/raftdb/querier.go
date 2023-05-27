@@ -11,6 +11,7 @@ import (
 type Querier interface {
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	DeleteNode(ctx context.Context, id string) error
+	DeleteNodeEdge(ctx context.Context, arg DeleteNodeEdgeParams) error
 	DeleteRaftACL(ctx context.Context, name string) error
 	DropLeases(ctx context.Context) error
 	DropMeshState(ctx context.Context) error
@@ -20,20 +21,23 @@ type Querier interface {
 	DumpNodes(ctx context.Context) ([]Node, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
-	GetNodePeer(ctx context.Context, id string) (GetNodePeerRow, error)
+	GetNodeEdges(ctx context.Context, srcNodeID string) ([]string, error)
 	GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
 	GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
 	GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error)
 	GetPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error)
 	GetRaftACL(ctx context.Context, name string) (RaftAcl, error)
 	GetULAPrefix(ctx context.Context) (string, error)
+	InsertNodeEdge(ctx context.Context, arg InsertNodeEdgeParams) error
 	InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error)
 	ListAllocatedIPv4(ctx context.Context) ([]string, error)
-	ListNodePeers(ctx context.Context, id string) ([]ListNodePeersRow, error)
+	ListNodeEdges(ctx context.Context) ([]NodeEdge, error)
+	ListNodeIDs(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)
 	ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error)
 	ListPublicWireguardEndpoints(ctx context.Context) ([]ListPublicWireguardEndpointsRow, error)
 	ListRaftACLs(ctx context.Context) ([]RaftAcl, error)
+	NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) (int64, error)
 	PutRaftACL(ctx context.Context, arg PutRaftACLParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
 	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error

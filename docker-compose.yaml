@@ -8,6 +8,11 @@ networks:
         - subnet: 10.1.0.0/24
           gateway: 10.1.0.100
 
+volumes:
+  bootstrap-node-1:
+  bootstrap-node-2:
+  bootstrap-node-3:
+
 services:
 
   bootstrap-node-1:
@@ -25,14 +30,14 @@ services:
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --store.node-additional-endpoints=127.0.0.1
+      - --global.log-level=debug
       - --store.bootstrap
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.bootstrap-with-raft-acls
-      - --store.bootstrap-allow-all-non-voters
       - --store.data-dir=/data
       - --store.snapshot-threshold=10
+      - --store.raft-log-level=debug
       - --services.enable-leader-proxy
       - --services.enable-peer-discovery-api
       - --services.enable-metrics
@@ -66,12 +71,13 @@ services:
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
+      - --global.log-level=debug
       - --store.bootstrap
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.bootstrap-with-raft-acls
-      - --store.bootstrap-allow-all-non-voters
       - --store.data-dir=/data
+      - --store.raft-log-level=debug
       - --services.enable-leader-proxy
     volumes:
       - bootstrap-node-2:/data
@@ -89,18 +95,14 @@ services:
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
+      - --global.log-level=debug
       - --store.bootstrap
       - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.bootstrap-with-raft-acls
-      - --store.bootstrap-allow-all-non-voters
       - --store.data-dir=/data
+      - --store.raft-log-level=debug
       - --services.enable-leader-proxy
     volumes:
       - bootstrap-node-3:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-
-volumes:
-  bootstrap-node-1:
-  bootstrap-node-2:
-  bootstrap-node-3:
