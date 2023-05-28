@@ -30,15 +30,15 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	promapi "github.com/prometheus/client_golang/prometheus"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"gitlab.com/webmesh/node/pkg/services/leaderproxy"
-	"gitlab.com/webmesh/node/pkg/store"
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/services/leaderproxy"
+	"github.com/webmeshproj/node/pkg/store"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 const (

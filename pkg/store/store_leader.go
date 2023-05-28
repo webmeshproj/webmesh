@@ -23,7 +23,7 @@ import (
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 )
 
 // IsLeader returns true if this node is the Raft leader.

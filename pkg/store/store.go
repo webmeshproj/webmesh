@@ -34,12 +34,12 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/firewall"
-	"gitlab.com/webmesh/node/pkg/meshdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/snapshots"
-	"gitlab.com/webmesh/node/pkg/store/streamlayer"
-	"gitlab.com/webmesh/node/pkg/wireguard"
+	"github.com/webmeshproj/node/pkg/firewall"
+	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
+	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/node/pkg/store/streamlayer"
+	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 var (

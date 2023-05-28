@@ -31,13 +31,13 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/global"
-	"gitlab.com/webmesh/node/pkg/services"
-	"gitlab.com/webmesh/node/pkg/store"
-	"gitlab.com/webmesh/node/pkg/store/streamlayer"
-	"gitlab.com/webmesh/node/pkg/util"
-	"gitlab.com/webmesh/node/pkg/version"
-	"gitlab.com/webmesh/node/pkg/wireguard"
+	"github.com/webmeshproj/node/pkg/global"
+	"github.com/webmeshproj/node/pkg/services"
+	"github.com/webmeshproj/node/pkg/store"
+	"github.com/webmeshproj/node/pkg/store/streamlayer"
+	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/version"
+	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 var (

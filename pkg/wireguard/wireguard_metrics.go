@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/elastic/go-sysinfo"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 // Metrics returns the metrics for the wireguard interface and the host.

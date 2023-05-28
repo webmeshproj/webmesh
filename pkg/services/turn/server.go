@@ -25,7 +25,7 @@ import (
 	"github.com/pion/turn/v2"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 // Options contains the options for the TURN server.

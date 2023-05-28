@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"gitlab.com/webmesh/node/pkg/version"
+	"github.com/webmeshproj/node/pkg/version"
 )
 
 func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.Status, error) {

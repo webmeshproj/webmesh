@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 )
 
 func init() {

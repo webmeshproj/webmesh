@@ -22,14 +22,14 @@ import (
 	"net/netip"
 	"time"
 
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/ipam"
-	"gitlab.com/webmesh/node/pkg/meshdb/peers"
-	"gitlab.com/webmesh/node/pkg/meshdb/raftacls"
-	"gitlab.com/webmesh/node/pkg/meshdb/state"
-	"gitlab.com/webmesh/node/pkg/store"
+	"github.com/webmeshproj/node/pkg/meshdb/ipam"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/meshdb/raftacls"
+	"github.com/webmeshproj/node/pkg/meshdb/state"
+	"github.com/webmeshproj/node/pkg/store"
 )
 
 // Server is the webmesh node service.

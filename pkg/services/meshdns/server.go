@@ -27,8 +27,8 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/peers"
-	"gitlab.com/webmesh/node/pkg/store"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/store"
 )
 
 // Options are the Mesh DNS server options.

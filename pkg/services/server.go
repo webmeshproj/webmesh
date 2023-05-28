@@ -26,18 +26,18 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"gitlab.com/webmesh/node/pkg/services/meshapi"
-	"gitlab.com/webmesh/node/pkg/services/meshdns"
-	"gitlab.com/webmesh/node/pkg/services/node"
-	"gitlab.com/webmesh/node/pkg/services/peerdiscovery"
-	"gitlab.com/webmesh/node/pkg/services/turn"
-	"gitlab.com/webmesh/node/pkg/services/webrtc"
-	"gitlab.com/webmesh/node/pkg/store"
+	"github.com/webmeshproj/node/pkg/services/meshapi"
+	"github.com/webmeshproj/node/pkg/services/meshdns"
+	"github.com/webmeshproj/node/pkg/services/node"
+	"github.com/webmeshproj/node/pkg/services/peerdiscovery"
+	"github.com/webmeshproj/node/pkg/services/turn"
+	"github.com/webmeshproj/node/pkg/services/webrtc"
+	"github.com/webmeshproj/node/pkg/store"
 )
 
 // Server is the gRPC server.

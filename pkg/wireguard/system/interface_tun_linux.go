@@ -28,7 +28,7 @@ import (
 	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
 
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 type linuxTUNInterface struct {

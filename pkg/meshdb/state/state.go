@@ -22,8 +22,8 @@ import (
 	"database/sql"
 	"net/netip"
 
-	"gitlab.com/webmesh/node/pkg/meshdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 )
 
 // State is the interface for querying mesh state.

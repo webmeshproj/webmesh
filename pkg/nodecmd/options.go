@@ -20,11 +20,11 @@ package nodecmd
 import (
 	"flag"
 
-	"gitlab.com/webmesh/node/pkg/global"
-	"gitlab.com/webmesh/node/pkg/services"
-	"gitlab.com/webmesh/node/pkg/store"
-	"gitlab.com/webmesh/node/pkg/store/streamlayer"
-	"gitlab.com/webmesh/node/pkg/wireguard"
+	"github.com/webmeshproj/node/pkg/global"
+	"github.com/webmeshproj/node/pkg/services"
+	"github.com/webmeshproj/node/pkg/store"
+	"github.com/webmeshproj/node/pkg/store/streamlayer"
+	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 // Options are the node options.

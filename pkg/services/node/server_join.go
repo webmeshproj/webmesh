@@ -23,16 +23,16 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/raft"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/peers"
-	"gitlab.com/webmesh/node/pkg/services/leaderproxy"
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/services/leaderproxy"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {

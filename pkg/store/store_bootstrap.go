@@ -27,15 +27,15 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/models"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/peers"
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
+	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 func (s *store) bootstrap() error {

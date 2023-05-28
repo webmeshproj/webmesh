@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 const (

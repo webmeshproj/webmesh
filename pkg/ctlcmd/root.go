@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"gitlab.com/webmesh/node/pkg/ctlcmd/config"
+	"github.com/webmeshproj/node/pkg/ctlcmd/config"
 )
 
 var (

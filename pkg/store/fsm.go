@@ -26,13 +26,13 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/hashicorp/raft"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 )
 
 // Snapshot returns a Raft snapshot.

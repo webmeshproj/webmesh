@@ -24,7 +24,7 @@ import (
 	"net/netip"
 	"time"
 
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -32,8 +32,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/models/localdb"
-	"gitlab.com/webmesh/node/pkg/wireguard"
+	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
+	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 func (s *store) join(ctx context.Context, joinAddr string) error {

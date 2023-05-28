@@ -28,7 +28,7 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
 
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 type linuxKernelInterface struct {

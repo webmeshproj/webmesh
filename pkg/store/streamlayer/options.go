@@ -27,7 +27,7 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 const (

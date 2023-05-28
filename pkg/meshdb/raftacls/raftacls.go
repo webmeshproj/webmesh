@@ -25,10 +25,10 @@ import (
 	"strings"
 	"time"
 
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 
-	"gitlab.com/webmesh/node/pkg/meshdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 )
 
 // ErrACLNotFound is returned when an ACL is not found.

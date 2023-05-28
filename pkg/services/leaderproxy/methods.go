@@ -19,7 +19,7 @@ package leaderproxy
 import (
 	"context"
 
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/metadata"
 )
 

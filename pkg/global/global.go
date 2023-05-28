@@ -25,10 +25,10 @@ import (
 	"net/netip"
 	"strconv"
 
-	"gitlab.com/webmesh/node/pkg/services"
-	"gitlab.com/webmesh/node/pkg/store"
-	"gitlab.com/webmesh/node/pkg/store/streamlayer"
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/services"
+	"github.com/webmeshproj/node/pkg/store"
+	"github.com/webmeshproj/node/pkg/store/streamlayer"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 const (

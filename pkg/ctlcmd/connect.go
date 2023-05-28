@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slog"
 
-	"gitlab.com/webmesh/node/pkg/ctlcmd/connect"
+	"github.com/webmeshproj/node/pkg/ctlcmd/connect"
 )
 
 var connectOpts connect.Options

@@ -25,13 +25,13 @@ import (
 	"net/netip"
 	"sync"
 
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/util"
-	"gitlab.com/webmesh/node/pkg/wireguard/system"
+	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/wireguard/system"
 )
 
 // Interface is a high-level interface for managing wireguard connections.

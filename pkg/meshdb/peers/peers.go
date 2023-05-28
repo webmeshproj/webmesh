@@ -31,8 +31,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"gitlab.com/webmesh/node/pkg/meshdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 )
 
 // ErrNodeNotFound is returned when a node is not found.

@@ -19,12 +19,12 @@ package meshapi
 import (
 	"context"
 
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
 
 func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshNode, error) {

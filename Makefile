@@ -1,13 +1,13 @@
 NAME  ?= node
 CTL   ?= wmctl
-REPO  ?= gitlab.com/webmesh
+REPO  ?= ghcr.io/webmeshproj
 IMAGE ?= $(REPO)/$(NAME):latest
-GOBGP_IMAGE ?= gitlab.com/webmesh/gobgp:latest
+GOBGP_IMAGE ?= ghcr.io/webmeshproj/gobgp:latest
 
 ARCH ?= $(shell go env GOARCH)
 OS   ?= $(shell go env GOOS)
 
-VERSION_PKG := gitlab.com/webmesh/$(NAME)/pkg/version
+VERSION_PKG := github.com/webmeshproj/$(NAME)/pkg/version
 VERSION     := $(shell git describe --tags --always --dirty)
 COMMIT      := $(shell git rev-parse HEAD)
 DATE        := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
@@ -45,7 +45,7 @@ dist: fmt vet generate ## Build node binaries for all platforms.
 		-ldflags "$(LDFLAGS)" \
 		-osarch="$(PLATFORMS)" \
 		-output="$(DIST)/$(NAME)_{{.OS}}_{{.Arch}}" \
-		gitlab.com/webmesh/$(NAME)/cmd/$(NAME)
+		github.com/webmeshproj/$(NAME)/cmd/$(NAME)
 
 dist-ctl: fmt vet ## Build wmctl binaries for all platforms.
 	go install github.com/mitchellh/gox@latest
@@ -54,7 +54,7 @@ dist-ctl: fmt vet ## Build wmctl binaries for all platforms.
 		-ldflags "$(LDFLAGS)" \
 		-osarch="$(PLATFORMS)" \
 		-output="$(DIST)/$(CTL)_{{.OS}}_{{.Arch}}" \
-		gitlab.com/webmesh/$(NAME)/cmd/$(CTL)
+		github.com/webmeshproj/$(NAME)/cmd/$(CTL)
 
 DOCKER ?= docker
 
@@ -92,4 +92,4 @@ generate: ## Generate SQL code.
 	sqlc -f $(SQLC_CONFIG) generate
 
 install-ctl:
-	go install gitlab.com/webmesh/$(NAME)/cmd/$(CTL)
+	go install github.com/webmeshproj/$(NAME)/cmd/$(CTL)

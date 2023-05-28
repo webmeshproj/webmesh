@@ -19,12 +19,12 @@ package node
 import (
 	"io"
 
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/webmesh/node/pkg/services/datachannels"
+	"github.com/webmeshproj/node/pkg/services/datachannels"
 )
 
 func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer) error {

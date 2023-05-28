@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/sys/unix"
 	"pault.ag/go/modprobe"
 )

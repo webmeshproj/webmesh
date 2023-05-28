@@ -29,9 +29,9 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"gitlab.com/webmesh/node/pkg/meshdb"
-	"gitlab.com/webmesh/node/pkg/meshdb/models/raftdb"
-	"gitlab.com/webmesh/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 // IPAM is the IP address management service.

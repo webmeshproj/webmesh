@@ -14,7 +14,7 @@ volumes:
 services:
 
   bootstrap-node:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile

@@ -18,10 +18,10 @@ package meshapi
 
 import (
 	"github.com/hashicorp/raft"
-	v1 "gitlab.com/webmesh/api/v1"
+	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"gitlab.com/webmesh/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
 
 func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Server) *v1.MeshNode {
