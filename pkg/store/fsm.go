@@ -191,11 +191,15 @@ func (s *store) getDBTermAndIndex() (term, index uint64, err error) {
 }
 
 func isEdgeChangeCmd(cmd *v1.RaftLogEntry) bool {
-	if cmd.GetType() != v1.RaftCommandType_EXECUTE {
-		return false
+	var sql string
+	if cmd.GetType() == v1.RaftCommandType_EXECUTE {
+		sql = cmd.GetSqlExec().GetStatement().GetSql()
+	} else {
+		sql = cmd.GetSqlQuery().GetStatement().GetSql()
 	}
-	sql := cmd.GetSqlExec().GetStatement().GetSql()
-	return sql == raftdb.InsertNodeEdge ||
+	return sql == raftdb.InsertNode ||
+		sql == raftdb.InsertNodeEdge ||
+		sql == raftdb.InsertNodeLease ||
 		sql == raftdb.DeleteNode ||
 		sql == raftdb.DeleteNodeEdge ||
 		sql == raftdb.DeleteNodeEdges

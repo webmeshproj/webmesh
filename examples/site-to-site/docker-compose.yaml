@@ -49,7 +49,6 @@ services:
     hostname: site-1-leader
     entrypoint:
       - /node
-      - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
       - --global.endpoint=10.250.0.1
@@ -65,18 +64,57 @@ services:
       - site-1-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
-  site-1-follower:
+  site-1-follower-1:
     image: ${IMAGE:-gitlab.com/webmesh/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
     networks:
       site-1:
-        ipv4_address: 10.1.0.2
-    hostname: site-1-follower
+        ipv4_address: 10.1.0.11
+    hostname: site-1-follower-1
     entrypoint:
       - /node
-      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.1.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-1-leader=10.1.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-1-follower-2:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-1:
+        ipv4_address: 10.1.0.12
+    hostname: site-1-follower-2
+    entrypoint:
+      - /node
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.1.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-1-leader=10.1.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-1-follower-3:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-1:
+        ipv4_address: 10.1.0.13
+    hostname: site-1-follower-3
+    entrypoint:
+      - /node
       - --global.insecure
       - --global.no-ipv6
       - --store.in-memory
@@ -101,7 +139,6 @@ services:
     hostname: site-2-leader
     entrypoint:
       - /node
-      - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
       - --global.endpoint=10.250.0.2
@@ -115,18 +152,57 @@ services:
       - site-2-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
-  site-2-follower:
+  site-2-follower-1:
     image: ${IMAGE:-gitlab.com/webmesh/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
     networks:
       site-2:
-        ipv4_address: 10.2.0.2
-    hostname: site-2-follower
+        ipv4_address: 10.2.0.11
+    hostname: site-2-follower-1
     entrypoint:
       - /node
-      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.2.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-2-leader=10.2.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-2-follower-2:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-2:
+        ipv4_address: 10.2.0.12
+    hostname: site-2-follower-2
+    entrypoint:
+      - /node
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.2.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-2-leader=10.2.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-2-follower-3:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-2:
+        ipv4_address: 10.2.0.13
+    hostname: site-2-follower-3
+    entrypoint:
+      - /node
       - --global.insecure
       - --global.no-ipv6
       - --store.in-memory
@@ -151,7 +227,6 @@ services:
     hostname: site-3-leader
     entrypoint:
       - /node
-      - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
       - --global.endpoint=10.250.0.3
@@ -165,18 +240,57 @@ services:
       - site-3-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
-  site-3-follower:
+  site-3-follower-1:
     image: ${IMAGE:-gitlab.com/webmesh/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
     networks:
       site-3:
-        ipv4_address: 10.3.0.2
-    hostname: site-3-follower
+        ipv4_address: 10.3.0.11
+    hostname: site-3-follower-1
     entrypoint:
       - /node
-      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.3.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-3-leader=10.3.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-3-follower-2:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-3:
+        ipv4_address: 10.3.0.12
+    hostname: site-3-follower-2
+    entrypoint:
+      - /node
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.3.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-3-leader=10.3.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-3-follower-3:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-3:
+        ipv4_address: 10.3.0.13
+    hostname: site-3-follower-3
+    entrypoint:
+      - /node
       - --global.insecure
       - --global.no-ipv6
       - --store.in-memory

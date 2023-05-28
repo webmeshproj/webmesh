@@ -41,9 +41,28 @@ type Peer struct {
 	AllowedIPs []netip.Prefix `json:"allowedIPs"`
 }
 
+func (p *Peer) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"id":         p.ID,
+		"publicKey":  p.PublicKey.String(),
+		"endpoint":   p.Endpoint.String(),
+		"allowedIPs": p.AllowedIPs,
+	})
+}
+
 // PutPeer updates a peer in the wireguard configuration.
 func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	w.log.Debug("put peer", slog.Any("peer", peer))
+	// Check if we already have the peer under a different key
+	// and remove it if so.
+	if peerKey, ok := w.peers[peer.ID]; ok {
+		if peerKey.String() != peer.PublicKey.String() {
+			// Remove the peer first
+			if err := w.DeletePeer(ctx, peer.ID); err != nil {
+				return fmt.Errorf("remove peer: %w", err)
+			}
+		}
+	}
 	if override, ok := w.epOverrides[peer.ID]; ok {
 		peer.Endpoint = override
 	}
@@ -51,6 +70,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	var allowedIPs []net.IPNet
 	if w.opts.PersistentKeepAlive != 0 {
 		keepAlive = &w.opts.PersistentKeepAlive
+	} else if !w.opts.IsPublic {
+		dur := time.Second * 5
+		keepAlive = &dur
 	}
 	for _, ip := range peer.AllowedIPs {
 		var ipnet net.IPNet

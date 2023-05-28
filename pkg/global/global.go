@@ -75,7 +75,7 @@ type Options struct {
 	// Endpoint is the preferred publicly routable address of this node.
 	// Setting this value will override the store advertise address and WireGuard
 	// primary endpoints with their configured listen ports.
-	Endpoint string `yaml:"endpoints" json:"endpoints" toml:"endpoints"`
+	Endpoint string `yaml:"endpoint" json:"endpoint" toml:"endpoint"`
 	// DetectEndpoints is true if the endpoints should be detected.
 	DetectEndpoints bool `yaml:"detect-endpoints" json:"detect-endpoints" toml:"detect-endpoints"`
 	// DetectPrivateEndpoints is true if private IP addresses should be included in detection.
@@ -115,7 +115,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(GlobalLogLevelEnvVar, "info"),
 		"Log level (debug, info, warn, error)")
 
-	fs.StringVar(&o.Endpoint, "global.primary-endpoint", util.GetEnvDefault(GlobalEndpointEnvVar, ""),
+	fs.StringVar(&o.Endpoint, "global.endpoint", util.GetEnvDefault(GlobalEndpointEnvVar, ""),
 		`The preferred publicly routable address of this node. Setting this
 value will override the address portion of the store advertise address
 and WireGuard endpoints. This is only necessary if you intend for

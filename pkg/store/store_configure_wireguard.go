@@ -127,6 +127,7 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 		if desc.NetworkIPv6.IsValid() {
 			peer.AllowedIPs = append(peer.AllowedIPs, desc.NetworkIPv6)
 		}
+		// Each descendant of our descendants is an allowed IP
 		descTargets := adjacencyMap[edge.Target]
 		if len(descTargets) > 0 {
 			for descTarget := range descTargets {

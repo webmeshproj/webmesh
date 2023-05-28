@@ -17,6 +17,7 @@ limitations under the License.
 package meshapi
 
 import (
+	"bytes"
 	"context"
 
 	v1 "gitlab.com/webmesh/api/v1"
@@ -45,10 +46,11 @@ func (s *Server) GetMeshGraph(ctx context.Context, _ *emptypb.Empty) (*v1.MeshGr
 			Weight: int32(edge.Properties.Weight),
 		}
 	}
-	graph, err := s.peers.DrawGraph(ctx)
+	var buf bytes.Buffer
+	err = s.peers.DrawGraph(ctx, &buf)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to draw graph: %v", err)
 	}
-	out.Dot = string(graph)
+	out.Dot = buf.String()
 	return out, nil
 }

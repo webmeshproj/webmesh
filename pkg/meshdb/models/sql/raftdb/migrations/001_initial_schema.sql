@@ -40,8 +40,7 @@ CREATE TABLE node_edges (
     src_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
     dst_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
     weight       INTEGER NOT NULL DEFAULT 1,
-    attrs        TEXT,
-    CONSTRAINT   node_edges_pkey PRIMARY KEY (src_node_id, dst_node_id)
+    attrs        TEXT
 );
 
 -- Views for more convenient querying.

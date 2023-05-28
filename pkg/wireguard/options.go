@@ -204,7 +204,7 @@ func parseEndpointOverrides(overrides string) (map[string]netip.AddrPort, error)
 		}
 		endpointAddr, err := netip.ParseAddrPort(endpoint)
 		if err != nil {
-			return nil, fmt.Errorf("invalid endpoint-overrides format: %s", s)
+			return nil, fmt.Errorf("invalid endpoint-overrides format: %s: %w", s, err)
 		}
 		m[peerName] = endpointAddr
 	}

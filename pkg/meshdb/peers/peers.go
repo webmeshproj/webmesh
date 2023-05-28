@@ -18,11 +18,11 @@ limitations under the License.
 package peers
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"net/netip"
 	"time"
 
@@ -60,8 +60,8 @@ type Peers interface {
 	AddEdge(ctx context.Context, from, to string) error
 	// RemoveEdge removes an edge between two nodes.
 	RemoveEdge(ctx context.Context, from, to string) error
-	// DrawGraph draws the graph of nodes.
-	DrawGraph(ctx context.Context) ([]byte, error)
+	// DrawGraph draws the graph of nodes to the given Writer.
+	DrawGraph(ctx context.Context, w io.Writer) error
 }
 
 // Node represents a node. Not all fields are populated in all contexts.
@@ -283,12 +283,11 @@ func (p *peers) RemoveEdge(ctx context.Context, from, to string) error {
 	return nil
 }
 
-func (p *peers) DrawGraph(ctx context.Context) ([]byte, error) {
-	var buf bytes.Buffer
+func (p *peers) DrawGraph(ctx context.Context, w io.Writer) error {
 	graph := graph.Graph[string, Node](p.graph)
-	err := draw.DOT(graph, &buf)
+	err := draw.DOT(graph, w)
 	if err != nil {
-		return nil, fmt.Errorf("draw graph: %w", err)
+		return fmt.Errorf("draw graph: %w", err)
 	}
-	return buf.Bytes(), nil
+	return nil
 }

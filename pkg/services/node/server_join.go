@@ -260,5 +260,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 		resp.Peers = append(resp.Peers, peer)
 	}
+	slog.Debug("sending join response", slog.Any("response", resp))
 	return resp, nil
 }
