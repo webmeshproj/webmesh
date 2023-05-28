@@ -28,6 +28,7 @@ import (
 
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
+	"github.com/google/go-cmp/cmp"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/meshdb"
@@ -57,7 +58,7 @@ type Peers interface {
 	// ListIDs lists all node IDs.
 	ListIDs(ctx context.Context) ([]string, error)
 	// AddEdge adds an edge between two nodes.
-	AddEdge(ctx context.Context, from, to string) error
+	PutEdge(ctx context.Context, edge Edge) error
 	// RemoveEdge removes an edge between two nodes.
 	RemoveEdge(ctx context.Context, from, to string) error
 	// DrawGraph draws the graph of nodes to the given Writer.
@@ -87,6 +88,18 @@ type Node struct {
 	CreatedAt time.Time
 	// UpdatedAt is the time the node was last updated.
 	UpdatedAt time.Time
+}
+
+// Edge represents an edge between two nodes.
+type Edge struct {
+	// From is the ID of the source node.
+	From string
+	// To is the ID of the target node.
+	To string
+	// Weight is the weight of the edge.
+	Weight int
+	// Attrs are the edge's attributes.
+	Attrs map[string]string
 }
 
 // CreateOptions are options for creating a node.
@@ -248,20 +261,33 @@ func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
 	return ids, nil
 }
 
-// AddEdge adds an edge between two nodes.
-func (p *peers) AddEdge(ctx context.Context, from, to string) error {
-	if from == to {
+// PutEdge adds or updates an edge between two nodes.
+func (p *peers) PutEdge(ctx context.Context, edge Edge) error {
+	if edge.From == edge.To {
 		return nil
 	}
+	opts := []func(*graph.EdgeProperties){graph.EdgeWeight(edge.Weight)}
+	if edge.Attrs != nil {
+		for k, v := range edge.Attrs {
+			opts = append(opts, graph.EdgeAttribute(k, v))
+		}
+	}
 	// Save the raft log some trouble by checking if the edge already exists.
-	_, err := p.graph.Edge(from, to)
+	graphEdge, err := p.graph.Edge(edge.From, edge.To)
 	if err == nil {
+		// Check if the weight or attributes changed
+		if !cmp.Equal(graphEdge.Properties.Attributes, edge.Attrs) {
+			return p.graph.UpdateEdge(edge.From, edge.To, opts...)
+		}
+		if graphEdge.Properties.Weight != edge.Weight {
+			return p.graph.UpdateEdge(edge.From, edge.To, opts...)
+		}
 		return nil
 	}
 	if !errors.Is(err, graph.ErrEdgeNotFound) {
 		return fmt.Errorf("get edge: %w", err)
 	}
-	err = p.graph.AddEdge(from, to)
+	err = p.graph.AddEdge(edge.From, edge.To, opts...)
 	if err == nil {
 		return nil
 	}

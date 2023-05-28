@@ -150,7 +150,16 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 	log.Debug("adding edge from joining server to caller", slog.String("joining_server", joiningServer))
-	err = s.peers.AddEdge(ctx, joiningServer, req.GetId())
+	err = s.peers.PutEdge(ctx, peers.Edge{
+		From: joiningServer,
+		To:   req.GetId(),
+		Weight: func() int {
+			if req.GetAsVoter() {
+				return 99
+			}
+			return 1
+		}(),
+	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 	}
@@ -160,7 +169,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		for _, server := range config.Servers {
 			if server.Suffrage == raft.Voter {
 				log.Debug("adding edge from caller to voter", slog.String("voter", string(server.ID)))
-				err = s.peers.AddEdge(ctx, req.GetId(), string(server.ID))
+				err = s.peers.PutEdge(ctx, peers.Edge{
+					From:   req.GetId(),
+					To:     string(server.ID),
+					Weight: 99,
+				})
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 				}
