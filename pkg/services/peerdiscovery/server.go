@@ -26,19 +26,19 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
-	"github.com/webmeshproj/node/pkg/store"
 )
 
 // Server is the webmesh PeerDiscovery service.
 type Server struct {
 	v1.UnimplementedPeerDiscoveryServer
-	store store.Store
+	store meshdb.Store
 	state state.State
 }
 
 // NewServer returns a new Server.
-func NewServer(store store.Store) *Server {
+func NewServer(store meshdb.Store) *Server {
 	return &Server{
 		store: store,
 		state: state.New(store),

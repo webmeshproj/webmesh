@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/node/pkg/store"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -30,8 +31,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-
-	"github.com/webmeshproj/node/pkg/store"
 )
 
 type Interceptor struct {

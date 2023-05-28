@@ -23,15 +23,15 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
-	"github.com/webmeshproj/node/pkg/store"
 )
 
 // Server is the webmesh WebRTC service.
 type Server struct {
 	v1.UnimplementedWebRTCServer
 
-	store       store.Store
+	store       meshdb.Store
 	meshstate   state.State
 	stunServers []string
 	tlsConfig   *tls.Config
@@ -39,7 +39,7 @@ type Server struct {
 }
 
 // NewServer returns a new Server.
-func NewServer(store store.Store, tlsConfig *tls.Config, stunServers []string) *Server {
+func NewServer(store meshdb.Store, tlsConfig *tls.Config, stunServers []string) *Server {
 	return &Server{
 		store:       store,
 		meshstate:   state.New(store),

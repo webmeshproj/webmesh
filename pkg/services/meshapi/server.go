@@ -21,21 +21,21 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/store"
 )
 
 // Server is the webmesh Mesh service.
 type Server struct {
 	v1.UnimplementedMeshServer
 
-	store store.Store
+	store meshdb.Store
 	peers peers.Peers
 	log   *slog.Logger
 }
 
 // NewServer returns a new Server.
-func NewServer(store store.Store) *Server {
+func NewServer(store meshdb.Store) *Server {
 	return &Server{
 		store: store,
 		peers: peers.New(store),

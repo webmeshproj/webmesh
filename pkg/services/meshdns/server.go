@@ -27,8 +27,8 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/store"
 )
 
 // Options are the Mesh DNS server options.
@@ -52,7 +52,7 @@ type Options struct {
 }
 
 // NewServer returns a new Mesh DNS server.
-func NewServer(store store.Store, o *Options) *Server {
+func NewServer(store meshdb.Store, o *Options) *Server {
 	timeout := o.RequestTimeout
 	if timeout == 0 {
 		timeout = 5 * time.Second
@@ -71,7 +71,7 @@ func NewServer(store store.Store, o *Options) *Server {
 }
 
 type Server struct {
-	store     store.Store
+	store     meshdb.Store
 	peers     peers.Peers
 	opts      *Options
 	udpServer *dns.Server

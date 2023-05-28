@@ -21,6 +21,8 @@ package meshdb
 import (
 	"context"
 	"database/sql"
+
+	"github.com/hashicorp/raft"
 )
 
 // Store is the interface for interacting with the mesh database.
@@ -31,6 +33,12 @@ type Store interface {
 	DB() DBTX
 	// ReadDB returns the underlying read database.
 	ReadDB() DBTX
+	// Raft returns the underlying Raft database.
+	Raft() *raft.Raft
+	// Leader returns the current Raft leader.
+	Leader() (raft.ServerID, error)
+	// IsLeader returns whether the current node is the Raft leader.
+	IsLeader() bool
 }
 
 type DBTX interface {
