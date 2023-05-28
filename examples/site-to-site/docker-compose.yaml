@@ -58,8 +58,10 @@ services:
       - --store.data-dir=/data
       - --services.enable-leader-proxy
       - --services.enable-mesh-api
+      - --services.enable-mesh-dns
     ports:
       - 8443:8443
+      - 5354:5353/udp
     volumes:
       - site-1-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

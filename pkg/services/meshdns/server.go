@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/raft"
 	"github.com/miekg/dns"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
@@ -167,85 +168,135 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 		slog.String("question", q.String()),
 	)
 	// TODO: Do an actual recursion
-	nodeId := strings.Split(q.Name, ".")[0]
-	peer, err := s.peers.Get(ctx, nodeId)
-	if err != nil {
-		s.log.Error("failed to get peer", slog.String("error", err.Error()))
-		m.SetRcode(r, dns.RcodeNameError)
-		err = w.WriteMsg(m)
+	nodeIDs := []string{strings.Split(q.Name, ".")[0]}
+	if nodeIDs[0] == "leader" {
+		// This is a special case for the leader node
+		leaderID, err := s.store.Leader()
 		if err != nil {
-			s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
-			dns.HandleFailed(w, r)
+			s.log.Error("failed to get leader", slog.String("error", err.Error()))
+			m.SetRcode(r, dns.RcodeServerFailure)
+			err = w.WriteMsg(m)
+			if err != nil {
+				s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+				dns.HandleFailed(w, r)
+			}
+			return
 		}
-		return
+		// Add a CNAME record for the leader
+		m.Answer = append(m.Answer, &dns.CNAME{
+			Hdr:    dns.RR_Header{Name: fmt.Sprintf("leader.%s", s.opts.Domain), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
+			Target: fmt.Sprintf("%s.%s", leaderID, s.opts.Domain),
+		})
+		nodeIDs[0] = string(leaderID)
 	}
+	if nodeIDs[0] == "voters" {
+		// This is a CNAME that points to all the voters
+		config := s.store.Raft().GetConfiguration().Configuration()
+		nodeIDs = []string{}
+		for _, server := range config.Servers {
+			if server.Suffrage == raft.Voter {
+				nodeIDs = append(nodeIDs, string(server.ID))
+				m.Answer = append(m.Answer, &dns.CNAME{
+					Hdr:    dns.RR_Header{Name: fmt.Sprintf("voters.%s", s.opts.Domain), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
+					Target: fmt.Sprintf("%s.%s", server.ID, s.opts.Domain),
+				})
+			}
+		}
+	}
+	if nodeIDs[0] == "observers" {
+		// Similar to voters, but for observers
+		config := s.store.Raft().GetConfiguration().Configuration()
+		nodeIDs = []string{}
+		for _, server := range config.Servers {
+			if server.Suffrage == raft.Nonvoter {
+				nodeIDs = append(nodeIDs, string(server.ID))
+				m.Answer = append(m.Answer, &dns.CNAME{
+					Hdr:    dns.RR_Header{Name: fmt.Sprintf("observers.%s", s.opts.Domain), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
+					Target: fmt.Sprintf("%s.%s", server.ID, s.opts.Domain),
+				})
+			}
+		}
+	}
+	for _, nodeID := range nodeIDs {
+		peer, err := s.peers.Get(ctx, nodeID)
+		if err != nil {
+			s.log.Error("failed to get peer", slog.String("error", err.Error()))
+			m.SetRcode(r, dns.RcodeNameError)
+			err = w.WriteMsg(m)
+			if err != nil {
+				s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+				dns.HandleFailed(w, r)
+			}
+			return
+		}
+		fqdn := fmt.Sprintf("%s.%s", nodeID, s.opts.Domain)
+		switch q.Qtype {
+		case dns.TypeTXT:
+			s.log.Debug("handling TXT question")
+			m.Answer = append(m.Answer, s.newPeerTXTRecord(fqdn, &peer))
+			if peer.PrivateIPv4.IsValid() {
+				m.Extra = append(m.Extra, &dns.A{
+					Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
+					A:   peer.PrivateIPv4.Addr().AsSlice(),
+				})
+			}
+			if peer.NetworkIPv6.IsValid() {
+				m.Extra = append(m.Extra, &dns.AAAA{
+					Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
+					AAAA: peer.NetworkIPv6.Addr().AsSlice(),
+				})
+			}
+		case dns.TypeA:
+			s.log.Debug("handling A question")
+			if peer.PrivateIPv4.IsValid() {
+				m.Answer = append(m.Answer, &dns.A{
+					Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
+					A:   peer.PrivateIPv4.Addr().AsSlice(),
+				})
+				m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, &peer))
+			} else {
+				s.log.Debug("no private IPv4 address for peer")
+				m.SetRcode(r, dns.RcodeNameError)
+				err = w.WriteMsg(m)
+				if err != nil {
+					s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+					dns.HandleFailed(w, r)
+				}
+				return
+			}
+		case dns.TypeAAAA:
+			s.log.Debug("handling AAAA question")
+			if peer.NetworkIPv6.IsValid() {
+				m.Answer = append(m.Answer, &dns.AAAA{
+					Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
+					AAAA: peer.NetworkIPv6.Addr().AsSlice(),
+				})
+				m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, &peer))
+			} else {
+				s.log.Debug("no network IPv6 address for peer")
+				m.SetRcode(r, dns.RcodeNameError)
+				err = w.WriteMsg(m)
+				if err != nil {
+					s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+					dns.HandleFailed(w, r)
+				}
+				return
+			}
+		case dns.TypeAXFR, dns.TypeIXFR:
+			s.log.Debug("handling AXFR/IXFR question")
+			c := make(chan *dns.Envelope)
+			tr := new(dns.Transfer)
+			defer close(c)
+			if err := tr.Out(w, r, c); err != nil {
+				return
+			}
+			soa, _ := dns.NewRR(fmt.Sprintf("%s 0 IN SOA %s %s %d 21600 7200 604800 3600",
+				fqdn, s.soa, s.soa, time.Now().Unix()))
+			c <- &dns.Envelope{RR: []dns.RR{soa}}
+			w.Hijack()
+			return
+		}
 
-	fqdn := fmt.Sprintf("%s.%s", nodeId, s.opts.Domain)
-	switch q.Qtype {
-	case dns.TypeTXT:
-		s.log.Debug("handling TXT question")
-		m.Answer = append(m.Answer, s.newPeerTXTRecord(fqdn, &peer))
-		if peer.PrivateIPv4.IsValid() {
-			m.Extra = append(m.Extra, &dns.A{
-				Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
-				A:   peer.PrivateIPv4.Addr().AsSlice(),
-			})
-		}
-		if peer.NetworkIPv6.IsValid() {
-			m.Extra = append(m.Extra, &dns.AAAA{
-				Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
-				AAAA: peer.NetworkIPv6.Addr().AsSlice(),
-			})
-		}
-	case dns.TypeA:
-		s.log.Debug("handling A question")
-		if peer.PrivateIPv4.IsValid() {
-			m.Answer = append(m.Answer, &dns.A{
-				Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
-				A:   peer.PrivateIPv4.Addr().AsSlice(),
-			})
-			m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, &peer))
-		} else {
-			s.log.Debug("no private IPv4 address for peer")
-			m.SetRcode(r, dns.RcodeNameError)
-			err = w.WriteMsg(m)
-			if err != nil {
-				s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
-				dns.HandleFailed(w, r)
-			}
-			return
-		}
-	case dns.TypeAAAA:
-		s.log.Debug("handling AAAA question")
-		if peer.NetworkIPv6.IsValid() {
-			m.Answer = append(m.Answer, &dns.AAAA{
-				Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
-				AAAA: peer.NetworkIPv6.Addr().AsSlice(),
-			})
-			m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, &peer))
-		} else {
-			s.log.Debug("no network IPv6 address for peer")
-			m.SetRcode(r, dns.RcodeNameError)
-			err = w.WriteMsg(m)
-			if err != nil {
-				s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
-				dns.HandleFailed(w, r)
-			}
-			return
-		}
-	case dns.TypeAXFR, dns.TypeIXFR:
-		s.log.Debug("handling AXFR/IXFR question")
-		c := make(chan *dns.Envelope)
-		tr := new(dns.Transfer)
-		defer close(c)
-		if err := tr.Out(w, r, c); err != nil {
-			return
-		}
-		soa, _ := dns.NewRR(fmt.Sprintf("%s 0 IN SOA %s %s %d 21600 7200 604800 3600",
-			fqdn, s.soa, s.soa, time.Now().Unix()))
-		c <- &dns.Envelope{RR: []dns.RR{soa}}
-		w.Hijack()
-		return
 	}
 
 	if r.IsTsig() != nil {
@@ -258,7 +309,7 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	s.log.Debug("responding to DNS question", slog.String("response", m.String()))
-	err = w.WriteMsg(m)
+	err := w.WriteMsg(m)
 	if err != nil {
 		s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
 		dns.HandleFailed(w, r)
