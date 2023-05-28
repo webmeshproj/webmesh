@@ -1,0 +1,187 @@
+version: '3'
+
+networks:
+  public-net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.250.0.0/24
+          gateway: 10.250.0.100
+  site-1:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.1.0.0/24
+          gateway: 10.1.0.100
+  site-2:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.2.0.0/24
+          gateway: 10.2.0.100
+  site-3:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.3.0.0/24
+          gateway: 10.3.0.100
+    
+
+volumes:
+  site-1-leader:
+  site-2-leader:
+  site-3-leader:
+
+services:
+
+  # Site 1
+
+  site-1-leader:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      public-net:
+        ipv4_address: 10.250.0.1
+      site-1:
+        ipv4_address: 10.1.0.1
+    hostname: site-1-leader
+    entrypoint:
+      - /node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.endpoint=10.250.0.1
+      - --store.bootstrap
+      - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
+      - --store.bootstrap-ipv4-network=10.10.10.0/24
+      - --store.data-dir=/data
+      - --services.enable-leader-proxy
+      - --services.enable-mesh-api
+    ports:
+      - 8443:8443
+    volumes:
+      - site-1-leader:/data
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-1-follower:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-1:
+        ipv4_address: 10.1.0.2
+    hostname: site-1-follower
+    entrypoint:
+      - /node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.1.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-1-leader=10.1.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  # Site 2
+
+  site-2-leader:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      public-net:
+        ipv4_address: 10.250.0.2
+      site-2:
+        ipv4_address: 10.2.0.1
+    hostname: site-2-leader
+    entrypoint:
+      - /node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.endpoint=10.250.0.2
+      - --store.bootstrap
+      - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
+      - --store.bootstrap-ipv4-network=10.10.10.0/24
+      - --store.data-dir=/data
+      - --services.enable-leader-proxy
+      - --services.enable-mesh-api
+    volumes:
+      - site-2-leader:/data
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-2-follower:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-2:
+        ipv4_address: 10.2.0.2
+    hostname: site-2-follower
+    entrypoint:
+      - /node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.2.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-2-leader=10.2.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  # Site 3
+
+  site-3-leader:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      public-net:
+        ipv4_address: 10.250.0.3
+      site-3:
+        ipv4_address: 10.3.0.1
+    hostname: site-3-leader
+    entrypoint:
+      - /node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.endpoint=10.250.0.3
+      - --store.bootstrap
+      - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
+      - --store.bootstrap-ipv4-network=10.10.10.0/24
+      - --store.data-dir=/data
+      - --services.enable-leader-proxy
+      - --services.enable-mesh-api
+    volumes:
+      - site-3-leader:/data
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-3-follower:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site-3:
+        ipv4_address: 10.3.0.2
+    hostname: site-3-follower
+    entrypoint:
+      - /node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --store.in-memory
+      - --store.join=10.3.0.1:8443
+      - --store.max-join-retries=10
+      - --wireguard.endpoint-overrides=site-3-leader=10.3.0.1:51820
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
