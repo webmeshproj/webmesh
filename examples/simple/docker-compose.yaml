@@ -1,0 +1,39 @@
+version: '3'
+
+networks:
+  bootstrap:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.1.0.0/24
+          gateway: 10.1.0.100
+
+volumes:
+  bootstrap-node:
+
+services:
+
+  bootstrap-node:
+    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.1
+    hostname: bootstrap-node-1
+    entrypoint:
+      - /node
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.detect-endpoints
+      - --global.detect-private-endpoints
+      - --store.bootstrap
+      - --store.bootstrap-ipv4-network=10.10.10.0/24
+      - --store.data-dir=/data
+    ports:
+      - 8443:8443
+      - 51820:51820/udp
+    volumes:
+      - bootstrap-node:/data
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

@@ -18,6 +18,7 @@ package ctlcmd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	v1 "gitlab.com/webmesh/api/v1"
@@ -27,6 +28,7 @@ import (
 
 func init() {
 	getCmd.AddCommand(getNodesCmd)
+	getCmd.AddCommand(getGraphCmd)
 	rootCmd.AddCommand(getCmd)
 }
 
@@ -59,5 +61,24 @@ var getNodesCmd = &cobra.Command{
 			return err
 		}
 		return encodeToStdout(cmd, resp)
+	},
+}
+
+var getGraphCmd = &cobra.Command{
+	Use:   "graph",
+	Short: "Get the mesh graph",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewMeshClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		resp, err := client.GetMeshGraph(context.Background(), &emptypb.Empty{})
+		if err != nil {
+			return err
+		}
+		fmt.Println(resp.Dot)
+		return nil
 	},
 }

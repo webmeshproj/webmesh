@@ -18,6 +18,7 @@ limitations under the License.
 package peers
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/dominikbraun/graph"
+	"github.com/dominikbraun/graph/draw"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"gitlab.com/webmesh/node/pkg/meshdb"
@@ -52,10 +54,14 @@ type Peers interface {
 	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
 	List(ctx context.Context) ([]Node, error)
+	// ListIDs lists all node IDs.
+	ListIDs(ctx context.Context) ([]string, error)
 	// AddEdge adds an edge between two nodes.
 	AddEdge(ctx context.Context, from, to string) error
 	// RemoveEdge removes an edge between two nodes.
 	RemoveEdge(ctx context.Context, from, to string) error
+	// DrawGraph draws the graph of nodes.
+	DrawGraph(ctx context.Context) ([]byte, error)
 }
 
 // Node represents a node. Not all fields are populated in all contexts.
@@ -230,8 +236,23 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 	return out, nil
 }
 
+// ListIDs returns a list of node IDs.
+func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
+	ids, err := raftdb.New(p.store.ReadDB()).ListNodeIDs(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("list node IDs: %w", err)
+	}
+	return ids, nil
+}
+
 // AddEdge adds an edge between two nodes.
 func (p *peers) AddEdge(ctx context.Context, from, to string) error {
+	if from == to {
+		return nil
+	}
 	// Save the raft log some trouble by checking if the edge already exists.
 	_, err := p.graph.Edge(from, to)
 	if err == nil {
@@ -260,4 +281,14 @@ func (p *peers) RemoveEdge(ctx context.Context, from, to string) error {
 		return fmt.Errorf("remove edge: %w", err)
 	}
 	return nil
+}
+
+func (p *peers) DrawGraph(ctx context.Context) ([]byte, error) {
+	var buf bytes.Buffer
+	graph := graph.Graph[string, Node](p.graph)
+	err := draw.DOT(graph, &buf)
+	if err != nil {
+		return nil, fmt.Errorf("draw graph: %w", err)
+	}
+	return buf.Bytes(), nil
 }
