@@ -61,4 +61,4 @@ SELECT * FROM node_edges;
 DELETE FROM node_edges;
 
 -- name: RestoreNodeEdge :exec
-INSERT INTO node_edges (src_node_id, dst_node_id) VALUES (?, ?);
+INSERT INTO node_edges (src_node_id, dst_node_id, weight, attrs) VALUES (?, ?, ?, ?);

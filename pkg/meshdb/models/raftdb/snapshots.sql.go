@@ -287,16 +287,23 @@ func (q *Queries) RestoreNode(ctx context.Context, arg RestoreNodeParams) error 
 }
 
 const RestoreNodeEdge = `-- name: RestoreNodeEdge :exec
-INSERT INTO node_edges (src_node_id, dst_node_id) VALUES (?, ?)
+INSERT INTO node_edges (src_node_id, dst_node_id, weight, attrs) VALUES (?, ?, ?, ?)
 `
 
 type RestoreNodeEdgeParams struct {
-	SrcNodeID string `json:"src_node_id"`
-	DstNodeID string `json:"dst_node_id"`
+	SrcNodeID string         `json:"src_node_id"`
+	DstNodeID string         `json:"dst_node_id"`
+	Weight    int64          `json:"weight"`
+	Attrs     sql.NullString `json:"attrs"`
 }
 
 func (q *Queries) RestoreNodeEdge(ctx context.Context, arg RestoreNodeEdgeParams) error {
-	_, err := q.db.ExecContext(ctx, RestoreNodeEdge, arg.SrcNodeID, arg.DstNodeID)
+	_, err := q.db.ExecContext(ctx, RestoreNodeEdge,
+		arg.SrcNodeID,
+		arg.DstNodeID,
+		arg.Weight,
+		arg.Attrs,
+	)
 	return err
 }
 
