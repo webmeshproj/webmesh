@@ -37,7 +37,7 @@ services:
   # Site 1
 
   site-1-leader:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -65,7 +65,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-1-follower-1:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -85,7 +85,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-1-follower-2:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -105,7 +105,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-1-follower-3:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -127,7 +127,7 @@ services:
   # Site 2
 
   site-2-leader:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -153,7 +153,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-2-follower-1:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -173,7 +173,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-2-follower-2:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -193,7 +193,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-2-follower-3:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -215,7 +215,7 @@ services:
   # Site 3
 
   site-3-leader:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -241,7 +241,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-3-follower-1:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -261,7 +261,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-3-follower-2:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -281,7 +281,7 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-3-follower-3:
-    image: ${IMAGE:-gitlab.com/webmesh/node:latest}
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
