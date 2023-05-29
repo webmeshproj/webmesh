@@ -59,10 +59,10 @@ func (s *store) bootstrap() error {
 		// Pick an address to rejoin the cluster with.
 		addrs, err := raftdb.New(s.ReadDB()).GetPeerPublicRPCAddresses(ctx, string(s.nodeID))
 		if err != nil {
-			return fmt.Errorf("get peer private rpc addresses: %w", err)
+			return fmt.Errorf("get peer public rpc addresses: %w", err)
 		}
 		if len(addrs) == 0 {
-			return fmt.Errorf("no private rpc addresses found")
+			return fmt.Errorf("no public rpc addresses found")
 		}
 		return s.join(ctx, addrs[0].(string))
 	}
