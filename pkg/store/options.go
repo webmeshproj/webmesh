@@ -19,7 +19,9 @@ package store
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -203,7 +205,6 @@ type Options struct {
 func NewOptions() *Options {
 	return &Options{
 		DataDir:              "/var/lib/webmesh/store",
-		AdvertiseAddress:     "localhost:9443",
 		ConnectionTimeout:    time.Second * 3,
 		HeartbeatTimeout:     time.Second * 3,
 		ElectionTimeout:      time.Second * 3,
@@ -240,7 +241,7 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 	fl.BoolVar(&o.Bootstrap, "store.bootstrap", util.GetEnvDefault(BootstrapEnvVar, "false") == "true",
 		"Bootstrap the cluster.")
 
-	fl.StringVar(&o.AdvertiseAddress, "store.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, "localhost:9443"),
+	fl.StringVar(&o.AdvertiseAddress, "store.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, ""),
 		`Raft advertise address. Required when bootstrapping a new cluster,
 but will be replaced with the WireGuard address after bootstrapping.`)
 
@@ -339,8 +340,18 @@ func (o *Options) Validate() error {
 	if !o.Bootstrap && o.Join == "" {
 		return errors.New("one of bootstrap or join address is required")
 	}
-	if o.Bootstrap && o.AdvertiseAddress == "" {
-		return errors.New("advertise address is required for bootstrapping")
+	if o.Bootstrap {
+		if o.BootstrapServers != "" {
+			if o.AdvertiseAddress == "" {
+				return errors.New("advertise address is required for bootstrapping with servers")
+			}
+			for _, server := range strings.Split(o.BootstrapServers, ",") {
+				parts := strings.Split(server, "=")
+				if len(parts) != 2 {
+					return fmt.Errorf("invalid bootstrap server: %s", server)
+				}
+			}
+		}
 	}
 	if o.Bootstrap && o.BootstrapIPv4Network == "" {
 		return errors.New("bootstrap IPv4 network is required for bootstrapping")

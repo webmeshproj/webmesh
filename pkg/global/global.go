@@ -202,7 +202,9 @@ func (o *Options) Overlay(opts ...any) error {
 				if v.NodeAdditionalEndpoints == "" && len(endpoints) > 0 {
 					v.NodeAdditionalEndpoints = strings.Join(endpoints.AddrStrings(), ",")
 				}
-				v.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
+				if v.AdvertiseAddress == "" {
+					v.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
+				}
 			}
 		case *services.Options:
 			if !v.Insecure {

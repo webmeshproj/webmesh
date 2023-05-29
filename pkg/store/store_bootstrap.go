@@ -67,12 +67,23 @@ func (s *store) bootstrap() error {
 		return s.join(ctx, addrs[0].(string))
 	}
 	s.firstBootstrap = true
+	if s.opts.AdvertiseAddress == "" && s.opts.BootstrapServers == "" {
+		s.opts.AdvertiseAddress = fmt.Sprintf("localhost:%d", s.sl.ListenPort())
+	} else if s.opts.AdvertiseAddress == "" {
+		// Validate() doesn't allow this on the options
+		// but lets go ahead and support it anyway.
+		s.opts.AdvertiseAddress = s.opts.BootstrapServers
+	}
+	addr, err := net.ResolveTCPAddr("tcp", s.opts.AdvertiseAddress)
+	if err != nil {
+		return fmt.Errorf("resolve advertise address: %w", err)
+	}
 	cfg := raft.Configuration{
 		Servers: []raft.Server{
 			{
 				Suffrage: raft.Voter,
 				ID:       s.nodeID,
-				Address:  raft.ServerAddress(s.opts.AdvertiseAddress),
+				Address:  raft.ServerAddress(addr.String()),
 			},
 		},
 	}
@@ -84,7 +95,11 @@ func (s *store) bootstrap() error {
 			if len(parts) != 2 {
 				return fmt.Errorf("invalid bootstrap server: %s", server)
 			}
-			servers[raft.ServerID(parts[0])] = raft.ServerAddress(parts[1])
+			addr, err := net.ResolveTCPAddr("tcp", parts[1])
+			if err != nil {
+				return fmt.Errorf("resolve advertise address: %w", err)
+			}
+			servers[raft.ServerID(parts[0])] = raft.ServerAddress(addr.String())
 		}
 		s.log.Info("bootstrapping from servers", slog.Any("servers", servers))
 		for id, addr := range servers {
