@@ -44,6 +44,7 @@ jobs:
         with:
           version: v1.51.2
           args: --timeout 10m
+          skip-pkg-cache: true
 
   build-publish:
     name: Build and Publish Artifacts
