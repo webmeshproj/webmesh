@@ -38,7 +38,7 @@ lint:
 	golangci-lint run
 
 .PHONY: dist
-dist: fmt vet generate ## Build node binaries for all platforms.
+dist: ## Build node binaries for all platforms.
 	go install github.com/mitchellh/gox@latest
 	CGO_ENABLED=0 gox \
 		-tags netgo \
@@ -47,7 +47,7 @@ dist: fmt vet generate ## Build node binaries for all platforms.
 		-output="$(DIST)/$(NAME)_{{.OS}}_{{.Arch}}" \
 		github.com/webmeshproj/$(NAME)/cmd/$(NAME)
 
-dist-ctl: fmt vet ## Build wmctl binaries for all platforms.
+dist-ctl: ## Build wmctl binaries for all platforms.
 	go install github.com/mitchellh/gox@latest
 	CGO_ENABLED=0 gox \
 		-tags netgo \
