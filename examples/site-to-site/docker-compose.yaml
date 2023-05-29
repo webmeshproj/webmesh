@@ -35,9 +35,6 @@ services:
 
   site-1-leader:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       public-net:
         ipv4_address: 10.250.0.1
@@ -68,9 +65,6 @@ services:
 
   site-1-follower-1:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-1:
     hostname: site-1-follower-1
@@ -87,9 +81,6 @@ services:
 
   site-1-follower-2:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-1:
     hostname: site-1-follower-2
@@ -106,9 +97,6 @@ services:
 
   site-1-follower-3:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-1:
     hostname: site-1-follower-3
@@ -127,9 +115,6 @@ services:
 
   site-2-leader:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       public-net:
         ipv4_address: 10.250.0.2
@@ -155,9 +140,6 @@ services:
 
   site-2-follower-1:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-2:
     hostname: site-2-follower-1
@@ -174,9 +156,6 @@ services:
 
   site-2-follower-2:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-2:
     hostname: site-2-follower-2
@@ -193,9 +172,6 @@ services:
 
   site-2-follower-3:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-2:
     hostname: site-2-follower-3
@@ -214,9 +190,6 @@ services:
 
   site-3-leader:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       public-net:
         ipv4_address: 10.250.0.3
@@ -242,9 +215,6 @@ services:
 
   site-3-follower-1:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-3:
     hostname: site-3-follower-1
@@ -261,9 +231,6 @@ services:
 
   site-3-follower-2:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-3:
     hostname: site-3-follower-2
@@ -280,9 +247,6 @@ services:
 
   site-3-follower-3:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site-3:
     hostname: site-3-follower-3
