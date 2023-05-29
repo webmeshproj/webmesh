@@ -76,19 +76,15 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 			Valid:  true,
 		}
 	}
-	if node.PrimaryEndpoint.IsValid() {
+	if node.PrimaryEndpoint != "" {
 		params.PrimaryEndpoint = sql.NullString{
-			String: node.PrimaryEndpoint.String(),
+			String: node.PrimaryEndpoint,
 			Valid:  true,
 		}
 	}
 	if len(node.AdditionalEndpoints) > 0 {
-		eps := make([]string, len(node.AdditionalEndpoints))
-		for i, ep := range node.AdditionalEndpoints {
-			eps[i] = ep.String()
-		}
 		params.AdditionalEndpoints = sql.NullString{
-			String: strings.Join(eps, ","),
+			String: strings.Join(node.AdditionalEndpoints, ","),
 			Valid:  true,
 		}
 	}
@@ -120,6 +116,7 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 		return
 	}
 	node.ID = dbnode.ID
+	node.PrimaryEndpoint = dbnode.PrimaryEndpoint.String
 	node.ZoneAwarenessID = dbnode.ZoneAwarenessID.String
 	node.GRPCPort = int(dbnode.GrpcPort)
 	node.RaftPort = int(dbnode.RaftPort)
@@ -133,23 +130,8 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 			return
 		}
 	}
-	if dbnode.PrimaryEndpoint.Valid {
-		node.PrimaryEndpoint, err = netip.ParseAddr(dbnode.PrimaryEndpoint.String)
-		if err != nil {
-			err = fmt.Errorf("parse node endpoint: %w", err)
-			return
-		}
-	}
 	if dbnode.AdditionalEndpoints.Valid {
-		eps := strings.Split(dbnode.AdditionalEndpoints.String, ",")
-		node.AdditionalEndpoints = make([]netip.Addr, len(eps))
-		for i, ep := range eps {
-			node.AdditionalEndpoints[i], err = netip.ParseAddr(ep)
-			if err != nil {
-				err = fmt.Errorf("parse node endpoint: %w", err)
-				return
-			}
-		}
+		node.AdditionalEndpoints = strings.Split(dbnode.AdditionalEndpoints.String, ",")
 	}
 	if dbnode.PrivateAddressV4 != "" {
 		node.PrivateIPv4, err = netip.ParsePrefix(dbnode.PrivateAddressV4)

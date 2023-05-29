@@ -74,9 +74,9 @@ type Node struct {
 	// PublicKey is the node's public key.
 	PublicKey wgtypes.Key
 	// PrimaryEndpoint is the primary public endpoint of the node.
-	PrimaryEndpoint netip.Addr
+	PrimaryEndpoint string
 	// AdditionalEndpoints are the additional public endpoints of the node.
-	AdditionalEndpoints []netip.Addr
+	AdditionalEndpoints []string
 	// ZoneAwarenessID is the node's zone awareness ID.
 	ZoneAwarenessID string
 	// PrivateIPv4 is the node's private IPv4 address.
@@ -114,9 +114,9 @@ type PutOptions struct {
 	// PublicKey is the node's public key.
 	PublicKey wgtypes.Key
 	// PrimaryEndpoint is the primary public endpoint of the node.
-	PrimaryEndpoint netip.Addr
+	PrimaryEndpoint string
 	// AdditionalEndpoints are the additional public endpoints of the node.
-	AdditionalEndpoints []netip.Addr
+	AdditionalEndpoints []string
 	// ZoneAwarenessID is the node's zone awareness ID.
 	ZoneAwarenessID string
 	// NetworkIPv6 is true if the node's network is IPv6.
@@ -224,23 +224,9 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
 		}
-		var primaryEndpoint netip.Addr
-		if node.PrimaryEndpoint.Valid {
-			primaryEndpoint, err = netip.ParseAddr(node.PrimaryEndpoint.String)
-			if err != nil {
-				return nil, fmt.Errorf("parse node endpoint: %w", err)
-			}
-		}
-		var additionalEndpoints []netip.Addr
+		var additionalEndpoints []string
 		if node.AdditionalEndpoints.Valid {
-			eps := strings.Split(node.AdditionalEndpoints.String, ",")
-			additionalEndpoints = make([]netip.Addr, len(eps))
-			for i, ep := range eps {
-				additionalEndpoints[i], err = netip.ParseAddr(ep)
-				if err != nil {
-					return nil, fmt.Errorf("parse node endpoint: %w", err)
-				}
-			}
+			additionalEndpoints = strings.Split(node.AdditionalEndpoints.String, ",")
 		}
 		var networkv4, networkv6 netip.Prefix
 		if node.PrivateAddressV4 != "" {
@@ -258,7 +244,7 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 		out[i] = Node{
 			ID:                  node.ID,
 			PublicKey:           key,
-			PrimaryEndpoint:     primaryEndpoint,
+			PrimaryEndpoint:     node.PrimaryEndpoint.String,
 			AdditionalEndpoints: additionalEndpoints,
 			ZoneAwarenessID:     node.ZoneAwarenessID.String,
 			PrivateIPv4:         networkv4,

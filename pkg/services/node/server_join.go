@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
@@ -57,8 +58,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 		if !allowed {
 			s.log.Warn("Node not allowed to join",
-				"id", req.GetId(),
-				"voter", req.GetAsVoter())
+				slog.String("id", req.GetId()),
+				slog.Bool("voter", req.GetAsVoter()))
 			return nil, status.Error(codes.PermissionDenied, "not allowed")
 		}
 	}
@@ -75,21 +76,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
-	var primaryEndpoint netip.Addr
-	if req.GetPrimaryEndpoint() != "" {
-		primaryEndpoint, err = netip.ParseAddr(req.GetPrimaryEndpoint())
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid primary endpoint: %v", err)
-		}
-	}
-	var additionalEndpoints []netip.Addr
-	for _, ep := range req.GetAdditionalEndpoints() {
-		epaddr, err := netip.ParseAddr(ep)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid additional endpoint: %v", err)
-		}
-		additionalEndpoints = append(additionalEndpoints, epaddr)
-	}
 
 	log := s.log.With("id", req.GetId())
 
@@ -105,8 +91,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		peer, err = s.peers.Put(ctx, &peers.PutOptions{
 			ID:                  req.GetId(),
 			PublicKey:           publicKey,
-			PrimaryEndpoint:     primaryEndpoint,
-			AdditionalEndpoints: additionalEndpoints,
+			PrimaryEndpoint:     req.GetPrimaryEndpoint(),
+			AdditionalEndpoints: req.GetAdditionalEndpoints(),
 			ZoneAwarenessID:     req.GetZoneAwarenessId(),
 			NetworkIPv6:         peer.NetworkIPv6,
 			GRPCPort:            int(req.GetGrpcPort()),
@@ -126,8 +112,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		peer, err = s.peers.Put(ctx, &peers.PutOptions{
 			ID:                  req.GetId(),
 			PublicKey:           publicKey,
-			PrimaryEndpoint:     primaryEndpoint,
-			AdditionalEndpoints: additionalEndpoints,
+			PrimaryEndpoint:     req.GetPrimaryEndpoint(),
+			AdditionalEndpoints: req.GetAdditionalEndpoints(),
 			ZoneAwarenessID:     req.GetZoneAwarenessId(),
 			NetworkIPv6:         networkIPv6,
 			GRPCPort:            int(req.GetGrpcPort()),
@@ -245,8 +231,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			PublicKey:       desc.PublicKey.String(),
 			ZoneAwarenessId: desc.ZoneAwarenessID,
 			PrimaryEndpoint: func() string {
-				if desc.PrimaryEndpoint.IsValid() {
-					return netip.AddrPortFrom(desc.PrimaryEndpoint, uint16(desc.WireguardPort)).String()
+				if desc.PrimaryEndpoint != "" {
+					return fmt.Sprintf("%s:%d", desc.PrimaryEndpoint, desc.WireguardPort)
 				}
 				return ""
 			}(),
@@ -254,7 +240,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				if len(desc.AdditionalEndpoints) > 0 {
 					endpoints := make([]string, 0, len(desc.AdditionalEndpoints))
 					for _, endpoint := range desc.AdditionalEndpoints {
-						endpoints = append(endpoints, netip.AddrPortFrom(endpoint, uint16(desc.WireguardPort)).String())
+						endpoints = append(endpoints, fmt.Sprintf("%s:%d", endpoint, desc.WireguardPort))
 					}
 					return endpoints
 				}

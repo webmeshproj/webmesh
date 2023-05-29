@@ -19,6 +19,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/netip"
 
 	"golang.org/x/exp/slog"
@@ -135,19 +136,48 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 			PublicKey:  desc.PublicKey,
 			AllowedIPs: make([]netip.Prefix, 0),
 		}
-		if desc.PrimaryEndpoint.IsValid() {
-			peer.Endpoint = netip.AddrPortFrom(desc.PrimaryEndpoint, uint16(desc.WireguardPort))
+		if desc.PrimaryEndpoint != "" {
+			addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", desc.PrimaryEndpoint, uint16(desc.WireguardPort)))
+			if err != nil {
+				s.log.Error("could not resolve primary udp addr", slog.String("error", err.Error()))
+			} else {
+				if addr.AddrPort().Addr().Is4In6() {
+					// This is an IPv4 address masquerading as an IPv6 address.
+					// We need to convert it to a real IPv4 address.
+					// This is a workaround for a bug in Go's net package.
+					addr = &net.UDPAddr{
+						IP:   addr.IP.To4(),
+						Port: addr.Port,
+						Zone: addr.Zone,
+					}
+				}
+				peer.Endpoint = addr.AddrPort()
+			}
 			if s.opts.ZoneAwarenessID != "" && desc.ZoneAwarenessID != "" {
 				if desc.ZoneAwarenessID == s.opts.ZoneAwarenessID {
-					if !localCIDRs.Contains(desc.PrimaryEndpoint) && len(desc.AdditionalEndpoints) > 0 {
+					if !localCIDRs.Contains(peer.Endpoint.Addr()) && len(desc.AdditionalEndpoints) > 0 {
 						// We share zone awareness with the peer and their primary endpoint
 						// is not in one of our local CIDRs. We'll try to use one of their
 						// additional endpoints instead.
 						for _, ep := range desc.AdditionalEndpoints {
-							if localCIDRs.Contains(ep) {
+							addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", ep, uint16(desc.WireguardPort)))
+							if err != nil {
+								s.log.Error("could not resolve additional udp addr", slog.String("error", err.Error()))
+								continue
+							}
+							if addr.AddrPort().Addr().Is4In6() {
+								// Same as above, this is an IPv4 address masquerading as an IPv6 address.
+								addr = &net.UDPAddr{
+									IP:   addr.IP.To4(),
+									Port: addr.Port,
+									Zone: addr.Zone,
+								}
+							}
+							ep := addr.AddrPort()
+							if localCIDRs.Contains(ep.Addr()) {
 								// We found an additional endpoint that is in one of our local
 								// CIDRs. We'll use this one instead.
-								peer.Endpoint = netip.AddrPortFrom(ep, uint16(desc.WireguardPort))
+								peer.Endpoint = ep
 								s.log.Info("zone awareness shared with peer, using LAN endpoint", slog.String("endpoint", peer.Endpoint.String()))
 								break
 							}

@@ -222,23 +222,17 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	if err != nil {
 		return fmt.Errorf("generate random IPv6: %w", err)
 	}
-	var endpoint netip.Addr
+	var endpoint string
 	if s.opts.NodeEndpoint != "" {
-		endpoint, err = netip.ParseAddr(s.opts.NodeEndpoint)
-		if err != nil {
-			return fmt.Errorf("parse node endpoint: %w", err)
-		}
+		endpoint = s.opts.NodeEndpoint
 	} else {
 		// We will use the address of our advertise interface.
 		listenAddr := s.sl.Addr()
 		if listenAddr == nil {
 			return fmt.Errorf("no advertise address available")
 		}
-		listenEndpoint, err := netip.ParseAddrPort(listenAddr.String())
-		if err != nil {
-			return fmt.Errorf("parse listen address: %w", err)
-		}
-		endpoint = listenEndpoint.Addr()
+		trimPort := strings.Split(listenAddr.String(), ":")[0]
+		endpoint = trimPort
 	}
 	p := peers.New(s)
 	params := &peers.PutOptions{
@@ -247,20 +241,11 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		GRPCPort:        s.opts.GRPCAdvertisePort,
 		RaftPort:        s.sl.ListenPort(),
 		WireguardPort:   s.wgopts.ListenPort,
+		PrimaryEndpoint: endpoint,
 		ZoneAwarenessID: s.opts.ZoneAwarenessID,
 	}
-	if endpoint.IsValid() {
-		params.PrimaryEndpoint = endpoint
-	}
 	if s.opts.NodeAdditionalEndpoints != "" {
-		eps := strings.Split(s.opts.NodeAdditionalEndpoints, ",")
-		params.AdditionalEndpoints = make([]netip.Addr, len(eps))
-		for i, ep := range eps {
-			params.AdditionalEndpoints[i], err = netip.ParseAddr(ep)
-			if err != nil {
-				return fmt.Errorf("parse additional endpoint: %w", err)
-			}
-		}
+		params.AdditionalEndpoints = strings.Split(s.opts.NodeAdditionalEndpoints, ",")
 	}
 	// Go ahead and generate our private key.
 	s.log.Info("generating wireguard key for ourselves")

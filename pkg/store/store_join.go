@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"strings"
 	"time"
@@ -193,9 +194,21 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			return fmt.Errorf("parse peer key: %w", err)
 		}
 		var endpoint netip.AddrPort
-		endpoint, err = netip.ParseAddrPort(peer.GetPrimaryEndpoint())
+		addr, err := net.ResolveUDPAddr("udp", peer.GetPrimaryEndpoint())
 		if err != nil {
-			return fmt.Errorf("parse peer endpoint: %w", err)
+			log.Error("could not resolve peer primary endpoint", slog.String("error", err.Error()))
+		} else {
+			if addr.AddrPort().Addr().Is4In6() {
+				// This is an IPv4 address masquerading as an IPv6 address.
+				// We need to convert it to a real IPv4 address.
+				// This is a workaround for a bug in Go's net package.
+				addr = &net.UDPAddr{
+					IP:   addr.IP.To4(),
+					Port: addr.Port,
+					Zone: addr.Zone,
+				}
+			}
+			endpoint = addr.AddrPort()
 		}
 		if s.opts.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() != "" {
 			if peer.GetZoneAwarenessId() == s.opts.ZoneAwarenessID {
@@ -204,10 +217,20 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 					// is not in one of our local CIDRs. We'll try to use one of their
 					// additional endpoints instead.
 					for _, additionalEndpoint := range peer.GetAdditionalEndpoints() {
-						ep, err := netip.ParseAddrPort(additionalEndpoint)
+						addr, err := net.ResolveUDPAddr("udp", additionalEndpoint)
 						if err != nil {
-							return fmt.Errorf("parse peer additional endpoint: %w", err)
+							log.Error("could not resolve peer primary endpoint", slog.String("error", err.Error()))
+							continue
 						}
+						if addr.AddrPort().Addr().Is4In6() {
+							// Same as above, this is an IPv4 address masquerading as an IPv6 address.
+							addr = &net.UDPAddr{
+								IP:   addr.IP.To4(),
+								Port: addr.Port,
+								Zone: addr.Zone,
+							}
+						}
+						ep := addr.AddrPort()
 						if localCIDRs.Contains(ep.Addr()) {
 							// We found an additional endpoint that is in one of our local
 							// CIDRs. We'll use this one instead.
