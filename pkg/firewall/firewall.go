@@ -50,6 +50,10 @@ type Options struct {
 	DefaultPolicy Policy
 	// WireguardPort is the port to allow for wireguard traffic.
 	WireguardPort uint16
+	// RaftPort is the port to allow for raft traffic.
+	RaftPort uint16
+	// GRPCPort is the port to allow for grpc traffic.
+	GRPCPort uint16
 }
 
 // New returns a new firewall manager for the given interface.

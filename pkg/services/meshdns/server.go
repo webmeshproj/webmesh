@@ -344,19 +344,27 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 func (m *Server) newPeerTXTRecord(name string, peer *peers.Node) *dns.TXT {
+	txtData := []string{
+		fmt.Sprintf("id=%s", peer.ID),
+		fmt.Sprintf("raft_port=%d", peer.RaftPort),
+		fmt.Sprintf("grpc_port=%d", peer.GRPCPort),
+		fmt.Sprintf("wireguard_port=%d", peer.WireguardPort),
+		fmt.Sprintf("primary_endpoint=%s", func() string {
+			if peer.PrimaryEndpoint.IsValid() {
+				return peer.PrimaryEndpoint.String()
+			}
+			return "<none>"
+		}()),
+	}
+	if len(peer.AdditionalEndpoints) > 0 {
+		eps := make([]string, len(peer.AdditionalEndpoints))
+		for i, ep := range peer.AdditionalEndpoints {
+			eps[i] = ep.String()
+		}
+		txtData = append(txtData, fmt.Sprintf("additional_endpoints=%s", strings.Join(eps, ",")))
+	}
 	return &dns.TXT{
 		Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 1},
-		Txt: []string{
-			fmt.Sprintf("id=%s", peer.ID),
-			fmt.Sprintf("raft_port=%d", peer.RaftPort),
-			fmt.Sprintf("grpc_port=%d", peer.GRPCPort),
-			fmt.Sprintf("wireguard_port=%d", peer.WireguardPort),
-			fmt.Sprintf("primary_endpoint=%s", func() string {
-				if peer.PrimaryEndpoint.IsValid() {
-					return peer.PrimaryEndpoint.String()
-				}
-				return "<none>"
-			}()),
-		},
+		Txt: txtData,
 	}
 }

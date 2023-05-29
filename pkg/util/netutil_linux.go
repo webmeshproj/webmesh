@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/jsimonetti/rtnetlink"
+	"github.com/vishvananda/netlink"
 )
 
 // EnableIPForwarding enables IP forwarding.
@@ -106,4 +107,27 @@ func decodeKernelHexIP(hexIP string) (netip.Addr, error) {
 	}
 	out, _ := netip.AddrFromSlice(ip)
 	return out, nil
+}
+
+func ifaceNetwork(ifaceName string, ipv6 bool) (netip.Prefix, error) {
+	family := netlink.FAMILY_V4
+	if ipv6 {
+		family = netlink.FAMILY_V6
+	}
+	link, err := netlink.LinkByName(ifaceName)
+	if err != nil {
+		return netip.Prefix{}, err
+	}
+	addrs, err := netlink.AddrList(link, family)
+	if err != nil {
+		return netip.Prefix{}, err
+	}
+	if len(addrs) == 0 {
+		return netip.Prefix{}, fmt.Errorf("no addresses found for interface %s", ifaceName)
+	}
+	// Return the first address on the interface.
+	addr := addrs[0]
+	ip, _ := netip.ParseAddr(addr.IP.String())
+	ones, _ := addr.Mask.Size()
+	return netip.PrefixFrom(ip, ones), nil
 }

@@ -86,6 +86,7 @@ type Options struct {
 	// DetectEndpoints is true if the endpoints should be detected.
 	DetectEndpoints bool `yaml:"detect-endpoints" json:"detect-endpoints" toml:"detect-endpoints"`
 	// DetectPrivateEndpoints is true if private IP addresses should be included in detection.
+	// This automatically enables DetectEndpoints.
 	DetectPrivateEndpoints bool `yaml:"detect-private-endpoints" json:"detect-private-endpoints" toml:"detect-private-endpoints"`
 	// AllowRemoteDetection is true if remote detection is allowed.
 	AllowRemoteDetection bool `yaml:"allow-remote-detection" json:"allow-remote-detection" toml:"allow-remote-detection"`
@@ -143,7 +144,7 @@ When detect-endpoints is true, this value will be the first address detected.`)
 // Overlay overlays the global options onto the given option sets.
 func (o *Options) Overlay(opts ...any) error {
 	var primaryEndpoint netip.Addr
-	var endpoints []netip.Addr
+	var endpoints util.PrefixList
 	var err error
 	if o.PrimaryEndpoint != "" {
 		primaryEndpoint, err = netip.ParseAddr(o.PrimaryEndpoint)
@@ -151,14 +152,18 @@ func (o *Options) Overlay(opts ...any) error {
 			return fmt.Errorf("failed to parse endpoint: %w", err)
 		}
 	}
-	if o.DetectEndpoints {
-		endpoints, err = o.detectEndpoints()
+	if o.DetectEndpoints || o.DetectPrivateEndpoints {
+		endpoints, err = util.DetectEndpoints(context.Background(), util.EndpointDetectOpts{
+			DetectIPv6:           o.DetectIPv6,
+			DetectPrivate:        o.DetectPrivateEndpoints,
+			AllowRemoteDetection: o.AllowRemoteDetection,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to detect endpoints: %w", err)
 		}
 		if len(endpoints) > 0 {
 			if !primaryEndpoint.IsValid() {
-				primaryEndpoint = endpoints[0]
+				primaryEndpoint = endpoints[0].Addr()
 				if len(endpoints) > 1 {
 					endpoints = endpoints[1:]
 				} else {
@@ -195,7 +200,7 @@ func (o *Options) Overlay(opts ...any) error {
 					v.NodeEndpoint = primaryEndpoint.String()
 				}
 				if v.NodeAdditionalEndpoints == "" && len(endpoints) > 0 {
-					v.NodeAdditionalEndpoints = strings.Join(toAddrList(endpoints), ",")
+					v.NodeAdditionalEndpoints = strings.Join(endpoints.AddrStrings(), ",")
 				}
 				v.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
 			}
@@ -255,82 +260,4 @@ func (o *Options) Overlay(opts ...any) error {
 		}
 	}
 	return nil
-}
-
-func (o *Options) detectEndpoints() ([]netip.Addr, error) {
-	addrs, err := o.detectFromInterfaces()
-	if err != nil {
-		return nil, err
-	}
-	if o.AllowRemoteDetection && len(addrs) == 0 {
-		var addr string
-		if o.DetectIPv6 {
-			addr, err = util.DetectPublicIPv6(context.Background())
-		} else {
-			addr, err = util.DetectPublicIPv4(context.Background())
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect public address: %w", err)
-		}
-		parsed, err := netip.ParseAddr(addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse public address: %w", err)
-		}
-		addrs = append(addrs, parsed)
-	}
-	return addrs, nil
-}
-
-func (o *Options) detectFromInterfaces() ([]netip.Addr, error) {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list interfaces: %w", err)
-	}
-	var ips []netip.Addr
-	for _, iface := range interfaces {
-		if iface.Flags&net.FlagUp == 0 {
-			continue
-		}
-		if iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		if iface.Flags&net.FlagPointToPoint != 0 {
-			continue
-		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			return nil, fmt.Errorf("failed to list addresses for interface %s: %w", iface.Name, err)
-		}
-		for _, addr := range addrs {
-			ip, _, err := net.ParseCIDR(addr.String())
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse address %s: %w", addr.String(), err)
-			}
-			addr, err := netip.ParseAddr(ip.String())
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse address %s: %w", ip.String(), err)
-			}
-			if addr.IsPrivate() && !o.DetectPrivateEndpoints {
-				continue
-			}
-			if o.DetectIPv6 {
-				if addr.Is6() {
-					ips = append(ips, addr)
-				}
-			} else {
-				if addr.Is4() && addr.IsPrivate() {
-					ips = append(ips, addr)
-				}
-			}
-		}
-	}
-	return ips, nil
-}
-
-func toAddrList(eps []netip.Addr) []string {
-	var out []string
-	for _, ep := range eps {
-		out = append(out, ep.String())
-	}
-	return out
 }

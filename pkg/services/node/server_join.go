@@ -84,11 +84,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	var additionalEndpoints []netip.Addr
 	for _, ep := range req.GetAdditionalEndpoints() {
-		additionalEndpoint, err := netip.ParseAddr(ep)
+		epaddr, err := netip.ParseAddr(ep)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid additional endpoint: %v", err)
 		}
-		additionalEndpoints = append(additionalEndpoints, additionalEndpoint)
+		additionalEndpoints = append(additionalEndpoints, epaddr)
 	}
 
 	log := s.log.With("id", req.GetId())

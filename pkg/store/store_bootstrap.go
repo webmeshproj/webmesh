@@ -227,14 +227,25 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	}
 	p := peers.New(s)
 	params := &peers.PutOptions{
-		ID:            string(s.nodeID),
-		NetworkIPv6:   networkIPv6,
-		GRPCPort:      s.opts.GRPCAdvertisePort,
-		RaftPort:      s.sl.ListenPort(),
-		WireguardPort: s.wgopts.ListenPort,
+		ID:              string(s.nodeID),
+		NetworkIPv6:     networkIPv6,
+		GRPCPort:        s.opts.GRPCAdvertisePort,
+		RaftPort:        s.sl.ListenPort(),
+		WireguardPort:   s.wgopts.ListenPort,
+		ZoneAwarenessID: s.opts.ZoneAwarenessID,
 	}
 	if endpoint.IsValid() {
 		params.PrimaryEndpoint = endpoint
+	}
+	if s.opts.NodeAdditionalEndpoints != "" {
+		eps := strings.Split(s.opts.NodeAdditionalEndpoints, ",")
+		params.AdditionalEndpoints = make([]netip.Addr, len(eps))
+		for i, ep := range eps {
+			params.AdditionalEndpoints[i], err = netip.ParseAddr(ep)
+			if err != nil {
+				return fmt.Errorf("parse additional endpoint: %w", err)
+			}
+		}
 	}
 	// Go ahead and generate our private key.
 	s.log.Info("generating wireguard key for ourselves")

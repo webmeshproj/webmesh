@@ -27,6 +27,7 @@ require (
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
+	github.com/vishvananda/netlink v1.0.0
 	github.com/webmeshproj/api v0.0.0-20230529111942-442d139d73b0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sync v0.1.0
@@ -81,6 +82,7 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/stretchr/testify v1.8.3 // indirect
+	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/net v0.10.0 // indirect

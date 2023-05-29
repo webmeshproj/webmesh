@@ -250,6 +250,71 @@ func ParsePortRange(s string) (start int, end int, err error) {
 	return start, end, nil
 }
 
+// EndpointDetectOpts contains options for endpoint detection.
+type EndpointDetectOpts struct {
+	// DetectIPv6 enables IPv6 detection.
+	DetectIPv6 bool
+	// DetectPrivate enables private address detection.
+	DetectPrivate bool
+	// AllowRemoteDetection enables remote address detection.
+	AllowRemoteDetection bool
+}
+
+type PrefixList []netip.Prefix
+
+func (a PrefixList) Contains(addr netip.Addr) bool {
+	for _, prefix := range a {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
+func (a PrefixList) Strings() []string {
+	var out []string
+	for _, addr := range a {
+		out = append(out, addr.String())
+	}
+	return out
+}
+
+func (a PrefixList) AddrStrings() []string {
+	var out []string
+	for _, addr := range a {
+		out = append(out, addr.Addr().String())
+	}
+	return out
+}
+
+// DetectEndpoints detects endpoints for this machine.
+func DetectEndpoints(ctx context.Context, opts EndpointDetectOpts) (PrefixList, error) {
+	addrs, err := detectFromInterfaces(&opts)
+	if err != nil {
+		return nil, err
+	}
+	if opts.AllowRemoteDetection && len(addrs) == 0 {
+		var addr string
+		var bits int
+		if opts.DetectIPv6 {
+			addr, err = DetectPublicIPv6(ctx)
+			bits = 128
+		} else {
+			addr, err = DetectPublicIPv4(ctx)
+			bits = 32
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect public address: %w", err)
+		}
+		parsed, err := netip.ParseAddr(addr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse public address: %w", err)
+		}
+		addrs = append(addrs, netip.PrefixFrom(parsed, bits))
+	}
+	return addrs, nil
+}
+
 // DetectPublicIPv4 detects the public IPv4 address of the machine
 // using the ifconfig.me service.
 func DetectPublicIPv4(ctx context.Context) (string, error) {
@@ -289,4 +354,54 @@ func httpGetToString(ctx context.Context, url string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func detectFromInterfaces(opts *EndpointDetectOpts) (PrefixList, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list interfaces: %w", err)
+	}
+	var ips PrefixList
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		if iface.Flags&net.FlagPointToPoint != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list addresses for interface %s: %w", iface.Name, err)
+		}
+		for _, addr := range addrs {
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse address %s: %w", addr.String(), err)
+			}
+			addr, err := netip.ParseAddr(ip.String())
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse address %s: %w", ip.String(), err)
+			}
+			if addr.IsPrivate() && !opts.DetectPrivate {
+				continue
+			}
+			if addr.Is6() && opts.DetectIPv6 {
+				prefix, err := ifaceNetwork(iface.Name, true)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get network for interface %s: %w", iface.Name, err)
+				}
+				ips = append(ips, prefix)
+			} else if addr.Is4() {
+				prefix, err := ifaceNetwork(iface.Name, false)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get network for interface %s: %w", iface.Name, err)
+				}
+				ips = append(ips, prefix)
+			}
+		}
+	}
+	return ips, nil
 }

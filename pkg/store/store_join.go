@@ -27,13 +27,13 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"golang.org/x/sync/errgroup"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
+	"github.com/webmeshproj/node/pkg/util"
 	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
@@ -175,41 +175,69 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
-	g, ctx := errgroup.WithContext(ctx)
-	for _, rpeer := range resp.GetPeers() {
-		peer := rpeer
-		g.Go(func() error {
-			key, err := wgtypes.ParseKey(peer.GetPublicKey())
-			if err != nil {
-				return fmt.Errorf("parse peer key: %w", err)
-			}
-			endpoint, err := netip.ParseAddrPort(peer.GetPrimaryEndpoint())
-			if err != nil {
-				return fmt.Errorf("parse peer endpoint: %w", err)
-			}
-			allowedIPs := make([]netip.Prefix, len(peer.GetAllowedIps()))
-			for i, ip := range peer.GetAllowedIps() {
-				allowedIPs[i], err = netip.ParsePrefix(ip)
-				if err != nil {
-					return fmt.Errorf("parse peer allowed ip: %w", err)
+	var localCIDRs util.PrefixList
+	if s.opts.ZoneAwarenessID != "" {
+		log.Info("using zone awareness, collecting local CIDRs")
+		localCIDRs, err = util.DetectEndpoints(ctx, util.EndpointDetectOpts{
+			DetectPrivate: true,
+			DetectIPv6:    !s.opts.NoIPv6,
+		})
+		log.Debug("detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
+		if err != nil {
+			return fmt.Errorf("detect endpoints: %w", err)
+		}
+	}
+	for _, peer := range resp.GetPeers() {
+		key, err := wgtypes.ParseKey(peer.GetPublicKey())
+		if err != nil {
+			return fmt.Errorf("parse peer key: %w", err)
+		}
+		var endpoint netip.AddrPort
+		endpoint, err = netip.ParseAddrPort(peer.GetPrimaryEndpoint())
+		if err != nil {
+			return fmt.Errorf("parse peer endpoint: %w", err)
+		}
+		if s.opts.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() != "" {
+			if peer.GetZoneAwarenessId() == s.opts.ZoneAwarenessID {
+				if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetAdditionalEndpoints()) > 0 {
+					// We share zone awareness with the peer and their primary endpoint
+					// is not in one of our local CIDRs. We'll try to use one of their
+					// additional endpoints instead.
+					for _, additionalEndpoint := range peer.GetAdditionalEndpoints() {
+						ep, err := netip.ParseAddrPort(additionalEndpoint)
+						if err != nil {
+							return fmt.Errorf("parse peer additional endpoint: %w", err)
+						}
+						if localCIDRs.Contains(ep.Addr()) {
+							// We found an additional endpoint that is in one of our local
+							// CIDRs. We'll use this one instead.
+							log.Info("zone awareness shared with peer, using LAN endpoint", slog.String("endpoint", ep.String()))
+							endpoint = ep
+							break
+						}
+					}
 				}
 			}
-			wgpeer := wireguard.Peer{
-				ID:         peer.GetId(),
-				PublicKey:  key,
-				Endpoint:   endpoint,
-				AllowedIPs: allowedIPs,
-			}
-			log.Info("adding wireguard peer", slog.Any("peer", wgpeer))
-			err = s.wg.PutPeer(ctx, &wgpeer)
+		}
+		allowedIPs := make([]netip.Prefix, len(peer.GetAllowedIps()))
+		for i, ip := range peer.GetAllowedIps() {
+			allowedIPs[i], err = netip.ParsePrefix(ip)
 			if err != nil {
-				return err
+				return fmt.Errorf("parse peer allowed ip: %w", err)
 			}
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return fmt.Errorf("add peers: %w", err)
+		}
+		wgpeer := wireguard.Peer{
+			ID:         peer.GetId(),
+			PublicKey:  key,
+			Endpoint:   endpoint,
+			AllowedIPs: allowedIPs,
+		}
+		log.Info("adding wireguard peer", slog.Any("peer", wgpeer))
+		err = s.wg.PutPeer(ctx, &wgpeer)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 	return nil
 }

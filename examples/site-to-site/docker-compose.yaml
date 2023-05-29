@@ -53,10 +53,12 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --global.primary-endpoint=10.250.0.1
+      - --global.detect-private-endpoints
       - --store.bootstrap
       - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
+      - --store.zone-awareness-id=site-1
       - --services.enable-leader-proxy
       - --services.enable-mesh-api
       - --services.enable-mesh-dns
@@ -83,7 +85,7 @@ services:
       - --store.in-memory
       - --store.join=10.1.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-1-leader=10.1.0.1:51820
+      - --store.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -103,7 +105,7 @@ services:
       - --store.in-memory
       - --store.join=10.1.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-1-leader=10.1.0.1:51820
+      - --store.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -123,7 +125,7 @@ services:
       - --store.in-memory
       - --store.join=10.1.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-1-leader=10.1.0.1:51820
+      - --store.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -145,10 +147,12 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --global.primary-endpoint=10.250.0.2
+      - --global.detect-private-endpoints
       - --store.bootstrap
       - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
+      - --store.zone-awareness-id=site-2
       - --services.enable-leader-proxy
       - --services.enable-mesh-api
     volumes:
@@ -171,7 +175,7 @@ services:
       - --store.in-memory
       - --store.join=10.2.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-2-leader=10.2.0.1:51820
+      - --store.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -191,7 +195,7 @@ services:
       - --store.in-memory
       - --store.join=10.2.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-2-leader=10.2.0.1:51820
+      - --store.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -211,7 +215,7 @@ services:
       - --store.in-memory
       - --store.join=10.2.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-2-leader=10.2.0.1:51820
+      - --store.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -233,10 +237,12 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --global.primary-endpoint=10.250.0.3
+      - --global.detect-private-endpoints
       - --store.bootstrap
       - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
       - --store.data-dir=/data
+      - --store.zone-awareness-id=site-3
       - --services.enable-leader-proxy
       - --services.enable-mesh-api
     volumes:
@@ -259,7 +265,7 @@ services:
       - --store.in-memory
       - --store.join=10.3.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-3-leader=10.3.0.1:51820
+      - --store.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -279,7 +285,7 @@ services:
       - --store.in-memory
       - --store.join=10.3.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-3-leader=10.3.0.1:51820
+      - --store.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -299,6 +305,6 @@ services:
       - --store.in-memory
       - --store.join=10.3.0.1:8443
       - --store.max-join-retries=10
-      - --wireguard.endpoint-overrides=site-3-leader=10.3.0.1:51820
+      - --store.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

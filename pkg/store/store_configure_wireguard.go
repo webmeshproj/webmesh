@@ -26,6 +26,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/firewall"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/util"
 	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
@@ -41,6 +42,8 @@ func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, network
 		s.fw, err = firewall.New(&firewall.Options{
 			DefaultPolicy: firewall.PolicyAccept,
 			WireguardPort: uint16(s.wgopts.ListenPort),
+			RaftPort:      uint16(s.sl.ListenPort()),
+			GRPCPort:      uint16(s.opts.GRPCAdvertisePort),
 		})
 		if err != nil {
 			return fmt.Errorf("new firewall: %w", err)
@@ -112,14 +115,46 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 		s.log.Debug("no descendants found in mesh DAG")
 		return nil
 	}
+	var localCIDRs util.PrefixList
+	if s.opts.ZoneAwarenessID != "" {
+		s.log.Debug("using zone awareness, collecting local CIDRs")
+		localCIDRs, err = util.DetectEndpoints(context.Background(), util.EndpointDetectOpts{
+			DetectPrivate: true,
+			DetectIPv6:    !s.opts.NoIPv6,
+		})
+		s.log.Debug("detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
+		if err != nil {
+			return fmt.Errorf("detect endpoints: %w", err)
+		}
+	}
 	for descendant, edge := range ourDescendants {
 		desc, _ := graph.Vertex(descendant)
 		// Each direct child is a wireguard peer
-		peer := wireguard.Peer{
+		peer := &wireguard.Peer{
 			ID:         desc.ID,
 			PublicKey:  desc.PublicKey,
-			Endpoint:   netip.AddrPortFrom(desc.PrimaryEndpoint, uint16(desc.WireguardPort)),
 			AllowedIPs: make([]netip.Prefix, 0),
+		}
+		if desc.PrimaryEndpoint.IsValid() {
+			peer.Endpoint = netip.AddrPortFrom(desc.PrimaryEndpoint, uint16(desc.WireguardPort))
+			if s.opts.ZoneAwarenessID != "" && desc.ZoneAwarenessID != "" {
+				if desc.ZoneAwarenessID == s.opts.ZoneAwarenessID {
+					if !localCIDRs.Contains(desc.PrimaryEndpoint) && len(desc.AdditionalEndpoints) > 0 {
+						// We share zone awareness with the peer and their primary endpoint
+						// is not in one of our local CIDRs. We'll try to use one of their
+						// additional endpoints instead.
+						for _, ep := range desc.AdditionalEndpoints {
+							if localCIDRs.Contains(ep) {
+								// We found an additional endpoint that is in one of our local
+								// CIDRs. We'll use this one instead.
+								peer.Endpoint = netip.AddrPortFrom(ep, uint16(desc.WireguardPort))
+								s.log.Info("zone awareness shared with peer, using LAN endpoint", slog.String("endpoint", peer.Endpoint.String()))
+								break
+							}
+						}
+					}
+				}
+			}
 		}
 		if desc.PrivateIPv4.IsValid() {
 			peer.AllowedIPs = append(peer.AllowedIPs, desc.PrivateIPv4)
@@ -144,7 +179,7 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 		}
 		slog.Debug("allowed ips for descendant",
 			slog.Any("allowed_ips", peer.AllowedIPs), slog.String("descendant", desc.ID))
-		if err := s.wg.PutPeer(context.Background(), &peer); err != nil {
+		if err := s.wg.PutPeer(context.Background(), peer); err != nil {
 			return fmt.Errorf("put peer: %w", err)
 		}
 	}
