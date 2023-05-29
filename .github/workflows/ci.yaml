@@ -14,6 +14,8 @@ jobs:
   tests:
     name: Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -28,7 +30,8 @@ jobs:
         shell: bash
         run: |
           echo "GOPRIVATE=github.com/webmeshproj" >> $GITHUB_ENV
-          git config --global url."https://oauth2:${{ github.token }}@github.com".insteadOf \
+          git config --global \
+            url."https://oauth2:${{ secrets.GOPRIVATE_TOKEN }}@github.com".insteadOf \
             https://github.com
 
       - name: Run linting
@@ -63,8 +66,9 @@ jobs:
         shell: bash
         run: |
           echo "GOPRIVATE=github.com/webmeshproj" >> $GITHUB_ENV
-          git config --global url."https://oauth2:${{ github.token }}@github.com".insteadOf \
-              https://github.com
+          git config --global \
+            url."https://oauth2:${{ secrets.GOPRIVATE_TOKEN }}@github.com".insteadOf \
+            https://github.com
 
       - name: Build Release Binaries
         shell: bash
