@@ -27,7 +27,7 @@ build-ctl: fmt vet ## Build wmctl binary.
 		-o dist/$(CTL)_$(OS)_$(ARCH) \
 		cmd/$(CTL)/main.go
 
-PLATFORMS ?= linux/arm64 linux/amd64 linux/s390x linux/ppc64le
+PLATFORMS ?= linux/arm linux/arm64 linux/amd64
 DIST      := $(CURDIR)/dist
 
 tidy:
@@ -93,3 +93,7 @@ generate: ## Generate SQL code.
 
 install-ctl:
 	go install github.com/webmeshproj/$(NAME)/cmd/$(CTL)
+
+clean:
+	rm -rf dist
+	rm -rf webmesh.sqlite

@@ -20,7 +20,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           check-latest: true
@@ -34,13 +35,15 @@ jobs:
             url."https://oauth2:${{ secrets.GOPRIVATE_TOKEN }}@github.com".insteadOf \
             https://github.com
 
+      - name: Download Go Modules
+        shell: bash
+        run: go mod download -x
+
       - name: Run linting
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.51.2
           args: --timeout 10m
-          skip-pkg-cache: true
-          skip-build-cache: true
 
   build-publish:
     name: Build and Publish Artifacts
@@ -56,7 +59,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           check-latest: true
@@ -69,6 +73,10 @@ jobs:
           git config --global \
             url."https://oauth2:${{ secrets.GOPRIVATE_TOKEN }}@github.com".insteadOf \
             https://github.com
+
+      - name: Download Go Modules
+        shell: bash
+        run: go mod download -x
 
       - name: Build Release Binaries
         shell: bash
