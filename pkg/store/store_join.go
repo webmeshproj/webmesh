@@ -237,7 +237,6 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		if err != nil {
 			return err
 		}
-		return nil
 	}
 	return nil
 }

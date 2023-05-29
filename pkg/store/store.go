@@ -194,10 +194,9 @@ type store struct {
 	dataAppliedIndex   atomic.Uint64
 	dataMux            sync.RWMutex
 
-	wg             wireguard.Interface
-	fw             firewall.Firewall
-	localEndpoints []netip.Addr
-	wgmux          sync.Mutex
+	wg    wireguard.Interface
+	fw    firewall.Firewall
+	wgmux sync.Mutex
 
 	open atomic.Bool
 }
