@@ -91,6 +91,8 @@ jobs:
 
       - name: Build Release Binaries
         shell: bash
+        env:
+          PLATFORMS: ${{ join(env.PLATFORMS, ' ') }}
         run: make dist
 
       - name: Login to GHCR
