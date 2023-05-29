@@ -135,10 +135,10 @@ func (q *Queries) ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAd
 const ListPublicWireguardEndpoints = `-- name: ListPublicWireguardEndpoints :many
 SELECT
     nodes.id AS node_id,
-    CAST(nodes.public_endpoint
+    CAST(nodes.primary_endpoint
     || ':'
     || CAST(nodes.wireguard_port AS TEXT) AS TEXT) AS endpoint
-FROM nodes WHERE nodes.public_endpoint IS NOT NULL
+FROM nodes WHERE nodes.primary_endpoint IS NOT NULL
 `
 
 type ListPublicWireguardEndpointsRow struct {

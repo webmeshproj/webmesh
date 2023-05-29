@@ -234,7 +234,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		WireguardPort: s.wgopts.ListenPort,
 	}
 	if endpoint.IsValid() {
-		params.PublicEndpoint = endpoint
+		params.PrimaryEndpoint = endpoint
 	}
 	// Go ahead and generate our private key.
 	s.log.Info("generating wireguard key for ourselves")

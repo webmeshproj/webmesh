@@ -56,7 +56,6 @@ type Querier interface {
 	RestoreRaftACL(ctx context.Context, arg RestoreRaftACLParams) error
 	SetIPv4Prefix(ctx context.Context, value string) error
 	SetULAPrefix(ctx context.Context, value string) error
-	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdateNodeEdge(ctx context.Context, arg UpdateNodeEdgeParams) error
 }
 

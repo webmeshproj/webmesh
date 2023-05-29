@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 
 	"github.com/webmeshproj/node/pkg/services"
 	"github.com/webmeshproj/node/pkg/store"
@@ -42,7 +43,8 @@ const (
 	GlobalInsecureEnvVar               = "GLOBAL_INSECURE"
 	GlobalNoIPv4EnvVar                 = "GLOBAL_NO_IPV4"
 	GlobalNoIPv6EnvVar                 = "GLOBAL_NO_IPV6"
-	GlobalEndpointEnvVar               = "GLOBAL_ENDPOINT"
+	GlobalPrimaryEndpointEnvVar        = "GLOBAL_PRIMARY_ENDPOINT"
+	GlobalEndpointsEnvVar              = "GLOBAL_ENDPOINTS"
 	GlobalDetectEndpointsEnvVar        = "GLOBAL_DETECT_ENDPOINTS"
 	GlobalDetectPrivateEndpointsEnvVar = "GLOBAL_DETECT_PRIVATE_ENDPOINTS"
 	GlobalAllowRemoteDetectionEnvVar   = "GLOBAL_ALLOW_REMOTE_DETECTION"
@@ -72,10 +74,15 @@ type Options struct {
 	NoIPv4 bool `yaml:"no-ipv4" json:"no-ipv4" toml:"no-ipv4"`
 	// NoIPv6 is true if IPv6 should be disabled.
 	NoIPv6 bool `yaml:"no-ipv6" json:"no-ipv6" toml:"no-ipv6"`
-	// Endpoint is the preferred publicly routable address of this node.
-	// Setting this value will override the store advertise address and WireGuard
-	// primary endpoints with their configured listen ports.
-	Endpoint string `yaml:"endpoint" json:"endpoint" toml:"endpoint"`
+	// PrimaryEndpoint is the preferred publicly routable address of this node.
+	// Setting this value will override the store advertise address with its
+	// configured listen port.
+	PrimaryEndpoint string `yaml:"primary-endpoint" json:"endpoint" toml:"endpoint"`
+	// Endpoints are the additional publicly routable addresses of this node.
+	// If PrimaryEndpoint is not set, it will be set to the first endpoint.
+	// Setting this value will override the store advertise with its configured
+	// listen port.
+	Endpoints []string `yaml:"endpoints" json:"endpoints" toml:"endpoints"`
 	// DetectEndpoints is true if the endpoints should be detected.
 	DetectEndpoints bool `yaml:"detect-endpoints" json:"detect-endpoints" toml:"detect-endpoints"`
 	// DetectPrivateEndpoints is true if private IP addresses should be included in detection.
@@ -115,11 +122,10 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(GlobalLogLevelEnvVar, "info"),
 		"Log level (debug, info, warn, error)")
 
-	fs.StringVar(&o.Endpoint, "global.endpoint", util.GetEnvDefault(GlobalEndpointEnvVar, ""),
+	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", util.GetEnvDefault(GlobalPrimaryEndpointEnvVar, ""),
 		`The preferred publicly routable address of this node. Setting this
-value will override the address portion of the store advertise address
-and WireGuard endpoints. This is only necessary if you intend for
-this node's API to be reachable outside the network.`)
+value will override the address portion of the store advertise address. 
+When detect-endpoints is true, this value will be the first address detected.`)
 
 	fs.BoolVar(&o.DetectEndpoints, "global.detect-endpoints", util.GetEnvDefault(GlobalDetectEndpointsEnvVar, "false") == "true",
 		"Detect potential endpoints from the local interfaces.")
@@ -137,21 +143,27 @@ this node's API to be reachable outside the network.`)
 // Overlay overlays the global options onto the given option sets.
 func (o *Options) Overlay(opts ...any) error {
 	var primaryEndpoint netip.Addr
+	var endpoints []netip.Addr
 	var err error
-	if o.Endpoint != "" {
-		primaryEndpoint, err = netip.ParseAddr(o.Endpoint)
+	if o.PrimaryEndpoint != "" {
+		primaryEndpoint, err = netip.ParseAddr(o.PrimaryEndpoint)
 		if err != nil {
 			return fmt.Errorf("failed to parse endpoint: %w", err)
 		}
 	}
 	if o.DetectEndpoints {
-		detected, err := o.detectEndpoints()
+		endpoints, err = o.detectEndpoints()
 		if err != nil {
 			return fmt.Errorf("failed to detect endpoints: %w", err)
 		}
-		if len(detected) > 0 {
+		if len(endpoints) > 0 {
 			if !primaryEndpoint.IsValid() {
-				primaryEndpoint = detected[0]
+				primaryEndpoint = endpoints[0]
+				if len(endpoints) > 1 {
+					endpoints = endpoints[1:]
+				} else {
+					endpoints = nil
+				}
 			}
 		}
 	}
@@ -166,7 +178,6 @@ func (o *Options) Overlay(opts ...any) error {
 			}
 			if primaryEndpoint.IsValid() {
 				var raftPort uint64
-				v.NodeEndpoint = primaryEndpoint.String()
 				for _, inOpts := range opts {
 					if vopt, ok := inOpts.(*streamlayer.Options); ok {
 						_, port, err := net.SplitHostPort(vopt.ListenAddress)
@@ -179,6 +190,12 @@ func (o *Options) Overlay(opts ...any) error {
 				}
 				if raftPort == 0 {
 					raftPort = 9443
+				}
+				if v.NodeEndpoint == "" {
+					v.NodeEndpoint = primaryEndpoint.String()
+				}
+				if v.NodeAdditionalEndpoints == "" && len(endpoints) > 0 {
+					v.NodeAdditionalEndpoints = strings.Join(toAddrList(endpoints), ",")
 				}
 				v.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
 			}
@@ -308,4 +325,12 @@ func (o *Options) detectFromInterfaces() ([]netip.Addr, error) {
 		}
 	}
 	return ips, nil
+}
+
+func toAddrList(eps []netip.Addr) []string {
+	var out []string
+	for _, ep := range eps {
+		out = append(out, ep.String())
+	}
+	return out
 }

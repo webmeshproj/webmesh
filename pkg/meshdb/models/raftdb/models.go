@@ -21,15 +21,17 @@ type MeshState struct {
 }
 
 type Node struct {
-	ID             string         `json:"id"`
-	PublicKey      sql.NullString `json:"public_key"`
-	RaftPort       int64          `json:"raft_port"`
-	GrpcPort       int64          `json:"grpc_port"`
-	WireguardPort  int64          `json:"wireguard_port"`
-	PublicEndpoint sql.NullString `json:"public_endpoint"`
-	NetworkIpv6    sql.NullString `json:"network_ipv6"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID                  string         `json:"id"`
+	PublicKey           sql.NullString `json:"public_key"`
+	RaftPort            int64          `json:"raft_port"`
+	GrpcPort            int64          `json:"grpc_port"`
+	WireguardPort       int64          `json:"wireguard_port"`
+	PrimaryEndpoint     sql.NullString `json:"primary_endpoint"`
+	AdditionalEndpoints sql.NullString `json:"additional_endpoints"`
+	ZoneAwarenessID     sql.NullString `json:"zone_awareness_id"`
+	NetworkIpv6         sql.NullString `json:"network_ipv6"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
 }
 
 type NodeEdge struct {

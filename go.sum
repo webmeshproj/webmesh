@@ -377,6 +377,8 @@ github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqri
 github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f h1:nBX3nTcmxEtHSERBJaIo1Qa26VwRaopnZmfDQUXsF4I=
 github.com/webmeshproj/api v0.0.0-20230528193431-bd0523575e48 h1:+DozjqKDW2lmQKT0uAzE4rZDM7OcPlb2taXo/yFVPV0=
 github.com/webmeshproj/api v0.0.0-20230528193431-bd0523575e48/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.0.0-20230529111942-442d139d73b0 h1:G2crDmeJOsq3W2KhbFYnflJQxplRuUZ45XASTrEMymA=
+github.com/webmeshproj/api v0.0.0-20230529111942-442d139d73b0/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

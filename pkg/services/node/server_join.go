@@ -76,11 +76,19 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
 	var primaryEndpoint netip.Addr
-	if req.GetPublicEndpoint() != "" {
-		primaryEndpoint, err = netip.ParseAddr(req.GetPublicEndpoint())
+	if req.GetPrimaryEndpoint() != "" {
+		primaryEndpoint, err = netip.ParseAddr(req.GetPrimaryEndpoint())
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid primary endpoint: %v", err)
 		}
+	}
+	var additionalEndpoints []netip.Addr
+	for _, ep := range req.GetAdditionalEndpoints() {
+		additionalEndpoint, err := netip.ParseAddr(ep)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid additional endpoint: %v", err)
+		}
+		additionalEndpoints = append(additionalEndpoints, additionalEndpoint)
 	}
 
 	log := s.log.With("id", req.GetId())
@@ -95,13 +103,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Info("peer already exists, updating")
 		// Peer already exists, update it
 		peer, err = s.peers.Put(ctx, &peers.PutOptions{
-			ID:             req.GetId(),
-			PublicKey:      publicKey,
-			PublicEndpoint: primaryEndpoint,
-			NetworkIPv6:    peer.NetworkIPv6,
-			GRPCPort:       int(req.GetGrpcPort()),
-			RaftPort:       int(req.GetRaftPort()),
-			WireguardPort:  int(req.GetWireguardPort()),
+			ID:                  req.GetId(),
+			PublicKey:           publicKey,
+			PrimaryEndpoint:     primaryEndpoint,
+			AdditionalEndpoints: additionalEndpoints,
+			ZoneAwarenessID:     req.GetZoneAwarenessId(),
+			NetworkIPv6:         peer.NetworkIPv6,
+			GRPCPort:            int(req.GetGrpcPort()),
+			RaftPort:            int(req.GetRaftPort()),
+			WireguardPort:       int(req.GetWireguardPort()),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
@@ -114,13 +124,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
 		}
 		peer, err = s.peers.Put(ctx, &peers.PutOptions{
-			ID:             req.GetId(),
-			PublicKey:      publicKey,
-			PublicEndpoint: primaryEndpoint,
-			NetworkIPv6:    networkIPv6,
-			GRPCPort:       int(req.GetGrpcPort()),
-			RaftPort:       int(req.GetRaftPort()),
-			WireguardPort:  int(req.GetWireguardPort()),
+			ID:                  req.GetId(),
+			PublicKey:           publicKey,
+			PrimaryEndpoint:     primaryEndpoint,
+			AdditionalEndpoints: additionalEndpoints,
+			ZoneAwarenessID:     req.GetZoneAwarenessId(),
+			NetworkIPv6:         networkIPv6,
+			GRPCPort:            int(req.GetGrpcPort()),
+			RaftPort:            int(req.GetRaftPort()),
+			WireguardPort:       int(req.GetWireguardPort()),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
@@ -229,13 +241,24 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		slog.Debug("found descendant", slog.Any("descendant", desc))
 		// Each direct child is a wireguard peer
 		peer := &v1.WireguardPeer{
-			Id:        desc.ID,
-			PublicKey: desc.PublicKey.String(),
-			PublicEndpoint: func() string {
-				if desc.PublicEndpoint.IsValid() {
-					return netip.AddrPortFrom(desc.PublicEndpoint, uint16(desc.WireguardPort)).String()
+			Id:              desc.ID,
+			PublicKey:       desc.PublicKey.String(),
+			ZoneAwarenessId: desc.ZoneAwarenessID,
+			PrimaryEndpoint: func() string {
+				if desc.PrimaryEndpoint.IsValid() {
+					return netip.AddrPortFrom(desc.PrimaryEndpoint, uint16(desc.WireguardPort)).String()
 				}
 				return ""
+			}(),
+			AdditionalEndpoints: func() []string {
+				if len(desc.AdditionalEndpoints) > 0 {
+					endpoints := make([]string, 0, len(desc.AdditionalEndpoints))
+					for _, endpoint := range desc.AdditionalEndpoints {
+						endpoints = append(endpoints, netip.AddrPortFrom(endpoint, uint16(desc.WireguardPort)).String())
+					}
+					return endpoints
+				}
+				return nil
 			}(),
 			AddressIpv4: func() string {
 				if desc.PrivateIPv4.IsValid() {

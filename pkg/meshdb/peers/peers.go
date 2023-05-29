@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
+	"strings"
 	"time"
 
 	"github.com/dominikbraun/graph"
@@ -72,8 +73,12 @@ type Node struct {
 	ID string
 	// PublicKey is the node's public key.
 	PublicKey wgtypes.Key
-	// PublicEndpoint is the primary public endpoint of the node.
-	PublicEndpoint netip.Addr
+	// PrimaryEndpoint is the primary public endpoint of the node.
+	PrimaryEndpoint netip.Addr
+	// AdditionalEndpoints are the additional public endpoints of the node.
+	AdditionalEndpoints []netip.Addr
+	// ZoneAwarenessID is the node's zone awareness ID.
+	ZoneAwarenessID string
 	// PrivateIPv4 is the node's private IPv4 address.
 	PrivateIPv4 netip.Prefix
 	// NetworkIPv6 is the node's IPv6 network.
@@ -108,8 +113,12 @@ type PutOptions struct {
 	ID string
 	// PublicKey is the node's public key.
 	PublicKey wgtypes.Key
-	// PublicEndpoint is the primary public endpoint of the node.
-	PublicEndpoint netip.Addr
+	// PrimaryEndpoint is the primary public endpoint of the node.
+	PrimaryEndpoint netip.Addr
+	// AdditionalEndpoints are the additional public endpoints of the node.
+	AdditionalEndpoints []netip.Addr
+	// ZoneAwarenessID is the node's zone awareness ID.
+	ZoneAwarenessID string
 	// NetworkIPv6 is true if the node's network is IPv6.
 	NetworkIPv6 netip.Prefix
 	// GRPCPort is the node's GRPC port.
@@ -137,15 +146,17 @@ func (p *peers) Graph() Graph { return p.graph }
 
 func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
 	err := p.graph.AddVertex(Node{
-		ID:             opts.ID,
-		PublicKey:      opts.PublicKey,
-		PublicEndpoint: opts.PublicEndpoint,
-		NetworkIPv6:    opts.NetworkIPv6,
-		GRPCPort:       opts.GRPCPort,
-		RaftPort:       opts.RaftPort,
-		WireguardPort:  opts.WireguardPort,
-		CreatedAt:      time.Now().UTC(),
-		UpdatedAt:      time.Now().UTC(),
+		ID:                  opts.ID,
+		PublicKey:           opts.PublicKey,
+		PrimaryEndpoint:     opts.PrimaryEndpoint,
+		AdditionalEndpoints: opts.AdditionalEndpoints,
+		ZoneAwarenessID:     opts.ZoneAwarenessID,
+		NetworkIPv6:         opts.NetworkIPv6,
+		GRPCPort:            opts.GRPCPort,
+		RaftPort:            opts.RaftPort,
+		WireguardPort:       opts.WireguardPort,
+		CreatedAt:           time.Now().UTC(),
+		UpdatedAt:           time.Now().UTC(),
 	})
 	if err != nil {
 		return Node{}, fmt.Errorf("add vertex: %w", err)
@@ -214,10 +225,21 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 			}
 		}
 		var primaryEndpoint netip.Addr
-		if node.PublicEndpoint.Valid {
-			primaryEndpoint, err = netip.ParseAddr(node.PublicEndpoint.String)
+		if node.PrimaryEndpoint.Valid {
+			primaryEndpoint, err = netip.ParseAddr(node.PrimaryEndpoint.String)
 			if err != nil {
 				return nil, fmt.Errorf("parse node endpoint: %w", err)
+			}
+		}
+		var additionalEndpoints []netip.Addr
+		if node.AdditionalEndpoints.Valid {
+			eps := strings.Split(node.AdditionalEndpoints.String, ",")
+			additionalEndpoints = make([]netip.Addr, len(eps))
+			for i, ep := range eps {
+				additionalEndpoints[i], err = netip.ParseAddr(ep)
+				if err != nil {
+					return nil, fmt.Errorf("parse node endpoint: %w", err)
+				}
 			}
 		}
 		var networkv4, networkv6 netip.Prefix
@@ -234,16 +256,18 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 			}
 		}
 		out[i] = Node{
-			ID:             node.ID,
-			PublicKey:      key,
-			PublicEndpoint: primaryEndpoint,
-			PrivateIPv4:    networkv4,
-			NetworkIPv6:    networkv6,
-			GRPCPort:       int(node.GrpcPort),
-			RaftPort:       int(node.RaftPort),
-			WireguardPort:  int(node.WireguardPort),
-			UpdatedAt:      node.UpdatedAt,
-			CreatedAt:      node.CreatedAt,
+			ID:                  node.ID,
+			PublicKey:           key,
+			PrimaryEndpoint:     primaryEndpoint,
+			AdditionalEndpoints: additionalEndpoints,
+			ZoneAwarenessID:     node.ZoneAwarenessID.String,
+			PrivateIPv4:         networkv4,
+			NetworkIPv6:         networkv6,
+			GRPCPort:            int(node.GrpcPort),
+			RaftPort:            int(node.RaftPort),
+			WireguardPort:       int(node.WireguardPort),
+			UpdatedAt:           node.UpdatedAt,
+			CreatedAt:           node.CreatedAt,
 		}
 	}
 	return out, nil

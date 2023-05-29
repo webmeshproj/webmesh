@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"strings"
 
 	"github.com/dominikbraun/graph"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -75,9 +76,25 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 			Valid:  true,
 		}
 	}
-	if node.PublicEndpoint.IsValid() {
-		params.PublicEndpoint = sql.NullString{
-			String: node.PublicEndpoint.String(),
+	if node.PrimaryEndpoint.IsValid() {
+		params.PrimaryEndpoint = sql.NullString{
+			String: node.PrimaryEndpoint.String(),
+			Valid:  true,
+		}
+	}
+	if len(node.AdditionalEndpoints) > 0 {
+		eps := make([]string, len(node.AdditionalEndpoints))
+		for i, ep := range node.AdditionalEndpoints {
+			eps[i] = ep.String()
+		}
+		params.AdditionalEndpoints = sql.NullString{
+			String: strings.Join(eps, ","),
+			Valid:  true,
+		}
+	}
+	if node.ZoneAwarenessID != "" {
+		params.ZoneAwarenessID = sql.NullString{
+			String: node.ZoneAwarenessID,
 			Valid:  true,
 		}
 	}
@@ -103,6 +120,7 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 		return
 	}
 	node.ID = dbnode.ID
+	node.ZoneAwarenessID = dbnode.ZoneAwarenessID.String
 	node.GRPCPort = int(dbnode.GrpcPort)
 	node.RaftPort = int(dbnode.RaftPort)
 	node.WireguardPort = int(dbnode.WireguardPort)
@@ -115,11 +133,22 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 			return
 		}
 	}
-	if dbnode.PublicEndpoint.Valid {
-		node.PublicEndpoint, err = netip.ParseAddr(dbnode.PublicEndpoint.String)
+	if dbnode.PrimaryEndpoint.Valid {
+		node.PrimaryEndpoint, err = netip.ParseAddr(dbnode.PrimaryEndpoint.String)
 		if err != nil {
 			err = fmt.Errorf("parse node endpoint: %w", err)
 			return
+		}
+	}
+	if dbnode.AdditionalEndpoints.Valid {
+		eps := strings.Split(dbnode.AdditionalEndpoints.String, ",")
+		node.AdditionalEndpoints = make([]netip.Addr, len(eps))
+		for i, ep := range eps {
+			node.AdditionalEndpoints[i], err = netip.ParseAddr(ep)
+			if err != nil {
+				err = fmt.Errorf("parse node endpoint: %w", err)
+				return
+			}
 		}
 	}
 	if dbnode.PrivateAddressV4 != "" {

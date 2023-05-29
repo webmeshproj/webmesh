@@ -32,6 +32,7 @@ import (
 const (
 	NodeIDEnvVar                    = "STORE_NODE_ID"
 	NodeEndpointEnvVar              = "STORE_NODE_ENDPOINT"
+	NodeAdditionalEndpointsEnvVar   = "STORE_NODE_ADDITIONAL_ENDPOINTS"
 	DataDirEnvVar                   = "STORE_DATA_DIR"
 	InMemoryEnvVar                  = "STORE_IN_MEMORY"
 	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
@@ -67,6 +68,7 @@ const (
 	NoIPv4EnvVar                    = "STORE_NO_IPV4"
 	NoIPv6EnvVar                    = "STORE_NO_IPV6"
 	LeaveOnShutdownEnvVar           = "STORE_LEAVE_ON_SHUTDOWN"
+	ZoneAwarenessIDEnvVar           = "STORE_ZONE_AWARENESS_ID"
 
 	// LogFile is the raft log file.
 	LogFile = "raft.log"
@@ -106,6 +108,8 @@ type Options struct {
 	NodeID string `json:"node-id" yaml:"node-id" toml:"node-id"`
 	// NodeEndpoint is the endpoint to broadcast when joining a cluster.
 	NodeEndpoint string `json:"node-endpoint" yaml:"node-endpoint" toml:"node-endpoint"`
+	// NodeAdditionalEndpoints are additional endpoints to broadcast when joining a cluster.
+	NodeAdditionalEndpoints string `json:"node-additional-endpoints" yaml:"node-additional-endpoints" toml:"node-additional-endpoints"`
 	// DataDir is the directory to store data in.
 	DataDir string `json:"data-dir" yaml:"data-dir" toml:"data-dir"`
 	// InMemory is if the store should be in memory. This should only be used for
@@ -191,6 +195,8 @@ type Options struct {
 	NoIPv6 bool `json:"no-ipv6" yaml:"no-ipv6" toml:"no-ipv6"`
 	// LeaveOnShutdown is the leave on shutdown flag.
 	LeaveOnShutdown bool `json:"leave-on-shutdown" yaml:"leave-on-shutdown" toml:"leave-on-shutdown"`
+	// ZoneAwarenessID is the zone awareness ID.
+	ZoneAwarenessID string `json:"zone-awareness-id" yaml:"zone-awareness-id" toml:"zone-awareness-id"`
 }
 
 // NewOptions returns new options with sensible defaults.
@@ -239,10 +245,11 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 but will be replaced with the WireGuard address after bootstrapping.`)
 
 	fl.StringVar(&o.NodeEndpoint, "store.node-endpoint", util.GetEnvDefault(NodeEndpointEnvVar, ""),
-		`NodeEndpoint is the endpoint to broadcast when joining a cluster.
-This is only necessary if the node intends on exposing it's API. When
-bootstrapping a cluster with a node that has an empty NodeEndpoint, the
-node will use the AdvertiseAddress as the NodeEndpoint.`)
+		`The endpoint to broadcast when joining a cluster.
+This is only necessary if the node intends on being publicly accessible.`)
+
+	fl.StringVar(&o.NodeAdditionalEndpoints, "store.node-additional-endpoints", util.GetEnvDefault(NodeAdditionalEndpointsEnvVar, ""),
+		`Comma separated list of additional endpoints to broadcast when joining a cluster.`)
 
 	fl.StringVar(&o.BootstrapServers, "store.bootstrap-servers", util.GetEnvDefault(BootstrapServersEnvVar, ""),
 		`Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
@@ -320,6 +327,8 @@ All nodes must use the same log format for the lifetime of the cluster.`)
 		"Disable IPv6 for the raft transport.")
 	fl.BoolVar(&o.LeaveOnShutdown, "store.leave-on-shutdown", util.GetEnvDefault(LeaveOnShutdownEnvVar, "false") == "true",
 		"Leave the cluster when the server shuts down.")
+	fl.StringVar(&o.ZoneAwarenessID, "store.zone-awareness-id", util.GetEnvDefault(ZoneAwarenessIDEnvVar, ""),
+		"Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.")
 }
 
 // Validate validates the options.

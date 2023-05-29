@@ -20,11 +20,13 @@ INSERT INTO nodes (
     raft_port,
     grpc_port,
     wireguard_port,
-    public_endpoint,
+    primary_endpoint,
+    additional_endpoints,
+    zone_awareness_id,
     network_ipv6,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: DumpLeases :many
 SELECT * FROM leases;

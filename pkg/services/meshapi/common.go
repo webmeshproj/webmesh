@@ -26,12 +26,22 @@ import (
 
 func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Server) *v1.MeshNode {
 	return &v1.MeshNode{
-		Id: node.ID,
-		PublicEndpoint: func() string {
-			if node.PublicEndpoint.IsValid() {
-				return node.PublicEndpoint.String()
+		Id:              node.ID,
+		ZoneAwarenessId: node.ZoneAwarenessID,
+		PrimaryEndpoint: func() string {
+			if node.PrimaryEndpoint.IsValid() {
+				return node.PrimaryEndpoint.String()
 			}
 			return ""
+		}(),
+		AdditionalEndpoints: func() []string {
+			var endpoints []string
+			for _, endpoint := range node.AdditionalEndpoints {
+				if endpoint.IsValid() {
+					endpoints = append(endpoints, endpoint.String())
+				}
+			}
+			return endpoints
 		}(),
 		PublicKey: func() string {
 			if len(node.PublicKey) > 0 {

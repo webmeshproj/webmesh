@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"strings"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -116,15 +117,22 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		defer conn.Close()
 		client := v1.NewNodeClient(conn)
 		req := &v1.JoinRequest{
-			Id:             string(s.nodeID),
-			PublicKey:      key.PublicKey().String(),
-			RaftPort:       int32(s.sl.ListenPort()),
-			GrpcPort:       int32(s.opts.GRPCAdvertisePort),
-			WireguardPort:  int32(s.wgopts.ListenPort),
-			PublicEndpoint: s.opts.NodeEndpoint,
-			AssignIpv4:     !s.opts.NoIPv4,
-			PreferRaftIpv6: s.opts.RaftPreferIPv6,
-			AsVoter:        s.opts.JoinAsVoter,
+			Id:              string(s.nodeID),
+			PublicKey:       key.PublicKey().String(),
+			RaftPort:        int32(s.sl.ListenPort()),
+			GrpcPort:        int32(s.opts.GRPCAdvertisePort),
+			WireguardPort:   int32(s.wgopts.ListenPort),
+			PrimaryEndpoint: s.opts.NodeEndpoint,
+			AdditionalEndpoints: func() []string {
+				if s.opts.NodeAdditionalEndpoints != "" {
+					return strings.Split(s.opts.NodeAdditionalEndpoints, ",")
+				}
+				return nil
+			}(),
+			ZoneAwarenessId: s.opts.ZoneAwarenessID,
+			AssignIpv4:      !s.opts.NoIPv4,
+			PreferRaftIpv6:  s.opts.RaftPreferIPv6,
+			AsVoter:         s.opts.JoinAsVoter,
 		}
 		log.Info("sending join request to node", slog.Any("req", req))
 		resp, err = client.Join(ctx, req)
@@ -175,7 +183,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			if err != nil {
 				return fmt.Errorf("parse peer key: %w", err)
 			}
-			endpoint, err := netip.ParseAddrPort(peer.GetPublicEndpoint())
+			endpoint, err := netip.ParseAddrPort(peer.GetPrimaryEndpoint())
 			if err != nil {
 				return fmt.Errorf("parse peer endpoint: %w", err)
 			}

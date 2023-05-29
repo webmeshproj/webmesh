@@ -167,6 +167,37 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 		slog.String("name", q.Name),
 		slog.String("question", q.String()),
 	)
+
+	if q.Qtype == dns.TypeNS {
+		// This is for us (and technically anyone else who wants to answer)
+		m.Answer = []dns.RR{&dns.NS{
+			Hdr: dns.RR_Header{Name: s.opts.Domain, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: 1},
+			Ns:  s.soa,
+		}}
+		err := w.WriteMsg(m)
+		if err != nil {
+			s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+			dns.HandleFailed(w, r)
+		}
+		if len(r.Question) > 1 {
+			q = r.Question[1]
+		} else {
+			return
+		}
+	}
+
+	if q.Qtype == dns.TypeAXFR {
+		s.log.Info("handling zone transfer")
+		// We don't allow these for now
+		m.SetRcode(r, dns.RcodeRefused)
+		err := w.WriteMsg(m)
+		if err != nil {
+			s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+			dns.HandleFailed(w, r)
+		}
+		return
+	}
+
 	// TODO: Do an actual recursion
 	nodeIDs := []string{strings.Split(q.Name, ".")[0]}
 	if nodeIDs[0] == "leader" {
@@ -220,6 +251,15 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 	for _, nodeID := range nodeIDs {
 		peer, err := s.peers.Get(ctx, nodeID)
 		if err != nil {
+			if err == peers.ErrNodeNotFound {
+				m.SetRcode(r, dns.RcodeNameError)
+				err = w.WriteMsg(m)
+				if err != nil {
+					s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+					dns.HandleFailed(w, r)
+				}
+				return
+			}
 			s.log.Error("failed to get peer", slog.String("error", err.Error()))
 			m.SetRcode(r, dns.RcodeNameError)
 			err = w.WriteMsg(m)
@@ -282,19 +322,6 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 				}
 				return
 			}
-		case dns.TypeAXFR, dns.TypeIXFR:
-			s.log.Debug("handling AXFR/IXFR question")
-			c := make(chan *dns.Envelope)
-			tr := new(dns.Transfer)
-			defer close(c)
-			if err := tr.Out(w, r, c); err != nil {
-				return
-			}
-			soa, _ := dns.NewRR(fmt.Sprintf("%s 0 IN SOA %s %s %d 21600 7200 604800 3600",
-				fqdn, s.soa, s.soa, time.Now().Unix()))
-			c <- &dns.Envelope{RR: []dns.RR{soa}}
-			w.Hijack()
-			return
 		}
 
 	}
@@ -324,9 +351,9 @@ func (m *Server) newPeerTXTRecord(name string, peer *peers.Node) *dns.TXT {
 			fmt.Sprintf("raft_port=%d", peer.RaftPort),
 			fmt.Sprintf("grpc_port=%d", peer.GRPCPort),
 			fmt.Sprintf("wireguard_port=%d", peer.WireguardPort),
-			fmt.Sprintf("public_endpoint=%s", func() string {
-				if peer.PublicEndpoint.IsValid() {
-					return peer.PublicEndpoint.String()
+			fmt.Sprintf("primary_endpoint=%s", func() string {
+				if peer.PrimaryEndpoint.IsValid() {
+					return peer.PrimaryEndpoint.String()
 				}
 				return "<none>"
 			}()),

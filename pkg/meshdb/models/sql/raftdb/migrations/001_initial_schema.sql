@@ -8,15 +8,17 @@ CREATE TABLE mesh_state (
 
 -- Tracks node lifecycle and configuration.
 CREATE TABLE nodes (
-    id                TEXT NOT NULL PRIMARY KEY,
-    public_key        TEXT,
-    raft_port         INTEGER NOT NULL DEFAULT 9444,
-    grpc_port         INTEGER NOT NULL DEFAULT 8443,
-    wireguard_port    INTEGER NOT NULL DEFAULT 51820,
-    public_endpoint   TEXT UNIQUE,
-    network_ipv6      TEXT UNIQUE,
-    created_at        TIMESTAMP NOT NULL,
-    updated_at        TIMESTAMP NOT NULL
+    id                    TEXT NOT NULL PRIMARY KEY,
+    public_key            TEXT,
+    raft_port             INTEGER NOT NULL DEFAULT 9444,
+    grpc_port             INTEGER NOT NULL DEFAULT 8443,
+    wireguard_port        INTEGER NOT NULL DEFAULT 51820,
+    primary_endpoint      TEXT UNIQUE,
+    additional_endpoints  TEXT,
+    zone_awareness_id     TEXT,
+    network_ipv6          TEXT UNIQUE,
+    created_at            TIMESTAMP NOT NULL,
+    updated_at            TIMESTAMP NOT NULL
 );
 
 -- Tracks IPv4 leases for nodes.
@@ -61,10 +63,10 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 CREATE VIEW node_public_rpc_addresses AS
 SELECT
     nodes.id as node_id,
-    nodes.public_endpoint
+    nodes.primary_endpoint
     || ':'
     || CAST(nodes.grpc_port AS TEXT) AS address
-FROM nodes WHERE nodes.public_endpoint IS NOT NULL;
+FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
 
 CREATE VIEW node_private_raft_addresses AS
 SELECT
@@ -82,10 +84,10 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 CREATE VIEW node_public_raft_addresses AS
 SELECT
     nodes.id as node_id,
-    nodes.public_endpoint
+    nodes.primary_endpoint
     || ':'
     || CAST(nodes.raft_port AS TEXT) AS address
-FROM nodes WHERE nodes.public_endpoint IS NOT NULL;
+FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
 
 -- +goose Down
 

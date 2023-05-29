@@ -49,9 +49,10 @@ services:
     hostname: site-1-leader
     entrypoint:
       - /node
+      - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
-      - --global.endpoint=10.250.0.1
+      - --global.primary-endpoint=10.250.0.1
       - --store.bootstrap
       - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
@@ -143,7 +144,7 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --global.endpoint=10.250.0.2
+      - --global.primary-endpoint=10.250.0.2
       - --store.bootstrap
       - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24
@@ -231,7 +232,7 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --global.endpoint=10.250.0.3
+      - --global.primary-endpoint=10.250.0.3
       - --store.bootstrap
       - --store.bootstrap-servers=site-1-leader=10.250.0.1:9443,site-2-leader=10.250.0.2:9443,site-3-leader=10.250.0.3:9443
       - --store.bootstrap-ipv4-network=10.10.10.0/24

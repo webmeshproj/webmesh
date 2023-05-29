@@ -118,7 +118,7 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 		peer := wireguard.Peer{
 			ID:         desc.ID,
 			PublicKey:  desc.PublicKey,
-			Endpoint:   netip.AddrPortFrom(desc.PublicEndpoint, uint16(desc.WireguardPort)),
+			Endpoint:   netip.AddrPortFrom(desc.PrimaryEndpoint, uint16(desc.WireguardPort)),
 			AllowedIPs: make([]netip.Prefix, 0),
 		}
 		if desc.PrivateIPv4.IsValid() {

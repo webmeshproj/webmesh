@@ -27,7 +27,7 @@ require (
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	github.com/webmeshproj/api v0.0.0-20230528193431-bd0523575e48
+	github.com/webmeshproj/api v0.0.0-20230529111942-442d139d73b0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.8.0

@@ -163,15 +163,17 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 		s.log.Debug("restoring node", slog.Any("node", node))
 		// nolint:gosimple
 		err = q.RestoreNode(ctx, raftdb.RestoreNodeParams{
-			ID:             node.ID,
-			PublicKey:      node.PublicKey,
-			RaftPort:       node.RaftPort,
-			GrpcPort:       node.GrpcPort,
-			WireguardPort:  node.WireguardPort,
-			PublicEndpoint: node.PublicEndpoint,
-			NetworkIpv6:    node.NetworkIpv6,
-			CreatedAt:      node.CreatedAt,
-			UpdatedAt:      node.UpdatedAt,
+			ID:                  node.ID,
+			PublicKey:           node.PublicKey,
+			RaftPort:            node.RaftPort,
+			GrpcPort:            node.GrpcPort,
+			WireguardPort:       node.WireguardPort,
+			PrimaryEndpoint:     node.PrimaryEndpoint,
+			AdditionalEndpoints: node.AdditionalEndpoints,
+			ZoneAwarenessID:     node.ZoneAwarenessID,
+			NetworkIpv6:         node.NetworkIpv6,
+			CreatedAt:           node.CreatedAt,
+			UpdatedAt:           node.UpdatedAt,
 		})
 		if err != nil {
 			return fmt.Errorf("restore node: %w", err)
