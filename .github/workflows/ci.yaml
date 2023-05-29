@@ -127,4 +127,4 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
-        run: cosign sign --recursive ${IMAGE_NAME}@${{ steps.build.outputs.digest }}
+        run: yes | cosign sign --recursive ${IMAGE_NAME}@${{ steps.build.outputs.digest }}
