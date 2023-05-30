@@ -30,7 +30,9 @@ import (
 
 // DecodeOptions will attempt to decode the given reader into the given object.
 // The formatHint is used to select the format of the document. If the formatHint
-// is empty, the format is guessed from the document.
+// is empty, the format is guessed from the document. The document is first
+// treated as a go-template with some custom functions. This allows us to use
+// environment variables and file contents in the config.
 func DecodeOptions(in io.ReadCloser, formatHint string, out any) error {
 	defer in.Close()
 	data, err := io.ReadAll(in)
@@ -45,12 +47,7 @@ func DecodeOptions(in io.ReadCloser, formatHint string, out any) error {
 			return os.Getenv(key)
 		},
 		"file": func(path string) string {
-			f, err := os.Open(path)
-			if err != nil {
-				return ""
-			}
-			defer f.Close()
-			data, err := io.ReadAll(f)
+			data, err := os.ReadFile(path)
 			if err != nil {
 				return ""
 			}
