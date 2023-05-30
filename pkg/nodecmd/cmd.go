@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"golang.org/x/exp/slog"
 
@@ -180,7 +179,7 @@ func Execute() error {
 	}
 
 	log.Info("waiting for raft store to become ready")
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), opts.Store.StartupTimeout)
 	<-st.ReadyNotify(ctx)
 	if ctx.Err() != nil {
 		defer cancel()

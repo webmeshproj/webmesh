@@ -38,8 +38,7 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-func (s *store) bootstrap() error {
-	ctx := context.Background()
+func (s *store) bootstrap(ctx context.Context) error {
 	version, err := models.GetDBVersion(s.weakData)
 	if err != nil {
 		return fmt.Errorf("get raft schema version: %w", err)
@@ -112,11 +111,23 @@ func (s *store) bootstrap() error {
 			if len(parts) != 2 {
 				return fmt.Errorf("invalid bootstrap server: %s", server)
 			}
-			addr, err := net.ResolveTCPAddr("tcp", parts[1])
-			if err != nil {
-				return fmt.Errorf("resolve advertise address: %w", err)
+			// There is a chance we are waiting for DNS to resolve.
+			// Retry until the context is cancelled.
+			for {
+				addr, err := net.ResolveTCPAddr("tcp", parts[1])
+				if err != nil {
+					err = fmt.Errorf("resolve advertise address: %w", err)
+					s.log.Error("failed to resolve bootstrap server", slog.String("error", err.Error()))
+					select {
+					case <-ctx.Done():
+						return fmt.Errorf("%w: %w", err, ctx.Err())
+					case <-time.After(time.Second):
+						continue
+					}
+				}
+				servers[raft.ServerID(parts[0])] = raft.ServerAddress(addr.String())
+				break
 			}
-			servers[raft.ServerID(parts[0])] = raft.ServerAddress(addr.String())
 		}
 		s.log.Info("bootstrapping from servers", slog.Any("servers", servers))
 		for id, addr := range servers {

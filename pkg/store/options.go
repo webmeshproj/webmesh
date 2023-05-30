@@ -64,6 +64,7 @@ const (
 	ObserverChanBufferEnvVar        = "STORE_OBSERVER_CHAN_BUFFER"
 	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
 	RaftLogFormatEnvVar             = "STORE_RAFT_LOG_FORMAT"
+	StartupTimeoutEnvVar            = "STORE_STARTUP_TIMEOUT"
 	ShutdownTimeoutEnvVar           = "STORE_SHUTDOWN_TIMEOUT"
 	KeyRotationIntervalEnvVar       = "STORE_KEY_ROTATION_INTERVAL"
 	NoIPv4EnvVar                    = "STORE_NO_IPV4"
@@ -182,6 +183,8 @@ type Options struct {
 	GRPCAdvertisePort int `json:"grpc-advertise-port,omitempty" yaml:"grpc-advertise-port,omitempty" toml:"grpc-advertise-port,omitempty"`
 	// RaftLogFormat is the log format for the raft backend.
 	RaftLogFormat string `json:"raft-log-format,omitempty" yaml:"raft-log-format,omitempty" toml:"raft-log-format,omitempty"`
+	// StartupTimeout is the timeout for starting up.
+	StartupTimeout time.Duration `json:"startup-timeout,omitempty" yaml:"startup-timeout,omitempty" toml:"startup-timeout,omitempty"`
 	// ShutdownTimeout is the timeout for shutting down.
 	ShutdownTimeout time.Duration `json:"shutdown-timeout,omitempty" yaml:"shutdown-timeout,omitempty" toml:"shutdown-timeout,omitempty"`
 	// KeyRotationInterval is the interval to rotate wireguard keys.
@@ -215,6 +218,7 @@ func NewOptions() *Options {
 		JoinTimeout:          time.Minute,
 		ObserverChanBuffer:   100,
 		BootstrapIPv4Network: "172.16.0.0/12",
+		StartupTimeout:       time.Minute * 2,
 		ShutdownTimeout:      time.Minute,
 		KeyRotationInterval:  time.Hour * 24 * 7,
 	}
@@ -311,6 +315,8 @@ Ports should be in the form of <node-id>=<port>.`)
 	fl.StringVar(&o.RaftLogFormat, "store.raft-log-format", util.GetEnvDefault(RaftLogFormatEnvVar, string(RaftLogFormatProtobufSnappy)),
 		`Raft log format. Valid options are 'json', 'protobuf', and 'protobuf+snappy'.
 All nodes must use the same log format for the lifetime of the cluster.`)
+	fl.DurationVar(&o.StartupTimeout, "store.startup-timeout", util.GetEnvDurationDefault(StartupTimeoutEnvVar, time.Minute*2),
+		"Timeout for startup.")
 	fl.DurationVar(&o.ShutdownTimeout, "store.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
 		"Timeout for graceful shutdown.")
 	fl.DurationVar(&o.KeyRotationInterval, "store.key-rotation-interval", util.GetEnvDurationDefault(KeyRotationIntervalEnvVar, time.Hour*24*7),

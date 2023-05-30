@@ -35,6 +35,8 @@ func (s *store) Open() error {
 	if s.open.Load() {
 		return ErrOpen
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.opts.StartupTimeout)
+	defer cancel()
 	log := s.log
 	handleErr := func(err error) error {
 		if s.raftTransport != nil {
@@ -149,7 +151,7 @@ func (s *store) Open() error {
 	if s.opts.Bootstrap {
 		// Database gets migrated during bootstrap.
 		log.Info("bootstrapping cluster")
-		if err = s.bootstrap(); err != nil {
+		if err = s.bootstrap(ctx); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if s.opts.Join != "" {
@@ -161,7 +163,7 @@ func (s *store) Open() error {
 		if err = models.MigrateLocalDB(s.localData); err != nil {
 			return fmt.Errorf("local db migrate: %w", err)
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), s.opts.JoinTimeout)
+		ctx, cancel := context.WithTimeout(ctx, s.opts.JoinTimeout)
 		defer cancel()
 		if err = s.join(ctx, s.opts.Join); err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
