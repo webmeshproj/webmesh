@@ -374,6 +374,7 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 		ClientAuth:   clientAuth,
 	}
 	if o.VerifyChainOnly {
+		config.InsecureSkipVerify = true
 		config.VerifyPeerCertificate = util.VerifyChainOnly
 	}
 	return config, nil

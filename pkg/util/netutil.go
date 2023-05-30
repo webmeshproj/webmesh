@@ -33,7 +33,7 @@ import (
 )
 
 // VerifyChainOnly is a function that can be used in a TLS configuration
-// to verify that the certificate chain is valid, but not the hostname.
+// to only verify that the certificate chain is valid.
 func VerifyChainOnly(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	roots := x509.NewCertPool()
 	var cert *x509.Certificate
