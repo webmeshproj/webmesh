@@ -254,7 +254,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			Endpoint:   endpoint,
 			AllowedIPs: allowedIPs,
 		}
-		log.Info("adding wireguard peer", slog.Any("peer", wgpeer))
+		log.Info("adding wireguard peer", slog.Any("peer", &wgpeer))
 		err = s.wg.PutPeer(ctx, &wgpeer)
 		if err != nil {
 			return err
