@@ -20,6 +20,7 @@ package store
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"fmt"
 	"io"
@@ -137,9 +138,21 @@ func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) S
 		// First check if we are using mTLS.
 		if !sl.Insecure() && sl.TLSConfig().ClientAuth == tls.RequireAndVerifyClientCert {
 			// If so, use the certificate's CN as the node ID.
-			nodeID = sl.TLSConfig().Certificates[0].Leaf.Subject.CommonName
-			log.Info("using CN as node ID",
-				slog.String("node-id", string(nodeID)))
+			if len(sl.TLSConfig().Certificates) == 0 {
+				log.Warn("no client certificate provided, generating random UUID for node ID")
+				nodeID = uuid.NewString()
+			} else {
+				clientCert := sl.TLSConfig().Certificates[0]
+				leaf, err := x509.ParseCertificate(clientCert.Certificate[0])
+				if err != nil {
+					log.Warn("unable to parse client certificate, generating random UUID for node ID",
+						slog.String("error", err.Error()))
+					nodeID = uuid.NewString()
+				} else {
+					nodeID = leaf.Subject.CommonName
+					log.Info("using CN as node ID", slog.String("node-id", nodeID))
+				}
+			}
 		} else {
 			// Try to retrieve the system hostname
 			hostname, err := os.Hostname()
