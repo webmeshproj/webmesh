@@ -36,15 +36,21 @@ import (
 // to only verify that the certificate chain is valid.
 func VerifyChainOnly(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	roots := x509.NewCertPool()
+	if systemPool, err := x509.SystemCertPool(); err == nil {
+		roots = systemPool
+	}
 	var cert *x509.Certificate
 	for _, rawCert := range rawCerts {
-		cert, _ := x509.ParseCertificate(rawCert)
+		var err error
+		cert, err = x509.ParseCertificate(rawCert)
+		if err != nil {
+			return err
+		}
 		roots.AddCert(cert)
 	}
-	opts := x509.VerifyOptions{
+	_, err := cert.Verify(x509.VerifyOptions{
 		Roots: roots,
-	}
-	_, err := cert.Verify(opts)
+	})
 	return err
 }
 
