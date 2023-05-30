@@ -40,7 +40,21 @@ type StoreOptions struct {
 	StreamLayer    *streamlayer.Options `yaml:"stream-layer,omitempty" json:"stream-layer,omitempty" toml:"stream-layer,omitempty"`
 }
 
-// BindFlags binds the flags.
+// NewOptions creates new options.
+func NewOptions() *Options {
+	return &Options{
+		Global: global.NewOptions(),
+		Store: &StoreOptions{
+			Options:     store.NewOptions(),
+			StreamLayer: streamlayer.NewOptions(),
+		},
+		Services:  services.NewOptions(),
+		Wireguard: wireguard.NewOptions(),
+	}
+}
+
+// BindFlags binds the flags. The options are returned
+// for convenience.
 func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	o.Global.BindFlags(fs)
 	o.Store.BindFlags(fs)

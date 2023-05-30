@@ -30,28 +30,18 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/global"
 	"github.com/webmeshproj/node/pkg/services"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
 	"github.com/webmeshproj/node/pkg/util"
 	"github.com/webmeshproj/node/pkg/version"
-	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 var (
 	versionFlag = flag.Bool("version", false, "Print version information and exit")
 	configFlag  = flag.String("config", "", "Path to a configuration file")
 	printConfig = flag.Bool("print-config", false, "Print the configuration and exit")
-	opts        = (&Options{
-		Global: global.NewOptions(),
-		Store: &StoreOptions{
-			Options:     store.NewOptions(),
-			StreamLayer: streamlayer.NewOptions(),
-		},
-		Services:  services.NewOptions(),
-		Wireguard: wireguard.NewOptions(),
-	}).BindFlags(flag.CommandLine)
+	opts        = NewOptions().BindFlags(flag.CommandLine)
 
 	log = slog.Default()
 )
