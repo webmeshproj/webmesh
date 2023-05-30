@@ -165,7 +165,13 @@ func (s *store) bootstrap(ctx context.Context) error {
 		return fmt.Errorf("local db migrate: %w", err)
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), s.opts.StartupTimeout)
+		deadline, ok := ctx.Deadline()
+		var cancel context.CancelFunc
+		if !ok {
+			ctx, cancel = context.WithTimeout(context.Background(), s.opts.StartupTimeout)
+		} else {
+			ctx, cancel = context.WithDeadline(context.Background(), deadline)
+		}
 		defer cancel()
 		defer close(s.readyErr)
 		s.log.Info("waiting for raft to become ready")
