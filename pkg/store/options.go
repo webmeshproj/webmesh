@@ -218,7 +218,7 @@ func NewOptions() *Options {
 		JoinTimeout:          time.Minute,
 		ObserverChanBuffer:   100,
 		BootstrapIPv4Network: "172.16.0.0/12",
-		StartupTimeout:       time.Minute * 2,
+		StartupTimeout:       time.Minute * 3,
 		ShutdownTimeout:      time.Minute,
 		KeyRotationInterval:  time.Hour * 24 * 7,
 	}
@@ -315,7 +315,7 @@ Ports should be in the form of <node-id>=<port>.`)
 	fl.StringVar(&o.RaftLogFormat, "store.raft-log-format", util.GetEnvDefault(RaftLogFormatEnvVar, string(RaftLogFormatProtobufSnappy)),
 		`Raft log format. Valid options are 'json', 'protobuf', and 'protobuf+snappy'.
 All nodes must use the same log format for the lifetime of the cluster.`)
-	fl.DurationVar(&o.StartupTimeout, "store.startup-timeout", util.GetEnvDurationDefault(StartupTimeoutEnvVar, time.Minute*2),
+	fl.DurationVar(&o.StartupTimeout, "store.startup-timeout", util.GetEnvDurationDefault(StartupTimeoutEnvVar, time.Minute*3),
 		"Timeout for startup.")
 	fl.DurationVar(&o.ShutdownTimeout, "store.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
 		"Timeout for graceful shutdown.")

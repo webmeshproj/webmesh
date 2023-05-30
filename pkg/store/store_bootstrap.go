@@ -121,7 +121,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 					select {
 					case <-ctx.Done():
 						return fmt.Errorf("%w: %w", err, ctx.Err())
-					case <-time.After(time.Second):
+					case <-time.After(time.Second * 2):
 						continue
 					}
 				}
@@ -153,8 +153,6 @@ func (s *store) bootstrap(ctx context.Context) error {
 	}
 	go func() {
 		defer close(s.readyErr)
-		ctx, cancel := context.WithTimeout(ctx, time.Minute)
-		defer cancel()
 		s.log.Info("waiting for raft to become ready")
 		<-s.ReadyNotify(ctx)
 		if ctx.Err() != nil {
