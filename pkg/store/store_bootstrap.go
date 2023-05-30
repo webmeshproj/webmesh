@@ -90,9 +90,22 @@ func (s *store) bootstrap(ctx context.Context) error {
 		// but lets go ahead and support it anyway.
 		s.opts.AdvertiseAddress = s.opts.BootstrapServers
 	}
-	addr, err := net.ResolveTCPAddr("tcp", s.opts.AdvertiseAddress)
-	if err != nil {
-		return fmt.Errorf("resolve advertise address: %w", err)
+	// There is a chance we are waiting for DNS to resolve.
+	// Retry until the context is cancelled.
+	var addr net.Addr
+	for {
+		addr, err = net.ResolveTCPAddr("tcp", s.opts.AdvertiseAddress)
+		if err != nil {
+			err = fmt.Errorf("resolve advertise address: %w", err)
+			s.log.Error("failed to resolve advertise address", slog.String("error", err.Error()))
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("%w: %w", err, ctx.Err())
+			case <-time.After(time.Second * 2):
+				continue
+			}
+		}
+		break
 	}
 	cfg := raft.Configuration{
 		Servers: []raft.Server{
