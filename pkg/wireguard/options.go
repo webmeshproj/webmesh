@@ -43,18 +43,18 @@ const (
 // Options are options for configuring the wireguard interface.
 type Options struct {
 	// ListenPort is the port to listen on.
-	ListenPort int `yaml:"listen-port" json:"listen-port" toml:"listen-port"`
+	ListenPort int `yaml:"listen-port,omitempty" json:"listen-port,omitempty" toml:"listen-port,omitempty"`
 	// Name is the name of the interface.
-	Name string `yaml:"name" json:"name" toml:"name"`
+	Name string `yaml:"name,omitempty" json:"name,omitempty" toml:"name,omitempty"`
 	// ForceName forces the use of the given name by deleting
 	// any pre-existing interface with the same name.
-	ForceName bool `yaml:"force-name" json:"force-name" toml:"force-name"`
+	ForceName bool `yaml:"force-name,omitempty" json:"force-name,omitempty" toml:"force-name,omitempty"`
 	// ForceTUN forces the use of a TUN interface.
-	ForceTUN bool `yaml:"force-tun" json:"force-tun" toml:"force-tun"`
+	ForceTUN bool `yaml:"force-tun,omitempty" json:"force-tun,omitempty" toml:"force-tun,omitempty"`
 	// Modprobe attempts to probe the wireguard module.
-	Modprobe bool `yaml:"modprobe" json:"modprobe" toml:"modprobe"`
+	Modprobe bool `yaml:"modprobe,omitempty" json:"modprobe,omitempty" toml:"modprobe,omitempty"`
 	// Masquerade enables masquerading of traffic from the wireguard interface.
-	Masquerade bool `yaml:"masquerade" json:"masquerade" toml:"masquerade"`
+	Masquerade bool `yaml:"masquerade,omitempty" json:"masquerade,omitempty" toml:"masquerade,omitempty"`
 	// AllowedIPs is a map of peers to allowed IPs. The peers can either be
 	// public keys or regexes matching peer IDs.
 	//
@@ -68,14 +68,14 @@ type Options struct {
 	//
 	//   "peer1=10.0.0.0/24,10.0.1.0/24 peer2="10.0.2.0/24"
 	//
-	AllowedIPs string `yaml:"allowed-ips" json:"allowed-ips" toml:"allowed-ips"`
+	AllowedIPs string `yaml:"allowed-ips,omitempty" json:"allowed-ips,omitempty" toml:"allowed-ips,omitempty"`
 	// PersistentKeepAlive is the interval at which to send keepalive packets
 	// to peers. If unset, keepalive packets will automatically be sent to publicly
 	// accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
 	// packets are sent.
-	PersistentKeepAlive time.Duration `yaml:"persistent-keepalive" json:"persistent-keepalive" toml:"persistent-keepalive"`
+	PersistentKeepAlive time.Duration `yaml:"persistent-keepalive,omitempty" json:"persistent-keepalive,omitempty" toml:"persistent-keepalive,omitempty"`
 	// EndpointOverrides is a map of peer IDs to endpoint overrides.
-	EndpointOverrides string `yaml:"endpoint-overrides" json:"endpoint-overrides" toml:"endpoint-overrides"`
+	EndpointOverrides string `yaml:"endpoint-overrides,omitempty" json:"endpoint-overrides,omitempty" toml:"endpoint-overrides,omitempty"`
 
 	// Below fields are set by the store when joining a cluster.
 

@@ -88,74 +88,74 @@ const (
 // Options contains the configuration for the gRPC server.
 type Options struct {
 	// GRPCListenAddress is the address to listen on.
-	GRPCListenAddress string `json:"grpc-listen-address" yaml:"grpc-listen-address" toml:"grpc-listen-address"`
+	GRPCListenAddress string `json:"grpc-listen-address,omitempty" yaml:"grpc-listen-address,omitempty" toml:"grpc-listen-address,omitempty"`
 	// TLSCertFile is the path to the TLS certificate file.
-	TLSCertFile string `json:"tls-cert-file" yaml:"tls-cert-file" toml:"tls-cert-file"`
+	TLSCertFile string `json:"tls-cert-file,omitempty" yaml:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty"`
 	// TLSKeyFile is the path to the TLS key file.
-	TLSKeyFile string `json:"tls-key-file" yaml:"tls-key-file" toml:"tls-key-file"`
+	TLSKeyFile string `json:"tls-key-file,omitempty" yaml:"tls-key-file,omitempty" toml:"tls-key-file,omitempty"`
 	// TLSCAFile is the path to the TLS CA file. If not set, client
 	// authentication is disabled.
-	TLSCAFile string `json:"tls-ca-file" yaml:"tls-ca-file" toml:"tls-ca-file"`
+	TLSCAFile string `json:"tls-ca-file,omitempty" yaml:"tls-ca-file,omitempty" toml:"tls-ca-file,omitempty"`
 	// TLSClientCAFile is the path to the TLS client CA file.
 	// If empty, either TLSCAFile or the system CA pool is used.
-	TLSClientCAFile string `json:"tls-client-ca-file" yaml:"tls-client-ca-file" toml:"tls-client-ca-file"`
+	TLSClientCAFile string `json:"tls-client-ca-file,omitempty" yaml:"tls-client-ca-file,omitempty" toml:"tls-client-ca-file,omitempty"`
 	// MTLS is true if mutual TLS is enabled.
-	MTLS bool `json:"mtls" yaml:"mtls" toml:"mtls"`
+	MTLS bool `json:"mtls,omitempty" yaml:"mtls,omitempty" toml:"mtls,omitempty"`
 	// SkipVerifyHostname is true if the hostname should not be verified.
-	SkipVerifyHostname bool `json:"skip-verify-hostname" yaml:"skip-verify-hostname" toml:"skip-verify-hostname"`
+	SkipVerifyHostname bool `json:"skip-verify-hostname,omitempty" yaml:"skip-verify-hostname,omitempty" toml:"skip-verify-hostname,omitempty"`
 	// Insecure is true if the transport is insecure.
-	Insecure bool `json:"insecure" yaml:"insecure" toml:"insecure"`
+	Insecure bool `json:"insecure,omitempty" yaml:"insecure,omitempty" toml:"insecure,omitempty"`
 	// EnableMetrics is true if metrics should be enabled.
-	EnableMetrics bool `json:"enable-metrics" yaml:"enable-metrics" toml:"enable-metrics"`
+	EnableMetrics bool `json:"enable-metrics,omitempty" yaml:"enable-metrics,omitempty" toml:"enable-metrics,omitempty"`
 	// MetricsListenAddress is the address to listen on for metrics.
-	MetricsListenAddress string `json:"metrics-listen-address" yaml:"metrics-listen-address" toml:"metrics-listen-address"`
+	MetricsListenAddress string `json:"metrics-listen-address,omitempty" yaml:"metrics-listen-address,omitempty" toml:"metrics-listen-address,omitempty"`
 	// MetricsPath is the path to serve metrics on.
-	MetricsPath string `json:"metrics-path" yaml:"metrics-path" toml:"metrics-path"`
+	MetricsPath string `json:"metrics-path,omitempty" yaml:"metrics-path,omitempty" toml:"metrics-path,omitempty"`
 	// EnableLeaderProxy enables the leader proxy.
-	EnableLeaderProxy bool `json:"enable-leader-proxy" yaml:"enable-leader-proxy" toml:"enable-leader-proxy"`
+	EnableLeaderProxy bool `json:"enable-leader-proxy,omitempty" yaml:"enable-leader-proxy,omitempty" toml:"enable-leader-proxy,omitempty"`
 	// EnableMeshAPI enables the mesh API.
-	EnableMeshAPI bool `json:"enable-mesh-api" yaml:"enable-mesh-api" toml:"enable-mesh-api"`
+	EnableMeshAPI bool `json:"enable-mesh-api,omitempty" yaml:"enable-mesh-api,omitempty" toml:"enable-mesh-api,omitempty"`
 	// EnablePeerDiscoveryAPI enables the peer discovery API.
-	EnablePeerDiscoveryAPI bool `json:"enable-peer-discovery-api" yaml:"enable-peer-discovery-api" toml:"enable-peer-discovery-api"`
+	EnablePeerDiscoveryAPI bool `json:"enable-peer-discovery-api,omitempty" yaml:"enable-peer-discovery-api,omitempty" toml:"enable-peer-discovery-api,omitempty"`
 	// EnableWebRTCAPI enables the WebRTC API.
-	EnableWebRTCAPI bool `json:"enable-webrtc-api" yaml:"enable-webrtc-api" toml:"enable-webrtc-api"`
+	EnableWebRTCAPI bool `json:"enable-webrtc-api,omitempty" yaml:"enable-webrtc-api,omitempty" toml:"enable-webrtc-api,omitempty"`
 	// EnableMeshDNS enables the mesh DNS server.
-	EnableMeshDNS bool `json:"enable-mesh-dns" yaml:"enable-mesh-dns" toml:"enable-mesh-dns"`
+	EnableMeshDNS bool `json:"enable-mesh-dns,omitempty" yaml:"enable-mesh-dns,omitempty" toml:"enable-mesh-dns,omitempty"`
 	// STUNServers is a list of STUN servers to use. Required
 	// if the WebRTC API is enabled and the TURN server is disabled.
-	STUNServers string `json:"stun-servers" yaml:"stun-servers" toml:"stun-servers"`
+	STUNServers string `json:"stun-servers,omitempty" yaml:"stun-servers,omitempty" toml:"stun-servers,omitempty"`
 	// EnableTURNServer enables the TURN server.
-	EnableTURNServer bool `json:"enable-turn-server" yaml:"enable-turn-server" toml:"enable-turn-server"`
+	EnableTURNServer bool `json:"enable-turn-server,omitempty" yaml:"enable-turn-server,omitempty" toml:"enable-turn-server,omitempty"`
 	// TURNServerEndpoint is the endpoint to advertise for the TURN server.
 	// If empty, the public IP and server port is used.
-	TURNServerEndpoint string `json:"turn-server-endpoint" yaml:"turn-server-endpoint" toml:"turn-server-endpoint"`
+	TURNServerEndpoint string `json:"turn-server-endpoint,omitempty" yaml:"turn-server-endpoint,omitempty" toml:"turn-server-endpoint,omitempty"`
 	// TURNServerPublicIP is the address advertised for STUN requests.
-	TURNServerPublicIP string `json:"turn-server-public-ip" yaml:"turn-server-public-ip" toml:"turn-server-public-ip"`
+	TURNServerPublicIP string `json:"turn-server-public-ip,omitempty" yaml:"turn-server-public-ip,omitempty" toml:"turn-server-public-ip,omitempty"`
 	// TURNServerListenAddress is the address to listen on for TURN connections.
-	TURNServerListenAddress string `json:"turn-server-listen-address" yaml:"turn-server-listen-address" toml:"turn-server-listen-address"`
+	TURNServerListenAddress string `json:"turn-server-listen-address,omitempty" yaml:"turn-server-listen-address,omitempty" toml:"turn-server-listen-address,omitempty"`
 	// TURNServerPort is the port to listen on for TURN connections.
-	TURNServerPort int `json:"turn-server-port" yaml:"turn-server-port" toml:"turn-server-port"`
+	TURNServerPort int `json:"turn-server-port,omitempty" yaml:"turn-server-port,omitempty" toml:"turn-server-port,omitempty"`
 	// TURNServerRealm is the realm used for TURN server authentication.
-	TURNServerRealm string `json:"turn-server-realm" yaml:"turn-server-realm" toml:"turn-server-realm"`
+	TURNServerRealm string `json:"turn-server-realm,omitempty" yaml:"turn-server-realm,omitempty" toml:"turn-server-realm,omitempty"`
 	// STUNPortRange is the port range to use for STUN.
-	STUNPortRange string `json:"stun-port-range" yaml:"stun-port-range" toml:"stun-port-range"`
+	STUNPortRange string `json:"stun-port-range,omitempty" yaml:"stun-port-range,omitempty" toml:"stun-port-range,omitempty"`
 	// ExclusiveTURNServer will replace all STUNServers with the local TURN server.
-	ExclusiveTURNServer bool `json:"exclusive-turn-server" yaml:"exclusive-turn-server" toml:"exclusive-turn-server"`
+	ExclusiveTURNServer bool `json:"exclusive-turn-server,omitempty" yaml:"exclusive-turn-server,omitempty" toml:"exclusive-turn-server,omitempty"`
 	// MeshDNSListenUDP is the address to listen on for UDP DNS requests.
-	MeshDNSListenUDP string `json:"mesh-dns-listen-udp" yaml:"mesh-dns-listen-udp" toml:"mesh-dns-listen-udp"`
+	MeshDNSListenUDP string `json:"mesh-dns-listen-udp,omitempty" yaml:"mesh-dns-listen-udp,omitempty" toml:"mesh-dns-listen-udp,omitempty"`
 	// MeshDNSListenTCP is the address to listen on for TCP DNS requests.
-	MeshDNSListenTCP string `json:"mesh-dns-listen-tcp" yaml:"mesh-dns-listen-tcp" toml:"mesh-dns-listen-tcp"`
+	MeshDNSListenTCP string `json:"mesh-dns-listen-tcp,omitempty" yaml:"mesh-dns-listen-tcp,omitempty" toml:"mesh-dns-listen-tcp,omitempty"`
 	// MeshDNSTSIGKey is the TSIG key to use for DNS updates.
-	MeshDNSTSIGKey string `json:"mesh-dns-tsig-key" yaml:"mesh-dns-tsig-key" toml:"mesh-dns-tsig-key"`
+	MeshDNSTSIGKey string `json:"mesh-dns-tsig-key,omitempty" yaml:"mesh-dns-tsig-key,omitempty" toml:"mesh-dns-tsig-key,omitempty"`
 	// MeshDNSReusePort sets the number of listeners to start on each port.
 	// This is only supported on Linux.
-	MeshDNSReusePort int `json:"mesh-dns-reuse-port" yaml:"mesh-dns-reuse-port" toml:"mesh-dns-reuse-port"`
+	MeshDNSReusePort int `json:"mesh-dns-reuse-port,omitempty" yaml:"mesh-dns-reuse-port,omitempty" toml:"mesh-dns-reuse-port,omitempty"`
 	// MeshDNSCompression is true if DNS compression should be enabled.
-	MeshDNSCompression bool `json:"mesh-dns-compression" yaml:"mesh-dns-compression" toml:"mesh-dns-compression"`
+	MeshDNSCompression bool `json:"mesh-dns-compression,omitempty" yaml:"mesh-dns-compression,omitempty" toml:"mesh-dns-compression,omitempty"`
 	// MeshDNSDomain is the domain to use for the mesh DNS server.
-	MeshDNSDomain string `json:"mesh-dns-domain" yaml:"mesh-dns-domain" toml:"mesh-dns-domain"`
+	MeshDNSDomain string `json:"mesh-dns-domain,omitempty" yaml:"mesh-dns-domain,omitempty" toml:"mesh-dns-domain,omitempty"`
 	// MeshDNSRequestTimeout is the timeout for DNS requests.
-	MeshDNSRequestTimeout time.Duration `json:"mesh-dns-request-timeout" yaml:"mesh-dns-request-timeout" toml:"mesh-dns-request-timeout"`
+	MeshDNSRequestTimeout time.Duration `json:"mesh-dns-request-timeout,omitempty" yaml:"mesh-dns-request-timeout,omitempty" toml:"mesh-dns-request-timeout,omitempty"`
 }
 
 // NewOptions returns new Options with sensible defaults.

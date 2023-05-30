@@ -29,15 +29,15 @@ import (
 
 // Options are the node options.
 type Options struct {
-	Global    *global.Options    `yaml:"global" json:"global" toml:"global"`
-	Store     *StoreOptions      `yaml:"store" json:"store" toml:"store"`
-	GRPC      *services.Options  `yaml:"grpc" json:"grpc" toml:"grpc"`
-	Wireguard *wireguard.Options `yaml:"wireguard" json:"wireguard" toml:"wireguard"`
+	Global    *global.Options    `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty"`
+	Store     *StoreOptions      `yaml:"store,omitempty" json:"store,omitempty" toml:"store,omitempty"`
+	GRPC      *services.Options  `yaml:"grpc,omitempty" json:"grpc,omitempty" toml:"grpc,omitempty"`
+	Wireguard *wireguard.Options `yaml:"wireguard,omitempty" json:"wireguard,omitempty" toml:"wireguard,omitempty"`
 }
 
 type StoreOptions struct {
 	*store.Options `yaml:",inline" json:",inline" toml:",inline"`
-	StreamLayer    *streamlayer.Options `yaml:"stream-layer" json:"stream-layer" toml:"stream-layer"`
+	StreamLayer    *streamlayer.Options `yaml:"stream-layer,omitempty" json:"stream-layer,omitempty" toml:"stream-layer,omitempty"`
 }
 
 // BindFlags binds the flags.

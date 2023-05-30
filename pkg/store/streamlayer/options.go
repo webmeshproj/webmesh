@@ -44,23 +44,23 @@ const (
 // Options are the StreamLayer options.
 type Options struct {
 	// ListenAddress is the address to listen on.
-	ListenAddress string `yaml:"listen-address" json:"listen-address" toml:"listen-address"`
+	ListenAddress string `yaml:"listen-address,omitempty" json:"listen-address,omitempty" toml:"listen-address,omitempty"`
 	// TLSCertFile is the path to the TLS certificate file.
-	TLSCertFile string `yaml:"tls-cert-file" json:"tls-cert-file" toml:"tls-cert-file"`
+	TLSCertFile string `yaml:"tls-cert-file,omitempty" json:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty"`
 	// TLSKeyFile is the path to the TLS key file.
-	TLSKeyFile string `yaml:"tls-key-file" json:"tls-key-file" toml:"tls-key-file"`
+	TLSKeyFile string `yaml:"tls-key-file,omitempty" json:"tls-key-file,omitempty" toml:"tls-key-file,omitempty"`
 	// TLSCAFile is the path to the TLS CA file. If empty,
 	// the system CA pool is used.
-	TLSCAFile string `yaml:"tls-ca-file" json:"tls-ca-file" toml:"tls-ca-file"`
+	TLSCAFile string `yaml:"tls-ca-file,omitempty" json:"tls-ca-file,omitempty" toml:"tls-ca-file,omitempty"`
 	// TLSClientCAFile is the path to the TLS client CA file.
 	// If empty, either TLSCAFile or the system CA pool is used.
-	TLSClientCAFile string `yaml:"tls-client-ca-file" json:"tls-client-ca-file" toml:"tls-client-ca-file"`
+	TLSClientCAFile string `yaml:"tls-client-ca-file,omitempty" json:"tls-client-ca-file,omitempty" toml:"tls-client-ca-file,omitempty"`
 	// MTLS is true if mutual TLS is enabled.
-	MTLS bool `yaml:"mtls" json:"mtls" toml:"mtls"`
+	MTLS bool `yaml:"mtls,omitempty" json:"mtls,omitempty" toml:"mtls,omitempty"`
 	// SkipVerifyHostname is true if the hostname should not be verified.
-	SkipVerifyHostname bool `yaml:"skip-verify-hostname" json:"skip-verify-hostname" toml:"skip-verify-hostname"`
+	SkipVerifyHostname bool `yaml:"skip-verify-hostname,omitempty" json:"skip-verify-hostname,omitempty" toml:"skip-verify-hostname,omitempty"`
 	// Insecure is true if the transport is insecure.
-	Insecure bool `yaml:"insecure" json:"insecure" toml:"insecure"`
+	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty" toml:"insecure,omitempty"`
 }
 
 // NewOptions returns new StreamLayerOptions with sensible defaults.

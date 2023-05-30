@@ -65,7 +65,6 @@ const (
 	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
 	RaftLogFormatEnvVar             = "STORE_RAFT_LOG_FORMAT"
 	ShutdownTimeoutEnvVar           = "STORE_SHUTDOWN_TIMEOUT"
-	PeerRefreshIntervalEnvVar       = "STORE_PEER_REFRESH_INTERVAL"
 	KeyRotationIntervalEnvVar       = "STORE_KEY_ROTATION_INTERVAL"
 	NoIPv4EnvVar                    = "STORE_NO_IPV4"
 	NoIPv6EnvVar                    = "STORE_NO_IPV6"
@@ -107,98 +106,95 @@ func (r RaftLogFormat) IsValid() bool {
 // Options are the options for the store.
 type Options struct {
 	// NodeID is the node ID.
-	NodeID string `json:"node-id" yaml:"node-id" toml:"node-id"`
+	NodeID string `json:"node-id,omitempty" yaml:"node-id,omitempty" toml:"node-id,omitempty"`
 	// NodeEndpoint is the endpoint to broadcast when joining a cluster.
-	NodeEndpoint string `json:"node-endpoint" yaml:"node-endpoint" toml:"node-endpoint"`
+	NodeEndpoint string `json:"node-endpoint,omitempty" yaml:"node-endpoint,omitempty" toml:"node-endpoint,omitempty"`
 	// NodeWireGuardEndpoints are additional WireGuard endpoints to broadcast when joining a cluster.
-	NodeWireGuardEndpoints string `json:"node-wireguard-endpoints" yaml:"node-wireguard-endpoints" toml:"node-wireguard-endpoints"`
+	NodeWireGuardEndpoints string `json:"node-wireguard-endpoints,omitempty" yaml:"node-wireguard-endpoints,omitempty" toml:"node-wireguard-endpoints,omitempty"`
 	// DataDir is the directory to store data in.
-	DataDir string `json:"data-dir" yaml:"data-dir" toml:"data-dir"`
+	DataDir string `json:"data-dir,omitempty" yaml:"data-dir,omitempty" toml:"data-dir,omitempty"`
 	// InMemory is if the store should be in memory. This should only be used for
 	// testing and ephemeral nodes.
-	InMemory bool `json:"in-memory" yaml:"in-memory" toml:"in-memory"`
+	InMemory bool `json:"in-memory,omitempty" yaml:"in-memory,omitempty" toml:"in-memory,omitempty"`
 	// AdvertiseAddress is the initial address to advertise for raft consensus.
-	AdvertiseAddress string `json:"advertise-address" yaml:"advertise-address" toml:"advertise-address"`
+	AdvertiseAddress string `json:"advertise-address,omitempty" yaml:"advertise-address,omitempty" toml:"advertise-address,omitempty"`
 	// ConnectionPoolCount is the number of connections to pool.
 	// If 0, no connection pooling is used.
-	ConnectionPoolCount int `json:"connection-pool-count" yaml:"connection-pool-count" toml:"connection-pool-count"`
+	ConnectionPoolCount int `json:"connection-pool-count,omitempty" yaml:"connection-pool-count,omitempty" toml:"connection-pool-count,omitempty"`
 	// ConnectionTimeout is the timeout for connections.
-	ConnectionTimeout time.Duration `json:"connection-timeout" yaml:"connection-timeout" toml:"connection-timeout"`
+	ConnectionTimeout time.Duration `json:"connection-timeout,omitempty" yaml:"connection-timeout,omitempty" toml:"connection-timeout,omitempty"`
 	// HeartbeatTimeout is the timeout for heartbeats.
-	HeartbeatTimeout time.Duration `json:"heartbeat-timeout" yaml:"heartbeat-timeout" toml:"heartbeat-timeout"`
+	HeartbeatTimeout time.Duration `json:"heartbeat-timeout,omitempty" yaml:"heartbeat-timeout,omitempty" toml:"heartbeat-timeout,omitempty"`
 	// ElectionTimeout is the timeout for elections.
-	ElectionTimeout time.Duration `json:"election-timeout" yaml:"election-timeout" toml:"election-timeout"`
+	ElectionTimeout time.Duration `json:"election-timeout,omitempty" yaml:"election-timeout,omitempty" toml:"election-timeout,omitempty"`
 	// ApplyTimeout is the timeout for applying.
-	ApplyTimeout time.Duration `json:"apply-timeout" yaml:"apply-timeout" toml:"apply-timeout"`
+	ApplyTimeout time.Duration `json:"apply-timeout,omitempty" yaml:"apply-timeout,omitempty" toml:"apply-timeout,omitempty"`
 	// CommitTimeout is the timeout for committing.
-	CommitTimeout time.Duration `json:"commit-timeout" yaml:"commit-timeout" toml:"commit-timeout"`
+	CommitTimeout time.Duration `json:"commit-timeout,omitempty" yaml:"commit-timeout,omitempty" toml:"commit-timeout,omitempty"`
 	// MaxAppendEntries is the maximum number of append entries.
-	MaxAppendEntries int `json:"max-append-entries" yaml:"max-append-entries" toml:"max-append-entries"`
+	MaxAppendEntries int `json:"max-append-entries,omitempty" yaml:"max-append-entries,omitempty" toml:"max-append-entries,omitempty"`
 	// LeaderLeaseTimeout is the timeout for leader leases.
-	LeaderLeaseTimeout time.Duration `json:"leader-lease-timeout" yaml:"leader-lease-timeout" toml:"leader-lease-timeout"`
+	LeaderLeaseTimeout time.Duration `json:"leader-lease-timeout,omitempty" yaml:"leader-lease-timeout,omitempty" toml:"leader-lease-timeout,omitempty"`
 	// SnapshotInterval is the interval to take snapshots.
-	SnapshotInterval time.Duration `json:"snapshot-interval" yaml:"snapshot-interval" toml:"snapshot-interval"`
+	SnapshotInterval time.Duration `json:"snapshot-interval,omitempty" yaml:"snapshot-interval,omitempty" toml:"snapshot-interval,omitempty"`
 	// SnapshotThreshold is the threshold to take snapshots.
-	SnapshotThreshold uint64 `json:"snapshot-threshold" yaml:"snapshot-threshold" toml:"snapshot-threshold"`
+	SnapshotThreshold uint64 `json:"snapshot-threshold,omitempty" yaml:"snapshot-threshold,omitempty" toml:"snapshot-threshold,omitempty"`
 	// SnapshotRetention is the number of snapshots to retain.
-	SnapshotRetention uint64 `json:"snapshot-retention" yaml:"snapshot-retention" toml:"snapshot-retention"`
+	SnapshotRetention uint64 `json:"snapshot-retention,omitempty" yaml:"snapshot-retention,omitempty" toml:"snapshot-retention,omitempty"`
 	// ObserverChanBuffer is the buffer size for the observer channel.
-	ObserverChanBuffer int `json:"observer-chan-buffer" yaml:"observer-chan-buffer" toml:"observer-chan-buffer"`
+	ObserverChanBuffer int `json:"observer-chan-buffer,omitempty" yaml:"observer-chan-buffer,omitempty" toml:"observer-chan-buffer,omitempty"`
 	// Join is the address of a node to join.
-	Join string `json:"join" yaml:"join" toml:"join"`
+	Join string `json:"join,omitempty" yaml:"join,omitempty" toml:"join,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
-	MaxJoinRetries int `json:"max-join-retries" yaml:"max-join-retries" toml:"max-join-retries"`
+	MaxJoinRetries int `json:"max-join-retries,omitempty" yaml:"max-join-retries,omitempty" toml:"max-join-retries,omitempty"`
 	// JoinTimeout is the timeout for joining.
-	JoinTimeout time.Duration `json:"join-timeout" yaml:"join-timeout" toml:"join-timeout"`
+	JoinTimeout time.Duration `json:"join-timeout,omitempty" yaml:"join-timeout,omitempty" toml:"join-timeout,omitempty"`
 	// JoinAsVoter is the join as voter flag.
-	JoinAsVoter bool `json:"join-as-voter" yaml:"join-as-voter" toml:"join-as-voter"`
+	JoinAsVoter bool `json:"join-as-voter,omitempty" yaml:"join-as-voter,omitempty" toml:"join-as-voter,omitempty"`
 	// Bootstrap is the bootstrap flag. If true, the node will
 	// only bootstrap a new cluster if no data is found. To force
 	// bootstrap, set ForceBootstrap to true.
-	Bootstrap bool `json:"bootstrap" yaml:"bootstrap" toml:"bootstrap"`
+	Bootstrap bool `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty" toml:"bootstrap,omitempty"`
 	// BootstrapServers is a comma separated list of servers to bootstrap with.
 	// This is only used if Bootstrap is true. If empty, the node will use
 	// the AdvertiseAddress as the bootstrap server. If not empty, all nodes in
 	// the list should be started with the same list and BootstrapIPv4Network. If the
 	// BootstrapIPv4Network is not the same, the first node to become leader will pick it.
 	// Servers should be in the form of <node-id>=<address> where address is the advertise address.
-	BootstrapServers string `json:"bootstrap-servers" yaml:"bootstrap-servers" toml:"bootstrap-servers"`
+	BootstrapServers string `json:"bootstrap-servers,omitempty" yaml:"bootstrap-servers,omitempty" toml:"bootstrap-servers,omitempty"`
 	// BootstrapServersGRPCPorts is a comma separated list of gRPC ports to bootstrap with.
 	// This is only used if Bootstrap is true. If empty, the node will use the advertise
 	// address and local gRPC port for every node in BootstrapServers. Ports should be
 	// in the form of <node-id>=<port>.
-	BootstrapServersGRPCPorts string `json:"bootstrap-servers-grpc-ports" yaml:"bootstrap-servers-grpc-ports" toml:"bootstrap-servers-grpc-ports"`
+	BootstrapServersGRPCPorts string `json:"bootstrap-servers-grpc-ports,omitempty" yaml:"bootstrap-servers-grpc-ports,omitempty" toml:"bootstrap-servers-grpc-ports,omitempty"`
 	// BootstrapIPv4Network is the IPv4 network of the mesh to write to the database
 	// when bootstraping a new cluster.
-	BootstrapIPv4Network string `json:"bootstrap-ipv4-network" yaml:"bootstrap-ipv4-network" toml:"bootstrap-ipv4-network"`
+	BootstrapIPv4Network string `json:"bootstrap-ipv4-network,omitempty" yaml:"bootstrap-ipv4-network,omitempty" toml:"bootstrap-ipv4-network,omitempty"`
 	// BoostrapWithRaftACLs is the flag to bootstrap with Raft ACLs.
-	BootstrapWithRaftACLs bool `json:"bootstrap-with-raft-acls" yaml:"bootstrap-with-raft-acls" toml:"bootstrap-with-raft-acls"`
+	BootstrapWithRaftACLs bool `json:"bootstrap-with-raft-acls,omitempty" yaml:"bootstrap-with-raft-acls,omitempty" toml:"bootstrap-with-raft-acls,omitempty"`
 	// ForceBootstrap is the force new bootstrap flag.
-	ForceBootstrap bool `json:"force-bootstrap" yaml:"force-bootstrap" toml:"force-bootstrap"`
+	ForceBootstrap bool `json:"force-bootstrap,omitempty" yaml:"force-bootstrap,omitempty" toml:"force-bootstrap,omitempty"`
 	// RaftLogLevel is the log level for the raft backend.
-	RaftLogLevel string `json:"raft-log-level" yaml:"raft-log-level" toml:"raft-log-level"`
+	RaftLogLevel string `json:"raft-log-level,omitempty" yaml:"raft-log-level,omitempty" toml:"raft-log-level,omitempty"`
 	// RaftPreferIPv6 is the prefer IPv6 flag.
-	RaftPreferIPv6 bool `json:"raft-prefer-ipv6" yaml:"raft-prefer-ipv6" toml:"raft-prefer-ipv6"`
+	RaftPreferIPv6 bool `json:"raft-prefer-ipv6,omitempty" yaml:"raft-prefer-ipv6,omitempty" toml:"raft-prefer-ipv6,omitempty"`
 	// GRPCAdvertisePort is the port to advertise for gRPC.
-	GRPCAdvertisePort int `json:"grpc-advertise-port" yaml:"grpc-advertise-port" toml:"grpc-advertise-port"`
+	GRPCAdvertisePort int `json:"grpc-advertise-port,omitempty" yaml:"grpc-advertise-port,omitempty" toml:"grpc-advertise-port,omitempty"`
 	// RaftLogFormat is the log format for the raft backend.
-	RaftLogFormat string `json:"raft-log-format" yaml:"raft-log-format" toml:"raft-log-format"`
+	RaftLogFormat string `json:"raft-log-format,omitempty" yaml:"raft-log-format,omitempty" toml:"raft-log-format,omitempty"`
 	// ShutdownTimeout is the timeout for shutting down.
-	ShutdownTimeout time.Duration `json:"shutdown-timeout" yaml:"shutdown-timeout" toml:"shutdown-timeout"`
-	// PeerRefreshInterval is the interval to refresh wireguard peers.
-	// Notifications of new peers are automatically added to the peer list.
-	PeerRefreshInterval time.Duration `json:"peer-refresh-interval" yaml:"peer-refresh-interval" toml:"peer-refresh-interval"`
+	ShutdownTimeout time.Duration `json:"shutdown-timeout,omitempty" yaml:"shutdown-timeout,omitempty" toml:"shutdown-timeout,omitempty"`
 	// KeyRotationInterval is the interval to rotate wireguard keys.
 	// Set this to 0 to disable key rotation.
-	KeyRotationInterval time.Duration `json:"key-rotation-interval" yaml:"key-rotation-interval" toml:"key-rotation-interval"`
+	KeyRotationInterval time.Duration `json:"key-rotation-interval,omitempty" yaml:"key-rotation-interval,omitempty" toml:"key-rotation-interval,omitempty"`
 	// NoIPv4 is the no IPv4 flag.
-	NoIPv4 bool `json:"no-ipv4" yaml:"no-ipv4" toml:"no-ipv4"`
+	NoIPv4 bool `json:"no-ipv4,omitempty" yaml:"no-ipv4,omitempty" toml:"no-ipv4,omitempty"`
 	// NoIPv6 is the no IPv6 flag.
-	NoIPv6 bool `json:"no-ipv6" yaml:"no-ipv6" toml:"no-ipv6"`
+	NoIPv6 bool `json:"no-ipv6,omitempty" yaml:"no-ipv6,omitempty" toml:"no-ipv6,omitempty"`
 	// LeaveOnShutdown is the leave on shutdown flag.
-	LeaveOnShutdown bool `json:"leave-on-shutdown" yaml:"leave-on-shutdown" toml:"leave-on-shutdown"`
+	LeaveOnShutdown bool `json:"leave-on-shutdown,omitempty" yaml:"leave-on-shutdown,omitempty" toml:"leave-on-shutdown,omitempty"`
 	// ZoneAwarenessID is the zone awareness ID.
-	ZoneAwarenessID string `json:"zone-awareness-id" yaml:"zone-awareness-id" toml:"zone-awareness-id"`
+	ZoneAwarenessID string `json:"zone-awareness-id,omitempty" yaml:"zone-awareness-id,omitempty" toml:"zone-awareness-id,omitempty"`
 }
 
 // NewOptions returns new options with sensible defaults.
@@ -220,7 +216,6 @@ func NewOptions() *Options {
 		ObserverChanBuffer:   100,
 		BootstrapIPv4Network: "172.16.0.0/12",
 		ShutdownTimeout:      time.Minute,
-		PeerRefreshInterval:  time.Minute,
 		KeyRotationInterval:  time.Hour * 24 * 7,
 	}
 }
@@ -318,8 +313,6 @@ Ports should be in the form of <node-id>=<port>.`)
 All nodes must use the same log format for the lifetime of the cluster.`)
 	fl.DurationVar(&o.ShutdownTimeout, "store.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
 		"Timeout for graceful shutdown.")
-	fl.DurationVar(&o.PeerRefreshInterval, "store.peer-refresh-interval", util.GetEnvDurationDefault(PeerRefreshIntervalEnvVar, time.Minute),
-		"Interval to refresh WireGuard peer list.")
 	fl.DurationVar(&o.KeyRotationInterval, "store.key-rotation-interval", util.GetEnvDurationDefault(KeyRotationIntervalEnvVar, time.Hour*24*7),
 		"Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.")
 	fl.BoolVar(&o.NoIPv4, "store.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
@@ -382,9 +375,6 @@ func (o *Options) Validate() error {
 	}
 	if o.MaxJoinRetries <= 0 {
 		return errors.New("max join retries must be > 0")
-	}
-	if o.PeerRefreshInterval <= 0 {
-		return errors.New("peer refresh interval must be > 0")
 	}
 	if o.KeyRotationInterval < 0 {
 		return errors.New("key rotation interval must be >= 0")
