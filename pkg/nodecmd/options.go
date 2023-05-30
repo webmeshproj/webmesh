@@ -31,7 +31,7 @@ import (
 type Options struct {
 	Global    *global.Options    `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty"`
 	Store     *StoreOptions      `yaml:"store,omitempty" json:"store,omitempty" toml:"store,omitempty"`
-	GRPC      *services.Options  `yaml:"grpc,omitempty" json:"grpc,omitempty" toml:"grpc,omitempty"`
+	Services  *services.Options  `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
 	Wireguard *wireguard.Options `yaml:"wireguard,omitempty" json:"wireguard,omitempty" toml:"wireguard,omitempty"`
 }
 
@@ -45,7 +45,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	o.Global.BindFlags(fs)
 	o.Store.BindFlags(fs)
 	o.Store.StreamLayer.BindFlags(fs)
-	o.GRPC.BindFlags(fs)
+	o.Services.BindFlags(fs)
 	o.Wireguard.BindFlags(fs)
 	return o
 }

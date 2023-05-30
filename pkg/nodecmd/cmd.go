@@ -50,7 +50,7 @@ var (
 			Options:     store.NewOptions(),
 			StreamLayer: streamlayer.NewOptions(),
 		},
-		GRPC:      services.NewOptions(),
+		Services:  services.NewOptions(),
 		Wireguard: wireguard.NewOptions(),
 	}).BindFlags(flag.CommandLine)
 
@@ -72,7 +72,7 @@ func Execute() error {
 	err := opts.Global.Overlay(
 		opts.Store.Options,
 		opts.Store.StreamLayer,
-		opts.GRPC,
+		opts.Services,
 		opts.Wireguard,
 	)
 	if err != nil {
@@ -152,7 +152,7 @@ func Execute() error {
 	if err != nil {
 		return fmt.Errorf("failed to validate wireguard options: %w", err)
 	}
-	err = opts.GRPC.Validate()
+	err = opts.Services.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate grpc options: %w", err)
 	}
@@ -201,7 +201,7 @@ func Execute() error {
 	log.Info("raft store is ready, starting services")
 
 	// Create the services
-	srv, err := services.NewServer(st, opts.GRPC)
+	srv, err := services.NewServer(st, opts.Services)
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to gRPC server: %w", err))
 	}
