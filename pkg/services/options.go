@@ -340,11 +340,10 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 		return nil, fmt.Errorf("load x509 key pair: %w", err)
 	}
 	pool, err := x509.SystemCertPool()
-	if err == nil {
+	if err != nil {
 		slog.Default().Warn("failed to load system cert pool", slog.String("error", err.Error()))
 		pool = x509.NewCertPool()
 	}
-	clientPool := pool.Clone()
 	if o.TLSCAFile != "" {
 		ca, err := os.ReadFile(o.TLSCAFile)
 		if err != nil {
@@ -354,6 +353,7 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 			return nil, fmt.Errorf("append certs from pem")
 		}
 	}
+	clientPool := pool.Clone()
 	if o.TLSClientCAFile != "" {
 		ca, err := os.ReadFile(o.TLSClientCAFile)
 		if err != nil {
