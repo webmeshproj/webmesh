@@ -31,14 +31,14 @@ import (
 )
 
 const (
-	StreamLayerListenAddressEnvVar      = "STORE_STREAM_LAYER_LISTEN_ADDRESS"
-	StreamLayerCertFileEnvVar           = "STORE_STREAM_LAYER_TLS_CERT_FILE"
-	StreamLayerKeyFileEnvVar            = "STORE_STREAM_LAYER_TLS_KEY_FILE"
-	StreamLayerCAFileEnvVar             = "STORE_STREAM_LAYER_TLS_CA_FILE"
-	StreamLayerClientCAFileEnvVar       = "STORE_STREAM_LAYER_TLS_CLIENT_CA_FILE"
-	StreamLayerMTLSEnvVar               = "STORE_STREAM_LAYER_MTLS"
-	StreamLayerSkipVerifyHostnameEnvVar = "STORE_STREAM_LAYER_SKIP_VERIFY_HOSTNAME"
-	StreamLayerInsecureEnvVar           = "STORE_STREAM_LAYER_INSECURE"
+	ListenAddressEnvVar   = "STORE_STREAM_LAYER_LISTEN_ADDRESS"
+	CertFileEnvVar        = "STORE_STREAM_LAYER_TLS_CERT_FILE"
+	KeyFileEnvVar         = "STORE_STREAM_LAYER_TLS_KEY_FILE"
+	CAFileEnvVar          = "STORE_STREAM_LAYER_TLS_CA_FILE"
+	ClientCAFileEnvVar    = "STORE_STREAM_LAYER_TLS_CLIENT_CA_FILE"
+	MTLSEnvVar            = "STORE_STREAM_LAYER_MTLS"
+	VerifyChainOnlyEnvVar = "STORE_STREAM_LAYER_VERIFY_CHAIN_ONLY"
+	InsecureEnvVar        = "STORE_STREAM_LAYER_INSECURE"
 )
 
 // Options are the StreamLayer options.
@@ -57,8 +57,8 @@ type Options struct {
 	TLSClientCAFile string `yaml:"tls-client-ca-file,omitempty" json:"tls-client-ca-file,omitempty" toml:"tls-client-ca-file,omitempty"`
 	// MTLS is true if mutual TLS is enabled.
 	MTLS bool `yaml:"mtls,omitempty" json:"mtls,omitempty" toml:"mtls,omitempty"`
-	// SkipVerifyHostname is true if the hostname should not be verified.
-	SkipVerifyHostname bool `yaml:"skip-verify-hostname,omitempty" json:"skip-verify-hostname,omitempty" toml:"skip-verify-hostname,omitempty"`
+	// VerifyChainOnly is true if only the certificate chain should be verified.
+	VerifyChainOnly bool `yaml:"verify-chain-only,omitempty" json:"verify-chain-only,omitempty" toml:"verify-chain-only,omitempty"`
 	// Insecure is true if the transport is insecure.
 	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty" toml:"insecure,omitempty"`
 }
@@ -72,21 +72,21 @@ func NewOptions() *Options {
 
 // BindFlags binds the StreamLayer options to the given flag set.
 func (o *Options) BindFlags(fs *flag.FlagSet) {
-	fs.StringVar(&o.ListenAddress, "store.stream-layer.listen-address", util.GetEnvDefault(StreamLayerListenAddressEnvVar, ":9443"),
+	fs.StringVar(&o.ListenAddress, "store.stream-layer.listen-address", util.GetEnvDefault(ListenAddressEnvVar, ":9443"),
 		"Stream layer listen address.")
-	fs.StringVar(&o.TLSCertFile, "store.stream-layer.tls-cert-file", util.GetEnvDefault(StreamLayerCertFileEnvVar, ""),
+	fs.StringVar(&o.TLSCertFile, "store.stream-layer.tls-cert-file", util.GetEnvDefault(CertFileEnvVar, ""),
 		"Stream layer TLS certificate file.")
-	fs.StringVar(&o.TLSKeyFile, "store.stream-layer.tls-key-file", util.GetEnvDefault(StreamLayerKeyFileEnvVar, ""),
+	fs.StringVar(&o.TLSKeyFile, "store.stream-layer.tls-key-file", util.GetEnvDefault(KeyFileEnvVar, ""),
 		"Stream layer TLS key file.")
-	fs.StringVar(&o.TLSCAFile, "store.stream-layer.tls-ca-file", util.GetEnvDefault(StreamLayerCAFileEnvVar, ""),
+	fs.StringVar(&o.TLSCAFile, "store.stream-layer.tls-ca-file", util.GetEnvDefault(CAFileEnvVar, ""),
 		"Stream layer TLS CA file.")
-	fs.StringVar(&o.TLSClientCAFile, "store.stream-layer.tls-client-ca-file", util.GetEnvDefault(StreamLayerClientCAFileEnvVar, ""),
+	fs.StringVar(&o.TLSClientCAFile, "store.stream-layer.tls-client-ca-file", util.GetEnvDefault(ClientCAFileEnvVar, ""),
 		"Stream layer TLS client CA file.")
-	fs.BoolVar(&o.MTLS, "store.stream-layer.mtls", util.GetEnvDefault(StreamLayerMTLSEnvVar, "false") == "true",
+	fs.BoolVar(&o.MTLS, "store.stream-layer.mtls", util.GetEnvDefault(MTLSEnvVar, "false") == "true",
 		"Enable mutual TLS for the stream layer.")
-	fs.BoolVar(&o.SkipVerifyHostname, "store.stream-layer.skip-verify-hostname", util.GetEnvDefault(StreamLayerSkipVerifyHostnameEnvVar, "false") == "true",
-		"Skip hostname verification for the stream layer.")
-	fs.BoolVar(&o.Insecure, "store.stream-layer.insecure", util.GetEnvDefault(StreamLayerInsecureEnvVar, "false") == "true",
+	fs.BoolVar(&o.VerifyChainOnly, "store.stream-layer.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
+		"Only verify the certificate chain for the stream layer.")
+	fs.BoolVar(&o.Insecure, "store.stream-layer.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Don't use TLS for the stream layer.")
 }
 
@@ -163,7 +163,7 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 		ClientCAs:    clientPool,
 		ClientAuth:   clientAuth,
 	}
-	if o.SkipVerifyHostname {
+	if o.VerifyChainOnly {
 		config.VerifyPeerCertificate = util.VerifyChainOnly
 	}
 	return config, nil

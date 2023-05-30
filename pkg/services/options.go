@@ -43,14 +43,14 @@ import (
 
 const (
 	// General options
-	ListenAddressEnvVar      = "SERVICES_GRPC_LISTEN_ADDRESS"
-	CertFileEnvVar           = "SERVICES_TLS_CERT_FILE"
-	KeyFileEnvVar            = "SERVICES_TLS_KEY_FILE"
-	CAFileEnvVar             = "SERVICES_TLS_CA_FILE"
-	ClientCAFileEnvVar       = "SERVICES_TLS_CLIENT_CA_FILE"
-	MTLSEnvVar               = "SERVICES_MTLS"
-	SkipVerifyHostnameEnvVar = "SERVICES_SKIP_VERIFY_HOSTNAME"
-	InsecureEnvVar           = "SERVICES_INSECURE"
+	ListenAddressEnvVar   = "SERVICES_GRPC_LISTEN_ADDRESS"
+	CertFileEnvVar        = "SERVICES_TLS_CERT_FILE"
+	KeyFileEnvVar         = "SERVICES_TLS_KEY_FILE"
+	CAFileEnvVar          = "SERVICES_TLS_CA_FILE"
+	ClientCAFileEnvVar    = "SERVICES_TLS_CLIENT_CA_FILE"
+	MTLSEnvVar            = "SERVICES_MTLS"
+	VerifyChainOnlyEnvVar = "SERVICES_VERIFY_CHAIN_ONLY"
+	InsecureEnvVar        = "SERVICES_INSECURE"
 
 	// Feature flags
 	EnableMetricsEnvVar          = "SERVICES_ENABLE_METRICS"
@@ -101,8 +101,8 @@ type Options struct {
 	TLSClientCAFile string `json:"tls-client-ca-file,omitempty" yaml:"tls-client-ca-file,omitempty" toml:"tls-client-ca-file,omitempty"`
 	// MTLS is true if mutual TLS is enabled.
 	MTLS bool `json:"mtls,omitempty" yaml:"mtls,omitempty" toml:"mtls,omitempty"`
-	// SkipVerifyHostname is true if the hostname should not be verified.
-	SkipVerifyHostname bool `json:"skip-verify-hostname,omitempty" yaml:"skip-verify-hostname,omitempty" toml:"skip-verify-hostname,omitempty"`
+	// VerifyChainOnly is true if only the chain should be verified.
+	VerifyChainOnly bool `json:"verify-chain-only,omitempty" yaml:"verify-chain-only,omitempty" toml:"verify-chain-only,omitempty"`
 	// Insecure is true if the transport is insecure.
 	Insecure bool `json:"insecure,omitempty" yaml:"insecure,omitempty" toml:"insecure,omitempty"`
 	// EnableMetrics is true if metrics should be enabled.
@@ -191,8 +191,8 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		"gRPC server TLS client CA file.")
 	fs.BoolVar(&o.MTLS, "services.mtls", util.GetEnvDefault(MTLSEnvVar, "false") == "true",
 		"Enable mutual TLS.")
-	fs.BoolVar(&o.SkipVerifyHostname, "services.skip-verify-hostname", util.GetEnvDefault(SkipVerifyHostnameEnvVar, "false") == "true",
-		"Skip hostname verification.")
+	fs.BoolVar(&o.VerifyChainOnly, "services.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
+		"Only verify the TLS chain.")
 	fs.BoolVar(&o.Insecure, "services.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Don't use TLS for the gRPC server.")
 	fs.BoolVar(&o.EnableMetrics, "services.enable-metrics", util.GetEnvDefault(EnableMetricsEnvVar, "false") == "true",
@@ -373,7 +373,7 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 		ClientCAs:    clientPool,
 		ClientAuth:   clientAuth,
 	}
-	if o.SkipVerifyHostname {
+	if o.VerifyChainOnly {
 		config.VerifyPeerCertificate = util.VerifyChainOnly
 	}
 	return config, nil

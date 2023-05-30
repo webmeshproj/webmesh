@@ -34,22 +34,22 @@ import (
 )
 
 const (
-	GlobalLogLevelEnvVar               = "GLOBAL_LOG_LEVEL"
-	GlobalTLSCertEnvVar                = "GLOBAL_TLS_CERT_FILE"
-	GlobalTLSKeyEnvVar                 = "GLOBAL_TLS_KEY_FILE"
-	GlobalTLACAEnvVar                  = "GLOBAL_TLS_CA_FILE"
-	GlobalTLSClientCAEnvVar            = "GLOBAL_TLS_CLIENT_CA_FILE"
-	GlobalMTLSEnvVar                   = "GLOBAL_MTLS"
-	GlobalSkipVerifyHostnameEnvVar     = "GLOBAL_SKIP_VERIFY_HOSTNAME"
-	GlobalInsecureEnvVar               = "GLOBAL_INSECURE"
-	GlobalNoIPv4EnvVar                 = "GLOBAL_NO_IPV4"
-	GlobalNoIPv6EnvVar                 = "GLOBAL_NO_IPV6"
-	GlobalPrimaryEndpointEnvVar        = "GLOBAL_PRIMARY_ENDPOINT"
-	GlobalEndpointsEnvVar              = "GLOBAL_ENDPOINTS"
-	GlobalDetectEndpointsEnvVar        = "GLOBAL_DETECT_ENDPOINTS"
-	GlobalDetectPrivateEndpointsEnvVar = "GLOBAL_DETECT_PRIVATE_ENDPOINTS"
-	GlobalAllowRemoteDetectionEnvVar   = "GLOBAL_ALLOW_REMOTE_DETECTION"
-	GlobalDetectIPv6EnvVar             = "GLOBAL_DETECT_IPV6"
+	LogLevelEnvVar               = "GLOBAL_LOG_LEVEL"
+	TLSCertEnvVar                = "GLOBAL_TLS_CERT_FILE"
+	TLSKeyEnvVar                 = "GLOBAL_TLS_KEY_FILE"
+	TLACAEnvVar                  = "GLOBAL_TLS_CA_FILE"
+	TLSClientCAEnvVar            = "GLOBAL_TLS_CLIENT_CA_FILE"
+	MTLSEnvVar                   = "GLOBAL_MTLS"
+	VerifyChainOnlyEnvVar        = "GLOBAL_VERIFY_CHAIN_ONLY"
+	InsecureEnvVar               = "GLOBAL_INSECURE"
+	NoIPv4EnvVar                 = "GLOBAL_NO_IPV4"
+	NoIPv6EnvVar                 = "GLOBAL_NO_IPV6"
+	PrimaryEndpointEnvVar        = "GLOBAL_PRIMARY_ENDPOINT"
+	EndpointsEnvVar              = "GLOBAL_ENDPOINTS"
+	DetectEndpointsEnvVar        = "GLOBAL_DETECT_ENDPOINTS"
+	DetectPrivateEndpointsEnvVar = "GLOBAL_DETECT_PRIVATE_ENDPOINTS"
+	AllowRemoteDetectionEnvVar   = "GLOBAL_ALLOW_REMOTE_DETECTION"
+	DetectIPv6EnvVar             = "GLOBAL_DETECT_IPV6"
 )
 
 // Options are the global options.
@@ -67,8 +67,8 @@ type Options struct {
 	TLSClientCAFile string `yaml:"tls-client-ca-file,omitempty" json:"tls-client-ca-file,omitempty" toml:"tls-client-ca-file,omitempty"`
 	// MTLS is true if mutual TLS is enabled.
 	MTLS bool `yaml:"mtls,omitempty" json:"mtls,omitempty" toml:"mtls,omitempty"`
-	// SkipVerifyHostname is true if the hostname should not be verified.
-	SkipVerifyHostname bool `yaml:"skip-verify-hostname,omitempty" json:"skip-verify-hostname,omitempty" toml:"skip-verify-hostname,omitempty"`
+	// VerifyChainOnly is true if only the chain should be verified.
+	VerifyChainOnly bool `yaml:"verify-chain-only,omitempty" json:"verify-chain-only,omitempty" toml:"verify-chain-only,omitempty"`
 	// Insecure is true if TLS should be disabled.
 	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty" toml:"insecure,omitempty"`
 	// NoIPv4 is true if IPv4 should be disabled.
@@ -103,42 +103,42 @@ func NewOptions() *Options {
 }
 
 func (o *Options) BindFlags(fs *flag.FlagSet) {
-	fs.StringVar(&o.TLSCertFile, "global.tls-cert-file", util.GetEnvDefault(GlobalTLSCertEnvVar, ""),
+	fs.StringVar(&o.TLSCertFile, "global.tls-cert-file", util.GetEnvDefault(TLSCertEnvVar, ""),
 		"The certificate file for TLS connections.")
-	fs.StringVar(&o.TLSKeyFile, "global.tls-key-file", util.GetEnvDefault(GlobalTLSKeyEnvVar, ""),
+	fs.StringVar(&o.TLSKeyFile, "global.tls-key-file", util.GetEnvDefault(TLSKeyEnvVar, ""),
 		"The key file for TLS connections.")
-	fs.StringVar(&o.TLSCAFile, "global.tls-ca-file", util.GetEnvDefault(GlobalTLACAEnvVar, ""),
+	fs.StringVar(&o.TLSCAFile, "global.tls-ca-file", util.GetEnvDefault(TLACAEnvVar, ""),
 		"The CA file for TLS connections.")
-	fs.StringVar(&o.TLSClientCAFile, "global.tls-client-ca-file", util.GetEnvDefault(GlobalTLSClientCAEnvVar, ""),
+	fs.StringVar(&o.TLSClientCAFile, "global.tls-client-ca-file", util.GetEnvDefault(TLSClientCAEnvVar, ""),
 		"The client CA file for TLS connections.")
-	fs.BoolVar(&o.MTLS, "global.mtls", util.GetEnvDefault(GlobalMTLSEnvVar, "false") == "true",
+	fs.BoolVar(&o.MTLS, "global.mtls", util.GetEnvDefault(MTLSEnvVar, "false") == "true",
 		"Enable mutual TLS globally.")
-	fs.BoolVar(&o.SkipVerifyHostname, "global.skip-verify-hostname", util.GetEnvDefault(GlobalSkipVerifyHostnameEnvVar, "false") == "true",
-		"Disable hostname verification globally.")
-	fs.BoolVar(&o.Insecure, "global.insecure", util.GetEnvDefault(GlobalInsecureEnvVar, "false") == "true",
+	fs.BoolVar(&o.VerifyChainOnly, "global.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
+		"Only verify the TLS chain globally.")
+	fs.BoolVar(&o.Insecure, "global.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Disable use of TLS globally.")
-	fs.BoolVar(&o.NoIPv6, "global.no-ipv6", util.GetEnvDefault(GlobalNoIPv6EnvVar, "false") == "true",
+	fs.BoolVar(&o.NoIPv6, "global.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
 		"Disable use of IPv6 globally.")
-	fs.BoolVar(&o.NoIPv4, "global.no-ipv4", util.GetEnvDefault(GlobalNoIPv4EnvVar, "false") == "true",
+	fs.BoolVar(&o.NoIPv4, "global.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Disable use of IPv4 globally.")
-	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(GlobalLogLevelEnvVar, "info"),
+	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(LogLevelEnvVar, "info"),
 		"Log level (debug, info, warn, error)")
 
-	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", util.GetEnvDefault(GlobalPrimaryEndpointEnvVar, ""),
+	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", util.GetEnvDefault(PrimaryEndpointEnvVar, ""),
 		`The preferred publicly routable address of this node. Setting this
 value will override the address portion of the store advertise address. 
 When detect-endpoints is true, this value will be the first address detected.`)
 
-	fs.BoolVar(&o.DetectEndpoints, "global.detect-endpoints", util.GetEnvDefault(GlobalDetectEndpointsEnvVar, "false") == "true",
+	fs.BoolVar(&o.DetectEndpoints, "global.detect-endpoints", util.GetEnvDefault(DetectEndpointsEnvVar, "false") == "true",
 		"Detect potential endpoints from the local interfaces.")
 
-	fs.BoolVar(&o.DetectPrivateEndpoints, "global.detect-private-endpoints", util.GetEnvDefault(GlobalDetectPrivateEndpointsEnvVar, "false") == "true",
+	fs.BoolVar(&o.DetectPrivateEndpoints, "global.detect-private-endpoints", util.GetEnvDefault(DetectPrivateEndpointsEnvVar, "false") == "true",
 		"Include private IP addresses in detection.")
 
-	fs.BoolVar(&o.AllowRemoteDetection, "global.allow-remote-detection", util.GetEnvDefault(GlobalAllowRemoteDetectionEnvVar, "false") == "true",
+	fs.BoolVar(&o.AllowRemoteDetection, "global.allow-remote-detection", util.GetEnvDefault(AllowRemoteDetectionEnvVar, "false") == "true",
 		"Allow remote detection of endpoints.")
 
-	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", util.GetEnvDefault(GlobalDetectIPv6EnvVar, "false") == "true",
+	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", util.GetEnvDefault(DetectIPv6EnvVar, "false") == "true",
 		"Detect IPv6 addresses. Default is to only detect IPv4.")
 }
 
@@ -235,8 +235,8 @@ func (o *Options) Overlay(opts ...any) error {
 			if !v.MTLS {
 				v.MTLS = o.MTLS
 			}
-			if !v.SkipVerifyHostname {
-				v.SkipVerifyHostname = o.SkipVerifyHostname
+			if !v.VerifyChainOnly {
+				v.VerifyChainOnly = o.VerifyChainOnly
 			}
 			if v.TLSCertFile == "" {
 				v.TLSCertFile = o.TLSCertFile
@@ -266,8 +266,8 @@ func (o *Options) Overlay(opts ...any) error {
 			if !v.MTLS {
 				v.MTLS = o.MTLS
 			}
-			if !v.SkipVerifyHostname {
-				v.SkipVerifyHostname = o.SkipVerifyHostname
+			if !v.VerifyChainOnly {
+				v.VerifyChainOnly = o.VerifyChainOnly
 			}
 			if v.TLSCertFile == "" {
 				v.TLSCertFile = o.TLSCertFile
