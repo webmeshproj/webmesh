@@ -69,16 +69,6 @@ func Execute() error {
 		return nil
 	}
 
-	err := opts.Global.Overlay(
-		opts.Store.Options,
-		opts.Store.StreamLayer,
-		opts.Services,
-		opts.Wireguard,
-	)
-	if err != nil {
-		return err
-	}
-
 	if *configFlag != "" {
 		f, err := os.Open(*configFlag)
 		if err != nil {
@@ -88,6 +78,16 @@ func Execute() error {
 		if err != nil {
 			return fmt.Errorf("failed to decode config file: %w", err)
 		}
+	}
+
+	err := opts.Global.Overlay(
+		opts.Store.Options,
+		opts.Store.StreamLayer,
+		opts.Services,
+		opts.Wireguard,
+	)
+	if err != nil {
+		return err
 	}
 
 	if *printConfig {
