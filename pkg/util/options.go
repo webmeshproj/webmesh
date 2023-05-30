@@ -40,11 +40,7 @@ func DecodeOptions(in io.ReadCloser, formatHint string, out any) error {
 	// We first treat the data as a go-template with some custom functions.
 	// This allows us to use environment variables and file contents in the config.
 	// We then decode the data into the given object.
-	t, err := template.New("config").Parse(string(data))
-	if err != nil {
-		return fmt.Errorf("convert config to template: %w", err)
-	}
-	t = t.Funcs(template.FuncMap{
+	t := template.New("config").Funcs(template.FuncMap{
 		"env": func(key string) string {
 			return os.Getenv(key)
 		},
@@ -61,6 +57,10 @@ func DecodeOptions(in io.ReadCloser, formatHint string, out any) error {
 			return string(data)
 		},
 	})
+	t, err = t.Parse(string(data))
+	if err != nil {
+		return fmt.Errorf("parse config template: %w", err)
+	}
 	var buf bytes.Buffer
 	err = t.Execute(&buf, nil)
 	if err != nil {
