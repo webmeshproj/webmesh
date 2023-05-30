@@ -17,8 +17,12 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"os"
+	"text/template"
 
 	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
@@ -33,6 +37,37 @@ func DecodeOptions(in io.ReadCloser, formatHint string, out any) error {
 	if err != nil {
 		return err
 	}
+	// We first treat the data as a go-template with some custom functions.
+	// This allows us to use environment variables and file contents in the config.
+	// We then decode the data into the given object.
+	t, err := template.New("config").Parse(string(data))
+	if err != nil {
+		return fmt.Errorf("convert config to template: %w", err)
+	}
+	t = t.Funcs(template.FuncMap{
+		"env": func(key string) string {
+			return os.Getenv(key)
+		},
+		"file": func(path string) string {
+			f, err := os.Open(path)
+			if err != nil {
+				return ""
+			}
+			defer f.Close()
+			data, err := io.ReadAll(f)
+			if err != nil {
+				return ""
+			}
+			return string(data)
+		},
+	})
+	var buf bytes.Buffer
+	err = t.Execute(&buf, nil)
+	if err != nil {
+		return fmt.Errorf("execute config template: %w", err)
+	}
+	data = buf.Bytes()
+	// Now we decode the data into the given object.
 	var format string
 	switch formatHint {
 	case "yaml", "yml":
