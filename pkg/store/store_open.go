@@ -35,6 +35,7 @@ func (s *store) Open() error {
 	if s.open.Load() {
 		return ErrOpen
 	}
+	log := s.log
 	handleErr := func(err error) error {
 		if s.raftTransport != nil {
 			defer s.raftTransport.Close()
@@ -72,16 +73,19 @@ func (s *store) Open() error {
 		if err != nil {
 			return fmt.Errorf("mkdir %q: %w", s.opts.DataDir, err)
 		}
+		log = log.With(slog.String("data-dir", s.opts.DataDir))
+	} else {
+		log = log.With(slog.String("data-dir", ":memory:"))
 	}
 	// Create the raft network transport
-	s.log.Info("creating raft network transport")
+	log.Info("creating raft network transport")
 	s.raftTransport = raft.NewNetworkTransport(s.sl,
 		s.opts.ConnectionPoolCount,
 		s.opts.ConnectionTimeout,
 		&logWriter{log: s.log},
 	)
 	// Create the raft stores.
-	s.log.Info("creating boltdb stores", slog.String("data-dir", s.opts.DataDir))
+	log.Info("creating boltdb stores")
 	if s.opts.InMemory {
 		s.logDB = newInmemStore()
 		s.stableDB = newInmemStore()
@@ -105,7 +109,7 @@ func (s *store) Open() error {
 		return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.DataDir, err))
 	}
 	// Create the data stores.
-	s.log.Info("creating data stores", slog.String("data-dir", s.opts.DataDir))
+	log.Info("creating data stores")
 	var dataPath, localDataPath string
 	if s.opts.InMemory {
 		dataPath = ":memory:"
@@ -128,7 +132,7 @@ func (s *store) Open() error {
 		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.LocalDataFilePath(), err))
 	}
 	// Create the raft instance.
-	s.log.Info("starting raft instance",
+	log.Info("starting raft instance",
 		slog.String("listen-addr", string(s.raftTransport.LocalAddr())),
 		slog.String("advertise-addr", s.opts.AdvertiseAddress),
 	)
@@ -144,16 +148,16 @@ func (s *store) Open() error {
 	// Bootstrap the cluster if needed.
 	if s.opts.Bootstrap {
 		// Database gets migrated during bootstrap.
-		s.log.Info("bootstrapping cluster")
+		log.Info("bootstrapping cluster")
 		if err = s.bootstrap(); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if s.opts.Join != "" {
-		s.log.Info("migrating raft database")
+		log.Info("migrating raft database")
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
-		s.log.Info("migrating local database")
+		log.Info("migrating local database")
 		if err = models.MigrateLocalDB(s.localData); err != nil {
 			return fmt.Errorf("local db migrate: %w", err)
 		}
