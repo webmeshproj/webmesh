@@ -143,7 +143,7 @@ func (q *Queries) DumpNodeEdges(ctx context.Context) ([]NodeEdge, error) {
 }
 
 const DumpNodes = `-- name: DumpNodes :many
-SELECT id, public_key, raft_port, grpc_port, wireguard_port, primary_endpoint, additional_endpoints, zone_awareness_id, network_ipv6, created_at, updated_at FROM nodes
+SELECT id, public_key, raft_port, grpc_port, primary_endpoint, wireguard_endpoints, zone_awareness_id, network_ipv6, created_at, updated_at FROM nodes
 `
 
 func (q *Queries) DumpNodes(ctx context.Context) ([]Node, error) {
@@ -160,9 +160,8 @@ func (q *Queries) DumpNodes(ctx context.Context) ([]Node, error) {
 			&i.PublicKey,
 			&i.RaftPort,
 			&i.GrpcPort,
-			&i.WireguardPort,
 			&i.PrimaryEndpoint,
-			&i.AdditionalEndpoints,
+			&i.WireguardEndpoints,
 			&i.ZoneAwarenessID,
 			&i.NetworkIpv6,
 			&i.CreatedAt,
@@ -253,28 +252,26 @@ INSERT INTO nodes (
     public_key,
     raft_port,
     grpc_port,
-    wireguard_port,
     primary_endpoint,
-    additional_endpoints,
+    wireguard_endpoints,
     zone_awareness_id,
     network_ipv6,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type RestoreNodeParams struct {
-	ID                  string         `json:"id"`
-	PublicKey           sql.NullString `json:"public_key"`
-	RaftPort            int64          `json:"raft_port"`
-	GrpcPort            int64          `json:"grpc_port"`
-	WireguardPort       int64          `json:"wireguard_port"`
-	PrimaryEndpoint     sql.NullString `json:"primary_endpoint"`
-	AdditionalEndpoints sql.NullString `json:"additional_endpoints"`
-	ZoneAwarenessID     sql.NullString `json:"zone_awareness_id"`
-	NetworkIpv6         sql.NullString `json:"network_ipv6"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
+	ID                 string         `json:"id"`
+	PublicKey          sql.NullString `json:"public_key"`
+	RaftPort           int64          `json:"raft_port"`
+	GrpcPort           int64          `json:"grpc_port"`
+	PrimaryEndpoint    sql.NullString `json:"primary_endpoint"`
+	WireguardEndpoints sql.NullString `json:"wireguard_endpoints"`
+	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
+	NetworkIpv6        sql.NullString `json:"network_ipv6"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
 func (q *Queries) RestoreNode(ctx context.Context, arg RestoreNodeParams) error {
@@ -283,9 +280,8 @@ func (q *Queries) RestoreNode(ctx context.Context, arg RestoreNodeParams) error 
 		arg.PublicKey,
 		arg.RaftPort,
 		arg.GrpcPort,
-		arg.WireguardPort,
 		arg.PrimaryEndpoint,
-		arg.AdditionalEndpoints,
+		arg.WireguardEndpoints,
 		arg.ZoneAwarenessID,
 		arg.NetworkIpv6,
 		arg.CreatedAt,

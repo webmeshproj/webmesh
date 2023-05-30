@@ -56,15 +56,32 @@ func (s *store) bootstrap() error {
 		}
 		// We rejoin as a voter no matter what
 		s.opts.JoinAsVoter = true
-		// Pick an address to rejoin the cluster with.
-		addrs, err := raftdb.New(s.ReadDB()).GetPeerPublicRPCAddresses(ctx, string(s.nodeID))
-		if err != nil {
-			return fmt.Errorf("get peer public rpc addresses: %w", err)
+		if s.opts.BootstrapServers == "" {
+			// We were the only bootstrap server
+			s.log.Info("cluster already bootstrapped, rejoining as voter")
+			// TODO: Configure wireguard and join the cluster
 		}
-		if len(addrs) == 0 {
-			return fmt.Errorf("no public rpc addresses found")
+		// Try to rejoin one of the bootstrap servers
+		servers := strings.Split(s.opts.BootstrapServers, ",")
+		for _, server := range servers {
+			parts := strings.Split(server, "=")
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid bootstrap server: %s", server)
+			}
+			if parts[0] == string(s.nodeID) {
+				continue
+			}
+			addr, err := net.ResolveTCPAddr("tcp", parts[1])
+			if err != nil {
+				return fmt.Errorf("resolve advertise address: %w", err)
+			}
+			if err = s.join(ctx, addr.String()); err != nil {
+				s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
+			}
+			return nil
 		}
-		return s.join(ctx, addrs[0].(string))
+		// We failed to rejoin any of the bootstrap servers
+		return fmt.Errorf("failed to rejoin any bootstrap servers")
 	}
 	s.firstBootstrap = true
 	if s.opts.AdvertiseAddress == "" && s.opts.BootstrapServers == "" {
@@ -240,12 +257,11 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		NetworkIPv6:     networkIPv6,
 		GRPCPort:        s.opts.GRPCAdvertisePort,
 		RaftPort:        s.sl.ListenPort(),
-		WireguardPort:   s.wgopts.ListenPort,
 		PrimaryEndpoint: endpoint,
 		ZoneAwarenessID: s.opts.ZoneAwarenessID,
 	}
-	if s.opts.NodeAdditionalEndpoints != "" {
-		params.AdditionalEndpoints = strings.Split(s.opts.NodeAdditionalEndpoints, ",")
+	if s.opts.NodeWireGuardEndpoints != "" {
+		params.WireGuardEndpoints = strings.Split(s.opts.NodeWireGuardEndpoints, ",")
 	}
 	// Go ahead and generate our private key.
 	s.log.Info("generating wireguard key for ourselves")

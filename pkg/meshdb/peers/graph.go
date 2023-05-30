@@ -64,11 +64,10 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 			String: node.PublicKey.String(),
 			Valid:  true,
 		},
-		GrpcPort:      int64(node.GRPCPort),
-		RaftPort:      int64(node.RaftPort),
-		WireguardPort: int64(node.WireguardPort),
-		CreatedAt:     node.CreatedAt,
-		UpdatedAt:     node.UpdatedAt,
+		GrpcPort:  int64(node.GRPCPort),
+		RaftPort:  int64(node.RaftPort),
+		CreatedAt: node.CreatedAt,
+		UpdatedAt: node.UpdatedAt,
 	}
 	if node.NetworkIPv6.IsValid() {
 		params.NetworkIpv6 = sql.NullString{
@@ -82,9 +81,9 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 			Valid:  true,
 		}
 	}
-	if len(node.AdditionalEndpoints) > 0 {
-		params.AdditionalEndpoints = sql.NullString{
-			String: strings.Join(node.AdditionalEndpoints, ","),
+	if len(node.WireGuardEndpoints) > 0 {
+		params.WireguardEndpoints = sql.NullString{
+			String: strings.Join(node.WireGuardEndpoints, ","),
 			Valid:  true,
 		}
 	}
@@ -120,7 +119,6 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 	node.ZoneAwarenessID = dbnode.ZoneAwarenessID.String
 	node.GRPCPort = int(dbnode.GrpcPort)
 	node.RaftPort = int(dbnode.RaftPort)
-	node.WireguardPort = int(dbnode.WireguardPort)
 	node.CreatedAt = dbnode.CreatedAt
 	node.UpdatedAt = dbnode.UpdatedAt
 	if dbnode.PublicKey.Valid {
@@ -130,8 +128,8 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 			return
 		}
 	}
-	if dbnode.AdditionalEndpoints.Valid {
-		node.AdditionalEndpoints = strings.Split(dbnode.AdditionalEndpoints.String, ",")
+	if dbnode.WireguardEndpoints.Valid {
+		node.WireGuardEndpoints = strings.Split(dbnode.WireguardEndpoints.String, ",")
 	}
 	if dbnode.PrivateAddressV4 != "" {
 		node.PrivateIPv4, err = netip.ParsePrefix(dbnode.PrivateAddressV4)

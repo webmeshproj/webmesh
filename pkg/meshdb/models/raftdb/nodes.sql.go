@@ -41,11 +41,10 @@ SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
     nodes.primary_endpoint AS primary_endpoint,
-    nodes.additional_endpoints AS additional_endpoints,
+    nodes.wireguard_endpoints AS wireguard_endpoints,
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.wireguard_port AS wireguard_port,
     nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
     nodes.updated_at AS updated_at,
@@ -56,18 +55,17 @@ WHERE nodes.id = ?
 `
 
 type GetNodeRow struct {
-	ID                  string         `json:"id"`
-	PublicKey           sql.NullString `json:"public_key"`
-	PrimaryEndpoint     sql.NullString `json:"primary_endpoint"`
-	AdditionalEndpoints sql.NullString `json:"additional_endpoints"`
-	ZoneAwarenessID     sql.NullString `json:"zone_awareness_id"`
-	GrpcPort            int64          `json:"grpc_port"`
-	RaftPort            int64          `json:"raft_port"`
-	WireguardPort       int64          `json:"wireguard_port"`
-	NetworkIpv6         sql.NullString `json:"network_ipv6"`
-	PrivateAddressV4    string         `json:"private_address_v4"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	CreatedAt           time.Time      `json:"created_at"`
+	ID                 string         `json:"id"`
+	PublicKey          sql.NullString `json:"public_key"`
+	PrimaryEndpoint    sql.NullString `json:"primary_endpoint"`
+	WireguardEndpoints sql.NullString `json:"wireguard_endpoints"`
+	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
+	GrpcPort           int64          `json:"grpc_port"`
+	RaftPort           int64          `json:"raft_port"`
+	NetworkIpv6        sql.NullString `json:"network_ipv6"`
+	PrivateAddressV4   string         `json:"private_address_v4"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	CreatedAt          time.Time      `json:"created_at"`
 }
 
 func (q *Queries) GetNode(ctx context.Context, id string) (GetNodeRow, error) {
@@ -77,11 +75,10 @@ func (q *Queries) GetNode(ctx context.Context, id string) (GetNodeRow, error) {
 		&i.ID,
 		&i.PublicKey,
 		&i.PrimaryEndpoint,
-		&i.AdditionalEndpoints,
+		&i.WireguardEndpoints,
 		&i.ZoneAwarenessID,
 		&i.GrpcPort,
 		&i.RaftPort,
-		&i.WireguardPort,
 		&i.NetworkIpv6,
 		&i.PrivateAddressV4,
 		&i.UpdatedAt,
@@ -106,40 +103,37 @@ INSERT INTO nodes (
     id,
     public_key,
     primary_endpoint,
-    additional_endpoints,
+    wireguard_endpoints,
     zone_awareness_id,
     network_ipv6,
     grpc_port,
     raft_port,
-    wireguard_port,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (id) DO UPDATE SET
     public_key = EXCLUDED.public_key,
     primary_endpoint = EXCLUDED.primary_endpoint,
-    additional_endpoints = EXCLUDED.additional_endpoints,
+    wireguard_endpoints = EXCLUDED.wireguard_endpoints,
     zone_awareness_id = EXCLUDED.zone_awareness_id,
     network_ipv6 = EXCLUDED.network_ipv6,
     grpc_port = EXCLUDED.grpc_port,
     raft_port = EXCLUDED.raft_port,
-    wireguard_port = EXCLUDED.wireguard_port,
     updated_at = EXCLUDED.updated_at
-RETURNING id, public_key, raft_port, grpc_port, wireguard_port, primary_endpoint, additional_endpoints, zone_awareness_id, network_ipv6, created_at, updated_at
+RETURNING id, public_key, raft_port, grpc_port, primary_endpoint, wireguard_endpoints, zone_awareness_id, network_ipv6, created_at, updated_at
 `
 
 type InsertNodeParams struct {
-	ID                  string         `json:"id"`
-	PublicKey           sql.NullString `json:"public_key"`
-	PrimaryEndpoint     sql.NullString `json:"primary_endpoint"`
-	AdditionalEndpoints sql.NullString `json:"additional_endpoints"`
-	ZoneAwarenessID     sql.NullString `json:"zone_awareness_id"`
-	NetworkIpv6         sql.NullString `json:"network_ipv6"`
-	GrpcPort            int64          `json:"grpc_port"`
-	RaftPort            int64          `json:"raft_port"`
-	WireguardPort       int64          `json:"wireguard_port"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
+	ID                 string         `json:"id"`
+	PublicKey          sql.NullString `json:"public_key"`
+	PrimaryEndpoint    sql.NullString `json:"primary_endpoint"`
+	WireguardEndpoints sql.NullString `json:"wireguard_endpoints"`
+	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
+	NetworkIpv6        sql.NullString `json:"network_ipv6"`
+	GrpcPort           int64          `json:"grpc_port"`
+	RaftPort           int64          `json:"raft_port"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
 func (q *Queries) InsertNode(ctx context.Context, arg InsertNodeParams) (Node, error) {
@@ -147,12 +141,11 @@ func (q *Queries) InsertNode(ctx context.Context, arg InsertNodeParams) (Node, e
 		arg.ID,
 		arg.PublicKey,
 		arg.PrimaryEndpoint,
-		arg.AdditionalEndpoints,
+		arg.WireguardEndpoints,
 		arg.ZoneAwarenessID,
 		arg.NetworkIpv6,
 		arg.GrpcPort,
 		arg.RaftPort,
-		arg.WireguardPort,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -162,9 +155,8 @@ func (q *Queries) InsertNode(ctx context.Context, arg InsertNodeParams) (Node, e
 		&i.PublicKey,
 		&i.RaftPort,
 		&i.GrpcPort,
-		&i.WireguardPort,
 		&i.PrimaryEndpoint,
-		&i.AdditionalEndpoints,
+		&i.WireguardEndpoints,
 		&i.ZoneAwarenessID,
 		&i.NetworkIpv6,
 		&i.CreatedAt,
@@ -205,11 +197,10 @@ SELECT
     nodes.id AS id,
     nodes.public_key AS public_key,
     nodes.primary_endpoint AS primary_endpoint,
-    nodes.additional_endpoints AS additional_endpoints,
+    nodes.wireguard_endpoints AS wireguard_endpoints,
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.wireguard_port AS wireguard_port,
     nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
     nodes.updated_at AS updated_at,
@@ -219,18 +210,17 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id
 `
 
 type ListNodesRow struct {
-	ID                  string         `json:"id"`
-	PublicKey           sql.NullString `json:"public_key"`
-	PrimaryEndpoint     sql.NullString `json:"primary_endpoint"`
-	AdditionalEndpoints sql.NullString `json:"additional_endpoints"`
-	ZoneAwarenessID     sql.NullString `json:"zone_awareness_id"`
-	GrpcPort            int64          `json:"grpc_port"`
-	RaftPort            int64          `json:"raft_port"`
-	WireguardPort       int64          `json:"wireguard_port"`
-	NetworkIpv6         sql.NullString `json:"network_ipv6"`
-	PrivateAddressV4    string         `json:"private_address_v4"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	CreatedAt           time.Time      `json:"created_at"`
+	ID                 string         `json:"id"`
+	PublicKey          sql.NullString `json:"public_key"`
+	PrimaryEndpoint    sql.NullString `json:"primary_endpoint"`
+	WireguardEndpoints sql.NullString `json:"wireguard_endpoints"`
+	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
+	GrpcPort           int64          `json:"grpc_port"`
+	RaftPort           int64          `json:"raft_port"`
+	NetworkIpv6        sql.NullString `json:"network_ipv6"`
+	PrivateAddressV4   string         `json:"private_address_v4"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	CreatedAt          time.Time      `json:"created_at"`
 }
 
 func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
@@ -246,11 +236,10 @@ func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 			&i.ID,
 			&i.PublicKey,
 			&i.PrimaryEndpoint,
-			&i.AdditionalEndpoints,
+			&i.WireguardEndpoints,
 			&i.ZoneAwarenessID,
 			&i.GrpcPort,
 			&i.RaftPort,
-			&i.WireguardPort,
 			&i.NetworkIpv6,
 			&i.PrivateAddressV4,
 			&i.UpdatedAt,

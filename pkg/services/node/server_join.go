@@ -18,10 +18,10 @@ package node
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
@@ -89,15 +89,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Info("peer already exists, updating")
 		// Peer already exists, update it
 		peer, err = s.peers.Put(ctx, &peers.PutOptions{
-			ID:                  req.GetId(),
-			PublicKey:           publicKey,
-			PrimaryEndpoint:     req.GetPrimaryEndpoint(),
-			AdditionalEndpoints: req.GetAdditionalEndpoints(),
-			ZoneAwarenessID:     req.GetZoneAwarenessId(),
-			NetworkIPv6:         peer.NetworkIPv6,
-			GRPCPort:            int(req.GetGrpcPort()),
-			RaftPort:            int(req.GetRaftPort()),
-			WireguardPort:       int(req.GetWireguardPort()),
+			ID:                 req.GetId(),
+			PublicKey:          publicKey,
+			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
+			WireGuardEndpoints: req.GetWireguardEndpoints(),
+			ZoneAwarenessID:    req.GetZoneAwarenessId(),
+			NetworkIPv6:        peer.NetworkIPv6,
+			GRPCPort:           int(req.GetGrpcPort()),
+			RaftPort:           int(req.GetRaftPort()),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
@@ -110,15 +109,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
 		}
 		peer, err = s.peers.Put(ctx, &peers.PutOptions{
-			ID:                  req.GetId(),
-			PublicKey:           publicKey,
-			PrimaryEndpoint:     req.GetPrimaryEndpoint(),
-			AdditionalEndpoints: req.GetAdditionalEndpoints(),
-			ZoneAwarenessID:     req.GetZoneAwarenessId(),
-			NetworkIPv6:         networkIPv6,
-			GRPCPort:            int(req.GetGrpcPort()),
-			RaftPort:            int(req.GetRaftPort()),
-			WireguardPort:       int(req.GetWireguardPort()),
+			ID:                 req.GetId(),
+			PublicKey:          publicKey,
+			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
+			WireGuardEndpoints: req.GetWireguardEndpoints(),
+			ZoneAwarenessID:    req.GetZoneAwarenessId(),
+			NetworkIPv6:        networkIPv6,
+			GRPCPort:           int(req.GetGrpcPort()),
+			RaftPort:           int(req.GetRaftPort()),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
@@ -221,31 +219,30 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, status.Errorf(codes.Internal, "failed to get adjacency map: %v", err)
 	}
 	ourDescendants := adjacencyMap[req.GetId()]
-	resp.Peers = make([]*v1.WireguardPeer, 0)
+	resp.Peers = make([]*v1.WireGuardPeer, 0)
 	for descendant, edge := range ourDescendants {
 		desc, _ := graph.Vertex(descendant)
 		slog.Debug("found descendant", slog.Any("descendant", desc))
+		// Determine the preferred wireguard endpoint
+		var primaryEndpoint string
+		if desc.PrimaryEndpoint != "" {
+			for _, endpoint := range desc.WireGuardEndpoints {
+				if strings.HasPrefix(endpoint, desc.PrimaryEndpoint) {
+					primaryEndpoint = endpoint
+					break
+				}
+			}
+		}
+		if primaryEndpoint == "" && len(desc.WireGuardEndpoints) > 0 {
+			primaryEndpoint = desc.WireGuardEndpoints[0]
+		}
 		// Each direct child is a wireguard peer
-		peer := &v1.WireguardPeer{
-			Id:              desc.ID,
-			PublicKey:       desc.PublicKey.String(),
-			ZoneAwarenessId: desc.ZoneAwarenessID,
-			PrimaryEndpoint: func() string {
-				if desc.PrimaryEndpoint != "" {
-					return fmt.Sprintf("%s:%d", desc.PrimaryEndpoint, desc.WireguardPort)
-				}
-				return ""
-			}(),
-			AdditionalEndpoints: func() []string {
-				if len(desc.AdditionalEndpoints) > 0 {
-					endpoints := make([]string, 0, len(desc.AdditionalEndpoints))
-					for _, endpoint := range desc.AdditionalEndpoints {
-						endpoints = append(endpoints, fmt.Sprintf("%s:%d", endpoint, desc.WireguardPort))
-					}
-					return endpoints
-				}
-				return nil
-			}(),
+		peer := &v1.WireGuardPeer{
+			Id:                 desc.ID,
+			PublicKey:          desc.PublicKey.String(),
+			ZoneAwarenessId:    desc.ZoneAwarenessID,
+			PrimaryEndpoint:    primaryEndpoint,
+			WireguardEndpoints: desc.WireGuardEndpoints,
 			AddressIpv4: func() string {
 				if desc.PrivateIPv4.IsValid() {
 					return desc.PrivateIPv4.String()

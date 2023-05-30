@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"strings"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -136,8 +137,22 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 			PublicKey:  desc.PublicKey,
 			AllowedIPs: make([]netip.Prefix, 0),
 		}
+		// Determine the preferred endpoint for this peer
+		var primaryEndpoint string
 		if desc.PrimaryEndpoint != "" {
-			addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", desc.PrimaryEndpoint, uint16(desc.WireguardPort)))
+			for _, ep := range desc.WireGuardEndpoints {
+				if strings.HasPrefix(ep, desc.PrimaryEndpoint) {
+					primaryEndpoint = ep
+					break
+				}
+			}
+		}
+		if primaryEndpoint == "" && len(desc.WireGuardEndpoints) > 0 {
+			primaryEndpoint = desc.WireGuardEndpoints[0]
+		}
+		// Resolve the endpoint and check for zone awareness
+		if primaryEndpoint != "" {
+			addr, err := net.ResolveUDPAddr("udp", primaryEndpoint)
 			if err != nil {
 				s.log.Error("could not resolve primary udp addr", slog.String("error", err.Error()))
 			} else {
@@ -155,12 +170,12 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 			}
 			if s.opts.ZoneAwarenessID != "" && desc.ZoneAwarenessID != "" {
 				if desc.ZoneAwarenessID == s.opts.ZoneAwarenessID {
-					if !localCIDRs.Contains(peer.Endpoint.Addr()) && len(desc.AdditionalEndpoints) > 0 {
+					if !localCIDRs.Contains(peer.Endpoint.Addr()) && len(desc.WireGuardEndpoints) > 0 {
 						// We share zone awareness with the peer and their primary endpoint
 						// is not in one of our local CIDRs. We'll try to use one of their
 						// additional endpoints instead.
-						for _, ep := range desc.AdditionalEndpoints {
-							addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", ep, uint16(desc.WireguardPort)))
+						for _, ep := range desc.WireGuardEndpoints {
+							addr, err := net.ResolveUDPAddr("udp", ep)
 							if err != nil {
 								s.log.Error("could not resolve additional udp addr", slog.String("error", err.Error()))
 								continue

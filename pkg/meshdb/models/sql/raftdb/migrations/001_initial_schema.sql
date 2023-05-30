@@ -12,9 +12,8 @@ CREATE TABLE nodes (
     public_key            TEXT,
     raft_port             INTEGER NOT NULL DEFAULT 9444,
     grpc_port             INTEGER NOT NULL DEFAULT 8443,
-    wireguard_port        INTEGER NOT NULL DEFAULT 51820,
     primary_endpoint      TEXT UNIQUE,
-    additional_endpoints  TEXT,
+    wireguard_endpoints   TEXT,
     zone_awareness_id     TEXT,
     network_ipv6          TEXT UNIQUE,
     created_at            TIMESTAMP NOT NULL,
@@ -81,14 +80,6 @@ SELECT
 FROM nodes
 LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 
-CREATE VIEW node_public_raft_addresses AS
-SELECT
-    nodes.id as node_id,
-    nodes.primary_endpoint
-    || ':'
-    || CAST(nodes.raft_port AS TEXT) AS address
-FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
-
 -- +goose Down
 
 DROP TABLE node_edges;
@@ -100,4 +91,3 @@ DROP TABLE mesh_state;
 DROP VIEW node_private_rpc_addresses;
 DROP VIEW node_public_rpc_addresses;
 DROP VIEW node_private_raft_addresses;
-DROP VIEW node_public_raft_addresses;

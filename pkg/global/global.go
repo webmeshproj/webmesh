@@ -30,6 +30,7 @@ import (
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
 	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 const (
@@ -182,25 +183,46 @@ func (o *Options) Overlay(opts ...any) error {
 				v.NoIPv6 = o.NoIPv6
 			}
 			if primaryEndpoint.IsValid() {
-				var raftPort uint64
+				var raftPort, wireguardPort uint16
 				for _, inOpts := range opts {
 					if vopt, ok := inOpts.(*streamlayer.Options); ok {
 						_, port, err := net.SplitHostPort(vopt.ListenAddress)
 						if err != nil {
 							return fmt.Errorf("failed to parse raft listen address: %w", err)
 						}
-						raftPort, _ = strconv.ParseUint(port, 10, 16)
-						break
+						raftPortz, err := strconv.ParseUint(port, 10, 16)
+						if err != nil {
+							return fmt.Errorf("failed to parse raft listen address: %w", err)
+						}
+						raftPort = uint16(raftPortz)
+					}
+				}
+				for _, inOpts := range opts {
+					if vopt, ok := inOpts.(*wireguard.Options); ok {
+						wireguardPort = uint16(vopt.ListenPort)
 					}
 				}
 				if raftPort == 0 {
 					raftPort = 9443
 				}
+				if wireguardPort == 0 {
+					wireguardPort = 51820
+				}
 				if v.NodeEndpoint == "" {
 					v.NodeEndpoint = primaryEndpoint.String()
 				}
-				if v.NodeAdditionalEndpoints == "" && len(endpoints) > 0 {
-					v.NodeAdditionalEndpoints = strings.Join(endpoints.AddrStrings(), ",")
+				if v.NodeWireGuardEndpoints == "" {
+					var eps []string
+					if primaryEndpoint.IsValid() {
+						eps = append(eps, netip.AddrPortFrom(primaryEndpoint, uint16(wireguardPort)).String())
+					}
+					for _, endpoint := range endpoints {
+						ep := netip.AddrPortFrom(endpoint.Addr(), uint16(wireguardPort)).String()
+						if ep != v.NodeEndpoint {
+							eps = append(eps, ep)
+						}
+					}
+					v.NodeWireGuardEndpoints = strings.Join(eps, ",")
 				}
 				if v.AdvertiseAddress == "" {
 					v.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()

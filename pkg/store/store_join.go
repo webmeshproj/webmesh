@@ -122,11 +122,10 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			PublicKey:       key.PublicKey().String(),
 			RaftPort:        int32(s.sl.ListenPort()),
 			GrpcPort:        int32(s.opts.GRPCAdvertisePort),
-			WireguardPort:   int32(s.wgopts.ListenPort),
 			PrimaryEndpoint: s.opts.NodeEndpoint,
-			AdditionalEndpoints: func() []string {
-				if s.opts.NodeAdditionalEndpoints != "" {
-					return strings.Split(s.opts.NodeAdditionalEndpoints, ",")
+			WireguardEndpoints: func() []string {
+				if s.opts.NodeWireGuardEndpoints != "" {
+					return strings.Split(s.opts.NodeWireGuardEndpoints, ",")
 				}
 				return nil
 			}(),
@@ -212,11 +211,11 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		}
 		if s.opts.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() != "" {
 			if peer.GetZoneAwarenessId() == s.opts.ZoneAwarenessID {
-				if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetAdditionalEndpoints()) > 0 {
+				if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetWireguardEndpoints()) > 0 {
 					// We share zone awareness with the peer and their primary endpoint
 					// is not in one of our local CIDRs. We'll try to use one of their
 					// additional endpoints instead.
-					for _, additionalEndpoint := range peer.GetAdditionalEndpoints() {
+					for _, additionalEndpoint := range peer.GetWireguardEndpoints() {
 						addr, err := net.ResolveUDPAddr("udp", additionalEndpoint)
 						if err != nil {
 							log.Error("could not resolve peer primary endpoint", slog.String("error", err.Error()))

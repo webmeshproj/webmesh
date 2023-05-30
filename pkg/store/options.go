@@ -34,7 +34,7 @@ import (
 const (
 	NodeIDEnvVar                    = "STORE_NODE_ID"
 	NodeEndpointEnvVar              = "STORE_NODE_ENDPOINT"
-	NodeAdditionalEndpointsEnvVar   = "STORE_NODE_ADDITIONAL_ENDPOINTS"
+	NodeWireGuardEndpointsEnvVar    = "STORE_NODE_WIREGUARD_ENDPOINTS"
 	DataDirEnvVar                   = "STORE_DATA_DIR"
 	InMemoryEnvVar                  = "STORE_IN_MEMORY"
 	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
@@ -110,8 +110,8 @@ type Options struct {
 	NodeID string `json:"node-id" yaml:"node-id" toml:"node-id"`
 	// NodeEndpoint is the endpoint to broadcast when joining a cluster.
 	NodeEndpoint string `json:"node-endpoint" yaml:"node-endpoint" toml:"node-endpoint"`
-	// NodeAdditionalEndpoints are additional endpoints to broadcast when joining a cluster.
-	NodeAdditionalEndpoints string `json:"node-additional-endpoints" yaml:"node-additional-endpoints" toml:"node-additional-endpoints"`
+	// NodeWireGuardEndpoints are additional WireGuard endpoints to broadcast when joining a cluster.
+	NodeWireGuardEndpoints string `json:"node-wireguard-endpoints" yaml:"node-wireguard-endpoints" toml:"node-wireguard-endpoints"`
 	// DataDir is the directory to store data in.
 	DataDir string `json:"data-dir" yaml:"data-dir" toml:"data-dir"`
 	// InMemory is if the store should be in memory. This should only be used for
@@ -246,11 +246,11 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 but will be replaced with the WireGuard address after bootstrapping.`)
 
 	fl.StringVar(&o.NodeEndpoint, "store.node-endpoint", util.GetEnvDefault(NodeEndpointEnvVar, ""),
-		`The endpoint to broadcast when joining a cluster.
+		`The primary endpoint to broadcast when joining a cluster.
 This is only necessary if the node intends on being publicly accessible.`)
 
-	fl.StringVar(&o.NodeAdditionalEndpoints, "store.node-additional-endpoints", util.GetEnvDefault(NodeAdditionalEndpointsEnvVar, ""),
-		`Comma separated list of additional endpoints to broadcast when joining a cluster.`)
+	fl.StringVar(&o.NodeWireGuardEndpoints, "store.node-wireguard-endpoints", util.GetEnvDefault(NodeWireGuardEndpointsEnvVar, ""),
+		`Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.`)
 
 	fl.StringVar(&o.BootstrapServers, "store.bootstrap-servers", util.GetEnvDefault(BootstrapServersEnvVar, ""),
 		`Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.

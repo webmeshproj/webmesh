@@ -26,10 +26,10 @@ import (
 
 func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Server) *v1.MeshNode {
 	return &v1.MeshNode{
-		Id:                  node.ID,
-		ZoneAwarenessId:     node.ZoneAwarenessID,
-		PrimaryEndpoint:     node.PrimaryEndpoint,
-		AdditionalEndpoints: node.AdditionalEndpoints,
+		Id:                 node.ID,
+		ZoneAwarenessId:    node.ZoneAwarenessID,
+		PrimaryEndpoint:    node.PrimaryEndpoint,
+		WireguardEndpoints: node.WireGuardEndpoints,
 		PublicKey: func() string {
 			if len(node.PublicKey) > 0 {
 				return node.PublicKey.String()

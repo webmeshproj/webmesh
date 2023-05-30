@@ -348,17 +348,18 @@ func (m *Server) newPeerTXTRecord(name string, peer *peers.Node) *dns.TXT {
 		fmt.Sprintf("id=%s", peer.ID),
 		fmt.Sprintf("raft_port=%d", peer.RaftPort),
 		fmt.Sprintf("grpc_port=%d", peer.GRPCPort),
-		fmt.Sprintf("wireguard_port=%d", peer.WireguardPort),
+		fmt.Sprintf("wireguard_endpoints=%s", func() string {
+			if len(peer.WireGuardEndpoints) > 0 {
+				return strings.Join(peer.WireGuardEndpoints, ",")
+			}
+			return "<none>"
+		}()),
 		fmt.Sprintf("primary_endpoint=%s", func() string {
 			if peer.PrimaryEndpoint != "" {
 				return peer.PrimaryEndpoint
 			}
 			return "<none>"
 		}()),
-	}
-	if len(peer.AdditionalEndpoints) > 0 {
-		txtData = append(txtData, fmt.Sprintf("additional_endpoints=%s",
-			strings.Join(peer.AdditionalEndpoints, ",")))
 	}
 	return &dns.TXT{
 		Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 1},
