@@ -19,6 +19,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -59,28 +60,10 @@ func (s *store) bootstrap(ctx context.Context) error {
 			// We were the only bootstrap server
 			s.log.Info("cluster already bootstrapped, rejoining as voter")
 			// TODO: Configure wireguard and join the cluster
-		}
-		// Try to rejoin one of the bootstrap servers
-		servers := strings.Split(s.opts.BootstrapServers, ",")
-		for _, server := range servers {
-			parts := strings.Split(server, "=")
-			if len(parts) != 2 {
-				return fmt.Errorf("invalid bootstrap server: %s", server)
-			}
-			if parts[0] == string(s.nodeID) {
-				continue
-			}
-			addr, err := net.ResolveTCPAddr("tcp", parts[1])
-			if err != nil {
-				return fmt.Errorf("resolve advertise address: %w", err)
-			}
-			if err = s.join(ctx, addr.String()); err != nil {
-				s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
-			}
 			return nil
 		}
-		// We failed to rejoin any of the bootstrap servers
-		return fmt.Errorf("failed to rejoin any bootstrap servers")
+		// Try to rejoin one of the bootstrap servers
+		return s.rejoin(ctx)
 	}
 	s.firstBootstrap = true
 	if s.opts.AdvertiseAddress == "" && s.opts.BootstrapServers == "" {
@@ -155,6 +138,21 @@ func (s *store) bootstrap(ctx context.Context) error {
 	}
 	future := s.raft.BootstrapCluster(cfg)
 	if err := future.Error(); err != nil {
+		// If the error is that we already bootstrapped and
+		// there were other servers to bootstrap with, then
+		// we might just need to rejoin the cluster.
+		if errors.Is(err, raft.ErrCantBootstrap) && s.opts.BootstrapServers != "" {
+			s.log.Info("cluster already bootstrapped, attempting to join as voter")
+			s.log.Info("migrating raft schema to latest version")
+			if err = models.MigrateRaftDB(s.weakData); err != nil {
+				return fmt.Errorf("raft db migrate: %w", err)
+			}
+			if err = models.MigrateLocalDB(s.localData); err != nil {
+				return fmt.Errorf("local db migrate: %w", err)
+			}
+			s.opts.JoinAsVoter = true
+			return s.rejoin(ctx)
+		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
 	s.log.Info("migrating raft schema to latest version")
@@ -391,4 +389,26 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 	joinAddr := net.JoinHostPort(advertiseAddress.Addr().String(), strconv.Itoa(int(grpcPort)))
 	s.opts.JoinAsVoter = true
 	return s.join(ctx, joinAddr)
+}
+
+func (s *store) rejoin(ctx context.Context) error {
+	servers := strings.Split(s.opts.BootstrapServers, ",")
+	for _, server := range servers {
+		parts := strings.Split(server, "=")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid bootstrap server: %s", server)
+		}
+		if parts[0] == string(s.nodeID) {
+			continue
+		}
+		addr, err := net.ResolveTCPAddr("tcp", parts[1])
+		if err != nil {
+			return fmt.Errorf("resolve advertise address: %w", err)
+		}
+		if err = s.join(ctx, addr.String()); err != nil {
+			s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
+		}
+		return nil
+	}
+	return fmt.Errorf("no joinable bootstrap servers found")
 }
