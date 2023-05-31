@@ -410,6 +410,7 @@ func (s *store) rejoin(ctx context.Context) error {
 		}
 		if err = s.join(ctx, addr.String()); err != nil {
 			s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
+			continue
 		}
 		return nil
 	}
