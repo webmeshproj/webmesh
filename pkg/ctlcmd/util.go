@@ -36,6 +36,11 @@ func completeNodes(maxNodes int) func(*cobra.Command, []string, string) ([]strin
 		if len(args) >= maxNodes {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
+		if configFileFlag != "" {
+			if err := cliConfig.LoadFile(configFileFlag); err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+		}
 		client, closer, err := cliConfig.NewMeshClient()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError

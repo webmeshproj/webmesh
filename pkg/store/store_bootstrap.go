@@ -393,6 +393,9 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 
 func (s *store) rejoin(ctx context.Context) error {
 	servers := strings.Split(s.opts.BootstrapServers, ",")
+	// Make sure we don't retry forever.
+	s.opts.MaxJoinRetries = 2
+	s.opts.JoinTimeout = 5 * time.Second
 	for _, server := range servers {
 		parts := strings.Split(server, "=")
 		if len(parts) != 2 {
