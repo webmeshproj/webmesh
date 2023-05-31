@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"text/template"
 
 	"github.com/pelletier/go-toml/v2"
@@ -51,7 +52,22 @@ func DecodeOptions(in io.ReadCloser, formatHint string, out any) error {
 			if err != nil {
 				return ""
 			}
-			return string(data)
+			return strings.TrimSpace(string(data))
+		},
+		"intFile": func(path string) int {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return 0
+			}
+			var i int
+			_, err = fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &i)
+			if err != nil {
+				return 0
+			}
+			return i
+		},
+		"add": func(a, b int) int {
+			return a + b
 		},
 	})
 	t, err = t.Parse(string(data))
