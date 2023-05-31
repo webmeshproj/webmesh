@@ -128,8 +128,9 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 	if s.opts.ZoneAwarenessID != "" {
 		s.log.Debug("using zone awareness, collecting local CIDRs")
 		localCIDRs, err = util.DetectEndpoints(context.Background(), util.EndpointDetectOpts{
-			DetectPrivate: true,
-			DetectIPv6:    !s.opts.NoIPv6,
+			DetectPrivate:  true,
+			DetectIPv6:     !s.opts.NoIPv6,
+			SkipInterfaces: []string{s.wg.Name()},
 		})
 		s.log.Debug("detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
 		if err != nil {

@@ -214,6 +214,8 @@ type EndpointDetectOpts struct {
 	DetectPrivate bool
 	// AllowRemoteDetection enables remote address detection.
 	AllowRemoteDetection bool
+	// SkipInterfaces contains a list of interfaces to skip.
+	SkipInterfaces []string
 }
 
 type PrefixList []netip.Prefix
@@ -326,6 +328,9 @@ func detectFromInterfaces(opts *EndpointDetectOpts) (PrefixList, error) {
 			continue
 		}
 		if iface.Flags&net.FlagPointToPoint != 0 {
+			continue
+		}
+		if Contains(opts.SkipInterfaces, iface.Name) {
 			continue
 		}
 		addrs, err := iface.Addrs()

@@ -185,8 +185,9 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	if s.opts.ZoneAwarenessID != "" {
 		log.Info("using zone awareness, collecting local CIDRs")
 		localCIDRs, err = util.DetectEndpoints(ctx, util.EndpointDetectOpts{
-			DetectPrivate: true,
-			DetectIPv6:    !s.opts.NoIPv6,
+			DetectPrivate:  true,
+			DetectIPv6:     !s.opts.NoIPv6,
+			SkipInterfaces: []string{s.wg.Name()},
 		})
 		log.Debug("detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
 		if err != nil {
