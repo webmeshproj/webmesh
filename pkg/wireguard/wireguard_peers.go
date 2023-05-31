@@ -133,8 +133,8 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	// Add routes to the allowed IPs
 	for _, ip := range allowedIPs {
 		addr, _ := netip.AddrFromSlice(ip.IP)
-		_, bits := ip.Mask.Size()
-		prefix := netip.PrefixFrom(addr, bits)
+		ones, _ := ip.Mask.Size()
+		prefix := netip.PrefixFrom(addr, ones)
 		if prefix.Addr().Is6() && w.opts.NetworkV6.IsValid() {
 			if w.opts.NetworkV6.Contains(addr) {
 				// Don't readd routes to our own network
