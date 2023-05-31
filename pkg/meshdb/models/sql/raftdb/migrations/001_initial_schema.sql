@@ -9,10 +9,10 @@ CREATE TABLE mesh_state (
 -- Tracks node lifecycle and configuration.
 CREATE TABLE nodes (
     id                    TEXT NOT NULL PRIMARY KEY,
-    public_key            TEXT,
+    public_key            TEXT UNIQUE,
     raft_port             INTEGER NOT NULL DEFAULT 9444,
     grpc_port             INTEGER NOT NULL DEFAULT 8443,
-    primary_endpoint      TEXT UNIQUE,
+    primary_endpoint      TEXT,
     wireguard_endpoints   TEXT,
     zone_awareness_id     TEXT,
     network_ipv6          TEXT UNIQUE,
