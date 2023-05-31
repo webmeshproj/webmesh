@@ -34,7 +34,7 @@ import (
 )
 
 func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.Status, error) {
-	if req.GetId() != "" {
+	if req.GetId() != "" && req.GetId() != string(s.store.ID()) {
 		return s.getRemoteNodeStatus(ctx, req.GetId())
 	}
 	var leader raft.ServerID

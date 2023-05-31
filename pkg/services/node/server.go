@@ -62,6 +62,7 @@ func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature) 
 		raftacls:  raftacls.New(store),
 		features:  features,
 		startedAt: time.Now(),
+		tlsConfig: tlsConfig,
 		log:       slog.Default().With("component", "node-server"),
 	}
 }

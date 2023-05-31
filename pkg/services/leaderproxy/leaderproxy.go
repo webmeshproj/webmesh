@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"github.com/webmeshproj/node/pkg/store"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -31,6 +30,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/webmeshproj/node/pkg/store"
 )
 
 type Interceptor struct {
@@ -117,16 +118,23 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	defer conn.Close()
 	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, string(i.store.ID()))
 	switch info.FullMethod {
+	// Node API
 	case v1.Node_Join_FullMethodName:
 		return v1.NewNodeClient(conn).Join(ctx, req.(*v1.JoinRequest))
 	case v1.Node_Leave_FullMethodName:
 		return v1.NewNodeClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
+	case v1.Node_GetStatus_FullMethodName:
+		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*v1.GetStatusRequest))
+	// Mesh API
 	case v1.Mesh_GetNode_FullMethodName:
 		return v1.NewMeshClient(conn).GetNode(ctx, req.(*v1.GetNodeRequest))
 	case v1.Mesh_ListNodes_FullMethodName:
 		return v1.NewMeshClient(conn).ListNodes(ctx, req.(*emptypb.Empty))
-	case v1.Node_GetStatus_FullMethodName:
-		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*v1.GetStatusRequest))
+	case v1.Mesh_GetMeshGraph_FullMethodName:
+		return v1.NewMeshClient(conn).GetMeshGraph(ctx, req.(*emptypb.Empty))
+	// Peer Discovery
+	case v1.PeerDiscovery_ListPeers_FullMethodName:
+		return v1.NewPeerDiscoveryClient(conn).ListPeers(ctx, req.(*emptypb.Empty))
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}
