@@ -34,6 +34,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
+
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 const (
@@ -107,6 +109,8 @@ type ClusterConfig struct {
 	Server string `yaml:"server,omitempty" json:"server,omitempty"`
 	// Insecure controls whether TLS should be disabled for the cluster connection.
 	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty"`
+	// TLSVerifyChainOnly controls whether only the cluster's TLS chain should be verified.
+	TLSVerifyChainOnly bool `yaml:"tls-verify-chain-only,omitempty" json:"tls-verify-chain-only,omitempty"`
 	// TLSSkipVerify controls whether the cluster's TLS certificate should be verified.
 	TLSSkipVerify bool `yaml:"tls-skip-verify,omitempty" json:"tls-skip-verify,omitempty"`
 	// CertificateAuthorityData is the base64-encoded certificate authority data for the cluster.
@@ -250,6 +254,10 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 		}
 		config.RootCAs = certpool
 		config.InsecureSkipVerify = c.CurrentCluster().TLSSkipVerify
+		if c.CurrentCluster().TLSVerifyChainOnly {
+			config.InsecureSkipVerify = true
+			config.VerifyPeerCertificate = util.VerifyChainOnly
+		}
 	}
 	currentUser := c.CurrentUser()
 	if currentUser.ClientCertificateData == "" || currentUser.ClientKeyData == "" {
