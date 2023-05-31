@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -30,6 +31,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/version"
 )
 
@@ -76,6 +78,9 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 func (s *Server) getRemoteNodeStatus(ctx context.Context, nodeID string) (*v1.Status, error) {
 	addr, err := s.meshstate.GetNodePrivateRPCAddress(ctx, nodeID)
 	if err != nil {
+		if errors.Is(err, state.ErrNodeNotFound) {
+			return nil, status.Errorf(codes.NotFound, "node %s not found", nodeID)
+		}
 		return nil, status.Errorf(codes.FailedPrecondition, "could not find rpc address for node %s: %s", nodeID, err.Error())
 	}
 	var creds credentials.TransportCredentials

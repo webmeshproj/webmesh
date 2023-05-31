@@ -39,6 +39,9 @@ type State interface {
 	ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error)
 }
 
+// ErrNodeNotFound is returned when a node is not found.
+var ErrNodeNotFound = sql.ErrNoRows
+
 type state struct {
 	q raftdb.Querier
 }
