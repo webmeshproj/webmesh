@@ -26,6 +26,8 @@ import (
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+
+	"github.com/webmeshproj/node/pkg/wireguard/system"
 )
 
 // Peer contains configurations for a wireguard peer. When removing,
@@ -140,7 +142,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 			w.log.Debug("adding ipv6 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
-			if err != nil && !IsRouteExists(err) {
+			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
 			}
 		}
@@ -151,7 +153,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 			w.log.Debug("adding ipv4 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
-			if err != nil && !IsRouteExists(err) {
+			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
 			}
 		}

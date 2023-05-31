@@ -19,6 +19,7 @@ package system
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -30,6 +31,11 @@ import (
 
 	"github.com/webmeshproj/node/pkg/util"
 )
+
+// IsRouteExists returns true if the given error is a route exists error.
+func IsRouteExists(err error) bool {
+	return errors.Is(err, ErrRouteExists)
+}
 
 type linuxKernelInterface struct {
 	opts *Options

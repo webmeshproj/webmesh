@@ -30,13 +30,14 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/util"
 	"github.com/webmeshproj/node/pkg/wireguard"
+	"github.com/webmeshproj/node/pkg/wireguard/system"
 )
 
-func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, networkv4, networkv6 netip.Prefix) error {
+func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, meshNetworkV6 netip.Prefix) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
-	s.wgopts.NetworkV4 = networkv4
-	s.wgopts.NetworkV6 = networkv6
+	s.wgopts.NetworkV4 = addressv4
+	s.wgopts.NetworkV6 = addressv6
 	s.wgopts.IsPublic = s.opts.NodeEndpoint != ""
 	s.log.Info("configuring wireguard interface", slog.Any("options", s.wgopts))
 	var err error
@@ -65,16 +66,22 @@ func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, network
 	if err != nil {
 		return fmt.Errorf("wireguard configure: %w", err)
 	}
-	if networkv4.IsValid() {
-		err = s.wg.AddRoute(ctx, networkv4)
-		if err != nil && !wireguard.IsRouteExists(err) {
+	if addressv4.IsValid() {
+		err = s.wg.AddRoute(ctx, addressv4)
+		if err != nil && !system.IsRouteExists(err) {
 			return fmt.Errorf("wireguard add ipv4 route: %w", err)
 		}
 	}
-	if networkv6.IsValid() {
-		err = s.wg.AddRoute(ctx, networkv6)
-		if err != nil && !wireguard.IsRouteExists(err) {
+	if addressv6.IsValid() {
+		err = s.wg.AddRoute(ctx, addressv6)
+		if err != nil && !system.IsRouteExists(err) {
 			return fmt.Errorf("wireguard add ipv6 route: %w", err)
+		}
+	}
+	if meshNetworkV6.IsValid() {
+		err = s.wg.AddRoute(ctx, meshNetworkV6)
+		if err != nil && !system.IsRouteExists(err) {
+			return fmt.Errorf("wireguard add mesh network route: %w", err)
 		}
 	}
 	err = s.fw.AddWireguardForwarding(ctx, s.wg.Name())

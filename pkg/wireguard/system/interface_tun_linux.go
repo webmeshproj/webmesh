@@ -111,27 +111,16 @@ func NewTUN(ctx context.Context, opts *Options) (Interface, error) {
 			log:  logger,
 		},
 	}
-
-	if opts.NetworkV4.IsValid() {
-		if err := iface.kernel.setAddress(ctx, opts.NetworkV4); err != nil {
-			derr := iface.Destroy(ctx)
-			if derr != nil {
-				logger.Error("failed to destroy interface", slog.String("error", derr.Error()))
+	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
+		if addr.IsValid() {
+			err = iface.kernel.setAddress(ctx, addr)
+			if err != nil {
+				iface.uapi.Close()
+				iface.dev.Close()
+				return nil, fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
 			}
-			return nil, err
 		}
 	}
-
-	if opts.NetworkV6.IsValid() {
-		if err := iface.kernel.setAddress(ctx, opts.NetworkV6); err != nil {
-			derr := iface.Destroy(ctx)
-			if derr != nil {
-				logger.Error("failed to destroy interface", slog.String("error", derr.Error()))
-			}
-			return nil, err
-		}
-	}
-
 	return iface, nil
 }
 

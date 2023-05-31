@@ -155,23 +155,29 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		return fmt.Errorf("join request failed")
 	}
 	log.Debug("received join response", slog.Any("resp", resp))
-	var networkv4, networkv6 netip.Prefix
+	var addressv4, addressv6, networkv6 netip.Prefix
 	if resp.AddressIpv4 != "" && !s.opts.NoIPv4 {
-		networkv4, err = netip.ParsePrefix(resp.AddressIpv4)
+		addressv4, err = netip.ParsePrefix(resp.AddressIpv4)
 		if err != nil {
 			return fmt.Errorf("parse ipv4 address: %w", err)
 		}
 	}
-	if resp.NetworkIpv6 != "" && !s.opts.NoIPv6 {
-		networkv6, err = netip.ParsePrefix(resp.NetworkIpv6)
+	if resp.AddressIpv6 != "" && !s.opts.NoIPv6 {
+		addressv6, err = netip.ParsePrefix(resp.AddressIpv6)
 		if err != nil {
 			return fmt.Errorf("parse ipv6 address: %w", err)
 		}
 	}
+	if !s.opts.NoIPv6 {
+		networkv6, err = netip.ParsePrefix(resp.NetworkIpv6)
+		if err != nil {
+			return fmt.Errorf("parse ipv6 network: %w", err)
+		}
+	}
 	log.Info("configuring wireguard",
-		slog.String("networkv4", networkv4.String()),
-		slog.String("networkv6", networkv6.String()))
-	err = s.ConfigureWireguard(ctx, key, networkv4, networkv6)
+		slog.String("networkv4", addressv4.String()),
+		slog.String("networkv6", addressv6.String()))
+	err = s.ConfigureWireguard(ctx, key, addressv4, addressv6, networkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

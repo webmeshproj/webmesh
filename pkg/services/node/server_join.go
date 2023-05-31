@@ -203,7 +203,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Start building the response
 	resp := &v1.JoinResponse{
-		NetworkIpv6: peer.NetworkIPv6.String(),
+		NetworkIpv6: s.ulaPrefix.String(),
+		AddressIpv6: peer.NetworkIPv6.String(),
 		AddressIpv4: func() string {
 			if lease.IsValid() {
 				return lease.String()

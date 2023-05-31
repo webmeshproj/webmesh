@@ -134,56 +134,6 @@ func Random64(prefix netip.Prefix) (netip.Prefix, error) {
 	return netip.PrefixFrom(addr, 64), nil
 }
 
-// Random96 generates a random /96 prefix from a /64 prefix.
-func Random96(prefix netip.Prefix) (netip.Prefix, error) {
-	if !prefix.Addr().Is6() {
-		return netip.Prefix{}, fmt.Errorf("prefix must be IPv6")
-	}
-	if prefix.Bits() != 64 {
-		return netip.Prefix{}, fmt.Errorf("prefix must be /64")
-	}
-
-	// Convert the prefix to a slice
-	ip := prefix.Addr().AsSlice()
-
-	// Set two random interface ID bytes
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	var iface [2]byte
-	binary.BigEndian.PutUint16(iface[:], uint16(r.Intn(65536)))
-	ip[8] = iface[0]
-	ip[9] = iface[1]
-
-	addr, _ := netip.AddrFromSlice(ip)
-	return netip.PrefixFrom(addr, 96), nil
-}
-
-// Random128 generates a random /128 prefix from a /64 prefix.
-func Random128(prefix netip.Prefix) (netip.Prefix, error) {
-	if !prefix.Addr().Is6() {
-		return netip.Prefix{}, fmt.Errorf("prefix must be IPv6")
-	}
-	if prefix.Bits() != 64 {
-		return netip.Prefix{}, fmt.Errorf("prefix must be /64")
-	}
-
-	// Convert the prefix to a slice
-	ip := prefix.Addr().AsSlice()
-
-	// Set random interface bytes
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	ip[8] = byte(r.Intn(256))
-	ip[9] = byte(r.Intn(256))
-	ip[10] = byte(r.Intn(256))
-	ip[11] = byte(r.Intn(256))
-	ip[12] = byte(r.Intn(256))
-	ip[13] = byte(r.Intn(256))
-	ip[14] = byte(r.Intn(256))
-	ip[15] = byte(r.Intn(256))
-
-	addr, _ := netip.AddrFromSlice(ip)
-	return netip.PrefixFrom(addr, 128), nil
-}
-
 // TimeToNTP converts a time.Time object to a 64-bit NTP time.
 func TimeToNTP(t time.Time) uint64 {
 	nsec := uint64(t.Sub(time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)))

@@ -71,7 +71,7 @@ type Store interface {
 	// ConfigureWireguard configures the wireguard interface. This is normally called
 	// when the store is opened through joining a cluster, but can be called again to
 	// reconfigure the interface or after a bootstrap.
-	ConfigureWireguard(ctx context.Context, key wgtypes.Key, networkv4, networkv6 netip.Prefix) error
+	ConfigureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, networkv6 netip.Prefix) error
 	// RefreshWireguardPeers refreshes the wireguard peers. This is normally called
 	// on an interval or when peer observations happen on the cluster. It can also
 	// be called manually to force a refresh.

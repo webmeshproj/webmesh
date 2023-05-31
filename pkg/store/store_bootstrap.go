@@ -349,12 +349,12 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		return fmt.Errorf("add voter: %w", err)
 	}
 	s.log.Info("configuring wireguard interface")
-	err = s.ConfigureWireguard(ctx, wireguardKey, networkv4, func() netip.Prefix {
-		if s.opts.NoIPv6 {
-			return netip.Prefix{}
-		}
-		return networkIPv6
-	}())
+	var networkv6, meshnetworkv6 netip.Prefix
+	if !s.opts.NoIPv6 {
+		networkv6 = networkIPv6
+		meshnetworkv6 = ula
+	}
+	err = s.ConfigureWireguard(ctx, wireguardKey, networkv4, networkv6, meshnetworkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

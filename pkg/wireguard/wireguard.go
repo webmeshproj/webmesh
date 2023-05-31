@@ -19,7 +19,6 @@ package wireguard
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -53,11 +52,6 @@ type Interface interface {
 	Metrics() (*v1.NodeMetrics, error)
 	// Close closes the wireguard interface and all client connections.
 	Close(ctx context.Context) error
-}
-
-// IsRouteExists returns true if the given error is a route exists error.
-func IsRouteExists(err error) bool {
-	return errors.Is(err, system.ErrRouteExists)
 }
 
 type wginterface struct {
