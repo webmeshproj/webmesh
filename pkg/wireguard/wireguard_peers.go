@@ -41,7 +41,7 @@ type Peer struct {
 	AllowedIPs []netip.Prefix `json:"allowedIPs"`
 }
 
-func (p *Peer) MarshalJSON() ([]byte, error) {
+func (p Peer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"id":         p.ID,
 		"publicKey":  p.PublicKey.String(),
@@ -187,7 +187,7 @@ type peerConfigMarshaler struct {
 	wgtypes.PeerConfig
 }
 
-func (m *peerConfigMarshaler) MarshalJSON() ([]byte, error) {
+func (m peerConfigMarshaler) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"public_key":         m.PublicKey.String(),
 		"endpoint":           m.Endpoint.String(),
