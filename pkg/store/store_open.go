@@ -168,6 +168,21 @@ func (s *store) Open() error {
 		if err = s.join(ctx, s.opts.Join); err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
+	} else {
+		// We neither had the bootstrap flag nor the join flag set.
+		// This means we are a possibly a single node cluster.
+		// Recover our previous wireguard configuration and start up.
+		log.Info("migrating raft database")
+		if err = models.MigrateRaftDB(s.weakData); err != nil {
+			return fmt.Errorf("raft db migrate: %w", err)
+		}
+		log.Info("migrating local database")
+		if err = models.MigrateLocalDB(s.localData); err != nil {
+			return fmt.Errorf("local db migrate: %w", err)
+		}
+		if err := s.recoverWireguard(ctx); err != nil {
+			return fmt.Errorf("recover wireguard: %w", err)
+		}
 	}
 	// Register observers.
 	s.observerChan = make(chan raft.Observation, s.opts.ObserverChanBuffer)

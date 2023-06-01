@@ -36,7 +36,6 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -62,27 +61,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 			// This is not foolproof, but it's the best we can do if the bootstrap
 			// flag is left on.
 			s.log.Info("cluster already bootstrapped, rejoining as voter")
-			meshnetworkv6, err := state.New(s).GetULAPrefix(ctx)
-			if err != nil {
-				return fmt.Errorf("get ula prefix: %w", err)
-			}
-			self, err := peers.New(s).Get(ctx, string(s.nodeID))
-			if err != nil {
-				return fmt.Errorf("get self peer: %w", err)
-			}
-			key, err := localdb.New(s.localData).GetCurrentWireguardKey(ctx)
-			if err != nil {
-				return fmt.Errorf("get current wireguard key: %w", err)
-			}
-			wireguardKey, err := wgtypes.ParseKey(key.PrivateKey)
-			if err != nil {
-				return fmt.Errorf("parse wireguard key: %w", err)
-			}
-			err = s.ConfigureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
-			if err != nil {
-				return fmt.Errorf("configure wireguard: %w", err)
-			}
-			return s.RefreshWireguardPeers(ctx)
+			return s.recoverWireguard(ctx)
 		}
 		// Try to rejoin one of the bootstrap servers
 		return s.rejoinBootstrapServer(ctx)
@@ -374,7 +353,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		networkv6 = networkIPv6
 		meshnetworkv6 = ula
 	}
-	err = s.ConfigureWireguard(ctx, wireguardKey, networkv4, networkv6, meshnetworkv6)
+	err = s.configureWireguard(ctx, wireguardKey, networkv4, networkv6, meshnetworkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

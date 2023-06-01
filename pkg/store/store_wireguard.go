@@ -27,13 +27,39 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/firewall"
+	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net/system"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, meshNetworkV6 netip.Prefix) error {
+func (s *store) recoverWireguard(ctx context.Context) error {
+	meshnetworkv6, err := state.New(s).GetULAPrefix(ctx)
+	if err != nil {
+		return fmt.Errorf("get ula prefix: %w", err)
+	}
+	self, err := peers.New(s).Get(ctx, string(s.nodeID))
+	if err != nil {
+		return fmt.Errorf("get self peer: %w", err)
+	}
+	key, err := localdb.New(s.localData).GetCurrentWireguardKey(ctx)
+	if err != nil {
+		return fmt.Errorf("get current wireguard key: %w", err)
+	}
+	wireguardKey, err := wgtypes.ParseKey(key.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("parse wireguard key: %w", err)
+	}
+	err = s.configureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
+	if err != nil {
+		return fmt.Errorf("configure wireguard: %w", err)
+	}
+	return s.RefreshWireguardPeers(ctx)
+}
+
+func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, meshNetworkV6 netip.Prefix) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
 	s.wgopts.NetworkV4 = addressv4

@@ -177,7 +177,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	log.Info("configuring wireguard",
 		slog.String("networkv4", addressv4.String()),
 		slog.String("networkv6", addressv6.String()))
-	err = s.ConfigureWireguard(ctx, key, addressv4, addressv6, networkv6)
+	err = s.configureWireguard(ctx, key, addressv4, addressv6, networkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

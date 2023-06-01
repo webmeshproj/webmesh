@@ -24,7 +24,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"net/netip"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -33,7 +32,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/firewall"
 	"github.com/webmeshproj/node/pkg/meshdb"
@@ -68,10 +66,6 @@ type Store interface {
 	Close() error
 	// Ready returns true if the store is ready to serve requests.
 	Ready() bool
-	// ConfigureWireguard configures the wireguard interface. This is normally called
-	// when the store is opened through joining a cluster, but can be called again to
-	// reconfigure the interface or after a bootstrap.
-	ConfigureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, networkv6 netip.Prefix) error
 	// RefreshWireguardPeers refreshes the wireguard peers. This is normally called
 	// on an interval or when peer observations happen on the cluster. It can also
 	// be called manually to force a refresh.
