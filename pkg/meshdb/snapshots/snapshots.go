@@ -55,11 +55,12 @@ func New(db *sql.DB) Snapshotter {
 }
 
 type snapshotModel struct {
-	State     []raftdb.MeshState `json:"state"`
-	Nodes     []raftdb.Node      `json:"nodes"`
-	Leases    []raftdb.Lease     `json:"leases"`
-	RaftACLs  []raftdb.RaftAcl   `json:"raft_acls"`
-	NodeEdges []raftdb.NodeEdge  `json:"node_edges"`
+	State       []raftdb.MeshState  `json:"state"`
+	Nodes       []raftdb.Node       `json:"nodes"`
+	Leases      []raftdb.Lease      `json:"leases"`
+	RaftACLs    []raftdb.RaftAcl    `json:"raft_acls"`
+	NetworkACLs []raftdb.NetworkAcl `json:"network_acls"`
+	NodeEdges   []raftdb.NodeEdge   `json:"node_edges"`
 }
 
 func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
@@ -83,6 +84,10 @@ func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 	model.RaftACLs, err = q.DumpRaftACLs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("dump raft acls: %w", err)
+	}
+	model.NetworkACLs, err = q.DumpNetworkACLs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("dump network acls: %w", err)
 	}
 	model.NodeEdges, err = q.DumpNodeEdges(ctx)
 	if err != nil {
@@ -144,6 +149,10 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	if err != nil {
 		return fmt.Errorf("drop raft acls: %w", err)
 	}
+	err = q.DropNetworkACLs(ctx)
+	if err != nil {
+		return fmt.Errorf("drop network acls: %w", err)
+	}
 	err = q.DropNodeEdges(ctx)
 	if err != nil {
 		return fmt.Errorf("drop node edges: %w", err)
@@ -202,6 +211,23 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 		})
 		if err != nil {
 			return fmt.Errorf("restore raft acl: %w", err)
+		}
+	}
+	for _, acl := range model.NetworkACLs {
+		s.log.Debug("restoring network acl", slog.Any("acl", acl))
+		// nolint:gosimple
+		err = q.RestoreNetworkACL(ctx, raftdb.RestoreNetworkACLParams{
+			Name:       acl.Name,
+			SrcNodeIds: acl.SrcNodeIds,
+			DstNodeIds: acl.DstNodeIds,
+			SrcCidrs:   acl.SrcCidrs,
+			DstCidrs:   acl.DstCidrs,
+			Action:     acl.Action,
+			CreatedAt:  acl.CreatedAt,
+			UpdatedAt:  acl.UpdatedAt,
+		})
+		if err != nil {
+			return fmt.Errorf("restore network acl: %w", err)
 		}
 	}
 	for _, edge := range model.NodeEdges {

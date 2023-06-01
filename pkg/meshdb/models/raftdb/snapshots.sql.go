@@ -29,6 +29,15 @@ func (q *Queries) DropMeshState(ctx context.Context) error {
 	return err
 }
 
+const DropNetworkACLs = `-- name: DropNetworkACLs :exec
+DELETE FROM network_acls
+`
+
+func (q *Queries) DropNetworkACLs(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropNetworkACLs)
+	return err
+}
+
 const DropNodeEdges = `-- name: DropNodeEdges :exec
 DELETE FROM node_edges
 `
@@ -97,6 +106,42 @@ func (q *Queries) DumpMeshState(ctx context.Context) ([]MeshState, error) {
 	for rows.Next() {
 		var i MeshState
 		if err := rows.Scan(&i.Key, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const DumpNetworkACLs = `-- name: DumpNetworkACLs :many
+SELECT name, src_node_ids, dst_node_ids, src_cidrs, dst_cidrs, "action", created_at, updated_at FROM network_acls
+`
+
+func (q *Queries) DumpNetworkACLs(ctx context.Context) ([]NetworkAcl, error) {
+	rows, err := q.db.QueryContext(ctx, DumpNetworkACLs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NetworkAcl
+	for rows.Next() {
+		var i NetworkAcl
+		if err := rows.Scan(
+			&i.Name,
+			&i.SrcNodeIds,
+			&i.DstNodeIds,
+			&i.SrcCidrs,
+			&i.DstCidrs,
+			&i.Action,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -243,6 +288,44 @@ type RestoreMeshStateParams struct {
 
 func (q *Queries) RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error {
 	_, err := q.db.ExecContext(ctx, RestoreMeshState, arg.Key, arg.Value)
+	return err
+}
+
+const RestoreNetworkACL = `-- name: RestoreNetworkACL :exec
+INSERT INTO network_acls (
+    name,
+    src_node_ids,
+    dst_node_ids,
+    src_cidrs,
+    dst_cidrs,
+    action,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`
+
+type RestoreNetworkACLParams struct {
+	Name       string         `json:"name"`
+	SrcNodeIds sql.NullString `json:"src_node_ids"`
+	DstNodeIds sql.NullString `json:"dst_node_ids"`
+	SrcCidrs   sql.NullString `json:"src_cidrs"`
+	DstCidrs   sql.NullString `json:"dst_cidrs"`
+	Action     int64          `json:"action"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) RestoreNetworkACL(ctx context.Context, arg RestoreNetworkACLParams) error {
+	_, err := q.db.ExecContext(ctx, RestoreNetworkACL,
+		arg.Name,
+		arg.SrcNodeIds,
+		arg.DstNodeIds,
+		arg.SrcCidrs,
+		arg.DstCidrs,
+		arg.Action,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
 	return err
 }
 

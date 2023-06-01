@@ -134,6 +134,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Info("assigned IPv4 address to peer", slog.String("ipv4", lease.String()))
 	}
 
+	// TODO: Evaluate network policy to determine edges
+
 	// Add an edge from the joining server to the caller
 	joiningServer := string(s.store.ID())
 	md, ok := metadata.FromIncomingContext(ctx)

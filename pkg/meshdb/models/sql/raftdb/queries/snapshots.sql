@@ -55,6 +55,24 @@ INSERT INTO raft_acls (
     updated_at
 ) VALUES (?, ?, ?, ?, ?);
 
+-- name: DumpNetworkACLs :many
+SELECT * FROM network_acls;
+
+-- name: DropNetworkACLs :exec
+DELETE FROM network_acls;
+
+-- name: RestoreNetworkACL :exec
+INSERT INTO network_acls (
+    name,
+    src_node_ids,
+    dst_node_ids,
+    src_cidrs,
+    dst_cidrs,
+    action,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
 -- name: DumpNodeEdges :many
 SELECT * FROM node_edges;
 

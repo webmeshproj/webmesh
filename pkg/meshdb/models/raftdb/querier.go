@@ -15,11 +15,13 @@ type Querier interface {
 	DeleteRaftACL(ctx context.Context, name string) error
 	DropLeases(ctx context.Context) error
 	DropMeshState(ctx context.Context) error
+	DropNetworkACLs(ctx context.Context) error
 	DropNodeEdges(ctx context.Context) error
 	DropNodes(ctx context.Context) error
 	DropRaftACLs(ctx context.Context) error
 	DumpLeases(ctx context.Context) ([]Lease, error)
 	DumpMeshState(ctx context.Context) ([]MeshState, error)
+	DumpNetworkACLs(ctx context.Context) ([]NetworkAcl, error)
 	DumpNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	DumpNodes(ctx context.Context) ([]Node, error)
 	DumpRaftACLs(ctx context.Context) ([]RaftAcl, error)
@@ -49,6 +51,7 @@ type Querier interface {
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
 	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error
 	RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error
+	RestoreNetworkACL(ctx context.Context, arg RestoreNetworkACLParams) error
 	RestoreNode(ctx context.Context, arg RestoreNodeParams) error
 	RestoreNodeEdge(ctx context.Context, arg RestoreNodeEdgeParams) error
 	RestoreRaftACL(ctx context.Context, arg RestoreRaftACLParams) error

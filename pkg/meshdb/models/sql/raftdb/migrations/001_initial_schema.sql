@@ -36,6 +36,18 @@ CREATE TABLE raft_acls (
     updated_at  TIMESTAMP NOT NULL
 );
 
+-- Network ACLs determine who can communicate with whom.
+CREATE TABLE network_acls (
+    name         TEXT NOT NULL PRIMARY KEY,
+    src_node_ids TEXT,
+    dst_node_ids TEXT,
+    src_cidrs    TEXT,
+    dst_cidrs    TEXT,
+    action       INTEGER NOT NULL DEFAULT 0,
+    created_at   TIMESTAMP NOT NULL,
+    updated_at   TIMESTAMP NOT NULL
+);
+
 -- Tracks edges between nodes for the mesh graph.
 CREATE TABLE node_edges (
     src_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
@@ -83,6 +95,7 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 -- +goose Down
 
 DROP TABLE node_edges;
+DROP TABLE network_acls;
 DROP TABLE raft_acls;
 DROP TABLE leases;
 DROP TABLE nodes;
