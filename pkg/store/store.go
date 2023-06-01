@@ -39,8 +39,8 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
-	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 var (

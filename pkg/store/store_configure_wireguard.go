@@ -28,9 +28,9 @@ import (
 
 	"github.com/webmeshproj/node/pkg/firewall"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/net/system"
+	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/util"
-	"github.com/webmeshproj/node/pkg/wireguard"
-	"github.com/webmeshproj/node/pkg/wireguard/system"
 )
 
 func (s *store) ConfigureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, meshNetworkV6 netip.Prefix) error {

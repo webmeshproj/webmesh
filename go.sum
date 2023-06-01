@@ -378,12 +378,6 @@ github.com/vishvananda/netlink v1.0.0 h1:bqNY2lgheFIu1meHUFSH3d7vG93AFyqg3oGbJCO
 github.com/vishvananda/netlink v1.0.0/go.mod h1:+SR5DhBJrl6ZM7CoCKvpw5BKroDKQ+PJqOg65H/2ktk=
 github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f h1:nBX3nTcmxEtHSERBJaIo1Qa26VwRaopnZmfDQUXsF4I=
 github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f/go.mod h1:ZjcWmFBXmLKZu9Nxj3WKYEafiSqer2rnvPr0en9UNpI=
-github.com/webmeshproj/api v0.0.0-20230529111942-442d139d73b0 h1:G2crDmeJOsq3W2KhbFYnflJQxplRuUZ45XASTrEMymA=
-github.com/webmeshproj/api v0.0.0-20230529111942-442d139d73b0/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
-github.com/webmeshproj/api v0.0.0-20230530105757-a316d202ed58 h1:i7WthHYYpCyUlAkfgmIvS4AN9QnYCQiA5ZEttcKVvhU=
-github.com/webmeshproj/api v0.0.0-20230530105757-a316d202ed58/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
-github.com/webmeshproj/api v0.0.0-20230530111959-5c5b7a2dc719 h1:AlVrMcf223PpI/b7EX5wzWCU/EzxoR9PAY1PcmJfXAQ=
-github.com/webmeshproj/api v0.0.0-20230530111959-5c5b7a2dc719/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.0.0-20230531001944-f923d019d4fe h1:fhESn/dlUIeyhptBQF6UGcJyZSu097uuPgCajT31DHA=
 github.com/webmeshproj/api v0.0.0-20230531001944-f923d019d4fe/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

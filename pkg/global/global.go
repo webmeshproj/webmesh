@@ -26,11 +26,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/services"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
 	"github.com/webmeshproj/node/pkg/util"
-	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 const (

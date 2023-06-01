@@ -27,10 +27,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/services/meshdns"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
-	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 // Options are options for configuring the connect command.

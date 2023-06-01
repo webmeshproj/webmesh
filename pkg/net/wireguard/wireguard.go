@@ -29,8 +29,8 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
+	"github.com/webmeshproj/node/pkg/net/system"
 	"github.com/webmeshproj/node/pkg/util"
-	"github.com/webmeshproj/node/pkg/wireguard/system"
 )
 
 // Interface is a high-level interface for managing wireguard connections.

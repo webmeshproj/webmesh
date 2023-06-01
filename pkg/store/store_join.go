@@ -34,8 +34,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
+	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/util"
-	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 func (s *store) join(ctx context.Context, joinAddr string) error {

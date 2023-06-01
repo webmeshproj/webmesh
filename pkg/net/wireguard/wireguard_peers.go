@@ -27,7 +27,7 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/webmeshproj/node/pkg/wireguard/system"
+	"github.com/webmeshproj/node/pkg/net/system"
 )
 
 // Peer contains configurations for a wireguard peer. When removing,

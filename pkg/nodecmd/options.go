@@ -21,10 +21,10 @@ import (
 	"flag"
 
 	"github.com/webmeshproj/node/pkg/global"
+	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/services"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
-	"github.com/webmeshproj/node/pkg/wireguard"
 )
 
 // Options are the node options.
