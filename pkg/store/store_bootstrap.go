@@ -36,6 +36,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -57,13 +58,30 @@ func (s *store) bootstrap(ctx context.Context) error {
 		// We rejoin as a voter no matter what
 		s.opts.JoinAsVoter = true
 		if s.opts.BootstrapServers == "" {
-			// We were the only bootstrap server
+			// We were the only bootstrap server, so we need to rejoin ourselves
+			// This is not foolproof, but it's the best we can do if the bootstrap
+			// flag is left on.
 			s.log.Info("cluster already bootstrapped, rejoining as voter")
-			// TODO: Configure wireguard and join the cluster
-			return nil
+			meshnetworkv6, err := state.New(s).GetULAPrefix(ctx)
+			if err != nil {
+				return fmt.Errorf("get ula prefix: %w", err)
+			}
+			self, err := peers.New(s).Get(ctx, string(s.nodeID))
+			if err != nil {
+				return fmt.Errorf("get self peer: %w", err)
+			}
+			key, err := localdb.New(s.localData).GetCurrentWireguardKey(ctx)
+			if err != nil {
+				return fmt.Errorf("get current wireguard key: %w", err)
+			}
+			wireguardKey, err := wgtypes.ParseKey(key.PrivateKey)
+			if err != nil {
+				return fmt.Errorf("parse wireguard key: %w", err)
+			}
+			return s.ConfigureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
 		}
 		// Try to rejoin one of the bootstrap servers
-		return s.rejoin(ctx)
+		return s.rejoinBootstrapServer(ctx)
 	}
 	s.firstBootstrap = true
 	if s.opts.AdvertiseAddress == "" && s.opts.BootstrapServers == "" {
@@ -151,7 +169,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 				return fmt.Errorf("local db migrate: %w", err)
 			}
 			s.opts.JoinAsVoter = true
-			return s.rejoin(ctx)
+			return s.rejoinBootstrapServer(ctx)
 		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
@@ -391,7 +409,7 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 	return s.join(ctx, joinAddr)
 }
 
-func (s *store) rejoin(ctx context.Context) error {
+func (s *store) rejoinBootstrapServer(ctx context.Context) error {
 	servers := strings.Split(s.opts.BootstrapServers, ",")
 	// Make sure we don't retry forever.
 	s.opts.MaxJoinRetries = 2
