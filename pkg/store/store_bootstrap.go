@@ -78,7 +78,11 @@ func (s *store) bootstrap(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("parse wireguard key: %w", err)
 			}
-			return s.ConfigureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
+			err = s.ConfigureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
+			if err != nil {
+				return fmt.Errorf("configure wireguard: %w", err)
+			}
+			return s.RefreshWireguardPeers(ctx)
 		}
 		// Try to rejoin one of the bootstrap servers
 		return s.rejoinBootstrapServer(ctx)
