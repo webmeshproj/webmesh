@@ -26,10 +26,10 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/webmeshproj/node/pkg/firewall"
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
+	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/system"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/util"

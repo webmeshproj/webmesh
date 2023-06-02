@@ -388,6 +388,8 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 		grpcPort = int64(s.opts.GRPCAdvertisePort)
 	}
 	joinAddr := net.JoinHostPort(advertiseAddress.Addr().String(), strconv.Itoa(int(grpcPort)))
+	s.opts.MaxJoinRetries = 5
+	s.opts.JoinTimeout = 30 * time.Second
 	s.opts.JoinAsVoter = true
 	return s.join(ctx, joinAddr)
 }
@@ -395,8 +397,9 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 func (s *store) rejoinBootstrapServer(ctx context.Context) error {
 	servers := strings.Split(s.opts.BootstrapServers, ",")
 	// Make sure we don't retry forever.
-	s.opts.MaxJoinRetries = 2
-	s.opts.JoinTimeout = 5 * time.Second
+	s.opts.MaxJoinRetries = 5
+	s.opts.JoinTimeout = 30 * time.Second
+	s.opts.JoinAsVoter = true
 	for _, server := range servers {
 		parts := strings.Split(server, "=")
 		if len(parts) != 2 {

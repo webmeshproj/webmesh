@@ -63,6 +63,7 @@ var rootCmd = &cobra.Command{
 	Use:           "wmctl",
 	Short:         "wmctl is a CLI tool for managing a webmesh",
 	SilenceErrors: true,
+	SilenceUsage:  true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if configFileFlag != "" {
 			if err := cliConfig.LoadFile(configFileFlag); err != nil {

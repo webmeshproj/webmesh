@@ -19,6 +19,7 @@ package firewall
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/nftables"
 	"github.com/google/nftables/expr"
@@ -62,7 +63,15 @@ func newFirewall(opts *Options) (Firewall, error) {
 		conn:  conn,
 		dnats: make(map[uint64][]byte),
 	}
-	return fw, fw.initialize()
+	err := fw.initialize()
+	if err != nil {
+		if strings.Contains(err.Error(), "not supported") {
+			// Try to fallback to iptables
+			return newIPTablesFirewall(opts)
+		}
+		return nil, err
+	}
+	return fw, nil
 }
 
 // AddWireguardForwarding should configure the firewall to allow forwarding traffic on the wireguard interface.

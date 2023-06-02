@@ -33,10 +33,10 @@ import (
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/firewall"
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
 )
