@@ -418,5 +418,6 @@ func (s *store) rejoinBootstrapServer(ctx context.Context) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("no joinable bootstrap servers found")
+	s.log.Error("no joinable bootstrap servers found, falling back to wireguard recovery")
+	return s.recoverWireguard(ctx)
 }

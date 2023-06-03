@@ -266,6 +266,28 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		if err != nil {
 			return err
 		}
+		// Try to ping the peer to establish a connection
+		go func(peer *v1.WireGuardPeer) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			var addr netip.Prefix
+			var err error
+			if peer.AddressIpv4 != "" {
+				addr, err = netip.ParsePrefix(peer.AddressIpv4)
+			} else {
+				addr, err = netip.ParsePrefix(peer.AddressIpv6)
+			}
+			if err != nil {
+				s.log.Warn("could not parse address", slog.String("error", err.Error()))
+				return
+			}
+			err = util.Ping(ctx, addr.Addr())
+			if err != nil {
+				s.log.Warn("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
+				return
+			}
+			s.log.Debug("successfully pinged descendant", slog.String("descendant", peer.Id))
+		}(peer)
 	}
 	return nil
 }

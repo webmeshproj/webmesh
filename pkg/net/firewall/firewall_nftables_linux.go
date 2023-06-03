@@ -65,7 +65,7 @@ func newFirewall(opts *Options) (Firewall, error) {
 	}
 	err := fw.initialize()
 	if err != nil {
-		if strings.Contains(err.Error(), "not supported") {
+		if strings.Contains(err.Error(), "not supported") || strings.Contains(err.Error(), "no such file") {
 			// Try to fallback to iptables
 			return newIPTablesFirewall(opts)
 		}

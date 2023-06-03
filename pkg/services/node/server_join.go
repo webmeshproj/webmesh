@@ -162,7 +162,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 	}
 	if req.GetAsVoter() {
-		// Add an edge from the caller to all other voters (including ourselves in the process)
+		// Add an edge from the caller to all other voters
 		config := s.store.Raft().GetConfiguration().Configuration()
 		for _, server := range config.Servers {
 			if server.Suffrage == raft.Voter {
@@ -170,6 +170,45 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				err = s.peers.PutEdge(ctx, peers.Edge{
 					From:   req.GetId(),
 					To:     string(server.ID),
+					Weight: 99,
+				})
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+				}
+				log.Debug("adding edge from voter to caller", slog.String("voter", string(server.ID)))
+				err = s.peers.PutEdge(ctx, peers.Edge{
+					From:   string(server.ID),
+					To:     req.GetId(),
+					Weight: 99,
+				})
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+				}
+			}
+		}
+	}
+	if req.GetPrimaryEndpoint() != "" {
+		// Add an edge from the caller to all other nodes with public endpoints
+		// TODO: This should be made into a query for just the nodes with public endpoints
+		allPeers, err := s.peers.List(ctx)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
+		}
+		for _, peer := range allPeers {
+			if peer.PrimaryEndpoint != "" && peer.ID != req.GetId() {
+				log.Debug("adding edge from caller to peer", slog.String("peer", peer.ID))
+				err = s.peers.PutEdge(ctx, peers.Edge{
+					From:   req.GetId(),
+					To:     peer.ID,
+					Weight: 99,
+				})
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+				}
+				log.Debug("adding edge from peer to caller", slog.String("peer", peer.ID))
+				err = s.peers.PutEdge(ctx, peers.Edge{
+					From:   peer.ID,
+					To:     req.GetId(),
 					Weight: 99,
 				})
 				if err != nil {

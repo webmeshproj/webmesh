@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/dominikbraun/graph v0.22.0
 	github.com/elastic/go-sysinfo v1.10.1
+	github.com/go-ping/ping v1.1.0
 	github.com/golang/snappy v0.0.4
 	github.com/google/go-cmp v0.5.9
 	github.com/google/nftables v0.1.0

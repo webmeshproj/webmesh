@@ -29,11 +29,19 @@ func newIPTablesFirewall(opts *Options) (Firewall, error) {
 	fw := &iptablesFirewall{
 		log: slog.Default().With(slog.String("component", "iptables-firewall")),
 	}
+	var initialRules []string
+	rules, err := fw.execOutput(context.Background(), "-S")
+	if err != nil {
+		return nil, fmt.Errorf("iptables -S: %v", err)
+	}
+	initialRules = append(initialRules, strings.Split(string(rules), "\n")...)
+	fw.initialRules = initialRules
 	return fw, nil
 }
 
 type iptablesFirewall struct {
-	log *slog.Logger
+	log          *slog.Logger
+	initialRules []string
 }
 
 // AddWireguardForwarding should configure the firewall to allow forwarding traffic on the wireguard interface.
@@ -48,7 +56,18 @@ func (fw *iptablesFirewall) AddMasquerade(ctx context.Context, ifaceName string)
 
 // Clear should clear any changes made to the firewall.
 func (fw *iptablesFirewall) Clear(ctx context.Context) error {
-	return fw.exec(ctx, "-F")
+	err := fw.exec(ctx, "-F")
+	if err != nil {
+		return err
+	}
+	// Restore initial rules
+	for _, rule := range fw.initialRules {
+		err = fw.exec(ctx, strings.Fields(rule)...)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Close should close any resources used by the firewall. It should also perform a Clear.
@@ -63,4 +82,10 @@ func (fw *iptablesFirewall) exec(ctx context.Context, args ...string) error {
 		return fmt.Errorf("iptables %v: %v: %s", args, err, out)
 	}
 	return nil
+}
+
+func (rw *iptablesFirewall) execOutput(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "iptables", args...)
+	rw.log.Debug("iptables", slog.String("args", strings.Join(args, " ")))
+	return cmd.CombinedOutput()
 }

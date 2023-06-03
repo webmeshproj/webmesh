@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -162,6 +163,7 @@ func (o *Options) Overlay(opts ...any) error {
 		if err != nil {
 			return fmt.Errorf("failed to detect endpoints: %w", err)
 		}
+		sort.Sort(endpoints)
 		if len(endpoints) > 0 {
 			if !primaryEndpoint.IsValid() {
 				primaryEndpoint = endpoints[0].Addr()
