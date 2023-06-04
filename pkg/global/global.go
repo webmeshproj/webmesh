@@ -184,6 +184,21 @@ func (o *Options) Overlay(opts ...any) error {
 			if !v.NoIPv6 {
 				v.NoIPv6 = o.NoIPv6
 			}
+			if !v.Insecure {
+				v.Insecure = o.Insecure
+			}
+			if !v.VerifyChainOnly {
+				v.VerifyChainOnly = o.VerifyChainOnly
+			}
+			if v.TLSCertFile == "" {
+				v.TLSCertFile = o.TLSCertFile
+			}
+			if v.TLSKeyFile == "" {
+				v.TLSKeyFile = o.TLSKeyFile
+			}
+			if v.TLSCAFile == "" {
+				v.TLSCAFile = o.TLSCAFile
+			}
 			if primaryEndpoint.IsValid() {
 				var raftPort, wireguardPort uint16
 				for _, inOpts := range opts {
@@ -261,6 +276,7 @@ func (o *Options) Overlay(opts ...any) error {
 					v.TURNServerPublicIP = primaryEndpoint.String()
 				}
 			}
+
 		}
 	}
 	return nil
