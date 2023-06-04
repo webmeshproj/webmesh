@@ -19,7 +19,6 @@ package streamlayer
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net"
 	"time"
@@ -30,45 +29,25 @@ import (
 // StreamLayer is the StreamLayer interface.
 type StreamLayer interface {
 	raft.StreamLayer
-
-	// Insecure returns true if the transport is insecure.
-	Insecure() bool
-	// TLSConfig returns the TLS config, if any.
-	TLSConfig() *tls.Config
 	// ListenPort returns the port the transport is listening on.
 	ListenPort() int
 }
 
 // New creates a new stream layer with the given options.
 func New(opts *Options) (StreamLayer, error) {
-	if opts.Insecure {
-		return NewInsecure(opts.ListenAddress)
-	}
-	tlsConfig, err := opts.TLSConfig()
-	if err != nil {
-		return nil, fmt.Errorf("generate tls config: %w", err)
-	}
-	ln, err := tls.Listen("tcp", opts.ListenAddress, tlsConfig)
+	ln, err := net.Listen("tcp", opts.ListenAddress)
 	if err != nil {
 		return nil, fmt.Errorf("listen %q: %w", opts.ListenAddress, err)
 	}
 	return &streamLayer{
 		Listener: ln,
-		Dialer: &tls.Dialer{
-			Config: tlsConfig,
-		},
+		Dialer:   &net.Dialer{},
 	}, nil
 }
 
 type streamLayer struct {
 	net.Listener
-	*tls.Dialer
-}
-
-func (t *streamLayer) Insecure() bool { return false }
-
-func (t *streamLayer) TLSConfig() *tls.Config {
-	return t.Dialer.Config
+	*net.Dialer
 }
 
 func (t *streamLayer) ListenPort() int {
@@ -77,41 +56,6 @@ func (t *streamLayer) ListenPort() int {
 
 // Dial is used to create a new outgoing connection
 func (t *streamLayer) Dial(address raft.ServerAddress, timeout time.Duration) (net.Conn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	return t.DialContext(ctx, "tcp", string(address))
-}
-
-// NewInsecure creates a new insecure transport. This is used for
-// testing only.
-func NewInsecure(listenAddr string) (StreamLayer, error) {
-	ln, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		return nil, fmt.Errorf("listen %q: %w", listenAddr, err)
-	}
-	return &insecureStreamLayer{
-		Listener: ln,
-		Dialer:   &net.Dialer{},
-	}, nil
-}
-
-type insecureStreamLayer struct {
-	net.Listener
-	*net.Dialer
-}
-
-func (t *insecureStreamLayer) Insecure() bool { return true }
-
-func (t *insecureStreamLayer) TLSConfig() *tls.Config {
-	return nil
-}
-
-func (t *insecureStreamLayer) ListenPort() int {
-	return t.Listener.Addr().(*net.TCPAddr).Port
-}
-
-// Dial is used to create a new outgoing connection
-func (t *insecureStreamLayer) Dial(address raft.ServerAddress, timeout time.Duration) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return t.DialContext(ctx, "tcp", string(address))

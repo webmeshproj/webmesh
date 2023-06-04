@@ -93,10 +93,10 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	}
 	log.Info("joining cluster")
 	var creds credentials.TransportCredentials
-	if tlsConfig := s.sl.TLSConfig(); tlsConfig != nil {
-		creds = credentials.NewTLS(tlsConfig)
-	} else {
+	if s.opts.Insecure {
 		creds = insecure.NewCredentials()
+	} else {
+		creds = credentials.NewTLS(s.tlsConfig)
 	}
 	var tries int
 	var resp *v1.JoinResponse
@@ -236,6 +236,9 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 								Zone: addr.Zone,
 							}
 						}
+						log.Debug("evalauting zone awareness endpoint",
+							slog.String("endpoint", addr.String()),
+							slog.String("zone", peer.GetZoneAwarenessId()))
 						ep := addr.AddrPort()
 						if localCIDRs.Contains(ep.Addr()) {
 							// We found an additional endpoint that is in one of our local
@@ -268,7 +271,8 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		}
 		// Try to ping the peer to establish a connection
 		go func(peer *v1.WireGuardPeer) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			// TODO: make this configurable
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			var addr netip.Prefix
 			var err error

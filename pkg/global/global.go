@@ -261,28 +261,6 @@ func (o *Options) Overlay(opts ...any) error {
 					v.TURNServerPublicIP = primaryEndpoint.String()
 				}
 			}
-		case *streamlayer.Options:
-			if !v.Insecure {
-				v.Insecure = o.Insecure
-			}
-			if !v.MTLS {
-				v.MTLS = o.MTLS
-			}
-			if !v.VerifyChainOnly {
-				v.VerifyChainOnly = o.VerifyChainOnly
-			}
-			if v.TLSCertFile == "" {
-				v.TLSCertFile = o.TLSCertFile
-			}
-			if v.TLSKeyFile == "" {
-				v.TLSKeyFile = o.TLSKeyFile
-			}
-			if v.TLSCAFile == "" {
-				v.TLSCAFile = o.TLSCAFile
-			}
-			if v.TLSClientCAFile == "" {
-				v.TLSClientCAFile = o.TLSClientCAFile
-			}
 		}
 	}
 	return nil

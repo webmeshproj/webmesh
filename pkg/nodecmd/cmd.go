@@ -155,7 +155,10 @@ func Execute() error {
 	}
 
 	// Create and open the store
-	st := store.New(sl, opts.Store.Options, opts.Wireguard)
+	st, err := store.New(sl, opts.Store.Options, opts.Wireguard)
+	if err != nil {
+		return fmt.Errorf("failed to create raft store: %w", err)
+	}
 	err = st.Open()
 	if err != nil {
 		return fmt.Errorf("failed to open raft store: %w", err)

@@ -125,18 +125,25 @@ type Store interface {
 }
 
 // New creates a new store.
-func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) Store {
+func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) (Store, error) {
 	log := slog.Default().With(slog.String("component", "store"))
 	nodeID := opts.NodeID
+	var tlsConfig *tls.Config
+	if !opts.Insecure {
+		var err error
+		tlsConfig, err = opts.TLSConfig()
+		if err != nil {
+			return nil, err
+		}
+	}
 	if nodeID == "" || nodeID == hostnameFlagDefault {
 		// First check if we are using mTLS.
-		if !sl.Insecure() && sl.TLSConfig().ClientAuth == tls.RequireAndVerifyClientCert {
-			// If so, use the certificate's CN as the node ID.
-			if len(sl.TLSConfig().Certificates) == 0 {
-				log.Warn("no client certificate provided, generating random UUID for node ID")
+		if tlsConfig != nil {
+			if len(tlsConfig.Certificates) == 0 {
+				log.Warn("no client certificates provided, generating random UUID for node ID")
 				nodeID = uuid.NewString()
 			} else {
-				clientCert := sl.TLSConfig().Certificates[0]
+				clientCert := tlsConfig.Certificates[0]
 				leaf, err := x509.ParseCertificate(clientCert.Certificate[0])
 				if err != nil {
 					log.Warn("unable to parse client certificate, generating random UUID for node ID",
@@ -164,12 +171,13 @@ func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) S
 	return &store{
 		sl:            sl,
 		opts:          opts,
+		tlsConfig:     tlsConfig,
 		wgopts:        wgOpts,
 		nodeID:        raft.ServerID(nodeID),
 		raftLogFormat: RaftLogFormat(opts.RaftLogFormat),
 		readyErr:      make(chan error, 2),
 		log:           log.With(slog.String("node-id", string(nodeID))),
-	}
+	}, nil
 }
 
 type store struct {
@@ -178,7 +186,8 @@ type store struct {
 	wgopts *wireguard.Options
 	log    *slog.Logger
 
-	nodeID raft.ServerID
+	nodeID    raft.ServerID
+	tlsConfig *tls.Config
 
 	readyErr       chan error
 	firstBootstrap bool

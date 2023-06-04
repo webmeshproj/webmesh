@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/netip"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -261,6 +262,31 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 		if err := s.wg.PutPeer(context.Background(), peer); err != nil {
 			return fmt.Errorf("put peer: %w", err)
 		}
+		// Try to ping the peer to establish a connection
+		go func(peer peers.Node) {
+			// TODO: make this configurable
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			var addr netip.Prefix
+			if peer.PrivateIPv4.IsValid() {
+				addr = peer.PrivateIPv4
+			} else if peer.NetworkIPv6.IsValid() {
+				addr = peer.NetworkIPv6
+			} else {
+				s.log.Warn("could not determine address for descendant", slog.String("descendant", peer.ID))
+				return
+			}
+			if err != nil {
+				s.log.Warn("could not parse address", slog.String("error", err.Error()))
+				return
+			}
+			err = util.Ping(ctx, addr.Addr())
+			if err != nil {
+				s.log.Warn("could not ping descendant", slog.String("descendant", peer.ID), slog.String("error", err.Error()))
+				return
+			}
+			s.log.Debug("successfully pinged descendant", slog.String("descendant", peer.ID))
+		}(desc)
 	}
 	return nil
 }

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"os"
 	"sync"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -68,7 +69,9 @@ type wginterface struct {
 
 // New creates a new wireguard interface.
 func New(ctx context.Context, opts *Options) (Interface, error) {
+	log := slog.Default().With("component", "wireguard")
 	if opts.ForceName {
+		log.Info("forcing wireguard interface name", "name", opts.Name)
 		iface, err := net.InterfaceByName(opts.Name)
 		if err != nil {
 			if _, ok := err.(net.UnknownNetworkError); !ok {
@@ -80,6 +83,13 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to delete interface: %w", err)
 			}
+		}
+	}
+	if os.Getuid() == 0 {
+		log.Info("enabling ip forwarding")
+		err := util.EnableIPForwarding()
+		if err != nil {
+			return nil, fmt.Errorf("failed to enable ip forwarding: %w", err)
 		}
 	}
 	var peerConfigs *peerConfigs
@@ -98,6 +108,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			return nil, fmt.Errorf("failed to parse endpoint overrides: %w", err)
 		}
 	}
+	log.Info("creating wireguard interface", "name", opts.Name)
 	iface, err := system.New(ctx, &system.Options{
 		Name:      opts.Name,
 		NetworkV4: opts.NetworkV4,
@@ -119,7 +130,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		peerConfigs: peerConfigs,
 		epOverrides: epOverrides,
 		peers:       make(map[string]wgtypes.Key),
-		log:         slog.Default().With("component", "wireguard"),
+		log:         log,
 	}, nil
 }
 

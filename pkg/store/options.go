@@ -17,9 +17,12 @@ limitations under the License.
 package store
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -58,6 +61,12 @@ const (
 	JoinAsVoterEnvVar               = "STORE_JOIN_AS_VOTER"
 	MaxJoinRetriesEnvVar            = "STORE_MAX_JOIN_RETRIES"
 	JoinTimeoutEnvVar               = "STORE_JOIN_TIMEOUT"
+	CertFileEnvVar                  = "STORE_TLS_CERT_FILE"
+	KeyFileEnvVar                   = "STORE_TLS_KEY_FILE"
+	CAFileEnvVar                    = "STORE_TLS_CA_FILE"
+	VerifyChainOnlyEnvVar           = "STORE_VERIFY_CHAIN_ONLY"
+	InsecureSkipVerifyEnvVar        = "STORE_INSECURE_SKIP_VERIFY"
+	InsecureEnvVar                  = "STORE_INSECURE"
 	ForceNewClusterEnvVar           = "STORE_FORCE_BOOTSTRAP"
 	RaftLogLevelEnvVar              = "STORE_RAFT_LOG_LEVEL"
 	RaftPreferIPv6EnvVar            = "STORE_RAFT_PREFER_IPV6"
@@ -152,6 +161,18 @@ type Options struct {
 	JoinTimeout time.Duration `json:"join-timeout,omitempty" yaml:"join-timeout,omitempty" toml:"join-timeout,omitempty"`
 	// JoinAsVoter is the join as voter flag.
 	JoinAsVoter bool `json:"join-as-voter,omitempty" yaml:"join-as-voter,omitempty" toml:"join-as-voter,omitempty"`
+	// TLSCertFile is the path to the TLS certificate file to present when joining.
+	TLSCertFile string `yaml:"tls-cert-file,omitempty" json:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty"`
+	// TLSKeyFile is the path to the TLS key file for the certificate.
+	TLSKeyFile string `yaml:"tls-key-file,omitempty" json:"tls-key-file,omitempty" toml:"tls-key-file,omitempty"`
+	// TLSCAFile is the path to a TLS CA file. If empty, the system CA pool is used.
+	TLSCAFile string `yaml:"tls-ca-file,omitempty" json:"tls-ca-file,omitempty" toml:"tls-ca-file,omitempty"`
+	// VerifyChainOnly is true if only the certificate chain should be verified.
+	VerifyChainOnly bool `yaml:"verify-chain-only,omitempty" json:"verify-chain-only,omitempty" toml:"verify-chain-only,omitempty"`
+	// InsecureSkipVerify is true if the server TLS cert should not be verified.
+	InsecureSkipVerify bool `yaml:"insecure-skip-verify,omitempty" json:"insecure-skip-verify,omitempty" toml:"insecure-skip-verify,omitempty"`
+	// Insecure is true if TLS should not be used.
+	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty" toml:"insecure,omitempty"`
 	// Bootstrap is the bootstrap flag. If true, the node will
 	// only bootstrap a new cluster if no data is found. To force
 	// bootstrap, set ForceBootstrap to true.
@@ -296,6 +317,7 @@ Ports should be in the form of <node-id>=<port>.`)
 		"Raft snapshot threshold.")
 	fl.Uint64Var(&o.SnapshotRetention, "store.snapshot-retention", uint64(util.GetEnvIntDefault(SnapshotRetentionEnvVar, 3)),
 		"Raft snapshot retention.")
+
 	fl.StringVar(&o.Join, "store.join", util.GetEnvDefault(JoinEnvVar, ""),
 		"Address of a node to join.")
 	fl.IntVar(&o.MaxJoinRetries, "store.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
@@ -304,6 +326,19 @@ Ports should be in the form of <node-id>=<port>.`)
 		"Join timeout.")
 	fl.BoolVar(&o.JoinAsVoter, "store.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
 		"Join the cluster as a voter. Default behavior is to join as an observer.")
+	fl.StringVar(&o.TLSCertFile, "store.tls-cert-file", util.GetEnvDefault(CertFileEnvVar, ""),
+		"Stream layer TLS certificate file.")
+	fl.StringVar(&o.TLSKeyFile, "store.tls-key-file", util.GetEnvDefault(KeyFileEnvVar, ""),
+		"Stream layer TLS key file.")
+	fl.StringVar(&o.TLSCAFile, "store.tls-ca-file", util.GetEnvDefault(CAFileEnvVar, ""),
+		"Stream layer TLS CA file.")
+	fl.BoolVar(&o.VerifyChainOnly, "store.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
+		"Only verify the certificate chain for the stream layer.")
+	fl.BoolVar(&o.InsecureSkipVerify, "store.insecure-skip-verify", util.GetEnvDefault(InsecureSkipVerifyEnvVar, "false") == "true",
+		"Skip verification of the stream layer certificate.")
+	fl.BoolVar(&o.Insecure, "store.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
+		"Don't use TLS for the stream layer.")
+
 	fl.StringVar(&o.RaftLogLevel, "store.raft-log-level", util.GetEnvDefault(RaftLogLevelEnvVar, "info"),
 		"Raft log level.")
 	fl.BoolVar(&o.RaftPreferIPv6, "store.raft-prefer-ipv6", util.GetEnvDefault(RaftPreferIPv6EnvVar, "false") == "true",
@@ -419,6 +454,43 @@ func (o *Options) RaftConfig(id raft.ServerID) *raft.Config {
 	config.LogLevel = hclog.LevelFromString(o.RaftLogLevel).String()
 	config.Logger = o.RaftLogger("raft")
 	return config
+}
+
+// TLSConfig returns the TLS configuration.
+func (o *Options) TLSConfig() (*tls.Config, error) {
+	if o.Insecure {
+		return nil, nil
+	}
+	var config tls.Config
+	if o.TLSCertFile != "" && o.TLSKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(o.TLSCertFile, o.TLSKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("load x509 key pair: %w", err)
+		}
+		config.Certificates = []tls.Certificate{cert}
+	}
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		slog.Default().Warn("failed to load system cert pool", slog.String("error", err.Error()))
+		pool = x509.NewCertPool()
+	}
+	if o.TLSCAFile != "" {
+		ca, err := os.ReadFile(o.TLSCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("read ca file: %w", err)
+		}
+		if ok := pool.AppendCertsFromPEM(ca); !ok {
+			return nil, fmt.Errorf("append certs from pem")
+		}
+	}
+	config.RootCAs = pool
+	if o.VerifyChainOnly {
+		config.InsecureSkipVerify = true
+		config.VerifyPeerCertificate = util.VerifyChainOnly
+	} else if o.InsecureSkipVerify {
+		config.InsecureSkipVerify = true
+	}
+	return &config, nil
 }
 
 // RaftLogger returns a logger for raft operations.

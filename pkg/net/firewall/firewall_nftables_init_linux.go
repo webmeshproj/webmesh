@@ -292,6 +292,30 @@ func (fw *firewall) initInputChain() error {
 				Action: accept,
 			},
 		},
+		{
+			comment: "allow raft",
+			rule: &nftableslib.Rule{
+				L4: &nftableslib.L4Rule{
+					L4Proto: unix.IPPROTO_TCP,
+					Dst: &nftableslib.Port{
+						List: nftableslib.SetPortList([]int{int(fw.opts.RaftPort)}),
+					},
+				},
+				Action: accept,
+			},
+		},
+		{
+			comment: "allow grpc",
+			rule: &nftableslib.Rule{
+				L4: &nftableslib.L4Rule{
+					L4Proto: unix.IPPROTO_TCP,
+					Dst: &nftableslib.Port{
+						List: nftableslib.SetPortList([]int{int(fw.opts.GRPCPort)}),
+					},
+				},
+				Action: accept,
+			},
+		},
 	}
 
 	for _, rule := range rules {

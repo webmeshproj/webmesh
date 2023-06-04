@@ -175,15 +175,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 				}
-				log.Debug("adding edge from voter to caller", slog.String("voter", string(server.ID)))
-				err = s.peers.PutEdge(ctx, peers.Edge{
-					From:   string(server.ID),
-					To:     req.GetId(),
-					Weight: 99,
-				})
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
-				}
+				// log.Debug("adding edge from voter to caller", slog.String("voter", string(server.ID)))
+				// err = s.peers.PutEdge(ctx, peers.Edge{
+				// 	From:   string(server.ID),
+				// 	To:     req.GetId(),
+				// 	Weight: 99,
+				// })
+				// if err != nil {
+				// 	return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+				// }
 			}
 		}
 	}
@@ -205,15 +205,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 				}
-				log.Debug("adding edge from peer to caller", slog.String("peer", peer.ID))
-				err = s.peers.PutEdge(ctx, peers.Edge{
-					From:   peer.ID,
-					To:     req.GetId(),
-					Weight: 99,
-				})
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
-				}
+				// log.Debug("adding edge from peer to caller", slog.String("peer", peer.ID))
+				// err = s.peers.PutEdge(ctx, peers.Edge{
+				// 	From:   peer.ID,
+				// 	To:     req.GetId(),
+				// 	Weight: 99,
+				// })
+				// if err != nil {
+				// 	return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+				// }
 			}
 		}
 	}

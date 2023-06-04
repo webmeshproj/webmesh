@@ -55,6 +55,9 @@ type Options struct {
 	// TLSCAFile is the path to a CA file for verifying the join
 	// server's certificate
 	TLSCAFile string
+	// VerifyChainOnly is whether to only verify the join server's
+	// certificate chain.
+	VerifyChainOnly bool
 	// Insecure is whether to not use TLS when joining the cluster.
 	// This assumes an insecure raft transport as well.
 	Insecure bool
@@ -79,16 +82,17 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	// Configure the stream layer
 	streamlayerOpts := streamlayer.NewOptions()
 	streamlayerOpts.ListenAddress = fmt.Sprintf(":%d", opts.RaftPort)
-	streamlayerOpts.TLSCertFile = opts.TLSCertFile
-	streamlayerOpts.TLSKeyFile = opts.TLSKeyFile
-	streamlayerOpts.TLSCAFile = opts.TLSCAFile
-	streamlayerOpts.Insecure = opts.Insecure
 
 	// Configure the raft store
 	storeOpts := store.NewOptions()
 	storeOpts.InMemory = true
 	storeOpts.RaftLogFormat = string(store.RaftLogFormatProtobufSnappy)
 	storeOpts.Join = opts.JoinServer
+	storeOpts.TLSCertFile = opts.TLSCertFile
+	storeOpts.TLSKeyFile = opts.TLSKeyFile
+	storeOpts.TLSCAFile = opts.TLSCAFile
+	storeOpts.Insecure = opts.Insecure
+	storeOpts.VerifyChainOnly = opts.VerifyChainOnly
 	storeOpts.NoIPv4 = opts.NoIPv4
 	storeOpts.NoIPv6 = opts.NoIPv6
 	storeOpts.LeaveOnShutdown = true
@@ -115,7 +119,10 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	}
 
 	// Create the store
-	st := store.New(sl, storeOpts, wireguardOpts)
+	st, err := store.New(sl, storeOpts, wireguardOpts)
+	if err != nil {
+		return fmt.Errorf("create store: %w", err)
+	}
 	if err := st.Open(); err != nil {
 		return fmt.Errorf("open store: %w", err)
 	}

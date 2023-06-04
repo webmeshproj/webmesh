@@ -45,6 +45,7 @@ func init() {
 	flags.StringVar(&connectOpts.TLSCertFile, "tls-cert-file", "", "path to a TLS certificate file to use for mTLS")
 	flags.StringVar(&connectOpts.TLSKeyFile, "tls-key-file", "", "path to a TLS key file to use for mTLS")
 	flags.StringVar(&connectOpts.TLSCAFile, "tls-ca-file", "", "path to a CA file for verifying the join server's certificate")
+	flags.BoolVar(&connectOpts.VerifyChainOnly, "verify-chain-only", false, "only verify the join server's certificate chain")
 	flags.BoolVar(&connectOpts.Insecure, "insecure", false, "do not use TLS when joining the cluster")
 	flags.BoolVar(&connectOpts.NoIPv4, "no-ipv4", false, "do not use IPv4 when joining the cluster")
 	flags.BoolVar(&connectOpts.NoIPv6, "no-ipv6", false, "do not use IPv6 when joining the cluster")
@@ -85,6 +86,7 @@ func doConnect(cmd *cobra.Command, args []string) error {
 	defer cancel()
 	if connectOpts.JoinServer == "" {
 		connectOpts.JoinServer = cliConfig.CurrentCluster().Server
+		connectOpts.VerifyChainOnly = cliConfig.CurrentCluster().TLSVerifyChainOnly
 		connectOpts.Insecure = cliConfig.CurrentCluster().Insecure
 		if connectOpts.JoinServer == "" {
 			return fmt.Errorf("no join server specified")

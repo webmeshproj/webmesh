@@ -36,10 +36,10 @@ func (s *store) leaveCluster(ctx context.Context) error {
 		return fmt.Errorf("get leader address: %w", err)
 	}
 	var creds credentials.TransportCredentials
-	if s.sl.Insecure() {
+	if s.opts.Insecure {
 		creds = insecure.NewCredentials()
 	} else {
-		creds = credentials.NewTLS(s.sl.TLSConfig())
+		creds = credentials.NewTLS(s.tlsConfig)
 	}
 	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(creds))
 	if err != nil {
