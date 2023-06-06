@@ -26,6 +26,9 @@ import (
 // ErrRouteExists is returned when a route already exists.
 var ErrRouteExists = errors.New("route already exists")
 
+// DefaultMTU is the default MTU for wireguard interfaces.
+const DefaultMTU = 1350
+
 // Interface represents an underlying machine network interface for
 // use with wireguard.
 type Interface interface {

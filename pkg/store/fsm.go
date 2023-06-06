@@ -86,7 +86,11 @@ func (s *store) StoreConfiguration(index uint64, configuration raft.Configuratio
 		s.log.Error("error starting transaction", slog.String("error", err.Error()))
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			s.log.Error("error rolling back transaction", slog.String("error", err.Error()))
+		}
+	}()
 	db := localdb.New(tx)
 	err = db.DropRaftServers(ctx)
 	if err != nil {
