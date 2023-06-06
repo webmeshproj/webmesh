@@ -22,8 +22,15 @@ CREATE TABLE raft_index (
     log_index   INTEGER NOT NULL
 );
 
+CREATE TABLE raft_servers (
+    id       TEXT NOT NULL PRIMARY KEY,
+    suffrage INTEGER NOT NULL,
+    address  TEXT NOT NULL
+);
+
 -- +goose Down
 
 DROP TABLE node_local_kv;
 DROP TABLE wireguard_key;
 DROP TABLE raft_index;
+DROP TABLE raft_servers;

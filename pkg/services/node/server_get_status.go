@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -45,15 +46,26 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 	if err != nil {
 		s.log.Error("failed to lookup current leader", slog.String("error", err.Error()))
 	}
+	stats := s.store.Raft().Stats()
+	var term uint64
+	if termStr, ok := stats["term"]; ok {
+		term, err = strconv.ParseUint(termStr, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
+	ifaceMetrics, err := s.store.Wireguard().Metrics()
+	if err != nil {
+		return nil, err
+	}
 	return &v1.Status{
-		Id:             string(s.store.ID()),
-		Version:        version.Version,
-		Commit:         version.Commit,
-		BuildDate:      version.BuildDate,
-		Uptime:         time.Since(s.startedAt).String(),
-		StartedAt:      timestamppb.New(s.startedAt),
-		Features:       s.features,
-		WireguardPeers: uint32(len(s.store.Wireguard().Peers())),
+		Id:        string(s.store.ID()),
+		Version:   version.Version,
+		Commit:    version.Commit,
+		BuildDate: version.BuildDate,
+		Uptime:    time.Since(s.startedAt).String(),
+		StartedAt: timestamppb.New(s.startedAt),
+		Features:  s.features,
 		ClusterStatus: func() v1.ClusterStatus {
 			if s.store.IsLeader() {
 				return v1.ClusterStatus_CLUSTER_LEADER
@@ -71,7 +83,11 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 			}
 			return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
 		}(),
-		CurrentLeader: string(leader),
+		CurrentLeader:    string(leader),
+		CurrentTerm:      term,
+		LastLogIndex:     s.store.Raft().LastIndex(),
+		LastApplied:      s.store.Raft().AppliedIndex(),
+		InterfaceMetrics: ifaceMetrics,
 	}, nil
 }
 
@@ -89,10 +105,13 @@ func (s *Server) getRemoteNodeStatus(ctx context.Context, nodeID string) (*v1.St
 	} else {
 		creds = credentials.NewTLS(s.tlsConfig)
 	}
+	s.log.Info("dialing node for status", slog.String("node", nodeID), slog.String("addr", addr.String()))
 	conn, err := grpc.DialContext(ctx, addr.String(), grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, status.Errorf(codes.FailedPrecondition, "could not connect to node %s: %s", nodeID, err.Error())
 	}
 	defer conn.Close()
-	return v1.NewNodeClient(conn).GetStatus(ctx, &v1.GetStatusRequest{})
+	return v1.NewNodeClient(conn).GetStatus(ctx, &v1.GetStatusRequest{
+		Id: nodeID,
+	})
 }

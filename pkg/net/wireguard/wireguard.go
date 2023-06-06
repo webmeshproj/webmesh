@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"strings"
 	"sync"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -31,7 +32,6 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/net/system"
-	"github.com/webmeshproj/node/pkg/util"
 )
 
 // Interface is a high-level interface for managing wireguard connections.
@@ -50,7 +50,7 @@ type Interface interface {
 	// IsPublic returns true if this wireguard interface is publicly routable.
 	IsPublic() bool
 	// Metrics returns the metrics for the wireguard interface and the host.
-	Metrics() (*v1.NodeMetrics, error)
+	Metrics() (*v1.InterfaceMetrics, error)
 	// Close closes the wireguard interface and all client connections.
 	Close(ctx context.Context) error
 }
@@ -67,6 +67,11 @@ type wginterface struct {
 	peersMux sync.Mutex
 }
 
+func isInterfaceNotExists(err error) bool {
+	_, ok := err.(net.UnknownNetworkError)
+	return ok || strings.Contains(err.Error(), "no such network interface")
+}
+
 // New creates a new wireguard interface.
 func New(ctx context.Context, opts *Options) (Interface, error) {
 	log := slog.Default().With("component", "wireguard")
@@ -74,12 +79,11 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		log.Info("forcing wireguard interface name", "name", opts.Name)
 		iface, err := net.InterfaceByName(opts.Name)
 		if err != nil {
-			if _, ok := err.(net.UnknownNetworkError); !ok {
+			if !isInterfaceNotExists(err) {
 				return nil, fmt.Errorf("failed to get interface: %w", err)
 			}
-		}
-		if iface != nil {
-			err = util.RemoveInterface(opts.Name)
+		} else if iface != nil {
+			err = system.RemoveInterface(opts.Name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to delete interface: %w", err)
 			}
@@ -87,7 +91,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	}
 	if os.Getuid() == 0 {
 		log.Info("enabling ip forwarding")
-		err := util.EnableIPForwarding()
+		err := system.EnableIPForwarding()
 		if err != nil {
 			return nil, fmt.Errorf("failed to enable ip forwarding: %w", err)
 		}

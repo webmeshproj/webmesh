@@ -43,14 +43,15 @@ import (
 
 const (
 	// General options
-	ListenAddressEnvVar   = "SERVICES_GRPC_LISTEN_ADDRESS"
-	CertFileEnvVar        = "SERVICES_TLS_CERT_FILE"
-	KeyFileEnvVar         = "SERVICES_TLS_KEY_FILE"
-	CAFileEnvVar          = "SERVICES_TLS_CA_FILE"
-	ClientCAFileEnvVar    = "SERVICES_TLS_CLIENT_CA_FILE"
-	MTLSEnvVar            = "SERVICES_MTLS"
-	VerifyChainOnlyEnvVar = "SERVICES_VERIFY_CHAIN_ONLY"
-	InsecureEnvVar        = "SERVICES_INSECURE"
+	ListenAddressEnvVar      = "SERVICES_GRPC_LISTEN_ADDRESS"
+	CertFileEnvVar           = "SERVICES_TLS_CERT_FILE"
+	KeyFileEnvVar            = "SERVICES_TLS_KEY_FILE"
+	CAFileEnvVar             = "SERVICES_TLS_CA_FILE"
+	ClientCAFileEnvVar       = "SERVICES_TLS_CLIENT_CA_FILE"
+	MTLSEnvVar               = "SERVICES_MTLS"
+	VerifyChainOnlyEnvVar    = "SERVICES_VERIFY_CHAIN_ONLY"
+	InsecureSkipVerifyEnvVar = "SERVICES_INSECURE_SKIP_VERIFY"
+	InsecureEnvVar           = "SERVICES_INSECURE"
 
 	// Feature flags
 	EnableMetricsEnvVar          = "SERVICES_ENABLE_METRICS"
@@ -103,6 +104,8 @@ type Options struct {
 	MTLS bool `json:"mtls,omitempty" yaml:"mtls,omitempty" toml:"mtls,omitempty"`
 	// VerifyChainOnly is true if only the chain should be verified.
 	VerifyChainOnly bool `json:"verify-chain-only,omitempty" yaml:"verify-chain-only,omitempty" toml:"verify-chain-only,omitempty"`
+	// InsecureSkipVerify is true if TLS verification should be skipped.
+	InsecureSkipVerify bool `json:"insecure-skip-verify,omitempty" yaml:"insecure-skip-verify,omitempty" toml:"insecure-skip-verify,omitempty"`
 	// Insecure is true if the transport is insecure.
 	Insecure bool `json:"insecure,omitempty" yaml:"insecure,omitempty" toml:"insecure,omitempty"`
 	// EnableMetrics is true if metrics should be enabled.
@@ -193,6 +196,8 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		"Enable mutual TLS.")
 	fs.BoolVar(&o.VerifyChainOnly, "services.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
 		"Only verify the TLS chain.")
+	fs.BoolVar(&o.InsecureSkipVerify, "services.insecure-skip-verify", util.GetEnvDefault(InsecureSkipVerifyEnvVar, "false") == "true",
+		"Skip TLS verification.")
 	fs.BoolVar(&o.Insecure, "services.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Don't use TLS for the gRPC server.")
 	fs.BoolVar(&o.EnableMetrics, "services.enable-metrics", util.GetEnvDefault(EnableMetricsEnvVar, "false") == "true",
@@ -376,6 +381,8 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 	if o.VerifyChainOnly {
 		config.InsecureSkipVerify = true
 		config.VerifyPeerCertificate = util.VerifyChainOnly
+	} else if o.InsecureSkipVerify {
+		config.InsecureSkipVerify = true
 	}
 	return config, nil
 }

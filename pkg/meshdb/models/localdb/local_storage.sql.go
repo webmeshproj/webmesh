@@ -10,6 +10,15 @@ import (
 	"database/sql"
 )
 
+const DropRaftServers = `-- name: DropRaftServers :exec
+DELETE FROM raft_servers
+`
+
+func (q *Queries) DropRaftServers(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropRaftServers)
+	return err
+}
+
 const GetCurrentRaftIndex = `-- name: GetCurrentRaftIndex :one
 SELECT id, term, log_index FROM raft_index LIMIT 1
 `
@@ -30,6 +39,52 @@ func (q *Queries) GetCurrentWireguardKey(ctx context.Context) (WireguardKey, err
 	var i WireguardKey
 	err := row.Scan(&i.ID, &i.PrivateKey, &i.ExpiresAt)
 	return i, err
+}
+
+const GetRaftServers = `-- name: GetRaftServers :many
+SELECT id, suffrage, address FROM raft_servers
+`
+
+func (q *Queries) GetRaftServers(ctx context.Context) ([]RaftServer, error) {
+	rows, err := q.db.QueryContext(ctx, GetRaftServers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RaftServer
+	for rows.Next() {
+		var i RaftServer
+		if err := rows.Scan(&i.ID, &i.Suffrage, &i.Address); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const InsertRaftServer = `-- name: InsertRaftServer :exec
+INSERT INTO raft_servers (
+    id,
+    suffrage,
+    address
+) VALUES (?, ?, ?)
+`
+
+type InsertRaftServerParams struct {
+	ID       string `json:"id"`
+	Suffrage int64  `json:"suffrage"`
+	Address  string `json:"address"`
+}
+
+func (q *Queries) InsertRaftServer(ctx context.Context, arg InsertRaftServerParams) error {
+	_, err := q.db.ExecContext(ctx, InsertRaftServer, arg.ID, arg.Suffrage, arg.Address)
+	return err
 }
 
 const SetCurrentRaftIndex = `-- name: SetCurrentRaftIndex :exec

@@ -22,6 +22,7 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
@@ -47,7 +48,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// TODO: When using mTLS, we should verify the peer certificate
-	// matches the node ID
+	// matches the node ID. A proxy server will need to pass the
+	// certificate through to the node server.
 
 	// We can go ahead and check here if the node is allowed to do what
 	// they want
@@ -78,6 +80,16 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	log := s.log.With("id", req.GetId())
+
+	// Issue a barrier to the raft cluster to ensure all nodes are
+	// fully caught up before we start assigning it addresses
+	log.Info("sending barrier to raft cluster")
+	timeout := time.Second * 10 // TODO: Make this configurable
+	err = s.store.Raft().Barrier(timeout).Error()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
+	}
+	log.Debug("barrier complete, all nodes caught up")
 
 	// Check if the peer already exists
 	var peer peers.Node
@@ -175,15 +187,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 				}
-				// log.Debug("adding edge from voter to caller", slog.String("voter", string(server.ID)))
-				// err = s.peers.PutEdge(ctx, peers.Edge{
-				// 	From:   string(server.ID),
-				// 	To:     req.GetId(),
-				// 	Weight: 99,
-				// })
-				// if err != nil {
-				// 	return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
-				// }
 			}
 		}
 	}
@@ -205,15 +208,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 				}
-				// log.Debug("adding edge from peer to caller", slog.String("peer", peer.ID))
-				// err = s.peers.PutEdge(ctx, peers.Edge{
-				// 	From:   peer.ID,
-				// 	To:     req.GetId(),
-				// 	Weight: 99,
-				// })
-				// if err != nil {
-				// 	return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
-				// }
 			}
 		}
 	}

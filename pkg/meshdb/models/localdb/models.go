@@ -19,6 +19,12 @@ type RaftIndex struct {
 	LogIndex int64 `json:"log_index"`
 }
 
+type RaftServer struct {
+	ID       string `json:"id"`
+	Suffrage int64  `json:"suffrage"`
+	Address  string `json:"address"`
+}
+
 type WireguardKey struct {
 	ID         int64        `json:"id"`
 	PrivateKey string       `json:"private_key"`

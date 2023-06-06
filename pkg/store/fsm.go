@@ -53,16 +53,80 @@ func (s *store) Restore(r io.ReadCloser) error {
 func (s *store) ApplyBatch(logs []*raft.Log) []any {
 	s.log.Debug("applying batch", slog.Int("count", len(logs)))
 	res := make([]any, len(logs))
+	var edgeChange bool
 	for i, l := range logs {
-		res[i] = s.Apply(l)
+		var changed bool
+		changed, res[i] = s.applyLog(l)
+		if changed {
+			edgeChange = true
+		}
+	}
+	if edgeChange && s.wg != nil {
+		defer func() {
+			s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
+			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+				s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
+			}
+		}()
 	}
 	return res
 }
 
+// StoreConfiguration is invoked once a log entry containing a configuration
+// change is committed. It takes the index at which the configuration was
+// written and the configuration value.
+func (s *store) StoreConfiguration(index uint64, configuration raft.Configuration) {
+	if s.opts.InMemory {
+		return
+	}
+	ctx := context.Background()
+	s.log.Debug("storing current raft configuration", slog.Int("index", int(index)))
+	tx, err := s.localData.Begin()
+	if err != nil {
+		s.log.Error("error starting transaction", slog.String("error", err.Error()))
+		return
+	}
+	defer tx.Rollback()
+	db := localdb.New(tx)
+	err = db.DropRaftServers(ctx)
+	if err != nil {
+		s.log.Error("error dropping raft servers", slog.String("error", err.Error()))
+		return
+	}
+	for _, srv := range configuration.Servers {
+		err = db.InsertRaftServer(ctx, localdb.InsertRaftServerParams{
+			ID:       string(srv.ID),
+			Suffrage: int64(srv.Suffrage),
+			Address:  string(srv.Address),
+		})
+		if err != nil {
+			s.log.Error("error inserting raft server", slog.String("error", err.Error()))
+			return
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		s.log.Error("error committing transaction", slog.String("error", err.Error()))
+		return
+	}
+	s.log.Debug("stored current raft configuration", slog.Int("index", int(index)))
+}
+
 // Apply applies a Raft log entry to the store.
 func (s *store) Apply(l *raft.Log) any {
-	ctx := context.Background()
+	edgeChange, res := s.applyLog(l)
+	if edgeChange && s.wg != nil {
+		defer func() {
+			s.log.Debug("applied node edge change, refreshing wireguard peers")
+			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+				s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
+			}
+		}()
+	}
+	return res
+}
 
+func (s *store) applyLog(l *raft.Log) (edgeChange bool, res any) {
 	log := s.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
 	log.Debug("applying log", "type", l.Type.String())
 	start := time.Now()
@@ -80,7 +144,7 @@ func (s *store) Apply(l *raft.Log) any {
 		// apply the log entry.
 		// TODO: This should trigger some sort of recovery.
 		log.Error("error checking last applied index", slog.String("error", err.Error()))
-		return &v1.RaftApplyResponse{
+		return false, &v1.RaftApplyResponse{
 			Time:  time.Since(start).String(),
 			Error: fmt.Sprintf("check last applied index: %s", err.Error()),
 		}
@@ -91,12 +155,12 @@ func (s *store) Apply(l *raft.Log) any {
 
 	if l.Term < dbTerm {
 		log.Debug("received log from old term")
-		return &v1.RaftApplyResponse{
+		return false, &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
 	} else if l.Index <= dbIndex {
 		log.Debug("log already applied to database")
-		return &v1.RaftApplyResponse{
+		return false, &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
 	}
@@ -121,7 +185,7 @@ func (s *store) Apply(l *raft.Log) any {
 
 	if l.Type != raft.LogCommand {
 		// We only care about command logs.
-		return &v1.RaftApplyResponse{
+		return false, &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
 	}
@@ -146,34 +210,13 @@ func (s *store) Apply(l *raft.Log) any {
 		// This is a fatal error. We can't apply the log entry if we can't
 		// decode it. This should never happen.
 		log.Error("error decoding raft log entry", slog.String("error", err.Error()))
-		return &v1.RaftApplyResponse{
+		return false, &v1.RaftApplyResponse{
 			Time:  time.Since(start).String(),
 			Error: fmt.Sprintf("unmarshal raft log entry: %s", err.Error()),
 		}
 	}
 
-	if isEdgeChangeCmd(&cmd) {
-		// This might be a bit of a hack, but the code is generated
-		// and we know exactly what's coming over the wire. We can check
-		// here if an edge is being changed and refresh the wireguard peers
-		if nodeID, ok := isDeleteEdgeCmd(&cmd); ok {
-			// If we are deleting a node edge, grab their public key
-			// so we can remove it from the wireguard config
-			log.Info("node edge being deleted", slog.String("node", nodeID))
-			err := s.wg.DeletePeer(ctx, nodeID)
-			if err != nil {
-				log.Error("error deleting wireguard peer", slog.String("node", nodeID), slog.String("error", err.Error()))
-			}
-		}
-		defer func() {
-			log.Debug("applied node edge change, refreshing wireguard peers")
-			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
-				log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
-			}
-		}()
-	}
-
-	return s.apply(l, &cmd, log, start)
+	return isEdgeChangeCmd(&cmd), s.apply(l, &cmd, log, start)
 }
 
 func (s *store) getDBTermAndIndex() (term, index uint64, err error) {
@@ -200,19 +243,8 @@ func isEdgeChangeCmd(cmd *v1.RaftLogEntry) bool {
 	return sql == raftdb.InsertNode ||
 		sql == raftdb.InsertNodeEdge ||
 		sql == raftdb.InsertNodeLease ||
+		sql == raftdb.UpdateNodeEdge ||
 		sql == raftdb.DeleteNode ||
 		sql == raftdb.DeleteNodeEdge ||
 		sql == raftdb.DeleteNodeEdges
-}
-
-func isDeleteEdgeCmd(cmd *v1.RaftLogEntry) (nodeId string, ok bool) {
-	if cmd.GetType() != v1.RaftCommandType_EXECUTE {
-		return
-	}
-	sql := cmd.GetSqlExec().GetStatement().GetSql()
-	ok = sql == raftdb.DeleteNodeEdge || sql == raftdb.DeleteNodeEdges
-	if ok {
-		nodeId = cmd.GetSqlExec().GetStatement().GetParameters()[0].GetStr()
-	}
-	return
 }

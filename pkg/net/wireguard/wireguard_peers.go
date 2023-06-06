@@ -72,8 +72,8 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	var allowedIPs []net.IPNet
 	if w.opts.PersistentKeepAlive != 0 {
 		keepAlive = &w.opts.PersistentKeepAlive
-	} else if !w.opts.IsPublic {
-		dur := time.Second * 5
+	} else {
+		dur := time.Second * 30
 		keepAlive = &dur
 	}
 	for _, ip := range peer.AllowedIPs {

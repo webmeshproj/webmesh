@@ -22,11 +22,14 @@ import (
 
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
+
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
 
 func (s *store) observe() (closeCh, doneCh chan struct{}) {
 	closeCh = make(chan struct{})
 	doneCh = make(chan struct{})
+	failedHeartbeats := make(map[raft.ServerID]int)
 	go func() {
 		defer close(doneCh)
 		for {
@@ -53,6 +56,32 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					s.log.Debug("ResumedHeartbeatObservation", slog.Any("data", data))
 				case raft.FailedHeartbeatObservation:
 					s.log.Debug("FailedHeartbeatObservation", slog.Any("data", data))
+					if failedHeartbeats[data.PeerID] > 10 {
+						s.log.Error("failed heartbeat", slog.String("peer", string(data.PeerID)))
+						// If the peer is a non voter then we can remove it from the cluster
+						// and it will be re-added when it comes back online.
+						cfg := s.raft.GetConfiguration().Configuration()
+						if s.IsLeader() {
+							for _, srv := range cfg.Servers {
+								if srv.ID == data.PeerID && srv.Suffrage == raft.Nonvoter {
+									s.log.Info("removing non-voting peer from cluster", slog.String("peer", string(data.PeerID)))
+									if err := s.RemoveServer(ctx, string(data.PeerID), false); err != nil {
+										s.log.Error("remove non-voting peer", slog.String("error", err.Error()))
+									}
+									if err := peers.New(s).Delete(ctx, string(data.PeerID)); err != nil {
+										s.log.Error("remove node", slog.String("error", err.Error()))
+									}
+								}
+							}
+						}
+						delete(failedHeartbeats, data.PeerID)
+						continue
+					}
+					if failedHeartbeats[data.PeerID] == 0 {
+						failedHeartbeats[data.PeerID] = 1
+					} else {
+						failedHeartbeats[data.PeerID]++
+					}
 				}
 			}
 		}

@@ -102,7 +102,7 @@ func (fw *firewall) AddMasquerade(ctx context.Context, ifaceName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create masquerade verdict: %w", err)
 	}
-	_, err = fw.output.Rules().CreateImm(&nftableslib.Rule{
+	_, err = fw.postrouting.Rules().CreateImm(&nftableslib.Rule{
 		Meta: &nftableslib.Meta{
 			Expr: []nftableslib.MetaExpr{
 				{

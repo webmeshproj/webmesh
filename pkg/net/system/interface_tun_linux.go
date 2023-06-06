@@ -27,16 +27,13 @@ import (
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
-
-	"github.com/webmeshproj/node/pkg/util"
 )
 
 type linuxTUNInterface struct {
-	opts   *Options
-	log    *slog.Logger
-	kernel *linuxKernelInterface
-	dev    *device.Device
-	uapi   net.Listener
+	opts *Options
+	log  *slog.Logger
+	dev  *device.Device
+	uapi net.Listener
 }
 
 // NewTUN creates a new wireguard interface using the userspace TUN implementation.
@@ -46,7 +43,7 @@ func NewTUN(ctx context.Context, opts *Options) (Interface, error) {
 		slog.String("type", "tun"),
 		slog.String("facility", "device"))
 	if !opts.DefaultGateway.IsValid() {
-		defaultGateway, err := util.GetDefaultGateway(ctx)
+		defaultGateway, err := GetDefaultGateway(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect current default gateway")
 		}
@@ -105,15 +102,10 @@ func NewTUN(ctx context.Context, opts *Options) (Interface, error) {
 		log:  logger,
 		dev:  device,
 		uapi: uapi,
-		// Inherit interface and route management from the kernel implementation
-		kernel: &linuxKernelInterface{
-			opts: opts,
-			log:  logger,
-		},
 	}
 	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
 		if addr.IsValid() {
-			err = iface.kernel.setAddress(ctx, addr)
+			err = SetInterfaceAddress(ctx, opts.Name, addr)
 			if err != nil {
 				iface.uapi.Close()
 				iface.dev.Close()
@@ -141,27 +133,28 @@ func (l *linuxTUNInterface) AddressV6() netip.Prefix {
 
 // Up activates the interface
 func (l *linuxTUNInterface) Up(ctx context.Context) error {
-	return l.kernel.activate(ctx)
+	return ActivateInterface(ctx, l.opts.Name)
 }
 
 // Down deactivates the interface
 func (l *linuxTUNInterface) Down(ctx context.Context) error {
-	return l.kernel.deactivate(ctx)
+	return DeactivateInterface(ctx, l.opts.Name)
 }
 
 // Destroy destroys the interface
 func (l *linuxTUNInterface) Destroy(ctx context.Context) error {
 	l.uapi.Close()
 	l.dev.Close()
+	// The interface destroys itself when the TUN is closed
 	return nil
 }
 
 // AddRoute adds a route for the given network.
 func (l *linuxTUNInterface) AddRoute(ctx context.Context, network netip.Prefix) error {
-	return l.kernel.addRoute(ctx, network)
+	return AddRoute(ctx, l.opts.Name, network)
 }
 
 // RemoveRoute removes the route for the given network.
 func (l *linuxTUNInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
-	return l.kernel.removeRoute(ctx, network)
+	return RemoveRoute(ctx, l.opts.Name, network)
 }

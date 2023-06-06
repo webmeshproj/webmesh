@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package system contains utilities for managing network interfaces on
-// the system.
+// Package system contains utilities for managing network interfaces on the system.
 package system
 
 import (
@@ -63,4 +62,9 @@ type Options struct {
 	ForceTUN bool
 	// Modprobe attempts to load the wireguard kernel module.
 	Modprobe bool
+}
+
+// IsRouteExists returns true if the given error is a route exists error.
+func IsRouteExists(err error) bool {
+	return errors.Is(err, ErrRouteExists)
 }
