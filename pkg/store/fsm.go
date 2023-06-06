@@ -62,12 +62,30 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 		}
 	}
 	if edgeChange && s.wg != nil {
-		defer func() {
-			s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
-			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
-				s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
-			}
-		}()
+		if s.raft.LastIndex() == s.lastAppliedIndex.Load() {
+			defer func() {
+				s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
+				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+					s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
+				}
+			}()
+		}
+	}
+	return res
+}
+
+// Apply applies a Raft log entry to the store.
+func (s *store) Apply(l *raft.Log) any {
+	edgeChange, res := s.applyLog(l)
+	if edgeChange && s.wg != nil {
+		if s.raft.LastIndex() == s.lastAppliedIndex.Load() {
+			defer func() {
+				s.log.Debug("applied node edge change, refreshing wireguard peers")
+				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+					s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
+				}
+			}()
+		}
 	}
 	return res
 }
@@ -116,20 +134,6 @@ func (s *store) StoreConfiguration(index uint64, configuration raft.Configuratio
 	s.log.Debug("stored current raft configuration", slog.Int("index", int(index)))
 }
 
-// Apply applies a Raft log entry to the store.
-func (s *store) Apply(l *raft.Log) any {
-	edgeChange, res := s.applyLog(l)
-	if edgeChange && s.wg != nil {
-		defer func() {
-			s.log.Debug("applied node edge change, refreshing wireguard peers")
-			if err := s.RefreshWireguardPeers(context.Background()); err != nil {
-				s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
-			}
-		}()
-	}
-	return res
-}
-
 func (s *store) applyLog(l *raft.Log) (edgeChange bool, res any) {
 	log := s.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
 	log.Debug("applying log", "type", l.Type.String())
@@ -137,7 +141,7 @@ func (s *store) applyLog(l *raft.Log) (edgeChange bool, res any) {
 	defer func() {
 		log.Debug("finished applying log", slog.String("took", time.Since(start).String()))
 	}()
-	defer s.raftIndex.Store(l.Index)
+	defer s.lastAppliedIndex.Store(l.Index)
 
 	// Validate and store the term/index to the local DB
 

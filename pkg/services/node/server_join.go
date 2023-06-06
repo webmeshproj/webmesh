@@ -174,7 +174,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	if req.GetPrimaryEndpoint() != "" {
 		// Add an edge from the caller to all other nodes
-		// TODO: This should be done according to network policy
+		// TODO: This should be done according to network policy and batched
 		allPeers, err := s.peers.List(ctx)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
@@ -185,6 +185,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				err = s.peers.PutEdge(ctx, peers.Edge{
 					From:   peer.ID,
 					To:     req.GetId(),
+					Weight: 99,
+				})
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+				}
+				log.Debug("adding edge public caller to peer", slog.String("peer", peer.ID))
+				err = s.peers.PutEdge(ctx, peers.Edge{
+					From:   req.GetId(),
+					To:     peer.ID,
 					Weight: 99,
 				})
 				if err != nil {

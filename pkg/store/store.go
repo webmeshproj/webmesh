@@ -192,14 +192,14 @@ type store struct {
 	readyErr       chan error
 	firstBootstrap bool
 
-	raft          *raft.Raft
-	raftIndex     atomic.Uint64
-	raftTransport *raft.NetworkTransport
-	raftSnapshots raft.SnapshotStore
-	logDB         LogStoreCloser
-	stableDB      StableStoreCloser
-	raftLogFormat RaftLogFormat
-	snapshotter   snapshots.Snapshotter
+	raft             *raft.Raft
+	lastAppliedIndex atomic.Uint64
+	raftTransport    *raft.NetworkTransport
+	raftSnapshots    raft.SnapshotStore
+	logDB            LogStoreCloser
+	stableDB         StableStoreCloser
+	raftLogFormat    RaftLogFormat
+	snapshotter      snapshots.Snapshotter
 
 	observerChan                chan raft.Observation
 	observer                    *raft.Observer

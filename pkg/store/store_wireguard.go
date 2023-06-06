@@ -127,8 +127,6 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	if s.wg == nil {
 		return nil
 	}
-	s.wgmux.Lock()
-	defer s.wgmux.Unlock()
 	err := s.walkMeshDescendants(peers.NewGraph(s))
 	if err != nil {
 		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
@@ -138,6 +136,9 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 }
 
 func (s *store) walkMeshDescendants(graph peers.Graph) error {
+	s.wgmux.Lock()
+	defer s.wgmux.Unlock()
+
 	currentPeers := s.wg.Peers()
 	seenPeers := make(map[string]struct{})
 	// This is currently hacked into the FSM apply function
