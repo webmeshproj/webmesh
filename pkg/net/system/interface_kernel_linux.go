@@ -19,6 +19,7 @@ package system
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/netip"
 
 	"github.com/jsimonetti/rtnetlink"
@@ -27,6 +28,8 @@ import (
 	"pault.ag/go/modprobe"
 )
 
+const DefaultMTU = 1300
+
 type linuxKernelInterface struct {
 	opts *Options
 	log  *slog.Logger
@@ -34,6 +37,30 @@ type linuxKernelInterface struct {
 
 // New creates a new wireguard interface.
 func New(ctx context.Context, opts *Options) (Interface, error) {
+	if opts.MTU == 0 {
+		// Try to get the MTU from the default interface
+		ifaces, err := net.Interfaces()
+		if err != nil {
+			return nil, fmt.Errorf("get interfaces: %w", err)
+		}
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback != 0 {
+				continue
+			}
+			if iface.Flags&net.FlagUp == 0 {
+				continue
+			}
+			mtu := iface.MTU
+			if mtu < DefaultMTU {
+				continue
+			}
+			opts.MTU = uint32(mtu)
+			break
+		}
+		if opts.MTU == 0 {
+			opts.MTU = DefaultMTU
+		}
+	}
 	if opts.ForceTUN {
 		return NewTUN(ctx, opts)
 	}
@@ -121,6 +148,7 @@ func (l *linuxKernelInterface) create(ctx context.Context) error {
 			Name:  name,
 			Alias: &name,
 			Type:  unix.ARPHRD_NETROM,
+			MTU:   l.opts.MTU,
 			Info:  &rtnetlink.LinkInfo{Kind: "wireguard"},
 		},
 	}

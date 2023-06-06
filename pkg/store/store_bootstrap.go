@@ -268,25 +268,13 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	if err != nil {
 		return fmt.Errorf("generate random IPv6: %w", err)
 	}
-	var endpoint string
-	if s.opts.NodeEndpoint != "" {
-		endpoint = s.opts.NodeEndpoint
-	} else {
-		// We will use the address of our advertise interface.
-		listenAddr := s.sl.Addr()
-		if listenAddr == nil {
-			return fmt.Errorf("no advertise address available")
-		}
-		trimPort := strings.Split(listenAddr.String(), ":")[0]
-		endpoint = trimPort
-	}
 	p := peers.New(s)
 	params := &peers.PutOptions{
 		ID:              string(s.nodeID),
 		NetworkIPv6:     networkIPv6,
 		GRPCPort:        s.opts.GRPCAdvertisePort,
 		RaftPort:        s.sl.ListenPort(),
-		PrimaryEndpoint: endpoint,
+		PrimaryEndpoint: s.opts.NodeEndpoint,
 		ZoneAwarenessID: s.opts.ZoneAwarenessID,
 	}
 	if s.opts.NodeWireGuardEndpoints != "" {
@@ -303,6 +291,59 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 	_, err = p.Put(ctx, params)
 	if err != nil {
 		return fmt.Errorf("create node: %w", err)
+	}
+	// Pre-create slots and edges for the other bootstrap servers.
+	cfg := s.raft.GetConfiguration().Configuration()
+	for _, server := range cfg.Servers {
+		if server.ID == s.nodeID {
+			continue
+		}
+		s.log.Info("creating node in database for bootstrap server",
+			slog.String("server-id", string(server.ID)),
+		)
+		// The server will generate and replace this when they join,
+		// but the database will reject a non-unique key.
+		key, err := wgtypes.GeneratePrivateKey()
+		if err != nil {
+			return fmt.Errorf("generate private key: %w", err)
+		}
+		// Generate an IPv6 address for the node.
+		networkIPv6, err := util.Random64(ula)
+		if err != nil {
+			return fmt.Errorf("generate random IPv6: %w", err)
+		}
+		_, err = p.Put(ctx, &peers.PutOptions{
+			ID:          string(server.ID),
+			PublicKey:   key.PublicKey(),
+			NetworkIPv6: networkIPv6,
+		})
+		if err != nil {
+			return fmt.Errorf("create node: %w", err)
+		}
+		err = s.raft.Barrier(time.Second * 5).Error()
+		if err != nil {
+			return fmt.Errorf("barrier: %w", err)
+		}
+	}
+	// Do the loop again for edges
+	for _, server := range cfg.Servers {
+		for _, peer := range cfg.Servers {
+			if peer.ID == server.ID {
+				continue
+			}
+			s.log.Info("creating edge in database for bootstrap server",
+				slog.String("server-id", string(server.ID)),
+				slog.String("peer-id", string(peer.ID)),
+			)
+			err = p.PutEdge(ctx, peers.Edge{
+				From:   string(server.ID),
+				To:     string(peer.ID),
+				Weight: 99,
+			})
+			if err != nil {
+				return fmt.Errorf("create edge: %w", err)
+			}
+		}
 	}
 	s.log.Debug("saving wireguard key to database")
 	keyparams := localdb.SetCurrentWireguardKeyParams{
@@ -367,6 +408,9 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 	if err != nil {
 		return fmt.Errorf("get leader ID: %w", err)
 	}
+	// TODO: This creates a race condition where the leader might readd itself with
+	// its wireguard address before we get here. We should instead match the leader
+	// to their initial bootstrap address.
 	config := s.raft.GetConfiguration().Configuration()
 	var advertiseAddress netip.AddrPort
 	for _, server := range config.Servers {
@@ -391,6 +435,12 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 	s.opts.MaxJoinRetries = 5
 	s.opts.JoinTimeout = 30 * time.Second
 	s.opts.JoinAsVoter = true
+	// TODO: Technically we want to wait for the first barrier to be reached before we
+	//       start the join process. This is because we want to make sure that the
+	//       leader has already written the first barrier to the log before we join.
+	//       However, this is not possible right now because we don't have a way to
+	//       wait for the first barrier to be reached.
+	time.Sleep(3 * time.Second)
 	return s.join(ctx, joinAddr)
 }
 

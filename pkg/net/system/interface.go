@@ -62,6 +62,9 @@ type Options struct {
 	ForceTUN bool
 	// Modprobe attempts to load the wireguard kernel module.
 	Modprobe bool
+	// MTU is the MTU of the interface. If unset, it will be automatically
+	// detected from the host.
+	MTU uint32
 }
 
 // IsRouteExists returns true if the given error is a route exists error.

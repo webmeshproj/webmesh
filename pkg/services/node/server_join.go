@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -164,7 +163,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		From: joiningServer,
 		To:   req.GetId(),
 		Weight: func() int {
-			if req.GetAsVoter() {
+			if req.GetPrimaryEndpoint() != "" {
 				return 99
 			}
 			return 1
@@ -173,36 +172,19 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 	}
-	if req.GetAsVoter() {
-		// Add an edge from the caller to all other voters
-		config := s.store.Raft().GetConfiguration().Configuration()
-		for _, server := range config.Servers {
-			if server.Suffrage == raft.Voter {
-				log.Debug("adding edge from caller to voter", slog.String("voter", string(server.ID)))
-				err = s.peers.PutEdge(ctx, peers.Edge{
-					From:   req.GetId(),
-					To:     string(server.ID),
-					Weight: 99,
-				})
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
-				}
-			}
-		}
-	}
 	if req.GetPrimaryEndpoint() != "" {
-		// Add an edge from the caller to all other nodes with public endpoints
-		// TODO: This should be made into a query for just the nodes with public endpoints
+		// Add an edge from the caller to all other nodes
+		// TODO: This should be done according to network policy
 		allPeers, err := s.peers.List(ctx)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
 		}
 		for _, peer := range allPeers {
-			if peer.PrimaryEndpoint != "" && peer.ID != req.GetId() {
-				log.Debug("adding edge from caller to peer", slog.String("peer", peer.ID))
+			if peer.ID != req.GetId() {
+				log.Debug("adding edge from peer to public caller", slog.String("peer", peer.ID))
 				err = s.peers.PutEdge(ctx, peers.Edge{
-					From:   req.GetId(),
-					To:     peer.ID,
+					From:   peer.ID,
+					To:     req.GetId(),
 					Weight: 99,
 				})
 				if err != nil {
