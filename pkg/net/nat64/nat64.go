@@ -133,6 +133,9 @@ func (nat *NAT64) Run() error {
 				}
 				nat.log.Debug("handling IPv4 packet", "header", hdr.String())
 				err = nat.handleIPv4(hdr, frame)
+				if err != nil {
+					nat.log.Error("handling packet", "error", err)
+				}
 			} else if typ[0] == 0x60 {
 				header, err := ipv6.ParseHeader(frame)
 				if err != nil {
@@ -141,12 +144,12 @@ func (nat *NAT64) Run() error {
 				}
 				nat.log.Debug("handling IPv6 packet", "header", header.String())
 				err = nat.handleIPv6(header, frame[ipv6.HeaderLen:len(frame)-header.PayloadLen])
+				if err != nil {
+					nat.log.Error("handling packet", "error", err)
+				}
 			} else {
 				nat.log.Warn("dropping unknown packet type", "type", frame[0]&0xf0)
 				continue
-			}
-			if err != nil {
-				nat.log.Error("handling packet", "error", err)
 			}
 		}
 	}
@@ -224,15 +227,4 @@ func (nat *NAT64) hostSendICMPv4(frame ethernet.Frame, srcHeader *ipv4.Header, m
 		return fmt.Errorf("write: %w", err)
 	}
 	return nil
-}
-
-func computeIPv4Checksum(data []byte) uint16 {
-	var sum uint32
-	for i := 0; i < len(data); i += 2 {
-		sum += uint32(data[i])<<8 | uint32(data[i+1])
-	}
-	for sum>>16 != 0 {
-		sum = (sum & 0xffff) + (sum >> 16)
-	}
-	return ^uint16(sum)
 }
