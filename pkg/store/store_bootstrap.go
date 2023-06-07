@@ -295,6 +295,15 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 			Name: string(server.ID),
 		}
 	}
+	if s.opts.BootstrapVoters != "" {
+		voters := strings.Split(s.opts.BootstrapVoters, ",")
+		for _, voter := range voters {
+			roleBinding.Subjects = append(roleBinding.Subjects, &v1.Subject{
+				Type: v1.SubjectType_SUBJECT_NODE,
+				Name: voter,
+			})
+		}
+	}
 	err = rb.PutRoleBinding(ctx, roleBinding)
 	if err != nil {
 		return fmt.Errorf("create voters role binding: %w", err)

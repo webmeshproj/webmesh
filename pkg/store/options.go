@@ -57,6 +57,7 @@ const (
 	BootstrapServersGRPCPortsEnvVar = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
 	BootstrapIPv4NetworkEnvVar      = "STORE_BOOTSTRAP_IPV4_NETWORK"
 	BootstrapAdminEnvVar            = "STORE_BOOTSTRAP_ADMIN"
+	BootstrapVotersEnvVar           = "STORE_BOOTSTRAP_VOTERS"
 	JoinEnvVar                      = "STORE_JOIN"
 	JoinAsVoterEnvVar               = "STORE_JOIN_AS_VOTER"
 	MaxJoinRetriesEnvVar            = "STORE_MAX_JOIN_RETRIES"
@@ -195,6 +196,9 @@ type Options struct {
 	// BootstrapAdmin is the user and/or node name to assign administrator privileges to
 	// when bootstraping a new cluster.
 	BootstrapAdmin string `json:"bootstrap-admin,omitempty" yaml:"bootstrap-admin,omitempty" toml:"bootstrap-admin,omitempty"`
+	// BootstrapVoters is a comma separated list of node IDs to assign voting privileges to
+	// when bootstraping a new cluster. BootstrapServers are automatically added to this list.
+	BootstrapVoters string `json:"bootstrap-voters,omitempty" yaml:"bootstrap-voters,omitempty" toml:"bootstrap-voters,omitempty"`
 	// ForceBootstrap is the force new bootstrap flag.
 	ForceBootstrap bool `json:"force-bootstrap,omitempty" yaml:"force-bootstrap,omitempty" toml:"force-bootstrap,omitempty"`
 	// RaftLogLevel is the log level for the raft backend.
@@ -294,6 +298,8 @@ Ports should be in the form of <node-id>=<port>.`)
 
 	fl.StringVar(&o.BootstrapAdmin, "store.bootstrap-admin", util.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
 		"Admin username to bootstrap the cluster with.")
+	fl.StringVar(&o.BootstrapVoters, "store.bootstrap-voters", util.GetEnvDefault(BootstrapVotersEnvVar, ""),
+		"Comma separated list of voters to bootstrap the cluster with. bootstrap--servers are already included in this list.")
 
 	fl.BoolVar(&o.ForceBootstrap, "store.force-bootstrap", util.GetEnvDefault(ForceNewClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
