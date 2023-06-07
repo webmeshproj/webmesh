@@ -182,6 +182,15 @@ func (c *Config) NewWebRTCClient() (v1.WebRTCClient, io.Closer, error) {
 	return v1.NewWebRTCClient(conn), conn, nil
 }
 
+// NewAdminClient creates a new Admin gRPC client for the current context.
+func (c *Config) NewAdminClient() (v1.AdminClient, io.Closer, error) {
+	conn, err := c.DialCurrent()
+	if err != nil {
+		return nil, nil, err
+	}
+	return v1.NewAdminClient(conn), conn, nil
+}
+
 // DialCurrent connects to the current context.
 func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 	var opts []grpc.DialOption
