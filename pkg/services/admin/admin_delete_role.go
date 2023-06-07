@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -39,6 +40,9 @@ func (s *Server) DeleteRole(ctx context.Context, role *v1.Role) (*emptypb.Empty,
 	}
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
+	}
+	if role.GetName() == rbacdb.MeshAdminRole || role.GetName() == rbacdb.VotersRole {
+		return nil, status.Error(codes.InvalidArgument, "cannot delete system roles")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteRoleAction.For(role.GetName())); !ok {
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete role")

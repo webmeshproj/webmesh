@@ -241,7 +241,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 
 	// Create an admin role and add the admin user/node to it.
 	err = rb.PutRole(ctx, &v1.Role{
-		Name: "mesh-admin",
+		Name: rbac.MeshAdminRole,
 		Rules: []*v1.Rule{
 			{
 				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
@@ -253,8 +253,8 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		return fmt.Errorf("create admin role: %w", err)
 	}
 	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
-		Name: "mesh-admin",
-		Role: "mesh-admin",
+		Name: rbac.MeshAdminRole,
+		Role: rbac.MeshAdminRoleBinding,
 		Subjects: []*v1.Subject{
 			{
 				Name: s.opts.BootstrapAdmin,
@@ -273,7 +273,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	// Create a "voters" role and add ourselves and all the bootstrap servers
 	// to it.
 	err = rb.PutRole(ctx, &v1.Role{
-		Name: "voters",
+		Name: rbac.VotersRole,
 		Rules: []*v1.Rule{
 			{
 				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_VOTES},
@@ -285,8 +285,8 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		return fmt.Errorf("create voters role: %w", err)
 	}
 	roleBinding := &v1.RoleBinding{
-		Name:     "bootstrap-voters",
-		Role:     "voters",
+		Name:     rbac.BootstrapVotersRoleBinding,
+		Role:     rbac.VotersRole,
 		Subjects: make([]*v1.Subject, len(cfg.Servers)),
 	}
 	for i, server := range cfg.Servers {

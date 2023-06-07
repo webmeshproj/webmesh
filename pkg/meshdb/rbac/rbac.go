@@ -31,6 +31,17 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 )
 
+const (
+	// MeshAdminRole is the name of the mesh admin role.
+	MeshAdminRole = "mesh-admin"
+	// MeshAdminRoleBinding is the name of the mesh admin rolebinding.
+	MeshAdminRoleBinding = "mesh-admin"
+	// VotersRole is the name of the voters role.
+	VotersRole = "voters"
+	// BootstrapVotersRoleBinding is the name of the bootstrap voters rolebinding.
+	BootstrapVotersRoleBinding = "bootstrap-voters"
+)
+
 // RBAC is the interface to the database models for RBAC.
 type RBAC interface {
 	// PutRole creates or updates a role.

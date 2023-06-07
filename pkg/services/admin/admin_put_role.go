@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -39,6 +40,9 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 	}
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
+	}
+	if role.GetName() == rbacdb.MeshAdminRole || role.GetName() == rbacdb.VotersRole {
+		return nil, status.Error(codes.InvalidArgument, "cannot update system roles")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRoleAction.For(role.GetName())); !ok {
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put role")

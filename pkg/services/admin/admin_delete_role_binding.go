@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -39,6 +40,9 @@ func (s *Server) DeleteRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*em
 	}
 	if rb.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
+	}
+	if rb.GetName() == rbacdb.MeshAdminRoleBinding || rb.GetName() == rbacdb.BootstrapVotersRoleBinding {
+		return nil, status.Error(codes.InvalidArgument, "cannot delete system rolebindings")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteRoleBindingAction.For(rb.GetName())); !ok {
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete rolebinding")

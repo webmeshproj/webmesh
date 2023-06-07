@@ -57,3 +57,57 @@ func completeNodes(maxNodes int) func(*cobra.Command, []string, string) ([]strin
 		return names, cobra.ShellCompDirectiveNoFileComp
 	}
 }
+
+func completeRoles(maxRoles int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) >= maxRoles {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if configFileFlag != "" {
+			if err := cliConfig.LoadFile(configFileFlag); err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+		}
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		defer closer.Close()
+		resp, err := client.ListRoles(cmd.Context(), &emptypb.Empty{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var names []string
+		for _, role := range resp.Roles {
+			names = append(names, role.GetName())
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func completeRoleBindings(maxRoles int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) >= maxRoles {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if configFileFlag != "" {
+			if err := cliConfig.LoadFile(configFileFlag); err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+		}
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		defer closer.Close()
+		resp, err := client.ListRoleBindings(cmd.Context(), &emptypb.Empty{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var names []string
+		for _, rb := range resp.RoleBindings {
+			names = append(names, rb.GetName())
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	}
+}

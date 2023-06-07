@@ -29,6 +29,8 @@ import (
 func init() {
 	getCmd.AddCommand(getNodesCmd)
 	getCmd.AddCommand(getGraphCmd)
+	getCmd.AddCommand(getRolesCommand)
+	getCmd.AddCommand(getRoleBindingsCommand)
 	rootCmd.AddCommand(getCmd)
 }
 
@@ -80,5 +82,55 @@ var getGraphCmd = &cobra.Command{
 		}
 		fmt.Println(resp.Dot)
 		return nil
+	},
+}
+
+var getRolesCommand = &cobra.Command{
+	Use:               "roles",
+	Short:             "Get roles from the mesh",
+	Aliases:           []string{"role"},
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeRoles(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		var resp proto.Message
+		if len(args) == 1 {
+			resp, err = client.GetRole(context.Background(), &v1.Role{Name: args[0]})
+		} else {
+			resp, err = client.ListRoles(context.Background(), &emptypb.Empty{})
+		}
+		if err != nil {
+			return err
+		}
+		return encodeToStdout(cmd, resp)
+	},
+}
+
+var getRoleBindingsCommand = &cobra.Command{
+	Use:               "rolebindings",
+	Short:             "Get rolebindingss from the mesh",
+	Aliases:           []string{"rolebinding", "rb"},
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeRoleBindings(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		var resp proto.Message
+		if len(args) == 1 {
+			resp, err = client.GetRoleBinding(context.Background(), &v1.RoleBinding{Name: args[0]})
+		} else {
+			resp, err = client.ListRoleBindings(context.Background(), &emptypb.Empty{})
+		}
+		if err != nil {
+			return err
+		}
+		return encodeToStdout(cmd, resp)
 	},
 }
