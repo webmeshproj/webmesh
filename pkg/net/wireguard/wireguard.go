@@ -119,6 +119,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		NetworkV6: opts.NetworkV6,
 		ForceTUN:  opts.ForceTUN,
 		Modprobe:  opts.Modprobe,
+		MTU:       uint32(opts.MTU),
 	})
 	if err != nil {
 		return nil, err

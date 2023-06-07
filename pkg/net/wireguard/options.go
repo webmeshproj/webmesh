@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/webmeshproj/node/pkg/net/system"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -38,7 +39,11 @@ const (
 	WireguardAllowedIPsEnvVar          = "WIREGUARD_ALLOWED_IPS"
 	WireguardPersistentKeepaliveEnvVar = "WIREGUARD_PERSISTENT_KEEPALIVE"
 	WireguardEndpointOverridesEnvVar   = "WIREGUARD_ENDPOINT_OVERRIDES"
+	WireguardMTUEnvVar                 = "WIREGUARD_MTU"
 )
+
+// DefaultInterfaceName is the default name of the wireguard interface.
+const DefaultInterfaceName = "webmesh0"
 
 // Options are options for configuring the wireguard interface.
 type Options struct {
@@ -76,6 +81,8 @@ type Options struct {
 	PersistentKeepAlive time.Duration `yaml:"persistent-keepalive,omitempty" json:"persistent-keepalive,omitempty" toml:"persistent-keepalive,omitempty"`
 	// EndpointOverrides is a map of peer IDs to endpoint overrides.
 	EndpointOverrides string `yaml:"endpoint-overrides,omitempty" json:"endpoint-overrides,omitempty" toml:"endpoint-overrides,omitempty"`
+	// MTU is the MTU to use for the interface.
+	MTU int `yaml:"mtu,omitempty" json:"mtu,omitempty" toml:"mtu,omitempty"`
 
 	// Below fields are set by the store when joining a cluster.
 
@@ -93,7 +100,8 @@ type Options struct {
 func NewOptions() *Options {
 	return &Options{
 		ListenPort: 51820,
-		Name:       "wg0",
+		Name:       DefaultInterfaceName,
+		MTU:        system.DefaultMTU,
 	}
 }
 
@@ -101,7 +109,7 @@ func NewOptions() *Options {
 func (o *Options) BindFlags(fl *flag.FlagSet) {
 	fl.IntVar(&o.ListenPort, "wireguard.listen-port", util.GetEnvIntDefault(WireguardListenPortEnvVar, 51820),
 		"The WireGuard listen port.")
-	fl.StringVar(&o.Name, "wireguard.name", util.GetEnvDefault(WireguardNameEnvVar, "wg0"),
+	fl.StringVar(&o.Name, "wireguard.name", util.GetEnvDefault(WireguardNameEnvVar, DefaultInterfaceName),
 		"The WireGuard interface name.")
 	fl.BoolVar(&o.ForceName, "wireguard.force-name", util.GetEnvDefault(WireguardForceNameEnvVar, "false") == "true",
 		"Force the use of the given name by deleting any pre-existing interface with the same name.")
@@ -137,6 +145,9 @@ For example:
 	fl.StringVar(&o.EndpointOverrides, "wireguard.endpoint-overrides", util.GetEnvDefault(WireguardEndpointOverridesEnvVar, ""),
 		`EndpointOverrides is a map of peer IDs to endpoint overrides.
 The format is similar to allowed-ips, but the value is a single endpoint.`)
+
+	fl.IntVar(&o.MTU, "wireguard.mtu", util.GetEnvIntDefault(WireguardMTUEnvVar, system.DefaultMTU),
+		"The MTU to use for the interface.")
 }
 
 // Validate validates the options.
@@ -149,6 +160,11 @@ func (o *Options) Validate() error {
 	}
 	if o.PersistentKeepAlive < 0 {
 		return errors.New("wireguard.persistent-keepalive must not be negative")
+	}
+	if o.MTU < 0 {
+		return errors.New("wireguard.mtu must not be negative")
+	} else if o.MTU > system.MaxMTU {
+		return fmt.Errorf("wireguard.mtu must not be greater than %d", system.MaxMTU)
 	}
 	if o.AllowedIPs != "" {
 		_, err := parseAllowedIPsMap(o.AllowedIPs)

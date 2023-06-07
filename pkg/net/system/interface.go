@@ -29,6 +29,9 @@ var ErrRouteExists = errors.New("route already exists")
 // DefaultMTU is the default MTU for wireguard interfaces.
 const DefaultMTU = 1350
 
+// MaxMTU is the maximum MTU for wireguard interfaces.
+const MaxMTU = 1500
+
 // Interface represents an underlying machine network interface for
 // use with wireguard.
 type Interface interface {

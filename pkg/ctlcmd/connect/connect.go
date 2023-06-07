@@ -24,6 +24,7 @@ package connect
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -156,12 +157,12 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 		go func() {
 			go func() {
 				if err := server.ListenAndServe(); err != nil {
-					fmt.Printf("dns serve: %v\n", err)
+					fmt.Fprintf(os.Stderr, "dns serve: %v\n", err)
 				}
 			}()
 			<-stopChan
 			if err := server.Shutdown(); err != nil {
-				fmt.Printf("dns shutdown: %v\n", err)
+				fmt.Fprintf(os.Stderr, "dns shutdown: %v\n", err)
 			}
 		}()
 	}
