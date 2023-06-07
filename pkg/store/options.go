@@ -242,6 +242,7 @@ func NewOptions() *Options {
 		StartupTimeout:       time.Minute * 3,
 		ShutdownTimeout:      time.Minute,
 		KeyRotationInterval:  time.Hour * 24 * 7,
+		GRPCAdvertisePort:    8443,
 	}
 }
 

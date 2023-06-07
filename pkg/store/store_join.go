@@ -117,6 +117,10 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		}
 		defer conn.Close()
 		client := v1.NewNodeClient(conn)
+		if s.opts.GRPCAdvertisePort == 0 {
+			// Assume the default port.
+			s.opts.GRPCAdvertisePort = 8443
+		}
 		req := &v1.JoinRequest{
 			Id:              string(s.nodeID),
 			PublicKey:       key.PublicKey().String(),
