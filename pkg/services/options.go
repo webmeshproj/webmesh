@@ -401,6 +401,9 @@ func (o *Options) ToFeatureSet() []v1.Feature {
 	if o.EnableMeshAPI {
 		features = append(features, v1.Feature_MESH_API)
 	}
+	if o.EnableAdminAPI {
+		features = append(features, v1.Feature_ADMIN_API)
+	}
 	if o.EnablePeerDiscoveryAPI {
 		features = append(features, v1.Feature_PEER_DISCOVERY)
 	}
