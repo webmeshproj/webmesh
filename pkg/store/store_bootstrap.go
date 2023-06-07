@@ -331,13 +331,21 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 			if peer.ID == server.ID {
 				continue
 			}
-			s.log.Info("creating edge in database for bootstrap server",
+			s.log.Info("creating edges in database for bootstrap server",
 				slog.String("server-id", string(server.ID)),
 				slog.String("peer-id", string(peer.ID)),
 			)
 			err = p.PutEdge(ctx, peers.Edge{
 				From:   string(server.ID),
 				To:     string(peer.ID),
+				Weight: 99,
+			})
+			if err != nil {
+				return fmt.Errorf("create edge: %w", err)
+			}
+			err = p.PutEdge(ctx, peers.Edge{
+				From:   string(peer.ID),
+				To:     string(server.ID),
 				Weight: 99,
 			})
 			if err != nil {

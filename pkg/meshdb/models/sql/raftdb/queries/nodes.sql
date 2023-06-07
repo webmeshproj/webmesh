@@ -69,3 +69,37 @@ SELECT
     nodes.created_at AS created_at
 FROM nodes 
 LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
+
+-- name: ListPublicNodes :many
+SELECT
+    nodes.id AS id,
+    nodes.public_key AS public_key,
+    nodes.primary_endpoint AS primary_endpoint,
+    nodes.wireguard_endpoints AS wireguard_endpoints,
+    nodes.zone_awareness_id AS zone_awareness_id,
+    nodes.grpc_port AS grpc_port,
+    nodes.raft_port AS raft_port,
+    nodes.network_ipv6 AS network_ipv6,
+    COALESCE(leases.ipv4, '') AS private_address_v4,
+    nodes.updated_at AS updated_at,
+    nodes.created_at AS created_at
+FROM nodes 
+LEFT OUTER JOIN leases ON nodes.id = leases.node_id
+WHERE nodes.primary_endpoint IS NOT NULL;
+
+-- name: ListNodesByZone :many
+SELECT
+    nodes.id AS id,
+    nodes.public_key AS public_key,
+    nodes.primary_endpoint AS primary_endpoint,
+    nodes.wireguard_endpoints AS wireguard_endpoints,
+    nodes.zone_awareness_id AS zone_awareness_id,
+    nodes.grpc_port AS grpc_port,
+    nodes.raft_port AS raft_port,
+    nodes.network_ipv6 AS network_ipv6,
+    COALESCE(leases.ipv4, '') AS private_address_v4,
+    nodes.updated_at AS updated_at,
+    nodes.created_at AS created_at
+FROM nodes 
+LEFT OUTER JOIN leases ON nodes.id = leases.node_id
+WHERE nodes.zone_awareness_id = ?;

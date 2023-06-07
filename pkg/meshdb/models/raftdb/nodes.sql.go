@@ -258,6 +258,140 @@ func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 	return items, nil
 }
 
+const ListNodesByZone = `-- name: ListNodesByZone :many
+SELECT
+    nodes.id AS id,
+    nodes.public_key AS public_key,
+    nodes.primary_endpoint AS primary_endpoint,
+    nodes.wireguard_endpoints AS wireguard_endpoints,
+    nodes.zone_awareness_id AS zone_awareness_id,
+    nodes.grpc_port AS grpc_port,
+    nodes.raft_port AS raft_port,
+    nodes.network_ipv6 AS network_ipv6,
+    COALESCE(leases.ipv4, '') AS private_address_v4,
+    nodes.updated_at AS updated_at,
+    nodes.created_at AS created_at
+FROM nodes 
+LEFT OUTER JOIN leases ON nodes.id = leases.node_id
+WHERE nodes.zone_awareness_id = ?
+`
+
+type ListNodesByZoneRow struct {
+	ID                 string         `json:"id"`
+	PublicKey          sql.NullString `json:"public_key"`
+	PrimaryEndpoint    sql.NullString `json:"primary_endpoint"`
+	WireguardEndpoints sql.NullString `json:"wireguard_endpoints"`
+	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
+	GrpcPort           int64          `json:"grpc_port"`
+	RaftPort           int64          `json:"raft_port"`
+	NetworkIpv6        sql.NullString `json:"network_ipv6"`
+	PrivateAddressV4   string         `json:"private_address_v4"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	CreatedAt          time.Time      `json:"created_at"`
+}
+
+func (q *Queries) ListNodesByZone(ctx context.Context, zoneAwarenessID sql.NullString) ([]ListNodesByZoneRow, error) {
+	rows, err := q.db.QueryContext(ctx, ListNodesByZone, zoneAwarenessID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListNodesByZoneRow
+	for rows.Next() {
+		var i ListNodesByZoneRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicKey,
+			&i.PrimaryEndpoint,
+			&i.WireguardEndpoints,
+			&i.ZoneAwarenessID,
+			&i.GrpcPort,
+			&i.RaftPort,
+			&i.NetworkIpv6,
+			&i.PrivateAddressV4,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const ListPublicNodes = `-- name: ListPublicNodes :many
+SELECT
+    nodes.id AS id,
+    nodes.public_key AS public_key,
+    nodes.primary_endpoint AS primary_endpoint,
+    nodes.wireguard_endpoints AS wireguard_endpoints,
+    nodes.zone_awareness_id AS zone_awareness_id,
+    nodes.grpc_port AS grpc_port,
+    nodes.raft_port AS raft_port,
+    nodes.network_ipv6 AS network_ipv6,
+    COALESCE(leases.ipv4, '') AS private_address_v4,
+    nodes.updated_at AS updated_at,
+    nodes.created_at AS created_at
+FROM nodes 
+LEFT OUTER JOIN leases ON nodes.id = leases.node_id
+WHERE nodes.primary_endpoint IS NOT NULL
+`
+
+type ListPublicNodesRow struct {
+	ID                 string         `json:"id"`
+	PublicKey          sql.NullString `json:"public_key"`
+	PrimaryEndpoint    sql.NullString `json:"primary_endpoint"`
+	WireguardEndpoints sql.NullString `json:"wireguard_endpoints"`
+	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
+	GrpcPort           int64          `json:"grpc_port"`
+	RaftPort           int64          `json:"raft_port"`
+	NetworkIpv6        sql.NullString `json:"network_ipv6"`
+	PrivateAddressV4   string         `json:"private_address_v4"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	CreatedAt          time.Time      `json:"created_at"`
+}
+
+func (q *Queries) ListPublicNodes(ctx context.Context) ([]ListPublicNodesRow, error) {
+	rows, err := q.db.QueryContext(ctx, ListPublicNodes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPublicNodesRow
+	for rows.Next() {
+		var i ListPublicNodesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicKey,
+			&i.PrimaryEndpoint,
+			&i.WireguardEndpoints,
+			&i.ZoneAwarenessID,
+			&i.GrpcPort,
+			&i.RaftPort,
+			&i.NetworkIpv6,
+			&i.PrivateAddressV4,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const NodeExists = `-- name: NodeExists :one
 SELECT 1 FROM nodes WHERE id = ?
 `

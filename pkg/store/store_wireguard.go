@@ -141,7 +141,6 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 
 	currentPeers := s.wg.Peers()
 	seenPeers := make(map[string]struct{})
-	// This is currently hacked into the FSM apply function
 	adjacencyMap, err := graph.AdjacencyMap()
 	if err != nil {
 		return fmt.Errorf("adjacency map: %w", err)

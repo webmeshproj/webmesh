@@ -58,6 +58,10 @@ type Peers interface {
 	List(ctx context.Context) ([]Node, error)
 	// ListIDs lists all node IDs.
 	ListIDs(ctx context.Context) ([]string, error)
+	// ListPublicNodes lists all public nodes.
+	ListPublicNodes(ctx context.Context) ([]Node, error)
+	// ListByZoneID lists all nodes in a zone.
+	ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
 	// AddEdge adds an edge between two nodes.
 	PutEdge(ctx context.Context, edge Edge) error
 	// RemoveEdge removes an edge between two nodes.
@@ -263,6 +267,112 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 	return out, nil
 }
 
+// ListPublicNodes lists all public nodes.
+func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
+	q := raftdb.New(p.store.ReadDB())
+	nodes, err := q.ListPublicNodes(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []Node{}, nil
+		}
+		return nil, err
+	}
+	out := make([]Node, len(nodes))
+	for i, node := range nodes {
+		var key wgtypes.Key
+		if node.PublicKey.Valid {
+			key, err = wgtypes.ParseKey(node.PublicKey.String)
+			if err != nil {
+				return nil, fmt.Errorf("parse node public key: %w", err)
+			}
+		}
+		var wireguardEndpoints []string
+		if node.WireguardEndpoints.Valid {
+			wireguardEndpoints = strings.Split(node.WireguardEndpoints.String, ",")
+		}
+		var networkv4, networkv6 netip.Prefix
+		if node.PrivateAddressV4 != "" {
+			networkv4, err = netip.ParsePrefix(node.PrivateAddressV4)
+			if err != nil {
+				return nil, fmt.Errorf("parse node network IPv4: %w", err)
+			}
+		}
+		if node.NetworkIpv6.Valid {
+			networkv6, err = netip.ParsePrefix(node.NetworkIpv6.String)
+			if err != nil {
+				return nil, fmt.Errorf("parse node network IPv6: %w", err)
+			}
+		}
+		out[i] = Node{
+			ID:                 node.ID,
+			PublicKey:          key,
+			PrimaryEndpoint:    node.PrimaryEndpoint.String,
+			WireGuardEndpoints: wireguardEndpoints,
+			ZoneAwarenessID:    node.ZoneAwarenessID.String,
+			PrivateIPv4:        networkv4,
+			NetworkIPv6:        networkv6,
+			GRPCPort:           int(node.GrpcPort),
+			RaftPort:           int(node.RaftPort),
+			UpdatedAt:          node.UpdatedAt,
+			CreatedAt:          node.CreatedAt,
+		}
+	}
+	return out, nil
+}
+
+// ListByZoneID lists all nodes in a zone.
+func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error) {
+	q := raftdb.New(p.store.ReadDB())
+	nodes, err := q.ListNodesByZone(ctx, sql.NullString{String: zoneID, Valid: true})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []Node{}, nil
+		}
+		return nil, err
+	}
+	out := make([]Node, len(nodes))
+	for i, node := range nodes {
+		var key wgtypes.Key
+		if node.PublicKey.Valid {
+			key, err = wgtypes.ParseKey(node.PublicKey.String)
+			if err != nil {
+				return nil, fmt.Errorf("parse node public key: %w", err)
+			}
+		}
+		var wireguardEndpoints []string
+		if node.WireguardEndpoints.Valid {
+			wireguardEndpoints = strings.Split(node.WireguardEndpoints.String, ",")
+		}
+		var networkv4, networkv6 netip.Prefix
+		if node.PrivateAddressV4 != "" {
+			networkv4, err = netip.ParsePrefix(node.PrivateAddressV4)
+			if err != nil {
+				return nil, fmt.Errorf("parse node network IPv4: %w", err)
+			}
+		}
+		if node.NetworkIpv6.Valid {
+			networkv6, err = netip.ParsePrefix(node.NetworkIpv6.String)
+			if err != nil {
+				return nil, fmt.Errorf("parse node network IPv6: %w", err)
+			}
+		}
+		out[i] = Node{
+			ID:                 node.ID,
+			PublicKey:          key,
+			PrimaryEndpoint:    node.PrimaryEndpoint.String,
+			WireGuardEndpoints: wireguardEndpoints,
+			ZoneAwarenessID:    node.ZoneAwarenessID.String,
+			PrivateIPv4:        networkv4,
+			NetworkIPv6:        networkv6,
+			GRPCPort:           int(node.GrpcPort),
+			RaftPort:           int(node.RaftPort),
+			UpdatedAt:          node.UpdatedAt,
+			CreatedAt:          node.CreatedAt,
+		}
+	}
+	return out, nil
+}
+
 // ListIDs returns a list of node IDs.
 func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
 	ids, err := raftdb.New(p.store.ReadDB()).ListNodeIDs(ctx)
@@ -293,7 +403,8 @@ func (p *peers) PutEdge(ctx context.Context, edge Edge) error {
 		if !cmp.Equal(graphEdge.Properties.Attributes, edge.Attrs) {
 			return p.graph.UpdateEdge(edge.From, edge.To, opts...)
 		}
-		if graphEdge.Properties.Weight != edge.Weight {
+		// Only update the weight if it's higher than the existing weight.
+		if graphEdge.Properties.Weight != edge.Weight && edge.Weight > graphEdge.Properties.Weight {
 			return p.graph.UpdateEdge(edge.From, edge.To, opts...)
 		}
 		return nil

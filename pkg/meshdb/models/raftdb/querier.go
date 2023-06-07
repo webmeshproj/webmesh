@@ -6,6 +6,7 @@ package raftdb
 
 import (
 	"context"
+	"database/sql"
 )
 
 type Querier interface {
@@ -42,6 +43,8 @@ type Querier interface {
 	ListNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	ListNodeIDs(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)
+	ListNodesByZone(ctx context.Context, zoneAwarenessID sql.NullString) ([]ListNodesByZoneRow, error)
+	ListPublicNodes(ctx context.Context) ([]ListPublicNodesRow, error)
 	ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error)
 	ListRaftACLs(ctx context.Context) ([]RaftAcl, error)
 	NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) (int64, error)
