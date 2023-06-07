@@ -28,11 +28,11 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
+	svcutil "github.com/webmeshproj/node/pkg/services/util"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -51,9 +51,20 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, status.Error(codes.InvalidArgument, "node id required")
 	}
 
-	// TODO: When using mTLS, we should verify the peer certificate
-	// matches the node ID. A proxy server will need to pass the
-	// certificate through to the node server.
+	// Check that the node is indeed who they say they are
+	if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
+		if proxiedFor != req.GetId() {
+			return nil, status.Errorf(codes.PermissionDenied, "proxied for %s, not %s", proxiedFor, req.GetId())
+		}
+	} else if s.tlsConfig != nil {
+		if peer, ok := svcutil.PeerFromContext(ctx); ok {
+			if peer != req.GetId() {
+				return nil, status.Errorf(codes.PermissionDenied, "peer id %s, not %s", peer, req.GetId())
+			}
+		} else {
+			return nil, status.Error(codes.PermissionDenied, "no peer authentication info in context")
+		}
+	}
 
 	// We can go ahead and check here if the node is allowed to do what
 	// they want
@@ -153,14 +164,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Add an edge from the joining server to the caller
 	joiningServer := string(s.store.ID())
-	md, ok := metadata.FromIncomingContext(ctx)
-	if ok {
-		proxiedFrom := md.Get(leaderproxy.ProxiedFromMeta)
-		if len(proxiedFrom) > 0 {
-			// The request was proxied, so the joining server is the
-			// server that proxied the request
-			joiningServer = proxiedFrom[0]
-		}
+	if proxiedFrom, ok := leaderproxy.ProxiedFrom(ctx); ok {
+		joiningServer = proxiedFrom
 	}
 	log.Debug("adding edge between caller and joining server", slog.String("joining_server", joiningServer))
 	err = s.peers.PutEdge(ctx, peers.Edge{

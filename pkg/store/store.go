@@ -34,6 +34,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/net/firewall"
@@ -77,7 +78,7 @@ type Store interface {
 	// fails to become ready. This is only applicable during an initial
 	// bootstrap. If the store is already bootstrapped then this channel
 	// will block until the store is ready and then return nil.
-	ReadyError() <-chan error
+	ReadyError(ctx context.Context) <-chan error
 	// State returns the current Raft state.
 	State() raft.RaftState
 	// IsLeader returns true if this node is the Raft leader.
@@ -122,6 +123,14 @@ type Store interface {
 	// Wireguard returns the Wireguard interface. Note that the returned value
 	// may be nil if the store is not open.
 	Wireguard() wireguard.Interface
+}
+
+// TestStore is a test store interface.
+type TestStore interface {
+	// Store is the base store interface.
+	Store
+	// Clear resets the data in the store to a clean state.
+	Clear() error
 }
 
 // New creates a new store.
@@ -180,6 +189,40 @@ func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) (
 	}, nil
 }
 
+// NewTestStore creates a new test store and waits for it to be ready.
+// The context is used to enforce startup timeouts.
+func NewTestStore(ctx context.Context) (TestStore, error) {
+	sl, err := streamlayer.New(&streamlayer.Options{
+		ListenAddress: ":0",
+	})
+	if err != nil {
+		return nil, err
+	}
+	opts := NewOptions()
+	opts.InMemory = true
+	opts.Insecure = true
+	opts.Bootstrap = true
+	opts.NodeID = uuid.NewString()
+	deadline, ok := ctx.Deadline()
+	if ok {
+		opts.StartupTimeout = time.Until(deadline)
+	}
+	st, err := New(sl, opts, nil)
+	if err != nil {
+		return nil, err
+	}
+	stor := st.(*store)
+	stor.noWG = true
+	if err := stor.Open(); err != nil {
+		return nil, err
+	}
+	err = <-stor.ReadyError(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &testStore{stor}, nil
+}
+
 type store struct {
 	sl     streamlayer.StreamLayer
 	opts   *Options
@@ -215,6 +258,9 @@ type store struct {
 	wgmux sync.Mutex
 
 	open atomic.Bool
+
+	// a flag set on test stores to indicate skipping wireguard setup
+	noWG bool
 }
 
 // ID returns the node ID.
@@ -299,12 +345,17 @@ func (s *store) ReadyNotify(ctx context.Context) <-chan struct{} {
 // ReadyError returns a channel that will receive an error if the store
 // fails to become ready or nil. This is only applicable during an initial
 // bootstrap. If the store is already bootstrapped then this channel
-// will block until the store is ready and then return nil.
-func (s *store) ReadyError() <-chan error {
+// will block until the store is ready and then return nil or the error from
+// the context.
+func (s *store) ReadyError(ctx context.Context) <-chan error {
 	if !s.firstBootstrap {
 		go func() {
 			defer close(s.readyErr)
-			<-s.ReadyNotify(context.Background())
+			<-s.ReadyNotify(ctx)
+			if ctx.Err() != nil {
+				s.readyErr <- ctx.Err()
+				return
+			}
 			s.readyErr <- nil
 		}()
 	}
@@ -319,4 +370,38 @@ type LogStoreCloser interface {
 type StableStoreCloser interface {
 	io.Closer
 	raft.StableStore
+}
+
+type testStore struct {
+	*store
+}
+
+func (t *testStore) Clear() error {
+	err := t.localData.Close()
+	if err != nil {
+		return err
+	}
+	err = t.weakData.Close()
+	if err != nil {
+		return err
+	}
+	t.weakData, err = sql.Open("sqlite", ":memory:")
+	if err != nil {
+		return err
+	}
+	_, err = t.weakData.Exec("PRAGMA case_sensitive_like = true;")
+	if err != nil {
+		return err
+	}
+	t.localData, err = sql.Open("sqlite", ":memory:")
+	if err != nil {
+		return err
+	}
+	if err = models.MigrateRaftDB(t.weakData); err != nil {
+		return fmt.Errorf("raft db migrate: %w", err)
+	}
+	if err = models.MigrateLocalDB(t.localData); err != nil {
+		return fmt.Errorf("local db migrate: %w", err)
+	}
+	return nil
 }

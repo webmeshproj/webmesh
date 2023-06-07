@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/webmeshproj/node/pkg/services/admin"
 	"github.com/webmeshproj/node/pkg/services/meshapi"
 	"github.com/webmeshproj/node/pkg/services/meshdns"
 	"github.com/webmeshproj/node/pkg/services/node"
@@ -60,6 +61,10 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 		srv:  grpc.NewServer(opts...),
 		opts: o,
 		log:  log,
+	}
+	if o.EnableAdminAPI {
+		log.Debug("registering admin api")
+		v1.RegisterAdminServer(server, admin.New(store))
 	}
 	if o.EnableMeshAPI {
 		log.Debug("registering mesh api")

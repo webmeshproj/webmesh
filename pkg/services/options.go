@@ -56,6 +56,7 @@ const (
 	// Feature flags
 	EnableMetricsEnvVar          = "SERVICES_ENABLE_METRICS"
 	EnableLeaderProxyEnvVar      = "SERVICES_ENABLE_LEADER_PROXY"
+	EnableAdminAPIEnvVar         = "SERVICES_ENABLE_ADMIN_API"
 	EnableMeshAPIEnvVar          = "SERVICES_ENABLE_MESH_API"
 	EnablePeerDiscoveryAPIEnvVar = "SERVICES_ENABLE_PEER_DISCOVERY_API"
 	EnableWebRTCAPIEnvVar        = "SERVICES_ENABLE_WEBRTC_API"
@@ -116,6 +117,8 @@ type Options struct {
 	MetricsPath string `json:"metrics-path,omitempty" yaml:"metrics-path,omitempty" toml:"metrics-path,omitempty"`
 	// EnableLeaderProxy enables the leader proxy.
 	EnableLeaderProxy bool `json:"enable-leader-proxy,omitempty" yaml:"enable-leader-proxy,omitempty" toml:"enable-leader-proxy,omitempty"`
+	// EnableAdminAPI enables the admin API.
+	EnableAdminAPI bool `json:"enable-admin-api,omitempty" yaml:"enable-admin-api,omitempty" toml:"enable-admin-api,omitempty"`
 	// EnableMeshAPI enables the mesh API.
 	EnableMeshAPI bool `json:"enable-mesh-api,omitempty" yaml:"enable-mesh-api,omitempty" toml:"enable-mesh-api,omitempty"`
 	// EnablePeerDiscoveryAPI enables the peer discovery API.
@@ -208,6 +211,8 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		"gRPC metrics path.")
 	fs.BoolVar(&o.EnableLeaderProxy, "services.enable-leader-proxy", util.GetEnvDefault(EnableLeaderProxyEnvVar, "false") == "true",
 		"Enable the leader proxy.")
+	fs.BoolVar(&o.EnableAdminAPI, "services.enable-admin-api", util.GetEnvDefault(EnableAdminAPIEnvVar, "false") == "true",
+		"Enable the admin API.")
 	fs.BoolVar(&o.EnableMeshAPI, "services.enable-mesh-api", util.GetEnvDefault(EnableMeshAPIEnvVar, "false") == "true",
 		"Enable the mesh API.")
 	fs.BoolVar(&o.EnablePeerDiscoveryAPI, "services.enable-peer-discovery-api", util.GetEnvDefault(EnablePeerDiscoveryAPIEnvVar, "false") == "true",

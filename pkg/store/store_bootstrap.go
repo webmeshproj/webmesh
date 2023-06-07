@@ -432,21 +432,24 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	} else {
 		raftAddr = net.JoinHostPort(networkIPv6.Addr().String(), strconv.Itoa(int(s.sl.ListenPort())))
 	}
-	// We need to readd ourselves server to the cluster as a voter with the acquired address.
-	s.log.Info("re-adding ourselves to the cluster with the acquired wireguard address")
-	err = s.AddVoter(ctx, string(s.nodeID), raftAddr)
-	if err != nil {
-		return fmt.Errorf("add voter: %w", err)
-	}
-	s.log.Info("configuring wireguard interface")
 	var networkv6, meshnetworkv6 netip.Prefix
 	if !s.opts.NoIPv6 {
 		networkv6 = networkIPv6
 		meshnetworkv6 = ula
 	}
+	if s.noWG {
+		return nil
+	}
+	s.log.Info("configuring wireguard interface")
 	err = s.configureWireguard(ctx, wireguardKey, networkv4, networkv6, meshnetworkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
+	}
+	// We need to readd ourselves server to the cluster as a voter with the acquired address.
+	s.log.Info("re-adding ourselves to the cluster with the acquired wireguard address")
+	err = s.AddVoter(ctx, string(s.nodeID), raftAddr)
+	if err != nil {
+		return fmt.Errorf("add voter: %w", err)
 	}
 	s.log.Info("initial bootstrap complete")
 	return nil

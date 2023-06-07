@@ -173,16 +173,11 @@ func Execute() error {
 
 	log.Info("waiting for raft store to become ready")
 	ctx, cancel := context.WithTimeout(context.Background(), opts.Store.StartupTimeout)
-	<-st.ReadyNotify(ctx)
-	if ctx.Err() != nil {
-		defer cancel()
-		return handleErr(fmt.Errorf("failed to wait for raft store to become ready: %w", ctx.Err()))
-	}
-	cancel()
-	if err := <-st.ReadyError(); err != nil {
-		// Only applicable during an initial bootstrap
+	if err := <-st.ReadyError(ctx); err != nil {
+		cancel()
 		return handleErr(fmt.Errorf("failed to wait for raft store to become ready: %w", err))
 	}
+	cancel()
 	// Shutdown the store on exit
 	defer func() {
 		log.Info("shutting down raft store")

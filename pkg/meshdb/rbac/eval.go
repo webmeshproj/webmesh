@@ -24,6 +24,9 @@ type RolesList []*v1.Role
 
 // EvalAction evaluates an action against the roles in the list.
 func (l RolesList) EvalAction(action *v1.Action) bool {
+	if l == nil {
+		return false
+	}
 	for _, role := range l {
 		if EvalRole(role, action) {
 			return true

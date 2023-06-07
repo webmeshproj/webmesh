@@ -17,19 +17,7 @@ limitations under the License.
 package leaderproxy
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/grpc/metadata"
-)
-
-const (
-	// PreferLeaderMeta is the metadata key for the Prefer-Leader header.
-	PreferLeaderMeta = "prefer-leader"
-	// ProxiedFromMeta is the metadata key for the Proxied-From header.
-	ProxiedFromMeta = "proxied-from"
-	// ProxiedForMeta is the metadata key for the Proxied-For header.
-	ProxiedForMeta = "proxied-for"
 )
 
 // MethodPolicy defines the policy for routing requests to the leader.
@@ -55,18 +43,17 @@ var MethodPolicyMap = map[string]MethodPolicy{
 	v1.Mesh_GetNode_FullMethodName:      AllowNonLeader,
 	v1.Mesh_ListNodes_FullMethodName:    AllowNonLeader,
 	v1.Mesh_GetMeshGraph_FullMethodName: AllowNonLeader,
-	// Peer Discovery
+	// Peer Discovery API
 	v1.PeerDiscovery_ListPeers_FullMethodName: AllowNonLeader,
-	// WebRTC
+	// WebRTC API
 	v1.WebRTC_StartDataChannel_FullMethodName: AllowNonLeader,
-}
-
-// HasPreferLeaderMeta returns true if the context has the Prefer-Leader header set to true.
-func HasPreferLeaderMeta(ctx context.Context) bool {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return false
-	}
-	leaderPref := md.Get(PreferLeaderMeta)
-	return len(leaderPref) > 0 && leaderPref[0] == "true"
+	// Admin API
+	v1.Admin_PutRole_FullMethodName:           RequireLeader,
+	v1.Admin_DeleteRole_FullMethodName:        RequireLeader,
+	v1.Admin_GetRole_FullMethodName:           AllowNonLeader,
+	v1.Admin_ListRoles_FullMethodName:         AllowNonLeader,
+	v1.Admin_PutRoleBinding_FullMethodName:    RequireLeader,
+	v1.Admin_DeleteRoleBinding_FullMethodName: RequireLeader,
+	v1.Admin_GetRoleBinding_FullMethodName:    AllowNonLeader,
+	v1.Admin_ListRoleBindings_FullMethodName:  AllowNonLeader,
 }

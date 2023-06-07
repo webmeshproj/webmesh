@@ -28,10 +28,10 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/services/util"
 	"github.com/webmeshproj/node/pkg/store"
 )
 
@@ -118,12 +118,8 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	}
 	defer conn.Close()
 	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, string(i.store.ID()))
-	p, ok := peer.FromContext(ctx)
-	if ok {
-		peerCerts := p.AuthInfo.(credentials.TLSInfo).State.PeerCertificates
-		if len(peerCerts) > 0 {
-			ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, string(peerCerts[0].Subject.CommonName))
-		}
+	if peer, ok := util.PeerFromContext(ctx); ok {
+		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
 	switch info.FullMethod {
 	// Node API
@@ -140,9 +136,26 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewMeshClient(conn).ListNodes(ctx, req.(*emptypb.Empty))
 	case v1.Mesh_GetMeshGraph_FullMethodName:
 		return v1.NewMeshClient(conn).GetMeshGraph(ctx, req.(*emptypb.Empty))
-	// Peer Discovery
+	// Peer Discovery API
 	case v1.PeerDiscovery_ListPeers_FullMethodName:
 		return v1.NewPeerDiscoveryClient(conn).ListPeers(ctx, req.(*emptypb.Empty))
+	// Admin API
+	case v1.Admin_PutRole_FullMethodName:
+		return v1.NewAdminClient(conn).PutRole(ctx, req.(*v1.Role))
+	case v1.Admin_DeleteRole_FullMethodName:
+		return v1.NewAdminClient(conn).DeleteRole(ctx, req.(*v1.Role))
+	case v1.Admin_GetRole_FullMethodName:
+		return v1.NewAdminClient(conn).GetRole(ctx, req.(*v1.Role))
+	case v1.Admin_ListRoles_FullMethodName:
+		return v1.NewAdminClient(conn).ListRoles(ctx, req.(*emptypb.Empty))
+	case v1.Admin_PutRoleBinding_FullMethodName:
+		return v1.NewAdminClient(conn).PutRoleBinding(ctx, req.(*v1.RoleBinding))
+	case v1.Admin_DeleteRoleBinding_FullMethodName:
+		return v1.NewAdminClient(conn).DeleteRoleBinding(ctx, req.(*v1.RoleBinding))
+	case v1.Admin_GetRoleBinding_FullMethodName:
+		return v1.NewAdminClient(conn).GetRoleBinding(ctx, req.(*v1.RoleBinding))
+	case v1.Admin_ListRoleBindings_FullMethodName:
+		return v1.NewAdminClient(conn).ListRoleBindings(ctx, req.(*emptypb.Empty))
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}
@@ -155,6 +168,9 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 	}
 	defer conn.Close()
 	ctx := metadata.AppendToOutgoingContext(ss.Context(), ProxiedFromMeta, string(i.store.ID()))
+	if peer, ok := util.PeerFromContext(ss.Context()); ok {
+		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
+	}
 	switch info.FullMethod {
 	case v1.WebRTC_StartDataChannel_FullMethodName:
 		client := v1.NewWebRTCClient(conn)
