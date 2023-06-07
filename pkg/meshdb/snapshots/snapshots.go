@@ -55,12 +55,15 @@ func New(db *sql.DB) Snapshotter {
 }
 
 type snapshotModel struct {
-	State       []raftdb.MeshState  `json:"state"`
-	Nodes       []raftdb.Node       `json:"nodes"`
-	Leases      []raftdb.Lease      `json:"leases"`
-	RaftACLs    []raftdb.RaftAcl    `json:"raft_acls"`
-	NetworkACLs []raftdb.NetworkAcl `json:"network_acls"`
-	NodeEdges   []raftdb.NodeEdge   `json:"node_edges"`
+	State        []raftdb.MeshState   `json:"state"`
+	Nodes        []raftdb.Node        `json:"nodes"`
+	NodeEdges    []raftdb.NodeEdge    `json:"node_edges"`
+	Leases       []raftdb.Lease       `json:"leases"`
+	Users        []raftdb.User        `json:"users"`
+	Groups       []raftdb.Group       `json:"groups"`
+	Roles        []raftdb.Role        `json:"roles"`
+	RoleBindings []raftdb.RoleBinding `json:"role_bindings"`
+	NetworkACLs  []raftdb.NetworkAcl  `json:"network_acls"`
 }
 
 func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
@@ -77,21 +80,33 @@ func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dump nodes: %w", err)
 	}
+	model.NodeEdges, err = q.DumpNodeEdges(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("dump node edges: %w", err)
+	}
 	model.Leases, err = q.DumpLeases(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("dump leases: %w", err)
 	}
-	model.RaftACLs, err = q.DumpRaftACLs(ctx)
+	model.Users, err = q.DumpUsers(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("dump raft acls: %w", err)
+		return nil, fmt.Errorf("dump users: %w", err)
+	}
+	model.Groups, err = q.DumpGroups(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("dump groups: %w", err)
+	}
+	model.Roles, err = q.DumpRoles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("dump roles: %w", err)
+	}
+	model.RoleBindings, err = q.DumpRoleBindings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("dump role bindings: %w", err)
 	}
 	model.NetworkACLs, err = q.DumpNetworkACLs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("dump network acls: %w", err)
-	}
-	model.NodeEdges, err = q.DumpNodeEdges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump node edges: %w", err)
 	}
 	var buf bytes.Buffer
 	gzw := gzip.NewWriter(&buf)
@@ -137,25 +152,37 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	if err != nil {
 		return fmt.Errorf("drop mesh state: %w", err)
 	}
-	err = q.DropNodes(ctx)
-	if err != nil {
-		return fmt.Errorf("drop nodes: %w", err)
-	}
 	err = q.DropLeases(ctx)
 	if err != nil {
 		return fmt.Errorf("drop leases: %w", err)
 	}
-	err = q.DropRaftACLs(ctx)
+	err = q.DropNodeEdges(ctx)
 	if err != nil {
-		return fmt.Errorf("drop raft acls: %w", err)
+		return fmt.Errorf("drop node edges: %w", err)
+	}
+	err = q.DropNodes(ctx)
+	if err != nil {
+		return fmt.Errorf("drop nodes: %w", err)
+	}
+	err = q.DropUsers(ctx)
+	if err != nil {
+		return fmt.Errorf("drop users: %w", err)
+	}
+	err = q.DropGroups(ctx)
+	if err != nil {
+		return fmt.Errorf("drop groups: %w", err)
+	}
+	err = q.DropRoleBindings(ctx)
+	if err != nil {
+		return fmt.Errorf("drop role bindings: %w", err)
+	}
+	err = q.DropRoles(ctx)
+	if err != nil {
+		return fmt.Errorf("drop roles: %w", err)
 	}
 	err = q.DropNetworkACLs(ctx)
 	if err != nil {
 		return fmt.Errorf("drop network acls: %w", err)
-	}
-	err = q.DropNodeEdges(ctx)
-	if err != nil {
-		return fmt.Errorf("drop node edges: %w", err)
 	}
 	for _, state := range model.State {
 		s.log.Debug("restoring mesh state", slog.Any("state", state))
@@ -187,6 +214,19 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 			return fmt.Errorf("restore node: %w", err)
 		}
 	}
+	for _, edge := range model.NodeEdges {
+		s.log.Debug("restoring node edge", slog.Any("edge", edge))
+		// nolint:gosimple
+		err = q.RestoreNodeEdge(ctx, raftdb.RestoreNodeEdgeParams{
+			SrcNodeID: edge.SrcNodeID,
+			DstNodeID: edge.DstNodeID,
+			Weight:    edge.Weight,
+			Attrs:     edge.Attrs,
+		})
+		if err != nil {
+			return fmt.Errorf("restore node edge: %w", err)
+		}
+	}
 	for _, lease := range model.Leases {
 		s.log.Debug("restoring lease", slog.Any("lease", lease))
 		// nolint:gosimple
@@ -199,18 +239,59 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 			return fmt.Errorf("restore lease: %w", err)
 		}
 	}
-	for _, acl := range model.RaftACLs {
-		s.log.Debug("restoring raft acl", slog.Any("acl", acl))
+	for _, user := range model.Users {
+		s.log.Debug("restoring user", slog.Any("user", user))
 		// nolint:gosimple
-		err = q.RestoreRaftACL(ctx, raftdb.RestoreRaftACLParams{
-			Name:      acl.Name,
-			Nodes:     acl.Nodes,
-			Action:    acl.Action,
-			CreatedAt: acl.CreatedAt,
-			UpdatedAt: acl.UpdatedAt,
+		err = q.RestoreUser(ctx, raftdb.RestoreUserParams{
+			Name:      user.Name,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
 		})
 		if err != nil {
-			return fmt.Errorf("restore raft acl: %w", err)
+			return fmt.Errorf("restore user: %w", err)
+		}
+	}
+	for _, group := range model.Groups {
+		s.log.Debug("restoring group", slog.Any("group", group))
+		// nolint:gosimple
+		err = q.RestoreGroup(ctx, raftdb.RestoreGroupParams{
+			Name:      group.Name,
+			Users:     group.Users,
+			Nodes:     group.Nodes,
+			CreatedAt: group.CreatedAt,
+			UpdatedAt: group.UpdatedAt,
+		})
+		if err != nil {
+			return fmt.Errorf("restore group: %w", err)
+		}
+	}
+	for _, role := range model.Roles {
+		s.log.Debug("restoring role", slog.Any("role", role))
+		// nolint:gosimple
+		err = q.RestoreRole(ctx, raftdb.RestoreRoleParams{
+			Name:      role.Name,
+			RulesJson: role.RulesJson,
+			CreatedAt: role.CreatedAt,
+			UpdatedAt: role.UpdatedAt,
+		})
+		if err != nil {
+			return fmt.Errorf("restore role: %w", err)
+		}
+	}
+	for _, binding := range model.RoleBindings {
+		s.log.Debug("restoring role binding", slog.Any("binding", binding))
+		// nolint:gosimple
+		err = q.RestoreRoleBinding(ctx, raftdb.RestoreRoleBindingParams{
+			Name:       binding.Name,
+			RoleName:   binding.RoleName,
+			NodeIds:    binding.NodeIds,
+			UserNames:  binding.UserNames,
+			GroupNames: binding.GroupNames,
+			CreatedAt:  binding.CreatedAt,
+			UpdatedAt:  binding.UpdatedAt,
+		})
+		if err != nil {
+			return fmt.Errorf("restore role binding: %w", err)
 		}
 	}
 	for _, acl := range model.NetworkACLs {
@@ -228,19 +309,6 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 		})
 		if err != nil {
 			return fmt.Errorf("restore network acl: %w", err)
-		}
-	}
-	for _, edge := range model.NodeEdges {
-		s.log.Debug("restoring node edge", slog.Any("edge", edge))
-		// nolint:gosimple
-		err = q.RestoreNodeEdge(ctx, raftdb.RestoreNodeEdgeParams{
-			SrcNodeID: edge.SrcNodeID,
-			DstNodeID: edge.DstNodeID,
-			Weight:    edge.Weight,
-			Attrs:     edge.Attrs,
-		})
-		if err != nil {
-			return fmt.Errorf("restore node edge: %w", err)
 		}
 	}
 	err = tx.Commit()

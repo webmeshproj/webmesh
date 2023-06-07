@@ -374,6 +374,14 @@ github.com/webmeshproj/api v0.0.0-20230531001944-f923d019d4fe h1:fhESn/dlUIeyhpt
 github.com/webmeshproj/api v0.0.0-20230531001944-f923d019d4fe/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.0.0-20230605190709-f6ff415f7413 h1:WDr2pYYY74svCDjMrB2Pc0kjpmlPQ9nVNDqf+73kIlw=
 github.com/webmeshproj/api v0.0.0-20230605190709-f6ff415f7413/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.0.0-20230607142922-1f056c5a5a95 h1:cEUj6DDK7TrH6Uo3jgexJsRDCmZ42lJ+/VN72nCvElA=
+github.com/webmeshproj/api v0.0.0-20230607142922-1f056c5a5a95/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.0.0-20230607144102-18124ffadcc6 h1:pZFQt8OfX9E14U3NQOi0D5Lfiu7k/j7ravkslSJikho=
+github.com/webmeshproj/api v0.0.0-20230607144102-18124ffadcc6/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.0.0-20230607165428-bfc408cfa8a9 h1:CN2tk3o39VWZmLOYHUyOhHvgA8wN48JVzmLspO97Weg=
+github.com/webmeshproj/api v0.0.0-20230607165428-bfc408cfa8a9/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.0.0-20230607171646-262c026a2467 h1:XS8ckN14YNGWwBET6RsqSbeM/4MWjX6pWiNv88+ZsYU=
+github.com/webmeshproj/api v0.0.0-20230607171646-262c026a2467/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

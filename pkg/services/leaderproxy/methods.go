@@ -28,6 +28,8 @@ const (
 	PreferLeaderMeta = "prefer-leader"
 	// ProxiedFromMeta is the metadata key for the Proxied-From header.
 	ProxiedFromMeta = "proxied-from"
+	// ProxiedForMeta is the metadata key for the Proxied-For header.
+	ProxiedForMeta = "proxied-for"
 )
 
 // MethodPolicy defines the policy for routing requests to the leader.

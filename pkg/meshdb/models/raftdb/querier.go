@@ -13,19 +13,26 @@ type Querier interface {
 	DeleteNode(ctx context.Context, id string) error
 	DeleteNodeEdge(ctx context.Context, arg DeleteNodeEdgeParams) error
 	DeleteNodeEdges(ctx context.Context, arg DeleteNodeEdgesParams) error
-	DeleteRaftACL(ctx context.Context, name string) error
+	DeleteRole(ctx context.Context, name string) error
+	DeleteRoleBinding(ctx context.Context, name string) error
+	DropGroups(ctx context.Context) error
 	DropLeases(ctx context.Context) error
 	DropMeshState(ctx context.Context) error
 	DropNetworkACLs(ctx context.Context) error
 	DropNodeEdges(ctx context.Context) error
 	DropNodes(ctx context.Context) error
-	DropRaftACLs(ctx context.Context) error
+	DropRoleBindings(ctx context.Context) error
+	DropRoles(ctx context.Context) error
+	DropUsers(ctx context.Context) error
+	DumpGroups(ctx context.Context) ([]Group, error)
 	DumpLeases(ctx context.Context) ([]Lease, error)
 	DumpMeshState(ctx context.Context) ([]MeshState, error)
 	DumpNetworkACLs(ctx context.Context) ([]NetworkAcl, error)
 	DumpNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	DumpNodes(ctx context.Context) ([]Node, error)
-	DumpRaftACLs(ctx context.Context) ([]RaftAcl, error)
+	DumpRoleBindings(ctx context.Context) ([]RoleBinding, error)
+	DumpRoles(ctx context.Context) ([]Role, error)
+	DumpUsers(ctx context.Context) ([]User, error)
 	EitherNodeExists(ctx context.Context, arg EitherNodeExistsParams) (int64, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
@@ -34,30 +41,38 @@ type Querier interface {
 	GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
 	GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
 	GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error)
-	GetRaftACL(ctx context.Context, name string) (RaftAcl, error)
+	GetRole(ctx context.Context, name string) (Role, error)
+	GetRoleBinding(ctx context.Context, name string) (RoleBinding, error)
 	GetULAPrefix(ctx context.Context) (string, error)
 	InsertNode(ctx context.Context, arg InsertNodeParams) (Node, error)
 	InsertNodeEdge(ctx context.Context, arg InsertNodeEdgeParams) error
 	InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error)
 	ListAllocatedIPv4(ctx context.Context) ([]string, error)
+	ListBoundRolesForNode(ctx context.Context, arg ListBoundRolesForNodeParams) ([]Role, error)
+	ListBoundRolesForUser(ctx context.Context, arg ListBoundRolesForUserParams) ([]Role, error)
 	ListNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	ListNodeIDs(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)
 	ListNodesByZone(ctx context.Context, zoneAwarenessID sql.NullString) ([]ListNodesByZoneRow, error)
 	ListPublicNodes(ctx context.Context) ([]ListPublicNodesRow, error)
 	ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error)
-	ListRaftACLs(ctx context.Context) ([]RaftAcl, error)
+	ListRoleBindings(ctx context.Context) ([]RoleBinding, error)
+	ListRoles(ctx context.Context) ([]Role, error)
 	NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) (int64, error)
 	NodeExists(ctx context.Context, id string) (int64, error)
 	NodeHasEdges(ctx context.Context, arg NodeHasEdgesParams) (int64, error)
-	PutRaftACL(ctx context.Context, arg PutRaftACLParams) error
+	PutRole(ctx context.Context, arg PutRoleParams) error
+	PutRoleBinding(ctx context.Context, arg PutRoleBindingParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
+	RestoreGroup(ctx context.Context, arg RestoreGroupParams) error
 	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error
 	RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error
 	RestoreNetworkACL(ctx context.Context, arg RestoreNetworkACLParams) error
 	RestoreNode(ctx context.Context, arg RestoreNodeParams) error
 	RestoreNodeEdge(ctx context.Context, arg RestoreNodeEdgeParams) error
-	RestoreRaftACL(ctx context.Context, arg RestoreRaftACLParams) error
+	RestoreRole(ctx context.Context, arg RestoreRoleParams) error
+	RestoreRoleBinding(ctx context.Context, arg RestoreRoleBindingParams) error
+	RestoreUser(ctx context.Context, arg RestoreUserParams) error
 	SetIPv4Prefix(ctx context.Context, value string) error
 	SetULAPrefix(ctx context.Context, value string) error
 	UpdateNodeEdge(ctx context.Context, arg UpdateNodeEdgeParams) error

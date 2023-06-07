@@ -2,7 +2,6 @@ NAME  ?= node
 CTL   ?= wmctl
 REPO  ?= ghcr.io/webmeshproj
 IMAGE ?= $(REPO)/$(NAME):latest
-GOBGP_IMAGE ?= ghcr.io/webmeshproj/gobgp:latest
 
 ARCH ?= $(shell go env GOARCH)
 OS   ?= $(shell go env GOOS)
@@ -19,6 +18,7 @@ build: fmt vet generate ## Build node binary.
 		-ldflags "$(LDFLAGS)" \
 		-o dist/$(NAME)_$(OS)_$(ARCH) \
 		cmd/$(NAME)/main.go
+	upx --best --lzma dist/$(NAME)_$(OS)_$(ARCH)
 
 build-ctl: fmt vet ## Build wmctl binary.
 	CGO_ENABLED=0 go build \
@@ -46,6 +46,7 @@ dist: ## Build node binaries for all platforms.
 		-osarch="$(PLATFORMS)" \
 		-output="$(DIST)/$(NAME)_{{.OS}}_{{.Arch}}" \
 		github.com/webmeshproj/$(NAME)/cmd/$(NAME)
+	upx --best --lzma $(DIST)/$(NAME)_*
 
 dist-ctl: ## Build wmctl binaries for all platforms.
 	go install github.com/mitchellh/gox@latest
@@ -61,16 +62,13 @@ DOCKER ?= docker
 docker-build: build ## Build the node docker image
 	IMAGE=$(IMAGE) docker-compose build
 
+docker-build-distroless: build ## Build the node docker image
+	docker build \
+		-f Dockerfile.distroless \
+		-t $(IMAGE)-distroless .
+
 docker-push: docker-build ## Push the node docker image
 	IMAGE=$(IMAGE) docker-compose push
-
-docker-build-gobgp: ## Build docker image with gobgp.
-	$(DOCKER) build . \
-		-t $(GOBGP_IMAGE) \
-		-f Dockerfile.gobgp
-
-docker-push-gobgp: ## Push docker image with gobgp.
-	$(DOCKER) push $(GOBGP_IMAGE)
 
 compose-up: ## Run docker-compose stack.
 	IMAGE=$(IMAGE) docker-compose up

@@ -36,6 +36,11 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
+var canVoteAction = &v1.Action{
+	Verb:     v1.RuleVerbs_VERB_PUT,
+	Resource: v1.RuleResource_RESOURCE_VOTES,
+}
+
 func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
 	if !s.store.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
@@ -53,14 +58,13 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// We can go ahead and check here if the node is allowed to do what
 	// they want
 	if req.GetAsVoter() {
-		allowed, err := s.raftacls.CanVote(ctx, req.GetId())
+		roles, err := s.rbac.ListNodeRoles(ctx, req.GetId())
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to check ACLs: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to list node roles: %v", err)
 		}
+		allowed := roles.EvalAction(canVoteAction)
 		if !allowed {
-			s.log.Warn("Node not allowed to join",
-				slog.String("id", req.GetId()),
-				slog.Bool("voter", req.GetAsVoter()))
+			s.log.Warn("Node not allowed to join as voter", slog.String("id", req.GetId()))
 			return nil, status.Error(codes.PermissionDenied, "not allowed")
 		}
 	}
@@ -218,7 +222,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Use IPv6
 		// TODO: doesn't work when we are IPv4 only. Need to fix this.
 		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
-		// We may as well use IPv4 for everything in that case.
+		// We may as well use IPv4 for everything in that case. Leave it for now,
+		// but need to document these requirements fully for dual-stack setups.
 		raftAddress = net.JoinHostPort(peer.NetworkIPv6.Addr().String(), strconv.Itoa(peer.RaftPort))
 	}
 	if req.GetAsVoter() {

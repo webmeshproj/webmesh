@@ -40,17 +40,61 @@ INSERT INTO leases (
     created_at
 ) VALUES ( ?, ?, ? );
 
--- name: DumpRaftACLs :many
-SELECT * FROM raft_acls;
+-- name: DumpRoles :many
+SELECT * FROM roles;
 
--- name: DropRaftACLs :exec
-DELETE FROM raft_acls;
+-- name: DropRoles :exec
+DELETE FROM roles;
 
--- name: RestoreRaftACL :exec
-INSERT INTO raft_acls (
+-- name: RestoreRole :exec
+INSERT INTO roles (
     name,
+    rules_json,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?);
+
+-- name: DumpRoleBindings :many
+SELECT * FROM role_bindings;
+
+-- name: DropRoleBindings :exec
+DELETE FROM role_bindings;
+
+-- name: RestoreRoleBinding :exec
+INSERT INTO role_bindings (
+    name,
+    role_name,
+    node_ids,
+    user_names,
+    group_names,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- name: DumpUsers :many
+SELECT * FROM users;
+
+-- name: DropUsers :exec
+DELETE FROM users;
+
+-- name: RestoreUser :exec
+INSERT INTO users (
+    name,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?);
+
+-- name: DumpGroups :many
+SELECT * FROM groups;
+
+-- name: DropGroups :exec
+DELETE FROM groups;
+
+-- name: RestoreGroup :exec
+INSERT INTO groups (
+    name,
+    users,
     nodes,
-    action,
     created_at,
     updated_at
 ) VALUES (?, ?, ?, ?, ?);

@@ -33,8 +33,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const raftDriverName = "meshqlite"
-
 // raftDBDriver is a driver that is backed by the Raft log.
 type raftDBDriver struct {
 	*store

@@ -11,6 +11,15 @@ import (
 	"time"
 )
 
+const DropGroups = `-- name: DropGroups :exec
+DELETE FROM groups
+`
+
+func (q *Queries) DropGroups(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropGroups)
+	return err
+}
+
 const DropLeases = `-- name: DropLeases :exec
 DELETE FROM leases
 `
@@ -56,13 +65,64 @@ func (q *Queries) DropNodes(ctx context.Context) error {
 	return err
 }
 
-const DropRaftACLs = `-- name: DropRaftACLs :exec
-DELETE FROM raft_acls
+const DropRoleBindings = `-- name: DropRoleBindings :exec
+DELETE FROM role_bindings
 `
 
-func (q *Queries) DropRaftACLs(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, DropRaftACLs)
+func (q *Queries) DropRoleBindings(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropRoleBindings)
 	return err
+}
+
+const DropRoles = `-- name: DropRoles :exec
+DELETE FROM roles
+`
+
+func (q *Queries) DropRoles(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropRoles)
+	return err
+}
+
+const DropUsers = `-- name: DropUsers :exec
+DELETE FROM users
+`
+
+func (q *Queries) DropUsers(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropUsers)
+	return err
+}
+
+const DumpGroups = `-- name: DumpGroups :many
+SELECT name, users, nodes, created_at, updated_at FROM groups
+`
+
+func (q *Queries) DumpGroups(ctx context.Context) ([]Group, error) {
+	rows, err := q.db.QueryContext(ctx, DumpGroups)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Group
+	for rows.Next() {
+		var i Group
+		if err := rows.Scan(
+			&i.Name,
+			&i.Users,
+			&i.Nodes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const DumpLeases = `-- name: DumpLeases :many
@@ -225,23 +285,25 @@ func (q *Queries) DumpNodes(ctx context.Context) ([]Node, error) {
 	return items, nil
 }
 
-const DumpRaftACLs = `-- name: DumpRaftACLs :many
-SELECT name, nodes, "action", created_at, updated_at FROM raft_acls
+const DumpRoleBindings = `-- name: DumpRoleBindings :many
+SELECT name, role_name, node_ids, user_names, group_names, created_at, updated_at FROM role_bindings
 `
 
-func (q *Queries) DumpRaftACLs(ctx context.Context) ([]RaftAcl, error) {
-	rows, err := q.db.QueryContext(ctx, DumpRaftACLs)
+func (q *Queries) DumpRoleBindings(ctx context.Context) ([]RoleBinding, error) {
+	rows, err := q.db.QueryContext(ctx, DumpRoleBindings)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []RaftAcl
+	var items []RoleBinding
 	for rows.Next() {
-		var i RaftAcl
+		var i RoleBinding
 		if err := rows.Scan(
 			&i.Name,
-			&i.Nodes,
-			&i.Action,
+			&i.RoleName,
+			&i.NodeIds,
+			&i.UserNames,
+			&i.GroupNames,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -256,6 +318,94 @@ func (q *Queries) DumpRaftACLs(ctx context.Context) ([]RaftAcl, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const DumpRoles = `-- name: DumpRoles :many
+SELECT name, rules_json, created_at, updated_at FROM roles
+`
+
+func (q *Queries) DumpRoles(ctx context.Context) ([]Role, error) {
+	rows, err := q.db.QueryContext(ctx, DumpRoles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Role
+	for rows.Next() {
+		var i Role
+		if err := rows.Scan(
+			&i.Name,
+			&i.RulesJson,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const DumpUsers = `-- name: DumpUsers :many
+SELECT name, created_at, updated_at FROM users
+`
+
+func (q *Queries) DumpUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, DumpUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(&i.Name, &i.CreatedAt, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const RestoreGroup = `-- name: RestoreGroup :exec
+INSERT INTO groups (
+    name,
+    users,
+    nodes,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?)
+`
+
+type RestoreGroupParams struct {
+	Name      string         `json:"name"`
+	Users     sql.NullString `json:"users"`
+	Nodes     sql.NullString `json:"nodes"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) RestoreGroup(ctx context.Context, arg RestoreGroupParams) error {
+	_, err := q.db.ExecContext(ctx, RestoreGroup,
+		arg.Name,
+		arg.Users,
+		arg.Nodes,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }
 
 const RestoreLease = `-- name: RestoreLease :exec
@@ -394,31 +544,82 @@ func (q *Queries) RestoreNodeEdge(ctx context.Context, arg RestoreNodeEdgeParams
 	return err
 }
 
-const RestoreRaftACL = `-- name: RestoreRaftACL :exec
-INSERT INTO raft_acls (
+const RestoreRole = `-- name: RestoreRole :exec
+INSERT INTO roles (
     name,
-    nodes,
-    action,
+    rules_json,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?)
 `
 
-type RestoreRaftACLParams struct {
+type RestoreRoleParams struct {
 	Name      string    `json:"name"`
-	Nodes     string    `json:"nodes"`
-	Action    int64     `json:"action"`
+	RulesJson string    `json:"rules_json"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func (q *Queries) RestoreRaftACL(ctx context.Context, arg RestoreRaftACLParams) error {
-	_, err := q.db.ExecContext(ctx, RestoreRaftACL,
+func (q *Queries) RestoreRole(ctx context.Context, arg RestoreRoleParams) error {
+	_, err := q.db.ExecContext(ctx, RestoreRole,
 		arg.Name,
-		arg.Nodes,
-		arg.Action,
+		arg.RulesJson,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
+	return err
+}
+
+const RestoreRoleBinding = `-- name: RestoreRoleBinding :exec
+INSERT INTO role_bindings (
+    name,
+    role_name,
+    node_ids,
+    user_names,
+    group_names,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
+type RestoreRoleBindingParams struct {
+	Name       string         `json:"name"`
+	RoleName   string         `json:"role_name"`
+	NodeIds    sql.NullString `json:"node_ids"`
+	UserNames  sql.NullString `json:"user_names"`
+	GroupNames sql.NullString `json:"group_names"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) RestoreRoleBinding(ctx context.Context, arg RestoreRoleBindingParams) error {
+	_, err := q.db.ExecContext(ctx, RestoreRoleBinding,
+		arg.Name,
+		arg.RoleName,
+		arg.NodeIds,
+		arg.UserNames,
+		arg.GroupNames,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const RestoreUser = `-- name: RestoreUser :exec
+INSERT INTO users (
+    name,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?)
+`
+
+type RestoreUserParams struct {
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) RestoreUser(ctx context.Context, arg RestoreUserParams) error {
+	_, err := q.db.ExecContext(ctx, RestoreUser, arg.Name, arg.CreatedAt, arg.UpdatedAt)
 	return err
 }

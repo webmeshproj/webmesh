@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+type Group struct {
+	Name      string         `json:"name"`
+	Users     sql.NullString `json:"users"`
+	Nodes     sql.NullString `json:"nodes"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
 type Lease struct {
 	NodeID    string    `json:"node_id"`
 	Ipv4      string    `json:"ipv4"`
@@ -66,10 +74,25 @@ type NodePublicRpcAddress struct {
 	Address sql.NullBool `json:"address"`
 }
 
-type RaftAcl struct {
+type Role struct {
 	Name      string    `json:"name"`
-	Nodes     string    `json:"nodes"`
-	Action    int64     `json:"action"`
+	RulesJson string    `json:"rules_json"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type RoleBinding struct {
+	Name       string         `json:"name"`
+	RoleName   string         `json:"role_name"`
+	NodeIds    sql.NullString `json:"node_ids"`
+	UserNames  sql.NullString `json:"user_names"`
+	GroupNames sql.NullString `json:"group_names"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+}
+
+type User struct {
+	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

@@ -56,7 +56,7 @@ const (
 	BootstrapServersEnvVar          = "STORE_BOOTSTRAP_SERVERS"
 	BootstrapServersGRPCPortsEnvVar = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
 	BootstrapIPv4NetworkEnvVar      = "STORE_BOOTSTRAP_IPV4_NETWORK"
-	BootstrapWithRaftACLsEnvVar     = "STORE_BOOTSTRAP_WITH_RAFT_ACLS"
+	BootstrapAdminEnvVar            = "STORE_BOOTSTRAP_ADMIN"
 	JoinEnvVar                      = "STORE_JOIN"
 	JoinAsVoterEnvVar               = "STORE_JOIN_AS_VOTER"
 	MaxJoinRetriesEnvVar            = "STORE_MAX_JOIN_RETRIES"
@@ -192,8 +192,9 @@ type Options struct {
 	// BootstrapIPv4Network is the IPv4 network of the mesh to write to the database
 	// when bootstraping a new cluster.
 	BootstrapIPv4Network string `json:"bootstrap-ipv4-network,omitempty" yaml:"bootstrap-ipv4-network,omitempty" toml:"bootstrap-ipv4-network,omitempty"`
-	// BoostrapWithRaftACLs is the flag to bootstrap with Raft ACLs.
-	BootstrapWithRaftACLs bool `json:"bootstrap-with-raft-acls,omitempty" yaml:"bootstrap-with-raft-acls,omitempty" toml:"bootstrap-with-raft-acls,omitempty"`
+	// BootstrapAdmin is the user and/or node name to assign administrator privileges to
+	// when bootstraping a new cluster.
+	BootstrapAdmin string `json:"bootstrap-admin,omitempty" yaml:"bootstrap-admin,omitempty" toml:"bootstrap-admin,omitempty"`
 	// ForceBootstrap is the force new bootstrap flag.
 	ForceBootstrap bool `json:"force-bootstrap,omitempty" yaml:"force-bootstrap,omitempty" toml:"force-bootstrap,omitempty"`
 	// RaftLogLevel is the log level for the raft backend.
@@ -239,6 +240,7 @@ func NewOptions() *Options {
 		JoinTimeout:          time.Minute,
 		ObserverChanBuffer:   100,
 		BootstrapIPv4Network: "172.16.0.0/12",
+		BootstrapAdmin:       "admin",
 		StartupTimeout:       time.Minute * 3,
 		ShutdownTimeout:      time.Minute,
 		KeyRotationInterval:  time.Hour * 24 * 7,
@@ -290,8 +292,8 @@ Ports should be in the form of <node-id>=<port>.`)
 	fl.StringVar(&o.BootstrapIPv4Network, "store.bootstrap-ipv4-network", util.GetEnvDefault(BootstrapIPv4NetworkEnvVar, "172.16.0.0/12"),
 		"IPv4 network of the mesh to write to the database when bootstraping a new cluster.")
 
-	fl.BoolVar(&o.BootstrapWithRaftACLs, "store.bootstrap-with-raft-acls", util.GetEnvDefault(BootstrapWithRaftACLsEnvVar, "false") == "true",
-		"Bootstrap the cluster with Raft ACLs enabled.")
+	fl.StringVar(&o.BootstrapAdmin, "store.bootstrap-admin", util.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
+		"Admin username to bootstrap the cluster with.")
 
 	fl.BoolVar(&o.ForceBootstrap, "store.force-bootstrap", util.GetEnvDefault(ForceNewClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")

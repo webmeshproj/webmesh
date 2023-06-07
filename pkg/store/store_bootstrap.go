@@ -36,6 +36,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -198,7 +199,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 			}
 		}
 		if s.IsLeader() {
-			err := s.initialBootstrapLeader(ctx, grpcPorts)
+			err := s.initialBootstrapLeader(ctx)
 			if err != nil {
 				s.log.Error("initial leader bootstrap failed", slog.String("error", err.Error()))
 			}
@@ -214,8 +215,9 @@ func (s *store) bootstrap(ctx context.Context) error {
 	return nil
 }
 
-func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.ServerID]int64) error {
+func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	q := raftdb.New(s.DB())
+	cfg := s.raft.GetConfiguration().Configuration()
 
 	// Set initial cluster configurations to the raft log
 	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
@@ -234,27 +236,68 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
 	}
 
-	if s.opts.BootstrapWithRaftACLs {
-		s.log.Info("Bootstrapping with Raft ACLs enabled")
-		// Write ACLs for all the bootstrap servers.
-		cfg := s.raft.GetConfiguration().Configuration()
-		var nodeIDs []string
-		for _, server := range cfg.Servers {
-			nodeIDs = append(nodeIDs, string(server.ID))
+	// Initialize the RBAC system.
+	rb := rbac.New(s)
+
+	// Create an admin role and add the admin user/node to it.
+	err = rb.PutRole(ctx, &v1.Role{
+		Name: "mesh-admin",
+		Rules: []*v1.Rule{
+			{
+				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
+				Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("create admin role: %w", err)
+	}
+	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
+		Name: "mesh-admin",
+		Role: "mesh-admin",
+		Subjects: []*v1.Subject{
+			{
+				Name: s.opts.BootstrapAdmin,
+				Type: v1.SubjectType_SUBJECT_NODE,
+			},
+			{
+				Name: s.opts.BootstrapAdmin,
+				Type: v1.SubjectType_SUBJECT_USER,
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("create admin role binding: %w", err)
+	}
+
+	// Create a "voters" role and add ourselves and all the bootstrap servers
+	// to it.
+	err = rb.PutRole(ctx, &v1.Role{
+		Name: "voters",
+		Rules: []*v1.Rule{
+			{
+				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_VOTES},
+				Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_PUT},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("create voters role: %w", err)
+	}
+	roleBinding := &v1.RoleBinding{
+		Name:     "bootstrap-voters",
+		Role:     "voters",
+		Subjects: make([]*v1.Subject, len(cfg.Servers)),
+	}
+	for i, server := range cfg.Servers {
+		roleBinding.Subjects[i] = &v1.Subject{
+			Type: v1.SubjectType_SUBJECT_NODE,
+			Name: string(server.ID),
 		}
-		s.log.Info("writing bootstrap servers raft acl",
-			slog.String("nodes", strings.Join(nodeIDs, ",")),
-		)
-		err = q.PutRaftACL(ctx, raftdb.PutRaftACLParams{
-			Name:      "bootstrap-servers",
-			Nodes:     strings.Join(nodeIDs, ","),
-			Action:    int64(v1.ACLAction_ALLOW.Number()),
-			CreatedAt: time.Now().UTC(),
-			UpdatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			return fmt.Errorf("put bootstrap servers raft acl: %w", err)
-		}
+	}
+	err = rb.PutRoleBinding(ctx, roleBinding)
+	if err != nil {
+		return fmt.Errorf("create voters role binding: %w", err)
 	}
 
 	// We need to officially "join" ourselves to the cluster with a wireguard
@@ -293,7 +336,6 @@ func (s *store) initialBootstrapLeader(ctx context.Context, grpcPorts map[raft.S
 		return fmt.Errorf("create node: %w", err)
 	}
 	// Pre-create slots and edges for the other bootstrap servers.
-	cfg := s.raft.GetConfiguration().Configuration()
 	for _, server := range cfg.Servers {
 		if server.ID == s.nodeID {
 			continue

@@ -30,7 +30,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.0.0
-	github.com/webmeshproj/api v0.0.0-20230605190709-f6ff415f7413
+	github.com/webmeshproj/api v0.0.0-20230607171646-262c026a2467
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/net v0.10.0
 	golang.org/x/sync v0.1.0

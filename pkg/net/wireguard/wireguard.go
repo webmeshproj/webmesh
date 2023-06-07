@@ -90,10 +90,10 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		}
 	}
 	if os.Getuid() == 0 {
-		log.Info("enabling ip forwarding")
+		log.Debug("enabling ip forwarding")
 		err := system.EnableIPForwarding()
 		if err != nil {
-			return nil, fmt.Errorf("failed to enable ip forwarding: %w", err)
+			log.Warn("failed to enable ip forwarding", "error", err)
 		}
 	}
 	var peerConfigs *peerConfigs

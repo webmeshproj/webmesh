@@ -20,6 +20,14 @@ CREATE TABLE nodes (
     updated_at            TIMESTAMP NOT NULL
 );
 
+-- Tracks edges between nodes for the mesh graph.
+CREATE TABLE node_edges (
+    src_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
+    dst_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
+    weight       INTEGER NOT NULL DEFAULT 1,
+    attrs        TEXT
+);
+
 -- Tracks IPv4 leases for nodes.
 CREATE TABLE leases (
     node_id     TEXT NOT NULL UNIQUE REFERENCES nodes (id) ON DELETE CASCADE,
@@ -27,13 +35,42 @@ CREATE TABLE leases (
     created_at  TIMESTAMP NOT NULL
 );
 
--- Raft ACLs determine who can vote in elections.
-CREATE TABLE raft_acls (
-    name        TEXT NOT NULL PRIMARY KEY,
-    nodes       TEXT NOT NULL,
-    action      INTEGER NOT NULL DEFAULT 0,
-    created_at  TIMESTAMP NOT NULL,
-    updated_at  TIMESTAMP NOT NULL
+-- Tracks users. Users are simply certificates signed by the CA that are not
+-- necessarily associated with a node. It's possible the two concepts should
+-- be merged. However, for now, there may be use cases where a user is purely
+-- for administrative purposes and never actually joins as a node.
+CREATE TABLE users (
+    name         TEXT NOT NULL PRIMARY KEY,
+    created_at   TIMESTAMP NOT NULL,
+    updated_at   TIMESTAMP NOT NULL
+);
+
+-- Tracks groups. Groups are collections of users and/or nodes.
+CREATE TABLE groups (
+    name         TEXT NOT NULL PRIMARY KEY,
+    users        TEXT,
+    nodes        TEXT,
+    created_at   TIMESTAMP NOT NULL,
+    updated_at   TIMESTAMP NOT NULL
+);
+
+-- Tracks roles. Roles are collections of rules that can be bound to users and nodes
+CREATE TABLE roles (
+    name         TEXT NOT NULL PRIMARY KEY,
+    rules_json   TEXT NOT NULL,
+    created_at   TIMESTAMP NOT NULL,
+    updated_at   TIMESTAMP NOT NULL
+);
+
+-- Tracks role bindings. Role bindings are the association of a role to users and/or nodes.
+CREATE TABLE role_bindings (
+    name         TEXT NOT NULL PRIMARY KEY,
+    role_name    TEXT NOT NULL REFERENCES roles (name) ON DELETE CASCADE,
+    node_ids     TEXT,
+    user_names   TEXT,
+    group_names  TEXT,
+    created_at   TIMESTAMP NOT NULL,
+    updated_at   TIMESTAMP NOT NULL
 );
 
 -- Network ACLs determine who can communicate with whom.
@@ -46,14 +83,6 @@ CREATE TABLE network_acls (
     action       INTEGER NOT NULL DEFAULT 0,
     created_at   TIMESTAMP NOT NULL,
     updated_at   TIMESTAMP NOT NULL
-);
-
--- Tracks edges between nodes for the mesh graph.
-CREATE TABLE node_edges (
-    src_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
-    dst_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
-    weight       INTEGER NOT NULL DEFAULT 1,
-    attrs        TEXT
 );
 
 -- Views for more convenient querying.
@@ -94,10 +123,13 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 
 -- +goose Down
 
-DROP TABLE node_edges;
 DROP TABLE network_acls;
-DROP TABLE raft_acls;
+DROP TABLE role_bindings;
+DROP TABLE roles;
+DROP TABLE groups;
+DROP TABLE users;
 DROP TABLE leases;
+DROP TABLE node_edges;
 DROP TABLE nodes;
 DROP TABLE mesh_state;
 

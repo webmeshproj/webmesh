@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
 	"golang.org/x/exp/slog"
@@ -60,7 +61,8 @@ func (s *store) Open() error {
 		return err
 	}
 	var err error
-	// Register the raft driver.
+	// Register a raft db driver.
+	raftDriverName := uuid.NewString()
 	sql.Register(raftDriverName, &raftDBDriver{s})
 	// If bootstrap and force are set, clear the data directory.
 	if s.opts.Bootstrap && s.opts.ForceBootstrap {
@@ -80,14 +82,14 @@ func (s *store) Open() error {
 		log = log.With(slog.String("data-dir", ":memory:"))
 	}
 	// Create the raft network transport
-	log.Info("creating raft network transport")
+	log.Debug("creating raft network transport")
 	s.raftTransport = raft.NewNetworkTransport(s.sl,
 		s.opts.ConnectionPoolCount,
 		s.opts.ConnectionTimeout,
 		&logWriter{log: s.log},
 	)
 	// Create the raft stores.
-	log.Info("creating boltdb stores")
+	log.Debug("creating boltdb stores")
 	if s.opts.InMemory {
 		s.logDB = newInmemStore()
 		s.stableDB = newInmemStore()
@@ -111,7 +113,7 @@ func (s *store) Open() error {
 		return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.DataDir, err))
 	}
 	// Create the data stores.
-	log.Info("creating data stores")
+	log.Debug("creating data stores")
 	var dataPath, localDataPath string
 	if s.opts.InMemory {
 		dataPath = ":memory:"
@@ -124,7 +126,11 @@ func (s *store) Open() error {
 	if err != nil {
 		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.DataFilePath(), err))
 	}
-	s.snapshotter = snapshots.New(s.weakData)
+	// Make sure we use case sensitive collation for the data store.
+	_, err = s.weakData.Exec("PRAGMA case_sensitive_like = true;")
+	if err != nil {
+		return handleErr(fmt.Errorf("set case sensitive like: %w", err))
+	}
 	s.raftData, err = sql.Open(raftDriverName, "")
 	if err != nil {
 		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
@@ -133,6 +139,7 @@ func (s *store) Open() error {
 	if err != nil {
 		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.LocalDataFilePath(), err))
 	}
+	s.snapshotter = snapshots.New(s.weakData)
 	// Create the raft instance.
 	log.Info("starting raft instance",
 		slog.String("listen-addr", string(s.raftTransport.LocalAddr())),
@@ -155,11 +162,11 @@ func (s *store) Open() error {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if s.opts.Join != "" {
-		log.Info("migrating raft database")
+		log.Debug("migrating raft database")
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
-		log.Info("migrating local database")
+		log.Debug("migrating local database")
 		if err = models.MigrateLocalDB(s.localData); err != nil {
 			return fmt.Errorf("local db migrate: %w", err)
 		}
@@ -172,11 +179,11 @@ func (s *store) Open() error {
 		// We neither had the bootstrap flag nor the join flag set.
 		// This means we are a possibly a single node cluster.
 		// Recover our previous wireguard configuration and start up.
-		log.Info("migrating raft database")
+		log.Debug("migrating raft database")
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
-		log.Info("migrating local database")
+		log.Debug("migrating local database")
 		if err = models.MigrateLocalDB(s.localData); err != nil {
 			return fmt.Errorf("local db migrate: %w", err)
 		}

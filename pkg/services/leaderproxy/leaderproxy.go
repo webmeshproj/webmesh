@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -117,6 +118,13 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	}
 	defer conn.Close()
 	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, string(i.store.ID()))
+	p, ok := peer.FromContext(ctx)
+	if ok {
+		peerCerts := p.AuthInfo.(credentials.TLSInfo).State.PeerCertificates
+		if len(peerCerts) > 0 {
+			ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, string(peerCerts[0].Subject.CommonName))
+		}
+	}
 	switch info.FullMethod {
 	// Node API
 	case v1.Node_Join_FullMethodName:
