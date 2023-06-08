@@ -35,52 +35,53 @@ import (
 )
 
 const (
-	NodeIDEnvVar                    = "STORE_NODE_ID"
-	NodeEndpointEnvVar              = "STORE_NODE_ENDPOINT"
-	NodeWireGuardEndpointsEnvVar    = "STORE_NODE_WIREGUARD_ENDPOINTS"
-	DataDirEnvVar                   = "STORE_DATA_DIR"
-	InMemoryEnvVar                  = "STORE_IN_MEMORY"
-	AdvertiseAddressEnvVar          = "STORE_ADVERTISE_ADDRESS"
-	ConnectionPoolCountEnvVar       = "STORE_CONNECTION_POOL_COUNT"
-	ConnectionTimeoutEnvVar         = "STORE_CONNECTION_TIMEOUT"
-	HeartbeatTimeoutEnvVar          = "STORE_HEARTBEAT_TIMEOUT"
-	ElectionTimeoutEnvVar           = "STORE_ELECTION_TIMEOUT"
-	ApplyTimeoutEnvVar              = "STORE_APPLY_TIMEOUT"
-	CommitTimeoutEnvVar             = "STORE_COMMIT_TIMEOUT"
-	MaxAppendEntriesEnvVar          = "STORE_MAX_APPEND_ENTRIES"
-	LeaderLeaseTimeoutEnvVar        = "STORE_LEADER_LEASE_TIMEOUT"
-	SnapshotIntervalEnvVar          = "STORE_SNAPSHOT_INTERVAL"
-	SnapshotThresholdEnvVar         = "STORE_SNAPSHOT_THRESHOLD"
-	SnapshotRetentionEnvVar         = "STORE_SNAPSHOT_RETENTION"
-	BootstrapEnvVar                 = "STORE_BOOTSTRAP"
-	BootstrapServersEnvVar          = "STORE_BOOTSTRAP_SERVERS"
-	BootstrapServersGRPCPortsEnvVar = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
-	BootstrapIPv4NetworkEnvVar      = "STORE_BOOTSTRAP_IPV4_NETWORK"
-	BootstrapAdminEnvVar            = "STORE_BOOTSTRAP_ADMIN"
-	BootstrapVotersEnvVar           = "STORE_BOOTSTRAP_VOTERS"
-	JoinEnvVar                      = "STORE_JOIN"
-	JoinAsVoterEnvVar               = "STORE_JOIN_AS_VOTER"
-	MaxJoinRetriesEnvVar            = "STORE_MAX_JOIN_RETRIES"
-	JoinTimeoutEnvVar               = "STORE_JOIN_TIMEOUT"
-	CertFileEnvVar                  = "STORE_TLS_CERT_FILE"
-	KeyFileEnvVar                   = "STORE_TLS_KEY_FILE"
-	CAFileEnvVar                    = "STORE_TLS_CA_FILE"
-	VerifyChainOnlyEnvVar           = "STORE_VERIFY_CHAIN_ONLY"
-	InsecureSkipVerifyEnvVar        = "STORE_INSECURE_SKIP_VERIFY"
-	InsecureEnvVar                  = "STORE_INSECURE"
-	ForceNewClusterEnvVar           = "STORE_FORCE_BOOTSTRAP"
-	RaftLogLevelEnvVar              = "STORE_RAFT_LOG_LEVEL"
-	RaftPreferIPv6EnvVar            = "STORE_RAFT_PREFER_IPV6"
-	ObserverChanBufferEnvVar        = "STORE_OBSERVER_CHAN_BUFFER"
-	GRPCAdvertisePortEnvVar         = "STORE_GRPC_ADVERTISE_PORT"
-	RaftLogFormatEnvVar             = "STORE_RAFT_LOG_FORMAT"
-	StartupTimeoutEnvVar            = "STORE_STARTUP_TIMEOUT"
-	ShutdownTimeoutEnvVar           = "STORE_SHUTDOWN_TIMEOUT"
-	KeyRotationIntervalEnvVar       = "STORE_KEY_ROTATION_INTERVAL"
-	NoIPv4EnvVar                    = "STORE_NO_IPV4"
-	NoIPv6EnvVar                    = "STORE_NO_IPV6"
-	LeaveOnShutdownEnvVar           = "STORE_LEAVE_ON_SHUTDOWN"
-	ZoneAwarenessIDEnvVar           = "STORE_ZONE_AWARENESS_ID"
+	NodeIDEnvVar                        = "STORE_NODE_ID"
+	NodeEndpointEnvVar                  = "STORE_NODE_ENDPOINT"
+	NodeWireGuardEndpointsEnvVar        = "STORE_NODE_WIREGUARD_ENDPOINTS"
+	DataDirEnvVar                       = "STORE_DATA_DIR"
+	InMemoryEnvVar                      = "STORE_IN_MEMORY"
+	AdvertiseAddressEnvVar              = "STORE_ADVERTISE_ADDRESS"
+	ConnectionPoolCountEnvVar           = "STORE_CONNECTION_POOL_COUNT"
+	ConnectionTimeoutEnvVar             = "STORE_CONNECTION_TIMEOUT"
+	HeartbeatTimeoutEnvVar              = "STORE_HEARTBEAT_TIMEOUT"
+	ElectionTimeoutEnvVar               = "STORE_ELECTION_TIMEOUT"
+	ApplyTimeoutEnvVar                  = "STORE_APPLY_TIMEOUT"
+	CommitTimeoutEnvVar                 = "STORE_COMMIT_TIMEOUT"
+	MaxAppendEntriesEnvVar              = "STORE_MAX_APPEND_ENTRIES"
+	LeaderLeaseTimeoutEnvVar            = "STORE_LEADER_LEASE_TIMEOUT"
+	SnapshotIntervalEnvVar              = "STORE_SNAPSHOT_INTERVAL"
+	SnapshotThresholdEnvVar             = "STORE_SNAPSHOT_THRESHOLD"
+	SnapshotRetentionEnvVar             = "STORE_SNAPSHOT_RETENTION"
+	BootstrapEnvVar                     = "STORE_BOOTSTRAP"
+	BootstrapServersEnvVar              = "STORE_BOOTSTRAP_SERVERS"
+	BootstrapServersGRPCPortsEnvVar     = "STORE_BOOTSTRAP_SERVERS_GRPC_PORTS"
+	BootstrapIPv4NetworkEnvVar          = "STORE_BOOTSTRAP_IPV4_NETWORK"
+	BootstrapAdminEnvVar                = "STORE_BOOTSTRAP_ADMIN"
+	BootstrapVotersEnvVar               = "STORE_BOOTSTRAP_VOTERS"
+	BootstrapDefaultNetworkPolicyEnvVar = "STORE_BOOTSTRAP_DEFAULT_NETWORK_POLICY"
+	JoinEnvVar                          = "STORE_JOIN"
+	JoinAsVoterEnvVar                   = "STORE_JOIN_AS_VOTER"
+	MaxJoinRetriesEnvVar                = "STORE_MAX_JOIN_RETRIES"
+	JoinTimeoutEnvVar                   = "STORE_JOIN_TIMEOUT"
+	CertFileEnvVar                      = "STORE_TLS_CERT_FILE"
+	KeyFileEnvVar                       = "STORE_TLS_KEY_FILE"
+	CAFileEnvVar                        = "STORE_TLS_CA_FILE"
+	VerifyChainOnlyEnvVar               = "STORE_VERIFY_CHAIN_ONLY"
+	InsecureSkipVerifyEnvVar            = "STORE_INSECURE_SKIP_VERIFY"
+	InsecureEnvVar                      = "STORE_INSECURE"
+	ForceNewClusterEnvVar               = "STORE_FORCE_BOOTSTRAP"
+	RaftLogLevelEnvVar                  = "STORE_RAFT_LOG_LEVEL"
+	RaftPreferIPv6EnvVar                = "STORE_RAFT_PREFER_IPV6"
+	ObserverChanBufferEnvVar            = "STORE_OBSERVER_CHAN_BUFFER"
+	GRPCAdvertisePortEnvVar             = "STORE_GRPC_ADVERTISE_PORT"
+	RaftLogFormatEnvVar                 = "STORE_RAFT_LOG_FORMAT"
+	StartupTimeoutEnvVar                = "STORE_STARTUP_TIMEOUT"
+	ShutdownTimeoutEnvVar               = "STORE_SHUTDOWN_TIMEOUT"
+	KeyRotationIntervalEnvVar           = "STORE_KEY_ROTATION_INTERVAL"
+	NoIPv4EnvVar                        = "STORE_NO_IPV4"
+	NoIPv6EnvVar                        = "STORE_NO_IPV6"
+	LeaveOnShutdownEnvVar               = "STORE_LEAVE_ON_SHUTDOWN"
+	ZoneAwarenessIDEnvVar               = "STORE_ZONE_AWARENESS_ID"
 
 	// LogFile is the raft log file.
 	LogFile = "raft.log"
@@ -103,6 +104,26 @@ const (
 	// RaftLogFormatProtobufSnappy is the protobuf snappy raft log format.
 	RaftLogFormatProtobufSnappy RaftLogFormat = "protobuf+snappy"
 )
+
+// NetworkPolicy is a type of network policy.
+type NetworkPolicy string
+
+const (
+	// NetworkPolicyAccept is the accept network policy.
+	NetworkPolicyAccept NetworkPolicy = "accept"
+	// NetworkPolicyDeny is the deny network policy.
+	NetworkPolicyDeny NetworkPolicy = "deny"
+)
+
+// IsValid returns if the network policy is valid.
+func (n NetworkPolicy) IsValid() bool {
+	switch n {
+	case NetworkPolicyAccept, NetworkPolicyDeny:
+		return true
+	default:
+		return false
+	}
+}
 
 // IsValid returns if the raft log format is valid.
 func (r RaftLogFormat) IsValid() bool {
@@ -199,6 +220,9 @@ type Options struct {
 	// BootstrapVoters is a comma separated list of node IDs to assign voting privileges to
 	// when bootstraping a new cluster. BootstrapServers are automatically added to this list.
 	BootstrapVoters string `json:"bootstrap-voters,omitempty" yaml:"bootstrap-voters,omitempty" toml:"bootstrap-voters,omitempty"`
+	// BootstrapDefaultNetworkPolicy is the default network policy to apply to the mesh when
+	// bootstraping a new cluster.
+	BootstrapDefaultNetworkPolicy string `json:"bootstrap-default-network-policy,omitempty" yaml:"bootstrap-default-network-policy,omitempty" toml:"bootstrap-default-network-policy,omitempty"`
 	// ForceBootstrap is the force new bootstrap flag.
 	ForceBootstrap bool `json:"force-bootstrap,omitempty" yaml:"force-bootstrap,omitempty" toml:"force-bootstrap,omitempty"`
 	// RaftLogLevel is the log level for the raft backend.
@@ -229,26 +253,28 @@ type Options struct {
 // NewOptions returns new options with sensible defaults.
 func NewOptions() *Options {
 	return &Options{
-		DataDir:              "/var/lib/webmesh/store",
-		ConnectionTimeout:    time.Second * 3,
-		HeartbeatTimeout:     time.Second * 3,
-		ElectionTimeout:      time.Second * 3,
-		ApplyTimeout:         time.Second * 10,
-		CommitTimeout:        time.Second * 15,
-		LeaderLeaseTimeout:   time.Second * 3,
-		SnapshotInterval:     time.Minute * 5,
-		SnapshotThreshold:    50,
-		MaxAppendEntries:     16,
-		SnapshotRetention:    3,
-		MaxJoinRetries:       10,
-		JoinTimeout:          time.Minute,
-		ObserverChanBuffer:   100,
-		BootstrapIPv4Network: "172.16.0.0/12",
-		BootstrapAdmin:       "admin",
-		StartupTimeout:       time.Minute * 3,
-		ShutdownTimeout:      time.Minute,
-		KeyRotationInterval:  time.Hour * 24 * 7,
-		GRPCAdvertisePort:    8443,
+		DataDir:                       "/var/lib/webmesh/store",
+		ConnectionTimeout:             time.Second * 3,
+		HeartbeatTimeout:              time.Second * 3,
+		ElectionTimeout:               time.Second * 3,
+		ApplyTimeout:                  time.Second * 10,
+		CommitTimeout:                 time.Second * 15,
+		LeaderLeaseTimeout:            time.Second * 3,
+		SnapshotInterval:              time.Minute * 5,
+		SnapshotThreshold:             50,
+		MaxAppendEntries:              16,
+		SnapshotRetention:             3,
+		MaxJoinRetries:                10,
+		JoinTimeout:                   time.Minute,
+		ObserverChanBuffer:            100,
+		BootstrapIPv4Network:          "172.16.0.0/12",
+		BootstrapAdmin:                "admin",
+		BootstrapDefaultNetworkPolicy: "deny",
+		StartupTimeout:                time.Minute * 3,
+		ShutdownTimeout:               time.Minute,
+		KeyRotationInterval:           time.Hour * 24 * 7,
+		GRPCAdvertisePort:             8443,
+		RaftLogFormat:                 string(RaftLogFormatProtobufSnappy),
 	}
 }
 
@@ -298,8 +324,12 @@ Ports should be in the form of <node-id>=<port>.`)
 
 	fl.StringVar(&o.BootstrapAdmin, "store.bootstrap-admin", util.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
 		"Admin username to bootstrap the cluster with.")
+
 	fl.StringVar(&o.BootstrapVoters, "store.bootstrap-voters", util.GetEnvDefault(BootstrapVotersEnvVar, ""),
 		"Comma separated list of voters to bootstrap the cluster with. bootstrap--servers are already included in this list.")
+
+	fl.StringVar(&o.BootstrapDefaultNetworkPolicy, "store.bootstrap-default-network-policy", util.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
+		"Default network policy to bootstrap the cluster with.")
 
 	fl.BoolVar(&o.ForceBootstrap, "store.force-bootstrap", util.GetEnvDefault(ForceNewClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")

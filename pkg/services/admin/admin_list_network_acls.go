@@ -43,5 +43,5 @@ func (s *Server) ListNetworkACLs(ctx context.Context, _ *emptypb.Empty) (*v1.Net
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.NetworkACLs{Items: acls}, nil
+	return &v1.NetworkACLs{Items: acls.Proto()}, nil
 }

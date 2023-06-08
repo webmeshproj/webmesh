@@ -44,7 +44,7 @@ func (q *Queries) GetNetworkACL(ctx context.Context, name string) (NetworkAcl, e
 }
 
 const ListNetworkACLs = `-- name: ListNetworkACLs :many
-SELECT name, priority, "action", src_node_ids, dst_node_ids, src_cidrs, dst_cidrs, protocols, ports, created_at, updated_at FROM network_acls
+SELECT name, priority, "action", src_node_ids, dst_node_ids, src_cidrs, dst_cidrs, protocols, ports, created_at, updated_at FROM network_acls ORDER BY priority DESC
 `
 
 func (q *Queries) ListNetworkACLs(ctx context.Context) ([]NetworkAcl, error) {

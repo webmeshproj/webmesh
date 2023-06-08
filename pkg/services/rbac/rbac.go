@@ -38,7 +38,7 @@ type Evaluator interface {
 }
 
 // Action is a convenience type for an action.
-type Action v1.Action
+type Action v1.RBACAction
 
 // For returns a copy of this action for the given resource name.
 func (a *Action) For(resource string) *Action {
@@ -50,8 +50,8 @@ func (a *Action) For(resource string) *Action {
 }
 
 // action returns the underlying v1.Action.
-func (a *Action) action() *v1.Action {
-	return (*v1.Action)(a)
+func (a *Action) action() *v1.RBACAction {
+	return (*v1.RBACAction)(a)
 }
 
 // NewStoreEvaluator returns a ActionEvaluator that evaluates actions
@@ -87,8 +87,8 @@ func (s *storeEvaluator) Evaluate(ctx context.Context, action *Action) (bool, er
 	if err != nil {
 		return false, err
 	}
-	return nodeRoles.EvalAction(action.action()) ||
-		userRoles.EvalAction(action.action()), nil
+	return nodeRoles.Eval(action.action()) ||
+		userRoles.Eval(action.action()), nil
 }
 
 // NewNoopEvaluator returns an evaluator that always returns true.

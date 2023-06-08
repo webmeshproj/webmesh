@@ -53,7 +53,7 @@ type Networking interface {
 	// PutNetworkACL creates or updates a NetworkACL.
 	PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error
 	// GetNetworkACL returns a NetworkACL by name.
-	GetNetworkACL(ctx context.Context, name string) (*v1.NetworkACL, error)
+	GetNetworkACL(ctx context.Context, name string) (*ACL, error)
 	// DeleteNetworkACL deletes a NetworkACL by name.
 	DeleteNetworkACL(ctx context.Context, name string) error
 	// ListNetworkACLs returns a list of NetworkACLs.
@@ -161,7 +161,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 }
 
 // GetNetworkACL returns a NetworkACL by name.
-func (n *networking) GetNetworkACL(ctx context.Context, name string) (*v1.NetworkACL, error) {
+func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, error) {
 	q := raftdb.New(n.store.ReadDB())
 	acl, err := q.GetNetworkACL(ctx, name)
 	if err != nil {
@@ -170,7 +170,7 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (*v1.Networ
 		}
 		return nil, fmt.Errorf("get network acl: %w", err)
 	}
-	return dbACLToAPIACL(&acl), nil
+	return dbACLToAPIACL(n.store, &acl), nil
 }
 
 // DeleteNetworkACL deletes a NetworkACL by name.
@@ -195,7 +195,7 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 	}
 	out := make(ACLs, len(acls))
 	for i, acl := range acls {
-		out[i] = dbACLToAPIACL(&acl)
+		out[i] = dbACLToAPIACL(n.store, &acl)
 	}
 	out.Sort(SortDescending)
 	return out, nil
@@ -305,56 +305,59 @@ func (n *networking) AppendNodeToRoute(ctx context.Context, routeName string, no
 	return n.PutRoute(ctx, route)
 }
 
-func dbACLToAPIACL(dbACL *raftdb.NetworkAcl) *v1.NetworkACL {
-	return &v1.NetworkACL{
-		Name:     dbACL.Name,
-		Priority: int32(dbACL.Priority),
-		Action:   v1.ACLAction(dbACL.Action),
-		SourceNodes: func() []string {
-			if dbACL.SrcNodeIds.Valid {
-				return strings.Split(dbACL.SrcNodeIds.String, ",")
-			}
-			return nil
-		}(),
-		DestinationNodes: func() []string {
-			if dbACL.DstNodeIds.Valid {
-				return strings.Split(dbACL.DstNodeIds.String, ",")
-			}
-			return nil
-		}(),
-		SourceCidrs: func() []string {
-			if dbACL.SrcCidrs.Valid {
-				return strings.Split(dbACL.SrcCidrs.String, ",")
-			}
-			return nil
-		}(),
-		DestinationCidrs: func() []string {
-			if dbACL.DstCidrs.Valid {
-				return strings.Split(dbACL.DstCidrs.String, ",")
-			}
-			return nil
-		}(),
-		Protocols: func() []string {
-			if dbACL.Protocols.Valid {
-				return strings.Split(dbACL.Protocols.String, ",")
-			}
-			return nil
-		}(),
-		Ports: func() []uint32 {
-			if dbACL.Ports.Valid {
-				out := make([]uint32, 0)
-				for _, port := range strings.Split(dbACL.Ports.String, ",") {
-					p, err := strconv.ParseUint(port, 10, 32)
-					if err != nil {
-						// A bad port got into the databse somehow, just skip it
-						continue
-					}
-					out = append(out, uint32(p))
+func dbACLToAPIACL(store meshdb.Store, dbACL *raftdb.NetworkAcl) *ACL {
+	return &ACL{
+		store: store,
+		NetworkACL: v1.NetworkACL{
+			Name:     dbACL.Name,
+			Priority: int32(dbACL.Priority),
+			Action:   v1.ACLAction(dbACL.Action),
+			SourceNodes: func() []string {
+				if dbACL.SrcNodeIds.Valid {
+					return strings.Split(dbACL.SrcNodeIds.String, ",")
 				}
-				return out
-			}
-			return nil
-		}(),
+				return nil
+			}(),
+			DestinationNodes: func() []string {
+				if dbACL.DstNodeIds.Valid {
+					return strings.Split(dbACL.DstNodeIds.String, ",")
+				}
+				return nil
+			}(),
+			SourceCidrs: func() []string {
+				if dbACL.SrcCidrs.Valid {
+					return strings.Split(dbACL.SrcCidrs.String, ",")
+				}
+				return nil
+			}(),
+			DestinationCidrs: func() []string {
+				if dbACL.DstCidrs.Valid {
+					return strings.Split(dbACL.DstCidrs.String, ",")
+				}
+				return nil
+			}(),
+			Protocols: func() []string {
+				if dbACL.Protocols.Valid {
+					return strings.Split(dbACL.Protocols.String, ",")
+				}
+				return nil
+			}(),
+			Ports: func() []uint32 {
+				if dbACL.Ports.Valid {
+					out := make([]uint32, 0)
+					for _, port := range strings.Split(dbACL.Ports.String, ",") {
+						p, err := strconv.ParseUint(port, 10, 32)
+						if err != nil {
+							// A bad port got into the databse somehow, just skip it
+							continue
+						}
+						out = append(out, uint32(p))
+					}
+					return out
+				}
+				return nil
+			}(),
+		},
 	}
 }
 

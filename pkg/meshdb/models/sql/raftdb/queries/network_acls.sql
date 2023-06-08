@@ -29,7 +29,7 @@ ON CONFLICT (name) DO UPDATE SET
 SELECT * FROM network_acls WHERE name = ?;
 
 -- name: ListNetworkACLs :many
-SELECT * FROM network_acls;
+SELECT * FROM network_acls ORDER BY priority DESC;
 
 -- name: DeleteNetworkACL :exec
 DELETE FROM network_acls WHERE name = ?;

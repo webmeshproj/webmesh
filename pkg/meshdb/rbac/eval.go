@@ -22,8 +22,8 @@ import v1 "github.com/webmeshproj/api/v1"
 // contained permissions.
 type RolesList []*v1.Role
 
-// EvalAction evaluates an action against the roles in the list.
-func (l RolesList) EvalAction(action *v1.Action) bool {
+// Eval evaluates an action against the roles in the list.
+func (l RolesList) Eval(action *v1.RBACAction) bool {
 	if l == nil {
 		return false
 	}
@@ -36,7 +36,7 @@ func (l RolesList) EvalAction(action *v1.Action) bool {
 }
 
 // EvalRole evaluates an action against a single role.
-func EvalRole(role *v1.Role, action *v1.Action) bool {
+func EvalRole(role *v1.Role, action *v1.RBACAction) bool {
 	for _, p := range role.GetRules() {
 		if EvalRule(p, action) {
 			return true
@@ -46,7 +46,7 @@ func EvalRole(role *v1.Role, action *v1.Action) bool {
 }
 
 // EvalRule evaluates an action against a single rule.
-func EvalRule(rule *v1.Rule, action *v1.Action) bool {
+func EvalRule(rule *v1.Rule, action *v1.RBACAction) bool {
 	var verbMatch bool
 	for _, verb := range rule.GetVerbs() {
 		if verb == action.GetVerb() || verb == v1.RuleVerbs_VERB_ALL {

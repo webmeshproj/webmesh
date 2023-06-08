@@ -316,6 +316,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 
 	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
+	// TODO: This should be filtered to only apply to internal traffic.
 	nodes := make([]string, 0)
 	nodes = append(nodes, s.opts.BootstrapAdmin)
 	for _, server := range cfg.Servers {
@@ -328,12 +329,26 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	err = n.PutNetworkACL(ctx, &v1.NetworkACL{
 		Name:             networking.BootstrapNodesNetworkACLName,
 		Priority:         math.MaxInt32,
-		Action:           v1.ACLAction_ACTION_ACCEPT,
 		SourceNodes:      nodes,
 		DestinationNodes: nodes,
+		Action:           v1.ACLAction_ACTION_ACCEPT,
 	})
 	if err != nil {
 		return fmt.Errorf("create bootstrap nodes network ACL: %w", err)
+	}
+
+	// Apply a default accept policy if configured
+	if s.opts.BootstrapDefaultNetworkPolicy == string(NetworkPolicyAccept) {
+		err = n.PutNetworkACL(ctx, &v1.NetworkACL{
+			Name:             "default-accept",
+			Priority:         math.MinInt32,
+			SourceNodes:      []string{"*"},
+			DestinationNodes: []string{"*"},
+			Action:           v1.ACLAction_ACTION_ACCEPT,
+		})
+		if err != nil {
+			return fmt.Errorf("create default accept network ACL: %w", err)
+		}
 	}
 
 	// We need to officially "join" ourselves to the cluster with a wireguard

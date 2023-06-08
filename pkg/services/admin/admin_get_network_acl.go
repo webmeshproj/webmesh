@@ -42,12 +42,12 @@ func (s *Server) GetNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*v1.Net
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	acl, err := s.networking.GetNetworkACL(ctx, acl.GetName())
+	out, err := s.networking.GetNetworkACL(ctx, acl.GetName())
 	if err != nil {
 		if err == networking.ErrACLNotFound {
 			return nil, status.Errorf(codes.NotFound, "network acl %q not found", acl.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return acl, nil
+	return out.Proto(), nil
 }

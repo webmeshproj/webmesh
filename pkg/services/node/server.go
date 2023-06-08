@@ -26,6 +26,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb/ipam"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
@@ -36,11 +37,12 @@ import (
 type Server struct {
 	v1.UnimplementedNodeServer
 
-	store     store.Store
-	peers     peers.Peers
-	ipam      ipam.IPAM
-	meshstate state.State
-	rbac      rbac.RBAC
+	store      store.Store
+	peers      peers.Peers
+	ipam       ipam.IPAM
+	meshstate  state.State
+	rbac       rbac.RBAC
+	networking networking.Networking
 
 	ulaPrefix netip.Prefix
 	features  []v1.Feature
@@ -55,14 +57,15 @@ type Server struct {
 // those servers are registered on the node.
 func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature) *Server {
 	return &Server{
-		store:     store,
-		peers:     peers.New(store),
-		ipam:      ipam.New(store),
-		meshstate: state.New(store),
-		rbac:      rbac.New(store),
-		features:  features,
-		startedAt: time.Now(),
-		tlsConfig: tlsConfig,
-		log:       slog.Default().With("component", "node-server"),
+		store:      store,
+		peers:      peers.New(store),
+		ipam:       ipam.New(store),
+		meshstate:  state.New(store),
+		rbac:       rbac.New(store),
+		networking: networking.New(store),
+		features:   features,
+		startedAt:  time.Now(),
+		tlsConfig:  tlsConfig,
+		log:        slog.Default().With("component", "node-server"),
 	}
 }

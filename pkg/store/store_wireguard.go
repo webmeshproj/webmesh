@@ -27,6 +27,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net/firewall"
@@ -127,7 +128,7 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	if s.wg == nil {
 		return nil
 	}
-	err := s.walkMeshDescendants(peers.NewGraph(s))
+	err := s.walkMeshDescendants(ctx)
 	if err != nil {
 		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
 		return nil
@@ -135,16 +136,22 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 	return nil
 }
 
-func (s *store) walkMeshDescendants(graph peers.Graph) error {
+func (s *store) walkMeshDescendants(ctx context.Context) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
 
+	graph := peers.NewGraph(s)
+	nacls, err := networking.New(s).ListNetworkACLs(ctx)
+	if err != nil {
+		return fmt.Errorf("list network acls: %w", err)
+	}
+	adjacencyMap, err := nacls.FilterGraph(ctx, graph, string(s.nodeID))
+	if err != nil {
+		return fmt.Errorf("filter graph: %w", err)
+	}
 	currentPeers := s.wg.Peers()
 	seenPeers := make(map[string]struct{})
-	adjacencyMap, err := graph.AdjacencyMap()
-	if err != nil {
-		return fmt.Errorf("adjacency map: %w", err)
-	}
+
 	slog.Debug("current adjacency map", slog.Any("map", adjacencyMap))
 	ourDescendants := adjacencyMap[string(s.nodeID)]
 	if len(ourDescendants) == 0 {
@@ -259,7 +266,7 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 		}
 		slog.Debug("allowed ips for descendant",
 			slog.Any("allowed_ips", peer.AllowedIPs), slog.String("descendant", desc.ID))
-		if err := s.wg.PutPeer(context.Background(), peer); err != nil {
+		if err := s.wg.PutPeer(ctx, peer); err != nil {
 			return fmt.Errorf("put peer: %w", err)
 		}
 		seenPeers[desc.ID] = struct{}{}
@@ -268,7 +275,7 @@ func (s *store) walkMeshDescendants(graph peers.Graph) error {
 	for _, peer := range currentPeers {
 		if _, ok := seenPeers[peer]; !ok {
 			s.log.Info("removing peer", slog.String("peer_id", peer))
-			if err := s.wg.DeletePeer(context.Background(), peer); err != nil {
+			if err := s.wg.DeletePeer(ctx, peer); err != nil {
 				return fmt.Errorf("delete peer: %w", err)
 			}
 		}

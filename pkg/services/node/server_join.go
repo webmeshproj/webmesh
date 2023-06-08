@@ -36,7 +36,7 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-var canVoteAction = &v1.Action{
+var canVoteAction = &v1.RBACAction{
 	Verb:     v1.RuleVerbs_VERB_PUT,
 	Resource: v1.RuleResource_RESOURCE_VOTES,
 }
@@ -73,7 +73,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list node roles: %v", err)
 		}
-		allowed := roles.EvalAction(canVoteAction)
+		allowed := roles.Eval(canVoteAction)
 		if !allowed {
 			s.log.Warn("Node not allowed to join as voter", slog.String("id", req.GetId()))
 			return nil, status.Error(codes.PermissionDenied, "not allowed")
@@ -159,8 +159,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 		log.Info("assigned IPv4 address to peer", slog.String("ipv4", lease.String()))
 	}
-
-	// TODO: Evaluate network policy to determine edges
 
 	// Add an edge from the joining server to the caller
 	joiningServer := string(s.store.ID())
@@ -255,9 +253,13 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}(),
 	}
 
-	// Build current peers for the new node
+	// Build current peers for the node
+	nacls, err := s.networking.ListNetworkACLs(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list network ACLs: %v", err)
+	}
 	graph := s.peers.Graph()
-	adjacencyMap, err := graph.AdjacencyMap()
+	adjacencyMap, err := nacls.FilterGraph(ctx, graph, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get adjacency map: %v", err)
 	}
