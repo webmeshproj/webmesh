@@ -183,7 +183,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 	if IsSystemRoleBinding(rolebinding.GetName()) {
 		// Allow if the rolebinding doesn't exist yet.
 		_, err := r.GetRoleBinding(ctx, rolebinding.GetName())
-		if err != nil && err != ErrRoleNotFound {
+		if err != nil && err != ErrRoleBindingNotFound {
 			return err
 		}
 		if err == nil {
