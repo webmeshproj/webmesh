@@ -57,7 +57,7 @@ type Networking interface {
 	// DeleteNetworkACL deletes a NetworkACL by name.
 	DeleteNetworkACL(ctx context.Context, name string) error
 	// ListNetworkACLs returns a list of NetworkACLs.
-	ListNetworkACLs(ctx context.Context) ([]*v1.NetworkACL, error)
+	ListNetworkACLs(ctx context.Context) (ACLs, error)
 
 	// PutRoute creates or updates a Route.
 	PutRoute(ctx context.Context, route *v1.Route) error
@@ -187,16 +187,17 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 }
 
 // ListNetworkACLs returns a list of NetworkACLs.
-func (n *networking) ListNetworkACLs(ctx context.Context) ([]*v1.NetworkACL, error) {
+func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 	q := raftdb.New(n.store.ReadDB())
 	acls, err := q.ListNetworkACLs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network acls: %w", err)
 	}
-	out := make([]*v1.NetworkACL, len(acls))
+	out := make(ACLs, len(acls))
 	for i, acl := range acls {
 		out[i] = dbACLToAPIACL(&acl)
 	}
+	out.Sort(SortDescending)
 	return out, nil
 }
 
