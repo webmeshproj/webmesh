@@ -110,7 +110,14 @@ type rbac struct {
 // PutRole creates or updates a role.
 func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 	if IsSystemRole(role.GetName()) {
-		return fmt.Errorf("cannot modify system role %q", role.GetName())
+		// Allow if the role doesn't exist yet.
+		_, err := r.GetRole(ctx, role.GetName())
+		if err != nil && err != ErrRoleNotFound {
+			return err
+		}
+		if err == nil {
+			return fmt.Errorf("cannot modify system role %q", role.GetName())
+		}
 	}
 	q := raftdb.New(r.store.DB())
 	rules, err := json.Marshal(role.GetRules())
@@ -174,7 +181,14 @@ func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
 // PutRoleBinding creates or updates a rolebinding.
 func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) error {
 	if IsSystemRoleBinding(rolebinding.GetName()) {
-		return fmt.Errorf("cannot modify system rolebinding %q", BootstrapVotersRoleBinding)
+		// Allow if the rolebinding doesn't exist yet.
+		_, err := r.GetRoleBinding(ctx, rolebinding.GetName())
+		if err != nil && err != ErrRoleNotFound {
+			return err
+		}
+		if err == nil {
+			return fmt.Errorf("cannot modify system rolebinding %q", rolebinding.GetName())
+		}
 	}
 	q := raftdb.New(r.store.DB())
 	params := raftdb.PutRoleBindingParams{

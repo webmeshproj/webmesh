@@ -90,7 +90,14 @@ type networking struct {
 // PutNetworkACL creates or updates a NetworkACL.
 func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error {
 	if IsSystemNetworkACL(acl.GetName()) {
-		return fmt.Errorf("cannot update system network acl %s", acl.GetName())
+		// Allow if the system NetworkACL doesn't exist yet
+		_, err := n.GetNetworkACL(ctx, acl.GetName())
+		if err != nil && err != ErrACLNotFound {
+			return err
+		}
+		if err == nil {
+			return fmt.Errorf("cannot update system network acl %s", acl.GetName())
+		}
 	}
 	q := raftdb.New(n.store.DB())
 	params := raftdb.PutNetworkACLParams{
