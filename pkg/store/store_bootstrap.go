@@ -314,11 +314,16 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	// Initialize the Networking system.
 	n := networking.New(s)
 
-	// Create a network ACL that ensures bootstrap servers can continue to
+	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
-	nodes := make([]string, len(cfg.Servers))
-	for i, server := range cfg.Servers {
-		nodes[i] = string(server.ID)
+	nodes := make([]string, 0)
+	nodes = append(nodes, s.opts.BootstrapAdmin)
+	for _, server := range cfg.Servers {
+		nodes = append(nodes, string(server.ID))
+	}
+	if s.opts.BootstrapVoters != "" {
+		voters := strings.Split(s.opts.BootstrapVoters, ",")
+		nodes = append(nodes, voters...)
 	}
 	err = n.PutNetworkACL(ctx, &v1.NetworkACL{
 		Name:             networking.BootstrapNodesNetworkACLName,
