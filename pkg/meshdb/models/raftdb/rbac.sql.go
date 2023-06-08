@@ -11,6 +11,15 @@ import (
 	"time"
 )
 
+const DeleteGroup = `-- name: DeleteGroup :exec
+DELETE FROM groups WHERE name = ?
+`
+
+func (q *Queries) DeleteGroup(ctx context.Context, name string) error {
+	_, err := q.db.ExecContext(ctx, DeleteGroup, name)
+	return err
+}
+
 const DeleteRole = `-- name: DeleteRole :exec
 DELETE FROM roles WHERE name = ?
 `
@@ -27,6 +36,23 @@ DELETE FROM role_bindings WHERE name = ?
 func (q *Queries) DeleteRoleBinding(ctx context.Context, name string) error {
 	_, err := q.db.ExecContext(ctx, DeleteRoleBinding, name)
 	return err
+}
+
+const GetGroup = `-- name: GetGroup :one
+SELECT name, users, nodes, created_at, updated_at FROM groups WHERE name = ?
+`
+
+func (q *Queries) GetGroup(ctx context.Context, name string) (Group, error) {
+	row := q.db.QueryRowContext(ctx, GetGroup, name)
+	var i Group
+	err := row.Scan(
+		&i.Name,
+		&i.Users,
+		&i.Nodes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const GetRole = `-- name: GetRole :one
@@ -150,6 +176,39 @@ func (q *Queries) ListBoundRolesForUser(ctx context.Context, arg ListBoundRolesF
 	return items, nil
 }
 
+const ListGroups = `-- name: ListGroups :many
+SELECT name, users, nodes, created_at, updated_at FROM groups
+`
+
+func (q *Queries) ListGroups(ctx context.Context) ([]Group, error) {
+	rows, err := q.db.QueryContext(ctx, ListGroups)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Group
+	for rows.Next() {
+		var i Group
+		if err := rows.Scan(
+			&i.Name,
+			&i.Users,
+			&i.Nodes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const ListRoleBindings = `-- name: ListRoleBindings :many
 SELECT name, role_name, node_ids, user_names, group_names, created_at, updated_at FROM role_bindings
 `
@@ -215,6 +274,41 @@ func (q *Queries) ListRoles(ctx context.Context) ([]Role, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const PutGroup = `-- name: PutGroup :exec
+INSERT INTO groups (
+    name,
+    users,
+    nodes,
+    created_at,
+    updated_at
+) VALUES (
+    ?, ?, ?, ?, ?
+)
+ON CONFLICT (name) DO UPDATE SET 
+    users = excluded.users, 
+    nodes = excluded.nodes, 
+    updated_at = excluded.updated_at
+`
+
+type PutGroupParams struct {
+	Name      string         `json:"name"`
+	Users     sql.NullString `json:"users"`
+	Nodes     sql.NullString `json:"nodes"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) PutGroup(ctx context.Context, arg PutGroupParams) error {
+	_, err := q.db.ExecContext(ctx, PutGroup,
+		arg.Name,
+		arg.Users,
+		arg.Nodes,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }
 
 const PutRole = `-- name: PutRole :exec

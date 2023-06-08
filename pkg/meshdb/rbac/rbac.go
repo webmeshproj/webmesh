@@ -62,6 +62,15 @@ type RBAC interface {
 	// ListRoleBindings returns a list of all rolebindings.
 	ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error)
 
+	// PutGroup creates or updates a group.
+	PutGroup(ctx context.Context, role *v1.Group) error
+	// GetGroup returns a group by name.
+	GetGroup(ctx context.Context, name string) (*v1.Group, error)
+	// DeleteGroup deletes a group by name.
+	DeleteGroup(ctx context.Context, name string) error
+	// ListGroups returns a list of all groups.
+	ListGroups(ctx context.Context) ([]*v1.Group, error)
+
 	// ListNodeRoles returns a list of all roles for a node.
 	ListNodeRoles(ctx context.Context, nodeID string) (RolesList, error)
 	// ListUserRoles returns a list of all roles for a user.
@@ -73,6 +82,9 @@ var ErrRoleNotFound = fmt.Errorf("role not found")
 
 // ErrRoleBindingNotFound is returned when a rolebinding is not found.
 var ErrRoleBindingNotFound = fmt.Errorf("rolebinding not found")
+
+// ErrGroupNotFound is returned when a group is not found.
+var ErrGroupNotFound = fmt.Errorf("group not found")
 
 // New returns a new RBAC.
 func New(store meshdb.Store) RBAC {
@@ -147,13 +159,10 @@ func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
 func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) error {
 	q := raftdb.New(r.store.DB())
 	params := raftdb.PutRoleBindingParams{
-		Name:       rolebinding.GetName(),
-		RoleName:   rolebinding.GetRole(),
-		NodeIds:    sql.NullString{},
-		UserNames:  sql.NullString{},
-		GroupNames: sql.NullString{},
-		CreatedAt:  time.Now().UTC(),
-		UpdatedAt:  time.Now().UTC(),
+		Name:      rolebinding.GetName(),
+		RoleName:  rolebinding.GetRole(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
 	var users, groups, nodes []string
 	for _, subject := range rolebinding.GetSubjects() {
@@ -219,6 +228,73 @@ func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) 
 	out := make([]*v1.RoleBinding, len(rbs))
 	for i, rb := range rbs {
 		out[i] = dbRoleBindingToAPIRoleBinding(&rb)
+	}
+	return out, nil
+}
+
+// PutGroup creates or updates a group.
+func (r *rbac) PutGroup(ctx context.Context, role *v1.Group) error {
+	q := raftdb.New(r.store.DB())
+	params := raftdb.PutGroupParams{
+		Name:      role.GetName(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	var users, nodes []string
+	for _, subject := range role.GetSubjects() {
+		switch subject.GetType() {
+		case v1.SubjectType_SUBJECT_NODE:
+			nodes = append(nodes, subject.GetName())
+		case v1.SubjectType_SUBJECT_USER:
+			users = append(users, subject.GetName())
+		}
+	}
+	if len(nodes) > 0 {
+		params.Nodes = sql.NullString{Valid: true, String: strings.Join(nodes, ",")}
+	}
+	if len(users) > 0 {
+		params.Users = sql.NullString{Valid: true, String: strings.Join(users, ",")}
+	}
+	err := q.PutGroup(ctx, params)
+	if err != nil {
+		return fmt.Errorf("put db group: %w", err)
+	}
+	return nil
+}
+
+// GetGroup returns a group by name.
+func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
+	q := raftdb.New(r.store.ReadDB())
+	group, err := q.GetGroup(ctx, name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrGroupNotFound
+		}
+		return nil, fmt.Errorf("get db group: %w", err)
+	}
+	return dbGroupToAPIGroup(&group), nil
+}
+
+// DeleteGroup deletes a group by name.
+func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
+	q := raftdb.New(r.store.DB())
+	err := q.DeleteGroup(ctx, name)
+	if err != nil {
+		return fmt.Errorf("delete db group: %w", err)
+	}
+	return nil
+}
+
+// ListGroups returns a list of all groups.
+func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
+	q := raftdb.New(r.store.ReadDB())
+	groups, err := q.ListGroups(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list db groups: %w", err)
+	}
+	out := make([]*v1.Group, len(groups))
+	for i, group := range groups {
+		out[i] = dbGroupToAPIGroup(&group)
 	}
 	return out, nil
 }
@@ -316,5 +392,29 @@ func dbRoleBindingToAPIRoleBinding(dbRoleBinding *raftdb.RoleBinding) *v1.RoleBi
 		}
 	}
 	// TODO: This should check for the "all" case and squash down to a single subject.
+	return out
+}
+
+func dbGroupToAPIGroup(dbGroup *raftdb.Group) *v1.Group {
+	out := &v1.Group{
+		Name:     dbGroup.Name,
+		Subjects: make([]*v1.Subject, 0),
+	}
+	if dbGroup.Users.Valid {
+		for _, user := range strings.Split(dbGroup.Users.String, ",") {
+			out.Subjects = append(out.Subjects, &v1.Subject{
+				Type: v1.SubjectType_SUBJECT_USER,
+				Name: user,
+			})
+		}
+	}
+	if dbGroup.Nodes.Valid {
+		for _, node := range strings.Split(dbGroup.Nodes.String, ",") {
+			out.Subjects = append(out.Subjects, &v1.Subject{
+				Type: v1.SubjectType_SUBJECT_NODE,
+				Name: node,
+			})
+		}
+	}
 	return out
 }

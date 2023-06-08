@@ -17,8 +17,6 @@ limitations under the License.
 package ctlcmd
 
 import (
-	"context"
-
 	"github.com/spf13/cobra"
 	v1 "github.com/webmeshproj/api/v1"
 )
@@ -42,7 +40,7 @@ var statusCmd = &cobra.Command{
 		if len(args) > 0 {
 			req.Id = args[0]
 		}
-		status, err := client.GetStatus(context.Background(), &req)
+		status, err := client.GetStatus(cmd.Context(), &req)
 		if err != nil {
 			return err
 		}

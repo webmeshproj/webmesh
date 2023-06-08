@@ -45,7 +45,7 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 		return nil, status.Error(codes.InvalidArgument, "cannot update system roles")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRoleAction.For(role.GetName())); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put role")
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put roles")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

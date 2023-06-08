@@ -56,4 +56,8 @@ var MethodPolicyMap = map[string]MethodPolicy{
 	v1.Admin_DeleteRoleBinding_FullMethodName: RequireLeader,
 	v1.Admin_GetRoleBinding_FullMethodName:    AllowNonLeader,
 	v1.Admin_ListRoleBindings_FullMethodName:  AllowNonLeader,
+	v1.Admin_PutGroup_FullMethodName:          RequireLeader,
+	v1.Admin_DeleteGroup_FullMethodName:       RequireLeader,
+	v1.Admin_GetGroup_FullMethodName:          AllowNonLeader,
+	v1.Admin_ListGroups_FullMethodName:        AllowNonLeader,
 }

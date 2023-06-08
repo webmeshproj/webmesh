@@ -33,7 +33,7 @@ func encodeToStdout(cmd *cobra.Command, resp proto.Message) error {
 
 func completeNodes(maxNodes int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) >= maxNodes {
+		if maxNodes > 0 && len(args) >= maxNodes {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		if configFileFlag != "" {
@@ -60,7 +60,7 @@ func completeNodes(maxNodes int) func(*cobra.Command, []string, string) ([]strin
 
 func completeRoles(maxRoles int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) >= maxRoles {
+		if maxRoles > 0 && len(args) >= maxRoles {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		if configFileFlag != "" {
@@ -85,9 +85,9 @@ func completeRoles(maxRoles int) func(*cobra.Command, []string, string) ([]strin
 	}
 }
 
-func completeRoleBindings(maxRoles int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func completeRoleBindings(maxRoleBindings int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) >= maxRoles {
+		if maxRoleBindings > 0 && len(args) >= maxRoleBindings {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		if configFileFlag != "" {
@@ -107,6 +107,33 @@ func completeRoleBindings(maxRoles int) func(*cobra.Command, []string, string) (
 		var names []string
 		for _, rb := range resp.RoleBindings {
 			names = append(names, rb.GetName())
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func completeGroups(maxGroups int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if maxGroups > 0 && len(args) >= maxGroups {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if configFileFlag != "" {
+			if err := cliConfig.LoadFile(configFileFlag); err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+		}
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		defer closer.Close()
+		resp, err := client.ListGroups(cmd.Context(), &emptypb.Empty{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var names []string
+		for _, group := range resp.Groups {
+			names = append(names, group.GetName())
 		}
 		return names, cobra.ShellCompDirectiveNoFileComp
 	}

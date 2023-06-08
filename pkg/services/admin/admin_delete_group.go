@@ -23,31 +23,31 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
-	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var getRoleBindingAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var deleteGroupAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_GROUPS,
+	Verb:     v1.RuleVerbs_VERB_DELETE,
 }
 
-func (s *Server) GetRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*v1.RoleBinding, error) {
-	if rb.GetName() == "" {
-		return nil, status.Error(codes.InvalidArgument, "name is required")
+func (s *Server) DeleteGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty, error) {
+	if !s.store.IsLeader() {
+		return nil, status.Error(codes.Unavailable, "not the leader")
 	}
-	if ok, err := s.rbacEval.Evaluate(ctx, getRoleBindingAction.For(rb.GetName())); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get rolebindings")
+	if group.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "group name is required")
+	}
+	if ok, err := s.rbacEval.Evaluate(ctx, deleteGroupAction.For(group.GetName())); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete groups")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	rb, err := s.rbac.GetRoleBinding(ctx, rb.GetName())
+	err := s.rbac.DeleteGroup(ctx, group.GetName())
 	if err != nil {
-		if err == rbacdb.ErrRoleBindingNotFound {
-			return nil, status.Errorf(codes.NotFound, "rolebinding %q not found", rb.GetName())
-		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return rb, nil
+	return &emptypb.Empty{}, nil
 }

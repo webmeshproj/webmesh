@@ -45,7 +45,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 		return nil, status.Error(codes.InvalidArgument, "cannot update system rolebindings")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRoleBindingAction.For(rb.GetName())); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put rolebinding")
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put rolebindings")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

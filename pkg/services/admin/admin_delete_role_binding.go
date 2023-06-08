@@ -45,7 +45,7 @@ func (s *Server) DeleteRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*em
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system rolebindings")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteRoleBindingAction.For(rb.GetName())); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete rolebinding")
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete rolebindings")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

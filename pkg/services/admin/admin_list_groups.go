@@ -23,31 +23,25 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
-	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var getRoleBindingAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
+var listGroupsAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_GROUPS,
 	Verb:     v1.RuleVerbs_VERB_GET,
 }
 
-func (s *Server) GetRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*v1.RoleBinding, error) {
-	if rb.GetName() == "" {
-		return nil, status.Error(codes.InvalidArgument, "name is required")
-	}
-	if ok, err := s.rbacEval.Evaluate(ctx, getRoleBindingAction.For(rb.GetName())); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get rolebindings")
+func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
+	if ok, err := s.rbacEval.Evaluate(ctx, listGroupsAction); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	rb, err := s.rbac.GetRoleBinding(ctx, rb.GetName())
+	groups, err := s.rbac.ListGroups(ctx)
 	if err != nil {
-		if err == rbacdb.ErrRoleBindingNotFound {
-			return nil, status.Errorf(codes.NotFound, "rolebinding %q not found", rb.GetName())
-		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return rb, nil
+	return &v1.Groups{Groups: groups}, nil
 }

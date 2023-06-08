@@ -45,7 +45,7 @@ func (s *Server) DeleteRole(ctx context.Context, role *v1.Role) (*emptypb.Empty,
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system roles")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteRoleAction.For(role.GetName())); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete role")
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete roles")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

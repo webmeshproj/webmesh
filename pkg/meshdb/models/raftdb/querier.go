@@ -10,6 +10,7 @@ import (
 )
 
 type Querier interface {
+	DeleteGroup(ctx context.Context, name string) error
 	DeleteNode(ctx context.Context, id string) error
 	DeleteNodeEdge(ctx context.Context, arg DeleteNodeEdgeParams) error
 	DeleteNodeEdges(ctx context.Context, arg DeleteNodeEdgesParams) error
@@ -34,6 +35,7 @@ type Querier interface {
 	DumpRoles(ctx context.Context) ([]Role, error)
 	DumpUsers(ctx context.Context) ([]User, error)
 	EitherNodeExists(ctx context.Context, arg EitherNodeExistsParams) (int64, error)
+	GetGroup(ctx context.Context, name string) (Group, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
 	GetNodeCount(ctx context.Context) (int64, error)
@@ -50,6 +52,7 @@ type Querier interface {
 	ListAllocatedIPv4(ctx context.Context) ([]string, error)
 	ListBoundRolesForNode(ctx context.Context, arg ListBoundRolesForNodeParams) ([]Role, error)
 	ListBoundRolesForUser(ctx context.Context, arg ListBoundRolesForUserParams) ([]Role, error)
+	ListGroups(ctx context.Context) ([]Group, error)
 	ListNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	ListNodeIDs(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)
@@ -61,6 +64,7 @@ type Querier interface {
 	NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) (int64, error)
 	NodeExists(ctx context.Context, id string) (int64, error)
 	NodeHasEdges(ctx context.Context, arg NodeHasEdgesParams) (int64, error)
+	PutGroup(ctx context.Context, arg PutGroupParams) error
 	PutRole(ctx context.Context, arg PutRoleParams) error
 	PutRoleBinding(ctx context.Context, arg PutRoleBindingParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error

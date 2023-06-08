@@ -38,7 +38,7 @@ func (s *Server) GetRole(ctx context.Context, role *v1.Role) (*v1.Role, error) {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, getRoleAction.For(role.GetName())); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get role")
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get roles")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

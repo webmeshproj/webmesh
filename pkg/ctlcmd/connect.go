@@ -83,7 +83,7 @@ func doConnect(cmd *cobra.Command, args []string) error {
 			}
 		}(),
 	})))
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 	if connectOpts.JoinServer == "" {
 		connectOpts.JoinServer = cliConfig.CurrentCluster().Server

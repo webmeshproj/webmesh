@@ -48,6 +48,30 @@ DELETE FROM role_bindings WHERE name = ?;
 -- name: ListRoleBindings :many
 SELECT * FROM role_bindings;
 
+-- name: PutGroup :exec
+INSERT INTO groups (
+    name,
+    users,
+    nodes,
+    created_at,
+    updated_at
+) VALUES (
+    ?, ?, ?, ?, ?
+)
+ON CONFLICT (name) DO UPDATE SET 
+    users = excluded.users, 
+    nodes = excluded.nodes, 
+    updated_at = excluded.updated_at;
+
+-- name: GetGroup :one
+SELECT * FROM groups WHERE name = ?;
+
+-- name: DeleteGroup :exec
+DELETE FROM groups WHERE name = ?;
+
+-- name: ListGroups :many
+SELECT * FROM groups;
+
 -- name: ListBoundRolesForNode :many
 SELECT DISTINCT roles.* FROM roles
 JOIN role_bindings ON roles.name = role_bindings.role_name

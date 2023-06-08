@@ -17,7 +17,6 @@ limitations under the License.
 package ctlcmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -29,14 +28,16 @@ import (
 func init() {
 	getCmd.AddCommand(getNodesCmd)
 	getCmd.AddCommand(getGraphCmd)
-	getCmd.AddCommand(getRolesCommand)
-	getCmd.AddCommand(getRoleBindingsCommand)
+	getCmd.AddCommand(getRolesCmd)
+	getCmd.AddCommand(getRoleBindingsCmd)
+	getCmd.AddCommand(getGroupsCmd)
+
 	rootCmd.AddCommand(getCmd)
 }
 
 var getCmd = &cobra.Command{
 	Use:   "get",
-	Short: "Get resources from the cluster",
+	Short: "Get resources from the mesh",
 }
 
 var getNodesCmd = &cobra.Command{
@@ -53,11 +54,11 @@ var getNodesCmd = &cobra.Command{
 		defer closer.Close()
 		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetNode(context.Background(), &v1.GetNodeRequest{
+			resp, err = client.GetNode(cmd.Context(), &v1.GetNodeRequest{
 				Id: args[0],
 			})
 		} else {
-			resp, err = client.ListNodes(context.Background(), &emptypb.Empty{})
+			resp, err = client.ListNodes(cmd.Context(), &emptypb.Empty{})
 		}
 		if err != nil {
 			return err
@@ -68,7 +69,7 @@ var getNodesCmd = &cobra.Command{
 
 var getGraphCmd = &cobra.Command{
 	Use:   "graph",
-	Short: "Get the mesh graph",
+	Short: "Get the mesh graph in DOT format",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, closer, err := cliConfig.NewMeshClient()
@@ -76,7 +77,7 @@ var getGraphCmd = &cobra.Command{
 			return err
 		}
 		defer closer.Close()
-		resp, err := client.GetMeshGraph(context.Background(), &emptypb.Empty{})
+		resp, err := client.GetMeshGraph(cmd.Context(), &emptypb.Empty{})
 		if err != nil {
 			return err
 		}
@@ -85,7 +86,7 @@ var getGraphCmd = &cobra.Command{
 	},
 }
 
-var getRolesCommand = &cobra.Command{
+var getRolesCmd = &cobra.Command{
 	Use:               "roles",
 	Short:             "Get roles from the mesh",
 	Aliases:           []string{"role"},
@@ -99,9 +100,9 @@ var getRolesCommand = &cobra.Command{
 		defer closer.Close()
 		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetRole(context.Background(), &v1.Role{Name: args[0]})
+			resp, err = client.GetRole(cmd.Context(), &v1.Role{Name: args[0]})
 		} else {
-			resp, err = client.ListRoles(context.Background(), &emptypb.Empty{})
+			resp, err = client.ListRoles(cmd.Context(), &emptypb.Empty{})
 		}
 		if err != nil {
 			return err
@@ -110,9 +111,9 @@ var getRolesCommand = &cobra.Command{
 	},
 }
 
-var getRoleBindingsCommand = &cobra.Command{
+var getRoleBindingsCmd = &cobra.Command{
 	Use:               "rolebindings",
-	Short:             "Get rolebindingss from the mesh",
+	Short:             "Get rolebindings from the mesh",
 	Aliases:           []string{"rolebinding", "rb"},
 	Args:              cobra.MaximumNArgs(1),
 	ValidArgsFunction: completeRoleBindings(1),
@@ -124,9 +125,34 @@ var getRoleBindingsCommand = &cobra.Command{
 		defer closer.Close()
 		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetRoleBinding(context.Background(), &v1.RoleBinding{Name: args[0]})
+			resp, err = client.GetRoleBinding(cmd.Context(), &v1.RoleBinding{Name: args[0]})
 		} else {
-			resp, err = client.ListRoleBindings(context.Background(), &emptypb.Empty{})
+			resp, err = client.ListRoleBindings(cmd.Context(), &emptypb.Empty{})
+		}
+		if err != nil {
+			return err
+		}
+		return encodeToStdout(cmd, resp)
+	},
+}
+
+var getGroupsCmd = &cobra.Command{
+	Use:               "groups",
+	Short:             "Get groups from the mesh",
+	Aliases:           []string{"group"},
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeGroups(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		var resp proto.Message
+		if len(args) == 1 {
+			resp, err = client.GetGroup(cmd.Context(), &v1.Group{Name: args[0]})
+		} else {
+			resp, err = client.ListGroups(cmd.Context(), &emptypb.Empty{})
 		}
 		if err != nil {
 			return err

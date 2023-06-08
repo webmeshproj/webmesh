@@ -156,6 +156,14 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewAdminClient(conn).GetRoleBinding(ctx, req.(*v1.RoleBinding))
 	case v1.Admin_ListRoleBindings_FullMethodName:
 		return v1.NewAdminClient(conn).ListRoleBindings(ctx, req.(*emptypb.Empty))
+	case v1.Admin_PutGroup_FullMethodName:
+		return v1.NewAdminClient(conn).PutGroup(ctx, req.(*v1.Group))
+	case v1.Admin_DeleteGroup_FullMethodName:
+		return v1.NewAdminClient(conn).DeleteGroup(ctx, req.(*v1.Group))
+	case v1.Admin_GetGroup_FullMethodName:
+		return v1.NewAdminClient(conn).GetGroup(ctx, req.(*v1.Group))
+	case v1.Admin_ListGroups_FullMethodName:
+		return v1.NewAdminClient(conn).ListGroups(ctx, req.(*emptypb.Empty))
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}
