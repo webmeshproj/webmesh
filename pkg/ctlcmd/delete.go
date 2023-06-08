@@ -25,6 +25,8 @@ func init() {
 	deleteCmd.AddCommand(deleteRolesCmd)
 	deleteCmd.AddCommand(deleteRoleBindingsCmd)
 	deleteCmd.AddCommand(deleteGroupsCmd)
+	deleteCmd.AddCommand(deleteNetworkACLsCmd)
+	deleteCmd.AddCommand(deleteRoutesCmd)
 
 	rootCmd.AddCommand(deleteCmd)
 }
@@ -98,6 +100,52 @@ var deleteGroupsCmd = &cobra.Command{
 				return err
 			}
 			cmd.Println("Deleted group", arg)
+		}
+		return nil
+	},
+}
+
+var deleteNetworkACLsCmd = &cobra.Command{
+	Use:               "networkacls",
+	Short:             "Delete networkacls from the mesh",
+	Aliases:           []string{"networkacl", "nacl", "acl"},
+	Args:              cobra.MinimumNArgs(1),
+	ValidArgsFunction: completeNetworkACLs(-1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		for _, arg := range args {
+			_, err = client.DeleteNetworkACL(cmd.Context(), &v1.NetworkACL{Name: arg})
+			if err != nil {
+				return err
+			}
+			cmd.Println("Deleted networkacl", arg)
+		}
+		return nil
+	},
+}
+
+var deleteRoutesCmd = &cobra.Command{
+	Use:               "routes",
+	Short:             "Delete routes from the mesh",
+	Aliases:           []string{"route", "rt"},
+	Args:              cobra.MinimumNArgs(1),
+	ValidArgsFunction: completeRoutes(-1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		for _, arg := range args {
+			_, err = client.DeleteRoute(cmd.Context(), &v1.Route{Name: arg})
+			if err != nil {
+				return err
+			}
+			cmd.Println("Deleted route", arg)
 		}
 		return nil
 	},

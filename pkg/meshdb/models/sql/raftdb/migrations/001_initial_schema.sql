@@ -76,13 +76,26 @@ CREATE TABLE role_bindings (
 -- Network ACLs determine who can communicate with whom.
 CREATE TABLE network_acls (
     name         TEXT NOT NULL PRIMARY KEY,
+    priority     INTEGER NOT NULL DEFAULT 0,
+    action       INTEGER NOT NULL DEFAULT 0,
     src_node_ids TEXT,
     dst_node_ids TEXT,
     src_cidrs    TEXT,
     dst_cidrs    TEXT,
-    action       INTEGER NOT NULL DEFAULT 0,
+    protocols    TEXT,
+    ports        TEXT,
     created_at   TIMESTAMP NOT NULL,
     updated_at   TIMESTAMP NOT NULL
+);
+
+-- Network Routes are non-mesh routes advertised by nodes.
+CREATE TABLE network_routes (
+    name       TEXT NOT NULL PRIMARY KEY,
+    nodes      TEXT NOT NULL,
+    dst_cidrs  TEXT NOT NULL,
+    next_hops  TEXT,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
 );
 
 -- Views for more convenient querying.
@@ -123,6 +136,7 @@ LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
 
 -- +goose Down
 
+DROP TABLE network_routes;
 DROP TABLE network_acls;
 DROP TABLE role_bindings;
 DROP TABLE roles;

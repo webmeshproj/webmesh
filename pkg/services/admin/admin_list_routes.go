@@ -28,20 +28,20 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var listGroupsAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
+var listRoutesAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_ROUTES,
 	Verb:     v1.RuleVerbs_VERB_GET,
 }
 
-func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listGroupsAction); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
+func (s *Server) ListRoutes(ctx context.Context, _ *emptypb.Empty) (*v1.Routes, error) {
+	if ok, err := s.rbacEval.Evaluate(ctx, listRoutesAction); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network routes")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	groups, err := s.rbac.ListGroups(ctx)
+	routes, err := s.networking.ListRoutes(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Groups{Items: groups}, nil
+	return &v1.Routes{Items: routes}, nil
 }

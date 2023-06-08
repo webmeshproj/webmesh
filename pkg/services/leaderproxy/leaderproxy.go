@@ -129,6 +129,7 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewNodeClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
 	case v1.Node_GetStatus_FullMethodName:
 		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*v1.GetStatusRequest))
+
 	// Mesh API
 	case v1.Mesh_GetNode_FullMethodName:
 		return v1.NewMeshClient(conn).GetNode(ctx, req.(*v1.GetNodeRequest))
@@ -136,9 +137,11 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewMeshClient(conn).ListNodes(ctx, req.(*emptypb.Empty))
 	case v1.Mesh_GetMeshGraph_FullMethodName:
 		return v1.NewMeshClient(conn).GetMeshGraph(ctx, req.(*emptypb.Empty))
+
 	// Peer Discovery API
 	case v1.PeerDiscovery_ListPeers_FullMethodName:
 		return v1.NewPeerDiscoveryClient(conn).ListPeers(ctx, req.(*emptypb.Empty))
+
 	// Admin API
 	case v1.Admin_PutRole_FullMethodName:
 		return v1.NewAdminClient(conn).PutRole(ctx, req.(*v1.Role))
@@ -148,6 +151,7 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewAdminClient(conn).GetRole(ctx, req.(*v1.Role))
 	case v1.Admin_ListRoles_FullMethodName:
 		return v1.NewAdminClient(conn).ListRoles(ctx, req.(*emptypb.Empty))
+
 	case v1.Admin_PutRoleBinding_FullMethodName:
 		return v1.NewAdminClient(conn).PutRoleBinding(ctx, req.(*v1.RoleBinding))
 	case v1.Admin_DeleteRoleBinding_FullMethodName:
@@ -156,6 +160,7 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewAdminClient(conn).GetRoleBinding(ctx, req.(*v1.RoleBinding))
 	case v1.Admin_ListRoleBindings_FullMethodName:
 		return v1.NewAdminClient(conn).ListRoleBindings(ctx, req.(*emptypb.Empty))
+
 	case v1.Admin_PutGroup_FullMethodName:
 		return v1.NewAdminClient(conn).PutGroup(ctx, req.(*v1.Group))
 	case v1.Admin_DeleteGroup_FullMethodName:
@@ -164,6 +169,25 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewAdminClient(conn).GetGroup(ctx, req.(*v1.Group))
 	case v1.Admin_ListGroups_FullMethodName:
 		return v1.NewAdminClient(conn).ListGroups(ctx, req.(*emptypb.Empty))
+
+	case v1.Admin_PutNetworkACL_FullMethodName:
+		return v1.NewAdminClient(conn).PutNetworkACL(ctx, req.(*v1.NetworkACL))
+	case v1.Admin_DeleteNetworkACL_FullMethodName:
+		return v1.NewAdminClient(conn).DeleteNetworkACL(ctx, req.(*v1.NetworkACL))
+	case v1.Admin_GetNetworkACL_FullMethodName:
+		return v1.NewAdminClient(conn).GetNetworkACL(ctx, req.(*v1.NetworkACL))
+	case v1.Admin_ListNetworkACLs_FullMethodName:
+		return v1.NewAdminClient(conn).ListNetworkACLs(ctx, req.(*emptypb.Empty))
+
+	case v1.Admin_PutRoute_FullMethodName:
+		return v1.NewAdminClient(conn).PutRoute(ctx, req.(*v1.Route))
+	case v1.Admin_DeleteRoute_FullMethodName:
+		return v1.NewAdminClient(conn).DeleteRoute(ctx, req.(*v1.Route))
+	case v1.Admin_GetRoute_FullMethodName:
+		return v1.NewAdminClient(conn).GetRoute(ctx, req.(*v1.Route))
+	case v1.Admin_ListRoutes_FullMethodName:
+		return v1.NewAdminClient(conn).ListRoutes(ctx, req.(*emptypb.Empty))
+
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}

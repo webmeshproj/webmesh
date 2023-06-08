@@ -41,13 +41,13 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
-	if role.GetName() == rbacdb.MeshAdminRole || role.GetName() == rbacdb.VotersRole {
-		return nil, status.Error(codes.InvalidArgument, "cannot update system roles")
-	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRoleAction.For(role.GetName())); !ok {
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put roles")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if rbacdb.IsSystemRole(role.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "cannot update system roles")
 	}
 	err := s.rbac.PutRole(ctx, role)
 	if err != nil {

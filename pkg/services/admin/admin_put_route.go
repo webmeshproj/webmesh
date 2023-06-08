@@ -28,20 +28,32 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var listGroupsAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var putRouteAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_ROUTES,
+	Verb:     v1.RuleVerbs_VERB_PUT,
 }
 
-func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listGroupsAction); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
+func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty, error) {
+	if !s.store.IsLeader() {
+		return nil, status.Error(codes.Unavailable, "not the leader")
+	}
+	if route.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "route name is required")
+	}
+	if ok, err := s.rbacEval.Evaluate(ctx, putRouteAction.For(route.GetName())); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put network routes")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	groups, err := s.rbac.ListGroups(ctx)
+	if len(route.GetNodes()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "at least one node is required")
+	}
+	if len(route.GetDestinationCidrs()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "at least one destination CIDR is required")
+	}
+	err := s.networking.PutRoute(ctx, route)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Groups{Items: groups}, nil
+	return &emptypb.Empty{}, nil
 }

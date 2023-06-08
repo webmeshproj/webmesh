@@ -27,6 +27,15 @@ INSERT INTO nodes (
     updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
+-- name: DumpNodeEdges :many
+SELECT * FROM node_edges;
+
+-- name: DropNodeEdges :exec
+DELETE FROM node_edges;
+
+-- name: RestoreNodeEdge :exec
+INSERT INTO node_edges (src_node_id, dst_node_id, weight, attrs) VALUES (?, ?, ?, ?);
+
 -- name: DumpLeases :many
 SELECT * FROM leases;
 
@@ -108,20 +117,30 @@ DELETE FROM network_acls;
 -- name: RestoreNetworkACL :exec
 INSERT INTO network_acls (
     name,
+    priority,
+    action,
     src_node_ids,
     dst_node_ids,
     src_cidrs,
     dst_cidrs,
-    action,
+    protocols,
+    ports,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
--- name: DumpNodeEdges :many
-SELECT * FROM node_edges;
+-- name: DumpNetworkRoutes :many
+SELECT * FROM network_routes;
 
--- name: DropNodeEdges :exec
-DELETE FROM node_edges;
+-- name: DropNetworkRoutes :exec
+DELETE FROM network_routes;
 
--- name: RestoreNodeEdge :exec
-INSERT INTO node_edges (src_node_id, dst_node_id, weight, attrs) VALUES (?, ?, ?, ?);
+-- name: RestoreNetworkRoute :exec
+INSERT INTO network_routes (
+    name,
+    nodes,
+    dst_cidrs,
+    next_hops,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?);

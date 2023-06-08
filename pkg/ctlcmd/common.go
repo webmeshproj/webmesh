@@ -78,7 +78,7 @@ func completeRoles(maxRoles int) func(*cobra.Command, []string, string) ([]strin
 			return nil, cobra.ShellCompDirectiveError
 		}
 		var names []string
-		for _, role := range resp.Roles {
+		for _, role := range resp.Items {
 			names = append(names, role.GetName())
 		}
 		return names, cobra.ShellCompDirectiveNoFileComp
@@ -105,7 +105,7 @@ func completeRoleBindings(maxRoleBindings int) func(*cobra.Command, []string, st
 			return nil, cobra.ShellCompDirectiveError
 		}
 		var names []string
-		for _, rb := range resp.RoleBindings {
+		for _, rb := range resp.Items {
 			names = append(names, rb.GetName())
 		}
 		return names, cobra.ShellCompDirectiveNoFileComp
@@ -132,8 +132,62 @@ func completeGroups(maxGroups int) func(*cobra.Command, []string, string) ([]str
 			return nil, cobra.ShellCompDirectiveError
 		}
 		var names []string
-		for _, group := range resp.Groups {
+		for _, group := range resp.Items {
 			names = append(names, group.GetName())
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func completeNetworkACLs(maxACLs int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if maxACLs > 0 && len(args) >= maxACLs {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if configFileFlag != "" {
+			if err := cliConfig.LoadFile(configFileFlag); err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+		}
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		defer closer.Close()
+		resp, err := client.ListNetworkACLs(cmd.Context(), &emptypb.Empty{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var names []string
+		for _, acl := range resp.Items {
+			names = append(names, acl.GetName())
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func completeRoutes(maxRoutes int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if maxRoutes > 0 && len(args) >= maxRoutes {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if configFileFlag != "" {
+			if err := cliConfig.LoadFile(configFileFlag); err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+		}
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		defer closer.Close()
+		resp, err := client.ListRoutes(cmd.Context(), &emptypb.Empty{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var names []string
+		for _, route := range resp.Items {
+			names = append(names, route.GetName())
 		}
 		return names, cobra.ShellCompDirectiveNoFileComp
 	}

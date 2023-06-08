@@ -42,6 +42,25 @@ const (
 	BootstrapVotersRoleBinding = "bootstrap-voters"
 )
 
+// IsSystemRole returns true if the role is a system role.
+func IsSystemRole(name string) bool {
+	return name == MeshAdminRole || name == VotersRole
+}
+
+// IsSystemRoleBinding returns true if the rolebinding is a system rolebinding.
+func IsSystemRoleBinding(name string) bool {
+	return name == MeshAdminRoleBinding || name == BootstrapVotersRoleBinding
+}
+
+// ErrRoleNotFound is returned when a role is not found.
+var ErrRoleNotFound = fmt.Errorf("role not found")
+
+// ErrRoleBindingNotFound is returned when a rolebinding is not found.
+var ErrRoleBindingNotFound = fmt.Errorf("rolebinding not found")
+
+// ErrGroupNotFound is returned when a group is not found.
+var ErrGroupNotFound = fmt.Errorf("group not found")
+
 // RBAC is the interface to the database models for RBAC.
 type RBAC interface {
 	// PutRole creates or updates a role.
@@ -77,15 +96,6 @@ type RBAC interface {
 	ListUserRoles(ctx context.Context, user string) (RolesList, error)
 }
 
-// ErrRoleNotFound is returned when a role is not found.
-var ErrRoleNotFound = fmt.Errorf("role not found")
-
-// ErrRoleBindingNotFound is returned when a rolebinding is not found.
-var ErrRoleBindingNotFound = fmt.Errorf("rolebinding not found")
-
-// ErrGroupNotFound is returned when a group is not found.
-var ErrGroupNotFound = fmt.Errorf("group not found")
-
 // New returns a new RBAC.
 func New(store meshdb.Store) RBAC {
 	return &rbac{
@@ -99,6 +109,9 @@ type rbac struct {
 
 // PutRole creates or updates a role.
 func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
+	if IsSystemRole(role.GetName()) {
+		return fmt.Errorf("cannot modify system role %q", role.GetName())
+	}
 	q := raftdb.New(r.store.DB())
 	rules, err := json.Marshal(role.GetRules())
 	if err != nil {
@@ -131,6 +144,9 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 
 // DeleteRole deletes a role by name.
 func (r *rbac) DeleteRole(ctx context.Context, name string) error {
+	if IsSystemRole(name) {
+		return fmt.Errorf("cannot delete system role %q", name)
+	}
 	q := raftdb.New(r.store.DB())
 	err := q.DeleteRole(ctx, name)
 	if err != nil {
@@ -157,6 +173,9 @@ func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
 
 // PutRoleBinding creates or updates a rolebinding.
 func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) error {
+	if IsSystemRoleBinding(rolebinding.GetName()) {
+		return fmt.Errorf("cannot modify system rolebinding %q", BootstrapVotersRoleBinding)
+	}
 	q := raftdb.New(r.store.DB())
 	params := raftdb.PutRoleBindingParams{
 		Name:      rolebinding.GetName(),
@@ -210,6 +229,9 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding
 
 // DeleteRoleBinding deletes a rolebinding by name.
 func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
+	if IsSystemRoleBinding(name) {
+		return fmt.Errorf("cannot delete system rolebinding %q", BootstrapVotersRoleBinding)
+	}
 	q := raftdb.New(r.store.DB())
 	err := q.DeleteRoleBinding(ctx, name)
 	if err != nil {

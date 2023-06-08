@@ -41,13 +41,13 @@ func (s *Server) DeleteRole(ctx context.Context, role *v1.Role) (*emptypb.Empty,
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
-	if role.GetName() == rbacdb.MeshAdminRole || role.GetName() == rbacdb.VotersRole {
-		return nil, status.Error(codes.InvalidArgument, "cannot delete system roles")
-	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteRoleAction.For(role.GetName())); !ok {
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete roles")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if rbacdb.IsSystemRole(role.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "cannot delete system roles")
 	}
 	err := s.rbac.DeleteRole(ctx, role.GetName())
 	if err != nil {

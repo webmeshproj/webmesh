@@ -47,6 +47,15 @@ func (q *Queries) DropNetworkACLs(ctx context.Context) error {
 	return err
 }
 
+const DropNetworkRoutes = `-- name: DropNetworkRoutes :exec
+DELETE FROM network_routes
+`
+
+func (q *Queries) DropNetworkRoutes(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, DropNetworkRoutes)
+	return err
+}
+
 const DropNodeEdges = `-- name: DropNodeEdges :exec
 DELETE FROM node_edges
 `
@@ -180,7 +189,7 @@ func (q *Queries) DumpMeshState(ctx context.Context) ([]MeshState, error) {
 }
 
 const DumpNetworkACLs = `-- name: DumpNetworkACLs :many
-SELECT name, src_node_ids, dst_node_ids, src_cidrs, dst_cidrs, "action", created_at, updated_at FROM network_acls
+SELECT name, priority, "action", src_node_ids, dst_node_ids, src_cidrs, dst_cidrs, protocols, ports, created_at, updated_at FROM network_acls
 `
 
 func (q *Queries) DumpNetworkACLs(ctx context.Context) ([]NetworkAcl, error) {
@@ -194,11 +203,48 @@ func (q *Queries) DumpNetworkACLs(ctx context.Context) ([]NetworkAcl, error) {
 		var i NetworkAcl
 		if err := rows.Scan(
 			&i.Name,
+			&i.Priority,
+			&i.Action,
 			&i.SrcNodeIds,
 			&i.DstNodeIds,
 			&i.SrcCidrs,
 			&i.DstCidrs,
-			&i.Action,
+			&i.Protocols,
+			&i.Ports,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const DumpNetworkRoutes = `-- name: DumpNetworkRoutes :many
+SELECT name, nodes, dst_cidrs, next_hops, created_at, updated_at FROM network_routes
+`
+
+func (q *Queries) DumpNetworkRoutes(ctx context.Context) ([]NetworkRoute, error) {
+	rows, err := q.db.QueryContext(ctx, DumpNetworkRoutes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NetworkRoute
+	for rows.Next() {
+		var i NetworkRoute
+		if err := rows.Scan(
+			&i.Name,
+			&i.Nodes,
+			&i.DstCidrs,
+			&i.NextHops,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -444,23 +490,29 @@ func (q *Queries) RestoreMeshState(ctx context.Context, arg RestoreMeshStatePara
 const RestoreNetworkACL = `-- name: RestoreNetworkACL :exec
 INSERT INTO network_acls (
     name,
+    priority,
+    action,
     src_node_ids,
     dst_node_ids,
     src_cidrs,
     dst_cidrs,
-    action,
+    protocols,
+    ports,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type RestoreNetworkACLParams struct {
 	Name       string         `json:"name"`
+	Priority   int64          `json:"priority"`
+	Action     int64          `json:"action"`
 	SrcNodeIds sql.NullString `json:"src_node_ids"`
 	DstNodeIds sql.NullString `json:"dst_node_ids"`
 	SrcCidrs   sql.NullString `json:"src_cidrs"`
 	DstCidrs   sql.NullString `json:"dst_cidrs"`
-	Action     int64          `json:"action"`
+	Protocols  sql.NullString `json:"protocols"`
+	Ports      sql.NullString `json:"ports"`
 	CreatedAt  time.Time      `json:"created_at"`
 	UpdatedAt  time.Time      `json:"updated_at"`
 }
@@ -468,11 +520,46 @@ type RestoreNetworkACLParams struct {
 func (q *Queries) RestoreNetworkACL(ctx context.Context, arg RestoreNetworkACLParams) error {
 	_, err := q.db.ExecContext(ctx, RestoreNetworkACL,
 		arg.Name,
+		arg.Priority,
+		arg.Action,
 		arg.SrcNodeIds,
 		arg.DstNodeIds,
 		arg.SrcCidrs,
 		arg.DstCidrs,
-		arg.Action,
+		arg.Protocols,
+		arg.Ports,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const RestoreNetworkRoute = `-- name: RestoreNetworkRoute :exec
+INSERT INTO network_routes (
+    name,
+    nodes,
+    dst_cidrs,
+    next_hops,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?)
+`
+
+type RestoreNetworkRouteParams struct {
+	Name      string         `json:"name"`
+	Nodes     string         `json:"nodes"`
+	DstCidrs  string         `json:"dst_cidrs"`
+	NextHops  sql.NullString `json:"next_hops"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
+func (q *Queries) RestoreNetworkRoute(ctx context.Context, arg RestoreNetworkRouteParams) error {
+	_, err := q.db.ExecContext(ctx, RestoreNetworkRoute,
+		arg.Name,
+		arg.Nodes,
+		arg.DstCidrs,
+		arg.NextHops,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)

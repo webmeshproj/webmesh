@@ -43,7 +43,5 @@ func (s *Server) ListRoleBindings(ctx context.Context, _ *emptypb.Empty) (*v1.Ro
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.RoleBindings{
-		RoleBindings: rbs,
-	}, nil
+	return &v1.RoleBindings{Items: rbs}, nil
 }

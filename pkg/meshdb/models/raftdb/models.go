@@ -30,13 +30,25 @@ type MeshState struct {
 
 type NetworkAcl struct {
 	Name       string         `json:"name"`
+	Priority   int64          `json:"priority"`
+	Action     int64          `json:"action"`
 	SrcNodeIds sql.NullString `json:"src_node_ids"`
 	DstNodeIds sql.NullString `json:"dst_node_ids"`
 	SrcCidrs   sql.NullString `json:"src_cidrs"`
 	DstCidrs   sql.NullString `json:"dst_cidrs"`
-	Action     int64          `json:"action"`
+	Protocols  sql.NullString `json:"protocols"`
+	Ports      sql.NullString `json:"ports"`
 	CreatedAt  time.Time      `json:"created_at"`
 	UpdatedAt  time.Time      `json:"updated_at"`
+}
+
+type NetworkRoute struct {
+	Name      string         `json:"name"`
+	Nodes     string         `json:"nodes"`
+	DstCidrs  string         `json:"dst_cidrs"`
+	NextHops  sql.NullString `json:"next_hops"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 }
 
 type Node struct {

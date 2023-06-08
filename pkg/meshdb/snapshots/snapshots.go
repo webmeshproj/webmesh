@@ -55,15 +55,16 @@ func New(db *sql.DB) Snapshotter {
 }
 
 type snapshotModel struct {
-	State        []raftdb.MeshState   `json:"state"`
-	Nodes        []raftdb.Node        `json:"nodes"`
-	NodeEdges    []raftdb.NodeEdge    `json:"node_edges"`
-	Leases       []raftdb.Lease       `json:"leases"`
-	Users        []raftdb.User        `json:"users"`
-	Groups       []raftdb.Group       `json:"groups"`
-	Roles        []raftdb.Role        `json:"roles"`
-	RoleBindings []raftdb.RoleBinding `json:"role_bindings"`
-	NetworkACLs  []raftdb.NetworkAcl  `json:"network_acls"`
+	State         []raftdb.MeshState    `json:"state"`
+	Nodes         []raftdb.Node         `json:"nodes"`
+	NodeEdges     []raftdb.NodeEdge     `json:"node_edges"`
+	Leases        []raftdb.Lease        `json:"leases"`
+	Users         []raftdb.User         `json:"users"`
+	Groups        []raftdb.Group        `json:"groups"`
+	Roles         []raftdb.Role         `json:"roles"`
+	RoleBindings  []raftdb.RoleBinding  `json:"role_bindings"`
+	NetworkACLs   []raftdb.NetworkAcl   `json:"network_acls"`
+	NetworkRoutes []raftdb.NetworkRoute `json:"network_routes"`
 }
 
 func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
@@ -107,6 +108,10 @@ func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 	model.NetworkACLs, err = q.DumpNetworkACLs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("dump network acls: %w", err)
+	}
+	model.NetworkRoutes, err = q.DumpNetworkRoutes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("dump network routes: %w", err)
 	}
 	var buf bytes.Buffer
 	gzw := gzip.NewWriter(&buf)
@@ -183,6 +188,10 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	err = q.DropNetworkACLs(ctx)
 	if err != nil {
 		return fmt.Errorf("drop network acls: %w", err)
+	}
+	err = q.DropNetworkRoutes(ctx)
+	if err != nil {
+		return fmt.Errorf("drop network routes: %w", err)
 	}
 	for _, state := range model.State {
 		s.log.Debug("restoring mesh state", slog.Any("state", state))
@@ -299,16 +308,34 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 		// nolint:gosimple
 		err = q.RestoreNetworkACL(ctx, raftdb.RestoreNetworkACLParams{
 			Name:       acl.Name,
+			Priority:   acl.Priority,
+			Action:     acl.Action,
 			SrcNodeIds: acl.SrcNodeIds,
 			DstNodeIds: acl.DstNodeIds,
 			SrcCidrs:   acl.SrcCidrs,
 			DstCidrs:   acl.DstCidrs,
-			Action:     acl.Action,
+			Protocols:  acl.Protocols,
+			Ports:      acl.Ports,
 			CreatedAt:  acl.CreatedAt,
 			UpdatedAt:  acl.UpdatedAt,
 		})
 		if err != nil {
 			return fmt.Errorf("restore network acl: %w", err)
+		}
+	}
+	for _, route := range model.NetworkRoutes {
+		s.log.Debug("restoring network route", slog.Any("route", route))
+		// nolint:gosimple
+		err = q.RestoreNetworkRoute(ctx, raftdb.RestoreNetworkRouteParams{
+			Name:      route.Name,
+			Nodes:     route.Nodes,
+			DstCidrs:  route.DstCidrs,
+			NextHops:  route.NextHops,
+			CreatedAt: route.CreatedAt,
+			UpdatedAt: route.UpdatedAt,
+		})
+		if err != nil {
+			return fmt.Errorf("restore network route: %w", err)
 		}
 	}
 	err = tx.Commit()

@@ -45,6 +45,9 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	if len(group.GetSubjects()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "group must have at least one node or user")
+	}
 	err := s.rbac.PutGroup(ctx, group)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

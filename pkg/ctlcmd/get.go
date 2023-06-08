@@ -31,6 +31,8 @@ func init() {
 	getCmd.AddCommand(getRolesCmd)
 	getCmd.AddCommand(getRoleBindingsCmd)
 	getCmd.AddCommand(getGroupsCmd)
+	getCmd.AddCommand(getNetworkACLsCmd)
+	getCmd.AddCommand(getRoutesCmd)
 
 	rootCmd.AddCommand(getCmd)
 }
@@ -153,6 +155,56 @@ var getGroupsCmd = &cobra.Command{
 			resp, err = client.GetGroup(cmd.Context(), &v1.Group{Name: args[0]})
 		} else {
 			resp, err = client.ListGroups(cmd.Context(), &emptypb.Empty{})
+		}
+		if err != nil {
+			return err
+		}
+		return encodeToStdout(cmd, resp)
+	},
+}
+
+var getNetworkACLsCmd = &cobra.Command{
+	Use:               "networkacls",
+	Short:             "Get network ACLs from the mesh",
+	Aliases:           []string{"networkacl", "nacl", "acl"},
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeNetworkACLs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		var resp proto.Message
+		if len(args) == 1 {
+			resp, err = client.GetNetworkACL(cmd.Context(), &v1.NetworkACL{Name: args[0]})
+		} else {
+			resp, err = client.ListNetworkACLs(cmd.Context(), &emptypb.Empty{})
+		}
+		if err != nil {
+			return err
+		}
+		return encodeToStdout(cmd, resp)
+	},
+}
+
+var getRoutesCmd = &cobra.Command{
+	Use:               "routes",
+	Short:             "Get routes from the mesh",
+	Aliases:           []string{"route", "rt"},
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeRoutes(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		var resp proto.Message
+		if len(args) == 1 {
+			resp, err = client.GetRoute(cmd.Context(), &v1.Route{Name: args[0]})
+		} else {
+			resp, err = client.ListRoutes(cmd.Context(), &emptypb.Empty{})
 		}
 		if err != nil {
 			return err

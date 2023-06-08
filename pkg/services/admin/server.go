@@ -22,6 +22,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -30,18 +31,20 @@ import (
 type Server struct {
 	v1.UnimplementedAdminServer
 
-	store    meshdb.Store
-	rbac     rbacdb.RBAC
-	rbacEval rbac.Evaluator
-	log      *slog.Logger
+	store      meshdb.Store
+	rbac       rbacdb.RBAC
+	rbacEval   rbac.Evaluator
+	networking networking.Networking
+	log        *slog.Logger
 }
 
 // New creates a new admin server.
 func New(store meshdb.Store) *Server {
 	return &Server{
-		store:    store,
-		rbac:     rbacdb.New(store),
-		rbacEval: rbac.NewStoreEvaluator(store),
-		log:      slog.Default().With("component", "admin-server"),
+		store:      store,
+		rbac:       rbacdb.New(store),
+		rbacEval:   rbac.NewStoreEvaluator(store),
+		networking: networking.New(store),
+		log:        slog.Default().With("component", "admin-server"),
 	}
 }

@@ -28,20 +28,26 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var listGroupsAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var deleteRouteAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_ROUTES,
+	Verb:     v1.RuleVerbs_VERB_DELETE,
 }
 
-func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listGroupsAction); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
+func (s *Server) DeleteRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty, error) {
+	if !s.store.IsLeader() {
+		return nil, status.Error(codes.Unavailable, "not the leader")
+	}
+	if route.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "route name is required")
+	}
+	if ok, err := s.rbacEval.Evaluate(ctx, deleteRouteAction.For(route.GetName())); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete network routes")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	groups, err := s.rbac.ListGroups(ctx)
+	err := s.networking.DeleteRoute(ctx, route.GetName())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Groups{Items: groups}, nil
+	return &emptypb.Empty{}, nil
 }

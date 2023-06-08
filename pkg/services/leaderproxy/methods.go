@@ -39,25 +39,41 @@ var MethodPolicyMap = map[string]MethodPolicy{
 	v1.Node_Leave_FullMethodName:                RequireLeader,
 	v1.Node_GetStatus_FullMethodName:            RequireLocal,
 	v1.Node_NegotiateDataChannel_FullMethodName: RequireLocal,
+
 	// Mesh API
 	v1.Mesh_GetNode_FullMethodName:      AllowNonLeader,
 	v1.Mesh_ListNodes_FullMethodName:    AllowNonLeader,
 	v1.Mesh_GetMeshGraph_FullMethodName: AllowNonLeader,
+
 	// Peer Discovery API
 	v1.PeerDiscovery_ListPeers_FullMethodName: AllowNonLeader,
+
 	// WebRTC API
 	v1.WebRTC_StartDataChannel_FullMethodName: AllowNonLeader,
+
 	// Admin API
-	v1.Admin_PutRole_FullMethodName:           RequireLeader,
-	v1.Admin_DeleteRole_FullMethodName:        RequireLeader,
-	v1.Admin_GetRole_FullMethodName:           AllowNonLeader,
-	v1.Admin_ListRoles_FullMethodName:         AllowNonLeader,
+	v1.Admin_PutRole_FullMethodName:    RequireLeader,
+	v1.Admin_DeleteRole_FullMethodName: RequireLeader,
+	v1.Admin_GetRole_FullMethodName:    AllowNonLeader,
+	v1.Admin_ListRoles_FullMethodName:  AllowNonLeader,
+
 	v1.Admin_PutRoleBinding_FullMethodName:    RequireLeader,
 	v1.Admin_DeleteRoleBinding_FullMethodName: RequireLeader,
 	v1.Admin_GetRoleBinding_FullMethodName:    AllowNonLeader,
 	v1.Admin_ListRoleBindings_FullMethodName:  AllowNonLeader,
-	v1.Admin_PutGroup_FullMethodName:          RequireLeader,
-	v1.Admin_DeleteGroup_FullMethodName:       RequireLeader,
-	v1.Admin_GetGroup_FullMethodName:          AllowNonLeader,
-	v1.Admin_ListGroups_FullMethodName:        AllowNonLeader,
+
+	v1.Admin_PutGroup_FullMethodName:    RequireLeader,
+	v1.Admin_DeleteGroup_FullMethodName: RequireLeader,
+	v1.Admin_GetGroup_FullMethodName:    AllowNonLeader,
+	v1.Admin_ListGroups_FullMethodName:  AllowNonLeader,
+
+	v1.Admin_PutNetworkACL_FullMethodName:    RequireLeader,
+	v1.Admin_DeleteNetworkACL_FullMethodName: RequireLeader,
+	v1.Admin_GetNetworkACL_FullMethodName:    AllowNonLeader,
+	v1.Admin_ListNetworkACLs_FullMethodName:  AllowNonLeader,
+
+	v1.Admin_PutRoute_FullMethodName:    RequireLeader,
+	v1.Admin_DeleteRoute_FullMethodName: RequireLeader,
+	v1.Admin_GetRoute_FullMethodName:    AllowNonLeader,
+	v1.Admin_ListRoutes_FullMethodName:  AllowNonLeader,
 }

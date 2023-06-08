@@ -41,13 +41,13 @@ func (s *Server) DeleteRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*em
 	if rb.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
-	if rb.GetName() == rbacdb.MeshAdminRoleBinding || rb.GetName() == rbacdb.BootstrapVotersRoleBinding {
-		return nil, status.Error(codes.InvalidArgument, "cannot delete system rolebindings")
-	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteRoleBindingAction.For(rb.GetName())); !ok {
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete rolebindings")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if rbacdb.IsSystemRoleBinding(rb.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "cannot delete system rolebindings")
 	}
 	err := s.rbac.DeleteRoleBinding(ctx, rb.GetName())
 	if err != nil {

@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/netip"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/util"
@@ -307,6 +309,26 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	err = rb.PutRoleBinding(ctx, roleBinding)
 	if err != nil {
 		return fmt.Errorf("create voters role binding: %w", err)
+	}
+
+	// Initialize the Networking system.
+	n := networking.New(s)
+
+	// Create a network ACL that ensures bootstrap servers can continue to
+	// communicate with each other.
+	nodes := make([]string, len(cfg.Servers))
+	for i, server := range cfg.Servers {
+		nodes[i] = string(server.ID)
+	}
+	err = n.PutNetworkACL(ctx, &v1.NetworkACL{
+		Name:             networking.BootstrapNodesNetworkACLName,
+		Priority:         math.MaxInt32,
+		Action:           v1.ACLAction_ACTION_ACCEPT,
+		SourceNodes:      nodes,
+		DestinationNodes: nodes,
+	})
+	if err != nil {
+		return fmt.Errorf("create bootstrap nodes network ACL: %w", err)
 	}
 
 	// We need to officially "join" ourselves to the cluster with a wireguard

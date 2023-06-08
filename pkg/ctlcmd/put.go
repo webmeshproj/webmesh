@@ -18,6 +18,7 @@ package ctlcmd
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	v1 "github.com/webmeshproj/api/v1"
@@ -35,6 +36,20 @@ var (
 
 	putGroupNodes []string
 	putGroupUsers []string
+
+	putNetworkACLPriority  int32
+	putNetworkACLSrcNodes  []string
+	putNetworkACLDstNodes  []string
+	putNetworkACLSrcCIDRs  []string
+	putNetworkACLDstCIDRs  []string
+	putNetworkACLProtocols []string
+	putNetworkACLPorts     []string
+	putNetworkACLAccept    bool
+	putNetworkACLDeny      bool
+
+	putRouteNodes    []string
+	putRouteCIDRs    []string
+	putRouteNextHops []string
 )
 
 func init() {
@@ -42,10 +57,8 @@ func init() {
 	putRoleFlags.StringArrayVar(&putRoleVerbs, "verb", nil, "verbs to add to the role")
 	putRoleFlags.StringArrayVar(&putRoleResources, "resource", nil, "resources to add to the role")
 	putRoleFlags.StringArrayVar(&putRoleResourceNames, "resource-name", nil, "resource names to add to the role")
-
 	cobra.CheckErr(putRoleCmd.MarkFlagRequired("verb"))
 	cobra.CheckErr(putRoleCmd.MarkFlagRequired("resource"))
-
 	cobra.CheckErr(putRoleCmd.RegisterFlagCompletionFunc("verb", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"put", "get", "delete", "*"}, cobra.ShellCompDirectiveNoFileComp
 	}))
@@ -58,7 +71,6 @@ func init() {
 	putRoleBindingFlags.StringArrayVar(&putRoleBindingNodes, "node", nil, "nodes to bind the role to")
 	putRoleBindingFlags.StringArrayVar(&putRoleBindingUsers, "user", nil, "users to bind the role to")
 	putRoleBindingFlags.StringArrayVar(&putRoleBindingGroups, "group", nil, "groups to bind the role to")
-
 	cobra.CheckErr(putRoleBindingCmd.MarkFlagRequired("role"))
 	cobra.CheckErr(putRoleBindingCmd.RegisterFlagCompletionFunc("role", completeRoles(1)))
 
@@ -66,9 +78,33 @@ func init() {
 	putGroupFlags.StringArrayVar(&putGroupNodes, "node", nil, "nodes to add to the group")
 	putGroupFlags.StringArrayVar(&putGroupUsers, "user", nil, "users to add to the group")
 
+	putACLFlags := putNetworkACLCmd.Flags()
+	putACLFlags.Int32Var(&putNetworkACLPriority, "priority", 0, "priority of the ACL")
+	putACLFlags.StringArrayVar(&putNetworkACLSrcNodes, "src-node", nil, "source nodes to add to the ACL")
+	putACLFlags.StringArrayVar(&putNetworkACLDstNodes, "dst-node", nil, "destination nodes to add to the ACL")
+	putACLFlags.StringArrayVar(&putNetworkACLSrcCIDRs, "src-cidr", nil, "source CIDRs to add to the ACL")
+	putACLFlags.StringArrayVar(&putNetworkACLDstCIDRs, "dst-cidr", nil, "destination CIDRs to add to the ACL")
+	putACLFlags.StringArrayVar(&putNetworkACLProtocols, "protocol", nil, "protocols to add to the ACL")
+	putACLFlags.StringArrayVar(&putNetworkACLPorts, "port", nil, "ports to add to the ACL")
+	putACLFlags.BoolVar(&putNetworkACLAccept, "accept", true, "whether to accept traffic matching the ACL")
+	putACLFlags.BoolVar(&putNetworkACLDeny, "deny", false, "whether to deny traffic matching the ACL")
+	cobra.CheckErr(putNetworkACLCmd.RegisterFlagCompletionFunc("src-node", completeNodes(1)))
+	cobra.CheckErr(putNetworkACLCmd.RegisterFlagCompletionFunc("dst-node", completeNodes(1)))
+
+	putRouteFlags := putRouteCmd.Flags()
+	putRouteFlags.StringArrayVar(&putRouteNodes, "node", nil, "nodes to add to the route")
+	putRouteFlags.StringArrayVar(&putRouteCIDRs, "cidr", nil, "CIDRs to add to the route")
+	putRouteFlags.StringArrayVar(&putRouteNextHops, "next-hop", nil, "next hops to add to the route")
+	cobra.CheckErr(putRouteCmd.MarkFlagRequired("node"))
+	cobra.CheckErr(putRouteCmd.MarkFlagRequired("cidr"))
+	cobra.CheckErr(putRouteCmd.RegisterFlagCompletionFunc("node", completeNodes(1)))
+	cobra.CheckErr(putRouteCmd.RegisterFlagCompletionFunc("next-hop", completeNodes(1)))
+
 	putCmd.AddCommand(putRoleCmd)
 	putCmd.AddCommand(putRoleBindingCmd)
 	putCmd.AddCommand(putGroupCmd)
+	putCmd.AddCommand(putNetworkACLCmd)
+	putCmd.AddCommand(putRouteCmd)
 
 	rootCmd.AddCommand(putCmd)
 }
@@ -241,6 +277,99 @@ var putGroupCmd = &cobra.Command{
 			return err
 		}
 		cmd.Println("put group", group.Name)
+		return nil
+	},
+}
+
+var putNetworkACLCmd = &cobra.Command{
+	Use:               "networkacls [NAME]",
+	Short:             "Create or update a networkacl in the mesh",
+	Aliases:           []string{"networkacl", "nacl", "acl"},
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeNetworkACLs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return errors.New("no networkacl name specified")
+		}
+		if len(putNetworkACLSrcNodes) == 0 && len(putNetworkACLDstNodes) == 0 && len(putNetworkACLSrcCIDRs) == 0 && len(putNetworkACLDstCIDRs) == 0 {
+			return errors.New("no sources or targets specified")
+		}
+		var ports []uint32
+		if len(putNetworkACLPorts) > 0 {
+			for _, portStr := range putNetworkACLPorts {
+				port, err := strconv.ParseUint(portStr, 10, 32)
+				if err != nil {
+					return err
+				}
+				ports = append(ports, uint32(port))
+			}
+		}
+		action := func() v1.ACLAction {
+			if putNetworkACLDeny {
+				return v1.ACLAction_ACTION_DENY
+			}
+			if putNetworkACLAccept {
+				return v1.ACLAction_ACTION_ACCEPT
+			}
+			return v1.ACLAction_ACTION_ACCEPT
+		}()
+		networkACL := &v1.NetworkACL{
+			Name:             args[0],
+			Priority:         putNetworkACLPriority,
+			Action:           action,
+			SourceNodes:      putNetworkACLSrcNodes,
+			DestinationNodes: putNetworkACLDstNodes,
+			SourceCidrs:      putNetworkACLSrcCIDRs,
+			DestinationCidrs: putNetworkACLDstCIDRs,
+			Protocols:        putNetworkACLProtocols,
+			Ports:            ports,
+		}
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		_, err = client.PutNetworkACL(cmd.Context(), networkACL)
+		if err != nil {
+			return err
+		}
+		cmd.Println("put networkacl", networkACL.Name)
+		return nil
+	},
+}
+
+var putRouteCmd = &cobra.Command{
+	Use:               "routes [NAME]",
+	Short:             "Create or update a route in the mesh",
+	Aliases:           []string{"route", "rt"},
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeRoutes(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return errors.New("no route name specified")
+		}
+		if len(putRouteNodes) == 0 {
+			return errors.New("no nodes specified")
+		}
+		if len(putRouteCIDRs) == 0 {
+			return errors.New("no CIDRs specified")
+		}
+		route := &v1.Route{
+			Name:             args[0],
+			Nodes:            putRoleBindingNodes,
+			DestinationCidrs: putRouteCIDRs,
+			NextHopNodes:     putRouteNextHops,
+		}
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		_, err = client.PutRoute(cmd.Context(), route)
+		if err != nil {
+			return err
+		}
+		cmd.Println("put route", route.Name)
 		return nil
 	},
 }

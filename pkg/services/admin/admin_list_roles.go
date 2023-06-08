@@ -43,7 +43,5 @@ func (s *Server) ListRoles(ctx context.Context, _ *emptypb.Empty) (*v1.Roles, er
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Roles{
-		Roles: roles,
-	}, nil
+	return &v1.Roles{Items: roles}, nil
 }

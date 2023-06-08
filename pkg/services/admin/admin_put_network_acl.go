@@ -25,33 +25,45 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var putRoleBindingAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
+var putNetworkACLAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
 	Verb:     v1.RuleVerbs_VERB_PUT,
 }
 
-func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*emptypb.Empty, error) {
+func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
 		return nil, status.Error(codes.Unavailable, "not the leader")
 	}
-	if rb.GetName() == "" {
-		return nil, status.Error(codes.InvalidArgument, "rolebinding name cannot be empty")
+	if acl.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "acl name is required")
 	}
-	if ok, err := s.rbacEval.Evaluate(ctx, putRoleBindingAction.For(rb.GetName())); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put rolebindings")
+	if ok, err := s.rbacEval.Evaluate(ctx, putNetworkACLAction.For(acl.GetName())); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put network acls")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if rbacdb.IsSystemRoleBinding(rb.GetName()) {
-		return nil, status.Error(codes.InvalidArgument, "cannot update system rolebindings")
+	if networking.IsSystemNetworkACL(acl.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "cannot update system network acls")
 	}
-	err := s.rbac.PutRoleBinding(ctx, rb)
+	if allEmpty([][]string{acl.GetDestinationCidrs(), acl.GetSourceCidrs(), acl.GetSourceNodes(), acl.GetDestinationNodes()}) {
+		return nil, status.Error(codes.InvalidArgument, "at least one of destination_cidrs, source_cidrs, source_nodes, or destination_nodes must be set")
+	}
+	err := s.networking.PutNetworkACL(ctx, acl)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func allEmpty(ss [][]string) bool {
+	for _, s := range ss {
+		if len(s) != 0 {
+			return false
+		}
+	}
+	return true
 }

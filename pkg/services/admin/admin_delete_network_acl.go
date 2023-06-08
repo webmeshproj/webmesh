@@ -25,23 +25,33 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var listGroupsAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var deleteNetworkACLAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
+	Verb:     v1.RuleVerbs_VERB_DELETE,
 }
 
-func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listGroupsAction); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
+func (s *Server) DeleteNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptypb.Empty, error) {
+	if !s.store.IsLeader() {
+		return nil, status.Error(codes.Unavailable, "not the leader")
+	}
+	if acl.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "acl name is required")
+	}
+	if ok, err := s.rbacEval.Evaluate(ctx, deleteNetworkACLAction.For(acl.GetName())); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete network acls")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	groups, err := s.rbac.ListGroups(ctx)
+	if networking.IsSystemNetworkACL(acl.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "cannot delete system network acls")
+	}
+	err := s.networking.DeleteNetworkACL(ctx, acl.GetName())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Groups{Items: groups}, nil
+	return &emptypb.Empty{}, nil
 }

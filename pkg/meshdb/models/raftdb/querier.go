@@ -11,6 +11,8 @@ import (
 
 type Querier interface {
 	DeleteGroup(ctx context.Context, name string) error
+	DeleteNetworkACL(ctx context.Context, name string) error
+	DeleteNetworkRoute(ctx context.Context, name string) error
 	DeleteNode(ctx context.Context, id string) error
 	DeleteNodeEdge(ctx context.Context, arg DeleteNodeEdgeParams) error
 	DeleteNodeEdges(ctx context.Context, arg DeleteNodeEdgesParams) error
@@ -20,6 +22,7 @@ type Querier interface {
 	DropLeases(ctx context.Context) error
 	DropMeshState(ctx context.Context) error
 	DropNetworkACLs(ctx context.Context) error
+	DropNetworkRoutes(ctx context.Context) error
 	DropNodeEdges(ctx context.Context) error
 	DropNodes(ctx context.Context) error
 	DropRoleBindings(ctx context.Context) error
@@ -29,6 +32,7 @@ type Querier interface {
 	DumpLeases(ctx context.Context) ([]Lease, error)
 	DumpMeshState(ctx context.Context) ([]MeshState, error)
 	DumpNetworkACLs(ctx context.Context) ([]NetworkAcl, error)
+	DumpNetworkRoutes(ctx context.Context) ([]NetworkRoute, error)
 	DumpNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	DumpNodes(ctx context.Context) ([]Node, error)
 	DumpRoleBindings(ctx context.Context) ([]RoleBinding, error)
@@ -37,6 +41,8 @@ type Querier interface {
 	EitherNodeExists(ctx context.Context, arg EitherNodeExistsParams) (int64, error)
 	GetGroup(ctx context.Context, name string) (Group, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
+	GetNetworkACL(ctx context.Context, name string) (NetworkAcl, error)
+	GetNetworkRoute(ctx context.Context, name string) (NetworkRoute, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
 	GetNodeCount(ctx context.Context) (int64, error)
 	GetNodeEdge(ctx context.Context, arg GetNodeEdgeParams) (NodeEdge, error)
@@ -53,6 +59,10 @@ type Querier interface {
 	ListBoundRolesForNode(ctx context.Context, arg ListBoundRolesForNodeParams) ([]Role, error)
 	ListBoundRolesForUser(ctx context.Context, arg ListBoundRolesForUserParams) ([]Role, error)
 	ListGroups(ctx context.Context) ([]Group, error)
+	ListNetworkACLs(ctx context.Context) ([]NetworkAcl, error)
+	ListNetworkRoutes(ctx context.Context) ([]NetworkRoute, error)
+	ListNetworkRoutesByDstCidr(ctx context.Context, dstCidrs string) ([]NetworkRoute, error)
+	ListNetworkRoutesByNode(ctx context.Context, nodes string) ([]NetworkRoute, error)
 	ListNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	ListNodeIDs(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)
@@ -65,6 +75,8 @@ type Querier interface {
 	NodeExists(ctx context.Context, id string) (int64, error)
 	NodeHasEdges(ctx context.Context, arg NodeHasEdgesParams) (int64, error)
 	PutGroup(ctx context.Context, arg PutGroupParams) error
+	PutNetworkACL(ctx context.Context, arg PutNetworkACLParams) error
+	PutNetworkRoute(ctx context.Context, arg PutNetworkRouteParams) error
 	PutRole(ctx context.Context, arg PutRoleParams) error
 	PutRoleBinding(ctx context.Context, arg PutRoleBindingParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
@@ -72,6 +84,7 @@ type Querier interface {
 	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error
 	RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error
 	RestoreNetworkACL(ctx context.Context, arg RestoreNetworkACLParams) error
+	RestoreNetworkRoute(ctx context.Context, arg RestoreNetworkRouteParams) error
 	RestoreNode(ctx context.Context, arg RestoreNodeParams) error
 	RestoreNodeEdge(ctx context.Context, arg RestoreNodeEdgeParams) error
 	RestoreRole(ctx context.Context, arg RestoreRoleParams) error

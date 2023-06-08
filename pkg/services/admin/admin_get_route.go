@@ -23,25 +23,31 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var listGroupsAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
+var getRouteAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_ROUTES,
 	Verb:     v1.RuleVerbs_VERB_GET,
 }
 
-func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listGroupsAction); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
+func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, error) {
+	if route.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "route name is required")
+	}
+	if ok, err := s.rbacEval.Evaluate(ctx, getRouteAction.For(route.GetName())); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network routes")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	groups, err := s.rbac.ListGroups(ctx)
+	route, err := s.networking.GetRoute(ctx, route.GetName())
 	if err != nil {
+		if err == networking.ErrACLNotFound {
+			return nil, status.Errorf(codes.NotFound, "network route %q not found", route.GetName())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Groups{Items: groups}, nil
+	return route, nil
 }

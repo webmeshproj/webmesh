@@ -23,25 +23,31 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var listGroupsAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
+var getNetworkACLAction = &rbac.Action{
+	Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
 	Verb:     v1.RuleVerbs_VERB_GET,
 }
 
-func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listGroupsAction); !ok {
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
+func (s *Server) GetNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*v1.NetworkACL, error) {
+	if acl.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "acl name is required")
+	}
+	if ok, err := s.rbacEval.Evaluate(ctx, getNetworkACLAction.For(acl.GetName())); !ok {
+		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network acls")
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	groups, err := s.rbac.ListGroups(ctx)
+	acl, err := s.networking.GetNetworkACL(ctx, acl.GetName())
 	if err != nil {
+		if err == networking.ErrACLNotFound {
+			return nil, status.Errorf(codes.NotFound, "network acl %q not found", acl.GetName())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Groups{Items: groups}, nil
+	return acl, nil
 }
