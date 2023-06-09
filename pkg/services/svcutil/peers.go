@@ -149,33 +149,38 @@ func recurseEdgeAllowedIPs(ctx context.Context, nw networking.Networking, graph 
 		if _, ok := directAdjacents[target]; ok {
 			continue
 		}
-		if _, ok := visited[target]; !ok {
-			targetNode, err := graph.Vertex(target)
-			if err != nil {
-				return nil, fmt.Errorf("get vertex: %w", err)
+		if _, ok := visited[target]; ok {
+			continue
+		}
+		targetNode, err := graph.Vertex(target)
+		if err != nil {
+			return nil, fmt.Errorf("get vertex: %w", err)
+		}
+		if targetNode.PrivateIPv4.IsValid() {
+			allowedIPs = append(allowedIPs, targetNode.PrivateIPv4.String())
+		}
+		if targetNode.NetworkIPv6.IsValid() {
+			allowedIPs = append(allowedIPs, targetNode.NetworkIPv6.String())
+		}
+		// Does this peer expose routes?
+		routes, err := nw.GetRoutesByNode(ctx, targetNode.ID)
+		if err != nil {
+			return nil, fmt.Errorf("get routes by node: %w", err)
+		}
+		if len(routes) > 0 {
+			for _, route := range routes {
+				allowedIPs = append(allowedIPs, route.GetDestinationCidrs()...)
 			}
-			if targetNode.PrivateIPv4.IsValid() {
-				allowedIPs = append(allowedIPs, targetNode.PrivateIPv4.String())
+		}
+		visited[target] = struct{}{}
+		ips, err := recurseEdgeAllowedIPs(ctx, nw, graph, adjacencyMap, thisPeer, &targetNode, visited)
+		if err != nil {
+			return nil, fmt.Errorf("recurse allowed IPs: %w", err)
+		}
+		for _, ip := range ips {
+			if !contains(allowedIPs, ip) {
+				allowedIPs = append(allowedIPs, ip)
 			}
-			if targetNode.NetworkIPv6.IsValid() {
-				allowedIPs = append(allowedIPs, targetNode.NetworkIPv6.String())
-			}
-			// Does this peer expose routes?
-			routes, err := nw.GetRoutesByNode(ctx, targetNode.ID)
-			if err != nil {
-				return nil, fmt.Errorf("get routes by node: %w", err)
-			}
-			if len(routes) > 0 {
-				for _, route := range routes {
-					allowedIPs = append(allowedIPs, route.GetDestinationCidrs()...)
-				}
-			}
-			visited[target] = struct{}{}
-			ips, err := recurseEdgeAllowedIPs(ctx, nw, graph, adjacencyMap, thisPeer, &targetNode, visited)
-			if err != nil {
-				return nil, fmt.Errorf("recurse allowed IPs: %w", err)
-			}
-			allowedIPs = append(allowedIPs, ips...)
 		}
 	}
 	return allowedIPs, nil
