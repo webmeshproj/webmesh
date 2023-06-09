@@ -65,6 +65,18 @@ func New() *Config {
 	}
 }
 
+// FromFile creates a configuration from the given filename.
+func FromFile(filename string) (*Config, error) {
+	c := New()
+	return c, c.LoadFile(filename)
+}
+
+// FromReader creates a configuration from the given reader.
+func FromReader(r io.Reader) (*Config, error) {
+	c := New()
+	return c, c.Unmarshal(r)
+}
+
 // LoadFile loads the configuration from the given filename.
 func (c *Config) LoadFile(filename string) error {
 	f, err := os.Open(filename)
