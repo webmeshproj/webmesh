@@ -358,6 +358,8 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 			Priority:         math.MinInt32,
 			SourceNodes:      []string{"*"},
 			DestinationNodes: []string{"*"},
+			SourceCidrs:      []string{"*"},
+			DestinationCidrs: []string{"*"},
 			Action:           v1.ACLAction_ACTION_ACCEPT,
 		})
 		if err != nil {
