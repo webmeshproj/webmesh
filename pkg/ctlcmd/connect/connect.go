@@ -25,13 +25,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/services/meshdns"
 	"github.com/webmeshproj/node/pkg/store"
-	"github.com/webmeshproj/node/pkg/store/streamlayer"
 )
 
 // Options are options for configuring the connect command.
@@ -66,8 +63,6 @@ type Options struct {
 	NoIPv4 bool
 	// NoIPv6 is whether to not use IPv6 when joining the cluster.
 	NoIPv6 bool
-	// AllowedIPs is a map of peers to allowed IPs.
-	AllowedIPs map[string][]string
 	// EndpointOverrides is a map of peer to endpoint overrides.
 	EndpointOverrides string
 	// LocalDNS is whether to start a local MeshDNS server.
@@ -80,47 +75,30 @@ type Options struct {
 // is used to cancel the initial join to the cluster. The stopChan
 // is used to stop the node.
 func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
-	// Configure the stream layer
-	streamlayerOpts := streamlayer.NewOptions()
-	streamlayerOpts.ListenAddress = fmt.Sprintf(":%d", opts.RaftPort)
-
 	// Configure the raft store
 	storeOpts := store.NewOptions()
-	storeOpts.InMemory = true
-	storeOpts.RaftLogFormat = string(store.RaftLogFormatProtobufSnappy)
-	storeOpts.Join = opts.JoinServer
-	storeOpts.TLSCertFile = opts.TLSCertFile
-	storeOpts.TLSKeyFile = opts.TLSKeyFile
-	storeOpts.TLSCAFile = opts.TLSCAFile
-	storeOpts.Insecure = opts.Insecure
-	storeOpts.VerifyChainOnly = opts.VerifyChainOnly
-	storeOpts.NoIPv4 = opts.NoIPv4
-	storeOpts.NoIPv6 = opts.NoIPv6
-	storeOpts.LeaveOnShutdown = true
-	storeOpts.ShutdownTimeout = time.Second * 10
-
-	// Configure the wireguard interface
-	wireguardOpts := wireguard.NewOptions()
-	wireguardOpts.Name = opts.InterfaceName
-	wireguardOpts.ListenPort = int(opts.ListenPort)
-	wireguardOpts.ForceTUN = opts.ForceTUN
-	wireguardOpts.Modprobe = opts.Modprobe
-	wireguardOpts.PersistentKeepAlive = time.Second * 10
-	wireguardOpts.EndpointOverrides = opts.EndpointOverrides
-	var allowedIPs strings.Builder
-	for peer, ips := range opts.AllowedIPs {
-		allowedIPs.WriteString(fmt.Sprintf("%s=%s", peer, strings.Join(ips, ",")))
-	}
-	wireguardOpts.AllowedIPs = allowedIPs.String()
-
-	// Create the stream layer
-	sl, err := streamlayer.New(streamlayerOpts)
-	if err != nil {
-		return fmt.Errorf("create stream layer: %w", err)
-	}
+	storeOpts.Raft.InMemory = true
+	storeOpts.Raft.ListenAddress = fmt.Sprintf(":%d", opts.RaftPort)
+	storeOpts.Raft.LogFormat = string(store.RaftLogFormatProtobufSnappy)
+	storeOpts.Raft.LeaveOnShutdown = true
+	storeOpts.Raft.ShutdownTimeout = time.Second * 10
+	storeOpts.TLS.CertFile = opts.TLSCertFile
+	storeOpts.TLS.KeyFile = opts.TLSKeyFile
+	storeOpts.TLS.CAFile = opts.TLSCAFile
+	storeOpts.TLS.Insecure = opts.Insecure
+	storeOpts.TLS.VerifyChainOnly = opts.VerifyChainOnly
+	storeOpts.Mesh.JoinAddress = opts.JoinServer
+	storeOpts.Mesh.NoIPv4 = opts.NoIPv4
+	storeOpts.Mesh.NoIPv6 = opts.NoIPv6
+	storeOpts.WireGuard.InterfaceName = opts.InterfaceName
+	storeOpts.WireGuard.ListenPort = int(opts.ListenPort)
+	storeOpts.WireGuard.ForceTUN = opts.ForceTUN
+	storeOpts.WireGuard.Modprobe = opts.Modprobe
+	storeOpts.WireGuard.PersistentKeepAlive = time.Second * 10
+	storeOpts.WireGuard.EndpointOverrides = opts.EndpointOverrides
 
 	// Create the store
-	st, err := store.New(sl, storeOpts, wireguardOpts)
+	st, err := store.New(storeOpts)
 	if err != nil {
 		return fmt.Errorf("create store: %w", err)
 	}

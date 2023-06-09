@@ -134,13 +134,16 @@ type TestStore interface {
 }
 
 // New creates a new store.
-func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) (Store, error) {
+func New(opts *Options) (Store, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
 	log := slog.Default().With(slog.String("component", "store"))
-	nodeID := opts.NodeID
+	nodeID := opts.Mesh.NodeID
 	var tlsConfig *tls.Config
-	if !opts.Insecure {
+	if !opts.TLS.Insecure {
 		var err error
-		tlsConfig, err = opts.TLSConfig()
+		tlsConfig, err = opts.TLS.TLSConfig()
 		if err != nil {
 			return nil, err
 		}
@@ -177,13 +180,18 @@ func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) (
 			}
 		}
 	}
+	sl, err := streamlayer.New(&streamlayer.Options{
+		ListenAddress: opts.Raft.ListenAddress,
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &store{
 		sl:            sl,
 		opts:          opts,
 		tlsConfig:     tlsConfig,
-		wgopts:        wgOpts,
 		nodeID:        raft.ServerID(nodeID),
-		raftLogFormat: RaftLogFormat(opts.RaftLogFormat),
+		raftLogFormat: RaftLogFormat(opts.Raft.LogFormat),
 		readyErr:      make(chan error, 2),
 		log:           log.With(slog.String("node-id", string(nodeID))),
 	}, nil
@@ -192,22 +200,17 @@ func New(sl streamlayer.StreamLayer, opts *Options, wgOpts *wireguard.Options) (
 // NewTestStore creates a new test store and waits for it to be ready.
 // The context is used to enforce startup timeouts.
 func NewTestStore(ctx context.Context) (TestStore, error) {
-	sl, err := streamlayer.New(&streamlayer.Options{
-		ListenAddress: ":0",
-	})
-	if err != nil {
-		return nil, err
-	}
 	opts := NewOptions()
-	opts.InMemory = true
-	opts.Insecure = true
-	opts.Bootstrap = true
-	opts.NodeID = uuid.NewString()
+	opts.Raft.ListenAddress = ":0"
+	opts.Raft.InMemory = true
+	opts.TLS.Insecure = true
+	opts.Bootstrap.Enabled = true
+	opts.Mesh.NodeID = uuid.NewString()
 	deadline, ok := ctx.Deadline()
 	if ok {
-		opts.StartupTimeout = time.Until(deadline)
+		opts.Raft.StartupTimeout = time.Until(deadline)
 	}
-	st, err := New(sl, opts, nil)
+	st, err := New(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -224,10 +227,9 @@ func NewTestStore(ctx context.Context) (TestStore, error) {
 }
 
 type store struct {
-	sl     streamlayer.StreamLayer
-	opts   *Options
-	wgopts *wireguard.Options
-	log    *slog.Logger
+	sl   streamlayer.StreamLayer
+	opts *Options
+	log  *slog.Logger
 
 	nodeID    raft.ServerID
 	tlsConfig *tls.Config

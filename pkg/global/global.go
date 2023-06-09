@@ -178,26 +178,26 @@ func (o *Options) Overlay(opts ...any) error {
 	for _, opt := range opts {
 		switch v := opt.(type) {
 		case *store.Options:
-			if !v.NoIPv4 {
-				v.NoIPv4 = o.NoIPv4
+			if !v.Mesh.NoIPv4 {
+				v.Mesh.NoIPv4 = o.NoIPv4
 			}
-			if !v.NoIPv6 {
-				v.NoIPv6 = o.NoIPv6
+			if !v.Mesh.NoIPv6 {
+				v.Mesh.NoIPv6 = o.NoIPv6
 			}
-			if !v.Insecure {
-				v.Insecure = o.Insecure
+			if !v.TLS.Insecure {
+				v.TLS.Insecure = o.Insecure
 			}
-			if !v.VerifyChainOnly {
-				v.VerifyChainOnly = o.VerifyChainOnly
+			if !v.TLS.VerifyChainOnly {
+				v.TLS.VerifyChainOnly = o.VerifyChainOnly
 			}
-			if v.TLSCertFile == "" {
-				v.TLSCertFile = o.TLSCertFile
+			if v.TLS.CertFile == "" {
+				v.TLS.CertFile = o.TLSCertFile
 			}
-			if v.TLSKeyFile == "" {
-				v.TLSKeyFile = o.TLSKeyFile
+			if v.TLS.KeyFile == "" {
+				v.TLS.KeyFile = o.TLSKeyFile
 			}
-			if v.TLSCAFile == "" {
-				v.TLSCAFile = o.TLSCAFile
+			if v.TLS.CAFile == "" {
+				v.TLS.CAFile = o.TLSCAFile
 			}
 			if primaryEndpoint.IsValid() {
 				var raftPort, wireguardPort uint16
@@ -225,24 +225,24 @@ func (o *Options) Overlay(opts ...any) error {
 				if wireguardPort == 0 {
 					wireguardPort = 51820
 				}
-				if v.NodeEndpoint == "" {
-					v.NodeEndpoint = primaryEndpoint.String()
+				if v.Mesh.PrimaryEndpoint == "" {
+					v.Mesh.PrimaryEndpoint = primaryEndpoint.String()
 				}
-				if v.NodeWireGuardEndpoints == "" {
+				if v.Mesh.WireGuardEndpoints == "" {
 					var eps []string
 					if primaryEndpoint.IsValid() {
 						eps = append(eps, netip.AddrPortFrom(primaryEndpoint, uint16(wireguardPort)).String())
 					}
 					for _, endpoint := range endpoints {
 						ep := netip.AddrPortFrom(endpoint.Addr(), uint16(wireguardPort)).String()
-						if ep != v.NodeEndpoint {
+						if ep != v.Mesh.PrimaryEndpoint {
 							eps = append(eps, ep)
 						}
 					}
-					v.NodeWireGuardEndpoints = strings.Join(eps, ",")
+					v.Mesh.WireGuardEndpoints = strings.Join(eps, ",")
 				}
-				if v.AdvertiseAddress == "" {
-					v.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
+				if v.Bootstrap.AdvertiseAddress == "" {
+					v.Bootstrap.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
 				}
 			}
 		case *services.Options:

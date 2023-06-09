@@ -56,9 +56,9 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		params := localdb.SetCurrentWireguardKeyParams{
 			PrivateKey: key.String(),
 		}
-		if s.opts.KeyRotationInterval > 0 {
+		if s.opts.Mesh.KeyRotationInterval > 0 {
 			params.ExpiresAt = sql.NullTime{
-				Time:  time.Now().UTC().Add(s.opts.KeyRotationInterval),
+				Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
 				Valid: true,
 			}
 		}
@@ -76,9 +76,9 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		params := localdb.SetCurrentWireguardKeyParams{
 			PrivateKey: key.String(),
 		}
-		if s.opts.KeyRotationInterval > 0 {
+		if s.opts.Mesh.KeyRotationInterval > 0 {
 			params.ExpiresAt = sql.NullTime{
-				Time:  time.Now().UTC().Add(s.opts.KeyRotationInterval),
+				Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
 				Valid: true,
 			}
 		}
@@ -93,14 +93,14 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	}
 	log.Info("joining cluster")
 	var creds credentials.TransportCredentials
-	if s.opts.Insecure {
+	if s.opts.TLS.Insecure {
 		creds = insecure.NewCredentials()
 	} else {
 		creds = credentials.NewTLS(s.tlsConfig)
 	}
 	var tries int
 	var resp *v1.JoinResponse
-	for tries <= s.opts.MaxJoinRetries {
+	for tries <= s.opts.Mesh.MaxJoinRetries {
 		if tries > 0 {
 			log.Info("retrying join request", slog.Int("tries", tries))
 		}
@@ -117,26 +117,26 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		}
 		defer conn.Close()
 		client := v1.NewNodeClient(conn)
-		if s.opts.GRPCAdvertisePort == 0 {
+		if s.opts.Mesh.GRPCPort == 0 {
 			// Assume the default port.
-			s.opts.GRPCAdvertisePort = 8443
+			s.opts.Mesh.GRPCPort = 8443
 		}
 		req := &v1.JoinRequest{
 			Id:              string(s.nodeID),
 			PublicKey:       key.PublicKey().String(),
 			RaftPort:        int32(s.sl.ListenPort()),
-			GrpcPort:        int32(s.opts.GRPCAdvertisePort),
-			PrimaryEndpoint: s.opts.NodeEndpoint,
+			GrpcPort:        int32(s.opts.Mesh.GRPCPort),
+			PrimaryEndpoint: s.opts.Mesh.PrimaryEndpoint,
 			WireguardEndpoints: func() []string {
-				if s.opts.NodeWireGuardEndpoints != "" {
-					return strings.Split(s.opts.NodeWireGuardEndpoints, ",")
+				if s.opts.Mesh.WireGuardEndpoints != "" {
+					return strings.Split(s.opts.Mesh.WireGuardEndpoints, ",")
 				}
 				return nil
 			}(),
-			ZoneAwarenessId: s.opts.ZoneAwarenessID,
-			AssignIpv4:      !s.opts.NoIPv4,
-			PreferRaftIpv6:  s.opts.RaftPreferIPv6,
-			AsVoter:         s.opts.JoinAsVoter,
+			ZoneAwarenessId: s.opts.Mesh.ZoneAwarenessID,
+			AssignIpv4:      !s.opts.Mesh.NoIPv4,
+			PreferRaftIpv6:  s.opts.Raft.PreferIPv6,
+			AsVoter:         s.opts.Mesh.JoinAsVoter,
 		}
 		log.Info("sending join request to node", slog.Any("req", req))
 		resp, err = client.Join(ctx, req)
@@ -160,19 +160,19 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 	}
 	log.Debug("received join response", slog.Any("resp", resp))
 	var addressv4, addressv6, networkv6 netip.Prefix
-	if resp.AddressIpv4 != "" && !s.opts.NoIPv4 {
+	if resp.AddressIpv4 != "" && !s.opts.Mesh.NoIPv4 {
 		addressv4, err = netip.ParsePrefix(resp.AddressIpv4)
 		if err != nil {
 			return fmt.Errorf("parse ipv4 address: %w", err)
 		}
 	}
-	if resp.AddressIpv6 != "" && !s.opts.NoIPv6 {
+	if resp.AddressIpv6 != "" && !s.opts.Mesh.NoIPv6 {
 		addressv6, err = netip.ParsePrefix(resp.AddressIpv6)
 		if err != nil {
 			return fmt.Errorf("parse ipv6 address: %w", err)
 		}
 	}
-	if !s.opts.NoIPv6 {
+	if !s.opts.Mesh.NoIPv6 {
 		networkv6, err = netip.ParsePrefix(resp.NetworkIpv6)
 		if err != nil {
 			return fmt.Errorf("parse ipv6 network: %w", err)
@@ -186,11 +186,11 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
 	var localCIDRs util.PrefixList
-	if s.opts.ZoneAwarenessID != "" {
+	if s.opts.Mesh.ZoneAwarenessID != "" {
 		log.Info("using zone awareness, collecting local CIDRs")
 		localCIDRs, err = util.DetectEndpoints(ctx, util.EndpointDetectOpts{
 			DetectPrivate:  true,
-			DetectIPv6:     !s.opts.NoIPv6,
+			DetectIPv6:     !s.opts.Mesh.NoIPv6,
 			SkipInterfaces: []string{s.wg.Name()},
 		})
 		log.Debug("detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
@@ -220,8 +220,8 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			}
 			endpoint = addr.AddrPort()
 		}
-		if s.opts.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() != "" {
-			if peer.GetZoneAwarenessId() == s.opts.ZoneAwarenessID {
+		if s.opts.Mesh.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() != "" {
+			if peer.GetZoneAwarenessId() == s.opts.Mesh.ZoneAwarenessID {
 				if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetWireguardEndpoints()) > 0 {
 					// We share zone awareness with the peer and their primary endpoint
 					// is not in one of our local CIDRs. We'll try to use one of their

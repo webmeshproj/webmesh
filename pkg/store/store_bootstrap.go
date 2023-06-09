@@ -58,8 +58,8 @@ func (s *store) bootstrap(ctx context.Context) error {
 			return fmt.Errorf("local db migrate: %w", err)
 		}
 		// We rejoin as a voter no matter what
-		s.opts.JoinAsVoter = true
-		if s.opts.BootstrapServers == "" {
+		s.opts.Mesh.JoinAsVoter = true
+		if s.opts.Bootstrap.Servers == "" {
 			// We were the only bootstrap server, so we need to rejoin ourselves
 			// This is not foolproof, but it's the best we can do if the bootstrap
 			// flag is left on.
@@ -70,18 +70,18 @@ func (s *store) bootstrap(ctx context.Context) error {
 		return s.rejoinBootstrapServer(ctx)
 	}
 	s.firstBootstrap = true
-	if s.opts.AdvertiseAddress == "" && s.opts.BootstrapServers == "" {
-		s.opts.AdvertiseAddress = fmt.Sprintf("localhost:%d", s.sl.ListenPort())
-	} else if s.opts.AdvertiseAddress == "" {
+	if s.opts.Bootstrap.AdvertiseAddress == "" && s.opts.Bootstrap.Servers == "" {
+		s.opts.Bootstrap.AdvertiseAddress = fmt.Sprintf("localhost:%d", s.sl.ListenPort())
+	} else if s.opts.Bootstrap.AdvertiseAddress == "" {
 		// Validate() doesn't allow this on the options
 		// but lets go ahead and support it anyway.
-		s.opts.AdvertiseAddress = s.opts.BootstrapServers
+		s.opts.Bootstrap.AdvertiseAddress = s.opts.Bootstrap.Servers
 	}
 	// There is a chance we are waiting for DNS to resolve.
 	// Retry until the context is cancelled.
 	var addr net.Addr
 	for {
-		addr, err = net.ResolveTCPAddr("tcp", s.opts.AdvertiseAddress)
+		addr, err = net.ResolveTCPAddr("tcp", s.opts.Bootstrap.AdvertiseAddress)
 		if err != nil {
 			err = fmt.Errorf("resolve advertise address: %w", err)
 			s.log.Error("failed to resolve advertise address", slog.String("error", err.Error()))
@@ -103,8 +103,8 @@ func (s *store) bootstrap(ctx context.Context) error {
 			},
 		},
 	}
-	if s.opts.BootstrapServers != "" {
-		bootstrapServers := strings.Split(s.opts.BootstrapServers, ",")
+	if s.opts.Bootstrap.Servers != "" {
+		bootstrapServers := strings.Split(s.opts.Bootstrap.Servers, ",")
 		servers := make(map[raft.ServerID]raft.ServerAddress)
 		for _, server := range bootstrapServers {
 			parts := strings.Split(server, "=")
@@ -145,7 +145,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 		// If the error is that we already bootstrapped and
 		// there were other servers to bootstrap with, then
 		// we might just need to rejoin the cluster.
-		if errors.Is(err, raft.ErrCantBootstrap) && s.opts.BootstrapServers != "" {
+		if errors.Is(err, raft.ErrCantBootstrap) && s.opts.Bootstrap.Servers != "" {
 			s.log.Info("cluster already bootstrapped, attempting to join as voter")
 			s.log.Info("migrating raft schema to latest version")
 			if err = models.MigrateRaftDB(s.weakData); err != nil {
@@ -154,7 +154,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 			if err = models.MigrateLocalDB(s.localData); err != nil {
 				return fmt.Errorf("local db migrate: %w", err)
 			}
-			s.opts.JoinAsVoter = true
+			s.opts.Mesh.JoinAsVoter = true
 			return s.rejoinBootstrapServer(ctx)
 		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
@@ -170,7 +170,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 		deadline, ok := ctx.Deadline()
 		var cancel context.CancelFunc
 		if !ok {
-			ctx, cancel = context.WithTimeout(context.Background(), s.opts.StartupTimeout)
+			ctx, cancel = context.WithTimeout(context.Background(), s.opts.Raft.StartupTimeout)
 		} else {
 			ctx, cancel = context.WithDeadline(context.Background(), deadline)
 		}
@@ -184,8 +184,8 @@ func (s *store) bootstrap(ctx context.Context) error {
 		}
 		s.log.Info("raft is ready")
 		grpcPorts := make(map[raft.ServerID]int64)
-		if s.opts.BootstrapServersGRPCPorts != "" {
-			ports := strings.Split(s.opts.BootstrapServersGRPCPorts, ",")
+		if s.opts.Bootstrap.ServersGRPCPorts != "" {
+			ports := strings.Split(s.opts.Bootstrap.ServersGRPCPorts, ",")
 			for _, port := range ports {
 				parts := strings.Split(port, "=")
 				if len(parts) != 2 {
@@ -223,7 +223,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 
 	// Set initial cluster configurations to the raft log
 	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
-		slog.String("ipv4-network", s.opts.BootstrapIPv4Network))
+		slog.String("ipv4-network", s.opts.Bootstrap.IPv4Network))
 	ula, err := util.GenerateULA()
 	if err != nil {
 		return fmt.Errorf("generate ULA: %w", err)
@@ -233,7 +233,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("set ULA prefix to db: %w", err)
 	}
-	err = q.SetIPv4Prefix(ctx, s.opts.BootstrapIPv4Network)
+	err = q.SetIPv4Prefix(ctx, s.opts.Bootstrap.IPv4Network)
 	if err != nil {
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
 	}
@@ -259,11 +259,11 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		Role: rbac.MeshAdminRoleBinding,
 		Subjects: []*v1.Subject{
 			{
-				Name: s.opts.BootstrapAdmin,
+				Name: s.opts.Bootstrap.Admin,
 				Type: v1.SubjectType_SUBJECT_NODE,
 			},
 			{
-				Name: s.opts.BootstrapAdmin,
+				Name: s.opts.Bootstrap.Admin,
 				Type: v1.SubjectType_SUBJECT_USER,
 			},
 		},
@@ -292,7 +292,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 			out := make([]*v1.Subject, 0)
 			out = append(out, &v1.Subject{
 				Type: v1.SubjectType_SUBJECT_NODE,
-				Name: s.opts.BootstrapAdmin,
+				Name: s.opts.Bootstrap.Admin,
 			})
 			for _, server := range cfg.Servers {
 				out = append(out, &v1.Subject{
@@ -300,8 +300,8 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 					Name: string(server.ID),
 				})
 			}
-			if s.opts.BootstrapVoters != "" {
-				voters := strings.Split(s.opts.BootstrapVoters, ",")
+			if s.opts.Bootstrap.Voters != "" {
+				voters := strings.Split(s.opts.Bootstrap.Voters, ",")
 				for _, voter := range voters {
 					out = append(out, &v1.Subject{
 						Type: v1.SubjectType_SUBJECT_NODE,
@@ -347,7 +347,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 
 	// Apply a default accept policy if configured
-	if s.opts.BootstrapDefaultNetworkPolicy == string(NetworkPolicyAccept) {
+	if s.opts.Bootstrap.DefaultNetworkPolicy == string(NetworkPolicyAccept) {
 		err = n.PutNetworkACL(ctx, &v1.NetworkACL{
 			Name:             "default-accept",
 			Priority:         math.MinInt32,
@@ -377,13 +377,13 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	params := &peers.PutOptions{
 		ID:              string(s.nodeID),
 		NetworkIPv6:     networkIPv6,
-		GRPCPort:        s.opts.GRPCAdvertisePort,
+		GRPCPort:        s.opts.Mesh.GRPCPort,
 		RaftPort:        s.sl.ListenPort(),
-		PrimaryEndpoint: s.opts.NodeEndpoint,
-		ZoneAwarenessID: s.opts.ZoneAwarenessID,
+		PrimaryEndpoint: s.opts.Mesh.PrimaryEndpoint,
+		ZoneAwarenessID: s.opts.Mesh.ZoneAwarenessID,
 	}
-	if s.opts.NodeWireGuardEndpoints != "" {
-		params.WireGuardEndpoints = strings.Split(s.opts.NodeWireGuardEndpoints, ",")
+	if s.opts.Mesh.WireGuardEndpoints != "" {
+		params.WireGuardEndpoints = strings.Split(s.opts.Mesh.WireGuardEndpoints, ",")
 	}
 	// Go ahead and generate our private key.
 	s.log.Info("generating wireguard key for ourselves")
@@ -461,9 +461,9 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	keyparams := localdb.SetCurrentWireguardKeyParams{
 		PrivateKey: wireguardKey.String(),
 	}
-	if s.opts.KeyRotationInterval > 0 {
+	if s.opts.Mesh.KeyRotationInterval > 0 {
 		keyparams.ExpiresAt = sql.NullTime{
-			Time:  time.Now().UTC().Add(s.opts.KeyRotationInterval),
+			Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
 			Valid: true,
 		}
 	}
@@ -473,9 +473,9 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 	var networkv4 netip.Prefix
 	var raftAddr string
-	if !s.opts.NoIPv4 && !s.opts.RaftPreferIPv6 {
+	if !s.opts.Mesh.NoIPv4 && !s.opts.Raft.PreferIPv6 {
 		// Grab the first IP address in the network
-		networkcidrv4, err := netip.ParsePrefix(s.opts.BootstrapIPv4Network)
+		networkcidrv4, err := netip.ParsePrefix(s.opts.Bootstrap.IPv4Network)
 		if err != nil {
 			return fmt.Errorf("parse IPv4 prefix: %w", err)
 		}
@@ -495,7 +495,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		raftAddr = net.JoinHostPort(networkIPv6.Addr().String(), strconv.Itoa(int(s.sl.ListenPort())))
 	}
 	var networkv6, meshnetworkv6 netip.Prefix
-	if !s.opts.NoIPv6 {
+	if !s.opts.Mesh.NoIPv6 {
 		networkv6 = networkIPv6
 		meshnetworkv6 = ula
 	}
@@ -544,12 +544,12 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 	if port, ok := grpcPorts[raft.ServerID(leader)]; ok {
 		grpcPort = port
 	} else {
-		grpcPort = int64(s.opts.GRPCAdvertisePort)
+		grpcPort = int64(s.opts.Mesh.GRPCPort)
 	}
 	joinAddr := net.JoinHostPort(advertiseAddress.Addr().String(), strconv.Itoa(int(grpcPort)))
-	s.opts.MaxJoinRetries = 5
-	s.opts.JoinTimeout = 30 * time.Second
-	s.opts.JoinAsVoter = true
+	s.opts.Mesh.MaxJoinRetries = 5
+	s.opts.Mesh.JoinTimeout = 30 * time.Second
+	s.opts.Mesh.JoinAsVoter = true
 	// TODO: Technically we want to wait for the first barrier to be reached before we
 	//       start the join process. This is because we want to make sure that the
 	//       leader has already written the first barrier to the log before we join.
@@ -560,11 +560,11 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 }
 
 func (s *store) rejoinBootstrapServer(ctx context.Context) error {
-	servers := strings.Split(s.opts.BootstrapServers, ",")
+	servers := strings.Split(s.opts.Bootstrap.Servers, ",")
 	// Make sure we don't retry forever.
-	s.opts.MaxJoinRetries = 5
-	s.opts.JoinTimeout = 30 * time.Second
-	s.opts.JoinAsVoter = true
+	s.opts.Mesh.MaxJoinRetries = 5
+	s.opts.Mesh.JoinTimeout = 30 * time.Second
+	s.opts.Mesh.JoinAsVoter = true
 	for _, server := range servers {
 		parts := strings.Split(server, "=")
 		if len(parts) != 2 {

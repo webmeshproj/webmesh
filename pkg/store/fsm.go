@@ -100,7 +100,7 @@ func (s *store) Apply(l *raft.Log) any {
 // change is committed. It takes the index at which the configuration was
 // written and the configuration value.
 func (s *store) StoreConfiguration(index uint64, configuration raft.Configuration) {
-	if s.opts.InMemory {
+	if s.opts.Raft.InMemory {
 		return
 	}
 	ctx := context.Background()

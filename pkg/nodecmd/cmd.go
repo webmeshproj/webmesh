@@ -32,7 +32,6 @@ import (
 
 	"github.com/webmeshproj/node/pkg/services"
 	"github.com/webmeshproj/node/pkg/store"
-	"github.com/webmeshproj/node/pkg/store/streamlayer"
 	"github.com/webmeshproj/node/pkg/util"
 	"github.com/webmeshproj/node/pkg/version"
 )
@@ -69,12 +68,7 @@ func Execute() error {
 		}
 	}
 
-	err := opts.Global.Overlay(
-		opts.Store.Options,
-		opts.Store.StreamLayer,
-		opts.Services,
-		opts.Wireguard,
-	)
+	err := opts.Global.Overlay(opts.Mesh, opts.Services)
 	if err != nil {
 		return err
 	}
@@ -88,11 +82,11 @@ func Execute() error {
 		return nil
 	}
 
-	if !opts.Store.Bootstrap && opts.Store.Join == "" {
-		if _, err := os.Stat(opts.Store.DataDir); os.IsNotExist(err) {
-			if !opts.Store.InMemory {
+	if !opts.Mesh.Bootstrap.Enabled && opts.Mesh.Mesh.JoinAddress == "" {
+		if _, err := os.Stat(opts.Mesh.Raft.DataDir); os.IsNotExist(err) {
+			if !opts.Mesh.Raft.InMemory {
 				flag.Usage()
-				return fmt.Errorf("Must specify either --store.bootstrap or --store.join when --store.data-dir does not exist")
+				return fmt.Errorf("Must specify either --bootstrap.enabled or --mesh.join-address when --raft.data-dir does not exist")
 			}
 		}
 	}
@@ -124,38 +118,14 @@ func Execute() error {
 	// Log all options at debug level
 	log.Debug("current configuration", slog.Any("options", opts))
 
-	if (opts.Global.NoIPv4 && opts.Global.NoIPv6) || (opts.Store.NoIPv4 && opts.Store.NoIPv6) {
+	if (opts.Global.NoIPv4 && opts.Global.NoIPv6) || (opts.Mesh.Mesh.NoIPv4 && opts.Mesh.Mesh.NoIPv6) {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
-	}
-
-	// Validate options
-	err = opts.Store.StreamLayer.Validate()
-	if err != nil {
-		return fmt.Errorf("failed to validate stream layer options: %w", err)
-	}
-	err = opts.Store.Validate()
-	if err != nil {
-		return fmt.Errorf("failed to validate store options: %w", err)
-	}
-	err = opts.Wireguard.Validate()
-	if err != nil {
-		return fmt.Errorf("failed to validate wireguard options: %w", err)
-	}
-	err = opts.Services.Validate()
-	if err != nil {
-		return fmt.Errorf("failed to validate grpc options: %w", err)
 	}
 
 	log.Info("starting raft node")
 
-	// Create the stream layer
-	sl, err := streamlayer.New(opts.Store.StreamLayer)
-	if err != nil {
-		return fmt.Errorf("failed to create stream layer: %w", err)
-	}
-
 	// Create and open the store
-	st, err := store.New(sl, opts.Store.Options, opts.Wireguard)
+	st, err := store.New(opts.Mesh)
 	if err != nil {
 		return fmt.Errorf("failed to create raft store: %w", err)
 	}
@@ -172,7 +142,7 @@ func Execute() error {
 	}
 
 	log.Info("waiting for raft store to become ready")
-	ctx, cancel := context.WithTimeout(context.Background(), opts.Store.StartupTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), opts.Mesh.Raft.StartupTimeout)
 	if err := <-st.ReadyError(ctx); err != nil {
 		cancel()
 		return handleErr(fmt.Errorf("failed to wait for raft store to become ready: %w", err))
@@ -242,8 +212,8 @@ configuration files. The configuration is parsed in the following order:
 
 Environment variables match the command line flags where all characters are
 uppercased and dashes and dots are replaced with underscores. For example, the
-command line flag "store.stream-layer.listen-address" would be set via the
-environment variable "STORE_STREAM_LAYER_LISTEN_ADDRESS".
+command line flag "mesh.node-id" would be set via the environment variable 
+"MESH_NODE_ID".
 
 Configuration files can be in YAML, JSON, or TOML. The configuration file is
 specified via the "--config" flag. The configuration file matches the structure 
@@ -251,17 +221,18 @@ of the command line flags. For example, the following YAML configuration would
 be equivalent to the shown command line flag:
 
   # config.yaml
-  store:
-    stream-layer:
-      listen-address: 127.0.0.1  # --store.stream-layer.listen-address
+  mesh:
+    node-id: "node-1"  # --mesh.node-id="node-1"
 
 `)
 
 	util.FlagsUsage("Global Configurations:", "global", "")
-	util.FlagsUsage("Raft Store Configurations:", "store", "store.stream-layer")
-	util.FlagsUsage("Raft Stream Layer Configurations:", "store.stream-layer", "")
-	util.FlagsUsage("Service Configurations:", "services", "")
+	util.FlagsUsage("Mesh Configurations:", "mesh", "")
+	util.FlagsUsage("Bootstrap Configurations:", "bootstrap", "")
+	util.FlagsUsage("Raft Configurations:", "raft", "")
+	util.FlagsUsage("TLS Configurations:", "tls", "")
 	util.FlagsUsage("WireGuard Configurations:", "wireguard", "")
+	util.FlagsUsage("Service Configurations:", "services", "")
 
 	fmt.Fprint(os.Stderr, "General Flags\n\n")
 	fmt.Fprint(os.Stderr, "  --config         Load flags from the given configuration file\n")

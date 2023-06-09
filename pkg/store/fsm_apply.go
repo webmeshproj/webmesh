@@ -38,8 +38,8 @@ func (s *store) apply(l *raft.Log, cmd *v1.RaftLogEntry, log *slog.Logger, start
 
 	var ctx context.Context
 	var cancel context.CancelFunc
-	if s.opts.ApplyTimeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), s.opts.ApplyTimeout)
+	if s.opts.Raft.ApplyTimeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), s.opts.Raft.ApplyTimeout)
 	} else {
 		ctx, cancel = context.WithCancel(context.Background())
 	}

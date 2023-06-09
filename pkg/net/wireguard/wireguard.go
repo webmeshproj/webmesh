@@ -25,6 +25,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
@@ -55,13 +56,41 @@ type Interface interface {
 	Close(ctx context.Context) error
 }
 
+// Options are options for configuring the wireguard interface.
+type Options struct {
+	// ListenPort is the port to listen on.
+	ListenPort int
+	// Name is the name of the interface.
+	Name string
+	// ForceName forces the use of the given name by deleting
+	// any pre-existing interface with the same name.
+	ForceName bool
+	// ForceTUN forces the use of a TUN interface.
+	ForceTUN bool
+	// Modprobe attempts to probe the wireguard module.
+	Modprobe bool
+	// PersistentKeepAlive is the interval at which to send keepalive packets
+	// to peers. If unset, keepalive packets will automatically be sent to publicly
+	// accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
+	// packets are sent.
+	PersistentKeepAlive time.Duration
+	// EndpointOverrides is a map of peer IDs to endpoint overrides.
+	EndpointOverrides map[string]netip.AddrPort
+	// MTU is the MTU to use for the interface.
+	MTU int
+	// NetworkV4 is the private IPv4 network of this interface.
+	NetworkV4 netip.Prefix
+	// NetworkV6 is the private IPv6 network of this interface.
+	NetworkV6 netip.Prefix
+	// IsPublic is true if this interface is public.
+	IsPublic bool
+}
+
 type wginterface struct {
 	system.Interface
-	opts        *Options
-	cli         *wgctrl.Client
-	log         *slog.Logger
-	peerConfigs *peerConfigs
-	epOverrides map[string]netip.AddrPort
+	opts *Options
+	cli  *wgctrl.Client
+	log  *slog.Logger
 	// A map of peer ID's to public keys.
 	peers    map[string]wgtypes.Key
 	peersMux sync.Mutex
@@ -96,22 +125,6 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			log.Warn("failed to enable ip forwarding", "error", err)
 		}
 	}
-	var peerConfigs *peerConfigs
-	if opts.AllowedIPs != "" {
-		var err error
-		peerConfigs, err = parseAllowedIPsMap(opts.AllowedIPs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse allowed IPs: %w", err)
-		}
-	}
-	epOverrides := make(map[string]netip.AddrPort)
-	if opts.EndpointOverrides != "" {
-		var err error
-		epOverrides, err = parseEndpointOverrides(opts.EndpointOverrides)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse endpoint overrides: %w", err)
-		}
-	}
 	log.Info("creating wireguard interface", "name", opts.Name)
 	iface, err := system.New(ctx, &system.Options{
 		Name:      opts.Name,
@@ -129,13 +142,11 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		return nil, fmt.Errorf("failed to create wireguard control client: %w", err)
 	}
 	return &wginterface{
-		Interface:   iface,
-		opts:        opts,
-		cli:         cli,
-		peerConfigs: peerConfigs,
-		epOverrides: epOverrides,
-		peers:       make(map[string]wgtypes.Key),
-		log:         log,
+		Interface: iface,
+		opts:      opts,
+		cli:       cli,
+		peers:     make(map[string]wgtypes.Key),
+		log:       log,
 	}, nil
 }
 

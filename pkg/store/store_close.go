@@ -30,9 +30,9 @@ func (s *store) Close() error {
 		return ErrNotOpen
 	}
 	ctx := context.Background()
-	if s.opts.ShutdownTimeout > 0 {
+	if s.opts.Raft.ShutdownTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, s.opts.ShutdownTimeout)
+		ctx, cancel = context.WithTimeout(ctx, s.opts.Raft.ShutdownTimeout)
 		defer cancel()
 	}
 	defer s.open.Store(false)
@@ -63,7 +63,7 @@ func (s *store) Close() error {
 	if s.raft != nil {
 		if s.IsLeader() {
 			s.log.Debug("currently the leader, removing ourselves and stepping down")
-			if s.opts.LeaveOnShutdown {
+			if s.opts.Raft.LeaveOnShutdown {
 				if err := s.RemoveServer(ctx, string(s.nodeID), true); err != nil {
 					return fmt.Errorf("remove voter: %w", err)
 				}
@@ -72,7 +72,7 @@ func (s *store) Close() error {
 			if err := s.Stepdown(true); err != nil && err != ErrNotLeader {
 				return fmt.Errorf("stepdown: %w", err)
 			}
-		} else if s.opts.LeaveOnShutdown {
+		} else if s.opts.Raft.LeaveOnShutdown {
 			s.log.Debug("leaving cluster")
 			// If we were not the leader, we need to leave
 			if err := s.leaveCluster(ctx); err != nil {

@@ -29,7 +29,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/ctlcmd/connect"
-	"github.com/webmeshproj/node/pkg/net/wireguard"
+	"github.com/webmeshproj/node/pkg/store"
 )
 
 var connectOpts connect.Options
@@ -37,7 +37,7 @@ var connectLogLevel string
 
 func init() {
 	flags := connectCmd.Flags()
-	flags.StringVar(&connectOpts.InterfaceName, "interface-name", wireguard.DefaultInterfaceName, "name of the wireguard interface to use")
+	flags.StringVar(&connectOpts.InterfaceName, "interface-name", store.DefaultInterfaceName, "name of the wireguard interface to use")
 	flags.Uint16Var(&connectOpts.ListenPort, "listen-port", 51820, "port for wireguard to listen on")
 	flags.BoolVar(&connectOpts.ForceTUN, "force-tun", false, "force the use of a TUN interface")
 	flags.BoolVar(&connectOpts.Modprobe, "modprobe", false, "attempt to load the wireguard kernel module")

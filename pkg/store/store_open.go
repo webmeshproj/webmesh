@@ -36,7 +36,7 @@ func (s *store) Open() error {
 	if s.open.Load() {
 		return ErrOpen
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), s.opts.StartupTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), s.opts.Raft.StartupTimeout)
 	defer cancel()
 	log := s.log
 	handleErr := func(err error) error {
@@ -65,66 +65,66 @@ func (s *store) Open() error {
 	raftDriverName := uuid.NewString()
 	sql.Register(raftDriverName, &raftDBDriver{s})
 	// If bootstrap and force are set, clear the data directory.
-	if s.opts.Bootstrap && s.opts.ForceBootstrap {
-		err = os.RemoveAll(s.opts.DataDir)
+	if s.opts.Bootstrap.Enabled && s.opts.Bootstrap.Force {
+		err = os.RemoveAll(s.opts.Raft.DataDir)
 		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove all %q: %w", s.opts.DataDir, err)
+			return fmt.Errorf("remove all %q: %w", s.opts.Raft.DataDir, err)
 		}
 	}
 	// Ensure the data and snapshots directory exists.
-	if !s.opts.InMemory {
-		err = os.MkdirAll(s.opts.DataDir, 0755)
+	if !s.opts.Raft.InMemory {
+		err = os.MkdirAll(s.opts.Raft.DataDir, 0755)
 		if err != nil {
-			return fmt.Errorf("mkdir %q: %w", s.opts.DataDir, err)
+			return fmt.Errorf("mkdir %q: %w", s.opts.Raft.DataDir, err)
 		}
-		log = log.With(slog.String("data-dir", s.opts.DataDir))
+		log = log.With(slog.String("data-dir", s.opts.Raft.DataDir))
 	} else {
 		log = log.With(slog.String("data-dir", ":memory:"))
 	}
 	// Create the raft network transport
 	log.Debug("creating raft network transport")
 	s.raftTransport = raft.NewNetworkTransport(s.sl,
-		s.opts.ConnectionPoolCount,
-		s.opts.ConnectionTimeout,
+		s.opts.Raft.ConnectionPoolCount,
+		s.opts.Raft.ConnectionTimeout,
 		&logWriter{log: s.log},
 	)
 	// Create the raft stores.
 	log.Debug("creating boltdb stores")
-	if s.opts.InMemory {
+	if s.opts.Raft.InMemory {
 		s.logDB = newInmemStore()
 		s.stableDB = newInmemStore()
 		s.raftSnapshots = raft.NewInmemSnapshotStore()
 	} else {
-		s.logDB, err = boltdb.NewBoltStore(s.opts.LogFilePath())
+		s.logDB, err = boltdb.NewBoltStore(s.opts.Raft.LogFilePath())
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.LogFilePath(), err))
+			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.LogFilePath(), err))
 		}
-		s.stableDB, err = boltdb.NewBoltStore(s.opts.StableStoreFilePath())
+		s.stableDB, err = boltdb.NewBoltStore(s.opts.Raft.StableStoreFilePath())
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.StableStoreFilePath(), err))
+			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.StableStoreFilePath(), err))
 		}
 		s.raftSnapshots, err = raft.NewFileSnapshotStoreWithLogger(
-			s.opts.DataDir,
-			int(s.opts.SnapshotRetention),
-			s.opts.RaftLogger("snapshots"),
+			s.opts.Raft.DataDir,
+			int(s.opts.Raft.SnapshotRetention),
+			s.opts.Raft.Logger("snapshots"),
 		)
 	}
 	if err != nil {
-		return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.DataDir, err))
+		return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.Raft.DataDir, err))
 	}
 	// Create the data stores.
 	log.Debug("creating data stores")
 	var dataPath, localDataPath string
-	if s.opts.InMemory {
+	if s.opts.Raft.InMemory {
 		dataPath = ":memory:"
 		localDataPath = ":memory:"
 	} else {
-		dataPath = s.opts.DataFilePath()
-		localDataPath = s.opts.LocalDataFilePath()
+		dataPath = s.opts.Raft.DataFilePath()
+		localDataPath = s.opts.Raft.LocalDataFilePath()
 	}
 	s.weakData, err = sql.Open("sqlite", dataPath)
 	if err != nil {
-		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.DataFilePath(), err))
+		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.Raft.DataFilePath(), err))
 	}
 	// Make sure we use case sensitive collation for the data store.
 	_, err = s.weakData.Exec("PRAGMA case_sensitive_like = true;")
@@ -137,16 +137,15 @@ func (s *store) Open() error {
 	}
 	s.localData, err = sql.Open("sqlite", localDataPath)
 	if err != nil {
-		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.LocalDataFilePath(), err))
+		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.Raft.LocalDataFilePath(), err))
 	}
 	s.snapshotter = snapshots.New(s.weakData)
 	// Create the raft instance.
 	log.Info("starting raft instance",
 		slog.String("listen-addr", string(s.raftTransport.LocalAddr())),
-		slog.String("advertise-addr", s.opts.AdvertiseAddress),
 	)
 	s.raft, err = raft.NewRaft(
-		s.opts.RaftConfig(s.nodeID), s,
+		s.opts.Raft.RaftConfig(string(s.nodeID)), s,
 		&monotonicLogStore{s.logDB},
 		s.stableDB,
 		s.raftSnapshots,
@@ -155,13 +154,13 @@ func (s *store) Open() error {
 		return handleErr(fmt.Errorf("new raft: %w", err))
 	}
 	// Bootstrap the cluster if needed.
-	if s.opts.Bootstrap {
+	if s.opts.Bootstrap.Enabled {
 		// Database gets migrated during bootstrap.
 		log.Info("bootstrapping cluster")
 		if err = s.bootstrap(ctx); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
-	} else if s.opts.Join != "" {
+	} else if s.opts.Mesh.JoinAddress != "" {
 		log.Debug("migrating raft database")
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
@@ -170,9 +169,9 @@ func (s *store) Open() error {
 		if err = models.MigrateLocalDB(s.localData); err != nil {
 			return fmt.Errorf("local db migrate: %w", err)
 		}
-		ctx, cancel := context.WithTimeout(ctx, s.opts.JoinTimeout)
+		ctx, cancel := context.WithTimeout(ctx, s.opts.Mesh.JoinTimeout)
 		defer cancel()
-		if err = s.join(ctx, s.opts.Join); err != nil {
+		if err = s.join(ctx, s.opts.Mesh.JoinAddress); err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
 	} else {
@@ -192,7 +191,7 @@ func (s *store) Open() error {
 		}
 	}
 	// Register observers.
-	s.observerChan = make(chan raft.Observation, s.opts.ObserverChanBuffer)
+	s.observerChan = make(chan raft.Observation, s.opts.Raft.ObserverChanBuffer)
 	s.observer = raft.NewObserver(s.observerChan, false, func(o *raft.Observation) bool {
 		return true
 	})

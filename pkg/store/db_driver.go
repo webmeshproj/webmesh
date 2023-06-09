@@ -167,7 +167,7 @@ func (s *raftDBStatement) ExecContext(ctx context.Context, args []driver.NamedVa
 	if !s.Ready() {
 		return nil, ErrNotReady
 	}
-	timeout := s.opts.ApplyTimeout
+	timeout := s.opts.Raft.ApplyTimeout
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
@@ -225,7 +225,7 @@ func (s *raftDBStatement) QueryContext(ctx context.Context, args []driver.NamedV
 	if !s.Ready() {
 		return nil, ErrNotReady
 	}
-	timeout := s.opts.ApplyTimeout
+	timeout := s.opts.Raft.ApplyTimeout
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}

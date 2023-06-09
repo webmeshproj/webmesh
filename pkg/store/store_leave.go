@@ -36,7 +36,7 @@ func (s *store) leaveCluster(ctx context.Context) error {
 		return fmt.Errorf("get leader address: %w", err)
 	}
 	var creds credentials.TransportCredentials
-	if s.opts.Insecure {
+	if s.opts.TLS.Insecure {
 		creds = insecure.NewCredentials()
 	} else {
 		creds = credentials.NewTLS(s.tlsConfig)

@@ -65,7 +65,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 		}
 	}
-	if override, ok := w.epOverrides[peer.ID]; ok {
+	if override, ok := w.opts.EndpointOverrides[peer.ID]; ok {
 		peer.Endpoint = override
 	}
 	var keepAlive *time.Duration
@@ -90,23 +90,6 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 		}
 		allowedIPs = append(allowedIPs, ipnet)
-	}
-	if w.peerConfigs != nil {
-		for _, ip := range w.peerConfigs.AllowedIPs(peer.ID) {
-			var ipnet net.IPNet
-			if ip.Addr().Is4() {
-				ipnet = net.IPNet{
-					IP:   ip.Addr().AsSlice(),
-					Mask: net.CIDRMask(ip.Bits(), 32),
-				}
-			} else {
-				ipnet = net.IPNet{
-					IP:   ip.Addr().AsSlice(),
-					Mask: net.CIDRMask(ip.Bits(), 128),
-				}
-			}
-			allowedIPs = append(allowedIPs, ipnet)
-		}
 	}
 	peerCfg := wgtypes.PeerConfig{
 		PublicKey:                   peer.PublicKey,

@@ -50,24 +50,41 @@ func (s *store) RefreshWireguardPeers(ctx context.Context) error {
 func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, meshNetworkV6 netip.Prefix) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
-	s.wgopts.NetworkV4 = addressv4
-	s.wgopts.NetworkV6 = addressv6
-	s.wgopts.IsPublic = s.opts.NodeEndpoint != ""
-	s.log.Info("configuring wireguard interface", slog.Any("options", s.wgopts))
+	wgopts := wireguard.Options{
+		ListenPort:          s.opts.WireGuard.ListenPort,
+		Name:                s.opts.WireGuard.InterfaceName,
+		ForceName:           s.opts.WireGuard.ForceInterfaceName,
+		ForceTUN:            s.opts.WireGuard.ForceTUN,
+		Modprobe:            s.opts.WireGuard.Modprobe,
+		PersistentKeepAlive: s.opts.WireGuard.PersistentKeepAlive,
+		EndpointOverrides:   map[string]netip.AddrPort{},
+		MTU:                 s.opts.WireGuard.MTU,
+		NetworkV4:           addressv4,
+		NetworkV6:           addressv6,
+		IsPublic:            s.opts.Mesh.PrimaryEndpoint != "",
+	}
+	if s.opts.WireGuard.EndpointOverrides != "" {
+		overrides, err := parseEndpointOverrides(s.opts.WireGuard.EndpointOverrides)
+		if err != nil {
+			return fmt.Errorf("parse endpoint overrides: %w", err)
+		}
+		wgopts.EndpointOverrides = overrides
+	}
+	s.log.Info("configuring wireguard interface", slog.Any("options", &wgopts))
 	var err error
 	if s.fw == nil {
 		s.fw, err = firewall.New(&firewall.Options{
 			DefaultPolicy: firewall.PolicyAccept,
-			WireguardPort: uint16(s.wgopts.ListenPort),
+			WireguardPort: uint16(s.opts.WireGuard.ListenPort),
 			RaftPort:      uint16(s.sl.ListenPort()),
-			GRPCPort:      uint16(s.opts.GRPCAdvertisePort),
+			GRPCPort:      uint16(s.opts.Mesh.GRPCPort),
 		})
 		if err != nil {
 			return fmt.Errorf("new firewall: %w", err)
 		}
 	}
 	if s.wg == nil {
-		s.wg, err = wireguard.New(ctx, s.wgopts)
+		s.wg, err = wireguard.New(ctx, &wgopts)
 		if err != nil {
 			return fmt.Errorf("new wireguard: %w", err)
 		}
@@ -76,7 +93,7 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 			return fmt.Errorf("wireguard up: %w", err)
 		}
 	}
-	err = s.wg.Configure(ctx, key, s.wgopts.ListenPort)
+	err = s.wg.Configure(ctx, key, s.opts.WireGuard.ListenPort)
 	if err != nil {
 		return fmt.Errorf("wireguard configure: %w", err)
 	}
@@ -102,7 +119,7 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 	if err != nil {
 		return fmt.Errorf("failed to add wireguard forwarding rule: %w", err)
 	}
-	if s.wgopts.Masquerade {
+	if s.opts.WireGuard.Masquerade {
 		err = s.fw.AddMasquerade(ctx, s.wg.Name())
 		if err != nil {
 			return fmt.Errorf("failed to add masquerade rule: %w", err)
@@ -149,11 +166,11 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 	seenPeers := make(map[string]struct{})
 
 	var localCIDRs util.PrefixList
-	if s.opts.ZoneAwarenessID != "" {
+	if s.opts.Mesh.ZoneAwarenessID != "" {
 		s.log.Debug("using zone awareness, collecting local CIDRs")
 		localCIDRs, err = util.DetectEndpoints(context.Background(), util.EndpointDetectOpts{
 			DetectPrivate:  true,
-			DetectIPv6:     !s.opts.NoIPv6,
+			DetectIPv6:     !s.opts.Mesh.NoIPv6,
 			SkipInterfaces: []string{s.wg.Name()},
 		})
 		s.log.Debug("detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
@@ -196,8 +213,8 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 				}
 				peer.Endpoint = addr.AddrPort()
 			}
-			if s.opts.ZoneAwarenessID != "" && wgPeer.GetZoneAwarenessId() != "" {
-				if wgPeer.GetZoneAwarenessId() == s.opts.ZoneAwarenessID {
+			if s.opts.Mesh.ZoneAwarenessID != "" && wgPeer.GetZoneAwarenessId() != "" {
+				if wgPeer.GetZoneAwarenessId() == s.opts.Mesh.ZoneAwarenessID {
 					if !localCIDRs.Contains(peer.Endpoint.Addr()) && len(wgPeer.GetWireguardEndpoints()) > 0 {
 						// We share zone awareness with the peer and their primary endpoint
 						// is not in one of our local CIDRs. We'll try to use one of their

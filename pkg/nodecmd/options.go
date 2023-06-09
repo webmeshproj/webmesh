@@ -26,35 +26,23 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/webmeshproj/node/pkg/global"
-	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/services"
 	"github.com/webmeshproj/node/pkg/store"
-	"github.com/webmeshproj/node/pkg/store/streamlayer"
 )
 
 // Options are the node options.
 type Options struct {
-	Global    *global.Options    `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty"`
-	Store     *StoreOptions      `yaml:"store,omitempty" json:"store,omitempty" toml:"store,omitempty"`
-	Services  *services.Options  `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
-	Wireguard *wireguard.Options `yaml:"wireguard,omitempty" json:"wireguard,omitempty" toml:"wireguard,omitempty"`
-}
-
-type StoreOptions struct {
-	*store.Options `yaml:",inline" json:",inline" toml:",inline"`
-	StreamLayer    *streamlayer.Options `yaml:"stream-layer,omitempty" json:"stream-layer,omitempty" toml:"stream-layer,omitempty"`
+	Global   *global.Options   `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty"`
+	Mesh     *store.Options    `yaml:"mesh,omitempty" json:"mesh,omitempty" toml:"mesh,omitempty"`
+	Services *services.Options `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
 }
 
 // NewOptions creates new options.
 func NewOptions() *Options {
 	return &Options{
-		Global: global.NewOptions(),
-		Store: &StoreOptions{
-			Options:     store.NewOptions(),
-			StreamLayer: streamlayer.NewOptions(),
-		},
-		Services:  services.NewOptions(),
-		Wireguard: wireguard.NewOptions(),
+		Global:   global.NewOptions(),
+		Mesh:     store.NewOptions(),
+		Services: services.NewOptions(),
 	}
 }
 
@@ -62,10 +50,8 @@ func NewOptions() *Options {
 // for convenience.
 func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	o.Global.BindFlags(fs)
-	o.Store.BindFlags(fs)
-	o.Store.StreamLayer.BindFlags(fs)
+	o.Mesh.BindFlags(fs)
 	o.Services.BindFlags(fs)
-	o.Wireguard.BindFlags(fs)
 	return o
 }
 
