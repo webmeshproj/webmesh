@@ -25,9 +25,23 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/node/pkg/services/datachannels"
+	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
+var canNegDataChannelAction = &rbac.Action{
+	Verb:     v1.RuleVerbs_VERB_PUT,
+	Resource: v1.RuleResource_RESOURCE_DATA_CHANNELS,
+}
+
 func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer) error {
+	allowed, err := s.rbacEval.Evaluate(stream.Context(), canNegDataChannelAction)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to evaluate data channel permissions: %v", err)
+	}
+	if !allowed {
+		s.log.Warn("caller not allowed to create data channels")
+		return status.Error(codes.PermissionDenied, "not allowed")
+	}
 	// Pull the initial request from the stream
 	req, err := stream.Recv()
 	if err != nil {

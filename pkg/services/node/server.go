@@ -28,8 +28,9 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/ipam"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/meshdb/rbac"
+	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
+	"github.com/webmeshproj/node/pkg/services/rbac"
 	"github.com/webmeshproj/node/pkg/store"
 )
 
@@ -41,7 +42,8 @@ type Server struct {
 	peers      peers.Peers
 	ipam       ipam.IPAM
 	meshstate  state.State
-	rbac       rbac.RBAC
+	rbac       rbacdb.RBAC
+	rbacEval   rbac.Evaluator
 	networking networking.Networking
 
 	ulaPrefix netip.Prefix
@@ -61,7 +63,8 @@ func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature) 
 		peers:      peers.New(store),
 		ipam:       ipam.New(store),
 		meshstate:  state.New(store),
-		rbac:       rbac.New(store),
+		rbac:       rbacdb.New(store),
+		rbacEval:   rbac.NewStoreEvaluator(store),
 		networking: networking.New(store),
 		features:   features,
 		startedAt:  time.Now(),

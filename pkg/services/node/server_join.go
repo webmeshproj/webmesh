@@ -32,11 +32,12 @@ import (
 
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
+	"github.com/webmeshproj/node/pkg/services/rbac"
 	svcutil "github.com/webmeshproj/node/pkg/services/util"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-var canVoteAction = &v1.RBACAction{
+var canVoteAction = &rbac.Action{
 	Verb:     v1.RuleVerbs_VERB_PUT,
 	Resource: v1.RuleResource_RESOURCE_VOTES,
 }
@@ -69,11 +70,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// We can go ahead and check here if the node is allowed to do what
 	// they want
 	if req.GetAsVoter() {
-		roles, err := s.rbac.ListNodeRoles(ctx, req.GetId())
+		allowed, err := s.rbacEval.Evaluate(ctx, canVoteAction)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to list node roles: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to evaluate voting permissions: %v", err)
 		}
-		allowed := roles.Eval(canVoteAction)
 		if !allowed {
 			s.log.Warn("Node not allowed to join as voter", slog.String("id", req.GetId()))
 			return nil, status.Error(codes.PermissionDenied, "not allowed")
