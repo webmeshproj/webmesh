@@ -272,7 +272,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		return fmt.Errorf("create admin role binding: %w", err)
 	}
 
-	// Create a "voters" role and add ourselves and all the bootstrap servers
+	// Create a "voters" role and group then add ourselves and all the bootstrap servers
 	// to it.
 	err = rb.PutRole(ctx, &v1.Role{
 		Name: rbac.VotersRole,
@@ -286,27 +286,41 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create voters role: %w", err)
 	}
-	roleBinding := &v1.RoleBinding{
-		Name:     rbac.BootstrapVotersRoleBinding,
-		Role:     rbac.VotersRole,
-		Subjects: make([]*v1.Subject, len(cfg.Servers)),
+	err = rb.PutGroup(ctx, &v1.Group{
+		Name: rbac.VotersGroup,
+		Subjects: func() []*v1.Subject {
+			out := make([]*v1.Subject, len(cfg.Servers))
+			for i, server := range cfg.Servers {
+				out[i] = &v1.Subject{
+					Type: v1.SubjectType_SUBJECT_NODE,
+					Name: string(server.ID),
+				}
+			}
+			if s.opts.BootstrapVoters != "" {
+				voters := strings.Split(s.opts.BootstrapVoters, ",")
+				for _, voter := range voters {
+					out = append(out, &v1.Subject{
+						Type: v1.SubjectType_SUBJECT_NODE,
+						Name: voter,
+					})
+				}
+			}
+			return out
+		}(),
+	})
+	if err != nil {
+		return fmt.Errorf("create voters group: %w", err)
 	}
-	for i, server := range cfg.Servers {
-		roleBinding.Subjects[i] = &v1.Subject{
-			Type: v1.SubjectType_SUBJECT_NODE,
-			Name: string(server.ID),
-		}
-	}
-	if s.opts.BootstrapVoters != "" {
-		voters := strings.Split(s.opts.BootstrapVoters, ",")
-		for _, voter := range voters {
-			roleBinding.Subjects = append(roleBinding.Subjects, &v1.Subject{
-				Type: v1.SubjectType_SUBJECT_NODE,
-				Name: voter,
-			})
-		}
-	}
-	err = rb.PutRoleBinding(ctx, roleBinding)
+	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
+		Name: rbac.BootstrapVotersRoleBinding,
+		Role: rbac.VotersRole,
+		Subjects: []*v1.Subject{
+			{
+				Type: v1.SubjectType_SUBJECT_GROUP,
+				Name: rbac.VotersGroup,
+			},
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("create voters role binding: %w", err)
 	}

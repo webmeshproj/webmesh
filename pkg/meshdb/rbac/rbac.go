@@ -38,6 +38,8 @@ const (
 	MeshAdminRoleBinding = "mesh-admin"
 	// VotersRole is the name of the voters role.
 	VotersRole = "voters"
+	// VotersGroup is the name of the voters group.
+	VotersGroup = "voters"
 	// BootstrapVotersRoleBinding is the name of the bootstrap voters rolebinding.
 	BootstrapVotersRoleBinding = "bootstrap-voters"
 )
