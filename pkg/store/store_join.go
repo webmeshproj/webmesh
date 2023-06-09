@@ -137,6 +137,12 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			AssignIpv4:      !s.opts.Mesh.NoIPv4,
 			PreferRaftIpv6:  s.opts.Raft.PreferIPv6,
 			AsVoter:         s.opts.Mesh.JoinAsVoter,
+			Routes: func() []string {
+				if s.opts.Mesh.Routes != "" {
+					return strings.Split(s.opts.Mesh.Routes, ",")
+				}
+				return nil
+			}(),
 		}
 		log.Info("sending join request to node", slog.Any("req", req))
 		resp, err = client.Join(ctx, req)

@@ -35,6 +35,7 @@ const (
 	GRPCAdvertisePortEnvVar      = "MESH_GRPC_PORT"
 	PrimaryEndpointEnvVar        = "MESH_PRIMARY_ENDPOINT"
 	NodeWireGuardEndpointsEnvVar = "MESH_WIREGUARD_ENDPOINTS"
+	NodeRoutesEnvVar             = "MESH_ROUTES"
 	NoIPv4EnvVar                 = "MESH_NO_IPV4"
 	NoIPv6EnvVar                 = "MESH_NO_IPV6"
 )
@@ -60,6 +61,9 @@ type MeshOptions struct {
 	PrimaryEndpoint string `json:"primary-endpoint,omitempty" yaml:"primary-endpoint,omitempty" toml:"primary-endpoint,omitempty"`
 	// WireGuardEndpoints are additional WireGuard endpoints to broadcast when joining.
 	WireGuardEndpoints string `json:"wireguard-endpoints,omitempty" yaml:"wireguard-endpoints,omitempty" toml:"wireguard-endpoints,omitempty"`
+	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
+	// If the node is not allowed to put routes in the mesh, the node will be unable to join.
+	Routes string `json:"routes,omitempty" yaml:"routes,omitempty" toml:"routes,omitempty"`
 	// GRPCPort is the port to advertise for gRPC.
 	GRPCPort int `json:"grpc-port,omitempty" yaml:"grpc-port,omitempty" toml:"grpc-port,omitempty"`
 	// NoIPv4 disables IPv4 usage.
@@ -88,13 +92,10 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
 1. If mTLS is enabled, the node ID is the CN of the client certificate.
 2. If mTLS is not enabled, the node ID is the hostname of the machine.
 3. If the hostname is not available, the node ID is a random UUID (should only be used for testing).`)
-
 	fl.DurationVar(&o.KeyRotationInterval, "mesh.key-rotation-interval", util.GetEnvDurationDefault(KeyRotationIntervalEnvVar, time.Hour*24*7),
 		"Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.")
-
 	fl.StringVar(&o.ZoneAwarenessID, "mesh.zone-awareness-id", util.GetEnvDefault(ZoneAwarenessIDEnvVar, ""),
 		"Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.")
-
 	fl.StringVar(&o.JoinAddress, "mesh.join-address", util.GetEnvDefault(JoinAddressEnvVar, ""),
 		"Address of a node to join.")
 	fl.IntVar(&o.MaxJoinRetries, "mesh.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
@@ -110,6 +111,10 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
 This is only necessary if the node intends on being publicly accessible.`)
 	fl.StringVar(&o.WireGuardEndpoints, "mesh.wireguard-endpoints", util.GetEnvDefault(NodeWireGuardEndpointsEnvVar, ""),
 		`Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.`)
+	fl.StringVar(&o.Routes, "mesh.routes", util.GetEnvDefault(NodeRoutesEnvVar, ""),
+		`Comma separated list of additional routes to advertise to the mesh.
+These routes are advertised to all peers. If the node is not allowed
+to put routes in the mesh, the node will be unable to join.`)
 	fl.BoolVar(&o.NoIPv4, "mesh.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Do not request IPv4 assignments when joining.")
 	fl.BoolVar(&o.NoIPv6, "mesh.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",

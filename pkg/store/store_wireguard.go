@@ -119,11 +119,12 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 	if err != nil {
 		return fmt.Errorf("failed to add wireguard forwarding rule: %w", err)
 	}
-	if s.opts.WireGuard.Masquerade {
+	if s.opts.WireGuard.Masquerade || s.opts.Mesh.Routes != "" {
 		err = s.fw.AddMasquerade(ctx, s.wg.Name())
 		if err != nil {
 			return fmt.Errorf("failed to add masquerade rule: %w", err)
 		}
+		s.masquerading = true
 	}
 	return nil
 }

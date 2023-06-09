@@ -33,6 +33,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 )
 
 // Snapshot returns a Raft snapshot.
@@ -54,11 +55,15 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 	s.log.Debug("applying batch", slog.Int("count", len(logs)))
 	res := make([]any, len(logs))
 	var edgeChange bool
+	var routeChange bool
 	for i, l := range logs {
-		var changed bool
-		changed, res[i] = s.applyLog(l)
-		if changed {
+		var edgeChanged, routeChanged bool
+		edgeChanged, routeChanged, res[i] = s.applyLog(l)
+		if edgeChanged {
 			edgeChange = true
+		}
+		if routeChanged {
+			routeChange = true
 		}
 	}
 	if edgeChange && s.wg != nil {
@@ -74,12 +79,40 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 			}()
 		}
 	}
+	if routeChange && s.wg != nil {
+		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
+			defer func() {
+				if s.noWG {
+					return
+				}
+				ctx := context.Background()
+				routes, err := networking.New(s).GetRoutesByNode(ctx, string(s.nodeID))
+				if err != nil {
+					s.log.Error("error getting routes by node", slog.String("error", err.Error()))
+					return
+				}
+				if len(routes) > 0 {
+					s.log.Debug("applied node route change, ensuring masquerade rules are in place")
+					if !s.masquerading {
+						s.wgmux.Lock()
+						defer s.wgmux.Unlock()
+						err = s.fw.AddMasquerade(ctx, s.wg.Name())
+						if err != nil {
+							s.log.Error("error adding masquerade rule", slog.String("error", err.Error()))
+						} else {
+							s.masquerading = true
+						}
+					}
+				}
+			}()
+		}
+	}
 	return res
 }
 
 // Apply applies a Raft log entry to the store.
 func (s *store) Apply(l *raft.Log) any {
-	edgeChange, res := s.applyLog(l)
+	edgeChange, routeChange, res := s.applyLog(l)
 	if edgeChange && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
 			defer func() {
@@ -89,6 +122,34 @@ func (s *store) Apply(l *raft.Log) any {
 				s.log.Debug("applied node edge change, refreshing wireguard peers")
 				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
 					s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
+				}
+			}()
+		}
+	}
+	if routeChange && s.wg != nil {
+		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
+			defer func() {
+				if s.noWG {
+					return
+				}
+				ctx := context.Background()
+				routes, err := networking.New(s).GetRoutesByNode(ctx, string(s.nodeID))
+				if err != nil {
+					s.log.Error("error getting routes by node", slog.String("error", err.Error()))
+					return
+				}
+				if len(routes) > 0 {
+					s.log.Debug("applied node route change, ensuring masquerade rules are in place")
+					if !s.masquerading {
+						s.wgmux.Lock()
+						defer s.wgmux.Unlock()
+						err = s.fw.AddMasquerade(ctx, s.wg.Name())
+						if err != nil {
+							s.log.Error("error adding masquerade rule", slog.String("error", err.Error()))
+						} else {
+							s.masquerading = true
+						}
+					}
 				}
 			}()
 		}
@@ -140,7 +201,7 @@ func (s *store) StoreConfiguration(index uint64, configuration raft.Configuratio
 	s.log.Debug("stored current raft configuration", slog.Int("index", int(index)))
 }
 
-func (s *store) applyLog(l *raft.Log) (edgeChange bool, res any) {
+func (s *store) applyLog(l *raft.Log) (edgeChange, routeChange bool, res any) {
 	log := s.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
 	log.Debug("applying log", "type", l.Type.String())
 	start := time.Now()
@@ -158,7 +219,7 @@ func (s *store) applyLog(l *raft.Log) (edgeChange bool, res any) {
 		// apply the log entry.
 		// TODO: This should trigger some sort of recovery.
 		log.Error("error checking last applied index", slog.String("error", err.Error()))
-		return false, &v1.RaftApplyResponse{
+		return false, false, &v1.RaftApplyResponse{
 			Time:  time.Since(start).String(),
 			Error: fmt.Sprintf("check last applied index: %s", err.Error()),
 		}
@@ -169,12 +230,12 @@ func (s *store) applyLog(l *raft.Log) (edgeChange bool, res any) {
 
 	if l.Term < dbTerm {
 		log.Debug("received log from old term")
-		return false, &v1.RaftApplyResponse{
+		return false, false, &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
 	} else if l.Index <= dbIndex {
 		log.Debug("log already applied to database")
-		return false, &v1.RaftApplyResponse{
+		return false, false, &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
 	}
@@ -199,7 +260,7 @@ func (s *store) applyLog(l *raft.Log) (edgeChange bool, res any) {
 
 	if l.Type != raft.LogCommand {
 		// We only care about command logs.
-		return false, &v1.RaftApplyResponse{
+		return false, false, &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
 	}
@@ -224,13 +285,13 @@ func (s *store) applyLog(l *raft.Log) (edgeChange bool, res any) {
 		// This is a fatal error. We can't apply the log entry if we can't
 		// decode it. This should never happen.
 		log.Error("error decoding raft log entry", slog.String("error", err.Error()))
-		return false, &v1.RaftApplyResponse{
+		return false, false, &v1.RaftApplyResponse{
 			Time:  time.Since(start).String(),
 			Error: fmt.Sprintf("unmarshal raft log entry: %s", err.Error()),
 		}
 	}
 
-	return isEdgeChangeCmd(&cmd), s.apply(l, &cmd, log, start)
+	return isEdgeChangeCmd(&cmd), isRouteChange(&cmd), s.apply(l, &cmd, log, start)
 }
 
 func (s *store) getDBTermAndIndex() (term, index uint64, err error) {
@@ -261,4 +322,14 @@ func isEdgeChangeCmd(cmd *v1.RaftLogEntry) bool {
 		sql == raftdb.DeleteNode ||
 		sql == raftdb.DeleteNodeEdge ||
 		sql == raftdb.DeleteNodeEdges
+}
+
+func isRouteChange(cmd *v1.RaftLogEntry) bool {
+	var sql string
+	if cmd.GetType() == v1.RaftCommandType_EXECUTE {
+		sql = cmd.GetSqlExec().GetStatement().GetSql()
+	} else {
+		sql = cmd.GetSqlQuery().GetStatement().GetSql()
+	}
+	return sql == raftdb.PutNetworkRoute || sql == raftdb.DeleteNetworkRoute
 }
