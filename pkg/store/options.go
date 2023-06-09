@@ -23,7 +23,7 @@ import (
 // Options are the options for the store.
 type Options struct {
 	// Mesh are options for participating in an existing mesh.
-	Mesh *MeshOptions `json:"join,omitempty" yaml:"join,omitempty" toml:"join,omitempty"`
+	Mesh *MeshOptions `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty"`
 	// Bootstrap are options for bootstrapping the store.
 	Bootstrap *BootstrapOptions `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty" toml:"bootstrap,omitempty"`
 	// Raft are options for the raft store.

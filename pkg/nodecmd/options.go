@@ -32,8 +32,8 @@ import (
 
 // Options are the node options.
 type Options struct {
+	Mesh     *store.Options    `yaml:",inline" json:",inline" toml:",inline"`
 	Global   *global.Options   `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty"`
-	Mesh     *store.Options    `yaml:"mesh,omitempty" json:"mesh,omitempty" toml:"mesh,omitempty"`
 	Services *services.Options `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
 }
 
