@@ -289,12 +289,16 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	err = rb.PutGroup(ctx, &v1.Group{
 		Name: rbac.VotersGroup,
 		Subjects: func() []*v1.Subject {
-			out := make([]*v1.Subject, len(cfg.Servers))
-			for i, server := range cfg.Servers {
-				out[i] = &v1.Subject{
+			out := make([]*v1.Subject, 0)
+			out = append(out, &v1.Subject{
+				Type: v1.SubjectType_SUBJECT_NODE,
+				Name: s.opts.BootstrapAdmin,
+			})
+			for _, server := range cfg.Servers {
+				out = append(out, &v1.Subject{
 					Type: v1.SubjectType_SUBJECT_NODE,
 					Name: string(server.ID),
-				}
+				})
 			}
 			if s.opts.BootstrapVoters != "" {
 				voters := strings.Split(s.opts.BootstrapVoters, ",")
@@ -331,20 +335,11 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
 	// TODO: This should be filtered to only apply to internal traffic.
-	nodes := make([]string, 0)
-	nodes = append(nodes, s.opts.BootstrapAdmin)
-	for _, server := range cfg.Servers {
-		nodes = append(nodes, string(server.ID))
-	}
-	if s.opts.BootstrapVoters != "" {
-		voters := strings.Split(s.opts.BootstrapVoters, ",")
-		nodes = append(nodes, voters...)
-	}
 	err = n.PutNetworkACL(ctx, &v1.NetworkACL{
 		Name:             networking.BootstrapNodesNetworkACLName,
 		Priority:         math.MaxInt32,
-		SourceNodes:      nodes,
-		DestinationNodes: nodes,
+		SourceNodes:      []string{"group:" + rbac.VotersGroup},
+		DestinationNodes: []string{"group:" + rbac.VotersGroup},
 		Action:           v1.ACLAction_ACTION_ACCEPT,
 	})
 	if err != nil {
