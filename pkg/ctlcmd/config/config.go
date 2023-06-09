@@ -121,6 +121,8 @@ type ClusterConfig struct {
 	ConnectTimeout Duration `yaml:"connect-timeout,omitempty" json:"connect-timeout,omitempty"`
 	// RequestTimeout is the timeout for requests to the cluster.
 	RequestTimeout Duration `yaml:"request-timeout,omitempty" json:"request-timeout,omitempty"`
+
+	flagCAFile string
 }
 
 // User is the named configuration for a user.
@@ -137,6 +139,9 @@ type UserConfig struct {
 	ClientCertificateData string `yaml:"client-certificate-data,omitempty" json:"client-certificate-data,omitempty"`
 	// ClientKeyData is the base64-encoded client key data for the user.
 	ClientKeyData string `yaml:"client-key-data,omitempty" json:"client-key-data,omitempty"`
+
+	flagKeyFile  string
+	flagCertFile string
 }
 
 // Context is the named configuration for a context.
@@ -252,8 +257,9 @@ func (c *Config) CurrentUser() UserConfig {
 // TLSConfig returns the TLS configuration for the current context.
 func (c *Config) TLSConfig() (*tls.Config, error) {
 	config := &tls.Config{}
-	if c.CurrentCluster().CertificateAuthorityData != "" {
-		certpool := x509.NewCertPool()
+	cluster := c.CurrentCluster()
+	certpool := x509.NewCertPool()
+	if cluster.CertificateAuthorityData != "" {
 		ca, err := base64.StdEncoding.DecodeString(c.CurrentCluster().CertificateAuthorityData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode CA certificate: %w", err)
@@ -261,30 +267,47 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 		if !certpool.AppendCertsFromPEM(ca) {
 			return nil, fmt.Errorf("failed to add CA certificate to cert pool")
 		}
-		config.RootCAs = certpool
-		config.InsecureSkipVerify = c.CurrentCluster().TLSSkipVerify
-		if c.CurrentCluster().TLSVerifyChainOnly {
-			config.InsecureSkipVerify = true
-			config.VerifyPeerCertificate = util.VerifyChainOnly
+	}
+	if cluster.flagCAFile != "" {
+		ca, err := os.ReadFile(cluster.flagCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+		}
+		if !certpool.AppendCertsFromPEM(ca) {
+			return nil, fmt.Errorf("failed to add CA certificate to cert pool")
 		}
 	}
+	config.RootCAs = certpool
+	config.InsecureSkipVerify = cluster.TLSSkipVerify
+	if cluster.TLSVerifyChainOnly {
+		config.InsecureSkipVerify = true
+		config.VerifyPeerCertificate = util.VerifyChainOnly
+	}
 	currentUser := c.CurrentUser()
-	if currentUser.ClientCertificateData == "" || currentUser.ClientKeyData == "" {
-		return nil, fmt.Errorf("client certificate and key must be configured")
+	var certs []tls.Certificate
+	if currentUser.ClientCertificateData != "" && currentUser.ClientKeyData != "" {
+		cert, err := base64.StdEncoding.DecodeString(currentUser.ClientCertificateData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode client certificate: %w", err)
+		}
+		key, err := base64.StdEncoding.DecodeString(currentUser.ClientKeyData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode client key: %w", err)
+		}
+		certificate, err := tls.X509KeyPair(cert, key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate and key: %w", err)
+		}
+		certs = append(certs, certificate)
 	}
-	cert, err := base64.StdEncoding.DecodeString(currentUser.ClientCertificateData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode client certificate: %w", err)
+	if currentUser.flagCertFile != "" && currentUser.flagKeyFile != "" {
+		certificate, err := tls.LoadX509KeyPair(currentUser.flagCertFile, currentUser.flagKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate and key: %w", err)
+		}
+		certs = append(certs, certificate)
 	}
-	key, err := base64.StdEncoding.DecodeString(currentUser.ClientKeyData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode client key: %w", err)
-	}
-	certificate, err := tls.X509KeyPair(cert, key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load client certificate and key: %w", err)
-	}
-	config.Certificates = []tls.Certificate{certificate}
+	config.Certificates = certs
 	return config, nil
 }
 
@@ -339,10 +362,10 @@ func bindFlags(c *Config, flags *pflag.FlagSet, usrIdx, clusterIdx int) {
 	flags.StringVar(&c.Clusters[clusterIdx].Cluster.Server, "server", c.Clusters[clusterIdx].Cluster.Server, "The URL of the node to connect to")
 	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.TLSSkipVerify, "tls-skip-verify", c.Clusters[clusterIdx].Cluster.TLSSkipVerify, "Whether TLS verification should be skipped for the cluster connection")
 	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.Insecure, "insecure", c.Clusters[clusterIdx].Cluster.Insecure, "Whether TLS should be disabled for the cluster connection")
-	flags.StringVar(&c.Clusters[clusterIdx].Cluster.CertificateAuthorityData, "certificate-authority-data", c.Clusters[clusterIdx].Cluster.CertificateAuthorityData, "The base64-encoded certificate authority data for the cluster")
+	flags.StringVar(&c.Clusters[clusterIdx].Cluster.flagCAFile, "certificate-authority", "", "The path to the CA certificate for the cluster connection")
 	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.PreferLeader, "prefer-leader", c.Clusters[clusterIdx].Cluster.PreferLeader, "Whether to prefer the leader node for the cluster connection")
-	flags.StringVar(&c.Users[usrIdx].User.ClientCertificateData, "client-certificate-data", c.Users[usrIdx].User.ClientCertificateData, "The base64-encoded client certificate data for the user")
-	flags.StringVar(&c.Users[usrIdx].User.ClientKeyData, "client-key-data", c.Users[usrIdx].User.ClientKeyData, "The base64-encoded client key data for the user")
+	flags.StringVar(&c.Users[usrIdx].User.flagCertFile, "client-certificate", "", "The path to the client certificate for the user")
+	flags.StringVar(&c.Users[usrIdx].User.flagKeyFile, "client-key", "", "The path to the client key for the user")
 }
 
 func unmarshal(reader io.ReadCloser, config interface{}) error {
