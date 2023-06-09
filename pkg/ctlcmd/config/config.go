@@ -71,12 +71,13 @@ func (c *Config) LoadFile(filename string) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	return c.Unmarshal(f)
 }
 
 // Unmarshal unmarshals the configuration from the given reader.
-func (c *Config) Unmarshal(reader io.ReadCloser) error {
-	return unmarshal(reader, c)
+func (c *Config) Unmarshal(r io.Reader) error {
+	return unmarshal(r, c)
 }
 
 // Config is the wmctl CLI tool configuration.
@@ -368,9 +369,8 @@ func bindFlags(c *Config, flags *pflag.FlagSet, usrIdx, clusterIdx int) {
 	flags.StringVar(&c.Users[usrIdx].User.flagKeyFile, "client-key", "", "The path to the client key for the user")
 }
 
-func unmarshal(reader io.ReadCloser, config interface{}) error {
-	defer reader.Close()
-	return yaml.NewDecoder(reader).Decode(config)
+func unmarshal(r io.Reader, config interface{}) error {
+	return yaml.NewDecoder(r).Decode(config)
 }
 
 type Duration struct{ time.Duration }
