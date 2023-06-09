@@ -92,6 +92,13 @@ func (c *Config) Unmarshal(r io.Reader) error {
 	return unmarshal(r, c)
 }
 
+// Marshal marshals the configuration to a writer.
+func (c *Config) Marshal(w io.Writer) error {
+	enc := yaml.NewEncoder(w)
+	enc.SetIndent(2)
+	return enc.Encode(c)
+}
+
 // Config is the wmctl CLI tool configuration.
 type Config struct {
 	// APIVersion is the version of the API to use.
