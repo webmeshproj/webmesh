@@ -195,8 +195,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 	}
-	if req.GetZoneAwarenessId() != "" {
-		// Add an edge between the caller and all other nodes in the same zone
+	if req.GetZoneAwarenessId() != "" && req.GetPrimaryEndpoint() != "" && len(req.GetWireguardEndpoints()) > 0 {
+		// Add an edge between the caller and all other nodes in the same zone if this node exposes itself
 		zonePeers, err := s.peers.ListByZoneID(ctx, req.GetZoneAwarenessId())
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
