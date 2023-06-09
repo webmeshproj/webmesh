@@ -18,7 +18,12 @@ limitations under the License.
 package nodecmd
 
 import (
+	"bytes"
 	"flag"
+	"fmt"
+	"io"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/webmeshproj/node/pkg/global"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
@@ -62,4 +67,24 @@ func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	o.Services.BindFlags(fs)
 	o.Wireguard.BindFlags(fs)
 	return o
+}
+
+// Marshal returns the marshaled options.
+func (o *Options) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+	err := o.MarshalTo(&buf)
+	if err != nil {
+		return nil, fmt.Errorf("marshal options: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (o *Options) MarshalTo(w io.Writer) error {
+	enc := yaml.NewEncoder(w)
+	enc.SetIndent(2)
+	err := enc.Encode(o)
+	if err != nil {
+		return fmt.Errorf("marshal options: %w", err)
+	}
+	return nil
 }
