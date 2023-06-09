@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var deleteRouteAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROUTES,
-	Verb:     v1.RuleVerbs_VERB_DELETE,
+var deleteRouteAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROUTES,
+		Verb:     v1.RuleVerbs_VERB_DELETE,
+	},
 }
 
 func (s *Server) DeleteRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty, error) {

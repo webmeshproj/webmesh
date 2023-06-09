@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var canNegDataChannelAction = &rbac.Action{
-	Verb:     v1.RuleVerbs_VERB_PUT,
-	Resource: v1.RuleResource_RESOURCE_DATA_CHANNELS,
+var canNegDataChannelAction = rbac.Actions{
+	{
+		Verb:     v1.RuleVerbs_VERB_PUT,
+		Resource: v1.RuleResource_RESOURCE_DATA_CHANNELS,
+	},
 }
 
 func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer) error {

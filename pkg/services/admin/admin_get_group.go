@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var getGroupAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var getGroupAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_GROUPS,
+		Verb:     v1.RuleVerbs_VERB_GET,
+	},
 }
 
 func (s *Server) GetGroup(ctx context.Context, group *v1.Group) (*v1.Group, error) {

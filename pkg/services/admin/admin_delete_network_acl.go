@@ -29,9 +29,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var deleteNetworkACLAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
-	Verb:     v1.RuleVerbs_VERB_DELETE,
+var deleteNetworkACLAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
+		Verb:     v1.RuleVerbs_VERB_DELETE,
+	},
 }
 
 func (s *Server) DeleteNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptypb.Empty, error) {

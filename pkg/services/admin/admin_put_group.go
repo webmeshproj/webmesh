@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var putGroupAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
-	Verb:     v1.RuleVerbs_VERB_PUT,
+var putGroupAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_GROUPS,
+		Verb:     v1.RuleVerbs_VERB_PUT,
+	},
 }
 
 func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty, error) {

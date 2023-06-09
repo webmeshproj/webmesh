@@ -29,9 +29,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var deleteRoleBindingAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
-	Verb:     v1.RuleVerbs_VERB_DELETE,
+var deleteRoleBindingAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
+		Verb:     v1.RuleVerbs_VERB_DELETE,
+	},
 }
 
 func (s *Server) DeleteRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*emptypb.Empty, error) {

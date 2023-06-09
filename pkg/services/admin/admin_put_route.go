@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var putRouteAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROUTES,
-	Verb:     v1.RuleVerbs_VERB_PUT,
+var putRouteAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROUTES,
+		Verb:     v1.RuleVerbs_VERB_PUT,
+	},
 }
 
 func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty, error) {

@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var deleteGroupAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
-	Verb:     v1.RuleVerbs_VERB_DELETE,
+var deleteGroupAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_GROUPS,
+		Verb:     v1.RuleVerbs_VERB_DELETE,
+	},
 }
 
 func (s *Server) DeleteGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty, error) {

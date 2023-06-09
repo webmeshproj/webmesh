@@ -29,9 +29,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var putRoleBindingAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
-	Verb:     v1.RuleVerbs_VERB_PUT,
+var putRoleBindingAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
+		Verb:     v1.RuleVerbs_VERB_PUT,
+	},
 }
 
 func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*emptypb.Empty, error) {

@@ -20,17 +20,14 @@ package networking
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
 
 // ACLs is a list of Network ACLs. It contains methods for evaluating actions against
@@ -106,55 +103,6 @@ func (a ACLs) Accept(ctx context.Context, action *v1.NetworkAction) bool {
 		}
 	}
 	return false
-}
-
-// AdjacencyMap is a map of node names to a map of node names to edges.
-type AdjacencyMap map[string]map[string]graph.Edge[string]
-
-// FilterGraph filters the adjacency map in the given graph for the given node name according
-// to the ACLs in this list. It assumes the ACLs are sorted by priority. Behavior is similar
-// to Accept, except that the adjacency map is filtered by nodes allowed to communicate instead
-// of returning a boolean. If the list is nil, an empty adjacency map is returned. An error is
-// returned on faiure building the initial map or if the node name is not found in the graph.
-func (a ACLs) FilterGraph(ctx context.Context, peerGraph peers.Graph, nodeName string) (AdjacencyMap, error) {
-	if a == nil {
-		return AdjacencyMap{}, nil
-	}
-	fullMap, err := peerGraph.AdjacencyMap()
-	if err != nil {
-		return nil, fmt.Errorf("build adjacency map: %w", err)
-	}
-	adjacents, ok := fullMap[nodeName]
-	if !ok {
-		return nil, fmt.Errorf("node %s not found in adjacency map", nodeName)
-	}
-	slog.Default().Debug("full adjacency map", "from", nodeName, "map", fullMap)
-	filtered := make(AdjacencyMap)
-	filtered[nodeName] = adjacents
-	for node := range adjacents {
-		if a.Accept(ctx, &v1.NetworkAction{
-			SrcNode: nodeName,
-			DstNode: node,
-		}) {
-			filtered[nodeName][node] = adjacents[node]
-		}
-	}
-	for node := range filtered {
-		edges, ok := fullMap[node]
-		if !ok {
-			continue
-		}
-		for peer, edge := range edges {
-			if a.Accept(ctx, &v1.NetworkAction{
-				SrcNode: nodeName,
-				DstNode: peer,
-			}) {
-				filtered[node][peer] = edge
-			}
-		}
-	}
-	slog.Debug("filtered adjacency map", "from", nodeName, "map", filtered)
-	return filtered, nil
 }
 
 // Matches checks if an action matches this ACL. If a database query fails it will log the

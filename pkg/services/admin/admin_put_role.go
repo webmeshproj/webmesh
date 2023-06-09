@@ -29,9 +29,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var putRoleAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLES,
-	Verb:     v1.RuleVerbs_VERB_PUT,
+var putRoleAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROLES,
+		Verb:     v1.RuleVerbs_VERB_PUT,
+	},
 }
 
 func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, error) {

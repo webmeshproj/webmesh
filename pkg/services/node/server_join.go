@@ -18,10 +18,10 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
-	"strings"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -33,13 +33,18 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
 	"github.com/webmeshproj/node/pkg/services/rbac"
-	svcutil "github.com/webmeshproj/node/pkg/services/util"
+	"github.com/webmeshproj/node/pkg/services/svcutil"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
 var canVoteAction = &rbac.Action{
 	Verb:     v1.RuleVerbs_VERB_PUT,
 	Resource: v1.RuleResource_RESOURCE_VOTES,
+}
+
+var canPutRouteAction = &rbac.Action{
+	Verb:     v1.RuleVerbs_VERB_PUT,
+	Resource: v1.RuleResource_RESOURCE_ROUTES,
 }
 
 func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
@@ -50,6 +55,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Validate inputs
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node id required")
+	}
+	if len(req.GetRoutes()) > 0 {
+		for _, route := range req.GetRoutes() {
+			_, err := netip.ParsePrefix(route)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid route %q: %v", route, err)
+			}
+		}
 	}
 
 	// Check that the node is indeed who they say they are
@@ -68,15 +81,27 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// We can go ahead and check here if the node is allowed to do what
-	// they want
-	if req.GetAsVoter() {
-		allowed, err := s.rbacEval.Evaluate(ctx, canVoteAction)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to evaluate voting permissions: %v", err)
+	// they want. This is currently only supported with mTLS. But we
+	// should support external auth mechanisms in the future.
+	if s.tlsConfig != nil {
+		var actions rbac.Actions
+		if req.GetAsVoter() {
+			actions = append(actions, canVoteAction)
 		}
-		if !allowed {
-			s.log.Warn("Node not allowed to join as voter", slog.String("id", req.GetId()))
-			return nil, status.Error(codes.PermissionDenied, "not allowed")
+		if len(req.GetRoutes()) > 0 {
+			actions = append(actions, canPutRouteAction)
+		}
+		if len(actions) > 0 {
+			allowed, err := s.rbacEval.Evaluate(ctx, actions)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to evaluate permissions: %v", err)
+			}
+			if !allowed {
+				s.log.Warn("Node not allowed to perform requested actions",
+					slog.String("id", req.GetId()),
+					slog.Any("actions", actions))
+				return nil, status.Error(codes.PermissionDenied, "not allowed")
+			}
 		}
 	}
 
@@ -105,7 +130,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	log.Debug("barrier complete, all nodes caught up")
 
-	// Check if the peer already exists
+	// Lookup the peer in the database
 	var peer peers.Node
 	peer, err = s.peers.Get(ctx, req.GetId())
 	if err != nil && err != peers.ErrNodeNotFound {
@@ -146,6 +171,53 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
+		}
+	}
+
+	// Handle any new routes
+	if len(req.GetRoutes()) > 0 {
+		current, err := s.networking.GetRoutesByNode(ctx, req.GetId())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get current routes: %v", err)
+		}
+		for _, route := range req.GetRoutes() {
+			// Check if the node is already assigned this route
+			var found bool
+			for _, r := range current {
+				for _, cidr := range r.DestinationCidrs {
+					if cidr == route {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				continue
+			}
+			// Check if the cidr is already registered under a different node
+			existing, err := s.networking.GetRoutesByCIDR(ctx, route)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to get existing routes: %v", err)
+			}
+			if len(existing) > 0 {
+				for _, r := range existing {
+					// We append the node ID to this route
+					err = s.networking.AppendNodeToRoute(ctx, r.Name, req.GetId())
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "failed to append node to route: %v", err)
+					}
+				}
+			} else {
+				// Create the new route
+				err = s.networking.PutRoute(ctx, &v1.Route{
+					Name:             fmt.Sprintf("%s-%s", req.GetId(), route),
+					Nodes:            []string{req.GetId()},
+					DestinationCidrs: []string{route},
+				})
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to create route: %v", err)
+				}
+			}
 		}
 	}
 
@@ -253,77 +325,79 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}(),
 	}
 
-	// Build current peers for the node
-	nacls, err := s.networking.ListNetworkACLs(ctx)
+	peers, err := svcutil.WireGuardPeersFor(ctx, s.store, req.GetId())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list network ACLs: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err)
 	}
-	graph := s.peers.Graph()
-	adjacencyMap, err := nacls.FilterGraph(ctx, graph, req.GetId())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get adjacency map: %v", err)
-	}
-	ourDescendants := adjacencyMap[req.GetId()]
-	resp.Peers = make([]*v1.WireGuardPeer, 0)
-	for descendant, edge := range ourDescendants {
-		desc, _ := graph.Vertex(descendant)
-		slog.Debug("found descendant", slog.Any("descendant", desc))
-		// Determine the preferred wireguard endpoint
-		var primaryEndpoint string
-		if desc.PrimaryEndpoint != "" {
-			for _, endpoint := range desc.WireGuardEndpoints {
-				if strings.HasPrefix(endpoint, desc.PrimaryEndpoint) {
-					primaryEndpoint = endpoint
-					break
-				}
-			}
-		}
-		if primaryEndpoint == "" && len(desc.WireGuardEndpoints) > 0 {
-			primaryEndpoint = desc.WireGuardEndpoints[0]
-		}
-		// Each direct child is a wireguard peer
-		peer := &v1.WireGuardPeer{
-			Id:                 desc.ID,
-			PublicKey:          desc.PublicKey.String(),
-			ZoneAwarenessId:    desc.ZoneAwarenessID,
-			PrimaryEndpoint:    primaryEndpoint,
-			WireguardEndpoints: desc.WireGuardEndpoints,
-			AddressIpv4: func() string {
-				if desc.PrivateIPv4.IsValid() {
-					return desc.PrivateIPv4.String()
-				}
-				return ""
-			}(),
-			AddressIpv6: func() string {
-				if desc.NetworkIPv6.IsValid() {
-					return desc.NetworkIPv6.String()
-				}
-				return ""
-			}(),
-			AllowedIps: make([]string, 0),
-		}
-		if desc.PrivateIPv4.IsValid() {
-			peer.AllowedIps = append(peer.AllowedIps, desc.PrivateIPv4.String())
-		}
-		if desc.NetworkIPv6.IsValid() {
-			peer.AllowedIps = append(peer.AllowedIps, desc.NetworkIPv6.String())
-		}
-		descTargets := adjacencyMap[edge.Target]
-		if len(descTargets) > 0 {
-			for descTarget := range descTargets {
-				if _, ok := ourDescendants[descTarget]; !ok && descTarget != req.GetId() {
-					target, _ := graph.Vertex(descTarget)
-					if target.PrivateIPv4.IsValid() {
-						peer.AllowedIps = append(peer.AllowedIps, target.PrivateIPv4.String())
-					}
-					if target.NetworkIPv6.IsValid() {
-						peer.AllowedIps = append(peer.AllowedIps, target.NetworkIPv6.String())
-					}
-				}
-			}
-		}
-		resp.Peers = append(resp.Peers, peer)
-	}
+	resp.Peers = peers
+
+	// // Build current peers for the node
+	// graph := s.peers.Graph()
+	// adjacencyMap, err := s.networking.FilterGraph(ctx, graph, req.GetId())
+	// if err != nil {
+	// 	return nil, status.Errorf(codes.Internal, "failed to get adjacency map: %v", err)
+	// }
+	// ourDescendants := adjacencyMap[req.GetId()]
+	// resp.Peers = make([]*v1.WireGuardPeer, 0)
+	// for descendant, edge := range ourDescendants {
+	// 	desc, _ := graph.Vertex(descendant)
+	// 	slog.Debug("found descendant", slog.Any("descendant", desc))
+	// 	// Determine the preferred wireguard endpoint
+	// 	var primaryEndpoint string
+	// 	if desc.PrimaryEndpoint != "" {
+	// 		for _, endpoint := range desc.WireGuardEndpoints {
+	// 			if strings.HasPrefix(endpoint, desc.PrimaryEndpoint) {
+	// 				primaryEndpoint = endpoint
+	// 				break
+	// 			}
+	// 		}
+	// 	}
+	// 	if primaryEndpoint == "" && len(desc.WireGuardEndpoints) > 0 {
+	// 		primaryEndpoint = desc.WireGuardEndpoints[0]
+	// 	}
+	// 	// Each direct child is a wireguard peer
+	// 	peer := &v1.WireGuardPeer{
+	// 		Id:                 desc.ID,
+	// 		PublicKey:          desc.PublicKey.String(),
+	// 		ZoneAwarenessId:    desc.ZoneAwarenessID,
+	// 		PrimaryEndpoint:    primaryEndpoint,
+	// 		WireguardEndpoints: desc.WireGuardEndpoints,
+	// 		AddressIpv4: func() string {
+	// 			if desc.PrivateIPv4.IsValid() {
+	// 				return desc.PrivateIPv4.String()
+	// 			}
+	// 			return ""
+	// 		}(),
+	// 		AddressIpv6: func() string {
+	// 			if desc.NetworkIPv6.IsValid() {
+	// 				return desc.NetworkIPv6.String()
+	// 			}
+	// 			return ""
+	// 		}(),
+	// 		AllowedIps: make([]string, 0),
+	// 	}
+	// 	if desc.PrivateIPv4.IsValid() {
+	// 		peer.AllowedIps = append(peer.AllowedIps, desc.PrivateIPv4.String())
+	// 	}
+	// 	if desc.NetworkIPv6.IsValid() {
+	// 		peer.AllowedIps = append(peer.AllowedIps, desc.NetworkIPv6.String())
+	// 	}
+	// 	descTargets := adjacencyMap[edge.Target]
+	// 	if len(descTargets) > 0 {
+	// 		for descTarget := range descTargets {
+	// 			if _, ok := ourDescendants[descTarget]; !ok && descTarget != req.GetId() {
+	// 				target, _ := graph.Vertex(descTarget)
+	// 				if target.PrivateIPv4.IsValid() {
+	// 					peer.AllowedIps = append(peer.AllowedIps, target.PrivateIPv4.String())
+	// 				}
+	// 				if target.NetworkIPv6.IsValid() {
+	// 					peer.AllowedIps = append(peer.AllowedIps, target.NetworkIPv6.String())
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// 	resp.Peers = append(resp.Peers, peer)
+	// }
 	slog.Debug("sending join response", slog.Any("response", resp))
 	return resp, nil
 }

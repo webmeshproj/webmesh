@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var listGroupsAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_GROUPS,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var listGroupsAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_GROUPS,
+		Verb:     v1.RuleVerbs_VERB_GET,
+	},
 }
 
 func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {

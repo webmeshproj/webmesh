@@ -27,18 +27,29 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
-	"github.com/webmeshproj/node/pkg/services/util"
+	"github.com/webmeshproj/node/pkg/services/svcutil"
 )
 
 // Evaluator is an interface for evaluating actions.
 type Evaluator interface {
-	// Evaluate returns true if the given action is allowed for the
+	// Evaluate returns true if the given actions are allowed for the
 	// peer information provided in the context.
-	Evaluate(ctx context.Context, action *Action) (bool, error)
+	Evaluate(ctx context.Context, actions Actions) (bool, error)
 }
 
 // Action is a convenience type for an action.
 type Action v1.RBACAction
+
+// Actions is a convenience type for a list of actions.
+type Actions []*Action
+
+func (a Actions) For(resource string) Actions {
+	var actions Actions
+	for _, action := range a {
+		actions = append(actions, action.For(resource))
+	}
+	return actions
+}
 
 // For returns a copy of this action for the given resource name.
 func (a *Action) For(resource string) *Action {
@@ -65,12 +76,12 @@ type storeEvaluator struct {
 }
 
 // Evaluate returns true if the given action is allowed for the peer information provided in the context.
-func (s *storeEvaluator) Evaluate(ctx context.Context, action *Action) (bool, error) {
+func (s *storeEvaluator) Evaluate(ctx context.Context, actions Actions) (bool, error) {
 	var peerName string
 	if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
 		peerName = proxiedFor
 	} else {
-		peerName, ok = util.PeerFromContext(ctx)
+		peerName, ok = svcutil.PeerFromContext(ctx)
 		if !ok {
 			return false, fmt.Errorf("no peer information in context")
 		}
@@ -87,8 +98,12 @@ func (s *storeEvaluator) Evaluate(ctx context.Context, action *Action) (bool, er
 	if err != nil {
 		return false, err
 	}
-	return nodeRoles.Eval(action.action()) ||
-		userRoles.Eval(action.action()), nil
+	for _, action := range actions {
+		if !nodeRoles.Eval(action.action()) && !userRoles.Eval(action.action()) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // NewNoopEvaluator returns an evaluator that always returns true.
@@ -99,6 +114,6 @@ func NewNoopEvaluator() Evaluator {
 type noopEvaluator struct{}
 
 // Evaluate returns true if the given action is allowed for the peer information provided in the context.
-func (n *noopEvaluator) Evaluate(ctx context.Context, action *Action) (bool, error) {
+func (n *noopEvaluator) Evaluate(ctx context.Context, actions Actions) (bool, error) {
 	return true, nil
 }

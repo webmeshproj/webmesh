@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var getRouteAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROUTES,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var getRouteAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROUTES,
+		Verb:     v1.RuleVerbs_VERB_GET,
+	},
 }
 
 func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, error) {

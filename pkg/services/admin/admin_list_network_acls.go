@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var listNetworkACLsAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var listNetworkACLsAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
+		Verb:     v1.RuleVerbs_VERB_GET,
+	},
 }
 
 func (s *Server) ListNetworkACLs(ctx context.Context, _ *emptypb.Empty) (*v1.NetworkACLs, error) {

@@ -26,10 +26,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
 
 const (
@@ -74,7 +77,15 @@ type Networking interface {
 
 	// AppendNodeToRoute appends a node to an existing Route.
 	AppendNodeToRoute(ctx context.Context, routeName string, nodeName string) error
+
+	// FilterGraph filters the adjacency map in the given graph for the given node name according
+	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
+	// error is returned on faiure building the initial map or any database error.
+	FilterGraph(ctx context.Context, peerGraph peers.Graph, nodeName string) (AdjacencyMap, error)
 }
+
+// AdjacencyMap is a map of node names to a map of node names to edges.
+type AdjacencyMap map[string]map[string]graph.Edge[string]
 
 // New returns a new Networking interface.
 func New(store meshdb.Store) Networking {
@@ -303,6 +314,94 @@ func (n *networking) AppendNodeToRoute(ctx context.Context, routeName string, no
 	}
 	route.Nodes = append(route.Nodes, nodeName)
 	return n.PutRoute(ctx, route)
+}
+
+// FilterGraph filters the adjacency map in the given graph for the given node name according
+// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
+// error is returned on faiure building the initial map or any database error. This implementation
+// needs improvement to be more efficient and to allow edges so long as one of the routes encountered is
+// allowed. Currently if a single route provided by a destination node is not allowed, the entire node
+// is filtered out.
+func (n *networking) FilterGraph(ctx context.Context, peerGraph peers.Graph, nodeName string) (AdjacencyMap, error) {
+	acls, err := n.ListNetworkACLs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list network acls: %w", err)
+	}
+	fullMap, err := peerGraph.AdjacencyMap()
+	if err != nil {
+		return nil, fmt.Errorf("build adjacency map: %w", err)
+	}
+	adjacents, ok := fullMap[nodeName]
+	if !ok {
+		return nil, fmt.Errorf("node %s not found in adjacency map", nodeName)
+	}
+	slog.Default().Debug("full adjacency map", "from", nodeName, "map", fullMap)
+	filtered := make(AdjacencyMap)
+	filtered[nodeName] = adjacents
+
+Nodes:
+	for node := range adjacents {
+		// Check if the nodes can communicate directly.
+		if !acls.Accept(ctx, &v1.NetworkAction{
+			SrcNode: nodeName,
+			DstNode: node,
+		}) {
+			continue Nodes
+		}
+		// If the destination node exposes additional routes, check if the nodes can communicate
+		// via any of those routes.
+		routes, err := n.GetRoutesByNode(ctx, node)
+		if err != nil {
+			return nil, fmt.Errorf("get routes by node: %w", err)
+		}
+		for _, route := range routes {
+			for _, cidr := range route.GetDestinationCidrs() {
+				if !acls.Accept(ctx, &v1.NetworkAction{
+					SrcNode: nodeName,
+					DstNode: node,
+					DstCidr: cidr,
+				}) {
+					continue Nodes
+				}
+			}
+		}
+		filtered[nodeName][node] = adjacents[node]
+	}
+	for node := range filtered {
+		edges, ok := fullMap[node]
+		if !ok {
+			continue
+		}
+	Peers:
+		for peer, edge := range edges {
+			if !acls.Accept(ctx, &v1.NetworkAction{
+				SrcNode: nodeName,
+				DstNode: peer,
+			}) {
+				continue Peers
+			}
+			// If the peer exposes additional routes, check if the nodes can communicate
+			// via any of those routes.
+			routes, err := n.GetRoutesByNode(ctx, peer)
+			if err != nil {
+				return nil, fmt.Errorf("get routes by node: %w", err)
+			}
+			for _, route := range routes {
+				for _, cidr := range route.GetDestinationCidrs() {
+					if !acls.Accept(ctx, &v1.NetworkAction{
+						SrcNode: nodeName,
+						DstNode: peer,
+						DstCidr: cidr,
+					}) {
+						continue Peers
+					}
+				}
+			}
+			filtered[node][peer] = edge
+		}
+	}
+	slog.Debug("filtered adjacency map", "from", nodeName, "map", filtered)
+	return filtered, nil
 }
 
 func dbACLToAPIACL(store meshdb.Store, dbACL *raftdb.NetworkAcl) *ACL {

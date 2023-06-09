@@ -21,43 +21,30 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"strings"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
-	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/system"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
+	"github.com/webmeshproj/node/pkg/services/svcutil"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-func (s *store) recoverWireguard(ctx context.Context) error {
-	meshnetworkv6, err := state.New(s).GetULAPrefix(ctx)
-	if err != nil {
-		return fmt.Errorf("get ula prefix: %w", err)
+func (s *store) RefreshWireguardPeers(ctx context.Context) error {
+	if s.wg == nil {
+		return nil
 	}
-	self, err := peers.New(s).Get(ctx, string(s.nodeID))
+	err := s.walkMeshDescendants(ctx)
 	if err != nil {
-		return fmt.Errorf("get self peer: %w", err)
+		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
+		return nil
 	}
-	key, err := localdb.New(s.localData).GetCurrentWireguardKey(ctx)
-	if err != nil {
-		return fmt.Errorf("get current wireguard key: %w", err)
-	}
-	wireguardKey, err := wgtypes.ParseKey(key.PrivateKey)
-	if err != nil {
-		return fmt.Errorf("parse wireguard key: %w", err)
-	}
-	err = s.configureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
-	if err != nil {
-		return fmt.Errorf("configure wireguard: %w", err)
-	}
-	return s.RefreshWireguardPeers(ctx)
+	return nil
 }
 
 func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, meshNetworkV6 netip.Prefix) error {
@@ -124,40 +111,43 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 	return nil
 }
 
-func (s *store) RefreshWireguardPeers(ctx context.Context) error {
-	if s.wg == nil {
-		return nil
-	}
-	err := s.walkMeshDescendants(ctx)
+func (s *store) recoverWireguard(ctx context.Context) error {
+	meshnetworkv6, err := state.New(s).GetULAPrefix(ctx)
 	if err != nil {
-		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
-		return nil
+		return fmt.Errorf("get ula prefix: %w", err)
 	}
-	return nil
+	self, err := peers.New(s).Get(ctx, string(s.nodeID))
+	if err != nil {
+		return fmt.Errorf("get self peer: %w", err)
+	}
+	key, err := localdb.New(s.localData).GetCurrentWireguardKey(ctx)
+	if err != nil {
+		return fmt.Errorf("get current wireguard key: %w", err)
+	}
+	wireguardKey, err := wgtypes.ParseKey(key.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("parse wireguard key: %w", err)
+	}
+	err = s.configureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
+	if err != nil {
+		return fmt.Errorf("configure wireguard: %w", err)
+	}
+	return s.RefreshWireguardPeers(ctx)
 }
 
 func (s *store) walkMeshDescendants(ctx context.Context) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
 
-	graph := peers.NewGraph(s)
-	nacls, err := networking.New(s).ListNetworkACLs(ctx)
+	peers, err := svcutil.WireGuardPeersFor(ctx, s, string(s.nodeID))
 	if err != nil {
-		return fmt.Errorf("list network acls: %w", err)
+		return fmt.Errorf("wireguard peers for: %w", err)
 	}
-	adjacencyMap, err := nacls.FilterGraph(ctx, graph, string(s.nodeID))
-	if err != nil {
-		return fmt.Errorf("filter graph: %w", err)
-	}
+	s.log.Debug("current wireguard peers", slog.Any("peers", peers))
+
 	currentPeers := s.wg.Peers()
 	seenPeers := make(map[string]struct{})
 
-	slog.Debug("current adjacency map", slog.Any("map", adjacencyMap))
-	ourDescendants := adjacencyMap[string(s.nodeID)]
-	if len(ourDescendants) == 0 {
-		s.log.Debug("no descendants found in mesh DAG")
-		return nil
-	}
 	var localCIDRs util.PrefixList
 	if s.opts.ZoneAwarenessID != "" {
 		s.log.Debug("using zone awareness, collecting local CIDRs")
@@ -171,30 +161,26 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 			return fmt.Errorf("detect endpoints: %w", err)
 		}
 	}
-	for descendant, edge := range ourDescendants {
-		desc, _ := graph.Vertex(descendant)
-		// Each direct child is a wireguard peer
+	for _, wgPeer := range peers {
+		key, err := wgtypes.ParseKey(wgPeer.GetPublicKey())
+		if err != nil {
+			return fmt.Errorf("parse wireguard key: %w", err)
+		}
 		peer := &wireguard.Peer{
-			ID:         desc.ID,
-			PublicKey:  desc.PublicKey,
-			AllowedIPs: make([]netip.Prefix, 0),
+			ID:         wgPeer.GetId(),
+			PublicKey:  key,
+			AllowedIPs: make([]netip.Prefix, len(wgPeer.GetAllowedIps())),
 		}
-		// Determine the preferred endpoint for this peer
-		var primaryEndpoint string
-		if desc.PrimaryEndpoint != "" {
-			for _, ep := range desc.WireGuardEndpoints {
-				if strings.HasPrefix(ep, desc.PrimaryEndpoint) {
-					primaryEndpoint = ep
-					break
-				}
+		for i, ip := range wgPeer.GetAllowedIps() {
+			prefix, err := netip.ParsePrefix(ip)
+			if err != nil {
+				return fmt.Errorf("parse prefix: %w", err)
 			}
-		}
-		if primaryEndpoint == "" && len(desc.WireGuardEndpoints) > 0 {
-			primaryEndpoint = desc.WireGuardEndpoints[0]
+			peer.AllowedIPs[i] = prefix
 		}
 		// Resolve the endpoint and check for zone awareness
-		if primaryEndpoint != "" {
-			addr, err := net.ResolveUDPAddr("udp", primaryEndpoint)
+		if wgPeer.GetPrimaryEndpoint() != "" {
+			addr, err := net.ResolveUDPAddr("udp", wgPeer.GetPrimaryEndpoint())
 			if err != nil {
 				s.log.Error("could not resolve primary udp addr", slog.String("error", err.Error()))
 			} else {
@@ -210,13 +196,13 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 				}
 				peer.Endpoint = addr.AddrPort()
 			}
-			if s.opts.ZoneAwarenessID != "" && desc.ZoneAwarenessID != "" {
-				if desc.ZoneAwarenessID == s.opts.ZoneAwarenessID {
-					if !localCIDRs.Contains(peer.Endpoint.Addr()) && len(desc.WireGuardEndpoints) > 0 {
+			if s.opts.ZoneAwarenessID != "" && wgPeer.GetZoneAwarenessId() != "" {
+				if wgPeer.GetZoneAwarenessId() == s.opts.ZoneAwarenessID {
+					if !localCIDRs.Contains(peer.Endpoint.Addr()) && len(wgPeer.GetWireguardEndpoints()) > 0 {
 						// We share zone awareness with the peer and their primary endpoint
 						// is not in one of our local CIDRs. We'll try to use one of their
 						// additional endpoints instead.
-						for _, ep := range desc.WireGuardEndpoints {
+						for _, ep := range wgPeer.GetWireguardEndpoints() {
 							addr, err := net.ResolveUDPAddr("udp", ep)
 							if err != nil {
 								s.log.Error("could not resolve additional udp addr", slog.String("error", err.Error()))
@@ -243,33 +229,10 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 				}
 			}
 		}
-		if desc.PrivateIPv4.IsValid() {
-			peer.AllowedIPs = append(peer.AllowedIPs, desc.PrivateIPv4)
-		}
-		if desc.NetworkIPv6.IsValid() {
-			peer.AllowedIPs = append(peer.AllowedIPs, desc.NetworkIPv6)
-		}
-		// Each descendant of our descendants is an allowed IP
-		descTargets := adjacencyMap[edge.Target]
-		if len(descTargets) > 0 {
-			for descTarget := range descTargets {
-				if _, ok := ourDescendants[descTarget]; !ok && descTarget != string(s.nodeID) {
-					target, _ := graph.Vertex(descTarget)
-					if target.PrivateIPv4.IsValid() {
-						peer.AllowedIPs = append(peer.AllowedIPs, target.PrivateIPv4)
-					}
-					if target.NetworkIPv6.IsValid() {
-						peer.AllowedIPs = append(peer.AllowedIPs, target.NetworkIPv6)
-					}
-				}
-			}
-		}
-		slog.Debug("allowed ips for descendant",
-			slog.Any("allowed_ips", peer.AllowedIPs), slog.String("descendant", desc.ID))
 		if err := s.wg.PutPeer(ctx, peer); err != nil {
 			return fmt.Errorf("put peer: %w", err)
 		}
-		seenPeers[desc.ID] = struct{}{}
+		seenPeers[peer.ID] = struct{}{}
 	}
 	// Remove any peers that are no longer in the DAG
 	for _, peer := range currentPeers {

@@ -29,9 +29,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var deleteRoleAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLES,
-	Verb:     v1.RuleVerbs_VERB_DELETE,
+var deleteRoleAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROLES,
+		Verb:     v1.RuleVerbs_VERB_DELETE,
+	},
 }
 
 func (s *Server) DeleteRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, error) {

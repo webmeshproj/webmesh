@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var getRoleBindingAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var getRoleBindingAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
+		Verb:     v1.RuleVerbs_VERB_GET,
+	},
 }
 
 func (s *Server) GetRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*v1.RoleBinding, error) {

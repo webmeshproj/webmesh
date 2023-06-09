@@ -29,9 +29,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var putNetworkACLAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
-	Verb:     v1.RuleVerbs_VERB_PUT,
+var putNetworkACLAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
+		Verb:     v1.RuleVerbs_VERB_PUT,
+	},
 }
 
 func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptypb.Empty, error) {

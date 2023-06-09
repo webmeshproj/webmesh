@@ -28,9 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
-var getRoleAction = &rbac.Action{
-	Resource: v1.RuleResource_RESOURCE_ROLES,
-	Verb:     v1.RuleVerbs_VERB_GET,
+var getRoleAction = rbac.Actions{
+	{
+		Resource: v1.RuleResource_RESOURCE_ROLES,
+		Verb:     v1.RuleVerbs_VERB_GET,
+	},
 }
 
 func (s *Server) GetRole(ctx context.Context, role *v1.Role) (*v1.Role, error) {
