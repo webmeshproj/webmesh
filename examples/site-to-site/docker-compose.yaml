@@ -53,9 +53,9 @@ services:
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.data-dir=/data
       - --mesh.zone-awareness-id=site-1
-      - --services.enable-leader-proxy
-      - --services.enable-mesh-api
-      - --services.enable-mesh-dns
+      - --services.api.leader-proxy
+      - --services.api.mesh
+      - --services.mesh-dns.enabled
     ports:
       - 8443:8443
       - 5354:5353/udp
@@ -132,8 +132,8 @@ services:
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.data-dir=/data
       - --mesh.zone-awareness-id=site-2
-      - --services.enable-leader-proxy
-      - --services.enable-mesh-api
+      - --services.api.leader-proxy
+      - --services.api.mesh
     volumes:
       - site-2-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -207,8 +207,8 @@ services:
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.data-dir=/data
       - --mesh.zone-awareness-id=site-3
-      - --services.enable-leader-proxy
-      - --services.enable-mesh-api
+      - --services.api.leader-proxy
+      - --services.api.mesh
     volumes:
       - site-3-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

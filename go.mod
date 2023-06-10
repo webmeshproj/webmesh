@@ -17,6 +17,7 @@ require (
 	github.com/jsimonetti/rtnetlink v1.3.3
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/miekg/dns v1.1.54
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pelletier/go-toml/v2 v2.0.7
 	github.com/pion/datachannel v1.5.5
 	github.com/pion/logging v0.2.2
@@ -29,7 +30,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.0.0
-	github.com/webmeshproj/api v0.0.0-20230610163059-1a05a40f63d7
+	github.com/webmeshproj/api v0.0.0-20230610220428-c1b2497fc9a2
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.8.0

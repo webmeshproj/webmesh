@@ -51,13 +51,15 @@ type Server struct {
 	startedAt time.Time
 	log       *slog.Logger
 	tlsConfig *tls.Config
+	// insecure flags that no authentication plugins are enabled.
+	insecure bool
 }
 
 // NewServer returns a new Server. The TLS config is optional and is used
 // for RPCs to other nodes in the cluster. Features are used for returning
 // what features are enabled. It is the callers responsibility to ensure
 // those servers are registered on the node.
-func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature) *Server {
+func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature, insecure bool) *Server {
 	return &Server{
 		store:      store,
 		peers:      peers.New(store),
@@ -69,6 +71,7 @@ func NewServer(store store.Store, tlsConfig *tls.Config, features []v1.Feature) 
 		features:   features,
 		startedAt:  time.Now(),
 		tlsConfig:  tlsConfig,
+		insecure:   insecure,
 		log:        slog.Default().With("component", "node-server"),
 	}
 }

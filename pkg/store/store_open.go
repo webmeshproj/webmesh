@@ -116,13 +116,13 @@ func (s *store) Open() error {
 	log.Debug("creating data stores")
 	var dataPath, localDataPath string
 	if s.opts.Raft.InMemory {
-		dataPath = ":memory:"
-		localDataPath = ":memory:"
+		dataPath = "file:raftdata?mode=memory&cache=shared&"
+		localDataPath = "file:localdata?mode=memory&cache=shared&"
 	} else {
-		dataPath = s.opts.Raft.DataFilePath()
-		localDataPath = s.opts.Raft.LocalDataFilePath()
+		dataPath = s.opts.Raft.DataFilePath() + "?"
+		localDataPath = s.opts.Raft.LocalDataFilePath() + "?"
 	}
-	dataPath += "?_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
+	dataPath += "_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
 	s.weakData, err = sql.Open("sqlite3", dataPath)
 	if err != nil {
 		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.Raft.DataFilePath(), err))

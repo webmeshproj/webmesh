@@ -19,15 +19,14 @@ limitations under the License.
 package rbac
 
 import (
-	"context"
 	"fmt"
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
-	"github.com/webmeshproj/node/pkg/services/svcutil"
 )
 
 // Evaluator is an interface for evaluating actions.
@@ -81,7 +80,7 @@ func (s *storeEvaluator) Evaluate(ctx context.Context, actions Actions) (bool, e
 	if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
 		peerName = proxiedFor
 	} else {
-		peerName, ok = svcutil.PeerFromContext(ctx)
+		peerName, ok = context.AuthenticatedCallerFrom(ctx)
 		if !ok {
 			return false, fmt.Errorf("no peer information in context")
 		}

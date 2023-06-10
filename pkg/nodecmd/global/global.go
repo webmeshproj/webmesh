@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/webmeshproj/node/pkg/net/wireguard"
+	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/services"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
@@ -113,7 +114,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 	fs.StringVar(&o.TLSClientCAFile, "global.tls-client-ca-file", util.GetEnvDefault(TLSClientCAEnvVar, ""),
 		"The client CA file for TLS connections.")
 	fs.BoolVar(&o.MTLS, "global.mtls", util.GetEnvDefault(MTLSEnvVar, "false") == "true",
-		"Enable mutual TLS globally.")
+		"Enable mutual TLS for authentication.")
 	fs.BoolVar(&o.VerifyChainOnly, "global.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
 		"Only verify the TLS chain globally.")
 	fs.BoolVar(&o.Insecure, "global.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
@@ -177,6 +178,19 @@ func (o *Options) Overlay(opts ...any) error {
 	}
 	for _, opt := range opts {
 		switch v := opt.(type) {
+		case *plugins.Options:
+			if o.MTLS && v.Plugins["mtls"] == nil {
+				v.Plugins["mtls"] = &plugins.Config{
+					Config: map[string]any{
+						"ca-file": func() string {
+							if o.TLSClientCAFile != "" {
+								return o.TLSClientCAFile
+							}
+							return o.TLSCAFile
+						}(),
+					},
+				}
+			}
 		case *store.Options:
 			if !v.Mesh.NoIPv4 {
 				v.Mesh.NoIPv4 = o.NoIPv4
@@ -249,31 +263,28 @@ func (o *Options) Overlay(opts ...any) error {
 			if !v.Insecure {
 				v.Insecure = o.Insecure
 			}
-			if !v.MTLS {
-				v.MTLS = o.MTLS
-			}
-			if !v.VerifyChainOnly {
-				v.VerifyChainOnly = o.VerifyChainOnly
-			}
 			if v.TLSCertFile == "" {
 				v.TLSCertFile = o.TLSCertFile
 			}
 			if v.TLSKeyFile == "" {
 				v.TLSKeyFile = o.TLSKeyFile
 			}
-			if v.TLSCAFile == "" {
-				v.TLSCAFile = o.TLSCAFile
+			if v.API.ProxyTLSCAFile == "" {
+				v.API.ProxyTLSCAFile = o.TLSCAFile
 			}
-			if v.TLSClientCAFile == "" {
-				v.TLSClientCAFile = o.TLSClientCAFile
+			if !v.API.ProxyVerifyChainOnly {
+				v.API.ProxyVerifyChainOnly = o.VerifyChainOnly
 			}
-			if v.EnableTURNServer {
-				if v.TURNServerEndpoint == "" && primaryEndpoint.IsValid() {
-					v.TURNServerEndpoint = fmt.Sprintf("stun:%s",
-						net.JoinHostPort(primaryEndpoint.String(), strconv.Itoa(v.TURNServerPort)))
+			if !v.API.ProxyInsecure {
+				v.API.ProxyInsecure = o.Insecure
+			}
+			if v.TURN.Enabled {
+				if v.TURN.Endpoint == "" && primaryEndpoint.IsValid() {
+					v.TURN.Endpoint = fmt.Sprintf("stun:%s",
+						net.JoinHostPort(primaryEndpoint.String(), strconv.Itoa(v.TURN.ListenPort)))
 				}
-				if v.TURNServerPublicIP == "" && primaryEndpoint.IsValid() {
-					v.TURNServerPublicIP = primaryEndpoint.String()
+				if v.TURN.PublicIP == "" && primaryEndpoint.IsValid() {
+					v.TURN.PublicIP = primaryEndpoint.String()
 				}
 			}
 

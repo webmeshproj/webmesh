@@ -29,9 +29,9 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net/firewall"
+	"github.com/webmeshproj/node/pkg/net/mesh"
 	"github.com/webmeshproj/node/pkg/net/system"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
-	"github.com/webmeshproj/node/pkg/services/svcutil"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -157,7 +157,7 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
 
-	peers, err := svcutil.WireGuardPeersFor(ctx, s, string(s.nodeID))
+	peers, err := mesh.WireGuardPeersFor(ctx, s, string(s.nodeID))
 	if err != nil {
 		return fmt.Errorf("wireguard peers for: %w", err)
 	}

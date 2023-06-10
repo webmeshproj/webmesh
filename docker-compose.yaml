@@ -37,16 +37,15 @@ services:
       - --raft.data-dir=/data
       - --raft.snapshot-threshold=10
       - --raft.log-level=debug
-      - --services.enable-leader-proxy
-      - --services.enable-peer-discovery-api
-      - --services.enable-metrics
-      - --services.enable-mesh-api
-      - --services.enable-webrtc-api
-      - --services.enable-turn-server
-      - --services.enable-mesh-dns
-      - --services.turn-server-public-ip=127.0.0.1
-      - --services.stun-port-range=60000-60001
-      - --services.exclusive-turn-server
+      - --services.api.leader-proxy
+      - --services.api.peer-discovery
+      - --services.api.mesh
+      - --services.api.webrtc
+      - --services.metrics.enabled
+      - --services.turn.enabled
+      - --services.turn.public-ip=127.0.0.1
+      - --services.turn.stun-port-range=60000-60001
+      - --services.mesh-dns.enabled
     ports:
       - 8443:8443
       - 3478:3478
@@ -77,7 +76,7 @@ services:
       - --raft.data-dir=/data
       - --raft.snapshot-threshold=10
       - --raft.log-level=debug
-      - --services.enable-leader-proxy
+      - --services.api.leader-proxy
     volumes:
       - bootstrap-node-2:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -101,7 +100,7 @@ services:
       - --raft.data-dir=/data
       - --raft.snapshot-threshold=10
       - --raft.log-level=debug
-      - --services.enable-leader-proxy
+      - --services.api.leader-proxy
     volumes:
       - bootstrap-node-3:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

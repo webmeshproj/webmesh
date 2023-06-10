@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/netip"
@@ -30,10 +29,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/net/mesh"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
 	"github.com/webmeshproj/node/pkg/services/rbac"
-	"github.com/webmeshproj/node/pkg/services/svcutil"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -66,17 +66,19 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// Check that the node is indeed who they say they are
-	if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
-		if proxiedFor != req.GetId() {
-			return nil, status.Errorf(codes.PermissionDenied, "proxied for %s, not %s", proxiedFor, req.GetId())
-		}
-	} else if s.tlsConfig != nil {
-		if peer, ok := svcutil.PeerFromContext(ctx); ok {
-			if peer != req.GetId() {
-				return nil, status.Errorf(codes.PermissionDenied, "peer id %s, not %s", peer, req.GetId())
+	if !s.insecure {
+		if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
+			if proxiedFor != req.GetId() {
+				return nil, status.Errorf(codes.PermissionDenied, "proxied for %s, not %s", proxiedFor, req.GetId())
 			}
 		} else {
-			return nil, status.Error(codes.PermissionDenied, "no peer authentication info in context")
+			if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
+				if peer != req.GetId() {
+					return nil, status.Errorf(codes.PermissionDenied, "peer id %s, not %s", peer, req.GetId())
+				}
+			} else {
+				return nil, status.Error(codes.PermissionDenied, "no peer authentication info in context")
+			}
 		}
 	}
 
@@ -310,80 +312,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return ""
 		}(),
 	}
-
-	peers, err := svcutil.WireGuardPeersFor(ctx, s.store, req.GetId())
+	peers, err := mesh.WireGuardPeersFor(ctx, s.store, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err)
 	}
 	resp.Peers = peers
-
-	// // Build current peers for the node
-	// graph := s.peers.Graph()
-	// adjacencyMap, err := s.networking.FilterGraph(ctx, graph, req.GetId())
-	// if err != nil {
-	// 	return nil, status.Errorf(codes.Internal, "failed to get adjacency map: %v", err)
-	// }
-	// ourDescendants := adjacencyMap[req.GetId()]
-	// resp.Peers = make([]*v1.WireGuardPeer, 0)
-	// for descendant, edge := range ourDescendants {
-	// 	desc, _ := graph.Vertex(descendant)
-	// 	slog.Debug("found descendant", slog.Any("descendant", desc))
-	// 	// Determine the preferred wireguard endpoint
-	// 	var primaryEndpoint string
-	// 	if desc.PrimaryEndpoint != "" {
-	// 		for _, endpoint := range desc.WireGuardEndpoints {
-	// 			if strings.HasPrefix(endpoint, desc.PrimaryEndpoint) {
-	// 				primaryEndpoint = endpoint
-	// 				break
-	// 			}
-	// 		}
-	// 	}
-	// 	if primaryEndpoint == "" && len(desc.WireGuardEndpoints) > 0 {
-	// 		primaryEndpoint = desc.WireGuardEndpoints[0]
-	// 	}
-	// 	// Each direct child is a wireguard peer
-	// 	peer := &v1.WireGuardPeer{
-	// 		Id:                 desc.ID,
-	// 		PublicKey:          desc.PublicKey.String(),
-	// 		ZoneAwarenessId:    desc.ZoneAwarenessID,
-	// 		PrimaryEndpoint:    primaryEndpoint,
-	// 		WireguardEndpoints: desc.WireGuardEndpoints,
-	// 		AddressIpv4: func() string {
-	// 			if desc.PrivateIPv4.IsValid() {
-	// 				return desc.PrivateIPv4.String()
-	// 			}
-	// 			return ""
-	// 		}(),
-	// 		AddressIpv6: func() string {
-	// 			if desc.NetworkIPv6.IsValid() {
-	// 				return desc.NetworkIPv6.String()
-	// 			}
-	// 			return ""
-	// 		}(),
-	// 		AllowedIps: make([]string, 0),
-	// 	}
-	// 	if desc.PrivateIPv4.IsValid() {
-	// 		peer.AllowedIps = append(peer.AllowedIps, desc.PrivateIPv4.String())
-	// 	}
-	// 	if desc.NetworkIPv6.IsValid() {
-	// 		peer.AllowedIps = append(peer.AllowedIps, desc.NetworkIPv6.String())
-	// 	}
-	// 	descTargets := adjacencyMap[edge.Target]
-	// 	if len(descTargets) > 0 {
-	// 		for descTarget := range descTargets {
-	// 			if _, ok := ourDescendants[descTarget]; !ok && descTarget != req.GetId() {
-	// 				target, _ := graph.Vertex(descTarget)
-	// 				if target.PrivateIPv4.IsValid() {
-	// 					peer.AllowedIps = append(peer.AllowedIps, target.PrivateIPv4.String())
-	// 				}
-	// 				if target.NetworkIPv6.IsValid() {
-	// 					peer.AllowedIps = append(peer.AllowedIps, target.NetworkIPv6.String())
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// 	resp.Peers = append(resp.Peers, peer)
-	// }
 	slog.Debug("sending join response", slog.Any("response", resp))
 	return resp, nil
 }

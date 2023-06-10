@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package svcutil contains common utilities for services.
-package svcutil
+// Package mesh contains helpers for computing networking information from the mesh.
+package mesh
 
 import (
 	"context"
@@ -24,27 +24,11 @@ import (
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/peer"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
-
-// PeerFromContext returns the peer ID from the context.
-func PeerFromContext(ctx context.Context) (string, bool) {
-	p, ok := peer.FromContext(ctx)
-	if ok {
-		if authInfo, ok := p.AuthInfo.(credentials.TLSInfo); ok {
-			peerCerts := authInfo.State.PeerCertificates
-			if len(peerCerts) > 0 {
-				return peerCerts[0].Subject.CommonName, true
-			}
-		}
-	}
-	return "", false
-}
 
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
 // Peers are filtered by network ACLs.

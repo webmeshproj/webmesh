@@ -18,7 +18,6 @@ limitations under the License.
 package leaderproxy
 
 import (
-	"context"
 	"crypto/tls"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -31,7 +30,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/services/svcutil"
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/store"
 )
 
@@ -118,7 +117,7 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	}
 	defer conn.Close()
 	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, string(i.store.ID()))
-	if peer, ok := svcutil.PeerFromContext(ctx); ok {
+	if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
 	switch info.FullMethod {
@@ -200,7 +199,7 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 	}
 	defer conn.Close()
 	ctx := metadata.AppendToOutgoingContext(ss.Context(), ProxiedFromMeta, string(i.store.ID()))
-	if peer, ok := svcutil.PeerFromContext(ss.Context()); ok {
+	if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
 	switch info.FullMethod {

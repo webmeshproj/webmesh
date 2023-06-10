@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/services/admin"
 	"github.com/webmeshproj/node/pkg/services/meshapi"
 	"github.com/webmeshproj/node/pkg/services/meshdns"
@@ -51,9 +52,9 @@ type Server struct {
 }
 
 // NewServer returns a new Server.
-func NewServer(store store.Store, o *Options) (*Server, error) {
+func NewServer(store store.Store, plugins plugins.Manager, o *Options) (*Server, error) {
 	log := slog.Default().With("component", "server")
-	opts, tlsConfig, err := o.ServerOptions(store)
+	opts, proxyTLSConfig, err := o.ServerOptions(store, plugins)
 	if err != nil {
 		return nil, err
 	}
@@ -62,47 +63,37 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 		opts: o,
 		log:  log,
 	}
-	if o.EnableAdminAPI {
+	if o.API.Admin {
 		log.Debug("registering admin api")
 		v1.RegisterAdminServer(server, admin.New(store))
 	}
-	if o.EnableMeshAPI {
+	if o.API.Mesh {
 		log.Debug("registering mesh api")
 		v1.RegisterMeshServer(server, meshapi.NewServer(store))
 	}
-	if o.EnablePeerDiscoveryAPI {
+	if o.API.PeerDiscovery {
 		log.Debug("registering peer discovery api")
 		v1.RegisterPeerDiscoveryServer(server, peerdiscovery.NewServer(store))
 	}
-	if o.EnableWebRTCAPI {
-		var stunURLs []string
-		if (o.EnableTURNServer && !o.ExclusiveTURNServer) && o.STUNServers != "" {
-			stunURLs = strings.Split(o.STUNServers, ",")
-		}
-		if o.EnableTURNServer {
-			if o.TURNServerEndpoint != "" {
-				stunURLs = append(stunURLs, o.TURNServerEndpoint)
-			} else {
-				stunURLs = append(stunURLs, fmt.Sprintf("stun:%s:%d", o.TURNServerPublicIP, o.TURNServerPort))
-			}
-		}
-		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, tlsConfig, stunURLs))
+	if o.API.WebRTC {
+		stunURLs := strings.Split(o.API.STUNServers, ",")
+		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, proxyTLSConfig, stunURLs))
 	}
-	if o.EnableMeshDNS {
+	if o.MeshDNS.Enabled {
 		log.Debug("registering mesh dns")
 		server.meshdns = meshdns.NewServer(store, &meshdns.Options{
-			UDPListenAddr:  o.MeshDNSListenUDP,
-			TCPListenAddr:  o.MeshDNSListenTCP,
-			TSIGKey:        o.MeshDNSTSIGKey,
-			ReusePort:      o.MeshDNSReusePort,
-			Compression:    o.MeshDNSCompression,
-			Domain:         o.MeshDNSDomain,
-			RequestTimeout: o.MeshDNSRequestTimeout,
+			UDPListenAddr:  o.MeshDNS.ListenUDP,
+			TCPListenAddr:  o.MeshDNS.ListenTCP,
+			TSIGKey:        o.MeshDNS.TSIGKey,
+			ReusePort:      o.MeshDNS.ReusePort,
+			Compression:    o.MeshDNS.EnableCompression,
+			Domain:         o.MeshDNS.Domain,
+			RequestTimeout: o.MeshDNS.RequestTimeout,
 		})
 	}
 	log.Debug("registering node server")
 	// Always register the node server
-	v1.RegisterNodeServer(server, node.NewServer(store, tlsConfig, o.ToFeatureSet()))
+	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), plugins.AuthPlugin() == nil))
 	return server, nil
 }
 
@@ -110,24 +101,24 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 // then blocks until the gRPC server exits.
 func (s *Server) ListenAndServe() error {
 	reflection.Register(s.srv)
-	if s.opts.EnableMetrics {
+	if s.opts.Metrics.Enabled {
 		go func() {
-			s.log.Info(fmt.Sprintf("Starting HTTP metrics server on %s", s.opts.MetricsListenAddress))
-			http.Handle(s.opts.MetricsPath, promhttp.Handler())
-			if err := http.ListenAndServe(s.opts.MetricsListenAddress, nil); err != nil {
+			s.log.Info(fmt.Sprintf("Starting HTTP metrics server on %s", s.opts.Metrics.ListenAddress))
+			http.Handle(s.opts.Metrics.Path, promhttp.Handler())
+			if err := http.ListenAndServe(s.opts.Metrics.ListenAddress, nil); err != nil {
 				s.log.Error("metrics server failed", slog.String("error", err.Error()))
 			}
 		}()
 	}
-	if s.opts.EnableTURNServer {
+	if s.opts.TURN.Enabled {
 		var err error
-		s.log.Info(fmt.Sprintf("Starting TURN server on %s:%d", s.opts.TURNServerListenAddress, s.opts.TURNServerPort))
+		s.log.Info(fmt.Sprintf("Starting TURN server on %s:%d", s.opts.TURN.ListenAddress, s.opts.TURN.ListenPort))
 		s.turn, err = turn.NewServer(&turn.Options{
-			PublicIP:         s.opts.TURNServerPublicIP,
-			ListenAddressUDP: s.opts.TURNServerListenAddress,
-			ListenPortUDP:    s.opts.TURNServerPort,
-			Realm:            s.opts.TURNServerRealm,
-			PortRange:        s.opts.STUNPortRange,
+			PublicIP:         s.opts.TURN.PublicIP,
+			ListenAddressUDP: s.opts.TURN.ListenAddress,
+			ListenPortUDP:    s.opts.TURN.ListenPort,
+			Realm:            s.opts.TURN.ServerRealm,
+			PortRange:        s.opts.TURN.STUNPortRange,
 		})
 		if err != nil {
 			return fmt.Errorf("create turn server: %w", err)
@@ -140,8 +131,8 @@ func (s *Server) ListenAndServe() error {
 			}
 		}()
 	}
-	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.GRPCListenAddress))
-	lis, err := net.Listen("tcp", s.opts.GRPCListenAddress)
+	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
+	lis, err := net.Listen("tcp", s.opts.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("start TCP listener: %w", err)
 	}
