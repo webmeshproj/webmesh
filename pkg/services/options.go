@@ -153,6 +153,11 @@ func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager) ([]g
 		if err != nil {
 			return nil, nil, err
 		}
+		// Bit of a hack, but if we are using the mTLS plugin, we need to make sure
+		// the server requests a client certificate.
+		if _, ok := plugins.Get("mtls"); ok {
+			tlsConfig.ClientAuth = tls.RequestClientCert
+		}
 		opts = append(opts, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	} else {
 		opts = append(opts, grpc.Creds(insecure.NewCredentials()))

@@ -42,6 +42,8 @@ var (
 
 // Manager is the interface for managing plugins.
 type Manager interface {
+	// Get returns the plugin with the given name.
+	Get(name string) (v1.PluginClient, bool)
 	// AuthPlugin returns the configured auth plugin, if any.
 	AuthPlugin() v1.PluginClient
 	// AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin, if any.
@@ -76,6 +78,7 @@ func NewOptions() *Options {
 // New creates a new plugin manager.
 func New(ctx context.Context, opts *Options) (Manager, error) {
 	var auth v1.PluginClient
+	registered := make(map[string]v1.PluginClient)
 	for name, cfg := range opts.Plugins {
 		if builtIn, ok := BuiltIns[name]; ok {
 			caps, err := builtIn.GetInfo(ctx, &emptypb.Empty{})
@@ -97,16 +100,24 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 			if err != nil {
 				return nil, fmt.Errorf("configure plugin: %w", err)
 			}
+			registered[name] = builtIn
 			continue
 		}
 	}
 	return &manager{
-		auth: auth,
+		auth:    auth,
+		plugins: registered,
 	}, nil
 }
 
 type manager struct {
-	auth v1.PluginClient
+	auth    v1.PluginClient
+	plugins map[string]v1.PluginClient
+}
+
+func (m *manager) Get(name string) (v1.PluginClient, bool) {
+	p, ok := m.plugins[name]
+	return p, ok
 }
 
 func (m *manager) AuthPlugin() v1.PluginClient {
