@@ -1,18 +1,18 @@
 -- name: PutNetworkRoute :exec
 INSERT INTO network_routes (
     name,
-    nodes,
+    node,
     dst_cidrs,
-    next_hops,
+    next_hop,
     created_at,
     updated_at
 ) VALUES (
     ?, ?, ?, ?, ?, ?
 )
 ON CONFLICT (name) DO UPDATE SET
-    nodes = EXCLUDED.nodes,
+    node = EXCLUDED.nodes,
     dst_cidrs = EXCLUDED.dst_cidrs,
-    next_hops = EXCLUDED.next_hops,
+    next_hop = EXCLUDED.next_hops,
     updated_at = EXCLUDED.updated_at;
 
 -- name: GetNetworkRoute :one
@@ -25,7 +25,9 @@ SELECT * FROM network_routes;
 DELETE FROM network_routes WHERE name = ?;
 
 -- name: ListNetworkRoutesByNode :many
-SELECT * FROM network_routes WHERE nodes LIKE '%' || ? || '%';
+SELECT network_routes.* FROM network_routes
+LEFT OUTER JOIN groups ON groups.nodes LIKE '%' || :node || '%'
+WHERE network_routes.node = :node OR network_routes.node = 'group:' || groups.name;
 
 -- name: ListNetworkRoutesByDstCidr :many
 SELECT * FROM network_routes WHERE dst_cidrs LIKE '%' || ? || '%';

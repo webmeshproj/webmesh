@@ -194,30 +194,16 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			if found {
 				continue
 			}
-			// Check if the cidr is already registered under a different node
-			existing, err := s.networking.GetRoutesByCIDR(ctx, route)
+			// Add a new route
+			err = s.networking.PutRoute(ctx, &v1.Route{
+				Name:             fmt.Sprintf("%s-auto", req.GetId()),
+				Node:             req.GetId(),
+				DestinationCidrs: req.GetRoutes(),
+			})
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get existing routes: %v", err)
+				return nil, status.Errorf(codes.Internal, "failed to add route: %v", err)
 			}
-			if len(existing) > 0 {
-				for _, r := range existing {
-					// We append the node ID to this route
-					err = s.networking.AppendNodeToRoute(ctx, r.Name, req.GetId())
-					if err != nil {
-						return nil, status.Errorf(codes.Internal, "failed to append node to route: %v", err)
-					}
-				}
-			} else {
-				// Create the new route
-				err = s.networking.PutRoute(ctx, &v1.Route{
-					Name:             fmt.Sprintf("%s-%s", req.GetId(), route),
-					Nodes:            []string{req.GetId()},
-					DestinationCidrs: []string{route},
-				})
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to create route: %v", err)
-				}
-			}
+			break
 		}
 	}
 

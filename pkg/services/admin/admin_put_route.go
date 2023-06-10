@@ -47,8 +47,8 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if len(route.GetNodes()) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "at least one node is required")
+	if route.GetNode() == "" {
+		return nil, status.Error(codes.InvalidArgument, "node name is required")
 	}
 	if len(route.GetDestinationCidrs()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "at least one destination CIDR is required")

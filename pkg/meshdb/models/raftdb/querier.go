@@ -42,7 +42,7 @@ type Querier interface {
 	ListNetworkACLs(ctx context.Context) ([]NetworkAcl, error)
 	ListNetworkRoutes(ctx context.Context) ([]NetworkRoute, error)
 	ListNetworkRoutesByDstCidr(ctx context.Context, dstCidrs string) ([]NetworkRoute, error)
-	ListNetworkRoutesByNode(ctx context.Context, nodes string) ([]NetworkRoute, error)
+	ListNetworkRoutesByNode(ctx context.Context, node string) ([]NetworkRoute, error)
 	ListNodeEdges(ctx context.Context) ([]NodeEdge, error)
 	ListNodeIDs(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)

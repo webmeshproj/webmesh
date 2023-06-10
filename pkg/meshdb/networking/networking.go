@@ -75,9 +75,6 @@ type Networking interface {
 	// ListRoutes returns a list of Routes.
 	ListRoutes(ctx context.Context) ([]*v1.Route, error)
 
-	// AppendNodeToRoute appends a node to an existing Route.
-	AppendNodeToRoute(ctx context.Context, routeName string, nodeName string) error
-
 	// FilterGraph filters the adjacency map in the given graph for the given node name according
 	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
 	// error is returned on faiure building the initial map or any database error.
@@ -217,14 +214,14 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 	q := raftdb.New(n.store.DB())
 	params := raftdb.PutNetworkRouteParams{
 		Name:      route.GetName(),
-		Nodes:     strings.Join(route.GetNodes(), ","),
+		Node:      route.GetNode(),
 		DstCidrs:  strings.Join(route.GetDestinationCidrs(), ","),
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	}
-	if len(route.GetNextHopNodes()) > 0 {
-		params.NextHops = sql.NullString{
-			String: strings.Join(route.GetNextHopNodes(), ","),
+	if route.GetNextHopNode() != "" {
+		params.NextHop = sql.NullString{
+			String: route.GetNextHopNode(),
 			Valid:  true,
 		}
 	}
@@ -298,22 +295,6 @@ func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
 		out[i] = dbRouteToAPIRoute(&route)
 	}
 	return out, nil
-}
-
-// AppendNodeToRoute appends a node to an existing Route.
-func (n *networking) AppendNodeToRoute(ctx context.Context, routeName string, nodeName string) error {
-	route, err := n.GetRoute(ctx, routeName)
-	if err != nil {
-		return fmt.Errorf("get route: %w", err)
-	}
-	for _, node := range route.Nodes {
-		if node == nodeName {
-			// Node already exists in route. Nothing to do.
-			return nil
-		}
-	}
-	route.Nodes = append(route.Nodes, nodeName)
-	return n.PutRoute(ctx, route)
 }
 
 // FilterGraph filters the adjacency map in the given graph for the given node name according
@@ -463,13 +444,8 @@ func dbACLToAPIACL(store meshdb.Store, dbACL *raftdb.NetworkAcl) *ACL {
 func dbRouteToAPIRoute(dbRoute *raftdb.NetworkRoute) *v1.Route {
 	return &v1.Route{
 		Name:             dbRoute.Name,
-		Nodes:            strings.Split(dbRoute.Nodes, ","),
+		Node:             dbRoute.Node,
 		DestinationCidrs: strings.Split(dbRoute.DstCidrs, ","),
-		NextHopNodes: func() []string {
-			if dbRoute.NextHops.Valid {
-				return strings.Split(dbRoute.NextHops.String, ",")
-			}
-			return nil
-		}(),
+		NextHopNode:      dbRoute.NextHop.String,
 	}
 }

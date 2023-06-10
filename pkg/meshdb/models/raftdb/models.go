@@ -44,9 +44,9 @@ type NetworkAcl struct {
 
 type NetworkRoute struct {
 	Name      string         `json:"name"`
-	Nodes     string         `json:"nodes"`
+	Node      string         `json:"node"`
 	DstCidrs  string         `json:"dst_cidrs"`
-	NextHops  sql.NullString `json:"next_hops"`
+	NextHop   sql.NullString `json:"next_hop"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 }

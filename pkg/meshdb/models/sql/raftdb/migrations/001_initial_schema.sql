@@ -91,9 +91,9 @@ CREATE TABLE network_acls (
 -- Network Routes are non-mesh routes advertised by nodes.
 CREATE TABLE network_routes (
     name       TEXT NOT NULL PRIMARY KEY,
-    nodes      TEXT NOT NULL,
+    node       TEXT NOT NULL,
     dst_cidrs  TEXT NOT NULL,
-    next_hops  TEXT,
+    next_hop   TEXT,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );

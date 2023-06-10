@@ -47,9 +47,9 @@ var (
 	putNetworkACLAccept    bool
 	putNetworkACLDeny      bool
 
-	putRouteNodes    []string
-	putRouteCIDRs    []string
-	putRouteNextHops []string
+	putRouteNode    string
+	putRouteCIDRs   []string
+	putRouteNextHop string
 )
 
 func init() {
@@ -92,9 +92,9 @@ func init() {
 	cobra.CheckErr(putNetworkACLCmd.RegisterFlagCompletionFunc("dst-node", completeNodes(1)))
 
 	putRouteFlags := putRouteCmd.Flags()
-	putRouteFlags.StringArrayVar(&putRouteNodes, "node", nil, "nodes to add to the route")
+	putRouteFlags.StringVar(&putRouteNode, "node", "", "node to add the route to")
 	putRouteFlags.StringArrayVar(&putRouteCIDRs, "cidr", nil, "CIDRs to add to the route")
-	putRouteFlags.StringArrayVar(&putRouteNextHops, "next-hop", nil, "next hops to add to the route")
+	putRouteFlags.StringVar(&putRouteNextHop, "next-hop", "", "next hop to add to the route")
 	cobra.CheckErr(putRouteCmd.MarkFlagRequired("node"))
 	cobra.CheckErr(putRouteCmd.MarkFlagRequired("cidr"))
 	cobra.CheckErr(putRouteCmd.RegisterFlagCompletionFunc("node", completeNodes(1)))
@@ -348,17 +348,11 @@ var putRouteCmd = &cobra.Command{
 		if len(args) == 0 {
 			return errors.New("no route name specified")
 		}
-		if len(putRouteNodes) == 0 {
-			return errors.New("no nodes specified")
-		}
-		if len(putRouteCIDRs) == 0 {
-			return errors.New("no CIDRs specified")
-		}
 		route := &v1.Route{
 			Name:             args[0],
-			Nodes:            putRoleBindingNodes,
+			Node:             putRouteNode,
 			DestinationCidrs: putRouteCIDRs,
-			NextHopNodes:     putRouteNextHops,
+			NextHopNode:      putRouteNextHop,
 		}
 		client, closer, err := cliConfig.NewAdminClient()
 		if err != nil {
