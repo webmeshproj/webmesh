@@ -1,22 +1,21 @@
 FROM golang:1.20-alpine
 
-RUN apk add --update \
-    curl build-base musl musl-dev git make upx \
-    && curl -JLO https://musl.cc/x86_64-linux-musl-cross.tgz \
-    && curl -JLO https://musl.cc/aarch64-linux-musl-cross.tgz \
-    && curl -JLO https://musl.cc/arm-linux-musleabihf-cross.tgz \
-    && curl -JLO https://musl.cc/riscv64-linux-musl-cross.tgz
+# Install build dependencies
+RUN apk add --update curl build-base musl musl-dev git make upx
 
+# Download toolchains
+RUN curl -JLO https://musl.cc/x86_64-linux-musl-cross.tgz \
+    && curl -JLO https://musl.cc/aarch64-linux-musl-cross.tgz \
+    && curl -JLO https://musl.cc/arm-linux-musleabihf-cross.tgz
+
+# Install toolchains
 RUN tar -xzf x86_64-linux-musl-cross.tgz \
     && tar -xzf aarch64-linux-musl-cross.tgz \
     && tar -xzf arm-linux-musleabihf-cross.tgz \
-    && tar -xzf riscv64-linux-musl-cross.tgz \
     && rm *.tgz \
     && mv x86_64-linux-musl-cross /usr/local/x86_64-linux-musl-cross \
     && mv aarch64-linux-musl-cross /usr/local/aarch64-linux-musl-cross \
     && mv arm-linux-musleabihf-cross /usr/local/arm-linux-musleabihf-cross \
-    && mv riscv64-linux-musl-cross /usr/local/riscv64-linux-musl-cross \
     && ln -s /usr/local/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc /usr/local/bin/x86_64-linux-musl-gcc \
     && ln -s /usr/local/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc /usr/local/bin/aarch64-linux-musl-gcc \
-    && ln -s /usr/local/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc /usr/local/bin/arm-linux-musleabihf-gcc \
-    && ln -s /usr/local/riscv64-linux-musl-cross/bin/riscv64-linux-musl-gcc /usr/local/bin/riscv64-linux-musl-gcc
+    && ln -s /usr/local/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc /usr/local/bin/arm-linux-musleabihf-gcc
