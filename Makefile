@@ -3,9 +3,6 @@ CTL   ?= wmctl
 REPO  ?= ghcr.io/webmeshproj
 IMAGE ?= $(REPO)/$(NAME):latest
 
-ARCH ?= $(shell go env GOARCH)
-OS   ?= $(shell go env GOOS)
-
 VERSION_PKG := github.com/webmeshproj/$(NAME)/pkg/version
 VERSION     := $(shell git describe --tags --always --dirty)
 COMMIT      := $(shell git rev-parse HEAD)
@@ -16,7 +13,9 @@ LDFLAGS     ?= -s -w -extldflags=-static \
 			   -X $(VERSION_PKG).BuildDate=$(DATE)
 BUILD_TAGS  ?= osusergo,netgo,sqlite_omit_load_extension,sqlite_vacuum_incr,sqlite_json
 
-DIST := $(CURDIR)/dist
+ARCH  ?= $(shell go env GOARCH)
+OS    ?= $(shell go env GOOS)
+DIST  := $(CURDIR)/dist
 
 build: fmt vet generate ## Build node binary.
 	go build \
@@ -39,7 +38,7 @@ lint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run
 
-BUILD_IMAGE ?= $(REPO)/node-buildx
+BUILD_IMAGE ?= $(REPO)/node-buildx:latest
 build-image: ## Build the node build image.
 	docker buildx build -t $(BUILD_IMAGE) -f Dockerfile.build --load .
 
