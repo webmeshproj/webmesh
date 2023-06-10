@@ -53,7 +53,7 @@ dist:
 		-v "$(shell go env GOPATH):/go" \
 		-e GOPATH=/go \
 		-w /build \
-		$(BUILD_IMAGE) make -j $(shell nproc) dist-node dist-ctl
+		$(BUILD_IMAGE) make -j $(shell nproc) dist-node
 
 dist-node: ## Build node binaries for all platforms.
 	$(MAKE) \
