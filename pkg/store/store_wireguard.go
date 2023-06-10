@@ -190,11 +190,16 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 			AllowedIPs: make([]netip.Prefix, len(wgPeer.GetAllowedIps())),
 		}
 		for i, ip := range wgPeer.GetAllowedIps() {
-			prefix, err := netip.ParsePrefix(ip)
+			peer.AllowedIPs[i], err = netip.ParsePrefix(ip)
 			if err != nil {
 				return fmt.Errorf("parse prefix: %w", err)
 			}
-			peer.AllowedIPs[i] = prefix
+		}
+		for i, ip := range wgPeer.GetAllowedRoutes() {
+			peer.AllowedRoutes[i], err = netip.ParsePrefix(ip)
+			if err != nil {
+				return fmt.Errorf("parse peer allowed route: %w", err)
+			}
 		}
 		// Resolve the endpoint and check for zone awareness
 		if wgPeer.GetPrimaryEndpoint() != "" {

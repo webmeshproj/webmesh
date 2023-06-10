@@ -41,6 +41,8 @@ type Peer struct {
 	Endpoint netip.AddrPort `json:"endpoint"`
 	// AllowedIPs is the list of allowed IPs for this peer.
 	AllowedIPs []netip.Prefix `json:"allowedIPs"`
+	// AllowedRoutes is the list of allowed routes for this peer.
+	AllowedRoutes []netip.Prefix `json:"allowedRoutes"`
 }
 
 func (p Peer) MarshalJSON() ([]byte, error) {
@@ -77,6 +79,21 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		keepAlive = &dur
 	}
 	for _, ip := range peer.AllowedIPs {
+		var ipnet net.IPNet
+		if ip.Addr().Is4() {
+			ipnet = net.IPNet{
+				IP:   ip.Addr().AsSlice(),
+				Mask: net.CIDRMask(ip.Bits(), 32),
+			}
+		} else {
+			ipnet = net.IPNet{
+				IP:   ip.Addr().AsSlice(),
+				Mask: net.CIDRMask(ip.Bits(), 128),
+			}
+		}
+		allowedIPs = append(allowedIPs, ipnet)
+	}
+	for _, ip := range peer.AllowedRoutes {
 		var ipnet net.IPNet
 		if ip.Addr().Is4() {
 			ipnet = net.IPNet{

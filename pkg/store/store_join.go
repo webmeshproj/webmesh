@@ -268,6 +268,13 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 				return fmt.Errorf("parse peer allowed ip: %w", err)
 			}
 		}
+		allowedRoutes := make([]netip.Prefix, len(peer.GetAllowedRoutes()))
+		for i, ip := range peer.GetAllowedRoutes() {
+			allowedRoutes[i], err = netip.ParsePrefix(ip)
+			if err != nil {
+				return fmt.Errorf("parse peer allowed route: %w", err)
+			}
+		}
 		wgpeer := wireguard.Peer{
 			ID:         peer.GetId(),
 			PublicKey:  key,

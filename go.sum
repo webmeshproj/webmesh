@@ -368,6 +368,8 @@ github.com/webmeshproj/api v0.0.0-20230610131910-64e975c6a8d2 h1:aA/ZF7hYr1QiFkA
 github.com/webmeshproj/api v0.0.0-20230610131910-64e975c6a8d2/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.0.0-20230610132134-5e17236820e7 h1:pwyXK9I7JTPNRCxAGE6wj6bH0E+k8LTW23J0WOPeIIY=
 github.com/webmeshproj/api v0.0.0-20230610132134-5e17236820e7/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.0.0-20230610163059-1a05a40f63d7 h1:k9p0TmzS3mM7cxu5fZHR7tbYHQ7Io8L8qmc6t+6sLYQ=
+github.com/webmeshproj/api v0.0.0-20230610163059-1a05a40f63d7/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

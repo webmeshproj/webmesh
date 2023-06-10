@@ -55,9 +55,19 @@ func WireGuardPeersFor(ctx context.Context, store meshdb.Store, peerID string) (
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)
 	}
-	ourRoutes, err := nw.GetRoutesByNode(ctx, peerID)
+	routes, err := nw.GetRoutesByNode(ctx, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("get routes by node: %w", err)
+	}
+	ourRoutes := make([]netip.Prefix, 0)
+	for _, route := range routes {
+		for _, cidr := range route.GetDestinationCidrs() {
+			prefix, err := netip.ParsePrefix(cidr)
+			if err != nil {
+				return nil, fmt.Errorf("parse prefix %q: %w", cidr, err)
+			}
+			ourRoutes = append(ourRoutes, prefix)
+		}
 	}
 	directAdjacents := adjacencyMap[peerID]
 	out := make([]*v1.WireGuardPeer, 0, len(directAdjacents))
@@ -99,36 +109,34 @@ func WireGuardPeersFor(ctx context.Context, store meshdb.Store, peerID string) (
 				return ""
 			}(),
 		}
-		allowedIPs, err := recurseAllowedIPs(ctx, nw, graph, adjacencyMap, peerID, &node)
+		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, peerID, ourRoutes, &node)
 		if err != nil {
 			return nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}
-
-		// Don't include allowed IPs for routes we expose
 		var ourAllowedIPs []string
-	IPs:
 		for _, ip := range allowedIPs {
-			for _, route := range ourRoutes {
-				for _, cidr := range route.GetDestinationCidrs() {
-					prefix, err := netip.ParsePrefix(cidr)
-					if err != nil {
-						return nil, fmt.Errorf("parse prefix: %w", err)
-					}
-					if prefix.Contains(ip.Addr()) {
-						continue IPs
-					}
-				}
-			}
 			ourAllowedIPs = append(ourAllowedIPs, ip.String())
 		}
+		var ourAllowedRoutes []string
+		for _, route := range allowedRoutes {
+			ourAllowedRoutes = append(ourAllowedRoutes, route.String())
+		}
 		peer.AllowedIps = ourAllowedIPs
+		peer.AllowedRoutes = ourAllowedRoutes
 		out = append(out, peer)
 	}
 	return out, nil
 }
 
-func recurseAllowedIPs(ctx context.Context, nw networking.Networking, graph peers.Graph, adjacencyMap networking.AdjacencyMap, thisPeer string, node *peers.Node) ([]netip.Prefix, error) {
-	allowedIPs := make([]netip.Prefix, 0)
+func recursePeers(
+	ctx context.Context,
+	nw networking.Networking,
+	graph peers.Graph,
+	adjacencyMap networking.AdjacencyMap,
+	thisPeer string,
+	thisRoutes []netip.Prefix,
+	node *peers.Node,
+) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
 	if node.PrivateIPv4.IsValid() {
 		allowedIPs = append(allowedIPs, node.PrivateIPv4)
 	}
@@ -138,38 +146,59 @@ func recurseAllowedIPs(ctx context.Context, nw networking.Networking, graph peer
 	// Does this peer expose routes?
 	routes, err := nw.GetRoutesByNode(ctx, node.ID)
 	if err != nil {
-		return nil, fmt.Errorf("get routes by node: %w", err)
+		return nil, nil, fmt.Errorf("get routes by node: %w", err)
 	}
 	if len(routes) > 0 {
 		for _, route := range routes {
 			for _, cidr := range route.GetDestinationCidrs() {
 				prefix, err := netip.ParsePrefix(cidr)
 				if err != nil {
-					return nil, fmt.Errorf("parse prefix: %w", err)
+					return nil, nil, fmt.Errorf("parse prefix: %w", err)
 				}
-				if !contains(allowedIPs, prefix) {
+				if !contains(allowedIPs, prefix) && !contains(thisRoutes, prefix) {
 					allowedIPs = append(allowedIPs, prefix)
 				}
 			}
 		}
+	} else if len(thisRoutes) > 0 {
+		// The peer doesn't expose routes but we do, so we need to add our routes to the peer
+		// TODO: There is a third condition where we both expose routes and there are non-overlapping routes
+		for _, prefix := range thisRoutes {
+			if !contains(allowedRoutes, prefix) {
+				allowedRoutes = append(allowedRoutes, prefix)
+			}
+		}
 	}
-	edgeIPs, err := recurseEdgeAllowedIPs(ctx, nw, graph, adjacencyMap, thisPeer, node, nil)
+	edgeIPs, edgeRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, node, nil)
 	if err != nil {
-		return nil, fmt.Errorf("recurse edge allowed IPs: %w", err)
+		return nil, nil, fmt.Errorf("recurse edge allowed IPs: %w", err)
 	}
 	for _, ip := range edgeIPs {
 		if !contains(allowedIPs, ip) {
 			allowedIPs = append(allowedIPs, ip)
 		}
 	}
-	return allowedIPs, nil
+	for _, route := range edgeRoutes {
+		if !contains(allowedRoutes, route) {
+			allowedRoutes = append(allowedRoutes, route)
+		}
+	}
+	return
 }
 
-func recurseEdgeAllowedIPs(ctx context.Context, nw networking.Networking, graph peers.Graph, adjacencyMap networking.AdjacencyMap, thisPeer string, node *peers.Node, visited map[string]struct{}) ([]netip.Prefix, error) {
+func recurseEdges(
+	ctx context.Context,
+	nw networking.Networking,
+	graph peers.Graph,
+	adjacencyMap networking.AdjacencyMap,
+	thisPeer string,
+	thisRoutes []netip.Prefix,
+	node *peers.Node,
+	visited map[string]struct{},
+) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
 	if visited == nil {
 		visited = make(map[string]struct{})
 	}
-	allowedIPs := make([]netip.Prefix, 0)
 	directAdjacents := adjacencyMap[thisPeer]
 	visited[node.ID] = struct{}{}
 	targets := adjacencyMap[node.ID]
@@ -185,7 +214,7 @@ func recurseEdgeAllowedIPs(ctx context.Context, nw networking.Networking, graph 
 		}
 		targetNode, err := graph.Vertex(target)
 		if err != nil {
-			return nil, fmt.Errorf("get vertex: %w", err)
+			return nil, nil, fmt.Errorf("get vertex: %w", err)
 		}
 		if targetNode.PrivateIPv4.IsValid() {
 			allowedIPs = append(allowedIPs, targetNode.PrivateIPv4)
@@ -196,33 +225,45 @@ func recurseEdgeAllowedIPs(ctx context.Context, nw networking.Networking, graph 
 		// Does this peer expose routes?
 		routes, err := nw.GetRoutesByNode(ctx, targetNode.ID)
 		if err != nil {
-			return nil, fmt.Errorf("get routes by node: %w", err)
+			return nil, nil, fmt.Errorf("get routes by node: %w", err)
 		}
 		if len(routes) > 0 {
 			for _, route := range routes {
 				for _, cidr := range route.GetDestinationCidrs() {
 					prefix, err := netip.ParsePrefix(cidr)
 					if err != nil {
-						return nil, fmt.Errorf("parse prefix: %w", err)
+						return nil, nil, fmt.Errorf("parse prefix: %w", err)
 					}
-					if !contains(allowedIPs, prefix) {
+					if !contains(allowedIPs, prefix) && !contains(thisRoutes, prefix) {
 						allowedIPs = append(allowedIPs, prefix)
 					}
 				}
 			}
+		} else if len(thisRoutes) > 0 {
+			// The peer doesn't expose routes but we do, so we need to add our routes to the peer
+			for _, prefix := range thisRoutes {
+				if !contains(allowedRoutes, prefix) {
+					allowedRoutes = append(allowedRoutes, prefix)
+				}
+			}
 		}
 		visited[target] = struct{}{}
-		ips, err := recurseEdgeAllowedIPs(ctx, nw, graph, adjacencyMap, thisPeer, &targetNode, visited)
+		ips, ipRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, &targetNode, visited)
 		if err != nil {
-			return nil, fmt.Errorf("recurse allowed IPs: %w", err)
+			return nil, nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}
 		for _, ip := range ips {
 			if !contains(allowedIPs, ip) {
 				allowedIPs = append(allowedIPs, ip)
 			}
 		}
+		for _, ipRoute := range ipRoutes {
+			if !contains(allowedRoutes, ipRoute) {
+				allowedRoutes = append(allowedRoutes, ipRoute)
+			}
+		}
 	}
-	return allowedIPs, nil
+	return
 }
 func contains(ss []netip.Prefix, s netip.Prefix) bool {
 	for _, v := range ss {
