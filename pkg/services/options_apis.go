@@ -30,6 +30,8 @@ const (
 	PeerDiscoveryEnabledEnvVar    = "SERVICES_API_PEER_DISCOVERY"
 	WebRTCEnabledEnvVar           = "SERVICES_API_WEBRTC"
 	WebRTCSTUNServersEnvVar       = "SERVICES_API_STUN_SERVERS"
+	ProxyTLSCertFileEnvVar        = "SERVICES_API_PROXY_TLS_CERT_FILE"
+	ProxyTLSKeyFileEnvVar         = "SERVICES_API_PROXY_TLS_KEY_FILE"
 	ProxyTLSCAFileEnvVar          = "SERVICES_API_PROXY_TLS_CA_FILE"
 	ProxyVerifyChainOnlyEnvVar    = "SERVICES_API_PROXY_VERIFY_CHAIN_ONLY"
 	ProxyInsecureSkipVerifyEnvVar = "SERVICES_API_PROXY_INSECURE_SKIP_VERIFY"
@@ -50,6 +52,12 @@ type APIOptions struct {
 	WebRTC bool `json:"webrtc,omitempty" yaml:"webrtc,omitempty" toml:"webrtc,omitempty"`
 	// STUNServers is a comma separated list of STUN servers to use if the WebRTC API is enabled.
 	STUNServers string `json:"stun-servers,omitempty" yaml:"stun-servers,omitempty" toml:"stun-servers,omitempty"`
+	// ProxyTLSCertFile is the path to the TLS certificate file for the proxy transport. If left unset,
+	// the server certificate will be used.
+	ProxyTLSCertFile string `json:"proxy-tls-cert-file,omitempty" yaml:"proxy-tls-cert-file,omitempty" toml:"proxy-tls-cert-file,omitempty"`
+	// ProxyTLSKeyFile is the path to the TLS key file for the proxy transport. If left unset,
+	// the server key will be used.
+	ProxyTLSKeyFile string `json:"proxy-tls-key-file,omitempty" yaml:"proxy-tls-key-file,omitempty" toml:"proxy-tls-key-file,omitempty"`
 	// ProxyTLSCAFile is the path to the TLS CA file for verifying a peer node's certificate.
 	ProxyTLSCAFile string `json:"proxy-tls-ca-file,omitempty" yaml:"proxy-tls-ca-file,omitempty" toml:"proxy-tls-ca-file,omitempty"`
 	// ProxyVerifyChainOnly is true if only the chain should be verified when proxying connections.
@@ -81,8 +89,12 @@ func (o *APIOptions) BindFlags(fs *flag.FlagSet) {
 		"Enable the WebRTC API.")
 	fs.StringVar(&o.STUNServers, "services.api.stun-servers", util.GetEnvDefault(WebRTCSTUNServersEnvVar, "stun:stun.l.google.com:19302"),
 		"STUN servers to use.")
+	fs.StringVar(&o.ProxyTLSCertFile, "services.api.proxy-tls-cert-file", util.GetEnvDefault(ProxyTLSCertFileEnvVar, ""),
+		"Path to the TLS certificate file for proxying.")
+	fs.StringVar(&o.ProxyTLSKeyFile, "services.api.proxy-tls-key-file", util.GetEnvDefault(ProxyTLSKeyFileEnvVar, ""),
+		"Path to the TLS key file for proxying.")
 	fs.StringVar(&o.ProxyTLSCAFile, "services.api.proxy-tls-ca-file", util.GetEnvDefault(ProxyTLSCAFileEnvVar, ""),
-		"Path to the TLS CA file for verifying the leader's certificate.")
+		"Path to the TLS CA file for verifying the peer certificates.")
 	fs.BoolVar(&o.ProxyVerifyChainOnly, "services.api.proxy-verify-chain-only", util.GetEnvDefault(ProxyVerifyChainOnlyEnvVar, "false") == "true",
 		"Only verify the TLS chain when proxying connections.")
 	fs.BoolVar(&o.ProxyInsecureSkipVerify, "services.api.proxy-insecure-skip-verify", util.GetEnvDefault(ProxyInsecureSkipVerifyEnvVar, "false") == "true",

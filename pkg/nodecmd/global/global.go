@@ -269,6 +269,12 @@ func (o *Options) Overlay(opts ...any) error {
 			if v.TLSKeyFile == "" {
 				v.TLSKeyFile = o.TLSKeyFile
 			}
+			if v.API.ProxyTLSCertFile == "" {
+				v.API.ProxyTLSCertFile = o.TLSCertFile
+			}
+			if v.API.ProxyTLSKeyFile == "" {
+				v.API.ProxyTLSKeyFile = o.TLSKeyFile
+			}
 			if v.API.ProxyTLSCAFile == "" {
 				v.API.ProxyTLSCAFile = o.TLSCAFile
 			}

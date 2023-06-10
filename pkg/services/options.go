@@ -215,7 +215,13 @@ func (o *Options) ProxyTLSConfig() (*tls.Config, error) {
 		return nil, nil
 	}
 	var config tls.Config
-	if !o.Insecure {
+	if o.API.ProxyTLSCertFile != "" && o.API.ProxyTLSKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(o.API.ProxyTLSCertFile, o.API.ProxyTLSKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("load x509 key pair: %w", err)
+		}
+		config.Certificates = []tls.Certificate{cert}
+	} else if !o.Insecure {
 		cert, err := tls.LoadX509KeyPair(o.TLSCertFile, o.TLSKeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("load x509 key pair: %w", err)
