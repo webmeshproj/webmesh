@@ -26,11 +26,11 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/hashicorp/raft"
+	_ "github.com/mattn/go-sqlite3"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	_ "modernc.org/sqlite"
 )
 
 // raftDBDriver is a driver that is backed by the Raft log.

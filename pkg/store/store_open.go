@@ -122,20 +122,16 @@ func (s *store) Open() error {
 		dataPath = s.opts.Raft.DataFilePath()
 		localDataPath = s.opts.Raft.LocalDataFilePath()
 	}
-	s.weakData, err = sql.Open("sqlite", dataPath)
+	dataPath += "?_foreign_keys=on&_case_sensitive_like=on&_journal_mode=WAL"
+	s.weakData, err = sql.Open("sqlite3", dataPath)
 	if err != nil {
 		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.Raft.DataFilePath(), err))
-	}
-	// Make sure we use case sensitive collation for the data store.
-	_, err = s.weakData.Exec("PRAGMA case_sensitive_like = true;")
-	if err != nil {
-		return handleErr(fmt.Errorf("set case sensitive like: %w", err))
 	}
 	s.raftData, err = sql.Open(raftDriverName, "")
 	if err != nil {
 		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
 	}
-	s.localData, err = sql.Open("sqlite", localDataPath)
+	s.localData, err = sql.Open("sqlite3", localDataPath)
 	if err != nil {
 		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.Raft.LocalDataFilePath(), err))
 	}

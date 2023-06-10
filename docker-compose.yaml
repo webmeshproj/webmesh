@@ -31,12 +31,12 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --global.log-level=debug
-      - --store.bootstrap
-      - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
-      - --store.bootstrap-ipv4-network=10.10.10.0/24
-      - --store.data-dir=/data
-      - --store.snapshot-threshold=10
-      - --store.raft-log-level=debug
+      - --bootstrap.enabled
+      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --bootstrap.ipv4-network=10.10.10.0/24
+      - --raft.data-dir=/data
+      - --raft.snapshot-threshold=10
+      - --raft.log-level=debug
       - --services.enable-leader-proxy
       - --services.enable-peer-discovery-api
       - --services.enable-metrics
@@ -71,11 +71,12 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --global.log-level=debug
-      - --store.bootstrap
-      - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
-      - --store.bootstrap-ipv4-network=10.10.10.0/24
-      - --store.data-dir=/data
-      - --store.raft-log-level=debug
+      - --bootstrap.enabled
+      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --bootstrap.ipv4-network=10.10.10.0/24
+      - --raft.data-dir=/data
+      - --raft.snapshot-threshold=10
+      - --raft.log-level=debug
       - --services.enable-leader-proxy
     volumes:
       - bootstrap-node-2:/data
@@ -94,11 +95,12 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --global.log-level=debug
-      - --store.bootstrap
-      - --store.bootstrap-servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
-      - --store.bootstrap-ipv4-network=10.10.10.0/24
-      - --store.data-dir=/data
-      - --store.raft-log-level=debug
+      - --bootstrap.enabled
+      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --bootstrap.ipv4-network=10.10.10.0/24
+      - --raft.data-dir=/data
+      - --raft.snapshot-threshold=10
+      - --raft.log-level=debug
       - --services.enable-leader-proxy
     volumes:
       - bootstrap-node-3:/data

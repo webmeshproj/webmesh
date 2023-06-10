@@ -22,15 +22,13 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/hashicorp/raft"
+	"github.com/mattn/go-sqlite3"
 	"golang.org/x/exp/slog"
-
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 )
 
 // Snapshotter is an interface for taking and restoring snapshots.
@@ -54,72 +52,31 @@ func New(db *sql.DB) Snapshotter {
 	}
 }
 
-type snapshotModel struct {
-	State         []raftdb.MeshState    `json:"state"`
-	Nodes         []raftdb.Node         `json:"nodes"`
-	NodeEdges     []raftdb.NodeEdge     `json:"node_edges"`
-	Leases        []raftdb.Lease        `json:"leases"`
-	Users         []raftdb.User         `json:"users"`
-	Groups        []raftdb.Group        `json:"groups"`
-	Roles         []raftdb.Role         `json:"roles"`
-	RoleBindings  []raftdb.RoleBinding  `json:"role_bindings"`
-	NetworkACLs   []raftdb.NetworkAcl   `json:"network_acls"`
-	NetworkRoutes []raftdb.NetworkRoute `json:"network_routes"`
-}
-
 func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 	s.log.Info("creating new db snapshot")
 	start := time.Now()
-	q := raftdb.New(s.db)
-	var model snapshotModel
-	var err error
-	model.State, err = q.DumpMeshState(ctx)
+	conn, err := s.db.Conn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("dump mesh state: %w", err)
-	}
-	model.Nodes, err = q.DumpNodes(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump nodes: %w", err)
-	}
-	model.NodeEdges, err = q.DumpNodeEdges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump node edges: %w", err)
-	}
-	model.Leases, err = q.DumpLeases(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump leases: %w", err)
-	}
-	model.Users, err = q.DumpUsers(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump users: %w", err)
-	}
-	model.Groups, err = q.DumpGroups(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump groups: %w", err)
-	}
-	model.Roles, err = q.DumpRoles(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump roles: %w", err)
-	}
-	model.RoleBindings, err = q.DumpRoleBindings(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump role bindings: %w", err)
-	}
-	model.NetworkACLs, err = q.DumpNetworkACLs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump network acls: %w", err)
-	}
-	model.NetworkRoutes, err = q.DumpNetworkRoutes(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("dump network routes: %w", err)
+		return nil, fmt.Errorf("get db connection: %w", err)
 	}
 	var buf bytes.Buffer
 	gzw := gzip.NewWriter(&buf)
-	if err := json.NewEncoder(gzw).Encode(model); err != nil {
-		return nil, fmt.Errorf("encode snapshot model: %w", err)
-	}
-	if err := gzw.Close(); err != nil {
-		return nil, fmt.Errorf("close gzip writer: %w", err)
+	err = conn.Raw(func(driverConn interface{}) error {
+		sqliteConn, ok := driverConn.(*sqlite3.SQLiteConn)
+		if !ok {
+			return fmt.Errorf("expected sqlite3 connection, got %T", conn)
+		}
+		out, err := sqliteConn.Serialize("")
+		if err != nil {
+			return fmt.Errorf("serialize db: %w", err)
+		}
+		if _, err := gzw.Write(out); err != nil {
+			return fmt.Errorf("write db: %w", err)
+		}
+		return gzw.Close()
+	})
+	if err != nil {
+		return nil, fmt.Errorf("snapshot db: %w", err)
 	}
 	snapshot := &snapshot{&buf}
 	s.log.Info("db snapshot complete",
@@ -138,211 +95,68 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 		return fmt.Errorf("gzip reader: %w", err)
 	}
 	defer gzr.Close()
-	var model snapshotModel
-	if err := json.NewDecoder(gzr).Decode(&model); err != nil {
-		return fmt.Errorf("decode snapshot model: %w", err)
-	}
-	tx, err := s.db.Begin()
+	data, err := io.ReadAll(gzr)
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
+		return fmt.Errorf("read snapshot: %w", err)
 	}
-	func() {
-		err := tx.Rollback()
-		if err != sql.ErrTxDone && err != nil {
-			s.log.Error("rollback transaction", slog.String("error", err.Error()))
-		}
-	}()
-	q := raftdb.New(tx)
-	err = q.DropMeshState(ctx)
+
+	// Create an in-memory database to deserialize the backup into.
+	restore, err := sql.Open("sqlite3", "file::memory:?mode=memory&cache=shared")
 	if err != nil {
-		return fmt.Errorf("drop mesh state: %w", err)
+		return fmt.Errorf("open in-memory db: %w", err)
 	}
-	err = q.DropLeases(ctx)
+	defer restore.Close()
+	// Execute the snapshot.
+	restoreConn, err := restore.Conn(ctx)
 	if err != nil {
-		return fmt.Errorf("drop leases: %w", err)
+		return fmt.Errorf("get db connection: %w", err)
 	}
-	err = q.DropNodeEdges(ctx)
+	var rawConn *sqlite3.SQLiteConn
+	err = restoreConn.Raw(func(driverConn interface{}) error {
+		rawConn = driverConn.(*sqlite3.SQLiteConn)
+		return rawConn.Deserialize(data, "")
+	})
 	if err != nil {
-		return fmt.Errorf("drop node edges: %w", err)
+		return fmt.Errorf("deserialize db: %w", err)
 	}
-	err = q.DropNodes(ctx)
+	// Drop all tables.
+	writeConn, err := s.db.Conn(ctx)
 	if err != nil {
-		return fmt.Errorf("drop nodes: %w", err)
+		return fmt.Errorf("get db connection: %w", err)
 	}
-	err = q.DropUsers(ctx)
+	_, err = writeConn.ExecContext(ctx, `PRAGMA writable_schema = 1; 
+	DELETE FROM sqlite_master WHERE type IN ('table', 'index', 'trigger', 'view'); 
+	PRAGMA writable_schema = 0;`)
 	if err != nil {
-		return fmt.Errorf("drop users: %w", err)
+		return fmt.Errorf("drop tables: %w", err)
 	}
-	err = q.DropGroups(ctx)
+	// Vacuum and integrity check.
+	_, err = writeConn.ExecContext(ctx, "VACUUM; PRAGMA INTEGRITY_CHECK;")
 	if err != nil {
-		return fmt.Errorf("drop groups: %w", err)
+		return fmt.Errorf("vacuum and integrity check: %w", err)
 	}
-	err = q.DropRoleBindings(ctx)
-	if err != nil {
-		return fmt.Errorf("drop role bindings: %w", err)
-	}
-	err = q.DropRoles(ctx)
-	if err != nil {
-		return fmt.Errorf("drop roles: %w", err)
-	}
-	err = q.DropNetworkACLs(ctx)
-	if err != nil {
-		return fmt.Errorf("drop network acls: %w", err)
-	}
-	err = q.DropNetworkRoutes(ctx)
-	if err != nil {
-		return fmt.Errorf("drop network routes: %w", err)
-	}
-	for _, state := range model.State {
-		s.log.Debug("restoring mesh state", slog.Any("state", state))
-		// nolint:gosimple
-		err = q.RestoreMeshState(ctx, raftdb.RestoreMeshStateParams{
-			Key:   state.Key,
-			Value: state.Value,
-		})
+	// Restore the deserialized database.
+	err = writeConn.Raw(func(driverConn interface{}) error {
+		c := driverConn.(*sqlite3.SQLiteConn)
+		backup, err := c.Backup("", rawConn, "")
 		if err != nil {
-			return fmt.Errorf("restore mesh state: %w", err)
+			return fmt.Errorf("backup db: %w", err)
 		}
-	}
-	for _, node := range model.Nodes {
-		s.log.Debug("restoring node", slog.Any("node", node))
-		// nolint:gosimple
-		err = q.RestoreNode(ctx, raftdb.RestoreNodeParams{
-			ID:                 node.ID,
-			PublicKey:          node.PublicKey,
-			RaftPort:           node.RaftPort,
-			GrpcPort:           node.GrpcPort,
-			PrimaryEndpoint:    node.PrimaryEndpoint,
-			WireguardEndpoints: node.WireguardEndpoints,
-			ZoneAwarenessID:    node.ZoneAwarenessID,
-			NetworkIpv6:        node.NetworkIpv6,
-			CreatedAt:          node.CreatedAt,
-			UpdatedAt:          node.UpdatedAt,
-		})
-		if err != nil {
-			return fmt.Errorf("restore node: %w", err)
+		for {
+			done, err := backup.Step(-1)
+			if err != nil {
+				return fmt.Errorf("backup step: %w", err)
+			}
+			if done {
+				break
+			}
 		}
-	}
-	for _, edge := range model.NodeEdges {
-		s.log.Debug("restoring node edge", slog.Any("edge", edge))
-		// nolint:gosimple
-		err = q.RestoreNodeEdge(ctx, raftdb.RestoreNodeEdgeParams{
-			SrcNodeID: edge.SrcNodeID,
-			DstNodeID: edge.DstNodeID,
-			Weight:    edge.Weight,
-			Attrs:     edge.Attrs,
-		})
-		if err != nil {
-			return fmt.Errorf("restore node edge: %w", err)
-		}
-	}
-	for _, lease := range model.Leases {
-		s.log.Debug("restoring lease", slog.Any("lease", lease))
-		// nolint:gosimple
-		err = q.RestoreLease(ctx, raftdb.RestoreLeaseParams{
-			NodeID:    lease.NodeID,
-			Ipv4:      lease.Ipv4,
-			CreatedAt: lease.CreatedAt,
-		})
-		if err != nil {
-			return fmt.Errorf("restore lease: %w", err)
-		}
-	}
-	for _, user := range model.Users {
-		s.log.Debug("restoring user", slog.Any("user", user))
-		// nolint:gosimple
-		err = q.RestoreUser(ctx, raftdb.RestoreUserParams{
-			Name:      user.Name,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-		})
-		if err != nil {
-			return fmt.Errorf("restore user: %w", err)
-		}
-	}
-	for _, group := range model.Groups {
-		s.log.Debug("restoring group", slog.Any("group", group))
-		// nolint:gosimple
-		err = q.RestoreGroup(ctx, raftdb.RestoreGroupParams{
-			Name:      group.Name,
-			Users:     group.Users,
-			Nodes:     group.Nodes,
-			CreatedAt: group.CreatedAt,
-			UpdatedAt: group.UpdatedAt,
-		})
-		if err != nil {
-			return fmt.Errorf("restore group: %w", err)
-		}
-	}
-	for _, role := range model.Roles {
-		s.log.Debug("restoring role", slog.Any("role", role))
-		// nolint:gosimple
-		err = q.RestoreRole(ctx, raftdb.RestoreRoleParams{
-			Name:      role.Name,
-			RulesJson: role.RulesJson,
-			CreatedAt: role.CreatedAt,
-			UpdatedAt: role.UpdatedAt,
-		})
-		if err != nil {
-			return fmt.Errorf("restore role: %w", err)
-		}
-	}
-	for _, binding := range model.RoleBindings {
-		s.log.Debug("restoring role binding", slog.Any("binding", binding))
-		// nolint:gosimple
-		err = q.RestoreRoleBinding(ctx, raftdb.RestoreRoleBindingParams{
-			Name:       binding.Name,
-			RoleName:   binding.RoleName,
-			NodeIds:    binding.NodeIds,
-			UserNames:  binding.UserNames,
-			GroupNames: binding.GroupNames,
-			CreatedAt:  binding.CreatedAt,
-			UpdatedAt:  binding.UpdatedAt,
-		})
-		if err != nil {
-			return fmt.Errorf("restore role binding: %w", err)
-		}
-	}
-	for _, acl := range model.NetworkACLs {
-		s.log.Debug("restoring network acl", slog.Any("acl", acl))
-		// nolint:gosimple
-		err = q.RestoreNetworkACL(ctx, raftdb.RestoreNetworkACLParams{
-			Name:       acl.Name,
-			Priority:   acl.Priority,
-			Action:     acl.Action,
-			SrcNodeIds: acl.SrcNodeIds,
-			DstNodeIds: acl.DstNodeIds,
-			SrcCidrs:   acl.SrcCidrs,
-			DstCidrs:   acl.DstCidrs,
-			Protocols:  acl.Protocols,
-			Ports:      acl.Ports,
-			CreatedAt:  acl.CreatedAt,
-			UpdatedAt:  acl.UpdatedAt,
-		})
-		if err != nil {
-			return fmt.Errorf("restore network acl: %w", err)
-		}
-	}
-	for _, route := range model.NetworkRoutes {
-		s.log.Debug("restoring network route", slog.Any("route", route))
-		// nolint:gosimple
-		err = q.RestoreNetworkRoute(ctx, raftdb.RestoreNetworkRouteParams{
-			Name:      route.Name,
-			Nodes:     route.Nodes,
-			DstCidrs:  route.DstCidrs,
-			NextHops:  route.NextHops,
-			CreatedAt: route.CreatedAt,
-			UpdatedAt: route.UpdatedAt,
-		})
-		if err != nil {
-			return fmt.Errorf("restore network route: %w", err)
-		}
-	}
-	err = tx.Commit()
+		return backup.Finish()
+	})
 	if err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
+		return fmt.Errorf("restore db: %w", err)
 	}
-	s.log.Info("restored db snapshot", slog.String("duration", time.Since(start).String()))
+	s.log.Info("db snapshot restore complete", slog.String("duration", time.Since(start).String()))
 	return nil
 }
 

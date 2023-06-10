@@ -7,7 +7,8 @@ on:
     branches: [main]
 
 env:
-  IMAGE_NAME: ghcr.io/webmeshproj/node
+  ALPINE_IMAGE_NAME: ghcr.io/webmeshproj/node
+  DISTROLESS_IMAGE_NAME: ghcr.io/webmeshproj/node-distroless
   GO_VERSION: ^1.20
   PLATFORMS: linux/amd64,linux/arm64,linux/arm
 
@@ -89,9 +90,20 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Build Cross Compiler Image
+        uses: docker/build-push-action@v3
+        with:
+          file: Dockerfile.build
+          tags: ghcr.io/webmeshproj/node-buildx
+          push: false
+          cache-to: type=gha
+          cache-from: type=gha
+
       - name: Build Release Binaries
         shell: bash
-        run: PLATFORMS="${PLATFORMS//,/ }" make dist
+        env:
+          BUILD_IMAGE: ghcr.io/webmeshproj/node-buildx
+        run: make dist
 
       - name: Login to GHCR
         uses: docker/login-action@v2
@@ -105,26 +117,41 @@ jobs:
         shell: bash
         id: tags
         run: |
-          IMAGES="${IMAGE_NAME}:latest,${IMAGE_NAME}:${{ github.sha }}"
+          ALPINE_IMAGES="${ALPINE_IMAGE_NAME}:latest,${ALPINE_IMAGE_NAME}:${{ github.sha }}"
+          DISTROLESS_IMAGES="${DISTROLESS_IMAGE_NAME}:latest,${DISTROLESS_IMAGE_NAME}:${{ github.sha }}"
           if [[ ${{ github.ref_name }} =~ ^v.* ]] ; then
-            IMAGES+=",${IMAGE_NAME}:${{ github.ref_name }}"
+            ALPINE_IMAGES+=",${ALPINE_IMAGE_NAME}:${{ github.ref_name }}"
+            DISTROLESS_IMAGES+=",${DISTROLESS_IMAGE_NAME}:${{ github.ref_name }}"
           fi
-          echo "IMAGES=${IMAGES}" >> "${GITHUB_OUTPUT}"
+          echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
+          echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build and Push Images
+      - name: Build and Push Alpine Images
         uses: docker/build-push-action@v3
-        id: build
+        id: alpine-build
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.tags.outputs.IMAGES }}
+          tags: ${{ steps.tags.outputs.alpine-images }}
           platforms: ${{ env.PLATFORMS }}
           cache-to: type=gha
           cache-from: type=gha
+
+      - name: Build and Push Distroless Images
+        uses: docker/build-push-action@v3
+        id: distroless-build
+        with:
+          context: .
+          file: Dockerfile.distroless
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.tags.outputs.distroless-images }}
+          platforms: ${{ env.PLATFORMS }}
 
       - name: Sign Images
         shell: bash
         if: ${{ github.event_name != 'pull_request' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
-        run: echo 'y' | cosign sign --recursive ${IMAGE_NAME}@${{ steps.build.outputs.digest }}
+        run: |
+          echo 'y' | cosign sign --recursive ${ALPINE_IMAGE_NAME}@${{ steps.alpine-build.outputs.digest }}
+          echo 'y' | cosign sign --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.distroless-build.outputs.digest }}

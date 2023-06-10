@@ -26,8 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
+	"github.com/mattn/go-sqlite3"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
@@ -106,8 +105,8 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix
 			CreatedAt: time.Now().UTC(),
 		})
 		if err != nil {
-			var sqlErr *sqlite.Error
-			if errors.As(err, &sqlErr) && sqlErr.Code() == sqlite3.SQLITE_CONSTRAINT {
+			var sqlErr *sqlite3.Error
+			if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
 				// We generated a duplicate IPv4 address, try again.
 				continue
 			}

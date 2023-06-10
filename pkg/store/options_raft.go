@@ -157,9 +157,9 @@ func NewRaftOptions() *RaftOptions {
 func (o *RaftOptions) BindFlags(fl *flag.FlagSet) {
 	fl.StringVar(&o.ListenAddress, "raft.listen-address", util.GetEnvDefault(RaftListenAddressEnvVar, ":9443"),
 		"Raft listen address.")
-	fl.StringVar(&o.DataDir, "data-dir", util.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
+	fl.StringVar(&o.DataDir, "raft.data-dir", util.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
 		"Store data directory.")
-	fl.BoolVar(&o.InMemory, "in-memory", util.GetEnvDefault(InMemoryEnvVar, "false") == "true",
+	fl.BoolVar(&o.InMemory, "raft.in-memory", util.GetEnvDefault(InMemoryEnvVar, "false") == "true",
 		"Store data in memory. This should only be used for testing and ephemeral nodes.")
 	fl.IntVar(&o.ConnectionPoolCount, "raft.connection-pool-count", util.GetEnvIntDefault(ConnectionPoolCountEnvVar, 0),
 		"Raft connection pool count.")

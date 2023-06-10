@@ -18,26 +18,6 @@ type Querier interface {
 	DeleteNodeEdges(ctx context.Context, arg DeleteNodeEdgesParams) error
 	DeleteRole(ctx context.Context, name string) error
 	DeleteRoleBinding(ctx context.Context, name string) error
-	DropGroups(ctx context.Context) error
-	DropLeases(ctx context.Context) error
-	DropMeshState(ctx context.Context) error
-	DropNetworkACLs(ctx context.Context) error
-	DropNetworkRoutes(ctx context.Context) error
-	DropNodeEdges(ctx context.Context) error
-	DropNodes(ctx context.Context) error
-	DropRoleBindings(ctx context.Context) error
-	DropRoles(ctx context.Context) error
-	DropUsers(ctx context.Context) error
-	DumpGroups(ctx context.Context) ([]Group, error)
-	DumpLeases(ctx context.Context) ([]Lease, error)
-	DumpMeshState(ctx context.Context) ([]MeshState, error)
-	DumpNetworkACLs(ctx context.Context) ([]NetworkAcl, error)
-	DumpNetworkRoutes(ctx context.Context) ([]NetworkRoute, error)
-	DumpNodeEdges(ctx context.Context) ([]NodeEdge, error)
-	DumpNodes(ctx context.Context) ([]Node, error)
-	DumpRoleBindings(ctx context.Context) ([]RoleBinding, error)
-	DumpRoles(ctx context.Context) ([]Role, error)
-	DumpUsers(ctx context.Context) ([]User, error)
 	EitherNodeExists(ctx context.Context, arg EitherNodeExistsParams) (int64, error)
 	GetGroup(ctx context.Context, name string) (Group, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
@@ -80,16 +60,6 @@ type Querier interface {
 	PutRole(ctx context.Context, arg PutRoleParams) error
 	PutRoleBinding(ctx context.Context, arg PutRoleBindingParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
-	RestoreGroup(ctx context.Context, arg RestoreGroupParams) error
-	RestoreLease(ctx context.Context, arg RestoreLeaseParams) error
-	RestoreMeshState(ctx context.Context, arg RestoreMeshStateParams) error
-	RestoreNetworkACL(ctx context.Context, arg RestoreNetworkACLParams) error
-	RestoreNetworkRoute(ctx context.Context, arg RestoreNetworkRouteParams) error
-	RestoreNode(ctx context.Context, arg RestoreNodeParams) error
-	RestoreNodeEdge(ctx context.Context, arg RestoreNodeEdgeParams) error
-	RestoreRole(ctx context.Context, arg RestoreRoleParams) error
-	RestoreRoleBinding(ctx context.Context, arg RestoreRoleBindingParams) error
-	RestoreUser(ctx context.Context, arg RestoreUserParams) error
 	SetIPv4Prefix(ctx context.Context, value string) error
 	SetULAPrefix(ctx context.Context, value string) error
 	UpdateNodeEdge(ctx context.Context, arg UpdateNodeEdgeParams) error

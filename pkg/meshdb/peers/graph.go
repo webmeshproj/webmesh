@@ -26,9 +26,8 @@ import (
 	"strings"
 
 	"github.com/dominikbraun/graph"
+	"github.com/mattn/go-sqlite3"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
@@ -95,8 +94,8 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 	}
 	_, err := g.wdb.InsertNode(context.Background(), params)
 	if err != nil {
-		var sqliteErr *sqlite.Error
-		if errors.As(err, &sqliteErr) && sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT {
+		var sqliteErr *sqlite3.Error
+		if errors.As(err, &sqliteErr) && sqliteErr.Code == sqlite3.ErrConstraint {
 			return graph.ErrVertexAlreadyExists
 		}
 		return fmt.Errorf("create node: %w", err)
@@ -231,8 +230,8 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 	}
 	err = g.wdb.InsertNodeEdge(context.Background(), params)
 	if err != nil {
-		var sqlerr *sqlite.Error
-		if errors.As(err, &sqlerr) && sqlerr.Code() == sqlite3.SQLITE_CONSTRAINT {
+		var sqlerr *sqlite3.Error
+		if errors.As(err, &sqlerr) && sqlerr.Code == sqlite3.ErrConstraint {
 			return graph.ErrEdgeAlreadyExists
 		}
 		return fmt.Errorf("insert node edge: %w", err)
