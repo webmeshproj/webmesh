@@ -95,9 +95,9 @@ SELECT DISTINCT roles.name, roles.rules_json, roles.created_at, roles.updated_at
 JOIN role_bindings ON roles.name = role_bindings.role_name
 LEFT OUTER JOIN groups ON role_bindings.group_names LIKE '%' || groups.name || '%'
 WHERE 
-    role_bindings.node_ids LIKE '%' || :nodeID || '%' OR
+    role_bindings.node_ids LIKE '%' || ? || '%' OR
     role_bindings.node_ids = '*' OR
-    groups.nodes LIKE '%' || :nodeID || '%'
+    groups.nodes LIKE '%' || ? || '%'
 `
 
 type ListBoundRolesForNodeParams struct {

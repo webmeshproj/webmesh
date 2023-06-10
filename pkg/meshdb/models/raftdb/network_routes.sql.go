@@ -154,9 +154,9 @@ INSERT INTO network_routes (
     ?, ?, ?, ?, ?, ?
 )
 ON CONFLICT (name) DO UPDATE SET
-    node = EXCLUDED.nodes,
+    node = EXCLUDED.node,
     dst_cidrs = EXCLUDED.dst_cidrs,
-    next_hop = EXCLUDED.next_hops,
+    next_hop = EXCLUDED.next_hop,
     updated_at = EXCLUDED.updated_at
 `
 
