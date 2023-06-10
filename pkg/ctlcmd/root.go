@@ -22,7 +22,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/node/pkg/ctlcmd/config"
 )
@@ -30,11 +29,6 @@ import (
 var (
 	configFileFlag string
 	cliConfig      *config.Config
-
-	encoder = protojson.MarshalOptions{
-		Multiline: true,
-		Indent:    "  ",
-	}
 )
 
 func init() {

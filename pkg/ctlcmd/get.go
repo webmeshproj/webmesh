@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -54,18 +53,20 @@ var getNodesCmd = &cobra.Command{
 			return err
 		}
 		defer closer.Close()
-		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetNode(cmd.Context(), &v1.GetNodeRequest{
+			resp, err := client.GetNode(cmd.Context(), &v1.GetNodeRequest{
 				Id: args[0],
 			})
-		} else {
-			resp, err = client.ListNodes(cmd.Context(), &emptypb.Empty{})
+			if err != nil {
+				return err
+			}
+			return encodeToStdout(cmd, resp)
 		}
+		resp, err := client.ListNodes(cmd.Context(), &emptypb.Empty{})
 		if err != nil {
 			return err
 		}
-		return encodeToStdout(cmd, resp)
+		return encodeListToStdout(cmd, resp.Nodes)
 	},
 }
 
@@ -100,16 +101,18 @@ var getRolesCmd = &cobra.Command{
 			return err
 		}
 		defer closer.Close()
-		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetRole(cmd.Context(), &v1.Role{Name: args[0]})
-		} else {
-			resp, err = client.ListRoles(cmd.Context(), &emptypb.Empty{})
+			resp, err := client.GetRole(cmd.Context(), &v1.Role{Name: args[0]})
+			if err != nil {
+				return err
+			}
+			return encodeToStdout(cmd, resp)
 		}
+		resp, err := client.ListRoles(cmd.Context(), &emptypb.Empty{})
 		if err != nil {
 			return err
 		}
-		return encodeToStdout(cmd, resp)
+		return encodeListToStdout(cmd, resp.Items)
 	},
 }
 
@@ -125,16 +128,18 @@ var getRoleBindingsCmd = &cobra.Command{
 			return err
 		}
 		defer closer.Close()
-		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetRoleBinding(cmd.Context(), &v1.RoleBinding{Name: args[0]})
-		} else {
-			resp, err = client.ListRoleBindings(cmd.Context(), &emptypb.Empty{})
+			resp, err := client.GetRoleBinding(cmd.Context(), &v1.RoleBinding{Name: args[0]})
+			if err != nil {
+				return err
+			}
+			return encodeToStdout(cmd, resp)
 		}
+		resp, err := client.ListRoleBindings(cmd.Context(), &emptypb.Empty{})
 		if err != nil {
 			return err
 		}
-		return encodeToStdout(cmd, resp)
+		return encodeListToStdout(cmd, resp.Items)
 	},
 }
 
@@ -150,16 +155,18 @@ var getGroupsCmd = &cobra.Command{
 			return err
 		}
 		defer closer.Close()
-		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetGroup(cmd.Context(), &v1.Group{Name: args[0]})
-		} else {
-			resp, err = client.ListGroups(cmd.Context(), &emptypb.Empty{})
+			resp, err := client.GetGroup(cmd.Context(), &v1.Group{Name: args[0]})
+			if err != nil {
+				return err
+			}
+			return encodeToStdout(cmd, resp)
 		}
+		resp, err := client.ListGroups(cmd.Context(), &emptypb.Empty{})
 		if err != nil {
 			return err
 		}
-		return encodeToStdout(cmd, resp)
+		return encodeListToStdout(cmd, resp.Items)
 	},
 }
 
@@ -175,16 +182,18 @@ var getNetworkACLsCmd = &cobra.Command{
 			return err
 		}
 		defer closer.Close()
-		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetNetworkACL(cmd.Context(), &v1.NetworkACL{Name: args[0]})
-		} else {
-			resp, err = client.ListNetworkACLs(cmd.Context(), &emptypb.Empty{})
+			resp, err := client.GetNetworkACL(cmd.Context(), &v1.NetworkACL{Name: args[0]})
+			if err != nil {
+				return err
+			}
+			return encodeToStdout(cmd, resp)
 		}
+		resp, err := client.ListNetworkACLs(cmd.Context(), &emptypb.Empty{})
 		if err != nil {
 			return err
 		}
-		return encodeToStdout(cmd, resp)
+		return encodeListToStdout(cmd, resp.Items)
 	},
 }
 
@@ -200,15 +209,17 @@ var getRoutesCmd = &cobra.Command{
 			return err
 		}
 		defer closer.Close()
-		var resp proto.Message
 		if len(args) == 1 {
-			resp, err = client.GetRoute(cmd.Context(), &v1.Route{Name: args[0]})
-		} else {
-			resp, err = client.ListRoutes(cmd.Context(), &emptypb.Empty{})
+			resp, err := client.GetRoute(cmd.Context(), &v1.Route{Name: args[0]})
+			if err != nil {
+				return err
+			}
+			return encodeToStdout(cmd, resp)
 		}
+		resp, err := client.ListRoutes(cmd.Context(), &emptypb.Empty{})
 		if err != nil {
 			return err
 		}
-		return encodeToStdout(cmd, resp)
+		return encodeListToStdout(cmd, resp.Items)
 	},
 }

@@ -17,9 +17,19 @@ limitations under the License.
 package ctlcmd
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
+)
+
+var (
+	encoder = protojson.MarshalOptions{
+		Multiline: true,
+		Indent:    "  ",
+	}
 )
 
 func encodeToStdout(cmd *cobra.Command, resp proto.Message) error {
@@ -28,6 +38,32 @@ func encodeToStdout(cmd *cobra.Command, resp proto.Message) error {
 		return err
 	}
 	cmd.Println(string(out))
+	return nil
+}
+
+func encodeListToStdout[T proto.Message](cmd *cobra.Command, resp []T) error {
+	var out strings.Builder
+	out.WriteString("[\n")
+	for i, msg := range resp {
+		if i > 0 {
+			out.WriteString(",\n")
+		}
+		encoded, err := encoder.Marshal(proto.Message(msg))
+		if err != nil {
+			return err
+		}
+		// Include the indent in the output
+		out.WriteString("  ")
+		spl := strings.Split(string(encoded), "\n")
+		for i, line := range spl {
+			out.WriteString(line)
+			if i < len(spl)-1 {
+				out.WriteString("\n  ")
+			}
+		}
+	}
+	out.WriteString("\n]")
+	cmd.Println(out.String())
 	return nil
 }
 
