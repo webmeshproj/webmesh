@@ -185,9 +185,10 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 			return fmt.Errorf("parse wireguard key: %w", err)
 		}
 		peer := &wireguard.Peer{
-			ID:         wgPeer.GetId(),
-			PublicKey:  key,
-			AllowedIPs: make([]netip.Prefix, len(wgPeer.GetAllowedIps())),
+			ID:            wgPeer.GetId(),
+			PublicKey:     key,
+			AllowedIPs:    make([]netip.Prefix, len(wgPeer.GetAllowedIps())),
+			AllowedRoutes: make([]netip.Prefix, len(wgPeer.GetAllowedRoutes())),
 		}
 		for i, ip := range wgPeer.GetAllowedIps() {
 			peer.AllowedIPs[i], err = netip.ParsePrefix(ip)
