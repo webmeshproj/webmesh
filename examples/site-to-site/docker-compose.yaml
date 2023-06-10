@@ -47,12 +47,12 @@ services:
       - --global.no-ipv6
       - --global.primary-endpoint=10.250.0.1
       - --global.detect-private-endpoints
-      - --store.bootstrap
-      - --store.advertise-address=site-1-leader:9443
-      - --store.bootstrap-servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
-      - --store.bootstrap-ipv4-network=10.10.10.0/24
-      - --store.data-dir=/data
-      - --store.zone-awareness-id=site-1
+      - --bootstrap.enabled
+      - --bootstrap.advertise-address=site-1-leader:9443
+      - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
+      - --bootstrap.ipv4-network=10.10.10.0/24
+      - --raft.data-dir=/data
+      - --mesh.zone-awareness-id=site-1
       - --services.enable-leader-proxy
       - --services.enable-mesh-api
       - --services.enable-mesh-dns
@@ -72,10 +72,10 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-1-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-1
+      - --raft.in-memory
+      - --mesh.join-address=site-1-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -88,10 +88,10 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-1-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-1
+      - --raft.in-memory
+      - --mesh.join-address=site-1-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -104,10 +104,10 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-1-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-1
+      - --raft.in-memory
+      - --mesh.join-address=site-1-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -126,12 +126,12 @@ services:
       - --global.no-ipv6
       - --global.primary-endpoint=10.250.0.2
       - --global.detect-private-endpoints
-      - --store.bootstrap
-      - --store.advertise-address=site-2-leader:9443
-      - --store.bootstrap-servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
-      - --store.bootstrap-ipv4-network=10.10.10.0/24
-      - --store.data-dir=/data
-      - --store.zone-awareness-id=site-2
+      - --bootstrap.enabled
+      - --bootstrap.advertise-address=site-2-leader:9443
+      - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
+      - --bootstrap.ipv4-network=10.10.10.0/24
+      - --raft.data-dir=/data
+      - --mesh.zone-awareness-id=site-2
       - --services.enable-leader-proxy
       - --services.enable-mesh-api
     volumes:
@@ -147,10 +147,10 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-2-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-2
+      - --raft.in-memory
+      - --mesh.join-address=site-2-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -163,10 +163,10 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-2-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-2
+      - --raft.in-memory
+      - --mesh.join-address=site-2-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -179,10 +179,10 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-2-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-2
+      - --raft.in-memory
+      - --mesh.join-address=site-2-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -201,12 +201,12 @@ services:
       - --global.no-ipv6
       - --global.primary-endpoint=10.250.0.3
       - --global.detect-private-endpoints
-      - --store.bootstrap
-      - --store.advertise-address=site-3-leader:9443
-      - --store.bootstrap-servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
-      - --store.bootstrap-ipv4-network=10.10.10.0/24
-      - --store.data-dir=/data
-      - --store.zone-awareness-id=site-3
+      - --bootstrap.enabled
+      - --bootstrap.advertise-address=site-3-leader:9443
+      - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
+      - --bootstrap.ipv4-network=10.10.10.0/24
+      - --raft.data-dir=/data
+      - --mesh.zone-awareness-id=site-3
       - --services.enable-leader-proxy
       - --services.enable-mesh-api
     volumes:
@@ -222,10 +222,10 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-3-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-3
+      - --raft.in-memory
+      - --mesh.join-address=site-3-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -238,10 +238,10 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-3-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-3
+      - --raft.in-memory
+      - --mesh.join-address=site-3-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -254,9 +254,9 @@ services:
       - /node
       - --global.insecure
       - --global.no-ipv6
-      - --store.in-memory
-      - --store.join=site-3-leader:8443
-      - --store.max-join-retries=10
-      - --store.zone-awareness-id=site-3
+      - --raft.in-memory
+      - --mesh.join-address=site-3-leader:8443
+      - --mesh.max-join-retries=10
+      - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

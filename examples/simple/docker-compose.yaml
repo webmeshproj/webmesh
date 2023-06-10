@@ -28,9 +28,9 @@ services:
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --store.bootstrap
-      - --store.bootstrap-ipv4-network=10.10.10.0/24
-      - --store.data-dir=/data
+      - --bootstrap.enabled
+      - --bootstrap.ipv4-network=10.10.10.0/24
+      - --raft.data-dir=/data
     ports:
       - 8443:8443
       - 51820:51820/udp
