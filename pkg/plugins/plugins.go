@@ -44,11 +44,13 @@ var (
 type Manager interface {
 	// Get returns the plugin with the given name.
 	Get(name string) (v1.PluginClient, bool)
-	// AuthPlugin returns the configured auth plugin, if any.
-	AuthPlugin() v1.PluginClient
-	// AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin, if any.
+	// HasAuth returns true if the manager has an auth plugin.
+	HasAuth() bool
+	// AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin.
+	// If no plugin is configured, the returned function is a no-op.
 	AuthUnaryInterceptor() grpc.UnaryServerInterceptor
-	// AuthStreamInterceptor returns a stream interceptor for the configured auth plugin, if any.
+	// AuthStreamInterceptor returns a stream interceptor for the configured auth plugin.
+	// If no plugin is configured, the returned function is a no-op.
 	AuthStreamInterceptor() grpc.StreamServerInterceptor
 }
 
@@ -120,8 +122,8 @@ func (m *manager) Get(name string) (v1.PluginClient, bool) {
 	return p, ok
 }
 
-func (m *manager) AuthPlugin() v1.PluginClient {
-	return m.auth
+func (m *manager) HasAuth() bool {
+	return m.auth != nil
 }
 
 func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {

@@ -177,7 +177,7 @@ func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager) ([]g
 		streammiddlewares = append(streammiddlewares, metrics.StreamServerInterceptor())
 		promapi.MustRegister(metrics)
 	}
-	if plugins.AuthPlugin() != nil {
+	if plugins.HasAuth() {
 		slog.Default().Debug("registering auth interceptor")
 		unarymiddlewares = append(unarymiddlewares, plugins.AuthUnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, plugins.AuthStreamInterceptor())

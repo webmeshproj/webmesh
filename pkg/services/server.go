@@ -93,7 +93,7 @@ func NewServer(store store.Store, plugins plugins.Manager, o *Options) (*Server,
 	}
 	log.Debug("registering node server")
 	// Always register the node server
-	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), plugins.AuthPlugin() == nil))
+	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), !plugins.HasAuth()))
 	return server, nil
 }
 
