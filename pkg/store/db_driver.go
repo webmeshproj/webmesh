@@ -214,6 +214,9 @@ func (s *raftDBStatement) ExecContext(ctx context.Context, args []driver.NamedVa
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("apply log entry data: %s", resp.GetError())
 	}
+	if resp.GetExecResult().GetError() != "" {
+		return nil, fmt.Errorf("execute statement: %s", resp.GetExecResult().GetError())
+	}
 	return &execResult{resp}, nil
 }
 
@@ -271,6 +274,9 @@ func (s *raftDBStatement) QueryContext(ctx context.Context, args []driver.NamedV
 	resp := f.Response().(*v1.RaftApplyResponse)
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("apply log entry data: %s", resp.GetError())
+	}
+	if resp.GetQueryResult().GetError() != "" {
+		return nil, fmt.Errorf("query: %s", resp.GetQueryResult().GetError())
 	}
 	return &queryResult{resp, 0}, nil
 }
