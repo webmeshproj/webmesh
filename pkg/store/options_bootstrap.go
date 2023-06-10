@@ -151,7 +151,7 @@ Ports should be in the form of <node-id>=<port>.`)
 		"Admin username to bootstrap the cluster with.")
 
 	fl.StringVar(&o.Voters, "bootstrap.voters", util.GetEnvDefault(BootstrapVotersEnvVar, ""),
-		"Comma separated list of voters to bootstrap the cluster with. bootstrap--servers are already included in this list.")
+		"Comma separated list of voters to bootstrap the cluster with. bootstrap-servers are already included in this list.")
 
 	fl.StringVar(&o.DefaultNetworkPolicy, "bootstrap.default-network-policy", util.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
 		"Default network policy to bootstrap the cluster with.")
