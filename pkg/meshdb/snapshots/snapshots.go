@@ -99,7 +99,6 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	if err != nil {
 		return fmt.Errorf("read snapshot: %w", err)
 	}
-
 	// Create an in-memory database to deserialize the backup into.
 	restore, err := sql.Open("sqlite3", "file::memory:?mode=memory&cache=shared")
 	if err != nil {
