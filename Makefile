@@ -36,10 +36,11 @@ lint:
 
 DIST        := $(CURDIR)/dist
 BUILD_IMAGE ?= $(REPO)/node-buildx
+BUILD_IMAGE_ARGS ?= --load
 .PHONY: dist
 dist:
 	mkdir -p $(DIST)
-	docker buildx build -t $(BUILD_IMAGE) -f Dockerfile.build --load .
+	docker buildx build -t $(BUILD_IMAGE) -f Dockerfile.build $(BUILD_IMAGE_ARGS) .
 	docker run --rm \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(CURDIR):/build" \
@@ -47,7 +48,7 @@ dist:
 		-v "$(shell go env GOPATH):/go" \
 		-e GOPATH=/go \
 		-w /build \
-		$(NAME)-build make -j $(shell nproc) dist-node dist-ctl
+		$(BUILD_IMAGE) make -j $(shell nproc) dist-node dist-ctl
 
 dist-node: ## Build node binaries for all platforms.
 	$(MAKE) \
