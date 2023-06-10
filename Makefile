@@ -10,21 +10,26 @@ VERSION_PKG := github.com/webmeshproj/$(NAME)/pkg/version
 VERSION     := $(shell git describe --tags --always --dirty)
 COMMIT      := $(shell git rev-parse HEAD)
 DATE        := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-LDFLAGS     ?= -s -w -extldflags=-static -X $(VERSION_PKG).Version=$(VERSION) -X $(VERSION_PKG).Commit=$(COMMIT) -X $(VERSION_PKG).BuildDate=$(DATE)
+LDFLAGS     ?= -s -w -extldflags=-static \
+			   -X $(VERSION_PKG).Version=$(VERSION) \
+			   -X $(VERSION_PKG).Commit=$(COMMIT) \
+			   -X $(VERSION_PKG).BuildDate=$(DATE)
 BUILD_TAGS  ?= osusergo,netgo,sqlite_omit_load_extension,sqlite_vacuum_incr,sqlite_json
+
+DIST := $(CURDIR)/dist
 
 build: fmt vet generate ## Build node binary.
 	go build \
-		-tags $(BUILD_TAGS) \
+		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
-		-o dist/$(NAME)_$(OS)_$(ARCH) \
+		-o "$(DIST)/$(NAME)_$(OS)_$(ARCH)" \
 		cmd/$(NAME)/main.go
 
 build-ctl: fmt vet ## Build wmctl binary.
 	go build \
-		-tags $(BUILD_TAGS) \
+		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
-		-o dist/$(CTL)_$(OS)_$(ARCH) \
+		-o "$(DIST)/$(CTL)_$(OS)_$(ARCH)" \
 		cmd/$(CTL)/main.go
 
 tidy:
@@ -34,13 +39,13 @@ lint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run
 
-DIST        := $(CURDIR)/dist
 BUILD_IMAGE ?= $(REPO)/node-buildx
-BUILD_IMAGE_ARGS ?= --load
+build-image: ## Build the node build image.
+	docker buildx build -t $(BUILD_IMAGE) -f Dockerfile.build --load .
+
 .PHONY: dist
 dist:
 	mkdir -p $(DIST)
-	docker buildx build -t $(BUILD_IMAGE) -f Dockerfile.build $(BUILD_IMAGE_ARGS) .
 	docker run --rm \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(CURDIR):/build" \
@@ -85,9 +90,10 @@ dist-ctl-linux-arm:
 define dist-build
 	CGO_ENABLED=1 GOOS=$(2) GOARCH=$(3) CC=$(4) \
 		go build \
-			-tags $(BUILD_TAGS) \
+			-tags "$(BUILD_TAGS)" \
 			-ldflags "$(LDFLAGS)" \
-			-o $(DIST)/$(1)_$(2)_$(3) \
+			-trimpath \
+			-o "$(DIST)/$(1)_$(2)_$(3)" \
 			cmd/$(1)/main.go
 endef
 
@@ -107,7 +113,7 @@ docker-push: docker-build ## Push the node docker image
 compose-up: ## Run docker-compose stack.
 	IMAGE=$(IMAGE) docker-compose up
 
-pull-db:
+pull-db: ## Pull the database from the bootstrap node.
 	docker-compose cp bootstrap-node-1:/data/webmesh.sqlite ./webmesh.sqlite
 
 .PHONY: fmt
@@ -123,9 +129,9 @@ generate: ## Generate SQL code.
 	go install github.com/kyleconroy/sqlc/cmd/sqlc@latest
 	sqlc -f $(SQLC_CONFIG) generate
 
-install-ctl:
-	go install github.com/webmeshproj/$(NAME)/cmd/$(CTL)
+install-ctl: build-ctl ## Install wmctl binary into $GOPATH/bin.
+	install -m 755 $(DIST)/$(CTL)_$(OS)_$(ARCH) $(shell go env GOPATH)/bin/$(CTL)
 
-clean:
+clean: ## Clean up build and development artifacts.
 	rm -rf dist
-	rm -rf webmesh.sqlite
+	rm -rf *.sqlite

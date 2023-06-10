@@ -95,7 +95,7 @@ jobs:
         with:
           file: Dockerfile.build
           tags: ghcr.io/webmeshproj/node-buildx
-          push: false
+          load: true
           cache-to: type=gha
           cache-from: type=gha
 
