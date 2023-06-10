@@ -122,7 +122,7 @@ func (s *store) Open() error {
 		dataPath = s.opts.Raft.DataFilePath()
 		localDataPath = s.opts.Raft.LocalDataFilePath()
 	}
-	dataPath += "?_foreign_keys=on&_case_sensitive_like=on&_journal_mode=WAL"
+	dataPath += "?_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
 	s.weakData, err = sql.Open("sqlite3", dataPath)
 	if err != nil {
 		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.Raft.DataFilePath(), err))

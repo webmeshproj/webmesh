@@ -66,7 +66,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 			routeChange = true
 		}
 	}
-	if edgeChange && s.wg != nil {
+	if (edgeChange || routeChange) && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
 			defer func() {
 				if s.noWG {
@@ -113,7 +113,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 // Apply applies a Raft log entry to the store.
 func (s *store) Apply(l *raft.Log) any {
 	edgeChange, routeChange, res := s.applyLog(l)
-	if edgeChange && s.wg != nil {
+	if (edgeChange || routeChange) && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
 			defer func() {
 				if s.noWG {

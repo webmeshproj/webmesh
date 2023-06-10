@@ -241,6 +241,7 @@ func recurseEdges(
 			}
 		} else if len(thisRoutes) > 0 {
 			// The peer doesn't expose routes but we do, so we need to add our routes to the peer
+			// TODO: There is a third condition where we both expose routes and there are non-overlapping routes
 			for _, prefix := range thisRoutes {
 				if !contains(allowedRoutes, prefix) {
 					allowedRoutes = append(allowedRoutes, prefix)

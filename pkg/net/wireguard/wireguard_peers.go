@@ -93,6 +93,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		}
 		allowedIPs = append(allowedIPs, ipnet)
 	}
+	var allowedRoutes []net.IPNet
 	for _, ip := range peer.AllowedRoutes {
 		var ipnet net.IPNet
 		if ip.Addr().Is4() {
@@ -106,11 +107,11 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 				Mask: net.CIDRMask(ip.Bits(), 128),
 			}
 		}
-		allowedIPs = append(allowedIPs, ipnet)
+		allowedRoutes = append(allowedRoutes, ipnet)
 	}
 	peerCfg := wgtypes.PeerConfig{
 		PublicKey:                   peer.PublicKey,
-		AllowedIPs:                  allowedIPs,
+		AllowedIPs:                  append(allowedIPs, allowedRoutes...),
 		PersistentKeepaliveInterval: keepAlive,
 		ReplaceAllowedIPs:           true,
 	}
