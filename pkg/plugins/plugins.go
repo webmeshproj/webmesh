@@ -32,6 +32,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -60,12 +62,19 @@ type Manager interface {
 	// AuthStreamInterceptor returns a stream interceptor for the configured auth plugin.
 	// If no plugin is configured, the returned function is a no-op.
 	AuthStreamInterceptor() grpc.StreamServerInterceptor
+	// ApplyRaftLog applies a raft log entry to all storage plugins. Responses are still returned
+	// even if an error occurs.
+	ApplyRaftLog(ctx context.Context, entry *v1.RaftLogEntry) ([]*v1.RaftApplyResponse, error)
+	// Emit emits an event to all watch plugins.
+	Emit(ctx context.Context, typ string, event proto.Message) error
 }
 
 // New creates a new plugin manager.
 func New(ctx context.Context, opts *Options) (Manager, error) {
 	var auth v1.PluginClient
 	registered := make(map[string]v1.PluginClient)
+	stores := make([]v1.PluginClient, 0)
+	emitters := make([]v1.PluginClient, 0)
 	log := slog.Default()
 	for name, cfg := range opts.Plugins {
 		log.Info("loading plugin", "name", name)
@@ -100,6 +109,12 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 			if cap == v1.PluginCapability_PLUGIN_CAPABILITY_AUTH {
 				auth = plugin
 			}
+			if cap == v1.PluginCapability_PLUGIN_CAPABILITY_STORE {
+				stores = append(stores, plugin)
+			}
+			if cap == v1.PluginCapability_PLUGIN_CAPABILITY_WATCH {
+				emitters = append(emitters, plugin)
+			}
 		}
 		pcfg, err := structpb.NewStruct(cfg.Config)
 		if err != nil {
@@ -114,27 +129,35 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 		registered[info.Name] = plugin
 	}
 	return &manager{
-		auth:    auth,
-		plugins: registered,
-		log:     slog.Default().With("component", "plugin-manager"),
+		auth:     auth,
+		plugins:  registered,
+		stores:   stores,
+		emitters: emitters,
+		log:      slog.Default().With("component", "plugin-manager"),
 	}, nil
 }
 
 type manager struct {
-	auth    v1.PluginClient
-	plugins map[string]v1.PluginClient
-	log     *slog.Logger
+	auth     v1.PluginClient
+	stores   []v1.PluginClient
+	emitters []v1.PluginClient
+	plugins  map[string]v1.PluginClient
+	log      *slog.Logger
 }
 
+// Get returns the plugin with the given name.
 func (m *manager) Get(name string) (v1.PluginClient, bool) {
 	p, ok := m.plugins[name]
 	return p, ok
 }
 
+// HasAuth returns true if the manager has an auth plugin.
 func (m *manager) HasAuth() bool {
 	return m.auth != nil
 }
 
+// AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin.
+// If no plugin is configured, the returned function is a no-op.
 func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		if m.auth == nil {
@@ -149,6 +172,8 @@ func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
+// AuthStreamInterceptor returns a stream interceptor for the configured auth plugin.
+// If no plugin is configured, the returned function is a no-op.
 func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if m.auth == nil {
@@ -161,6 +186,47 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 		ctx := context.WithAuthenticatedCaller(ss.Context(), resp.GetId())
 		return handler(srv, &authenticatedServerStream{ss, ctx})
 	}
+}
+
+// ApplyRaftLog applies a raft log entry to all storage plugins.
+func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.RaftLogEntry) ([]*v1.RaftApplyResponse, error) {
+	out := make([]*v1.RaftApplyResponse, len(m.stores))
+	errs := make([]error, 0)
+	for i, store := range m.stores {
+		resp, err := store.Store(ctx, entry)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		out[i] = resp
+	}
+	var err error
+	if len(errs) > 0 {
+		err = fmt.Errorf("apply raft log: %v", errs)
+	}
+	return out, err
+}
+
+// Emit emits an event to all watch plugins.
+func (m *manager) Emit(ctx context.Context, typ string, event proto.Message) error {
+	ev, err := anypb.New(event)
+	if err != nil {
+		return fmt.Errorf("new any: %w", err)
+	}
+	errs := make([]error, 0)
+	for _, emitter := range m.emitters {
+		_, err = emitter.Emit(ctx, &v1.WatchEvent{
+			Type:   typ,
+			Object: ev,
+		})
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("emit: %v", errs)
+	}
+	return nil
 }
 
 func (m *manager) newAuthRequest(ctx context.Context) *v1.AuthenticationRequest {

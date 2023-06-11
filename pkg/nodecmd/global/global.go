@@ -215,6 +215,18 @@ func (o *Options) Overlay(opts ...any) error {
 			if v.TLS.CAFile == "" {
 				v.TLS.CAFile = o.TLSCAFile
 			}
+			if o.MTLS && v.Plugins.Plugins["mtls"] == nil {
+				v.Plugins.Plugins["mtls"] = &plugins.Config{
+					Config: map[string]any{
+						"ca-file": func() string {
+							if o.TLSClientCAFile != "" {
+								return o.TLSClientCAFile
+							}
+							return o.TLSCAFile
+						}(),
+					},
+				}
+			}
 			if primaryEndpoint.IsValid() {
 				var raftPort, wireguardPort uint16
 				for _, inOpts := range opts {

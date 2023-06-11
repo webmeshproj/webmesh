@@ -73,7 +73,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 					return
 				}
 				s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
-				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+				if err := s.refreshWireguardPeers(context.Background()); err != nil {
 					s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
 				}
 			}()
@@ -120,7 +120,7 @@ func (s *store) Apply(l *raft.Log) any {
 					return
 				}
 				s.log.Debug("applied node edge change, refreshing wireguard peers")
-				if err := s.RefreshWireguardPeers(context.Background()); err != nil {
+				if err := s.refreshWireguardPeers(context.Background()); err != nil {
 					s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
 				}
 			}()

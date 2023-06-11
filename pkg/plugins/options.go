@@ -21,7 +21,7 @@ import "flag"
 // Options are the options for loading plugins.
 type Options struct {
 	// Plugins is a map of plugin names to plugin configs.
-	Plugins map[string]*Config `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
+	Plugins map[string]*Config `yaml:",inline" json:",inline" toml:",inline"`
 }
 
 // Config is the configuration for a plugin.

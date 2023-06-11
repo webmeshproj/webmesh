@@ -39,6 +39,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
+	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
 )
 
@@ -67,10 +68,6 @@ type Store interface {
 	Close() error
 	// Ready returns true if the store is ready to serve requests.
 	Ready() bool
-	// RefreshWireguardPeers refreshes the wireguard peers. This is normally called
-	// on an interval or when peer observations happen on the cluster. It can also
-	// be called manually to force a refresh.
-	RefreshWireguardPeers(ctx context.Context) error
 	// ReadyNotify returns a channel that is closed when the store is ready
 	// to serve requests. Ready is defined as having a leader.
 	ReadyNotify(ctx context.Context) <-chan struct{}
@@ -123,6 +120,8 @@ type Store interface {
 	// Wireguard returns the Wireguard interface. Note that the returned value
 	// may be nil if the store is not open.
 	Wireguard() wireguard.Interface
+	// Plugins returns the plugin manager.
+	Plugins() plugins.Manager
 }
 
 // TestStore is a test store interface.
@@ -138,7 +137,10 @@ func New(opts *Options) (Store, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
-	log := slog.Default().With(slog.String("component", "store"))
+	pluginManager, err := plugins.New(context.Background(), opts.Plugins)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load plugins: %w", err)
+	}
 	nodeID := opts.Mesh.NodeID
 	var tlsConfig *tls.Config
 	if !opts.TLS.Insecure {
@@ -148,6 +150,7 @@ func New(opts *Options) (Store, error) {
 			return nil, err
 		}
 	}
+	log := slog.Default().With(slog.String("component", "store"))
 	if nodeID == "" || nodeID == hostnameFlagDefault {
 		// First check if we are using mTLS.
 		if tlsConfig != nil {
@@ -190,6 +193,7 @@ func New(opts *Options) (Store, error) {
 		sl:            sl,
 		opts:          opts,
 		tlsConfig:     tlsConfig,
+		plugins:       pluginManager,
 		nodeID:        raft.ServerID(nodeID),
 		raftLogFormat: RaftLogFormat(opts.Raft.LogFormat),
 		readyErr:      make(chan error, 2),
@@ -233,6 +237,7 @@ type store struct {
 
 	nodeID    raft.ServerID
 	tlsConfig *tls.Config
+	plugins   plugins.Manager
 
 	readyErr       chan error
 	firstBootstrap bool
@@ -308,6 +313,9 @@ func (s *store) Raft() *raft.Raft { return s.raft }
 // Wireguard returns the Wireguard interface. Note that the returned value
 // may be nil if the store is not open.
 func (s *store) Wireguard() wireguard.Interface { return s.wg }
+
+// Plugins returns the plugin manager.
+func (s *store) Plugins() plugins.Manager { return s.plugins }
 
 // State returns the current Raft state.
 func (s *store) State() raft.RaftState {

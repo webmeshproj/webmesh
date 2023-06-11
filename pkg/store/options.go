@@ -25,6 +25,7 @@ import (
 
 	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -42,6 +43,8 @@ type Options struct {
 	TLS *TLSOptions `json:"tls,omitempty" yaml:"tls,omitempty" toml:"tls,omitempty"`
 	// WireGuard are options for WireGuard.
 	WireGuard *WireGuardOptions `json:"wireguard,omitempty" yaml:"wireguard,omitempty" toml:"wireguard,omitempty"`
+	// Plugins are options for plugins.
+	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
 }
 
 // NewOptions returns new options with sensible defaults.
@@ -53,6 +56,7 @@ func NewOptions() *Options {
 		Raft:      NewRaftOptions(),
 		TLS:       NewTLSOptions(),
 		WireGuard: NewWireGuardOptions(),
+		Plugins:   plugins.NewOptions(),
 	}
 }
 
@@ -64,6 +68,7 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 	o.Raft.BindFlags(fl)
 	o.TLS.BindFlags(fl)
 	o.WireGuard.BindFlags(fl)
+	o.Plugins.BindFlags(fl)
 }
 
 // Validate validates the options.

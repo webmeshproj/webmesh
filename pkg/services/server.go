@@ -31,7 +31,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/services/admin"
 	"github.com/webmeshproj/node/pkg/services/meshapi"
 	"github.com/webmeshproj/node/pkg/services/meshdns"
@@ -52,9 +51,9 @@ type Server struct {
 }
 
 // NewServer returns a new Server.
-func NewServer(store store.Store, plugins plugins.Manager, o *Options) (*Server, error) {
+func NewServer(store store.Store, o *Options) (*Server, error) {
 	log := slog.Default().With("component", "server")
-	opts, proxyTLSConfig, err := o.ServerOptions(store, plugins)
+	opts, proxyTLSConfig, err := o.ServerOptions(store, store.Plugins())
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +92,7 @@ func NewServer(store store.Store, plugins plugins.Manager, o *Options) (*Server,
 	}
 	log.Debug("registering node server")
 	// Always register the node server
-	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), !plugins.HasAuth()))
+	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), !store.Plugins().HasAuth()))
 	return server, nil
 }
 

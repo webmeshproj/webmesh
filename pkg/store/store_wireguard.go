@@ -35,7 +35,7 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-func (s *store) RefreshWireguardPeers(ctx context.Context) error {
+func (s *store) refreshWireguardPeers(ctx context.Context) error {
 	if s.wg == nil {
 		return nil
 	}
@@ -150,7 +150,7 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
-	return s.RefreshWireguardPeers(ctx)
+	return s.refreshWireguardPeers(ctx)
 }
 
 func (s *store) walkMeshDescendants(ctx context.Context) error {

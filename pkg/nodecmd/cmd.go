@@ -30,7 +30,6 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/services"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/util"
@@ -69,7 +68,7 @@ func Execute() error {
 		}
 	}
 
-	err := opts.Global.Overlay(opts.Mesh, opts.Services, opts.Plugins)
+	err := opts.Global.Overlay(opts.Mesh, opts.Services)
 	if err != nil {
 		return err
 	}
@@ -125,10 +124,6 @@ func Execute() error {
 
 	// Load plugins
 	ctx := context.Background()
-	pluginManager, err := plugins.New(ctx, opts.Plugins)
-	if err != nil {
-		return fmt.Errorf("failed to load plugins: %w", err)
-	}
 
 	log.Info("starting raft node")
 
@@ -166,7 +161,7 @@ func Execute() error {
 	log.Info("raft store is ready, starting services")
 
 	// Create the services
-	srv, err := services.NewServer(st, pluginManager, opts.Services)
+	srv, err := services.NewServer(st, opts.Services)
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to gRPC server: %w", err))
 	}
