@@ -156,7 +156,7 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 	if p.config.UserDisabledAttribute != "" {
 		attrs = append(attrs, p.config.UserDisabledAttribute)
 	}
-	r := ldap.NewSearchRequest(
+	resp, err := conn.Search(ldap.NewSearchRequest(
 		baseDN,
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
@@ -166,8 +166,7 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 		fmt.Sprintf("(%s=%s)", p.config.UserIDAttribute, username), // User filter
 		attrs, // User attrs
 		nil,
-	)
-	resp, err := conn.Search(r)
+	))
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}

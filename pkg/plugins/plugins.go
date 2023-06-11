@@ -123,9 +123,9 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 	}
 	return &manager{
 		auth:     auth,
-		plugins:  registered,
 		stores:   stores,
 		emitters: emitters,
+		plugins:  registered,
 		log:      slog.Default().With("component", "plugin-manager"),
 	}, nil
 }
