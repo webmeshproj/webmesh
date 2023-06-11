@@ -190,6 +190,9 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 
 // ApplyRaftLog applies a raft log entry to all storage plugins.
 func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.RaftLogEntry) ([]*v1.RaftApplyResponse, error) {
+	if len(m.stores) == 0 {
+		return nil, nil
+	}
 	out := make([]*v1.RaftApplyResponse, len(m.stores))
 	errs := make([]error, 0)
 	for i, store := range m.stores {
@@ -209,6 +212,9 @@ func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.RaftLogEntry) ([]*
 
 // Emit emits an event to all watch plugins.
 func (m *manager) Emit(ctx context.Context, typ string, event proto.Message) error {
+	if len(m.emitters) == 0 {
+		return nil
+	}
 	ev, err := anypb.New(event)
 	if err != nil {
 		return fmt.Errorf("new any: %w", err)
