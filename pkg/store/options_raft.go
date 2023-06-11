@@ -138,7 +138,7 @@ func NewRaftOptions() *RaftOptions {
 		ConnectionTimeout:  time.Second * 3,
 		HeartbeatTimeout:   time.Second * 3,
 		ElectionTimeout:    time.Second * 3,
-		ApplyTimeout:       time.Second * 10,
+		ApplyTimeout:       time.Second * 15,
 		CommitTimeout:      time.Second * 15,
 		LeaderLeaseTimeout: time.Second * 3,
 		SnapshotInterval:   time.Minute * 5,
@@ -169,7 +169,7 @@ func (o *RaftOptions) BindFlags(fl *flag.FlagSet) {
 		"Raft heartbeat timeout.")
 	fl.DurationVar(&o.ElectionTimeout, "raft.election-timeout", util.GetEnvDurationDefault(ElectionTimeoutEnvVar, time.Second*3),
 		"Raft election timeout.")
-	fl.DurationVar(&o.ApplyTimeout, "raft.apply-timeout", util.GetEnvDurationDefault(ApplyTimeoutEnvVar, time.Second*10),
+	fl.DurationVar(&o.ApplyTimeout, "raft.apply-timeout", util.GetEnvDurationDefault(ApplyTimeoutEnvVar, time.Second*15),
 		"Raft apply timeout.")
 	fl.DurationVar(&o.CommitTimeout, "raft.commit-timeout", util.GetEnvDurationDefault(CommitTimeoutEnvVar, time.Second*15),
 		"Raft commit timeout.")

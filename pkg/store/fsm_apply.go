@@ -45,6 +45,18 @@ func (s *store) apply(l *raft.Log, cmd *v1.RaftLogEntry, log *slog.Logger, start
 	}
 	defer cancel()
 
+	// Dispatch the log to all storage plugins when we are done.
+	// This is a no-op if there are no storage plugins.
+	defer func() {
+		responses, err := s.plugins.ApplyRaftLog(ctx, cmd)
+		if err != nil {
+			log.Error("errors while dispatching logs to plugins", slog.String("error", err.Error()))
+		}
+		for _, res := range responses {
+			log.Debug("plugin response", slog.Any("response", res))
+		}
+	}()
+
 	// TODO: Really any database operation failing would be a serious condition
 	// needing to be handled. For now, we just log the error and return.
 
