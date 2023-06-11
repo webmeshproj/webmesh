@@ -57,9 +57,6 @@ func (s *store) apply(l *raft.Log, cmd *v1.RaftLogEntry, log *slog.Logger, start
 		}
 	}()
 
-	// TODO: Really any database operation failing would be a serious condition
-	// needing to be handled. For now, we just log the error and return.
-
 	switch cmd.GetType() {
 	case v1.RaftCommandType_QUERY:
 		log.Debug("applying query",
