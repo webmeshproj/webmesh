@@ -19,6 +19,7 @@ package context
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
@@ -28,6 +29,15 @@ import (
 // Context is an alias to context.Context for convenience and to avoid
 // confusion with the context package.
 type Context = context.Context
+
+// CancelFunc is an alias to context.CancelFunc for convenience and to avoid
+// confusion with the context package.
+type CancelFunc = context.CancelFunc
+
+// WithDeadline returns a context with the given deadline.
+func WithDeadline(ctx Context, deadline time.Time) (Context, CancelFunc) {
+	return context.WithDeadline(ctx, deadline)
+}
 
 type contextKey string
 

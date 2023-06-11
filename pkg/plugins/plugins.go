@@ -18,15 +18,20 @@ limitations under the License.
 package plugins
 
 import (
-	"flag"
+	"bufio"
 	"fmt"
-	"net"
+	"os"
+	"os/exec"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -57,49 +62,6 @@ type Manager interface {
 	AuthStreamInterceptor() grpc.StreamServerInterceptor
 }
 
-// Options are the options for loading plugins.
-type Options struct {
-	// Plugins is a map of plugin names to plugin configs.
-	Plugins map[string]*Config `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
-}
-
-// BindFlags binds the plugin flags to the given flag set.
-func (o *Options) BindFlags(fs *flag.FlagSet) {
-	fs.Func("plugins.mtls.ca-file", "Enables the mTLS plugin with the path to a CA for verifying certificates", func(s string) error {
-		o.Plugins["mtls"] = &Config{
-			Config: map[string]any{
-				"ca-file": s,
-			},
-		}
-		return nil
-	})
-	fs.Func("plugins.basic-auth.htpasswd-file", "Enables the basic auth plugin with the path to a htpasswd file", func(s string) error {
-		o.Plugins["basic-auth"] = &Config{
-			Config: map[string]any{
-				"htpasswd-file": s,
-			},
-		}
-		return nil
-	})
-}
-
-// Config is the configuration for a plugin.
-type Config struct {
-	// Path is the path to an executable for the plugin.
-	Path string `yaml:"path,omitempty" json:"path,omitempty" toml:"path,omitempty"`
-	// Server is the address of a server for the plugin.
-	Server string `yaml:"server,omitempty" json:"server,omitempty" toml:"server,omitempty"`
-	// Config is the configuration for the plugin.
-	Config map[string]any `yaml:"config,omitempty" json:"config,omitempty" toml:"config,omitempty"`
-}
-
-// NewOptions creates new options.
-func NewOptions() *Options {
-	return &Options{
-		Plugins: map[string]*Config{},
-	}
-}
-
 // New creates a new plugin manager.
 func New(ctx context.Context, opts *Options) (Manager, error) {
 	var auth v1.PluginClient
@@ -108,29 +70,48 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 	for name, cfg := range opts.Plugins {
 		log.Info("loading plugin", "name", name)
 		log.Debug("plugin configuration", "config", cfg)
+		// Load the plugin.
+		var plugin v1.PluginClient
 		if builtIn, ok := BuiltIns[name]; ok {
-			caps, err := builtIn.GetInfo(ctx, &emptypb.Empty{})
+			plugin = builtIn
+		} else {
+			if cfg.Path == "" && cfg.Server == "" {
+				return nil, fmt.Errorf("plugin %q: path or server must be specified", name)
+			}
+			if cfg.Path != "" && cfg.Server != "" {
+				return nil, fmt.Errorf("plugin %q: path and server cannot both be specified", name)
+			}
+			var err error
+			if cfg.Path != "" {
+				plugin, err = newExternalProcess(ctx, cfg.Path)
+			} else {
+				plugin, err = newExternalServer(ctx, cfg.Server)
+			}
 			if err != nil {
-				return nil, fmt.Errorf("get plugin info: %w", err)
+				return nil, fmt.Errorf("plugin %q: %w", name, err)
 			}
-			for _, cap := range caps.Capabilities {
-				if cap == v1.PluginCapability_PLUGIN_CAPABILITY_AUTH {
-					auth = builtIn
-				}
-			}
-			pcfg, err := structpb.NewStruct(cfg.Config)
-			if err != nil {
-				return nil, fmt.Errorf("convert config: %w", err)
-			}
-			_, err = builtIn.Configure(ctx, &v1.PluginConfiguration{
-				Config: pcfg,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("configure plugin %q: %w", name, err)
-			}
-			registered[name] = builtIn
-			continue
 		}
+		// Configure the plugin.
+		info, err := plugin.GetInfo(ctx, &emptypb.Empty{})
+		if err != nil {
+			return nil, fmt.Errorf("get plugin info: %w", err)
+		}
+		for _, cap := range info.Capabilities {
+			if cap == v1.PluginCapability_PLUGIN_CAPABILITY_AUTH {
+				auth = plugin
+			}
+		}
+		pcfg, err := structpb.NewStruct(cfg.Config)
+		if err != nil {
+			return nil, fmt.Errorf("convert config: %w", err)
+		}
+		_, err = plugin.Configure(ctx, &v1.PluginConfiguration{
+			Config: pcfg,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("configure plugin %q: %w", name, err)
+		}
+		registered[info.Name] = plugin
 	}
 	return &manager{
 		auth:    auth,
@@ -159,8 +140,7 @@ func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 		if m.auth == nil {
 			return handler(ctx, req)
 		}
-		authReq := m.newAuthRequest(ctx)
-		resp, err := m.auth.Authenticate(ctx, authReq)
+		resp, err := m.auth.Authenticate(ctx, m.newAuthRequest(ctx))
 		if err != nil {
 			return nil, fmt.Errorf("authenticate: %w", err)
 		}
@@ -174,8 +154,7 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 		if m.auth == nil {
 			return handler(srv, ss)
 		}
-		req := m.newAuthRequest(ss.Context())
-		resp, err := m.auth.Authenticate(ss.Context(), req)
+		resp, err := m.auth.Authenticate(ss.Context(), m.newAuthRequest(ss.Context()))
 		if err != nil {
 			return fmt.Errorf("authenticate: %w", err)
 		}
@@ -201,28 +180,6 @@ func (m *manager) newAuthRequest(ctx context.Context) *v1.AuthenticationRequest 
 		}
 	}
 	return &req
-}
-
-// Serve serves a plugin.
-func Serve(ctx context.Context, plugin v1.PluginServer) error {
-	port := flag.Int("port", 0, "port to serve on")
-	flag.Parse()
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-	if err != nil {
-		return err
-	}
-	defer ln.Close()
-	s := grpc.NewServer()
-	go func() {
-		<-ctx.Done()
-		defer ln.Close()
-		s.GracefulStop()
-	}()
-	v1.RegisterPluginServer(s, plugin)
-	if err := s.Serve(ln); err != nil {
-		return err
-	}
-	return nil
 }
 
 // inProcessClient creates a plugin client from a plugin server.
@@ -257,6 +214,118 @@ func (p *inProcessPlugin) Authenticate(ctx context.Context, in *v1.Authenticatio
 // Emit emits a watch event.
 func (p *inProcessPlugin) Emit(ctx context.Context, in *v1.WatchEvent, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	return p.server.Emit(ctx, in)
+}
+
+type externalProcessPlugin struct {
+	path string
+	cmd  *exec.Cmd
+	mux  sync.Mutex
+	cli  v1.PluginClient
+}
+
+func newExternalProcess(ctx context.Context, path string) (*externalProcessPlugin, error) {
+	p := &externalProcessPlugin{path: path}
+	return p, p.start(ctx)
+}
+
+// GetInfo returns the information for the plugin.
+func (p *externalProcessPlugin) GetInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*v1.PluginInfo, error) {
+	if err := p.checkProcess(ctx); err != nil {
+		return nil, err
+	}
+	return p.cli.GetInfo(ctx, in)
+}
+
+// Configure configures the plugin.
+func (p *externalProcessPlugin) Configure(ctx context.Context, in *v1.PluginConfiguration, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	if err := p.checkProcess(ctx); err != nil {
+		return nil, err
+	}
+	return p.cli.Configure(ctx, in)
+}
+
+// Store applies a raft log entry to the store.
+func (p *externalProcessPlugin) Store(ctx context.Context, in *v1.RaftLogEntry, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
+	if err := p.checkProcess(ctx); err != nil {
+		return nil, err
+	}
+	return p.cli.Store(ctx, in)
+}
+
+// Authenticate authenticates a request.
+func (p *externalProcessPlugin) Authenticate(ctx context.Context, in *v1.AuthenticationRequest, opts ...grpc.CallOption) (*v1.AuthenticationResponse, error) {
+	if err := p.checkProcess(ctx); err != nil {
+		return nil, err
+	}
+	return p.cli.Authenticate(ctx, in)
+}
+
+// Emit emits a watch event.
+func (p *externalProcessPlugin) Emit(ctx context.Context, in *v1.WatchEvent, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	if err := p.checkProcess(ctx); err != nil {
+		return nil, err
+	}
+	return p.cli.Emit(ctx, in)
+}
+
+// checkProcess checks if the process is running and restarts it if it is not.
+func (p *externalProcessPlugin) checkProcess(ctx context.Context) error {
+	if p.cmd.ProcessState != nil {
+		_, ok := ctx.Deadline()
+		if !ok {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithDeadline(ctx, time.Now().Add(5*time.Second))
+			defer cancel()
+		}
+		return p.start(ctx)
+	}
+	return nil
+}
+
+// start starts the plugin server.
+func (p *externalProcessPlugin) start(ctx context.Context) error {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+	r, w, err := os.Pipe()
+	if err != nil {
+		return fmt.Errorf("create pipe: %w", err)
+	}
+	defer r.Close()
+	defer w.Close()
+	p.cmd = exec.Command(p.path, "--broadcast-fd", strconv.Itoa(int(w.Fd())))
+	err = p.cmd.Start()
+	if err != nil {
+		return fmt.Errorf("start plugin: %w", err)
+	}
+	// Wait for the address to be written to the pipe.
+	b := bufio.NewReader(r)
+	if deadline, ok := ctx.Deadline(); ok {
+		err = r.SetReadDeadline(deadline)
+		if err != nil {
+			return fmt.Errorf("set read deadline: %w", err)
+		}
+	}
+	addr, err := b.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("read address: %w", err)
+	}
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial: %w", err)
+	}
+	p.cli = v1.NewPluginClient(conn)
+	return nil
+}
+
+type externalServerPlugin struct{ v1.PluginClient }
+
+func newExternalServer(ctx context.Context, addr string) (*externalServerPlugin, error) {
+	// TODO: support TLS
+	c, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("dial: %w", err)
+	}
+	return &externalServerPlugin{v1.NewPluginClient(c)}, nil
 }
 
 type authenticatedServerStream struct {
