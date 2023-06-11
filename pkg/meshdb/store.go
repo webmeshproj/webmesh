@@ -23,9 +23,13 @@ import (
 	"database/sql"
 
 	"github.com/hashicorp/raft"
+
+	"github.com/webmeshproj/node/pkg/plugins"
 )
 
-// Store is the interface for interacting with the mesh database.
+// Store is the interface for interacting with the mesh database. It is a reduced
+// version of the store.Store interface, and is used by the meshdb package to
+// interact with the database.
 type Store interface {
 	// ID returns the ID of the node.
 	ID() string
@@ -39,6 +43,8 @@ type Store interface {
 	Leader() (raft.ServerID, error)
 	// IsLeader returns whether the current node is the Raft leader.
 	IsLeader() bool
+	// Plugins returns the plugins for the current node.
+	Plugins() plugins.Manager
 }
 
 type DBTX interface {
