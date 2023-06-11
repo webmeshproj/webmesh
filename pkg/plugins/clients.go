@@ -63,7 +63,7 @@ func (p *inProcessPlugin) Authenticate(ctx context.Context, in *v1.Authenticatio
 }
 
 // Emit emits a watch event.
-func (p *inProcessPlugin) Emit(ctx context.Context, in *v1.WatchEvent, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (p *inProcessPlugin) Emit(ctx context.Context, in *v1.Event, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	return p.server.Emit(ctx, in)
 }
 
@@ -112,7 +112,7 @@ func (p *externalProcessPlugin) Authenticate(ctx context.Context, in *v1.Authent
 }
 
 // Emit emits a watch event.
-func (p *externalProcessPlugin) Emit(ctx context.Context, in *v1.WatchEvent, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (p *externalProcessPlugin) Emit(ctx context.Context, in *v1.Event, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	if err := p.checkProcess(ctx); err != nil {
 		return nil, err
 	}

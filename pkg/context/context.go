@@ -34,23 +34,31 @@ type Context = context.Context
 // confusion with the context package.
 type CancelFunc = context.CancelFunc
 
+// Background returns a background context.
+func Background() Context {
+	return context.Background()
+}
+
+// WithTimeout returns a context with the given timeout.
+func WithTimeout(ctx Context, timeout time.Duration) (Context, CancelFunc) {
+	return context.WithTimeout(ctx, timeout)
+}
+
 // WithDeadline returns a context with the given deadline.
 func WithDeadline(ctx Context, deadline time.Time) (Context, CancelFunc) {
 	return context.WithDeadline(ctx, deadline)
 }
 
-type contextKey string
-
-const authenticatedCallerKey = contextKey("authenticatedCaller")
+type authenticatedCallerKey struct{}
 
 // WithAuthenticatedCaller returns a context with the authenticated caller set.
 func WithAuthenticatedCaller(ctx Context, id string) Context {
-	return context.WithValue(ctx, authenticatedCallerKey, id)
+	return context.WithValue(ctx, authenticatedCallerKey{}, id)
 }
 
 // AuthenticatedCallerFrom returns the authenticated caller from the context.
 func AuthenticatedCallerFrom(ctx Context) (string, bool) {
-	id, ok := ctx.Value(authenticatedCallerKey).(string)
+	id, ok := ctx.Value(authenticatedCallerKey{}).(string)
 	return id, ok
 }
 

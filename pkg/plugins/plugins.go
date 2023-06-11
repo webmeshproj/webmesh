@@ -25,8 +25,6 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -59,7 +57,7 @@ type Manager interface {
 	// even if an error occurs.
 	ApplyRaftLog(ctx context.Context, entry *v1.RaftLogEntry) ([]*v1.RaftApplyResponse, error)
 	// Emit emits an event to all watch plugins.
-	Emit(ctx context.Context, typ string, event proto.Message) error
+	Emit(ctx context.Context, ev *v1.Event) error
 }
 
 // New creates a new plugin manager.
@@ -204,20 +202,13 @@ func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.RaftLogEntry) ([]*
 }
 
 // Emit emits an event to all watch plugins.
-func (m *manager) Emit(ctx context.Context, typ string, event proto.Message) error {
+func (m *manager) Emit(ctx context.Context, ev *v1.Event) error {
 	if len(m.emitters) == 0 {
 		return nil
 	}
-	ev, err := anypb.New(event)
-	if err != nil {
-		return fmt.Errorf("new any: %w", err)
-	}
 	errs := make([]error, 0)
 	for _, emitter := range m.emitters {
-		_, err = emitter.Emit(ctx, &v1.WatchEvent{
-			Type:   typ,
-			Object: ev,
-		})
+		_, err := emitter.Emit(ctx, ev)
 		if err != nil {
 			errs = append(errs, err)
 		}

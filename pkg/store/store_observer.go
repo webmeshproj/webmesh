@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"github.com/hashicorp/raft"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
@@ -55,6 +56,20 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					}
 				case raft.LeaderObservation:
 					s.log.Debug("LeaderObservation", slog.Any("data", data))
+					node, err := peers.New(s).Get(ctx, string(data.LeaderID))
+					if err != nil {
+						s.log.Error("failed to get leader", slog.String("error", err.Error()))
+						continue
+					}
+					err = s.plugins.Emit(ctx, &v1.Event{
+						Type: v1.WatchEvent_WATCH_EVENT_LEADER_CHANGE,
+						Event: &v1.Event_Node{
+							Node: node.Proto(v1.ClusterStatus_CLUSTER_LEADER),
+						},
+					})
+					if err != nil {
+						s.log.Error("emit leader change event", slog.String("error", err.Error()))
+					}
 				case raft.ResumedHeartbeatObservation:
 					s.log.Debug("ResumedHeartbeatObservation", slog.Any("data", data))
 				case raft.FailedHeartbeatObservation:

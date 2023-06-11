@@ -30,7 +30,9 @@ import (
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
 	"github.com/google/go-cmp/cmp"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
@@ -95,6 +97,39 @@ type Node struct {
 	CreatedAt time.Time
 	// UpdatedAt is the time the node was last updated.
 	UpdatedAt time.Time
+}
+
+// Proto converts a Node to the protobuf representation.
+func (n Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
+	return &v1.MeshNode{
+		Id:                 n.ID,
+		PrimaryEndpoint:    n.PrimaryEndpoint,
+		WireguardEndpoints: n.WireGuardEndpoints,
+		ZoneAwarenessId:    n.ZoneAwarenessID,
+		RaftPort:           int32(n.RaftPort),
+		GrpcPort:           int32(n.GRPCPort),
+		PublicKey: func() string {
+			if len(n.PublicKey) > 0 {
+				return n.PublicKey.String()
+			}
+			return ""
+		}(),
+		PrivateIpv4: func() string {
+			if n.PrivateIPv4.IsValid() {
+				return n.PrivateIPv4.String()
+			}
+			return ""
+		}(),
+		PrivateIpv6: func() string {
+			if n.NetworkIPv6.IsValid() {
+				return n.NetworkIPv6.String()
+			}
+			return ""
+		}(),
+		UpdatedAt:     timestamppb.New(n.UpdatedAt),
+		CreatedAt:     timestamppb.New(n.CreatedAt),
+		ClusterStatus: status,
+	}
 }
 
 // Edge represents an edge between two nodes.
