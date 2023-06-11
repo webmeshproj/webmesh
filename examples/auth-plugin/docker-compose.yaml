@@ -53,7 +53,6 @@ services:
       - --raft.in-memory
       - --mesh.join-address=10.1.0.5:8443
       - --mesh.max-join-retries=10
-      - --auth.basic.enabled
       - --auth.basic.username=join-node
       - --auth.basic.password=dobad
     restart: on-failure
