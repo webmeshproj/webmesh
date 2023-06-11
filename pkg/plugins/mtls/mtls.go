@@ -63,6 +63,9 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		return nil, err
 	}
+	if config.CAFile == "" {
+		return nil, fmt.Errorf("ca-file is required")
+	}
 	p.config = &tls.Config{}
 	roots, err := x509.SystemCertPool()
 	if err != nil {

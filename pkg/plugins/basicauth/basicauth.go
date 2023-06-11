@@ -75,6 +75,9 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		return nil, err
 	}
+	if config.HTPasswdFile == "" {
+		return nil, fmt.Errorf("htpasswd-file is required")
+	}
 	f, err := os.Open(config.HTPasswdFile)
 	if err != nil {
 		return nil, err
@@ -118,25 +121,18 @@ func (p *Plugin) verify(username, password string) bool {
 	if p.users == nil {
 		return false
 	}
-	passw, ok := p.users[username]
+	hashed, ok := p.users[username]
 	if !ok {
 		return false
 	}
-	if strings.HasPrefix(passw, "{SHA}") {
-		return verifySHAHash(passw[5:], password)
+	if strings.HasPrefix(hashed, "{SHA}") {
+		hashed = hashed[5:]
+		d := sha1.New()
+		d.Write([]byte(password))
+		return subtle.ConstantTimeCompare([]byte(hashed), []byte(base64.StdEncoding.EncodeToString(d.Sum(nil)))) == 1
 	}
-	if strings.HasPrefix(passw, "$2") {
-		return verifyBcryptHash(passw, password)
+	if strings.HasPrefix(hashed, "$2") {
+		return bcrypt.CompareHashAndPassword([]byte(hashed), []byte(password)) == nil
 	}
 	return false
-}
-
-func verifySHAHash(hashed, password string) bool {
-	d := sha1.New()
-	d.Write([]byte(password))
-	return subtle.ConstantTimeCompare([]byte(hashed), []byte(base64.StdEncoding.EncodeToString(d.Sum(nil)))) == 1
-}
-
-func verifyBcryptHash(hashed, password string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hashed), []byte(password)) == nil
 }
