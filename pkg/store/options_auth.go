@@ -75,14 +75,14 @@ func (o *AuthOptions) BindFlags(fl *flag.FlagSet) {
 		o.MTLS.KeyFile = s
 		return nil
 	})
-	fl.Func("auth.basic.username", "The username.", func(s string) error {
+	fl.Func("auth.basic.username", "A username to use for basic auth.", func(s string) error {
 		if o.Basic == nil {
 			o.Basic = &BasicAuthOptions{}
 		}
 		o.Basic.Username = s
 		return nil
 	})
-	fl.Func("auth.basic.password", "The password.", func(s string) error {
+	fl.Func("auth.basic.password", "A password to use for basic auth.", func(s string) error {
 		if o.Basic == nil {
 			o.Basic = &BasicAuthOptions{}
 		}
