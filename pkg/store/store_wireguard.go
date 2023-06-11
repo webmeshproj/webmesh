@@ -35,18 +35,6 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-func (s *store) refreshWireguardPeers(ctx context.Context) error {
-	if s.wg == nil {
-		return nil
-	}
-	err := s.walkMeshDescendants(ctx)
-	if err != nil {
-		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
-		return nil
-	}
-	return nil
-}
-
 func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, meshNetworkV6 netip.Prefix) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
@@ -129,7 +117,22 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 	return nil
 }
 
+func (s *store) refreshWireguardPeers(ctx context.Context) error {
+	if s.wg == nil {
+		return nil
+	}
+	err := s.walkMeshDescendants(ctx)
+	if err != nil {
+		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
+		return nil
+	}
+	return nil
+}
+
 func (s *store) recoverWireguard(ctx context.Context) error {
+	if s.noWG {
+		return nil
+	}
 	meshnetworkv6, err := state.New(s).GetULAPrefix(ctx)
 	if err != nil {
 		return fmt.Errorf("get ula prefix: %w", err)
@@ -154,6 +157,10 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 }
 
 func (s *store) walkMeshDescendants(ctx context.Context) error {
+	if s.wg == nil {
+		return nil
+	}
+
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
 

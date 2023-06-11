@@ -396,15 +396,13 @@ func (t *testStore) Clear() error {
 	if err != nil {
 		return err
 	}
-	t.weakData, err = sql.Open("sqlite", ":memory:")
+	dataPath := "file:raftdata?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
+	localDataPath := "file:localdata?mode=memory&cache=shared"
+	t.weakData, err = sql.Open("sqlite", dataPath)
 	if err != nil {
 		return err
 	}
-	_, err = t.weakData.Exec("PRAGMA case_sensitive_like = true;")
-	if err != nil {
-		return err
-	}
-	t.localData, err = sql.Open("sqlite", ":memory:")
+	t.localData, err = sql.Open("sqlite", localDataPath)
 	if err != nil {
 		return err
 	}
