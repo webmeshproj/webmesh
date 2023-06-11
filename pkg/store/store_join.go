@@ -35,6 +35,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
+	"github.com/webmeshproj/node/pkg/plugins/basicauth"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -92,11 +93,15 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		}
 	}
 	log.Info("joining cluster")
-	var creds credentials.TransportCredentials
+	var opts []grpc.DialOption
 	if s.opts.TLS.Insecure {
-		creds = insecure.NewCredentials()
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
-		creds = credentials.NewTLS(s.tlsConfig)
+		// MTLS is included in the TLS config already if enabled.
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
+	}
+	if s.opts.Auth.Basic.Enabled {
+		opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
 	}
 	var tries int
 	var resp *v1.JoinResponse
@@ -104,7 +109,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		if tries > 0 {
 			log.Info("retrying join request", slog.Int("tries", tries))
 		}
-		conn, err := grpc.DialContext(ctx, joinAddr, grpc.WithTransportCredentials(creds))
+		conn, err := grpc.DialContext(ctx, joinAddr, opts...)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()

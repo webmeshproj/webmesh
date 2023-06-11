@@ -17,11 +17,21 @@ limitations under the License.
 package store
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
+	"fmt"
+	"os"
+
+	"golang.org/x/exp/slog"
+
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 // Options are the options for the store.
 type Options struct {
+	// Auth are options for authentication to the mesh.
+	Auth *AuthOptions `json:"auth,omitempty" yaml:"auth,omitempty" toml:"auth,omitempty"`
 	// Mesh are options for participating in an existing mesh.
 	Mesh *MeshOptions `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty"`
 	// Bootstrap are options for bootstrapping the store.
@@ -37,8 +47,9 @@ type Options struct {
 // NewOptions returns new options with sensible defaults.
 func NewOptions() *Options {
 	return &Options{
-		Bootstrap: NewBootstrapOptions(),
+		Auth:      NewAuthOptions(),
 		Mesh:      NewMeshOptions(),
+		Bootstrap: NewBootstrapOptions(),
 		Raft:      NewRaftOptions(),
 		TLS:       NewTLSOptions(),
 		WireGuard: NewWireGuardOptions(),
@@ -47,6 +58,7 @@ func NewOptions() *Options {
 
 // BindFlags binds the options to the flags.
 func (o *Options) BindFlags(fl *flag.FlagSet) {
+	o.Auth.BindFlags(fl)
 	o.Mesh.BindFlags(fl)
 	o.Bootstrap.BindFlags(fl)
 	o.Raft.BindFlags(fl)
@@ -56,6 +68,9 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 
 // Validate validates the options.
 func (o *Options) Validate() error {
+	if o.Auth == nil {
+		o.Auth = NewAuthOptions()
+	}
 	if o.Raft == nil {
 		o.Raft = NewRaftOptions()
 	}
@@ -71,6 +86,9 @@ func (o *Options) Validate() error {
 	if o.WireGuard == nil {
 		o.WireGuard = NewWireGuardOptions()
 	}
+	if err := o.Auth.Validate(); err != nil {
+		return err
+	}
 	if err := o.Mesh.Validate(); err != nil {
 		return err
 	}
@@ -84,4 +102,46 @@ func (o *Options) Validate() error {
 		return err
 	}
 	return nil
+}
+
+// TLSConfig returns the TLS configuration.
+func (o *Options) TLSConfig() (*tls.Config, error) {
+	if o.TLS == nil {
+		return nil, nil
+	}
+	if o.TLS.Insecure {
+		return nil, nil
+	}
+	var config tls.Config
+	if o.Auth.MTLS.Enabled {
+		if o.Auth.MTLS.CertFile != "" && o.Auth.MTLS.KeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(o.Auth.MTLS.CertFile, o.Auth.MTLS.KeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("load x509 key pair: %w", err)
+			}
+			config.Certificates = []tls.Certificate{cert}
+		}
+	}
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		slog.Default().Warn("failed to load system cert pool", slog.String("error", err.Error()))
+		pool = x509.NewCertPool()
+	}
+	if o.TLS.CAFile != "" {
+		ca, err := os.ReadFile(o.TLS.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("read ca file: %w", err)
+		}
+		if ok := pool.AppendCertsFromPEM(ca); !ok {
+			return nil, fmt.Errorf("append certs from pem")
+		}
+	}
+	config.RootCAs = pool
+	if o.TLS.VerifyChainOnly {
+		config.InsecureSkipVerify = true
+		config.VerifyPeerCertificate = util.VerifyChainOnly
+	} else if o.TLS.InsecureSkipVerify {
+		config.InsecureSkipVerify = true
+	}
+	return &config, nil
 }

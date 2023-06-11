@@ -143,7 +143,7 @@ func New(opts *Options) (Store, error) {
 	var tlsConfig *tls.Config
 	if !opts.TLS.Insecure {
 		var err error
-		tlsConfig, err = opts.TLS.TLSConfig()
+		tlsConfig, err = opts.TLSConfig()
 		if err != nil {
 			return nil, err
 		}

@@ -204,11 +204,10 @@ func (o *Options) Overlay(opts ...any) error {
 			if !v.TLS.VerifyChainOnly {
 				v.TLS.VerifyChainOnly = o.VerifyChainOnly
 			}
-			if v.TLS.CertFile == "" {
-				v.TLS.CertFile = o.TLSCertFile
-			}
-			if v.TLS.KeyFile == "" {
-				v.TLS.KeyFile = o.TLSKeyFile
+			if o.MTLS {
+				v.Auth.MTLS.Enabled = true
+				v.Auth.MTLS.CertFile = o.TLSCertFile
+				v.Auth.MTLS.KeyFile = o.TLSKeyFile
 			}
 			if v.TLS.CAFile == "" {
 				v.TLS.CAFile = o.TLSCAFile

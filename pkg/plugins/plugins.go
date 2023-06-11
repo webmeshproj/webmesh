@@ -30,13 +30,15 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/plugins/basicauth"
 	"github.com/webmeshproj/node/pkg/plugins/mtls"
 )
 
 var (
 	// BuiltIns are the built-in plugins.
 	BuiltIns = map[string]v1.PluginClient{
-		"mtls": inProcessClient(&mtls.Plugin{}),
+		"mtls":       inProcessClient(&mtls.Plugin{}),
+		"basic-auth": inProcessClient(&basicauth.Plugin{}),
 	}
 )
 

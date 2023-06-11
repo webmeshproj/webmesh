@@ -236,6 +236,7 @@ be equivalent to the shown command line flag:
 
 	util.FlagsUsage("Global Configurations:", "global", "")
 	util.FlagsUsage("Mesh Configurations:", "mesh", "")
+	util.FlagsUsage("Authentication Configurations:", "auth", "")
 	util.FlagsUsage("Bootstrap Configurations:", "bootstrap", "")
 	util.FlagsUsage("Raft Configurations:", "raft", "")
 	util.FlagsUsage("TLS Configurations:", "tls", "")

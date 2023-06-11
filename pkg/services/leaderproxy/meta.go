@@ -24,11 +24,11 @@ import (
 
 const (
 	// PreferLeaderMeta is the metadata key for the Prefer-Leader header.
-	PreferLeaderMeta = "prefer-leader"
+	PreferLeaderMeta = "x-webmesh-prefer-leader"
 	// ProxiedFromMeta is the metadata key for the Proxied-From header.
-	ProxiedFromMeta = "proxied-from"
+	ProxiedFromMeta = "x-webmesh-proxied-from"
 	// ProxiedForMeta is the metadata key for the Proxied-For header.
-	ProxiedForMeta = "proxied-for"
+	ProxiedForMeta = "x-webmesh-proxied-for"
 )
 
 // HasPreferLeaderMeta returns true if the context has the Prefer-Leader header set to true.
