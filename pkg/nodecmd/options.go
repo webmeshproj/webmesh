@@ -55,6 +55,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	o.Global.BindFlags(fs)
 	o.Mesh.BindFlags(fs)
 	o.Services.BindFlags(fs)
+	o.Plugins.BindFlags(fs)
 	return o
 }
 

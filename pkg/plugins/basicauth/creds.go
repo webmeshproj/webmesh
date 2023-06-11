@@ -36,8 +36,8 @@ type basicAuthCreds struct {
 
 func (c *basicAuthCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
 	return map[string]string{
-		"username": c.username,
-		"password": c.password,
+		usernameHeader: c.username,
+		passwordHeader: c.password,
 	}, nil
 }
 

@@ -99,21 +99,17 @@ endef
 DOCKER ?= docker
 
 docker-build: build ## Build the node docker image
-	IMAGE=$(IMAGE) docker-compose build
+	docker build \
+		-f Dockerfile \
+		-t $(IMAGE) .
 
-docker-build-distroless: build ## Build the node docker image
+docker-build-distroless: build ## Build the distroless node docker image
 	docker build \
 		-f Dockerfile.distroless \
 		-t $(IMAGE)-distroless .
 
 docker-push: docker-build ## Push the node docker image
 	IMAGE=$(IMAGE) docker-compose push
-
-compose-up: ## Run docker-compose stack.
-	IMAGE=$(IMAGE) docker-compose up
-
-pull-db: ## Pull the database from the bootstrap node.
-	docker-compose cp bootstrap-node-1:/data/webmesh.sqlite ./webmesh.sqlite
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -133,4 +129,3 @@ install-ctl: build-ctl ## Install wmctl binary into $GOPATH/bin.
 
 clean: ## Clean up build and development artifacts.
 	rm -rf dist
-	rm -rf *.sqlite

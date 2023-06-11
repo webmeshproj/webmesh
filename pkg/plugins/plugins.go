@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -62,6 +63,26 @@ type Options struct {
 	Plugins map[string]*Config `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
 }
 
+// BindFlags binds the plugin flags to the given flag set.
+func (o *Options) BindFlags(fs *flag.FlagSet) {
+	fs.Func("plugins.mtls.ca-file", "Enables the mTLS plugin with the path to a CA for verifying certificates", func(s string) error {
+		o.Plugins["mtls"] = &Config{
+			Config: map[string]any{
+				"ca-file": s,
+			},
+		}
+		return nil
+	})
+	fs.Func("plugins.basic-auth.htpasswd-file", "Enables the basic auth plugin with the path to a htpasswd file", func(s string) error {
+		o.Plugins["basic-auth"] = &Config{
+			Config: map[string]any{
+				"htpasswd-file": s,
+			},
+		}
+		return nil
+	})
+}
+
 // Config is the configuration for a plugin.
 type Config struct {
 	// Path is the path to an executable for the plugin.
@@ -83,7 +104,10 @@ func NewOptions() *Options {
 func New(ctx context.Context, opts *Options) (Manager, error) {
 	var auth v1.PluginClient
 	registered := make(map[string]v1.PluginClient)
+	log := slog.Default()
 	for name, cfg := range opts.Plugins {
+		log.Info("loading plugin", "name", name)
+		log.Debug("plugin configuration", "config", cfg)
 		if builtIn, ok := BuiltIns[name]; ok {
 			caps, err := builtIn.GetInfo(ctx, &emptypb.Empty{})
 			if err != nil {
@@ -102,7 +126,7 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 				Config: pcfg,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("configure plugin: %w", err)
+				return nil, fmt.Errorf("configure plugin %q: %w", name, err)
 			}
 			registered[name] = builtIn
 			continue
@@ -111,12 +135,14 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 	return &manager{
 		auth:    auth,
 		plugins: registered,
+		log:     slog.Default().With("component", "plugin-manager"),
 	}, nil
 }
 
 type manager struct {
 	auth    v1.PluginClient
 	plugins map[string]v1.PluginClient
+	log     *slog.Logger
 }
 
 func (m *manager) Get(name string) (v1.PluginClient, bool) {
