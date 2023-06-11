@@ -109,7 +109,7 @@ docker-build-distroless: build ## Build the distroless node docker image
 		-t $(IMAGE)-distroless .
 
 docker-push: docker-build ## Push the node docker image
-	IMAGE=$(IMAGE) docker-compose push
+	docker push $(IMAGE)
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.

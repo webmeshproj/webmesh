@@ -19,8 +19,6 @@ package store
 import (
 	"errors"
 	"flag"
-
-	"github.com/webmeshproj/node/pkg/util"
 )
 
 const (
@@ -42,8 +40,6 @@ type AuthOptions struct {
 
 // MTLSOptions are options for mutual TLS.
 type MTLSOptions struct {
-	// Enabled indicates whether mutual TLS is enabled.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
 	// TLSCertFile is the path to a TLS certificate file to present when joining.
 	CertFile string `yaml:"cert-file,omitempty" json:"cert-file,omitempty" toml:"cert-file,omitempty"`
 	// TLSKeyFile is the path to a TLS key file for the certificate.
@@ -52,8 +48,6 @@ type MTLSOptions struct {
 
 // BasicAuthOptions are options for basic authentication.
 type BasicAuthOptions struct {
-	// Enabled indicates whether basic authentication is enabled.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
 	// Username is the username.
 	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty"`
 	// Password is the password.
@@ -62,30 +56,46 @@ type BasicAuthOptions struct {
 
 // NewAuthOptions creates a new AuthOptions.
 func NewAuthOptions() *AuthOptions {
-	return &AuthOptions{
-		MTLS:  &MTLSOptions{},
-		Basic: &BasicAuthOptions{},
-	}
+	return &AuthOptions{}
 }
 
 // BindFlags binds the flags to the options.
 func (o *AuthOptions) BindFlags(fl *flag.FlagSet) {
-	fl.BoolVar(&o.MTLS.Enabled, "auth.mtls.enabled", util.GetEnvDefault(MTLSEnabledEnvVar, "false") == "true",
-		"Enable mutual TLS authentication.")
-	fl.StringVar(&o.MTLS.CertFile, "auth.mtls.cert-file", util.GetEnvDefault(MTLSCertFileEnvVar, ""),
-		"The path to a TLS certificate file to present when joining.")
-	fl.StringVar(&o.MTLS.KeyFile, "auth.mtls.key-file", util.GetEnvDefault(MTLSKeyFileEnvVar, ""),
-		"The path to a TLS key file for the certificate.")
-	fl.BoolVar(&o.Basic.Enabled, "auth.basic.enabled", util.GetEnvDefault(AuthBasicEnabledEnvVar, "false") == "true",
-		"Enable basic authentication.")
-	fl.StringVar(&o.Basic.Username, "auth.basic.username", util.GetEnvDefault(AuthBasicUsernameEnvVar, ""),
-		"The username for basic authentication.")
-	fl.StringVar(&o.Basic.Password, "auth.basic.password", util.GetEnvDefault(AuthBasicPasswordEnvVar, ""),
-		"The password for basic authentication.")
+	fl.Func("auth.mtls.cert-file", "The path to a TLS certificate file to present when joining.", func(s string) error {
+		if o.MTLS == nil {
+			o.MTLS = &MTLSOptions{}
+		}
+		o.MTLS.CertFile = s
+		return nil
+	})
+	fl.Func("auth.mtls.key-file", "The path to a TLS key file for the certificate.", func(s string) error {
+		if o.MTLS == nil {
+			o.MTLS = &MTLSOptions{}
+		}
+		o.MTLS.KeyFile = s
+		return nil
+	})
+	fl.Func("auth.basic.username", "The username.", func(s string) error {
+		if o.Basic == nil {
+			o.Basic = &BasicAuthOptions{}
+		}
+		o.Basic.Username = s
+		return nil
+	})
+	fl.Func("auth.basic.password", "The password.", func(s string) error {
+		if o.Basic == nil {
+			o.Basic = &BasicAuthOptions{}
+		}
+		o.Basic.Password = s
+		return nil
+	})
 }
 
 func (o *AuthOptions) Validate() error {
-	if o.MTLS.Enabled {
+	if o == nil {
+		return nil
+	}
+	if o.MTLS != nil {
 		if o.MTLS.CertFile == "" {
 			return errors.New("auth.mtls.cert-file is required")
 		}
@@ -93,7 +103,7 @@ func (o *AuthOptions) Validate() error {
 			return errors.New("auth.mtls.key-file is required")
 		}
 	}
-	if o.Basic.Enabled {
+	if o.Basic != nil {
 		if o.Basic.Username == "" {
 			return errors.New("auth.basic.username is required")
 		}

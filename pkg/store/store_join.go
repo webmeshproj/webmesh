@@ -101,7 +101,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		log.Debug("using TLS credentials")
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
 	}
-	if s.opts.Auth.Basic.Enabled {
+	if s.opts.Auth != nil && s.opts.Auth.Basic != nil {
 		log.Debug("using basic auth credentials")
 		opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
 	}

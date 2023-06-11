@@ -68,9 +68,6 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 
 // Validate validates the options.
 func (o *Options) Validate() error {
-	if o.Auth == nil {
-		o.Auth = NewAuthOptions()
-	}
 	if o.Raft == nil {
 		o.Raft = NewRaftOptions()
 	}
@@ -106,14 +103,11 @@ func (o *Options) Validate() error {
 
 // TLSConfig returns the TLS configuration.
 func (o *Options) TLSConfig() (*tls.Config, error) {
-	if o.TLS == nil {
-		return nil, nil
-	}
-	if o.TLS.Insecure {
+	if o.TLS == nil || o.TLS.Insecure {
 		return nil, nil
 	}
 	var config tls.Config
-	if o.Auth.MTLS.Enabled {
+	if o.Auth != nil && o.Auth.MTLS != nil {
 		if o.Auth.MTLS.CertFile != "" && o.Auth.MTLS.KeyFile != "" {
 			cert, err := tls.LoadX509KeyPair(o.Auth.MTLS.CertFile, o.Auth.MTLS.KeyFile)
 			if err != nil {

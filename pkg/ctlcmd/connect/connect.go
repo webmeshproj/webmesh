@@ -83,9 +83,10 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	storeOpts.Raft.LeaveOnShutdown = true
 	storeOpts.Raft.ShutdownTimeout = time.Second * 10
 	if opts.TLSCertFile != "" && opts.TLSKeyFile != "" {
-		storeOpts.Auth.MTLS.Enabled = true
-		storeOpts.Auth.MTLS.CertFile = opts.TLSCertFile
-		storeOpts.Auth.MTLS.KeyFile = opts.TLSKeyFile
+		storeOpts.Auth.MTLS = &store.MTLSOptions{
+			CertFile: opts.TLSCertFile,
+			KeyFile:  opts.TLSKeyFile,
+		}
 	}
 	storeOpts.TLS.CAFile = opts.TLSCAFile
 	storeOpts.TLS.Insecure = opts.Insecure
