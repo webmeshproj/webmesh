@@ -25,7 +25,6 @@ import (
 	"net/netip"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
@@ -256,7 +255,7 @@ func (o *Options) Overlay(opts ...any) error {
 				if v.Mesh.PrimaryEndpoint == "" {
 					v.Mesh.PrimaryEndpoint = primaryEndpoint.String()
 				}
-				if v.Mesh.WireGuardEndpoints == "" {
+				if len(v.Mesh.WireGuardEndpoints) == 0 {
 					var eps []string
 					if primaryEndpoint.IsValid() {
 						eps = append(eps, netip.AddrPortFrom(primaryEndpoint, uint16(wireguardPort)).String())
@@ -267,7 +266,7 @@ func (o *Options) Overlay(opts ...any) error {
 							eps = append(eps, ep)
 						}
 					}
-					v.Mesh.WireGuardEndpoints = strings.Join(eps, ",")
+					v.Mesh.WireGuardEndpoints = eps
 				}
 				if v.Bootstrap.AdvertiseAddress == "" {
 					v.Bootstrap.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()

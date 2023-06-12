@@ -18,15 +18,15 @@ limitations under the License.
 package peerdiscovery
 
 import (
-	"context"
-
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
 )
 
@@ -70,6 +70,28 @@ func (s *Server) ListPeers(ctx context.Context, _ *emptypb.Empty) (*v1.ListRaftP
 			}(),
 			Leader: id == string(leader),
 		})
+	}
+	// If the caller is authenticated, we should filter this down to only the
+	// peers the caller has access to.
+	caller, ok := context.AuthenticatedCallerFrom(ctx)
+	if ok {
+		n := networking.New(s.store)
+		nacls, err := n.ListNetworkACLs(ctx)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to list network ACLs: %v", err)
+		}
+		allowedPeers := make([]*v1.RaftPeer, 0)
+		action := v1.NetworkAction{
+			SrcNode: caller,
+		}
+		for _, peer := range out {
+			action.DstNode = peer.Id
+			if !nacls.Accept(ctx, &action) {
+				continue
+			}
+			allowedPeers = append(allowedPeers, peer)
+		}
+		out = allowedPeers
 	}
 	return &v1.ListRaftPeersResponse{Peers: out}, nil
 }

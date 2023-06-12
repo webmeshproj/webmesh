@@ -18,7 +18,6 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"math"
@@ -34,7 +33,6 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"
-	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
@@ -342,6 +340,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		DestinationNodes: []string{"group:" + rbac.VotersGroup},
 		Action:           v1.ACLAction_ACTION_ACCEPT,
 	})
+
 	if err != nil {
 		return fmt.Errorf("create bootstrap nodes network ACL: %w", err)
 	}
@@ -362,6 +361,18 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		}
 	}
 
+	// If we have routes configured, add them to the db
+	if len(s.opts.Mesh.Routes) > 0 {
+		err = n.PutRoute(ctx, &v1.Route{
+			Name:             fmt.Sprintf("%s-auto", s.nodeID),
+			Node:             string(s.nodeID),
+			DestinationCidrs: s.opts.Mesh.Routes,
+		})
+		if err != nil {
+			return fmt.Errorf("create routes: %w", err)
+		}
+	}
+
 	// We need to officially "join" ourselves to the cluster with a wireguard
 	// address. This is done by creating a new node in the database and then
 	// readding it to the cluster as a voter with the acquired address.
@@ -375,19 +386,17 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 	p := peers.New(s)
 	params := &peers.PutOptions{
-		ID:              string(s.nodeID),
-		NetworkIPv6:     networkIPv6,
-		GRPCPort:        s.opts.Mesh.GRPCPort,
-		RaftPort:        s.sl.ListenPort(),
-		PrimaryEndpoint: s.opts.Mesh.PrimaryEndpoint,
-		ZoneAwarenessID: s.opts.Mesh.ZoneAwarenessID,
-	}
-	if s.opts.Mesh.WireGuardEndpoints != "" {
-		params.WireGuardEndpoints = strings.Split(s.opts.Mesh.WireGuardEndpoints, ",")
+		ID:                 string(s.nodeID),
+		NetworkIPv6:        networkIPv6,
+		GRPCPort:           s.opts.Mesh.GRPCPort,
+		RaftPort:           s.sl.ListenPort(),
+		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
+		WireGuardEndpoints: s.opts.Mesh.WireGuardEndpoints,
+		ZoneAwarenessID:    s.opts.Mesh.ZoneAwarenessID,
 	}
 	// Go ahead and generate our private key.
 	s.log.Info("generating wireguard key for ourselves")
-	wireguardKey, err := wgtypes.GeneratePrivateKey()
+	wireguardKey, err := s.loadWireGuardKey(ctx)
 	if err != nil {
 		return fmt.Errorf("generate private key: %w", err)
 	}
@@ -456,20 +465,6 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 				return fmt.Errorf("create edge: %w", err)
 			}
 		}
-	}
-	s.log.Debug("saving wireguard key to database")
-	keyparams := localdb.SetCurrentWireguardKeyParams{
-		PrivateKey: wireguardKey.String(),
-	}
-	if s.opts.Mesh.KeyRotationInterval > 0 {
-		keyparams.ExpiresAt = sql.NullTime{
-			Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
-			Valid: true,
-		}
-	}
-	err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, keyparams)
-	if err != nil {
-		return fmt.Errorf("set current wireguard key: %w", err)
 	}
 	var networkv4 netip.Prefix
 	var raftAddr string
@@ -547,7 +542,6 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 		grpcPort = int64(s.opts.Mesh.GRPCPort)
 	}
 	joinAddr := net.JoinHostPort(advertiseAddress.Addr().String(), strconv.Itoa(int(grpcPort)))
-	s.opts.Mesh.MaxJoinRetries = 5
 	s.opts.Mesh.JoinTimeout = 30 * time.Second
 	s.opts.Mesh.JoinAsVoter = true
 	// TODO: Technically we want to wait for the first barrier to be reached before we
@@ -556,13 +550,11 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 	//       However, this is not possible right now because we don't have a way to
 	//       wait for the first barrier to be reached.
 	time.Sleep(3 * time.Second)
-	return s.join(ctx, joinAddr)
+	return s.join(ctx, joinAddr, 5)
 }
 
 func (s *store) rejoinBootstrapServer(ctx context.Context) error {
 	servers := strings.Split(s.opts.Bootstrap.Servers, ",")
-	// Make sure we don't retry forever.
-	s.opts.Mesh.MaxJoinRetries = 5
 	s.opts.Mesh.JoinTimeout = 30 * time.Second
 	s.opts.Mesh.JoinAsVoter = true
 	for _, server := range servers {
@@ -577,7 +569,7 @@ func (s *store) rejoinBootstrapServer(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("resolve advertise address: %w", err)
 		}
-		if err = s.join(ctx, addr.String()); err != nil {
+		if err = s.join(ctx, addr.String(), 5); err != nil {
 			s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
 			continue
 		}

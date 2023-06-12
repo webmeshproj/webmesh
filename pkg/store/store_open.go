@@ -155,7 +155,7 @@ func (s *store) Open() error {
 		if err = s.bootstrap(ctx); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
-	} else if s.opts.Mesh.JoinAddress != "" {
+	} else if s.opts.Mesh.JoinAddress != "" || len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
 		log.Debug("migrating raft database")
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
@@ -166,12 +166,17 @@ func (s *store) Open() error {
 		}
 		ctx, cancel := context.WithTimeout(ctx, s.opts.Mesh.JoinTimeout)
 		defer cancel()
-		if err = s.join(ctx, s.opts.Mesh.JoinAddress); err != nil {
+		if len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
+			err = s.joinWithPeerDiscovery(ctx)
+		} else {
+			err = s.join(ctx, s.opts.Mesh.JoinAddress, s.opts.Mesh.MaxJoinRetries)
+		}
+		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
 	} else {
 		// We neither had the bootstrap flag nor the join flag set.
-		// This means we are a possibly a single node cluster.
+		// This means we are possibly a single node cluster.
 		// Recover our previous wireguard configuration and start up.
 		log.Debug("migrating raft database")
 		if err = models.MigrateRaftDB(s.weakData); err != nil {

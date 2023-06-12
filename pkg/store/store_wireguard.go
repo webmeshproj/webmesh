@@ -18,9 +18,12 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
+	"time"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -107,7 +110,7 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 	if err != nil {
 		return fmt.Errorf("failed to add wireguard forwarding rule: %w", err)
 	}
-	if s.opts.WireGuard.Masquerade || s.opts.Mesh.Routes != "" {
+	if s.opts.WireGuard.Masquerade || len(s.opts.Mesh.Routes) > 0 {
 		err = s.fw.AddMasquerade(ctx, s.wg.Name())
 		if err != nil {
 			return fmt.Errorf("failed to add masquerade rule: %w", err)
@@ -154,6 +157,62 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
 	return s.refreshWireguardPeers(ctx)
+}
+
+func (s *store) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
+	var key wgtypes.Key
+	keyData, err := localdb.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return key, fmt.Errorf("get current wireguard key: %w", err)
+		}
+		// We don't have a key yet, so we generate one.
+		s.log.Info("generating wireguard key")
+		key, err = wgtypes.GeneratePrivateKey()
+		if err != nil {
+			return key, fmt.Errorf("generate wireguard key: %w", err)
+		}
+		// Save it to the database.
+		params := localdb.SetCurrentWireguardKeyParams{
+			PrivateKey: key.String(),
+		}
+		if s.opts.Mesh.KeyRotationInterval > 0 {
+			params.ExpiresAt = sql.NullTime{
+				Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
+				Valid: true,
+			}
+		}
+		s.log.Debug("saving wireguard key to database")
+		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
+			return key, fmt.Errorf("set current wireguard key: %w", err)
+		}
+	} else if keyData.ExpiresAt.Valid && keyData.ExpiresAt.Time.Before(time.Now().UTC()) {
+		// We have a key, but it's expired, so we generate a new one.
+		s.log.Info("wireguard key expired, generating new one")
+		key, err = wgtypes.GeneratePrivateKey()
+		if err != nil {
+			return key, fmt.Errorf("generate wireguard key: %w", err)
+		}
+		// Save it to the database.
+		params := localdb.SetCurrentWireguardKeyParams{
+			PrivateKey: key.String(),
+		}
+		if s.opts.Mesh.KeyRotationInterval > 0 {
+			params.ExpiresAt = sql.NullTime{
+				Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
+				Valid: true,
+			}
+		}
+		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
+			return key, fmt.Errorf("set current wireguard key: %w", err)
+		}
+	} else {
+		key, err = wgtypes.ParseKey(keyData.PrivateKey)
+		if err != nil {
+			return key, fmt.Errorf("parse wireguard key: %w", err)
+		}
+	}
+	return key, nil
 }
 
 func (s *store) walkMeshDescendants(ctx context.Context) error {

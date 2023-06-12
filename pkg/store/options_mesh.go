@@ -19,6 +19,8 @@ package store
 import (
 	"errors"
 	"flag"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/webmeshproj/node/pkg/util"
@@ -29,6 +31,7 @@ const (
 	KeyRotationIntervalEnvVar    = "MESH_KEY_ROTATION_INTERVAL"
 	ZoneAwarenessIDEnvVar        = "MESH_ZONE_AWARENESS_ID"
 	JoinAddressEnvVar            = "MESH_JOIN_ADDRESS"
+	PeerDiscoveryAddressesEnvVar = "MESH_PEER_DISCOVERY_ADDRESSES"
 	JoinAsVoterEnvVar            = "MESH_JOIN_AS_VOTER"
 	MaxJoinRetriesEnvVar         = "MESH_MAX_JOIN_RETRIES"
 	JoinTimeoutEnvVar            = "MESH_JOIN_TIMEOUT"
@@ -51,6 +54,8 @@ type MeshOptions struct {
 	ZoneAwarenessID string `json:"zone-awareness-id,omitempty" yaml:"zone-awareness-id,omitempty" toml:"zone-awareness-id,omitempty"`
 	// JoinAddress is the address of a node to join.
 	JoinAddress string `json:"join-address,omitempty" yaml:"join-address,omitempty" toml:"join-address,omitempty"`
+	// PeerDiscoveryAddresses are the addresses to use for peer discovery.
+	PeerDiscoveryAddresses []string `json:"peer-discovery-addresses,omitempty" yaml:"peer-discovery-addresses,omitempty" toml:"peer-discovery-addresses,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int `json:"max-join-retries,omitempty" yaml:"max-join-retries,omitempty" toml:"max-join-retries,omitempty"`
 	// JoinTimeout is the timeout for joining.
@@ -60,10 +65,10 @@ type MeshOptions struct {
 	// PrimaryEndpoint is the primary endpoint to advertise when joining.
 	PrimaryEndpoint string `json:"primary-endpoint,omitempty" yaml:"primary-endpoint,omitempty" toml:"primary-endpoint,omitempty"`
 	// WireGuardEndpoints are additional WireGuard endpoints to broadcast when joining.
-	WireGuardEndpoints string `json:"wireguard-endpoints,omitempty" yaml:"wireguard-endpoints,omitempty" toml:"wireguard-endpoints,omitempty"`
+	WireGuardEndpoints []string `json:"wireguard-endpoints,omitempty" yaml:"wireguard-endpoints,omitempty" toml:"wireguard-endpoints,omitempty"`
 	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
 	// If the node is not allowed to put routes in the mesh, the node will be unable to join.
-	Routes string `json:"routes,omitempty" yaml:"routes,omitempty" toml:"routes,omitempty"`
+	Routes []string `json:"routes,omitempty" yaml:"routes,omitempty" toml:"routes,omitempty"`
 	// GRPCPort is the port to advertise for gRPC.
 	GRPCPort int `json:"grpc-port,omitempty" yaml:"grpc-port,omitempty" toml:"grpc-port,omitempty"`
 	// NoIPv4 disables IPv4 usage.
@@ -75,7 +80,18 @@ type MeshOptions struct {
 // NewMeshOptions creates a new MeshOptions with default values.
 func NewMeshOptions() *MeshOptions {
 	return &MeshOptions{
-		JoinAddress:         "",
+		PeerDiscoveryAddresses: func() []string {
+			if val, ok := os.LookupEnv(PeerDiscoveryAddressesEnvVar); ok {
+				return strings.Split(val, ",")
+			}
+			return nil
+		}(),
+		WireGuardEndpoints: func() []string {
+			if val, ok := os.LookupEnv(NodeWireGuardEndpointsEnvVar); ok {
+				return strings.Split(val, ",")
+			}
+			return nil
+		}(),
 		MaxJoinRetries:      10,
 		GRPCPort:            8443,
 		JoinTimeout:         time.Minute,
@@ -98,6 +114,10 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
 		"Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.")
 	fl.StringVar(&o.JoinAddress, "mesh.join-address", util.GetEnvDefault(JoinAddressEnvVar, ""),
 		"Address of a node to join.")
+	fl.Func("mesh.peer-discovery-addresses", "Addresses to use for peer discovery.", func(val string) error {
+		o.PeerDiscoveryAddresses = strings.Split(val, ",")
+		return nil
+	})
 	fl.IntVar(&o.MaxJoinRetries, "mesh.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
 		"Maximum number of join retries.")
 	fl.DurationVar(&o.JoinTimeout, "mesh.join-timeout", util.GetEnvDurationDefault(JoinTimeoutEnvVar, time.Minute),
@@ -109,12 +129,16 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
 	fl.StringVar(&o.PrimaryEndpoint, "mesh.primary-endpoint", util.GetEnvDefault(PrimaryEndpointEnvVar, ""),
 		`The primary endpoint to broadcast when joining a cluster.
 This is only necessary if the node intends on being publicly accessible.`)
-	fl.StringVar(&o.WireGuardEndpoints, "mesh.wireguard-endpoints", util.GetEnvDefault(NodeWireGuardEndpointsEnvVar, ""),
-		`Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.`)
-	fl.StringVar(&o.Routes, "mesh.routes", util.GetEnvDefault(NodeRoutesEnvVar, ""),
-		`Comma separated list of additional routes to advertise to the mesh.
-These routes are advertised to all peers. If the node is not allowed
-to put routes in the mesh, the node will be unable to join.`)
+	fl.Func("mesh.wireguard-endpoints", `Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.`, func(s string) error {
+		o.WireGuardEndpoints = strings.Split(s, ",")
+		return nil
+	})
+	fl.Func("mesh.routes", `Comma separated list of additional routes to advertise to the mesh.
+	These routes are advertised to all peers. If the node is not allowed
+	to put routes in the mesh, the node will be unable to join.`, func(s string) error {
+		o.Routes = strings.Split(s, ",")
+		return nil
+	})
 	fl.BoolVar(&o.NoIPv4, "mesh.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Do not request IPv4 assignments when joining.")
 	fl.BoolVar(&o.NoIPv6, "mesh.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",

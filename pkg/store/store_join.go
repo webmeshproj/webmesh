@@ -17,9 +17,6 @@ limitations under the License.
 package store
 
 import (
-	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -32,86 +29,74 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins/basicauth"
+	"github.com/webmeshproj/node/pkg/plugins/ldap"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-func (s *store) join(ctx context.Context, joinAddr string) error {
-	log := s.log.With(slog.String("join-addr", joinAddr))
-	var key wgtypes.Key
-	keyData, err := localdb.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
+func (s *store) joinWithPeerDiscovery(ctx context.Context) error {
+	log := s.log.With(slog.String("peer-discovery-addrs", strings.Join(s.opts.Mesh.PeerDiscoveryAddresses, ",")))
+	ctx = context.WithLogger(ctx, log)
+	log.Info("discovering joinable peers")
+	var err error
+	for _, addr := range s.opts.Mesh.PeerDiscoveryAddresses {
+		var c *grpc.ClientConn
+		c, err = s.newGRPCConn(ctx, addr)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			log.Error("failed to dial peer discovery address", slog.String("error", err.Error()))
+			continue
+		}
+		defer c.Close()
+		cli := v1.NewPeerDiscoveryClient(c)
+		var resp *v1.ListRaftPeersResponse
+		resp, err = cli.ListPeers(ctx, &emptypb.Empty{})
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			log.Error("failed to list peers", slog.String("error", err.Error()))
+			continue
+		}
+		log.Info("discovered joinable peers", slog.Any("peers", resp.Peers))
+	Peers:
+		for _, peer := range resp.Peers {
+			err = s.join(ctx, peer.Address, s.opts.Mesh.MaxJoinRetries)
+			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				log.Error("failed to join peer", slog.String("error", err.Error()))
+				continue Peers
+			}
+		}
+		// If we got this far, we aren't going to try another discovery server.
+		// They'll all have the same peers.
+		break
+	}
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("get current wireguard key: %w", err)
-		}
-		// We don't have a key yet, so we generate one.
-		log.Info("generating wireguard key")
-		key, err = wgtypes.GeneratePrivateKey()
-		if err != nil {
-			return fmt.Errorf("generate wireguard key: %w", err)
-		}
-		// Save it to the database.
-		params := localdb.SetCurrentWireguardKeyParams{
-			PrivateKey: key.String(),
-		}
-		if s.opts.Mesh.KeyRotationInterval > 0 {
-			params.ExpiresAt = sql.NullTime{
-				Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
-				Valid: true,
-			}
-		}
-		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
-			return fmt.Errorf("set current wireguard key: %w", err)
-		}
-	} else if keyData.ExpiresAt.Valid && keyData.ExpiresAt.Time.Before(time.Now().UTC()) {
-		// We have a key, but it's expired, so we generate a new one.
-		log.Info("wireguard key expired, generating new one")
-		key, err = wgtypes.GeneratePrivateKey()
-		if err != nil {
-			return fmt.Errorf("generate wireguard key: %w", err)
-		}
-		// Save it to the database.
-		params := localdb.SetCurrentWireguardKeyParams{
-			PrivateKey: key.String(),
-		}
-		if s.opts.Mesh.KeyRotationInterval > 0 {
-			params.ExpiresAt = sql.NullTime{
-				Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
-				Valid: true,
-			}
-		}
-		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
-			return fmt.Errorf("set current wireguard key: %w", err)
-		}
-	} else {
-		key, err = wgtypes.ParseKey(keyData.PrivateKey)
-		if err != nil {
-			return fmt.Errorf("parse wireguard key: %w", err)
-		}
+		return fmt.Errorf("join with peer discovery: %w", err)
 	}
-	log.Info("joining cluster")
-	var opts []grpc.DialOption
-	if s.opts.TLS.Insecure {
-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else {
-		// MTLS is included in the TLS config already if enabled.
-		log.Debug("using TLS credentials")
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
-	}
-	if s.opts.Auth != nil && s.opts.Auth.Basic != nil {
-		log.Debug("using basic auth credentials")
-		opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
-	}
+	return nil
+}
+
+func (s *store) join(ctx context.Context, joinAddr string, maxRetries int) error {
+	log := s.log.With(slog.String("join-addr", joinAddr))
+	ctx = context.WithLogger(ctx, log)
+	log.Info("joining mesh")
 	var tries int
-	var resp *v1.JoinResponse
-	for tries <= s.opts.Mesh.MaxJoinRetries {
+	var err error
+	for tries <= maxRetries {
 		if tries > 0 {
 			log.Info("retrying join request", slog.Int("tries", tries))
 		}
-		conn, err := grpc.DialContext(ctx, joinAddr, opts...)
+		conn, err := s.newGRPCConn(ctx, joinAddr)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -122,37 +107,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			time.Sleep(time.Second)
 			continue
 		}
-		defer conn.Close()
-		client := v1.NewNodeClient(conn)
-		if s.opts.Mesh.GRPCPort == 0 {
-			// Assume the default port.
-			s.opts.Mesh.GRPCPort = 8443
-		}
-		req := &v1.JoinRequest{
-			Id:              string(s.nodeID),
-			PublicKey:       key.PublicKey().String(),
-			RaftPort:        int32(s.sl.ListenPort()),
-			GrpcPort:        int32(s.opts.Mesh.GRPCPort),
-			PrimaryEndpoint: s.opts.Mesh.PrimaryEndpoint,
-			WireguardEndpoints: func() []string {
-				if s.opts.Mesh.WireGuardEndpoints != "" {
-					return strings.Split(s.opts.Mesh.WireGuardEndpoints, ",")
-				}
-				return nil
-			}(),
-			ZoneAwarenessId: s.opts.Mesh.ZoneAwarenessID,
-			AssignIpv4:      !s.opts.Mesh.NoIPv4,
-			PreferRaftIpv6:  s.opts.Raft.PreferIPv6,
-			AsVoter:         s.opts.Mesh.JoinAsVoter,
-			Routes: func() []string {
-				if s.opts.Mesh.Routes != "" {
-					return strings.Split(s.opts.Mesh.Routes, ",")
-				}
-				return nil
-			}(),
-		}
-		log.Info("sending join request to node", slog.Any("req", req))
-		resp, err = client.Join(ctx, req)
+		err = s.joinWithConn(ctx, conn)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -165,11 +120,38 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 		}
 		break
 	}
-	if err != nil {
-		return err
+	return err
+}
+
+func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
+	log := context.LoggerFrom(ctx)
+	client := v1.NewNodeClient(c)
+	defer c.Close()
+	if s.opts.Mesh.GRPCPort == 0 {
+		// Assume the default port.
+		s.opts.Mesh.GRPCPort = 8443
 	}
-	if resp == nil {
-		return fmt.Errorf("join request failed")
+	key, err := s.loadWireGuardKey(ctx)
+	if err != nil {
+		return fmt.Errorf("load wireguard key: %w", err)
+	}
+	req := &v1.JoinRequest{
+		Id:                 string(s.nodeID),
+		PublicKey:          key.PublicKey().String(),
+		RaftPort:           int32(s.sl.ListenPort()),
+		GrpcPort:           int32(s.opts.Mesh.GRPCPort),
+		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
+		WireguardEndpoints: s.opts.Mesh.WireGuardEndpoints,
+		ZoneAwarenessId:    s.opts.Mesh.ZoneAwarenessID,
+		AssignIpv4:         !s.opts.Mesh.NoIPv4,
+		PreferRaftIpv6:     s.opts.Raft.PreferIPv6,
+		AsVoter:            s.opts.Mesh.JoinAsVoter,
+		Routes:             s.opts.Mesh.Routes,
+	}
+	log.Debug("sending join request to node", slog.Any("req", req))
+	resp, err := client.Join(ctx, req)
+	if err != nil {
+		return fmt.Errorf("join request: %w", err)
 	}
 	log.Debug("received join response", slog.Any("resp", resp))
 	var addressv4, addressv6, networkv6 netip.Prefix
@@ -294,6 +276,7 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 			return err
 		}
 		// Try to ping the peer to establish a connection
+		// TODO: Only do this if we are a private node
 		go func(peer *v1.WireGuardPeer) {
 			// TODO: make this configurable
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -306,16 +289,38 @@ func (s *store) join(ctx context.Context, joinAddr string) error {
 				addr, err = netip.ParsePrefix(peer.AddressIpv6)
 			}
 			if err != nil {
-				s.log.Warn("could not parse address", slog.String("error", err.Error()))
+				log.Warn("could not parse address", slog.String("error", err.Error()))
 				return
 			}
 			err = util.Ping(ctx, addr.Addr())
 			if err != nil {
-				s.log.Warn("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
+				log.Warn("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
 				return
 			}
-			s.log.Debug("successfully pinged descendant", slog.String("descendant", peer.Id))
+			log.Debug("successfully pinged descendant", slog.String("descendant", peer.Id))
 		}(peer)
 	}
 	return nil
+}
+
+func (s *store) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
+	log := context.LoggerFrom(ctx)
+	var opts []grpc.DialOption
+	if s.opts.TLS.Insecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		// MTLS is included in the TLS config already if enabled.
+		log.Debug("using TLS credentials")
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
+	}
+	if s.opts.Auth != nil {
+		if s.opts.Auth.Basic != nil {
+			log.Debug("using basic auth credentials")
+			opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
+		} else if s.opts.Auth.LDAP != nil {
+			log.Debug("using LDAP auth credentials")
+			opts = append(opts, ldap.NewCreds(s.opts.Auth.LDAP.Username, s.opts.Auth.LDAP.Password))
+		}
+	}
+	return grpc.DialContext(ctx, addr, opts...)
 }

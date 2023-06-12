@@ -21,6 +21,7 @@ import (
 	"context"
 	"time"
 
+	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -47,6 +48,23 @@ func WithTimeout(ctx Context, timeout time.Duration) (Context, CancelFunc) {
 // WithDeadline returns a context with the given deadline.
 func WithDeadline(ctx Context, deadline time.Time) (Context, CancelFunc) {
 	return context.WithDeadline(ctx, deadline)
+}
+
+type logContextKey struct{}
+
+// WithLogger returns a context with the given logger set.
+func WithLogger(ctx Context, logger *slog.Logger) Context {
+	return context.WithValue(ctx, logContextKey{}, logger)
+}
+
+// LoggerFrom returns the logger from the context. If no logger is set, the
+// default logger is returned.
+func LoggerFrom(ctx Context) *slog.Logger {
+	logger, ok := ctx.Value(logContextKey{}).(*slog.Logger)
+	if !ok {
+		return slog.Default()
+	}
+	return logger
 }
 
 type authenticatedCallerKey struct{}

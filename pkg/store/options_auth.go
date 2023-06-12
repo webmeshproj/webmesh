@@ -36,6 +36,8 @@ type AuthOptions struct {
 	Basic *BasicAuthOptions `json:"basic,omitempty" yaml:"basic,omitempty" toml:"basic,omitempty"`
 	// MTLS are options for mutual TLS.
 	MTLS *MTLSOptions `json:"mtls,omitempty" yaml:"mtls,omitempty" toml:"mtls,omitempty"`
+	// LDAP are options for LDAP authentication.
+	LDAP *LDAPAuthOptions `json:"ldap,omitempty" yaml:"ldap,omitempty" toml:"ldap,omitempty"`
 }
 
 // MTLSOptions are options for mutual TLS.
@@ -48,6 +50,14 @@ type MTLSOptions struct {
 
 // BasicAuthOptions are options for basic authentication.
 type BasicAuthOptions struct {
+	// Username is the username.
+	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty"`
+	// Password is the password.
+	Password string `json:"password,omitempty" yaml:"password,omitempty" toml:"password,omitempty"`
+}
+
+// LDAPAuthOptions are options for LDAP authentication.
+type LDAPAuthOptions struct {
 	// Username is the username.
 	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty"`
 	// Password is the password.
@@ -87,6 +97,20 @@ func (o *AuthOptions) BindFlags(fl *flag.FlagSet) {
 			o.Basic = &BasicAuthOptions{}
 		}
 		o.Basic.Password = s
+		return nil
+	})
+	fl.Func("auth.ldap.username", "A username to use for LDAP auth.", func(s string) error {
+		if o.LDAP == nil {
+			o.LDAP = &LDAPAuthOptions{}
+		}
+		o.LDAP.Username = s
+		return nil
+	})
+	fl.Func("auth.ldap.password", "A password to use for LDAP auth.", func(s string) error {
+		if o.LDAP == nil {
+			o.LDAP = &LDAPAuthOptions{}
+		}
+		o.LDAP.Password = s
 		return nil
 	})
 }
