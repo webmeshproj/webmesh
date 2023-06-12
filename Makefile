@@ -17,24 +17,31 @@ ARCH  ?= $(shell go env GOARCH)
 OS    ?= $(shell go env GOOS)
 DIST  := $(CURDIR)/dist
 
-build: fmt vet generate ## Build node binary.
+default: build
+
+##@ General
+
+.PHONY: help
+help: ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Build
+
+build: fmt vet generate ## Build node binary for the local platform.
 	go build \
 		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
 		-o "$(DIST)/$(NAME)_$(OS)_$(ARCH)" \
 		cmd/$(NAME)/main.go
 
-build-ctl: fmt vet ## Build wmctl binary.
+build-ctl: fmt vet ## Build wmctl binary for the local platform.
 	go build \
 		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
 		-o "$(DIST)/$(CTL)_$(OS)_$(ARCH)" \
 		cmd/$(CTL)/main.go
 
-tidy:
-	go mod tidy
-
-lint:
+lint: ## Run linters.
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run
 
@@ -43,7 +50,7 @@ build-image: ## Build the node build image.
 	docker buildx build -t $(BUILD_IMAGE) -f Dockerfile.build --load .
 
 .PHONY: dist
-dist:
+dist: ## Build node binaries for all platforms.
 	mkdir -p $(DIST)
 	docker run --rm \
 		-u $(shell id -u):$(shell id -g) \
@@ -52,16 +59,16 @@ dist:
 		-v "$(shell go env GOPATH):/go" \
 		-e GOPATH=/go \
 		-w /build \
-		$(BUILD_IMAGE) make -j $(shell nproc) dist-node
+		$(BUILD_IMAGE) make -j $(shell nproc) dist-node dist-ctl
 
-dist-node: ## Build node binaries for all platforms.
+dist-node: ## Build node binaries for all platforms, this is called within the build image.
 	$(MAKE) \
 		dist-node-linux-amd64 \
 		dist-node-linux-arm64 \
 		dist-node-linux-arm
 	upx --best --lzma $(DIST)/$(NAME)_*
 
-dist-ctl: ## Build wmctl binaries for all platforms.
+dist-ctl: ## Build wmctl binaries for all platforms, this is called within the build image.
 	$(MAKE) \
 		dist-ctl-linux-amd64 \
 		dist-ctl-linux-arm64 \
@@ -110,6 +117,9 @@ docker-build-distroless: build ## Build the distroless node docker image
 
 docker-push: docker-build ## Push the node docker image
 	docker push $(IMAGE)
+
+docker-push-distroless: docker-build-distroless ## Push the distroless node docker image
+	docker push $(IMAGE)-distroless
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
