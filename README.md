@@ -7,7 +7,7 @@ This project aims to provide distributed and decentralized communication for dev
 It is inspired by several other projects that have emerged over the years such as TailScale, ZeroTier, and OpenZiti.
 The core difference, however, is that every node in the network is also, optionally, a controller server.
 Another core aim is to offload as much networking onto pre-existing protocols as possible and strive to maintain a simple codebase.
-This is one of the reasons the project is built on top of [WireGuard](https://www.wireguard.com/).
+This is one of the reasons the project is built on top of [WireGuard](https://www.wireguard.com/) and doesn't attempt to implement another Virtual Network Layer.
 
 Nodes connected to the network take on one of three roles. They can be a client, a server, or both.
 A client is a node that is connected to the network but does not provide any services, except to itself.
