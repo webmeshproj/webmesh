@@ -172,20 +172,20 @@ func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager, log 
 		logging.StreamServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
 	}
 	if o.Metrics.Enabled {
-		slog.Default().Debug("registering gRPC metrics interceptors")
+		log.Debug("registering gRPC metrics interceptors")
 		metrics := prometheus.NewServerMetrics(prometheus.WithServerHandlingTimeHistogram())
 		unarymiddlewares = append(unarymiddlewares, metrics.UnaryServerInterceptor())
 		streammiddlewares = append(streammiddlewares, metrics.StreamServerInterceptor())
 		promapi.MustRegister(metrics)
 	}
 	if plugins.HasAuth() {
-		slog.Default().Debug("registering auth interceptor")
+		log.Debug("registering auth interceptor")
 		unarymiddlewares = append(unarymiddlewares, plugins.AuthUnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, plugins.AuthStreamInterceptor())
 	}
 	var leaderProxyTLS *tls.Config
 	if o.API.LeaderProxy {
-		slog.Default().Debug("registering leader proxy interceptors")
+		log.Debug("registering leader proxy interceptors")
 		leaderProxyTLS, err := o.ProxyTLSConfig()
 		if err != nil {
 			return nil, nil, err

@@ -73,6 +73,7 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 		v1.RegisterPeerDiscoveryServer(server, peerdiscovery.NewServer(store))
 	}
 	if o.API.WebRTC {
+		log.Debug("registering webrtc api")
 		stunURLs := strings.Split(o.API.STUNServers, ",")
 		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, proxyTLSConfig, stunURLs))
 	}
