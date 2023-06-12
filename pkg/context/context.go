@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"golang.org/x/exp/slog"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -65,6 +66,31 @@ func LoggerFrom(ctx Context) *slog.Logger {
 		return slog.Default()
 	}
 	return logger
+}
+
+// LogInjectUnaryServerInterceptor returns a unary server interceptor that
+// injects the logger into the context.
+func LogInjectUnaryServerInterceptor(logger *slog.Logger) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+		return handler(WithLogger(ctx, logger), req)
+	}
+}
+
+// LogInjectStreamServerInterceptor returns a stream server interceptor that
+// injects the logger into the context.
+func LogInjectStreamServerInterceptor(logger *slog.Logger) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		return handler(srv, &logInjectServerStream{ss, logger})
+	}
+}
+
+type logInjectServerStream struct {
+	grpc.ServerStream
+	logger *slog.Logger
+}
+
+func (ss *logInjectServerStream) Context() Context {
+	return WithLogger(ss.ServerStream.Context(), ss.logger)
 }
 
 type authenticatedCallerKey struct{}

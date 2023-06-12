@@ -18,7 +18,6 @@ limitations under the License.
 package webrtc
 
 import (
-	"context"
 	"io"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/services/datachannels"
 )
 
@@ -41,7 +41,7 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 		remoteAddr = p.Addr.String()
 	}
 
-	log := s.log.With(slog.String("remote_addr", remoteAddr))
+	log := context.LoggerFrom(stream.Context()).With(slog.String("remote_addr", remoteAddr))
 
 	// Pull the initial request from the stream in a goroutine to avoid blocking
 	// forever if the client never sends anything.
@@ -199,7 +199,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	defer func() {
 		err := negotiateStream.CloseSend()
 		if err != nil {
-			s.log.Error("failed to close negotiation stream", slog.String("error", err.Error()))
+			log.Error("failed to close negotiation stream", slog.String("error", err.Error()))
 		}
 	}()
 	err = negotiateStream.Send(&v1.DataChannelNegotiation{
@@ -272,7 +272,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 			return
 		}
 		if nodeCandidate.GetCandidate() == "" {
-			s.log.Error("received empty candidate from node")
+			log.Error("received empty candidate from node")
 			return
 		}
 		log.Info("received candidate from node", slog.String("candidate", nodeCandidate.GetCandidate()))
@@ -316,7 +316,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 func (s *Server) newPeerClient(ctx context.Context, id string) (v1.NodeClient, io.Closer, error) {
 	addr, err := s.meshstate.GetNodePrivateRPCAddress(ctx, id)
 	if err != nil {
-		s.log.Error("failed to get peer address", slog.String("error", err.Error()))
+		context.LoggerFrom(ctx).Error("failed to get peer address", slog.String("error", err.Error()))
 		return nil, nil, status.Error(codes.NotFound, "failed to get peer address")
 	}
 	var creds credentials.TransportCredentials

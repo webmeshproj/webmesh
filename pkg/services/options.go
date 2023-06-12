@@ -34,6 +34,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
 	"github.com/webmeshproj/node/pkg/store"
@@ -146,7 +147,7 @@ func (o *Options) ListenPort() (int, error) {
 }
 
 // ServerOptions converts the options to gRPC server options.
-func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager) ([]grpc.ServerOption, *tls.Config, error) {
+func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager, log *slog.Logger) ([]grpc.ServerOption, *tls.Config, error) {
 	var opts []grpc.ServerOption
 	if !o.Insecure {
 		tlsConfig, err := o.TLSConfig()
@@ -163,12 +164,12 @@ func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager) ([]g
 		opts = append(opts, grpc.Creds(insecure.NewCredentials()))
 	}
 	unarymiddlewares := []grpc.UnaryServerInterceptor{
-		logging.UnaryServerInterceptor(InterceptorLogger(slog.Default().With("component", "grpc")),
-			logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+		context.LogInjectUnaryServerInterceptor(log),
+		logging.UnaryServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
 	}
 	streammiddlewares := []grpc.StreamServerInterceptor{
-		logging.StreamServerInterceptor(InterceptorLogger(slog.Default().With("component", "grpc")),
-			logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+		context.LogInjectStreamServerInterceptor(log),
+		logging.StreamServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
 	}
 	if o.Metrics.Enabled {
 		slog.Default().Debug("registering gRPC metrics interceptors")
@@ -189,8 +190,7 @@ func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager) ([]g
 		if err != nil {
 			return nil, nil, err
 		}
-		proxyLogger := slog.Default().With("component", "leader-proxy")
-		leaderProxy := leaderproxy.New(store, leaderProxyTLS, proxyLogger)
+		leaderProxy := leaderproxy.New(store, leaderProxyTLS)
 		unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
 	}
@@ -285,4 +285,11 @@ func (o *Options) ToFeatureSet() []v1.Feature {
 		features = append(features, v1.Feature_MESH_DNS)
 	}
 	return features
+}
+
+// InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.
+func InterceptorLogger() logging.Logger {
+	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
+		context.LoggerFrom(ctx).Log(ctx, slog.Level(lvl), msg, fields...)
+	})
 }

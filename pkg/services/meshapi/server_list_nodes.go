@@ -17,13 +17,13 @@ limitations under the License.
 package meshapi
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/webmeshproj/node/pkg/context"
 )
 
 func (s *Server) ListNodes(ctx context.Context, req *emptypb.Empty) (*v1.NodeList, error) {
@@ -34,7 +34,7 @@ func (s *Server) ListNodes(ctx context.Context, req *emptypb.Empty) (*v1.NodeLis
 	servers := s.store.Raft().GetConfiguration().Configuration().Servers
 	leader, err := s.store.Leader()
 	if err != nil {
-		s.log.Error("failed to get leader", slog.String("error", err.Error()))
+		context.LoggerFrom(ctx).Error("failed to get leader", slog.String("error", err.Error()))
 	}
 	out := make([]*v1.MeshNode, len(node))
 	for i, n := range node {

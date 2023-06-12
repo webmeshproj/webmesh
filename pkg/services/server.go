@@ -18,13 +18,11 @@ limitations under the License.
 package services
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"strings"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
@@ -53,7 +51,7 @@ type Server struct {
 // NewServer returns a new Server.
 func NewServer(store store.Store, o *Options) (*Server, error) {
 	log := slog.Default().With("component", "server")
-	opts, proxyTLSConfig, err := o.ServerOptions(store, store.Plugins())
+	opts, proxyTLSConfig, err := o.ServerOptions(store, store.Plugins(), log)
 	if err != nil {
 		return nil, err
 	}
@@ -163,11 +161,4 @@ func (s *Server) Stop() {
 	}
 	s.log.Info("Shutting down gRPC server")
 	s.srv.GracefulStop()
-}
-
-// InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.
-func InterceptorLogger(l *slog.Logger) logging.Logger {
-	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
-		l.Log(ctx, slog.Level(lvl), msg, fields...)
-	})
 }

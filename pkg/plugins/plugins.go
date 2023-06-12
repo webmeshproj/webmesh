@@ -160,7 +160,9 @@ func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 		if err != nil {
 			return nil, fmt.Errorf("authenticate: %w", err)
 		}
+		log := context.LoggerFrom(ctx).With("caller", resp.GetId())
 		ctx = context.WithAuthenticatedCaller(ctx, resp.GetId())
+		ctx = context.WithLogger(ctx, log)
 		return handler(ctx, req)
 	}
 }
@@ -176,7 +178,9 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 		if err != nil {
 			return fmt.Errorf("authenticate: %w", err)
 		}
+		log := context.LoggerFrom(ss.Context()).With("caller", resp.GetId())
 		ctx := context.WithAuthenticatedCaller(ss.Context(), resp.GetId())
+		ctx = context.WithLogger(ctx, log)
 		return handler(srv, &authenticatedServerStream{ss, ctx})
 	}
 }

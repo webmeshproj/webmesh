@@ -37,12 +37,11 @@ import (
 type Interceptor struct {
 	store     store.Store
 	tlsConfig *tls.Config
-	logger    *slog.Logger
 	dialOpts  []grpc.DialOption
 }
 
 // New returns a new leader proxy interceptor.
-func New(store store.Store, tlsConfig *tls.Config, logger *slog.Logger) *Interceptor {
+func New(store store.Store, tlsConfig *tls.Config) *Interceptor {
 	var creds credentials.TransportCredentials
 	if tlsConfig == nil {
 		creds = insecure.NewCredentials()
@@ -52,7 +51,6 @@ func New(store store.Store, tlsConfig *tls.Config, logger *slog.Logger) *Interce
 	return &Interceptor{
 		store:     store,
 		tlsConfig: tlsConfig,
-		logger:    logger,
 		dialOpts:  []grpc.DialOption{grpc.WithTransportCredentials(creds)},
 	}
 }
@@ -61,20 +59,21 @@ func New(store store.Store, tlsConfig *tls.Config, logger *slog.Logger) *Interce
 func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Fast path - if we are the leader, it doesn't make sense to proxy the request.
+		log := context.LoggerFrom(ctx)
 		if i.store.IsLeader() {
-			i.logger.Debug("currently the leader, handling request locally", slog.String("method", info.FullMethod))
+			log.Debug("currently the leader, handling request locally", slog.String("method", info.FullMethod))
 			return handler(ctx, req)
 		}
 		policy, ok := MethodPolicyMap[info.FullMethod]
 		if ok {
 			switch policy {
 			case RequireLocal:
-				i.logger.Debug("request requires local handling", slog.String("method", info.FullMethod))
+				log.Debug("request requires local handling", slog.String("method", info.FullMethod))
 				return handler(ctx, req)
 			case AllowNonLeader:
-				i.logger.Debug("request allows non-leader handling", slog.String("method", info.FullMethod))
+				log.Debug("request allows non-leader handling", slog.String("method", info.FullMethod))
 				if HasPreferLeaderMeta(ctx) {
-					i.logger.Debug("requestor prefers leader handling", slog.String("method", info.FullMethod))
+					log.Debug("requestor prefers leader handling", slog.String("method", info.FullMethod))
 					return i.proxyUnaryToLeader(ctx, req, info, handler)
 				}
 				return handler(ctx, req)
@@ -87,20 +86,21 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 // StreamInterceptor returns a gRPC stream interceptor that proxies requests to the leader node.
 func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		log := context.LoggerFrom(ss.Context())
 		if i.store.IsLeader() {
-			i.logger.Debug("currently the leader, handling stream locally", slog.String("method", info.FullMethod))
+			log.Debug("currently the leader, handling stream locally", slog.String("method", info.FullMethod))
 			return handler(srv, ss)
 		}
 		policy, ok := MethodPolicyMap[info.FullMethod]
 		if ok {
 			switch policy {
 			case RequireLocal:
-				i.logger.Debug("stream requires local handling", slog.String("method", info.FullMethod))
+				log.Debug("stream requires local handling", slog.String("method", info.FullMethod))
 				return handler(srv, ss)
 			case AllowNonLeader:
-				i.logger.Debug("stream allows non-leader handling", slog.String("method", info.FullMethod))
+				log.Debug("stream allows non-leader handling", slog.String("method", info.FullMethod))
 				if HasPreferLeaderMeta(ss.Context()) {
-					i.logger.Debug("requestor prefers leader handling of stream", slog.String("method", info.FullMethod))
+					log.Debug("requestor prefers leader handling of stream", slog.String("method", info.FullMethod))
 					return i.proxyStreamToLeader(srv, ss, info, handler)
 				}
 				return handler(srv, ss)
@@ -218,10 +218,10 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 func (i *Interceptor) newLeaderConn(ctx context.Context) (*grpc.ClientConn, error) {
 	leaderAddr, err := i.store.LeaderRPCAddr(ctx)
 	if err != nil {
-		i.logger.Error("could not get leader address", slog.String("error", err.Error()))
+		context.LoggerFrom(ctx).Error("could not get leader address", slog.String("error", err.Error()))
 		return nil, status.Errorf(codes.Unavailable, "no leader available to serve the request: %s", err.Error())
 	}
-	i.logger.Info("dialing leader to serve request", slog.String("leader", leaderAddr))
+	context.LoggerFrom(ctx).Info("dialing leader to serve request", slog.String("leader", leaderAddr))
 	conn, err := grpc.DialContext(ctx, leaderAddr, i.dialOpts...)
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "could not connect to leader to serve the request: %s", err.Error())

@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
@@ -35,7 +34,6 @@ type Server struct {
 	meshstate   state.State
 	stunServers []string
 	tlsConfig   *tls.Config
-	log         *slog.Logger
 }
 
 // NewServer returns a new Server.
@@ -45,6 +43,5 @@ func NewServer(store meshdb.Store, tlsConfig *tls.Config, stunServers []string) 
 		meshstate:   state.New(store),
 		stunServers: stunServers,
 		tlsConfig:   tlsConfig,
-		log:         slog.Default().With("component", "webrtc-server"),
 	}
 }

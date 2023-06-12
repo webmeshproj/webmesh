@@ -19,7 +19,6 @@ package admin
 
 import (
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
@@ -35,7 +34,6 @@ type Server struct {
 	rbac       rbacdb.RBAC
 	rbacEval   rbac.Evaluator
 	networking networking.Networking
-	log        *slog.Logger
 }
 
 // New creates a new admin server.
@@ -45,6 +43,5 @@ func New(store meshdb.Store) *Server {
 		rbac:       rbacdb.New(store),
 		rbacEval:   rbac.NewStoreEvaluator(store),
 		networking: networking.New(store),
-		log:        slog.Default().With("component", "admin-server"),
 	}
 }

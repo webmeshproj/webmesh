@@ -19,7 +19,6 @@ package meshapi
 
 import (
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
@@ -31,7 +30,6 @@ type Server struct {
 
 	store meshdb.Store
 	peers peers.Peers
-	log   *slog.Logger
 }
 
 // NewServer returns a new Server.
@@ -39,6 +37,5 @@ func NewServer(store meshdb.Store) *Server {
 	return &Server{
 		store: store,
 		peers: peers.New(store),
-		log:   slog.Default().With("component", "mesh-server"),
 	}
 }

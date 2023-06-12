@@ -17,13 +17,12 @@ limitations under the License.
 package meshapi
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
 
@@ -38,7 +37,7 @@ func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshN
 	servers := s.store.Raft().GetConfiguration().Configuration().Servers
 	leader, err := s.store.Leader()
 	if err != nil {
-		s.log.Error("failed to get leader", slog.String("error", err.Error()))
+		context.LoggerFrom(ctx).Error("failed to get leader", slog.String("error", err.Error()))
 	}
 	return dbNodeToAPINode(&node, leader, servers), nil
 }
