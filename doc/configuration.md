@@ -1,4 +1,4 @@
-# Confiuration
+# Configuration
 
 For now this is just the help output from running the node with no arguments.
 It explains the flags and environment variables that can be used to configure the node.
