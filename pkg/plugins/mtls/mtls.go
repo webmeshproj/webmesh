@@ -71,15 +71,13 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		roots = x509.NewCertPool()
 	}
-	if config.CAFile != "" {
-		data, err := os.ReadFile(config.CAFile)
-		if err != nil {
-			return nil, err
-		}
-		ok := roots.AppendCertsFromPEM(data)
-		if !ok {
-			return nil, fmt.Errorf("failed to parse CA file %q", config.CAFile)
-		}
+	data, err := os.ReadFile(config.CAFile)
+	if err != nil {
+		return nil, err
+	}
+	ok := roots.AppendCertsFromPEM(data)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse CA file %q", config.CAFile)
 	}
 	p.config.ClientCAs = roots
 	return &emptypb.Empty{}, nil
