@@ -29,6 +29,8 @@ The current supported authentication methods are:
 Examples of different topologies and usages can be found in the [examples](examples/) directory.
 More examples and documentation will be added as the project matures.
 
+**This project is not yet ready for production use, but I hope to rapidly get there**
+
 ## Getting Started
 
 If you'd like to play with the project on Kubernetes, there is a work-in-progress Operator in the [operator](https://github.com/webmeshproj/operator/) repository.

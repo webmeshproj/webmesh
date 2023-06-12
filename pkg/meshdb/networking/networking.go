@@ -346,9 +346,12 @@ Nodes:
 				}
 			}
 		}
-		filtered[nodeName][node] = adjacents[node]
+		filtered[node] = make(map[string]graph.Edge[string])
 	}
 	for node := range filtered {
+		if node == nodeName {
+			continue
+		}
 		edges, ok := fullMap[node]
 		if !ok {
 			continue

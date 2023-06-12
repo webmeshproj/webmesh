@@ -252,13 +252,18 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 	}
-	if req.GetZoneAwarenessId() != "" && req.GetPrimaryEndpoint() != "" && len(req.GetWireguardEndpoints()) > 0 {
-		// Add an edge between the caller and all other nodes in the same zone if this node exposes itself
+	if req.GetZoneAwarenessId() != "" {
+		// Add an edge between the caller and all other nodes in the same zone
+		// with public endpoints.
+		// TODO: Same as above - this should be done according to network policy and batched
 		zonePeers, err := s.peers.ListByZoneID(ctx, req.GetZoneAwarenessId())
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
 		}
 		for _, peer := range zonePeers {
+			if peer.ID == req.GetId() || peer.PrimaryEndpoint == "" {
+				continue
+			}
 			log.Debug("adding edges to peer in the same zone", slog.String("peer", peer.ID))
 			if peer.ID != req.GetId() {
 				err = s.peers.PutEdge(ctx, peers.Edge{
