@@ -18,3 +18,8 @@ Currently, it can run in-cluster nodes on any provider, but out-of-cluster nodes
 Support for other providers is planned, but not yet implemented.
 
 Feel free to open an issue or PR if you have any questions or would like to contribute.
+
+The [Plugin](https://github.com/webmeshproj/api/blob/main/proto/v1/plugin.proto) interface is the preferred destination for most functionality (not related to API calls) as it comes in.
+I also hope to move a good chunk of the existing functionality into plugins as well.
+Currently all the authentication mechanisms are implemented as plugins, but the rest of the functionality is still in the main codebase.
+The current plugins and how they are used can all be found in the [plugins](./pkg/plugins/) directory.
