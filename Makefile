@@ -60,6 +60,7 @@ dist: ## Build node binaries for all platforms.
 		-e GOPATH=/go \
 		-w /build \
 		$(BUILD_IMAGE) make -j $(shell nproc) dist-node dist-ctl
+	cd "$(DIST)" ; sha256sum * > sha256sums.txt
 
 dist-node: ## Build node binaries for all platforms, this is called within the build image.
 	$(MAKE) \
