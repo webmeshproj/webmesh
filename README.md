@@ -20,6 +20,11 @@ This allows for the network to be highly available and fault tolerant.
 The network supports role-based access control and can be configured to allow or deny access to specific services and operations to specific nodes.
 The same goes for network access controls.
 This is the recommended way to run the network, but insecure options are provided for testing and development purposes.
+The current supported authentication methods are:
+
+- mTLS
+- LDAP
+- Basic Auth
 
 Examples of different topologies and usages can be found in the [examples](examples/) directory.
 More examples and documentation will be added as the project matures.
@@ -72,7 +77,7 @@ You can run `make help` to see all the available targets.
 ## Roadmap
 
 - [ ] Add Darwin Support. It's mostly there and just needs bindings to `ifconfig` for managing system firewall rules.
-- [ ] Add Windows Support. Same as Darwin, but with bindings to `netsh`.
+- [ ] Add Windows Support. Same as Darwin, but with bindings to `netsh`. Most use cases on Windows will also involve SYSTEM level services to provide interface management.
 - [ ] Potential SaaS offering for those who don't want to run their own controllers or have a simple off-site backup of the mesh state.
 - [ ] Ability to peer with other meshes. This would allow for a mesh to be split into multiple smaller meshes that can still communicate with each other.
 
