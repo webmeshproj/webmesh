@@ -251,7 +251,6 @@ type store struct {
 	observerClose, observerDone chan struct{}
 
 	weakData, raftData *sql.DB
-	dataAppliedIndex   atomic.Uint64
 	dataMux            sync.RWMutex
 
 	wg           wireguard.Interface

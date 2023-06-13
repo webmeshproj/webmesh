@@ -108,33 +108,53 @@ func (s *store) Open() error {
 			int(s.opts.Raft.SnapshotRetention),
 			s.opts.Raft.Logger("snapshots"),
 		)
-	}
-	if err != nil {
-		return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.Raft.DataDir, err))
+		if err != nil {
+			return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.Raft.DataDir, err))
+		}
 	}
 	// Create the data stores.
-	log.Debug("creating data stores")
-	var dataPath string
-	if s.opts.Raft.InMemory {
-		dataPath = "file:raftdata?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
-	} else {
-		dataPath = s.opts.Raft.DataFilePath() + "?_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
-	}
+	log.Debug("creating data store")
+	dataPath := "file:raftdata?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
 	s.weakData, err = sql.Open("sqlite3", dataPath)
 	if err != nil {
-		return handleErr(fmt.Errorf("open data sqlite %q: %w", s.opts.Raft.DataFilePath(), err))
+		return handleErr(fmt.Errorf("open data sqlite: %w", err))
 	}
 	s.raftData, err = sql.Open(raftDriverName, "")
 	if err != nil {
 		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
 	}
 	s.snapshotter = snapshots.New(s.weakData)
+
+	// Check if we have a snapshot to restore from.
+	log.Debug("checking for snapshot")
+	snapshots, err := s.raftSnapshots.List()
+	if err != nil {
+		return handleErr(fmt.Errorf("list snapshots: %w", err))
+	}
+	if len(snapshots) > 0 {
+		latest := snapshots[0]
+		log.Info("restoring from snapshot",
+			slog.String("id", latest.ID),
+			slog.Int("term", int(latest.Term)),
+			slog.Int("index", int(latest.Index)))
+		_, reader, err := s.raftSnapshots.Open(latest.ID)
+		if err != nil {
+			return handleErr(fmt.Errorf("open snapshot: %w", err))
+		}
+		if err = s.snapshotter.Restore(ctx, reader); err != nil {
+			return handleErr(fmt.Errorf("restore snapshot: %w", err))
+		}
+		s.currentTerm.Store(latest.Term)
+		s.lastAppliedIndex.Store(latest.Index)
+	}
+
 	// Create the raft instance.
 	log.Info("starting raft instance",
 		slog.String("listen-addr", string(s.raftTransport.LocalAddr())),
 	)
 	s.raft, err = raft.NewRaft(
-		s.opts.Raft.RaftConfig(string(s.nodeID)), s,
+		s.opts.Raft.RaftConfig(string(s.nodeID)),
+		s,
 		&monotonicLogStore{s.logDB},
 		s.stableDB,
 		s.raftSnapshots,

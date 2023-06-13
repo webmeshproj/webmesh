@@ -48,18 +48,14 @@ const (
 	RaftLogFormatEnvVar       = "RAFT_LOG_FORMAT"
 	RaftLogLevelEnvVar        = "RAFT_LOG_LEVEL"
 	RaftPreferIPv6EnvVar      = "RAFT_PREFER_IPV6"
-	LeaveOnShutdownEnvVar     = "LEAVE_ON_SHUTDOWN"
-	StartupTimeoutEnvVar      = "STARTUP_TIMEOUT"
-	ShutdownTimeoutEnvVar     = "SHUTDOWN_TIMEOUT"
+	LeaveOnShutdownEnvVar     = "RAFT_LEAVE_ON_SHUTDOWN"
+	StartupTimeoutEnvVar      = "RAFT_STARTUP_TIMEOUT"
+	ShutdownTimeoutEnvVar     = "RAFT_SHUTDOWN_TIMEOUT"
 
 	// LogFile is the raft log file.
 	LogFile = "raft.log"
 	// StableStoreFile is the raft stable store file.
 	StableStoreFile = "raft-stable-dat"
-	// DataFile is the data file.
-	DataFile = "webmesh.sqlite"
-	// LocalDataFile is the local data file.
-	LocalDataFile = "local.sqlite"
 )
 
 // RaftLogFormat is the raft log format.
@@ -142,8 +138,8 @@ func NewRaftOptions() *RaftOptions {
 		CommitTimeout:      time.Second * 15,
 		LeaderLeaseTimeout: time.Second * 3,
 		SnapshotInterval:   time.Minute * 5,
-		SnapshotThreshold:  50,
-		MaxAppendEntries:   16,
+		SnapshotThreshold:  15,
+		MaxAppendEntries:   15,
 		SnapshotRetention:  3,
 		ObserverChanBuffer: 100,
 		LogFormat:          string(RaftLogFormatProtobufSnappy),
@@ -173,13 +169,13 @@ func (o *RaftOptions) BindFlags(fl *flag.FlagSet) {
 		"Raft apply timeout.")
 	fl.DurationVar(&o.CommitTimeout, "raft.commit-timeout", util.GetEnvDurationDefault(CommitTimeoutEnvVar, time.Second*15),
 		"Raft commit timeout.")
-	fl.IntVar(&o.MaxAppendEntries, "raft.max-append-entries", util.GetEnvIntDefault(MaxAppendEntriesEnvVar, 16),
+	fl.IntVar(&o.MaxAppendEntries, "raft.max-append-entries", util.GetEnvIntDefault(MaxAppendEntriesEnvVar, 15),
 		"Raft max append entries.")
 	fl.DurationVar(&o.LeaderLeaseTimeout, "raft.leader-lease-timeout", util.GetEnvDurationDefault(LeaderLeaseTimeoutEnvVar, time.Second*3),
 		"Raft leader lease timeout.")
 	fl.DurationVar(&o.SnapshotInterval, "raft.snapshot-interval", util.GetEnvDurationDefault(SnapshotIntervalEnvVar, time.Minute*5),
 		"Raft snapshot interval.")
-	fl.Uint64Var(&o.SnapshotThreshold, "raft.snapshot-threshold", uint64(util.GetEnvIntDefault(SnapshotThresholdEnvVar, 50)),
+	fl.Uint64Var(&o.SnapshotThreshold, "raft.snapshot-threshold", uint64(util.GetEnvIntDefault(SnapshotThresholdEnvVar, 15)),
 		"Raft snapshot threshold.")
 	fl.Uint64Var(&o.SnapshotRetention, "raft.snapshot-retention", uint64(util.GetEnvIntDefault(SnapshotRetentionEnvVar, 3)),
 		"Raft snapshot retention.")
@@ -284,14 +280,4 @@ func (o *RaftOptions) LogFilePath() string {
 // StableStoreFilePath returns the stable store file path.
 func (o *RaftOptions) StableStoreFilePath() string {
 	return filepath.Join(o.DataDir, StableStoreFile)
-}
-
-// DataFilePath returns the data file path.
-func (o *RaftOptions) DataFilePath() string {
-	return filepath.Join(o.DataDir, DataFile)
-}
-
-// LocalDataFilePath returns the local file path.
-func (o *RaftOptions) LocalDataFilePath() string {
-	return filepath.Join(o.DataDir, LocalDataFile)
 }

@@ -21,9 +21,14 @@ package localstore
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
+	"sync/atomic"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/mitchellh/mapstructure"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -37,14 +42,16 @@ import (
 type Plugin struct {
 	v1.UnimplementedPluginServer
 
-	data *sql.DB
-	mux  sync.Mutex
+	data                          *sql.DB
+	mux                           sync.Mutex
+	termFile, indexFile           string
+	currentTerm, lastAppliedIndex atomic.Uint64
 }
 
 // Config is the configuration for the localstore plugin.
 type Config struct {
-	// Path is the path to the database file.
-	Path string `mapstructure:"path"`
+	// DataDir is the path to the directory to store data in.
+	DataDir string `mapstructure:"data-dir"`
 }
 
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {
@@ -64,22 +71,54 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		return nil, err
 	}
-	if config.Path == "" {
+	if config.DataDir == "" {
 		return nil, fmt.Errorf("path is required")
 	}
-	config.Path += "?_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
-	p.data, err = sql.Open("sqlite3", config.Path)
+	err = os.MkdirAll(config.DataDir, 0755)
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(config.DataDir, "webmesh.db?_foreign_keys=on&_case_sensitive_like=on&synchronous=full")
+	p.data, err = sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, err
 	}
 	if err = models.MigrateRaftDB(p.data); err != nil {
 		return nil, fmt.Errorf("db migrate: %w", err)
 	}
+	p.termFile = filepath.Join(config.DataDir, ".current-term")
+	p.indexFile = filepath.Join(config.DataDir, ".last-applied-index")
+	data, err := os.ReadFile(p.termFile)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	} else if err == nil {
+		p.currentTerm.Store(binary.BigEndian.Uint64(data))
+	}
+	data, err = os.ReadFile(p.indexFile)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	} else if err == nil {
+		p.lastAppliedIndex.Store(binary.BigEndian.Uint64(data))
+	}
 	return &emptypb.Empty{}, nil
 }
 
-func (p *Plugin) Store(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
+func (p *Plugin) Store(ctx context.Context, log *v1.StoreLogRequest) (*v1.RaftApplyResponse, error) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
-	return raftlogs.Apply(ctx, p.data, log), nil
+	defer p.currentTerm.Store(log.GetTerm())
+	defer p.lastAppliedIndex.Store(log.GetIndex())
+	lastIndex := p.lastAppliedIndex.Load()
+	if log.GetIndex() <= lastIndex {
+		return &v1.RaftApplyResponse{}, nil
+	}
+	err := os.WriteFile(p.termFile, []byte(fmt.Sprintf("%d", log.GetTerm())), 0644)
+	if err != nil {
+		return nil, err
+	}
+	err = os.WriteFile(p.indexFile, []byte(fmt.Sprintf("%d", log.GetIndex())), 0644)
+	if err != nil {
+		return nil, err
+	}
+	return raftlogs.Apply(ctx, p.data, log.GetLog()), nil
 }

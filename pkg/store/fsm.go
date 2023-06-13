@@ -236,7 +236,11 @@ func (s *store) applyLog(l *raft.Log) (edgeChange, routeChange bool, res any) {
 	// Dispatch the log to all storage plugins when we are done.
 	// This is a no-op if there are no storage plugins.
 	defer func() {
-		responses, err := s.plugins.ApplyRaftLog(ctx, &cmd)
+		responses, err := s.plugins.ApplyRaftLog(ctx, &v1.StoreLogRequest{
+			Term:  l.Term,
+			Index: l.Index,
+			Log:   &cmd,
+		})
 		if err != nil {
 			log.Error("errors while dispatching logs to plugins", slog.String("error", err.Error()))
 		}

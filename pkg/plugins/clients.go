@@ -53,7 +53,7 @@ func (p *inProcessPlugin) Configure(ctx context.Context, in *v1.PluginConfigurat
 }
 
 // Store applies a raft log entry to the store.
-func (p *inProcessPlugin) Store(ctx context.Context, in *v1.RaftLogEntry, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
+func (p *inProcessPlugin) Store(ctx context.Context, in *v1.StoreLogRequest, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
 	return p.server.Store(ctx, in)
 }
 
@@ -96,7 +96,7 @@ func (p *externalProcessPlugin) Configure(ctx context.Context, in *v1.PluginConf
 }
 
 // Store applies a raft log entry to the store.
-func (p *externalProcessPlugin) Store(ctx context.Context, in *v1.RaftLogEntry, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
+func (p *externalProcessPlugin) Store(ctx context.Context, in *v1.StoreLogRequest, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
 	if err := p.checkProcess(ctx); err != nil {
 		return nil, err
 	}

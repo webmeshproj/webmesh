@@ -209,7 +209,6 @@ func (s *raftDBStatement) ExecContext(ctx context.Context, args []driver.NamedVa
 		}
 		return nil, fmt.Errorf("apply log entry: %w", f.Error())
 	}
-	s.dataAppliedIndex.Store(f.Index())
 	resp := f.Response().(*v1.RaftApplyResponse)
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("apply log entry data: %s", resp.GetError())
@@ -267,7 +266,6 @@ func (s *raftDBStatement) QueryContext(ctx context.Context, args []driver.NamedV
 		}
 		return nil, fmt.Errorf("apply log entry: %w", f.Error())
 	}
-	s.dataAppliedIndex.Store(f.Index())
 	resp := f.Response().(*v1.RaftApplyResponse)
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("apply log entry data: %s", resp.GetError())

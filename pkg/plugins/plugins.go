@@ -59,7 +59,7 @@ type Manager interface {
 	AuthStreamInterceptor() grpc.StreamServerInterceptor
 	// ApplyRaftLog applies a raft log entry to all storage plugins. Responses are still returned
 	// even if an error occurs.
-	ApplyRaftLog(ctx context.Context, entry *v1.RaftLogEntry) ([]*v1.RaftApplyResponse, error)
+	ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) ([]*v1.RaftApplyResponse, error)
 	// Emit emits an event to all watch plugins.
 	Emit(ctx context.Context, ev *v1.Event) error
 }
@@ -188,7 +188,7 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 }
 
 // ApplyRaftLog applies a raft log entry to all storage plugins.
-func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.RaftLogEntry) ([]*v1.RaftApplyResponse, error) {
+func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) ([]*v1.RaftApplyResponse, error) {
 	if len(m.stores) == 0 {
 		return nil, nil
 	}
