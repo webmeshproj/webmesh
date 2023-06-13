@@ -1,23 +1,12 @@
 version: "2"
 sql:
   - engine: sqlite
-    queries: ./raftdb/queries
-    schema: ./raftdb/migrations
+    queries: ./queries
+    schema: ./migrations
     gen:
       go:
-        package: raftdb
-        out: ../raftdb
-        sql_package: database/sql
-        emit_interface: true
-        emit_json_tags: true
-        emit_exported_queries: true
-  - engine: sqlite
-    queries: ./localdb/queries
-    schema: ./localdb/migrations
-    gen:
-      go:
-        package: localdb
-        out: ../localdb
+        package: models
+        out: ..
         sql_package: database/sql
         emit_interface: true
         emit_json_tags: true

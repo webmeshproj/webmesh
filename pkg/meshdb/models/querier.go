@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.18.0
 
-package raftdb
+package models
 
 import (
 	"context"

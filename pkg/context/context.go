@@ -51,6 +51,11 @@ func WithDeadline(ctx Context, deadline time.Time) (Context, CancelFunc) {
 	return context.WithDeadline(ctx, deadline)
 }
 
+// WithCancel returns a context with the given cancel function.
+func WithCancel(ctx Context) (Context, CancelFunc) {
+	return context.WithCancel(ctx)
+}
+
 type logContextKey struct{}
 
 // WithLogger returns a context with the given logger set.

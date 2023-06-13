@@ -3,7 +3,7 @@
 //   sqlc v1.18.0
 // source: leases.sql
 
-package raftdb
+package models
 
 import (
 	"context"

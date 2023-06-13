@@ -35,7 +35,6 @@ import (
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models"
-	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
@@ -109,11 +108,6 @@ type Store interface {
 	// to ensure that no modifications are happening while the transaction
 	// is in progress and that SQLite itself is not busy.
 	ReadDB() meshdb.DBTX
-	// LocalDB returns a DB interface for use by the application. This
-	// interface will not ensure consistency with the Raft log. It is
-	// intended for use with the node_local database which is not replicated
-	// across the cluster.
-	LocalDB() localdb.DBTX
 	// Raft returns the Raft interface. Note that the returned value
 	// may be nil if the store is not open.
 	Raft() *raft.Raft
@@ -244,6 +238,7 @@ type store struct {
 
 	raft             *raft.Raft
 	lastAppliedIndex atomic.Uint64
+	currentTerm      atomic.Uint64
 	raftTransport    *raft.NetworkTransport
 	raftSnapshots    raft.SnapshotStore
 	logDB            LogStoreCloser
@@ -297,14 +292,6 @@ func (s *store) DB() meshdb.DBTX {
 // is in progress and that SQLite itself is not busy.
 func (s *store) ReadDB() meshdb.DBTX {
 	return &lockableDB{DB: s.weakData, mux: s.dataMux.RLocker()}
-}
-
-// LocalDB returns a DB interface for use by the application. This
-// interface will not ensure consistency with the Raft log. It is
-// intended for use with the node_local table which is not replicated
-// across the cluster.
-func (s *store) LocalDB() localdb.DBTX {
-	return &lockableDB{DB: s.localData, mux: &s.dataMux}
 }
 
 // Raft returns the Raft interface.

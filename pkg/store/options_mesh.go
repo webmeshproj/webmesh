@@ -17,7 +17,6 @@ limitations under the License.
 package store
 
 import (
-	"errors"
 	"flag"
 	"os"
 	"strings"
@@ -28,7 +27,6 @@ import (
 
 const (
 	NodeIDEnvVar                 = "MESH_NODE_ID"
-	KeyRotationIntervalEnvVar    = "MESH_KEY_ROTATION_INTERVAL"
 	ZoneAwarenessIDEnvVar        = "MESH_ZONE_AWARENESS_ID"
 	JoinAddressEnvVar            = "MESH_JOIN_ADDRESS"
 	PeerDiscoveryAddressesEnvVar = "MESH_PEER_DISCOVERY_ADDRESSES"
@@ -37,7 +35,6 @@ const (
 	JoinTimeoutEnvVar            = "MESH_JOIN_TIMEOUT"
 	GRPCAdvertisePortEnvVar      = "MESH_GRPC_PORT"
 	PrimaryEndpointEnvVar        = "MESH_PRIMARY_ENDPOINT"
-	NodeWireGuardEndpointsEnvVar = "MESH_WIREGUARD_ENDPOINTS"
 	NodeRoutesEnvVar             = "MESH_ROUTES"
 	NoIPv4EnvVar                 = "MESH_NO_IPV4"
 	NoIPv6EnvVar                 = "MESH_NO_IPV6"
@@ -47,9 +44,6 @@ const (
 type MeshOptions struct {
 	// NodeID is the node ID.
 	NodeID string `json:"node-id,omitempty" yaml:"node-id,omitempty" toml:"node-id,omitempty"`
-	// KeyRotationInterval is the interval to rotate wireguard keys.
-	// Set this to 0 to disable key rotation.
-	KeyRotationInterval time.Duration `json:"key-rotation-interval,omitempty" yaml:"key-rotation-interval,omitempty" toml:"key-rotation-interval,omitempty"`
 	// ZoneAwarenessID is the zone awareness ID.
 	ZoneAwarenessID string `json:"zone-awareness-id,omitempty" yaml:"zone-awareness-id,omitempty" toml:"zone-awareness-id,omitempty"`
 	// JoinAddress is the address of a node to join.
@@ -64,8 +58,6 @@ type MeshOptions struct {
 	JoinAsVoter bool `json:"voter,omitempty" yaml:"voter,omitempty" toml:"voter,omitempty"`
 	// PrimaryEndpoint is the primary endpoint to advertise when joining.
 	PrimaryEndpoint string `json:"primary-endpoint,omitempty" yaml:"primary-endpoint,omitempty" toml:"primary-endpoint,omitempty"`
-	// WireGuardEndpoints are additional WireGuard endpoints to broadcast when joining.
-	WireGuardEndpoints []string `json:"wireguard-endpoints,omitempty" yaml:"wireguard-endpoints,omitempty" toml:"wireguard-endpoints,omitempty"`
 	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
 	// If the node is not allowed to put routes in the mesh, the node will be unable to join.
 	Routes []string `json:"routes,omitempty" yaml:"routes,omitempty" toml:"routes,omitempty"`
@@ -86,16 +78,10 @@ func NewMeshOptions() *MeshOptions {
 			}
 			return nil
 		}(),
-		WireGuardEndpoints: func() []string {
-			if val, ok := os.LookupEnv(NodeWireGuardEndpointsEnvVar); ok {
-				return strings.Split(val, ",")
-			}
-			return nil
-		}(),
-		MaxJoinRetries:      10,
-		GRPCPort:            8443,
-		JoinTimeout:         time.Minute,
-		KeyRotationInterval: time.Hour * 24 * 7,
+
+		MaxJoinRetries: 10,
+		GRPCPort:       8443,
+		JoinTimeout:    time.Minute,
 	}
 }
 
@@ -108,8 +94,7 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
 1. If mTLS is enabled, the node ID is the CN of the client certificate.
 2. If mTLS is not enabled, the node ID is the hostname of the machine.
 3. If the hostname is not available, the node ID is a random UUID (should only be used for testing).`)
-	fl.DurationVar(&o.KeyRotationInterval, "mesh.key-rotation-interval", util.GetEnvDurationDefault(KeyRotationIntervalEnvVar, time.Hour*24*7),
-		"Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.")
+
 	fl.StringVar(&o.ZoneAwarenessID, "mesh.zone-awareness-id", util.GetEnvDefault(ZoneAwarenessIDEnvVar, ""),
 		"Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.")
 	fl.StringVar(&o.JoinAddress, "mesh.join-address", util.GetEnvDefault(JoinAddressEnvVar, ""),
@@ -129,10 +114,6 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
 	fl.StringVar(&o.PrimaryEndpoint, "mesh.primary-endpoint", util.GetEnvDefault(PrimaryEndpointEnvVar, ""),
 		`The primary endpoint to broadcast when joining a cluster.
 This is only necessary if the node intends on being publicly accessible.`)
-	fl.Func("mesh.wireguard-endpoints", `Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.`, func(s string) error {
-		o.WireGuardEndpoints = strings.Split(s, ",")
-		return nil
-	})
 	fl.Func("mesh.routes", `Comma separated list of additional routes to advertise to the mesh.
 	These routes are advertised to all peers. If the node is not allowed
 	to put routes in the mesh, the node will be unable to join.`, func(s string) error {
@@ -147,8 +128,5 @@ This is only necessary if the node intends on being publicly accessible.`)
 
 // Validate validates the MeshOptions.
 func (o *MeshOptions) Validate() error {
-	if o.KeyRotationInterval < 0 {
-		return errors.New("key rotation interval must be >= 0")
-	}
 	return nil
 }

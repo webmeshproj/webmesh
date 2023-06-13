@@ -141,7 +141,7 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 		RaftPort:           int32(s.sl.ListenPort()),
 		GrpcPort:           int32(s.opts.Mesh.GRPCPort),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
-		WireguardEndpoints: s.opts.Mesh.WireGuardEndpoints,
+		WireguardEndpoints: s.opts.WireGuard.Endpoints,
 		ZoneAwarenessId:    s.opts.Mesh.ZoneAwarenessID,
 		AssignIpv4:         !s.opts.Mesh.NoIPv4,
 		PreferRaftIpv6:     s.opts.Raft.PreferIPv6,

@@ -31,7 +31,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
 
@@ -107,8 +107,8 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 			return fmt.Errorf("cannot update system network acl %s", acl.GetName())
 		}
 	}
-	q := raftdb.New(n.store.DB())
-	params := raftdb.PutNetworkACLParams{
+	q := models.New(n.store.DB())
+	params := models.PutNetworkACLParams{
 		Name:       acl.GetName(),
 		Priority:   int64(acl.GetPriority()),
 		Action:     int64(acl.GetAction()),
@@ -170,7 +170,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 
 // GetNetworkACL returns a NetworkACL by name.
 func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, error) {
-	q := raftdb.New(n.store.ReadDB())
+	q := models.New(n.store.ReadDB())
 	acl, err := q.GetNetworkACL(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -186,7 +186,7 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 	if IsSystemNetworkACL(name) {
 		return fmt.Errorf("cannot delete system network acl %s", name)
 	}
-	q := raftdb.New(n.store.DB())
+	q := models.New(n.store.DB())
 	err := q.DeleteNetworkACL(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete network acl: %w", err)
@@ -196,7 +196,7 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 
 // ListNetworkACLs returns a list of NetworkACLs.
 func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
-	q := raftdb.New(n.store.ReadDB())
+	q := models.New(n.store.ReadDB())
 	acls, err := q.ListNetworkACLs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network acls: %w", err)
@@ -211,8 +211,8 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 
 // PutRoute creates or updates a Route.
 func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
-	q := raftdb.New(n.store.DB())
-	params := raftdb.PutNetworkRouteParams{
+	q := models.New(n.store.DB())
+	params := models.PutNetworkRouteParams{
 		Name:      route.GetName(),
 		Node:      route.GetNode(),
 		DstCidrs:  strings.Join(route.GetDestinationCidrs(), ","),
@@ -234,7 +234,7 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 
 // GetRoute returns a Route by name.
 func (n *networking) GetRoute(ctx context.Context, name string) (*v1.Route, error) {
-	q := raftdb.New(n.store.ReadDB())
+	q := models.New(n.store.ReadDB())
 	route, err := q.GetNetworkRoute(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -247,7 +247,7 @@ func (n *networking) GetRoute(ctx context.Context, name string) (*v1.Route, erro
 
 // GetRoutesByNode returns a list of Routes for a given Node.
 func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) ([]*v1.Route, error) {
-	q := raftdb.New(n.store.ReadDB())
+	q := models.New(n.store.ReadDB())
 	routes, err := q.ListNetworkRoutesByNode(ctx, nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes by node: %w", err)
@@ -261,7 +261,7 @@ func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) ([]*v
 
 // GetRoutesByCIDR returns a list of Routes for a given CIDR.
 func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr string) ([]*v1.Route, error) {
-	q := raftdb.New(n.store.ReadDB())
+	q := models.New(n.store.ReadDB())
 	routes, err := q.ListNetworkRoutesByDstCidr(ctx, cidr)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes by cidr: %w", err)
@@ -275,7 +275,7 @@ func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr string) ([]*v1.Ro
 
 // DeleteRoute deletes a Route by name.
 func (n *networking) DeleteRoute(ctx context.Context, name string) error {
-	q := raftdb.New(n.store.DB())
+	q := models.New(n.store.DB())
 	err := q.DeleteNetworkRoute(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete network route: %w", err)
@@ -285,7 +285,7 @@ func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 
 // ListRoutes returns a list of Routes.
 func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
-	q := raftdb.New(n.store.ReadDB())
+	q := models.New(n.store.ReadDB())
 	routes, err := q.ListNetworkRoutes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes: %w", err)
@@ -388,7 +388,7 @@ Nodes:
 	return filtered, nil
 }
 
-func dbACLToAPIACL(store meshdb.Store, dbACL *raftdb.NetworkAcl) *ACL {
+func dbACLToAPIACL(store meshdb.Store, dbACL *models.NetworkAcl) *ACL {
 	return &ACL{
 		store: store,
 		NetworkACL: v1.NetworkACL{
@@ -444,7 +444,7 @@ func dbACLToAPIACL(store meshdb.Store, dbACL *raftdb.NetworkAcl) *ACL {
 	}
 }
 
-func dbRouteToAPIRoute(dbRoute *raftdb.NetworkRoute) *v1.Route {
+func dbRouteToAPIRoute(dbRoute *models.NetworkRoute) *v1.Route {
 	return &v1.Route{
 		Name:             dbRoute.Name,
 		Node:             dbRoute.Node,

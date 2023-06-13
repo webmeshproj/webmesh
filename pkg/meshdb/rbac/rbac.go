@@ -28,7 +28,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 )
 
 const (
@@ -121,12 +121,12 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 			return fmt.Errorf("cannot modify system role %q", role.GetName())
 		}
 	}
-	q := raftdb.New(r.store.DB())
+	q := models.New(r.store.DB())
 	rules, err := json.Marshal(role.GetRules())
 	if err != nil {
 		return err
 	}
-	params := raftdb.PutRoleParams{
+	params := models.PutRoleParams{
 		Name:      role.GetName(),
 		RulesJson: string(rules),
 		CreatedAt: time.Now().UTC(),
@@ -141,7 +141,7 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 
 // GetRole returns a role by name.
 func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
-	role, err := raftdb.New(r.store.ReadDB()).GetRole(ctx, name)
+	role, err := models.New(r.store.ReadDB()).GetRole(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrRoleNotFound
@@ -156,7 +156,7 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 	if IsSystemRole(name) {
 		return fmt.Errorf("cannot delete system role %q", name)
 	}
-	q := raftdb.New(r.store.DB())
+	q := models.New(r.store.DB())
 	err := q.DeleteRole(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete db role: %w", err)
@@ -166,7 +166,7 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 
 // ListRoles returns a list of all roles.
 func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
-	roles, err := raftdb.New(r.store.ReadDB()).ListRoles(ctx)
+	roles, err := models.New(r.store.ReadDB()).ListRoles(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list db roles: %w", err)
 	}
@@ -192,8 +192,8 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 			return fmt.Errorf("cannot modify system rolebinding %q", rolebinding.GetName())
 		}
 	}
-	q := raftdb.New(r.store.DB())
-	params := raftdb.PutRoleBindingParams{
+	q := models.New(r.store.DB())
+	params := models.PutRoleBindingParams{
 		Name:      rolebinding.GetName(),
 		RoleName:  rolebinding.GetRole(),
 		CreatedAt: time.Now().UTC(),
@@ -232,7 +232,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 
 // GetRoleBinding returns a rolebinding by name.
 func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding, error) {
-	q := raftdb.New(r.store.ReadDB())
+	q := models.New(r.store.ReadDB())
 	rb, err := q.GetRoleBinding(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -248,7 +248,7 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 	if IsSystemRoleBinding(name) {
 		return fmt.Errorf("cannot delete system rolebinding %q", BootstrapVotersRoleBinding)
 	}
-	q := raftdb.New(r.store.DB())
+	q := models.New(r.store.DB())
 	err := q.DeleteRoleBinding(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete db rolebinding: %w", err)
@@ -258,7 +258,7 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 
 // ListRoleBindings returns a list of all rolebindings.
 func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) {
-	q := raftdb.New(r.store.ReadDB())
+	q := models.New(r.store.ReadDB())
 	rbs, err := q.ListRoleBindings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list db rolebindings: %w", err)
@@ -272,8 +272,8 @@ func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) 
 
 // PutGroup creates or updates a group.
 func (r *rbac) PutGroup(ctx context.Context, role *v1.Group) error {
-	q := raftdb.New(r.store.DB())
-	params := raftdb.PutGroupParams{
+	q := models.New(r.store.DB())
+	params := models.PutGroupParams{
 		Name:      role.GetName(),
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
@@ -302,7 +302,7 @@ func (r *rbac) PutGroup(ctx context.Context, role *v1.Group) error {
 
 // GetGroup returns a group by name.
 func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
-	q := raftdb.New(r.store.ReadDB())
+	q := models.New(r.store.ReadDB())
 	group, err := q.GetGroup(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -315,7 +315,7 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 
 // DeleteGroup deletes a group by name.
 func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
-	q := raftdb.New(r.store.DB())
+	q := models.New(r.store.DB())
 	err := q.DeleteGroup(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete db group: %w", err)
@@ -325,7 +325,7 @@ func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 
 // ListGroups returns a list of all groups.
 func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
-	q := raftdb.New(r.store.ReadDB())
+	q := models.New(r.store.ReadDB())
 	groups, err := q.ListGroups(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list db groups: %w", err)
@@ -339,7 +339,7 @@ func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
 
 // ListNodeRoles returns a list of all roles for a node.
 func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (RolesList, error) {
-	roles, err := raftdb.New(r.store.ReadDB()).ListBoundRolesForNode(ctx, raftdb.ListBoundRolesForNodeParams{
+	roles, err := models.New(r.store.ReadDB()).ListBoundRolesForNode(ctx, models.ListBoundRolesForNodeParams{
 		NodeIds: sql.NullString{
 			String: nodeID,
 			Valid:  true,
@@ -364,7 +364,7 @@ func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (RolesList, err
 
 // ListUserRoles returns a list of all roles for a user.
 func (r *rbac) ListUserRoles(ctx context.Context, user string) (RolesList, error) {
-	roles, err := raftdb.New(r.store.ReadDB()).ListBoundRolesForUser(ctx, raftdb.ListBoundRolesForUserParams{
+	roles, err := models.New(r.store.ReadDB()).ListBoundRolesForUser(ctx, models.ListBoundRolesForUserParams{
 		UserNames: sql.NullString{
 			String: user,
 			Valid:  true,
@@ -387,7 +387,7 @@ func (r *rbac) ListUserRoles(ctx context.Context, user string) (RolesList, error
 	return out, nil
 }
 
-func dbRoleToAPIRole(dbRole *raftdb.Role) (*v1.Role, error) {
+func dbRoleToAPIRole(dbRole *models.Role) (*v1.Role, error) {
 	out := &v1.Role{
 		Name:  dbRole.Name,
 		Rules: []*v1.Rule{},
@@ -399,7 +399,7 @@ func dbRoleToAPIRole(dbRole *raftdb.Role) (*v1.Role, error) {
 	return out, nil
 }
 
-func dbRoleBindingToAPIRoleBinding(dbRoleBinding *raftdb.RoleBinding) *v1.RoleBinding {
+func dbRoleBindingToAPIRoleBinding(dbRoleBinding *models.RoleBinding) *v1.RoleBinding {
 	out := &v1.RoleBinding{
 		Name:     dbRoleBinding.Name,
 		Role:     dbRoleBinding.RoleName,
@@ -433,7 +433,7 @@ func dbRoleBindingToAPIRoleBinding(dbRoleBinding *raftdb.RoleBinding) *v1.RoleBi
 	return out
 }
 
-func dbGroupToAPIGroup(dbGroup *raftdb.Group) *v1.Group {
+func dbGroupToAPIGroup(dbGroup *models.Group) *v1.Group {
 	out := &v1.Group{
 		Name:     dbGroup.Name,
 		Subjects: make([]*v1.Subject, 0),

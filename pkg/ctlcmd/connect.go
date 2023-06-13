@@ -52,7 +52,6 @@ func init() {
 	flags.BoolVar(&connectOpts.NoIPv6, "no-ipv6", false, "do not use IPv6 when joining the cluster")
 	flags.BoolVar(&connectOpts.LocalDNS, "local-dns", false, "start a local MeshDNS server")
 	flags.Uint16Var(&connectOpts.LocalDNSPort, "local-dns-port", 5353, "port to use for the local MeshDNS server")
-	flags.StringVar(&connectOpts.EndpointOverrides, "endpoint-overrides", "", "space separated list of endpoint overrides to use for wireguard peers")
 
 	flags.StringVar(&connectLogLevel, "log-level", "info", "log level to use")
 	rootCmd.AddCommand(connectCmd)

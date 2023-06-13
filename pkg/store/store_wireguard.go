@@ -18,17 +18,16 @@ package store
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"net"
 	"net/netip"
+	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/webmeshproj/node/pkg/meshdb/models/localdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net/firewall"
@@ -53,13 +52,6 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 		NetworkV4:           addressv4,
 		NetworkV6:           addressv6,
 		IsPublic:            s.opts.Mesh.PrimaryEndpoint != "",
-	}
-	if s.opts.WireGuard.EndpointOverrides != "" {
-		overrides, err := parseEndpointOverrides(s.opts.WireGuard.EndpointOverrides)
-		if err != nil {
-			return fmt.Errorf("parse endpoint overrides: %w", err)
-		}
-		wgopts.EndpointOverrides = overrides
 	}
 	s.log.Info("configuring wireguard interface", slog.Any("options", &wgopts))
 	var err error
@@ -144,75 +136,15 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get self peer: %w", err)
 	}
-	key, err := localdb.New(s.localData).GetCurrentWireguardKey(ctx)
+	wireguardKey, err := s.loadWireGuardKey(ctx)
 	if err != nil {
 		return fmt.Errorf("get current wireguard key: %w", err)
-	}
-	wireguardKey, err := wgtypes.ParseKey(key.PrivateKey)
-	if err != nil {
-		return fmt.Errorf("parse wireguard key: %w", err)
 	}
 	err = s.configureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
 	return s.refreshWireguardPeers(ctx)
-}
-
-func (s *store) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
-	var key wgtypes.Key
-	keyData, err := localdb.New(s.LocalDB()).GetCurrentWireguardKey(ctx)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return key, fmt.Errorf("get current wireguard key: %w", err)
-		}
-		// We don't have a key yet, so we generate one.
-		s.log.Info("generating wireguard key")
-		key, err = wgtypes.GeneratePrivateKey()
-		if err != nil {
-			return key, fmt.Errorf("generate wireguard key: %w", err)
-		}
-		// Save it to the database.
-		params := localdb.SetCurrentWireguardKeyParams{
-			PrivateKey: key.String(),
-		}
-		if s.opts.Mesh.KeyRotationInterval > 0 {
-			params.ExpiresAt = sql.NullTime{
-				Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
-				Valid: true,
-			}
-		}
-		s.log.Debug("saving wireguard key to database")
-		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
-			return key, fmt.Errorf("set current wireguard key: %w", err)
-		}
-	} else if keyData.ExpiresAt.Valid && keyData.ExpiresAt.Time.Before(time.Now().UTC()) {
-		// We have a key, but it's expired, so we generate a new one.
-		s.log.Info("wireguard key expired, generating new one")
-		key, err = wgtypes.GeneratePrivateKey()
-		if err != nil {
-			return key, fmt.Errorf("generate wireguard key: %w", err)
-		}
-		// Save it to the database.
-		params := localdb.SetCurrentWireguardKeyParams{
-			PrivateKey: key.String(),
-		}
-		if s.opts.Mesh.KeyRotationInterval > 0 {
-			params.ExpiresAt = sql.NullTime{
-				Time:  time.Now().UTC().Add(s.opts.Mesh.KeyRotationInterval),
-				Valid: true,
-			}
-		}
-		if err = localdb.New(s.LocalDB()).SetCurrentWireguardKey(ctx, params); err != nil {
-			return key, fmt.Errorf("set current wireguard key: %w", err)
-		}
-	} else {
-		key, err = wgtypes.ParseKey(keyData.PrivateKey)
-		if err != nil {
-			return key, fmt.Errorf("parse wireguard key: %w", err)
-		}
-	}
-	return key, nil
 }
 
 func (s *store) walkMeshDescendants(ctx context.Context) error {
@@ -334,4 +266,46 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (s *store) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
+	var key wgtypes.Key
+	var err error
+	if s.opts.WireGuard.KeyFile != "" {
+		// Load the key from the specified file.
+		stat, err := os.Stat(s.opts.WireGuard.KeyFile)
+		if err != nil && !os.IsNotExist(err) {
+			return key, fmt.Errorf("stat key file: %w", err)
+		}
+		if err == nil {
+			if stat.IsDir() {
+				return key, fmt.Errorf("key file is a directory")
+			}
+			if stat.ModTime().Add(-s.opts.WireGuard.KeyRotationInterval).Before(time.Now()) {
+				// Delete the key file if it's older than the key rotation interval.
+				if err := os.Remove(s.opts.WireGuard.KeyFile); err != nil {
+					return key, fmt.Errorf("remove key file: %w", err)
+				}
+			} else {
+				// If we got here, the key file exists and is not older than the key rotation interval.
+				// We'll load the key from the file.
+				keyData, err := os.ReadFile(s.opts.WireGuard.KeyFile)
+				if err != nil {
+					return key, fmt.Errorf("read key file: %w", err)
+				}
+				return wgtypes.ParseKey(strings.TrimSpace(string(keyData)))
+			}
+		}
+	}
+	// Generate a new key and save it to the specified file.
+	key, err = wgtypes.GeneratePrivateKey()
+	if err != nil {
+		return key, fmt.Errorf("generate private key: %w", err)
+	}
+	if s.opts.WireGuard.KeyFile != "" {
+		if err := os.WriteFile(s.opts.WireGuard.KeyFile, []byte(key.String()+"\n"), 0600); err != nil {
+			return key, fmt.Errorf("write key file: %w", err)
+		}
+	}
+	return key, nil
 }

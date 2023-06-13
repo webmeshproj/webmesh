@@ -31,6 +31,7 @@ import (
 	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/plugins/basicauth"
 	"github.com/webmeshproj/node/pkg/plugins/ldap"
+	"github.com/webmeshproj/node/pkg/plugins/localstore"
 	"github.com/webmeshproj/node/pkg/plugins/mtls"
 )
 
@@ -40,6 +41,7 @@ var (
 		"mtls":       inProcessClient(&mtls.Plugin{}),
 		"basic-auth": inProcessClient(&basicauth.Plugin{}),
 		"ldap":       inProcessClient(&ldap.Plugin{}),
+		"localstore": inProcessClient(&localstore.Plugin{}),
 	}
 )
 

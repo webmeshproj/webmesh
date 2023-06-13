@@ -30,14 +30,14 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 )
 
 // GraphStore implements graph.Store[string, Node] where
 // string is the node ID and Node is the node itself.
 type GraphStore struct {
-	rdb raftdb.Querier
-	wdb raftdb.Querier
+	rdb models.Querier
+	wdb models.Querier
 }
 
 // NewGraph creates a new Graph instance.
@@ -48,8 +48,8 @@ func NewGraph(store meshdb.Store) Graph {
 // NewGraphStore creates a new GraphStore instance.
 func NewGraphStore(store meshdb.Store) graph.Store[string, Node] {
 	return graph.Store[string, Node](&GraphStore{
-		rdb: raftdb.New(store.ReadDB()),
-		wdb: raftdb.New(store.DB()),
+		rdb: models.New(store.ReadDB()),
+		wdb: models.New(store.DB()),
 	})
 }
 
@@ -57,7 +57,7 @@ func NewGraphStore(store meshdb.Store) graph.Store[string, Node] {
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no
 // error should be returned.
 func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexProperties) error {
-	params := raftdb.InsertNodeParams{
+	params := models.InsertNodeParams{
 		ID: node.ID,
 		PublicKey: sql.NullString{
 			String: node.PublicKey.String(),
@@ -161,7 +161,7 @@ func (g *GraphStore) RemoveVertex(nodeID string) error {
 		}
 		return err
 	}
-	_, err = g.rdb.NodeHasEdges(context.Background(), raftdb.NodeHasEdgesParams{
+	_, err = g.rdb.NodeHasEdges(context.Background(), models.NodeHasEdgesParams{
 		SrcNodeID: nodeID,
 		DstNodeID: nodeID,
 	})
@@ -203,7 +203,7 @@ func (g *GraphStore) VertexCount() (int, error) {
 // If either vertex doesn't exit, ErrVertexNotFound should be returned for the respective
 // vertex. If the edge already exists, ErrEdgeAlreadyExists should be returned.
 func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
-	_, err := g.rdb.EitherNodeExists(context.Background(), raftdb.EitherNodeExistsParams{
+	_, err := g.rdb.EitherNodeExists(context.Background(), models.EitherNodeExistsParams{
 		ID:   sourceNode,
 		ID_2: targetNode,
 	})
@@ -213,7 +213,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 		}
 		return err
 	}
-	params := raftdb.InsertNodeEdgeParams{
+	params := models.InsertNodeEdgeParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
 		Weight:    int64(edge.Properties.Weight),
@@ -242,7 +242,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 // UpdateEdge should update the edge between the given vertices with the data of the given
 // Edge instance. If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
-	_, err := g.rdb.NodeEdgeExists(context.Background(), raftdb.NodeEdgeExistsParams{
+	_, err := g.rdb.NodeEdgeExists(context.Background(), models.NodeEdgeExistsParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
 	})
@@ -252,7 +252,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[s
 		}
 		return fmt.Errorf("get node edge: %w", err)
 	}
-	params := raftdb.UpdateNodeEdgeParams{
+	params := models.UpdateNodeEdgeParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
 		Weight:    int64(edge.Properties.Weight),
@@ -281,7 +281,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[s
 // be returned. If the edge doesn't exist, it is up to you whether ErrEdgeNotFound or no error
 // should be returned.
 func (g *GraphStore) RemoveEdge(sourceNode, targetNode string) error {
-	return g.wdb.DeleteNodeEdge(context.Background(), raftdb.DeleteNodeEdgeParams{
+	return g.wdb.DeleteNodeEdge(context.Background(), models.DeleteNodeEdgeParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
 	})
@@ -296,7 +296,7 @@ func (g *GraphStore) RemoveEdge(sourceNode, targetNode string) error {
 //
 // If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) Edge(sourceNode, targetNode string) (graph.Edge[string], error) {
-	edge, err := g.rdb.GetNodeEdge(context.Background(), raftdb.GetNodeEdgeParams{
+	edge, err := g.rdb.GetNodeEdge(context.Background(), models.GetNodeEdgeParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
 	})

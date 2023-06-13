@@ -35,7 +35,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 )
 
 // ErrNodeNotFound is returned when a node is not found.
@@ -229,8 +229,8 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("get edges: %w", err)
 	}
 	if len(edges) > 0 {
-		q := raftdb.New(p.store.DB())
-		err = q.DeleteNodeEdges(ctx, raftdb.DeleteNodeEdgesParams{
+		q := models.New(p.store.DB())
+		err = q.DeleteNodeEdges(ctx, models.DeleteNodeEdgesParams{
 			SrcNodeID: id,
 			DstNodeID: id,
 		})
@@ -251,7 +251,7 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 }
 
 func (p *peers) List(ctx context.Context) ([]Node, error) {
-	q := raftdb.New(p.store.ReadDB())
+	q := models.New(p.store.ReadDB())
 	nodes, err := q.ListNodes(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -304,7 +304,7 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 
 // ListPublicNodes lists all public nodes.
 func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
-	q := raftdb.New(p.store.ReadDB())
+	q := models.New(p.store.ReadDB())
 	nodes, err := q.ListPublicNodes(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -357,7 +357,7 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 
 // ListByZoneID lists all nodes in a zone.
 func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error) {
-	q := raftdb.New(p.store.ReadDB())
+	q := models.New(p.store.ReadDB())
 	nodes, err := q.ListNodesByZone(ctx, sql.NullString{String: zoneID, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -410,7 +410,7 @@ func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
 
 // ListIDs returns a list of node IDs.
 func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
-	ids, err := raftdb.New(p.store.ReadDB()).ListNodeIDs(ctx)
+	ids, err := models.New(p.store.ReadDB()).ListNodeIDs(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return []string{}, nil

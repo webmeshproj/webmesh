@@ -63,8 +63,6 @@ type Options struct {
 	NoIPv4 bool
 	// NoIPv6 is whether to not use IPv6 when joining the cluster.
 	NoIPv6 bool
-	// EndpointOverrides is a map of peer to endpoint overrides.
-	EndpointOverrides string
 	// LocalDNS is whether to start a local MeshDNS server.
 	LocalDNS bool
 	// LocalDNSPort is the port to use for the local MeshDNS server.
@@ -99,7 +97,6 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	storeOpts.WireGuard.ForceTUN = opts.ForceTUN
 	storeOpts.WireGuard.Modprobe = opts.Modprobe
 	storeOpts.WireGuard.PersistentKeepAlive = time.Second * 10
-	storeOpts.WireGuard.EndpointOverrides = opts.EndpointOverrides
 
 	// Create the store
 	st, err := store.New(storeOpts)

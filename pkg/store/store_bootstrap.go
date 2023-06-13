@@ -33,7 +33,6 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/rbac"
@@ -216,7 +215,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 }
 
 func (s *store) initialBootstrapLeader(ctx context.Context) error {
-	q := raftdb.New(s.DB())
+	q := models.New(s.DB())
 	cfg := s.raft.GetConfiguration().Configuration()
 
 	// Set initial cluster configurations to the raft log
@@ -391,7 +390,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		GRPCPort:           s.opts.Mesh.GRPCPort,
 		RaftPort:           s.sl.ListenPort(),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
-		WireGuardEndpoints: s.opts.Mesh.WireGuardEndpoints,
+		WireGuardEndpoints: s.opts.WireGuard.Endpoints,
 		ZoneAwarenessID:    s.opts.Mesh.ZoneAwarenessID,
 	}
 	// Go ahead and generate our private key.
@@ -475,7 +474,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 			return fmt.Errorf("parse IPv4 prefix: %w", err)
 		}
 		networkv4 = netip.PrefixFrom(networkcidrv4.Addr().Next(), networkcidrv4.Bits())
-		_, err = q.InsertNodeLease(ctx, raftdb.InsertNodeLeaseParams{
+		_, err = q.InsertNodeLease(ctx, models.InsertNodeLeaseParams{
 			NodeID: string(s.nodeID),
 			Ipv4:   networkv4.String(),
 		})

@@ -23,7 +23,7 @@ import (
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 )
 
 // IsLeader returns true if this node is the Raft leader.
@@ -76,7 +76,7 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 		return "", err
 	}
 	s.log.Debug("looking up rpc address for leader", slog.String("leader", string(leader)))
-	addr, err := raftdb.New(s.ReadDB()).GetNodePrivateRPCAddress(ctx, string(leader))
+	addr, err := models.New(s.ReadDB()).GetNodePrivateRPCAddress(ctx, string(leader))
 	if err != nil {
 		return "", err
 	}

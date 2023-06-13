@@ -255,7 +255,7 @@ func (o *Options) Overlay(opts ...any) error {
 				if v.Mesh.PrimaryEndpoint == "" {
 					v.Mesh.PrimaryEndpoint = primaryEndpoint.String()
 				}
-				if len(v.Mesh.WireGuardEndpoints) == 0 {
+				if len(v.WireGuard.Endpoints) == 0 {
 					var eps []string
 					if primaryEndpoint.IsValid() {
 						eps = append(eps, netip.AddrPortFrom(primaryEndpoint, uint16(wireguardPort)).String())
@@ -266,7 +266,7 @@ func (o *Options) Overlay(opts ...any) error {
 							eps = append(eps, ep)
 						}
 					}
-					v.Mesh.WireGuardEndpoints = eps
+					v.WireGuard.Endpoints = eps
 				}
 				if v.Bootstrap.AdvertiseAddress == "" {
 					v.Bootstrap.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()

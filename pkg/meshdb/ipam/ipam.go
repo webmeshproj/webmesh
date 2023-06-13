@@ -29,7 +29,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -62,10 +62,10 @@ func (i *ipam) PrefixV4() netip.Prefix { return i.prefixv4 }
 func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix, err error) {
 	i.mux.Lock()
 	defer i.mux.Unlock()
-	rdb := raftdb.New(i.store.ReadDB())
+	rdb := models.New(i.store.ReadDB())
 	if !i.prefixv4.IsValid() {
 		var ipv4 string
-		ipv4, err = raftdb.New(i.store.ReadDB()).GetIPv4Prefix(ctx)
+		ipv4, err = models.New(i.store.ReadDB()).GetIPv4Prefix(ctx)
 		if err != nil {
 			err = fmt.Errorf("get ipv4 prefix: %w", err)
 			return
@@ -82,7 +82,7 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix
 		var allocatedIPv4s []string
 		var prefixSet map[netip.Prefix]struct{}
 		var allocated netip.Prefix
-		var dblease raftdb.Lease
+		var dblease models.Lease
 
 		allocatedIPv4s, err = rdb.ListAllocatedIPv4(ctx)
 		if err != nil && err != sql.ErrNoRows {
@@ -99,7 +99,7 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix
 			err = fmt.Errorf("failed to generate random IPv4 prefix: %w", err)
 			return
 		}
-		dblease, err = raftdb.New(i.store.DB()).InsertNodeLease(ctx, raftdb.InsertNodeLeaseParams{
+		dblease, err = models.New(i.store.DB()).InsertNodeLease(ctx, models.InsertNodeLeaseParams{
 			NodeID:    nodeID,
 			Ipv4:      allocated.String(),
 			CreatedAt: time.Now().UTC(),
@@ -131,5 +131,5 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix
 func (i *ipam) Release(ctx context.Context, nodeID string) error {
 	i.mux.Lock()
 	defer i.mux.Unlock()
-	return raftdb.New(i.store.DB()).ReleaseNodeLease(ctx, nodeID)
+	return models.New(i.store.DB()).ReleaseNodeLease(ctx, nodeID)
 }

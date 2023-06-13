@@ -27,7 +27,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 )
 
 // ACLs is a list of Network ACLs. It contains methods for evaluating actions against
@@ -118,7 +118,7 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 						continue
 					}
 					groupName := strings.TrimPrefix(node, "group:")
-					group, err := raftdb.New(acl.store.ReadDB()).GetGroup(ctx, groupName)
+					group, err := models.New(acl.store.ReadDB()).GetGroup(ctx, groupName)
 					if err != nil {
 						if err != sql.ErrNoRows {
 							slog.Default().Error("failed to get group", "group", groupName, "error", err)
@@ -157,7 +157,7 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 						continue
 					}
 					groupName := strings.TrimPrefix(node, "group:")
-					group, err := raftdb.New(acl.store.ReadDB()).GetGroup(ctx, groupName)
+					group, err := models.New(acl.store.ReadDB()).GetGroup(ctx, groupName)
 					if err != nil {
 						if err != sql.ErrNoRows {
 							slog.Default().Error("failed to get group", "group", groupName, "error", err)

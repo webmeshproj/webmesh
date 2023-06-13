@@ -3,7 +3,7 @@
 //   sqlc v1.18.0
 // source: network_routes.sql
 
-package raftdb
+package models
 
 import (
 	"context"

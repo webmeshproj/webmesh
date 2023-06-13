@@ -20,7 +20,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net/netip"
+	"os"
 	"strings"
 	"time"
 
@@ -37,8 +37,9 @@ const (
 	WireguardMasqueradeEnvVar          = "WIREGUARD_MASQUERADE"
 	WireguardAllowedIPsEnvVar          = "WIREGUARD_ALLOWED_IPS"
 	WireguardPersistentKeepaliveEnvVar = "WIREGUARD_PERSISTENT_KEEPALIVE"
-	WireguardEndpointOverridesEnvVar   = "WIREGUARD_ENDPOINT_OVERRIDES"
 	WireguardMTUEnvVar                 = "WIREGUARD_MTU"
+	WireGuardEndpointsEnvVar           = "WIREGUARD_ENDPOINTS"
+	WireGuardKeyRotationIntervalEnvVar = "WIREGUARD_KEY_ROTATION_INTERVAL"
 )
 
 // DefaultInterfaceName is the default name of the WireGuard interface.
@@ -64,18 +65,30 @@ type WireGuardOptions struct {
 	// accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
 	// packets are sent.
 	PersistentKeepAlive time.Duration `yaml:"persistent-keepalive,omitempty" json:"persistent-keepalive,omitempty" toml:"persistent-keepalive,omitempty"`
-	// EndpointOverrides is a map of peer IDs to endpoint overrides.
-	EndpointOverrides string `yaml:"endpoint-overrides,omitempty" json:"endpoint-overrides,omitempty" toml:"endpoint-overrides,omitempty"`
 	// MTU is the MTU to use for the interface.
 	MTU int `yaml:"mtu,omitempty" json:"mtu,omitempty" toml:"mtu,omitempty"`
+	// Endpoints are additional WireGuard endpoints to broadcast when joining.
+	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty" toml:"endpoints,omitempty"`
+	// KeyFile is the path to the WireGuard private key. If it does not exist it will be created.
+	KeyFile string `json:"key-file,omitempty" yaml:"key-file,omitempty" toml:"key-file,omitempty"`
+	// KeyRotationInterval is the interval to rotate wireguard keys.
+	// Set this to 0 to disable key rotation.
+	KeyRotationInterval time.Duration `json:"key-rotation-interval,omitempty" yaml:"key-rotation-interval,omitempty" toml:"key-rotation-interval,omitempty"`
 }
 
 // WireGuardOptions returns a new WireGuardOptions with sensible defaults.
 func NewWireGuardOptions() *WireGuardOptions {
 	return &WireGuardOptions{
-		ListenPort:    51820,
-		InterfaceName: DefaultInterfaceName,
-		MTU:           system.DefaultMTU,
+		ListenPort:          51820,
+		InterfaceName:       DefaultInterfaceName,
+		MTU:                 system.DefaultMTU,
+		KeyRotationInterval: time.Hour * 24 * 7,
+		Endpoints: func() []string {
+			if val, ok := os.LookupEnv(WireGuardEndpointsEnvVar); ok {
+				return strings.Split(val, ",")
+			}
+			return nil
+		}(),
 	}
 }
 
@@ -98,13 +111,14 @@ func (o *WireGuardOptions) BindFlags(fl *flag.FlagSet) {
 to peers. If unset, keepalive packets will automatically be sent to publicly
 accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
 packets are sent.`)
-
-	fl.StringVar(&o.EndpointOverrides, "wireguard.endpoint-overrides", util.GetEnvDefault(WireguardEndpointOverridesEnvVar, ""),
-		`EndpointOverrides is a map of peer IDs to endpoint overrides.
-The format is similar to allowed-ips, but the value is a single endpoint.`)
-
 	fl.IntVar(&o.MTU, "wireguard.mtu", util.GetEnvIntDefault(WireguardMTUEnvVar, system.DefaultMTU),
 		"The MTU to use for the interface.")
+	fl.Func("wireguard.endpoints", `Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.`, func(s string) error {
+		o.Endpoints = strings.Split(s, ",")
+		return nil
+	})
+	fl.DurationVar(&o.KeyRotationInterval, "wireguard.key-rotation-interval", util.GetEnvDurationDefault(WireGuardKeyRotationIntervalEnvVar, time.Hour*24*7),
+		"Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.")
 }
 
 // Validate validates the options.
@@ -123,28 +137,8 @@ func (o *WireGuardOptions) Validate() error {
 	} else if o.MTU > system.MaxMTU {
 		return fmt.Errorf("wireguard.mtu must not be greater than %d", system.MaxMTU)
 	}
-	if o.EndpointOverrides != "" {
-		_, err := parseEndpointOverrides(o.EndpointOverrides)
-		if err != nil {
-			return err
-		}
+	if o.KeyRotationInterval < 0 {
+		return errors.New("key rotation interval must be >= 0")
 	}
 	return nil
-}
-
-func parseEndpointOverrides(overrides string) (map[string]netip.AddrPort, error) {
-	spl := strings.Fields(overrides)
-	m := make(map[string]netip.AddrPort, len(spl))
-	for _, s := range spl {
-		peerName, endpoint, found := strings.Cut(s, "=")
-		if !found {
-			return nil, fmt.Errorf("invalid endpoint-overrides format: %s", s)
-		}
-		endpointAddr, err := netip.ParseAddrPort(endpoint)
-		if err != nil {
-			return nil, fmt.Errorf("invalid endpoint-overrides format: %s: %w", s, err)
-		}
-		m[peerName] = endpointAddr
-	}
-	return m, nil
 }

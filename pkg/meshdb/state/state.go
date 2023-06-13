@@ -23,7 +23,7 @@ import (
 	"net/netip"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models/raftdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 )
 
 // State is the interface for querying mesh state.
@@ -43,12 +43,12 @@ type State interface {
 var ErrNodeNotFound = sql.ErrNoRows
 
 type state struct {
-	q raftdb.Querier
+	q models.Querier
 }
 
 // New returns a new State.
 func New(st meshdb.Store) State {
-	return &state{q: raftdb.New(st.ReadDB())}
+	return &state{q: models.New(st.ReadDB())}
 }
 
 func (s *state) GetULAPrefix(ctx context.Context) (netip.Prefix, error) {

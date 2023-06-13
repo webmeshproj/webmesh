@@ -214,9 +214,6 @@ func (s *raftDBStatement) ExecContext(ctx context.Context, args []driver.NamedVa
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("apply log entry data: %s", resp.GetError())
 	}
-	if resp.GetExecResult().GetError() != "" {
-		return nil, fmt.Errorf("execute statement: %s", resp.GetExecResult().GetError())
-	}
 	return &execResult{resp}, nil
 }
 
@@ -274,9 +271,6 @@ func (s *raftDBStatement) QueryContext(ctx context.Context, args []driver.NamedV
 	resp := f.Response().(*v1.RaftApplyResponse)
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("apply log entry data: %s", resp.GetError())
-	}
-	if resp.GetQueryResult().GetError() != "" {
-		return nil, fmt.Errorf("query: %s", resp.GetQueryResult().GetError())
 	}
 	return &queryResult{resp, 0}, nil
 }
@@ -337,18 +331,12 @@ type execResult struct {
 // after, for example, an INSERT into a table with primary
 // key.
 func (r *execResult) LastInsertId() (int64, error) {
-	if r.resp.GetExecResult().GetError() != "" {
-		return 0, fmt.Errorf("apply log entry data: %s", r.resp.GetExecResult().GetError())
-	}
 	return r.resp.GetExecResult().GetLastInsertId(), nil
 }
 
 // RowsAffected returns the number of rows affected by the
 // query.
 func (r *execResult) RowsAffected() (int64, error) {
-	if r.resp.GetExecResult().GetError() != "" {
-		return 0, fmt.Errorf("apply log entry data: %s", r.resp.GetExecResult().GetError())
-	}
 	return r.resp.GetExecResult().GetRowsAffected(), nil
 }
 
@@ -365,9 +353,6 @@ func (q *queryResult) Columns() []string {
 // Next is called to populate the next row of data into
 // the provided slice.
 func (q *queryResult) Next(dest []driver.Value) error {
-	if q.resp.GetQueryResult().GetError() != "" {
-		return fmt.Errorf("apply log entry data: %s", q.resp.GetQueryResult().GetError())
-	}
 	if q.index >= int64(len(q.resp.GetQueryResult().GetValues())) {
 		return io.EOF
 	}
