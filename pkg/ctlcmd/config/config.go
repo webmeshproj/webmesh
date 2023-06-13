@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -35,6 +36,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
+	"github.com/webmeshproj/node/pkg/plugins/basicauth"
+	"github.com/webmeshproj/node/pkg/plugins/ldap"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -141,8 +144,6 @@ type ClusterConfig struct {
 	ConnectTimeout Duration `yaml:"connect-timeout,omitempty" json:"connect-timeout,omitempty"`
 	// RequestTimeout is the timeout for requests to the cluster.
 	RequestTimeout Duration `yaml:"request-timeout,omitempty" json:"request-timeout,omitempty"`
-
-	flagCAFile string
 }
 
 // User is the named configuration for a user.
@@ -159,9 +160,14 @@ type UserConfig struct {
 	ClientCertificateData string `yaml:"client-certificate-data,omitempty" json:"client-certificate-data,omitempty"`
 	// ClientKeyData is the base64-encoded client key data for the user.
 	ClientKeyData string `yaml:"client-key-data,omitempty" json:"client-key-data,omitempty"`
-
-	flagKeyFile  string
-	flagCertFile string
+	// BasicAuthUsername is the username for basic authentication.
+	BasicAuthUsername string `yaml:"basic-auth-username,omitempty" json:"basic-auth-username,omitempty"`
+	// BasicAuthPassword is the password for basic authentication.
+	BasicAuthPassword string `yaml:"basic-auth-password,omitempty" json:"basic-auth-password,omitempty"`
+	// LDAPUsername is the username for LDAP authentication.
+	LDAPUsername string `yaml:"ldap-username,omitempty" json:"ldap-username,omitempty"`
+	// LDAPPassword is the password for LDAP authentication.
+	LDAPPassword string `yaml:"ldap-password,omitempty" json:"ldap-password,omitempty"`
 }
 
 // Context is the named configuration for a context.
@@ -219,7 +225,9 @@ func (c *Config) NewAdminClient() (v1.AdminClient, io.Closer, error) {
 // DialCurrent connects to the current context.
 func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 	var opts []grpc.DialOption
-	if c.CurrentCluster().Insecure {
+	cluster := c.CurrentCluster()
+	user := c.CurrentUser()
+	if cluster.Insecure {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
 		creds, err := c.TLSConfig()
@@ -228,22 +236,27 @@ func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 		}
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(creds)))
 	}
-	if c.CurrentCluster().PreferLeader {
+	if user.BasicAuthUsername != "" && user.BasicAuthPassword != "" {
+		opts = append(opts, basicauth.NewCreds(user.BasicAuthUsername, user.BasicAuthPassword))
+	} else if user.LDAPUsername != "" && user.LDAPPassword != "" {
+		opts = append(opts, ldap.NewCreds(user.LDAPUsername, user.LDAPPassword))
+	}
+	if cluster.PreferLeader {
 		opts = append(opts, grpc.WithUnaryInterceptor(LeaderUnaryClientInterceptor()))
 		opts = append(opts, grpc.WithStreamInterceptor(LeaderStreamClientInterceptor()))
 	}
-	if c.CurrentCluster().RequestTimeout.Duration > 0 {
-		timeout := c.CurrentCluster().RequestTimeout.Duration
+	if cluster.RequestTimeout.Duration > 0 {
+		timeout := cluster.RequestTimeout.Duration
 		opts = append(opts, grpc.WithUnaryInterceptor(RequestTimeoutUnaryClientInterceptor(timeout)))
 		opts = append(opts, grpc.WithStreamInterceptor(RequestTimeoutStreamClientInterceptor(timeout)))
 	}
 	ctx := context.Background()
-	if c.CurrentCluster().ConnectTimeout.Duration > 0 {
+	if cluster.ConnectTimeout.Duration > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.CurrentCluster().ConnectTimeout.Duration)
+		ctx, cancel = context.WithTimeout(ctx, cluster.ConnectTimeout.Duration)
 		defer cancel()
 	}
-	return grpc.DialContext(ctx, c.CurrentCluster().Server, opts...)
+	return grpc.DialContext(ctx, cluster.Server, opts...)
 }
 
 // CurrentCluster returns the current cluster.
@@ -288,15 +301,6 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 			return nil, fmt.Errorf("failed to add CA certificate to cert pool")
 		}
 	}
-	if cluster.flagCAFile != "" {
-		ca, err := os.ReadFile(cluster.flagCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
-		}
-		if !certpool.AppendCertsFromPEM(ca) {
-			return nil, fmt.Errorf("failed to add CA certificate to cert pool")
-		}
-	}
 	config.RootCAs = certpool
 	config.InsecureSkipVerify = cluster.TLSSkipVerify
 	if cluster.TLSVerifyChainOnly {
@@ -315,13 +319,6 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 			return nil, fmt.Errorf("failed to decode client key: %w", err)
 		}
 		certificate, err := tls.X509KeyPair(cert, key)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load client certificate and key: %w", err)
-		}
-		certs = append(certs, certificate)
-	}
-	if currentUser.flagCertFile != "" && currentUser.flagKeyFile != "" {
-		certificate, err := tls.LoadX509KeyPair(currentUser.flagCertFile, currentUser.flagKeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load client certificate and key: %w", err)
 		}
@@ -377,15 +374,57 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) {
 	bindFlags(c, flags, usrIdx, clusterIdx)
 }
 
-func bindFlags(c *Config, flags *pflag.FlagSet, usrIdx, clusterIdx int) {
-	flags.StringVar(&c.CurrentContext, "context", c.CurrentContext, "The name of the context to use")
-	flags.StringVar(&c.Clusters[clusterIdx].Cluster.Server, "server", c.Clusters[clusterIdx].Cluster.Server, "The URL of the node to connect to")
-	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.TLSSkipVerify, "tls-skip-verify", c.Clusters[clusterIdx].Cluster.TLSSkipVerify, "Whether TLS verification should be skipped for the cluster connection")
-	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.Insecure, "insecure", c.Clusters[clusterIdx].Cluster.Insecure, "Whether TLS should be disabled for the cluster connection")
-	flags.StringVar(&c.Clusters[clusterIdx].Cluster.flagCAFile, "certificate-authority", "", "The path to the CA certificate for the cluster connection")
-	flags.BoolVar(&c.Clusters[clusterIdx].Cluster.PreferLeader, "prefer-leader", c.Clusters[clusterIdx].Cluster.PreferLeader, "Whether to prefer the leader node for the cluster connection")
-	flags.StringVar(&c.Users[usrIdx].User.flagCertFile, "client-certificate", "", "The path to the client certificate for the user")
-	flags.StringVar(&c.Users[usrIdx].User.flagKeyFile, "client-key", "", "The path to the client key for the user")
+func bindFlags(c *Config, flset *pflag.FlagSet, usrIdx, clusterIdx int) {
+	fs := flag.NewFlagSet("", flag.ExitOnError)
+
+	fs.StringVar(&c.CurrentContext, "context", c.CurrentContext, "The name of the context to use")
+	fs.StringVar(&c.Clusters[clusterIdx].Cluster.Server, "server", c.Clusters[clusterIdx].Cluster.Server, "The URL of the node to connect to")
+	fs.BoolVar(&c.Clusters[clusterIdx].Cluster.TLSSkipVerify, "tls-skip-verify", c.Clusters[clusterIdx].Cluster.TLSSkipVerify, "Whether TLS verification should be skipped for the cluster connection")
+	fs.BoolVar(&c.Clusters[clusterIdx].Cluster.Insecure, "insecure", c.Clusters[clusterIdx].Cluster.Insecure, "Whether TLS should be disabled for the cluster connection")
+	fs.BoolVar(&c.Clusters[clusterIdx].Cluster.PreferLeader, "prefer-leader", c.Clusters[clusterIdx].Cluster.PreferLeader, "Whether to prefer the leader node for the cluster connection")
+
+	fs.Func("certificate-authority", "The path to the CA certificate for the cluster connection", func(s string) error {
+		data, err := os.ReadFile(s)
+		if err != nil {
+			return err
+		}
+		c.Clusters[clusterIdx].Cluster.CertificateAuthorityData = base64.StdEncoding.EncodeToString(data)
+		return nil
+	})
+	fs.Func("client-certificate", "The path to the client certificate for the user", func(s string) error {
+		data, err := os.ReadFile(s)
+		if err != nil {
+			return err
+		}
+		c.Users[usrIdx].User.ClientCertificateData = base64.StdEncoding.EncodeToString(data)
+		return nil
+	})
+	fs.Func("client-key", "The path to the client key for the user", func(s string) error {
+		data, err := os.ReadFile(s)
+		if err != nil {
+			return err
+		}
+		c.Users[usrIdx].User.ClientKeyData = base64.StdEncoding.EncodeToString(data)
+		return nil
+	})
+	fs.Func("basic-auth-username", "The username for basic authentication", func(s string) error {
+		c.Users[usrIdx].User.BasicAuthUsername = s
+		return nil
+	})
+	fs.Func("basic-auth-password", "The password for basic authentication", func(s string) error {
+		c.Users[usrIdx].User.BasicAuthPassword = s
+		return nil
+	})
+	fs.Func("ldap-username", "The username for LDAP authentication", func(s string) error {
+		c.Users[usrIdx].User.LDAPUsername = s
+		return nil
+	})
+	fs.Func("ldap-password", "The password for LDAP authentication", func(s string) error {
+		c.Users[usrIdx].User.LDAPPassword = s
+		return nil
+	})
+
+	flset.AddGoFlagSet(fs)
 }
 
 func unmarshal(r io.Reader, config interface{}) error {

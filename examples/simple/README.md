@@ -109,3 +109,23 @@ $ wmctl --insecure --server localhost:8443 status join-node
   }
 }
 ```
+
+You can take a snapshot of the mesh database and write it to a local sqlite to explore with the following command:
+
+```bash
+$ wmctl --insecure --server localhost:8443 snapshot --format sqlite --output data.sqlite
+2023/06/13 23:33:14 INFO restoring db snapshot component=snapshots
+2023/06/13 23:33:14 INFO db snapshot restore complete component=snapshots duration=38.352891ms
+
+$ sqlite3 data.sqlite
+SQLite version 3.42.0 2023-05-16 12:36:15
+Enter ".help" for usage hints.
+sqlite> .tables
+groups                       node_private_rpc_addresses
+leases                       node_public_rpc_addresses
+mesh_state                   nodes
+network_acls                 role_bindings
+network_routes               roles
+node_edges                   schema_version
+node_private_raft_addresses  users
+```

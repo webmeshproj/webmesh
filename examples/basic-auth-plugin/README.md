@@ -5,3 +5,4 @@ This is not a recommended architecture (at least without also using TLS), but it
 For mTLS examples, the [operator](https://github.com/webmeshproj/operator) provides an easier setup and playground via cert-manager.
 
 Start and stop the example the same as the others.
+Use the `--basic-auth-username` and `--basic-auth-password` flags to set the username and password when using the CLI.
