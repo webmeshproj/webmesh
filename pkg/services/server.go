@@ -51,7 +51,7 @@ type Server struct {
 // NewServer returns a new Server.
 func NewServer(store store.Store, o *Options) (*Server, error) {
 	log := slog.Default().With("component", "server")
-	opts, proxyTLSConfig, err := o.ServerOptions(store, store.Plugins(), log)
+	opts, proxyTLSConfig, err := o.ServerOptions(store, log)
 	if err != nil {
 		return nil, err
 	}

@@ -13,7 +13,7 @@ docker-compose up
 
 Stop it with:
 
-```
+```bash
 docker-compose down -v
 ```
 

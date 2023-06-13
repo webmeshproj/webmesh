@@ -30,6 +30,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/node/pkg/plugins"
 )
 
 // Open opens the store.
@@ -62,6 +63,11 @@ func (s *store) Open() error {
 		return err
 	}
 	var err error
+	// Create the plugin manager
+	s.plugins, err = plugins.New(ctx, s.opts.Plugins)
+	if err != nil {
+		return fmt.Errorf("failed to load plugins: %w", err)
+	}
 	// Register a raft db driver.
 	raftDriverName := uuid.NewString()
 	sql.Register(raftDriverName, &raftDBDriver{s})

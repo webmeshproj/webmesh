@@ -122,9 +122,6 @@ func Execute() error {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
 
-	// Load plugins
-	ctx := context.Background()
-
 	log.Info("starting raft node")
 
 	// Create and open the store
@@ -145,7 +142,7 @@ func Execute() error {
 	}
 
 	log.Info("waiting for raft store to become ready")
-	ctx, cancel := context.WithTimeout(ctx, opts.Mesh.Raft.StartupTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), opts.Mesh.Raft.StartupTimeout)
 	if err := <-st.ReadyError(ctx); err != nil {
 		cancel()
 		return handleErr(fmt.Errorf("failed to wait for raft store to become ready: %w", err))

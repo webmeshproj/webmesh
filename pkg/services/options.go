@@ -35,7 +35,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/util"
@@ -147,7 +146,7 @@ func (o *Options) ListenPort() (int, error) {
 }
 
 // ServerOptions converts the options to gRPC server options.
-func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager, log *slog.Logger) ([]grpc.ServerOption, *tls.Config, error) {
+func (o *Options) ServerOptions(store store.Store, log *slog.Logger) ([]grpc.ServerOption, *tls.Config, error) {
 	var opts []grpc.ServerOption
 	if !o.Insecure {
 		tlsConfig, err := o.TLSConfig()
@@ -156,7 +155,7 @@ func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager, log 
 		}
 		// Bit of a hack, but if we are using the mTLS plugin, we need to make sure
 		// the server requests a client certificate.
-		if _, ok := plugins.Get("mtls"); ok {
+		if _, ok := store.Plugins().Get("mtls"); ok {
 			tlsConfig.ClientAuth = tls.RequestClientCert
 		}
 		opts = append(opts, grpc.Creds(credentials.NewTLS(tlsConfig)))
@@ -178,10 +177,10 @@ func (o *Options) ServerOptions(store store.Store, plugins plugins.Manager, log 
 		streammiddlewares = append(streammiddlewares, metrics.StreamServerInterceptor())
 		promapi.MustRegister(metrics)
 	}
-	if plugins.HasAuth() {
+	if store.Plugins().HasAuth() {
 		log.Debug("registering auth interceptor")
-		unarymiddlewares = append(unarymiddlewares, plugins.AuthUnaryInterceptor())
-		streammiddlewares = append(streammiddlewares, plugins.AuthStreamInterceptor())
+		unarymiddlewares = append(unarymiddlewares, store.Plugins().AuthUnaryInterceptor())
+		streammiddlewares = append(streammiddlewares, store.Plugins().AuthStreamInterceptor())
 	}
 	var leaderProxyTLS *tls.Config
 	if o.API.LeaderProxy {

@@ -55,11 +55,14 @@ var (
 	ErrNotReady = fmt.Errorf("not ready")
 )
 
-// Store is the store interface.
+// Store is the store interface. It contains the state of the mesh and manages
+// the WireGuard interface.
 type Store interface {
 	// ID returns the node ID.
 	ID() string
-	// Open opens the store.
+	// Open opens the store. This must be called before the store can be used.
+	// The Ready functions should be used to determine when the store is ready
+	// to serve requests.
 	Open() error
 	// IsOpen returns true if the store is open.
 	IsOpen() bool
@@ -118,14 +121,11 @@ type Store interface {
 	Plugins() plugins.Manager
 }
 
-// New creates a new store.
+// New creates a new store. You must call Open() on the returned store
+// before it can become ready to use.
 func New(opts *Options) (Store, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
-	}
-	pluginManager, err := plugins.New(context.Background(), opts.Plugins)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load plugins: %w", err)
 	}
 	nodeID := opts.Mesh.NodeID
 	var tlsConfig *tls.Config
@@ -179,7 +179,6 @@ func New(opts *Options) (Store, error) {
 		sl:            sl,
 		opts:          opts,
 		tlsConfig:     tlsConfig,
-		plugins:       pluginManager,
 		nodeID:        raft.ServerID(nodeID),
 		raftLogFormat: RaftLogFormat(opts.Raft.LogFormat),
 		readyErr:      make(chan error, 2),
