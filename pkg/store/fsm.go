@@ -50,6 +50,8 @@ func (s *store) Restore(r io.ReadCloser) error {
 
 // ApplyBatch implements the raft.BatchingFSM interface.
 func (s *store) ApplyBatch(logs []*raft.Log) []any {
+	s.dataMux.Lock()
+	defer s.dataMux.Unlock()
 	s.log.Debug("applying batch", slog.Int("count", len(logs)))
 	res := make([]any, len(logs))
 	var edgeChange bool
@@ -66,7 +68,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 	}
 	if (edgeChange || routeChange) && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
-			defer func() {
+			go func() {
 				if s.noWG {
 					return
 				}
@@ -79,7 +81,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 	}
 	if routeChange && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
-			defer func() {
+			go func() {
 				if s.noWG {
 					return
 				}
@@ -110,10 +112,12 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 
 // Apply applies a Raft log entry to the store.
 func (s *store) Apply(l *raft.Log) any {
+	s.dataMux.Lock()
+	defer s.dataMux.Unlock()
 	edgeChange, routeChange, res := s.applyLog(l)
 	if (edgeChange || routeChange) && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
-			defer func() {
+			go func() {
 				if s.noWG {
 					return
 				}
@@ -126,7 +130,7 @@ func (s *store) Apply(l *raft.Log) any {
 	}
 	if routeChange && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
-			defer func() {
+			go func() {
 				if s.noWG {
 					return
 				}
@@ -156,9 +160,6 @@ func (s *store) Apply(l *raft.Log) any {
 }
 
 func (s *store) applyLog(l *raft.Log) (edgeChange, routeChange bool, res any) {
-	s.dataMux.Lock()
-	defer s.dataMux.Unlock()
-
 	log := s.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
 	log.Debug("applying log", "type", l.Type.String())
 

@@ -34,7 +34,6 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
@@ -118,14 +117,6 @@ type Store interface {
 	Plugins() plugins.Manager
 }
 
-// TestStore is a test store interface.
-type TestStore interface {
-	// Store is the base store interface.
-	Store
-	// Clear resets the data in the store to a clean state.
-	Clear() error
-}
-
 // New creates a new store.
 func New(opts *Options) (Store, error) {
 	if err := opts.Validate(); err != nil {
@@ -197,7 +188,7 @@ func New(opts *Options) (Store, error) {
 
 // NewTestStore creates a new test store and waits for it to be ready.
 // The context is used to enforce startup timeouts.
-func NewTestStore(ctx context.Context) (TestStore, error) {
+func NewTestStore(ctx context.Context) (Store, error) {
 	opts := NewOptions()
 	opts.Raft.ListenAddress = ":0"
 	opts.Raft.InMemory = true
@@ -221,7 +212,7 @@ func NewTestStore(ctx context.Context) (TestStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &testStore{stor}, nil
+	return stor, nil
 }
 
 type store struct {
@@ -366,24 +357,4 @@ type LogStoreCloser interface {
 type StableStoreCloser interface {
 	io.Closer
 	raft.StableStore
-}
-
-type testStore struct {
-	*store
-}
-
-func (t *testStore) Clear() error {
-	err := t.weakData.Close()
-	if err != nil {
-		return err
-	}
-	dataPath := "file:raftdata?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
-	t.weakData, err = sql.Open("sqlite", dataPath)
-	if err != nil {
-		return err
-	}
-	if err = models.MigrateRaftDB(t.weakData); err != nil {
-		return fmt.Errorf("raft db migrate: %w", err)
-	}
-	return nil
 }

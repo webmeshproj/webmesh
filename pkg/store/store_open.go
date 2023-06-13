@@ -25,6 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
+	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"

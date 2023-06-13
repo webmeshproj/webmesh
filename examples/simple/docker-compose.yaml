@@ -19,15 +19,16 @@ services:
       dockerfile: Dockerfile
     networks:
       simple:
-        ipv4_address: 10.1.0.2
-    hostname: bootstrap-node-1
+    hostname: bootstrap-node
     entrypoint:
       - /node
       - --global.insecure
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
+      - --global.log-level=debug
       - --bootstrap.enabled
+      - --bootstrap.default-network-policy=accept
       - --raft.data-dir=/data
     ports:
       - 8443:8443
@@ -46,7 +47,7 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --raft.in-memory
-      - --mesh.join-address=10.1.0.2:8443
+      - --mesh.join-address=bootstrap-node:8443
       - --mesh.max-join-retries=15
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
