@@ -251,7 +251,6 @@ type store struct {
 	observerClose, observerDone chan struct{}
 
 	weakData, raftData *sql.DB
-	localData          *sql.DB
 	dataAppliedIndex   atomic.Uint64
 	dataMux            sync.RWMutex
 
@@ -375,29 +374,17 @@ type testStore struct {
 }
 
 func (t *testStore) Clear() error {
-	err := t.localData.Close()
-	if err != nil {
-		return err
-	}
-	err = t.weakData.Close()
+	err := t.weakData.Close()
 	if err != nil {
 		return err
 	}
 	dataPath := "file:raftdata?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
-	localDataPath := "file:localdata?mode=memory&cache=shared"
 	t.weakData, err = sql.Open("sqlite", dataPath)
-	if err != nil {
-		return err
-	}
-	t.localData, err = sql.Open("sqlite", localDataPath)
 	if err != nil {
 		return err
 	}
 	if err = models.MigrateRaftDB(t.weakData); err != nil {
 		return fmt.Errorf("raft db migrate: %w", err)
-	}
-	if err = models.MigrateLocalDB(t.localData); err != nil {
-		return fmt.Errorf("local db migrate: %w", err)
 	}
 	return nil
 }

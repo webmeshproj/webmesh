@@ -43,10 +43,7 @@ func Apply(ctx context.Context, db *sql.DB, logEntry *v1.RaftLogEntry) *v1.RaftA
 		)
 		res, err := applyQuery(ctx, db, logEntry.GetSqlQuery())
 		if err != nil {
-			return &v1.RaftApplyResponse{
-				Time:  time.Since(start).String(),
-				Error: err.Error(),
-			}
+			res.Error = err.Error()
 		}
 		res.Time = time.Since(start).String()
 		return res
@@ -57,10 +54,7 @@ func Apply(ctx context.Context, db *sql.DB, logEntry *v1.RaftLogEntry) *v1.RaftA
 		)
 		res, err := applyExecute(ctx, db, logEntry.GetSqlExec())
 		if err != nil {
-			return &v1.RaftApplyResponse{
-				Time:  time.Since(start).String(),
-				Error: err.Error(),
-			}
+			res.Error = err.Error()
 		}
 		res.Time = time.Since(start).String()
 		return res

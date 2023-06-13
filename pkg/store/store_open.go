@@ -114,13 +114,11 @@ func (s *store) Open() error {
 	}
 	// Create the data stores.
 	log.Debug("creating data stores")
-	var dataPath, localDataPath string
+	var dataPath string
 	if s.opts.Raft.InMemory {
 		dataPath = "file:raftdata?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
-		localDataPath = "file:localdata?mode=memory&cache=shared"
 	} else {
 		dataPath = s.opts.Raft.DataFilePath() + "?_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
-		localDataPath = s.opts.Raft.LocalDataFilePath()
 	}
 	s.weakData, err = sql.Open("sqlite3", dataPath)
 	if err != nil {
@@ -129,10 +127,6 @@ func (s *store) Open() error {
 	s.raftData, err = sql.Open(raftDriverName, "")
 	if err != nil {
 		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
-	}
-	s.localData, err = sql.Open("sqlite3", localDataPath)
-	if err != nil {
-		return handleErr(fmt.Errorf("open local sqlite %q: %w", s.opts.Raft.LocalDataFilePath(), err))
 	}
 	s.snapshotter = snapshots.New(s.weakData)
 	// Create the raft instance.
@@ -160,10 +154,6 @@ func (s *store) Open() error {
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
-		log.Debug("migrating local database")
-		if err = models.MigrateLocalDB(s.localData); err != nil {
-			return fmt.Errorf("local db migrate: %w", err)
-		}
 		ctx, cancel := context.WithTimeout(ctx, s.opts.Mesh.JoinTimeout)
 		defer cancel()
 		if len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
@@ -181,10 +171,6 @@ func (s *store) Open() error {
 		log.Debug("migrating raft database")
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
-		}
-		log.Debug("migrating local database")
-		if err = models.MigrateLocalDB(s.localData); err != nil {
-			return fmt.Errorf("local db migrate: %w", err)
 		}
 		if err := s.recoverWireguard(ctx); err != nil {
 			return fmt.Errorf("recover wireguard: %w", err)

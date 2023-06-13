@@ -94,7 +94,6 @@ func (s *store) Close() error {
 	for name, closer := range map[string]io.Closer{
 		"raft transport": s.raftTransport,
 		"raft database":  s.weakData,
-		"local database": s.localData,
 		"raft log db":    s.logDB,
 		"raft stable db": s.stableDB,
 	} {

@@ -51,9 +51,6 @@ func (s *store) bootstrap(ctx context.Context) error {
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
-		if err = models.MigrateLocalDB(s.localData); err != nil {
-			return fmt.Errorf("local db migrate: %w", err)
-		}
 		// We rejoin as a voter no matter what
 		s.opts.Mesh.JoinAsVoter = true
 		if s.opts.Bootstrap.Servers == "" {
@@ -148,9 +145,6 @@ func (s *store) bootstrap(ctx context.Context) error {
 			if err = models.MigrateRaftDB(s.weakData); err != nil {
 				return fmt.Errorf("raft db migrate: %w", err)
 			}
-			if err = models.MigrateLocalDB(s.localData); err != nil {
-				return fmt.Errorf("local db migrate: %w", err)
-			}
 			s.opts.Mesh.JoinAsVoter = true
 			return s.rejoinBootstrapServer(ctx)
 		}
@@ -159,9 +153,6 @@ func (s *store) bootstrap(ctx context.Context) error {
 	s.log.Info("migrating raft schema to latest version")
 	if err = models.MigrateRaftDB(s.weakData); err != nil {
 		return fmt.Errorf("raft db migrate: %w", err)
-	}
-	if err = models.MigrateLocalDB(s.localData); err != nil {
-		return fmt.Errorf("local db migrate: %w", err)
 	}
 	go func() {
 		deadline, ok := ctx.Deadline()
