@@ -34,6 +34,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
@@ -347,6 +348,63 @@ func (s *store) ReadyError(ctx context.Context) <-chan error {
 		}()
 	}
 	return s.readyErr
+}
+
+// IsLeader returns true if this node is the Raft leader.
+func (s *store) IsLeader() bool {
+	return s.State() == raft.Leader
+}
+
+// Leader returns the current Raft leader.
+func (s *store) Leader() (raft.ServerID, error) {
+	if s.raft == nil || !s.open.Load() {
+		return "", ErrNotOpen
+	}
+	_, id := s.raft.LeaderWithID()
+	if id == "" {
+		return "", fmt.Errorf("no leader")
+	}
+	return id, nil
+}
+
+// LeaderAddr returns the address of the current leader.
+func (s *store) LeaderAddr() (string, error) {
+	if !s.open.Load() {
+		return "", ErrNotOpen
+	}
+	addr, _ := s.raft.LeaderWithID()
+	return string(addr), nil
+}
+
+// LeaderRPCAddr returns the gRPC address of the current leader.
+func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
+	leader, err := s.Leader()
+	if err != nil {
+		return "", err
+	}
+	s.log.Debug("looking up rpc address for leader", slog.String("leader", string(leader)))
+	addr, err := models.New(s.ReadDB()).GetNodePrivateRPCAddress(ctx, string(leader))
+	if err != nil {
+		return "", err
+	}
+	return addr.(string), nil
+}
+
+// Stepdown forces this node to relinquish leadership to another node in
+// the cluster. If wait is true then this method will block until the
+// leadership transfer is complete and return any error that ocurred.
+func (s *store) Stepdown(wait bool) error {
+	if !s.open.Load() {
+		return ErrNotOpen
+	}
+	if !s.IsLeader() {
+		return ErrNotLeader
+	}
+	f := s.raft.LeadershipTransfer()
+	if !wait {
+		return nil
+	}
+	return f.Error()
 }
 
 type LogStoreCloser interface {

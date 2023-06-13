@@ -154,7 +154,7 @@ func (s *store) Open() error {
 		slog.String("listen-addr", string(s.raftTransport.LocalAddr())),
 	)
 	s.raft, err = raft.NewRaft(
-		s.opts.Raft.RaftConfig(string(s.nodeID)),
+		s.opts.Raft.RaftConfig(s.ID()),
 		s,
 		&monotonicLogStore{s.logDB},
 		s.stableDB,

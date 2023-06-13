@@ -361,7 +361,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if len(s.opts.Mesh.Routes) > 0 {
 		err = n.PutRoute(ctx, &v1.Route{
 			Name:             fmt.Sprintf("%s-auto", s.nodeID),
-			Node:             string(s.nodeID),
+			Node:             s.ID(),
 			DestinationCidrs: s.opts.Mesh.Routes,
 		})
 		if err != nil {
@@ -372,8 +372,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	// We need to officially "join" ourselves to the cluster with a wireguard
 	// address. This is done by creating a new node in the database and then
 	// readding it to the cluster as a voter with the acquired address.
-	s.log.Info("registering ourselves as a node in the cluster",
-		slog.String("server-id", string(s.nodeID)))
+	s.log.Info("registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 
 	// Generate an IPv6 address for the node.
 	networkIPv6, err := util.Random64(ula)
@@ -382,7 +381,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 	p := peers.New(s)
 	params := &peers.PutOptions{
-		ID:                 string(s.nodeID),
+		ID:                 s.ID(),
 		NetworkIPv6:        networkIPv6,
 		GRPCPort:           s.opts.Mesh.GRPCPort,
 		RaftPort:           s.sl.ListenPort(),
@@ -472,14 +471,14 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		}
 		networkv4 = netip.PrefixFrom(networkcidrv4.Addr().Next(), networkcidrv4.Bits())
 		_, err = q.InsertNodeLease(ctx, models.InsertNodeLeaseParams{
-			NodeID: string(s.nodeID),
+			NodeID: s.ID(),
 			Ipv4:   networkv4.String(),
 		})
 		if err != nil {
 			return fmt.Errorf("insert node lease: %w", err)
 		}
 		s.log.Info("acquired IPv4 address for node",
-			slog.String("server-id", string(s.nodeID)),
+			slog.String("server-id", s.ID()),
 			slog.String("address", networkv4.String()))
 		raftAddr = net.JoinHostPort(networkv4.Addr().String(), strconv.Itoa(int(s.sl.ListenPort())))
 	} else {
@@ -500,7 +499,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 	// We need to readd ourselves server to the cluster as a voter with the acquired address.
 	s.log.Info("re-adding ourselves to the cluster with the acquired wireguard address")
-	err = s.AddVoter(ctx, string(s.nodeID), raftAddr)
+	err = s.AddVoter(ctx, s.ID(), raftAddr)
 	if err != nil {
 		return fmt.Errorf("add voter: %w", err)
 	}
@@ -558,7 +557,7 @@ func (s *store) rejoinBootstrapServer(ctx context.Context) error {
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid bootstrap server: %s", server)
 		}
-		if parts[0] == string(s.nodeID) {
+		if parts[0] == s.ID() {
 			continue
 		}
 		addr, err := net.ResolveTCPAddr("tcp", parts[1])

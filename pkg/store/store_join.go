@@ -136,7 +136,7 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 		return fmt.Errorf("load wireguard key: %w", err)
 	}
 	req := &v1.JoinRequest{
-		Id:                 string(s.nodeID),
+		Id:                 s.ID(),
 		PublicKey:          key.PublicKey().String(),
 		RaftPort:           int32(s.sl.ListenPort()),
 		GrpcPort:           int32(s.opts.Mesh.GRPCPort),

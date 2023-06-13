@@ -48,7 +48,7 @@ func (s *store) leaveCluster(ctx context.Context) error {
 	defer conn.Close()
 	client := v1.NewNodeClient(conn)
 	_, err = client.Leave(ctx, &v1.LeaveRequest{
-		Id: string(s.nodeID),
+		Id: s.ID(),
 	})
 	return err
 }

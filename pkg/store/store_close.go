@@ -64,7 +64,7 @@ func (s *store) Close() error {
 		if s.IsLeader() {
 			s.log.Debug("currently the leader, removing ourselves and stepping down")
 			if s.opts.Raft.LeaveOnShutdown {
-				if err := s.RemoveServer(ctx, string(s.nodeID), true); err != nil {
+				if err := s.RemoveServer(ctx, s.ID(), true); err != nil {
 					return fmt.Errorf("remove voter: %w", err)
 				}
 			}

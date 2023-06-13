@@ -136,7 +136,7 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 			return fmt.Errorf("get ula prefix: %w", err)
 		}
 	}
-	self, err := peers.New(s).Get(ctx, string(s.nodeID))
+	self, err := peers.New(s).Get(ctx, s.ID())
 	if err != nil {
 		return fmt.Errorf("get self peer: %w", err)
 	}
@@ -169,7 +169,7 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
 
-	peers, err := mesh.WireGuardPeersFor(ctx, s, string(s.nodeID))
+	peers, err := mesh.WireGuardPeersFor(ctx, s, s.ID())
 	if err != nil {
 		return fmt.Errorf("wireguard peers for: %w", err)
 	}
