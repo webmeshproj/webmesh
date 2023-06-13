@@ -57,7 +57,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 			// We were the only bootstrap server, so we need to rejoin ourselves
 			// This is not foolproof, but it's the best we can do if the bootstrap
 			// flag is left on.
-			s.log.Info("cluster already bootstrapped, rejoining as voter")
+			s.log.Info("cluster already bootstrapped and no other servers set, attempting to rejoin self")
 			return s.recoverWireguard(ctx)
 		}
 		// Try to rejoin one of the bootstrap servers
@@ -139,14 +139,20 @@ func (s *store) bootstrap(ctx context.Context) error {
 		// If the error is that we already bootstrapped and
 		// there were other servers to bootstrap with, then
 		// we might just need to rejoin the cluster.
-		if errors.Is(err, raft.ErrCantBootstrap) && s.opts.Bootstrap.Servers != "" {
-			s.log.Info("cluster already bootstrapped, attempting to join as voter")
-			s.log.Info("migrating raft schema to latest version")
+		if errors.Is(err, raft.ErrCantBootstrap) {
 			if err = models.MigrateRaftDB(s.weakData); err != nil {
 				return fmt.Errorf("raft db migrate: %w", err)
 			}
-			s.opts.Mesh.JoinAsVoter = true
-			return s.rejoinBootstrapServer(ctx)
+			if s.opts.Bootstrap.Servers != "" {
+				s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
+				s.opts.Mesh.JoinAsVoter = true
+				return s.rejoinBootstrapServer(ctx)
+			}
+			// We were the only bootstrap server, so we need to rejoin ourselves
+			// This is not foolproof, but it's the best we can do if the bootstrap
+			// flag is left on.
+			s.log.Info("cluster already bootstrapped and no other servers set, attempting to rejoin self")
+			return s.recoverWireguard(ctx)
 		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}

@@ -109,5 +109,3 @@ $ wmctl --insecure --server localhost:8443 status join-node
   }
 }
 ```
-
-You can exec into the bootstrap node to look at the data directory and explore the database schemas.

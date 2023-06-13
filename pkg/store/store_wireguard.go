@@ -128,9 +128,13 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	if s.noWG {
 		return nil
 	}
-	meshnetworkv6, err := state.New(s).GetULAPrefix(ctx)
-	if err != nil {
-		return fmt.Errorf("get ula prefix: %w", err)
+	var meshnetworkv6 netip.Prefix
+	var err error
+	if !s.opts.Mesh.NoIPv6 {
+		meshnetworkv6, err = state.New(s).GetULAPrefix(ctx)
+		if err != nil {
+			return fmt.Errorf("get ula prefix: %w", err)
+		}
 	}
 	self, err := peers.New(s).Get(ctx, string(s.nodeID))
 	if err != nil {
@@ -140,7 +144,17 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get current wireguard key: %w", err)
 	}
-	err = s.configureWireguard(ctx, wireguardKey, self.PrivateIPv4, self.NetworkIPv6, meshnetworkv6)
+	err = s.configureWireguard(ctx, wireguardKey, func() netip.Prefix {
+		if s.opts.Mesh.NoIPv4 {
+			return netip.Prefix{}
+		}
+		return self.PrivateIPv4
+	}(), func() netip.Prefix {
+		if s.opts.Mesh.NoIPv6 {
+			return netip.Prefix{}
+		}
+		return self.NetworkIPv6
+	}(), meshnetworkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

@@ -52,6 +52,8 @@ func New(db *sql.DB) Snapshotter {
 	}
 }
 
+const schema = "main"
+
 func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 	s.log.Info("creating new db snapshot")
 	start := time.Now()
@@ -66,7 +68,7 @@ func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 		if !ok {
 			return fmt.Errorf("expected sqlite3 connection, got %T", conn)
 		}
-		out, err := sqliteConn.Serialize("")
+		out, err := sqliteConn.Serialize(schema)
 		if err != nil {
 			return fmt.Errorf("serialize db: %w", err)
 		}
@@ -100,7 +102,7 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 		return fmt.Errorf("read snapshot: %w", err)
 	}
 	// Create an in-memory database to deserialize the backup into.
-	restore, err := sql.Open("sqlite3", "file::memory:?mode=memory&cache=shared")
+	restore, err := sql.Open("sqlite3", "file::restoredb:?mode=memory&cache=shared")
 	if err != nil {
 		return fmt.Errorf("open in-memory db: %w", err)
 	}
@@ -113,7 +115,7 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	var rawConn *sqlite3.SQLiteConn
 	err = restoreConn.Raw(func(driverConn interface{}) error {
 		rawConn = driverConn.(*sqlite3.SQLiteConn)
-		return rawConn.Deserialize(data, "")
+		return rawConn.Deserialize(data, schema)
 	})
 	if err != nil {
 		return fmt.Errorf("deserialize db: %w", err)
@@ -137,14 +139,14 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	// Restore the deserialized database.
 	err = writeConn.Raw(func(driverConn interface{}) error {
 		c := driverConn.(*sqlite3.SQLiteConn)
-		backup, err := c.Backup("", rawConn, "")
+		backup, err := c.Backup(schema, rawConn, schema)
 		if err != nil {
-			return fmt.Errorf("backup db: %w", err)
+			return fmt.Errorf("restore deserialized db: %w", err)
 		}
 		for {
 			done, err := backup.Step(-1)
 			if err != nil {
-				return fmt.Errorf("backup step: %w", err)
+				return fmt.Errorf("restore step: %w", err)
 			}
 			if done {
 				break

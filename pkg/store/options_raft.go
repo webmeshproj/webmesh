@@ -137,8 +137,8 @@ func NewRaftOptions() *RaftOptions {
 		ApplyTimeout:       time.Second * 15,
 		CommitTimeout:      time.Second * 15,
 		LeaderLeaseTimeout: time.Second * 3,
-		SnapshotInterval:   time.Minute * 5,
-		SnapshotThreshold:  15,
+		SnapshotInterval:   time.Minute * 3,
+		SnapshotThreshold:  5,
 		MaxAppendEntries:   15,
 		SnapshotRetention:  3,
 		ObserverChanBuffer: 100,
@@ -173,9 +173,9 @@ func (o *RaftOptions) BindFlags(fl *flag.FlagSet) {
 		"Raft max append entries.")
 	fl.DurationVar(&o.LeaderLeaseTimeout, "raft.leader-lease-timeout", util.GetEnvDurationDefault(LeaderLeaseTimeoutEnvVar, time.Second*3),
 		"Raft leader lease timeout.")
-	fl.DurationVar(&o.SnapshotInterval, "raft.snapshot-interval", util.GetEnvDurationDefault(SnapshotIntervalEnvVar, time.Minute*5),
+	fl.DurationVar(&o.SnapshotInterval, "raft.snapshot-interval", util.GetEnvDurationDefault(SnapshotIntervalEnvVar, time.Minute*3),
 		"Raft snapshot interval.")
-	fl.Uint64Var(&o.SnapshotThreshold, "raft.snapshot-threshold", uint64(util.GetEnvIntDefault(SnapshotThresholdEnvVar, 15)),
+	fl.Uint64Var(&o.SnapshotThreshold, "raft.snapshot-threshold", uint64(util.GetEnvIntDefault(SnapshotThresholdEnvVar, 5)),
 		"Raft snapshot threshold.")
 	fl.Uint64Var(&o.SnapshotRetention, "raft.snapshot-retention", uint64(util.GetEnvIntDefault(SnapshotRetentionEnvVar, 3)),
 		"Raft snapshot retention.")
