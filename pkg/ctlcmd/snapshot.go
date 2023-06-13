@@ -50,6 +50,21 @@ var snapshotCmd = &cobra.Command{
 	Use:   "snapshot",
 	Short: "Take a snapshot of the current state of the mesh",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var out io.Writer
+		if snapshotFormat == "sqlite" && snapshotOutput == "" {
+			return fmt.Errorf("sqlite snapshot format requires --output")
+		}
+		if snapshotOutput == "" || snapshotOutput == "-" {
+			out = cmd.OutOrStdout()
+		} else if snapshotFormat == "raw" {
+			f, err := os.Create(snapshotOutput)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			out = f
+		}
+
 		client, closer, err := cliConfig.NewNodeClient()
 		if err != nil {
 			return err
@@ -60,26 +75,12 @@ var snapshotCmd = &cobra.Command{
 			return err
 		}
 		rawSnapshot := resp.GetSnapshot()
-		var out io.Writer
-		if snapshotOutput == "" {
-			out = cmd.OutOrStdout()
-		} else {
-			f, err := os.Create(snapshotOutput)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			out = f
-		}
+
 		switch snapshotFormat {
 		case "raw":
 			_, err = out.Write(rawSnapshot)
 			return err
 		case "sqlite":
-			// TODO: implement
-			if snapshotOutput == "" {
-				return fmt.Errorf("sqlite snapshot format requires --output")
-			}
 			db, err := sql.Open("sqlite3", snapshotOutput)
 			if err != nil {
 				return err
