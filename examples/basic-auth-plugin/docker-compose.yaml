@@ -31,6 +31,7 @@ services:
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.data-dir=/data
+      - --wireguard.key-file=/data/wireguard.key
       - --plugins.basic-auth.htpasswd-file=/etc/htpasswd
     ports:
       - 8443:8443

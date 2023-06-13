@@ -295,14 +295,16 @@ func (s *store) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
 			if stat.IsDir() {
 				return key, fmt.Errorf("key file is a directory")
 			}
-			if stat.ModTime().Add(-s.opts.WireGuard.KeyRotationInterval).Before(time.Now()) {
+			if stat.ModTime().Add(s.opts.WireGuard.KeyRotationInterval).Before(time.Now()) {
 				// Delete the key file if it's older than the key rotation interval.
+				s.log.Info("removing expired wireguard key file")
 				if err := os.Remove(s.opts.WireGuard.KeyFile); err != nil {
 					return key, fmt.Errorf("remove key file: %w", err)
 				}
 			} else {
 				// If we got here, the key file exists and is not older than the key rotation interval.
 				// We'll load the key from the file.
+				s.log.Info("loading wireguard key from file")
 				keyData, err := os.ReadFile(s.opts.WireGuard.KeyFile)
 				if err != nil {
 					return key, fmt.Errorf("read key file: %w", err)
@@ -311,6 +313,7 @@ func (s *store) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
 			}
 		}
 	}
+	s.log.Info("generating new wireguard key")
 	// Generate a new key and save it to the specified file.
 	key, err = wgtypes.GeneratePrivateKey()
 	if err != nil {

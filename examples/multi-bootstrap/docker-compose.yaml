@@ -46,6 +46,7 @@ services:
       - --services.turn.public-ip=127.0.0.1
       - --services.turn.stun-port-range=60000-60001
       - --services.mesh-dns.enabled
+      - --wireguard.key-file=/data/wireguard.key
     ports:
       - 8443:8443
       - 3478:3478
@@ -77,6 +78,7 @@ services:
       - --raft.snapshot-threshold=10
       - --raft.log-level=debug
       - --services.api.leader-proxy
+      - --wireguard.key-file=/data/wireguard.key
     volumes:
       - bootstrap-node-2:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -101,6 +103,7 @@ services:
       - --raft.snapshot-threshold=10
       - --raft.log-level=debug
       - --services.api.leader-proxy
+      - --wireguard.key-file=/data/wireguard.key
     volumes:
       - bootstrap-node-3:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

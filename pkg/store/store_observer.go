@@ -74,7 +74,9 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					s.log.Debug("ResumedHeartbeatObservation", slog.Any("data", data))
 				case raft.FailedHeartbeatObservation:
 					s.log.Debug("FailedHeartbeatObservation", slog.Any("data", data))
-					if failedHeartbeats[data.PeerID] > 10 {
+					// TODO: Make this configurable, but if we lose 30 heartbeats from a peer
+					// then we should remove it from the cluster.
+					if failedHeartbeats[data.PeerID] > 30 {
 						s.log.Error("failed heartbeat", slog.String("peer", string(data.PeerID)))
 						// If the peer is a non voter then we can remove it from the cluster
 						// and it will be re-added when it comes back online.

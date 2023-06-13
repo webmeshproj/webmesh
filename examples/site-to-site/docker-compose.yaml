@@ -59,6 +59,7 @@ services:
       - --services.api.leader-proxy
       - --services.api.mesh
       - --services.mesh-dns.enabled
+      - --wireguard.key-file=/data/wireguard.key
     ports:
       - 8443:8443
       - 5354:5353/udp
@@ -138,6 +139,7 @@ services:
       - --mesh.zone-awareness-id=site-2
       - --services.api.leader-proxy
       - --services.api.mesh
+      - --wireguard.key-file=/data/wireguard.key
     volumes:
       - site-2-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -214,6 +216,7 @@ services:
       - --mesh.zone-awareness-id=site-3
       - --services.api.leader-proxy
       - --services.api.mesh
+      - --wireguard.key-file=/data/wireguard.key
     volumes:
       - site-3-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

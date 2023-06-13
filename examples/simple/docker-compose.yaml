@@ -30,6 +30,7 @@ services:
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
       - --raft.data-dir=/data
+      - --wireguard.key-file=/data/wireguard.key
     ports:
       - 8443:8443
       - 51820:51820/udp

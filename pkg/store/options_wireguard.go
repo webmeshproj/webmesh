@@ -39,6 +39,7 @@ const (
 	WireguardPersistentKeepaliveEnvVar = "WIREGUARD_PERSISTENT_KEEPALIVE"
 	WireguardMTUEnvVar                 = "WIREGUARD_MTU"
 	WireGuardEndpointsEnvVar           = "WIREGUARD_ENDPOINTS"
+	WireGuardKeyFileEnvVar             = "WIREGUARD_KEY_FILE"
 	WireGuardKeyRotationIntervalEnvVar = "WIREGUARD_KEY_ROTATION_INTERVAL"
 )
 
@@ -117,6 +118,8 @@ packets are sent.`)
 		o.Endpoints = strings.Split(s, ",")
 		return nil
 	})
+	fl.StringVar(&o.KeyFile, "wireguard.key-file", util.GetEnvDefault(WireGuardKeyFileEnvVar, ""),
+		"The path to the WireGuard private key. If it does not exist it will be created.")
 	fl.DurationVar(&o.KeyRotationInterval, "wireguard.key-rotation-interval", util.GetEnvDurationDefault(WireGuardKeyRotationIntervalEnvVar, time.Hour*24*7),
 		"Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.")
 }
