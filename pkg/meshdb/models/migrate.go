@@ -24,6 +24,8 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
+//go:generate bash -xc "go run github.com/kyleconroy/sqlc/cmd/sqlc@latest -f sql/sqlc.yaml generate"
+
 // migrationFS is the filesystem containing the goose migrations.
 //
 //go:embed sql/**/*

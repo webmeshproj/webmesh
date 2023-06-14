@@ -50,7 +50,7 @@ build-image: ## Build the node build image.
 	docker buildx build -t $(BUILD_IMAGE) -f Dockerfile.build --load .
 
 .PHONY: dist
-dist: ## Build node binaries for all platforms.
+dist: generate ## Build node binaries for all platforms.
 	mkdir -p $(DIST)
 	docker run --rm \
 		-u $(shell id -u):$(shell id -g) \
@@ -130,10 +130,8 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-SQLC_CONFIG := pkg/meshdb/models/sql/sqlc.yaml
-generate: ## Generate SQL code.
-	go install github.com/kyleconroy/sqlc/cmd/sqlc@latest
-	sqlc -f $(SQLC_CONFIG) generate
+generate: ## Run go generate against code.
+	go generate ./...
 
 install-ctl: build-ctl ## Install wmctl binary into $GOPATH/bin.
 	install -m 755 $(DIST)/$(CTL)_$(OS)_$(ARCH) $(shell go env GOPATH)/bin/$(CTL)
