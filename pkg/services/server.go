@@ -1,5 +1,5 @@
 /*
-Copyright 2023.
+Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,13 +22,16 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/services/admin"
 	"github.com/webmeshproj/node/pkg/services/meshapi"
 	"github.com/webmeshproj/node/pkg/services/meshdns"
@@ -45,6 +48,7 @@ type Server struct {
 	srv     *grpc.Server
 	turn    *turn.Server
 	meshdns *meshdns.Server
+	store   store.Store
 	log     *slog.Logger
 }
 
@@ -56,9 +60,10 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 		return nil, err
 	}
 	server := &Server{
-		srv:  grpc.NewServer(opts...),
-		opts: o,
-		log:  log,
+		srv:   grpc.NewServer(opts...),
+		opts:  o,
+		store: store,
+		log:   log,
 	}
 	if o.API.Admin {
 		log.Debug("registering admin api")
@@ -92,13 +97,16 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	log.Debug("registering node server")
 	// Always register the node server
 	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), !store.Plugins().HasAuth()))
+	// Register the reflection service
+	reflection.Register(server.srv)
+	// Register the health service
+	healthpb.RegisterHealthServer(server.srv, server)
 	return server, nil
 }
 
 // ListenAndServe starts the gRPC server and optional metrics server
 // then blocks until the gRPC server exits.
 func (s *Server) ListenAndServe() error {
-	reflection.Register(s.srv)
 	if s.opts.Metrics.Enabled {
 		go func() {
 			s.log.Info(fmt.Sprintf("Starting HTTP metrics server on %s", s.opts.Metrics.ListenAddress))
@@ -162,4 +170,48 @@ func (s *Server) Stop() {
 	}
 	s.log.Info("Shutting down gRPC server")
 	s.srv.GracefulStop()
+}
+
+// Check implements grpc.health.v1.HealthServer.
+func (s *Server) Check(context.Context, *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
+	return &healthpb.HealthCheckResponse{
+		Status: s.currentStatus(),
+	}, nil
+}
+
+// Watch implements grpc.health.v1.HealthServer.
+func (s *Server) Watch(_ *healthpb.HealthCheckRequest, srv healthpb.Health_WatchServer) error {
+	last := s.currentStatus()
+	err := srv.Send(&healthpb.HealthCheckResponse{
+		Status: last,
+	})
+	if err != nil {
+		return err
+	}
+	t := time.NewTicker(1 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-srv.Context().Done():
+			return nil
+		case <-t.C:
+			current := s.currentStatus()
+			if last != current {
+				last = current
+				err := srv.Send(&healthpb.HealthCheckResponse{
+					Status: current,
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
+
+func (s *Server) currentStatus() healthpb.HealthCheckResponse_ServingStatus {
+	if s.store.Ready() {
+		return healthpb.HealthCheckResponse_SERVING
+	}
+	return healthpb.HealthCheckResponse_NOT_SERVING
 }
