@@ -17,9 +17,11 @@ limitations under the License.
 package store
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/google/uuid"
@@ -144,12 +146,21 @@ func (s *store) Open() error {
 			slog.String("id", latest.ID),
 			slog.Int("term", int(latest.Term)),
 			slog.Int("index", int(latest.Index)))
-		_, reader, err := s.raftSnapshots.Open(latest.ID)
+		meta, reader, err := s.raftSnapshots.Open(latest.ID)
 		if err != nil {
 			return handleErr(fmt.Errorf("open snapshot: %w", err))
 		}
-		if err = s.snapshotter.Restore(ctx, reader); err != nil {
+		defer reader.Close()
+		var buf bytes.Buffer
+		tee := io.TeeReader(reader, &buf)
+		// Restore to the in-memory database.
+		if err = s.snapshotter.Restore(ctx, io.NopCloser(tee)); err != nil {
 			return handleErr(fmt.Errorf("restore snapshot: %w", err))
+		}
+		// Dispatch the snapshot to any storage plugins.
+		if err = s.plugins.ApplySnapshot(ctx, meta, io.NopCloser(&buf)); err != nil {
+			// This is non-fatal for now.
+			log.Error("failed to apply snapshot to plugins", slog.String("error", err.Error()))
 		}
 		s.currentTerm.Store(latest.Term)
 		s.lastAppliedIndex.Store(latest.Index)

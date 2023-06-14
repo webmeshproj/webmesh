@@ -38,6 +38,7 @@ var MethodPolicyMap = map[string]MethodPolicy{
 	v1.Node_Join_FullMethodName:                 RequireLeader,
 	v1.Node_Leave_FullMethodName:                RequireLeader,
 	v1.Node_GetStatus_FullMethodName:            RequireLocal,
+	v1.Node_Snapshot_FullMethodName:             AllowNonLeader,
 	v1.Node_NegotiateDataChannel_FullMethodName: RequireLocal,
 
 	// Mesh API

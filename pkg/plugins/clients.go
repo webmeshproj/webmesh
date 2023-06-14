@@ -57,6 +57,11 @@ func (p *inProcessPlugin) Store(ctx context.Context, in *v1.StoreLogRequest, opt
 	return p.server.Store(ctx, in)
 }
 
+// RestoreSnapshot restores a snapshot.
+func (p *inProcessPlugin) RestoreSnapshot(ctx context.Context, in *v1.DataSnapshot, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return p.server.RestoreSnapshot(ctx, in)
+}
+
 // Authenticate authenticates a request.
 func (p *inProcessPlugin) Authenticate(ctx context.Context, in *v1.AuthenticationRequest, opts ...grpc.CallOption) (*v1.AuthenticationResponse, error) {
 	return p.server.Authenticate(ctx, in)
@@ -101,6 +106,14 @@ func (p *externalProcessPlugin) Store(ctx context.Context, in *v1.StoreLogReques
 		return nil, err
 	}
 	return p.cli.Store(ctx, in)
+}
+
+// RestoreSnapshot restores a snapshot.
+func (p *externalProcessPlugin) RestoreSnapshot(ctx context.Context, in *v1.DataSnapshot, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	if err := p.checkProcess(ctx); err != nil {
+		return nil, err
+	}
+	return p.cli.RestoreSnapshot(ctx, in)
 }
 
 // Authenticate authenticates a request.

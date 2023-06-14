@@ -19,10 +19,12 @@ limitations under the License.
 package localstore
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -31,10 +33,12 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mitchellh/mapstructure"
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
+	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/version"
 )
 
@@ -46,6 +50,7 @@ type Plugin struct {
 	mux                           sync.Mutex
 	termFile, indexFile           string
 	currentTerm, lastAppliedIndex atomic.Uint64
+	log                           *slog.Logger
 }
 
 // Config is the configuration for the localstore plugin.
@@ -66,6 +71,7 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 }
 
 func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*emptypb.Empty, error) {
+	p.log = slog.Default().With("plugin", "localstore")
 	var config Config
 	err := mapstructure.Decode(req.Config.AsMap(), &config)
 	if err != nil {
@@ -92,12 +98,14 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	} else if err == nil {
+		p.log.Debug("restoring current term", "term", string(data))
 		p.currentTerm.Store(binary.BigEndian.Uint64(data))
 	}
 	data, err = os.ReadFile(p.indexFile)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	} else if err == nil {
+		p.log.Debug("restoring last applied index", "index", string(data))
 		p.lastAppliedIndex.Store(binary.BigEndian.Uint64(data))
 	}
 	return &emptypb.Empty{}, nil
@@ -112,6 +120,7 @@ func (p *Plugin) Store(ctx context.Context, log *v1.StoreLogRequest) (*v1.RaftAp
 	if log.GetIndex() <= lastIndex {
 		return &v1.RaftApplyResponse{}, nil
 	}
+	p.log.Info("storing log", "index", log.GetIndex(), "term", log.GetTerm())
 	err := os.WriteFile(p.termFile, []byte(fmt.Sprintf("%d", log.GetTerm())), 0644)
 	if err != nil {
 		return nil, err
@@ -121,4 +130,22 @@ func (p *Plugin) Store(ctx context.Context, log *v1.StoreLogRequest) (*v1.RaftAp
 		return nil, err
 	}
 	return raftlogs.Apply(ctx, p.data, log.GetLog()), nil
+}
+
+func (p *Plugin) RestoreSnapshot(ctx context.Context, snapshot *v1.DataSnapshot) (*emptypb.Empty, error) {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+	defer p.currentTerm.Store(snapshot.GetTerm())
+	defer p.lastAppliedIndex.Store(snapshot.GetIndex())
+	p.log.Info("restoring snapshot", "index", snapshot.GetIndex(), "term", snapshot.GetTerm())
+	err := os.WriteFile(p.termFile, []byte(fmt.Sprintf("%d", snapshot.GetTerm())), 0644)
+	if err != nil {
+		return nil, err
+	}
+	err = os.WriteFile(p.indexFile, []byte(fmt.Sprintf("%d", snapshot.GetIndex())), 0644)
+	if err != nil {
+		return nil, err
+	}
+	snapshotter := snapshots.New(p.data)
+	return &emptypb.Empty{}, snapshotter.Restore(ctx, io.NopCloser(bytes.NewReader(snapshot.GetData())))
 }

@@ -19,8 +19,10 @@ package plugins
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
+	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
@@ -60,6 +62,8 @@ type Manager interface {
 	// ApplyRaftLog applies a raft log entry to all storage plugins. Responses are still returned
 	// even if an error occurs.
 	ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) ([]*v1.RaftApplyResponse, error)
+	// ApplySnapshot applies a snapshot to all storage plugins.
+	ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) error
 	// Emit emits an event to all watch plugins.
 	Emit(ctx context.Context, ev *v1.Event) error
 }
@@ -207,6 +211,33 @@ func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) (
 		err = fmt.Errorf("apply raft log: %v", errs)
 	}
 	return out, err
+}
+
+// ApplySnapshot applies a snapshot to all storage plugins.
+func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) error {
+	if len(m.stores) == 0 {
+		return nil
+	}
+	defer data.Close()
+	snapsot, err := io.ReadAll(data)
+	if err != nil {
+		return fmt.Errorf("read snapshot: %w", err)
+	}
+	errs := make([]error, 0)
+	for _, store := range m.stores {
+		_, err := store.RestoreSnapshot(ctx, &v1.DataSnapshot{
+			Term:  meta.Term,
+			Index: meta.Index,
+			Data:  snapsot,
+		})
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("apply snapshot: %v", errs)
+	}
+	return nil
 }
 
 // Emit emits an event to all watch plugins.
