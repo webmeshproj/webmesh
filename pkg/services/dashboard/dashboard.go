@@ -17,6 +17,8 @@ limitations under the License.
 // Package dashboard contains a service that serves a web dashboard.
 package dashboard
 
+// nolint: typecheck
+
 import (
 	"crypto/tls"
 	"embed"
@@ -31,8 +33,6 @@ import (
 
 //go:generate bash -xc "cd app; yarn ; yarn build"
 
-// nolint:typecheck
-//
 //go:embed app/dist/spa
 var staticFiles embed.FS
 

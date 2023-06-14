@@ -60,6 +60,14 @@ func (s *store) Close() error {
 			}
 		}()
 	}
+	if s.plugins != nil {
+		// Close the plugins
+		s.log.Debug("closing plugins")
+		err := s.plugins.Close()
+		if err != nil {
+			s.log.Error("error closing plugins", slog.String("error", err.Error()))
+		}
+	}
 	if s.raft != nil {
 		// If we were not running in-memory, take a snapshot before shutting down.
 		if !s.opts.Raft.InMemory {

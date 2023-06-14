@@ -39,7 +39,7 @@ import (
 
 var (
 	// BuiltIns are the built-in plugins.
-	BuiltIns = map[string]v1.PluginClient{
+	BuiltIns = map[string]PluginClientCloser{
 		"mtls":       inProcessClient(&mtls.Plugin{}),
 		"basic-auth": inProcessClient(&basicauth.Plugin{}),
 		"ldap":       inProcessClient(&ldap.Plugin{}),
@@ -66,20 +66,22 @@ type Manager interface {
 	ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) error
 	// Emit emits an event to all watch plugins.
 	Emit(ctx context.Context, ev *v1.Event) error
+	// Close closes all plugins.
+	Close() error
 }
 
 // New creates a new plugin manager.
 func New(ctx context.Context, opts *Options) (Manager, error) {
-	var auth v1.PluginClient
-	registered := make(map[string]v1.PluginClient)
-	stores := make([]v1.PluginClient, 0)
-	emitters := make([]v1.PluginClient, 0)
+	var auth PluginClientCloser
+	registered := make(map[string]PluginClientCloser)
+	stores := make([]PluginClientCloser, 0)
+	emitters := make([]PluginClientCloser, 0)
 	log := slog.Default()
 	for name, cfg := range opts.Plugins {
 		log.Info("loading plugin", "name", name)
 		log.Debug("plugin configuration", "config", cfg)
 		// Load the plugin.
-		var plugin v1.PluginClient
+		var plugin PluginClientCloser
 		if builtIn, ok := BuiltIns[name]; ok {
 			plugin = builtIn
 		} else {
@@ -137,10 +139,10 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 }
 
 type manager struct {
-	auth     v1.PluginClient
-	stores   []v1.PluginClient
-	emitters []v1.PluginClient
-	plugins  map[string]v1.PluginClient
+	auth     PluginClientCloser
+	stores   []PluginClientCloser
+	emitters []PluginClientCloser
+	plugins  map[string]PluginClientCloser
 	log      *slog.Logger
 }
 
@@ -254,6 +256,21 @@ func (m *manager) Emit(ctx context.Context, ev *v1.Event) error {
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("emit: %v", errs)
+	}
+	return nil
+}
+
+// Close closes all plugins.
+func (m *manager) Close() error {
+	errs := make([]error, 0)
+	for _, p := range m.plugins {
+		err := p.Close()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("close: %v", errs)
 	}
 	return nil
 }

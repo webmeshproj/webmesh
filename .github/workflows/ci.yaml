@@ -83,7 +83,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           file: Dockerfile.build
-          tags: ghcr.io/webmeshproj/node-buildx
+          tags: ghcr.io/webmeshproj/node-buildx:latest
           load: true
           cache-to: type=gha
           cache-from: type=gha
@@ -91,7 +91,7 @@ jobs:
       - name: Build Release Binaries
         shell: bash
         env:
-          BUILD_IMAGE: ghcr.io/webmeshproj/node-buildx
+          BUILD_IMAGE: ghcr.io/webmeshproj/node-buildx:latest
         run: make dist
 
       - name: Login to GHCR

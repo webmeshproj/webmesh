@@ -19,6 +19,7 @@ package plugins
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -33,8 +34,13 @@ import (
 	"github.com/webmeshproj/node/pkg/context"
 )
 
+type PluginClientCloser interface {
+	v1.PluginClient
+	io.Closer
+}
+
 // inProcessClient creates a plugin client from a plugin server.
-func inProcessClient(plugin v1.PluginServer) v1.PluginClient {
+func inProcessClient(plugin v1.PluginServer) *inProcessPlugin {
 	return &inProcessPlugin{plugin}
 }
 
@@ -72,11 +78,14 @@ func (p *inProcessPlugin) Emit(ctx context.Context, in *v1.Event, opts ...grpc.C
 	return p.server.Emit(ctx, in)
 }
 
+func (p *inProcessPlugin) Close() error { return nil }
+
 type externalProcessPlugin struct {
 	path string
 	cmd  *exec.Cmd
 	mux  sync.Mutex
 	cli  v1.PluginClient
+	conn *grpc.ClientConn
 }
 
 func newExternalProcess(ctx context.Context, path string) (*externalProcessPlugin, error) {
@@ -132,8 +141,30 @@ func (p *externalProcessPlugin) Emit(ctx context.Context, in *v1.Event, opts ...
 	return p.cli.Emit(ctx, in)
 }
 
+func (p *externalProcessPlugin) Close() error {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+	errs := make([]error, 0, 2)
+	if p.conn != nil {
+		if err := p.conn.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if p.cmd != nil && p.cmd.ProcessState == nil {
+		if err := p.cmd.Process.Kill(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("close: %v", errs)
+	}
+	return nil
+}
+
 // checkProcess checks if the process is running and restarts it if it is not.
 func (p *externalProcessPlugin) checkProcess(ctx context.Context) error {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 	if p.cmd.ProcessState != nil {
 		_, ok := ctx.Deadline()
 		if !ok {
@@ -148,8 +179,6 @@ func (p *externalProcessPlugin) checkProcess(ctx context.Context) error {
 
 // start starts the plugin server.
 func (p *externalProcessPlugin) start(ctx context.Context) error {
-	p.mux.Lock()
-	defer p.mux.Unlock()
 	r, w, err := os.Pipe()
 	if err != nil {
 		return fmt.Errorf("create pipe: %w", err)
@@ -173,15 +202,18 @@ func (p *externalProcessPlugin) start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("read address: %w", err)
 	}
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	p.conn, err = grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
-	p.cli = v1.NewPluginClient(conn)
+	p.cli = v1.NewPluginClient(p.conn)
 	return nil
 }
 
-type externalServerPlugin struct{ v1.PluginClient }
+type externalServerPlugin struct {
+	v1.PluginClient
+	conn *grpc.ClientConn
+}
 
 func newExternalServer(ctx context.Context, addr string) (*externalServerPlugin, error) {
 	// TODO: support TLS
@@ -189,5 +221,9 @@ func newExternalServer(ctx context.Context, addr string) (*externalServerPlugin,
 	if err != nil {
 		return nil, fmt.Errorf("dial: %w", err)
 	}
-	return &externalServerPlugin{v1.NewPluginClient(c)}, nil
+	return &externalServerPlugin{v1.NewPluginClient(c), c}, nil
+}
+
+func (p *externalServerPlugin) Close() error {
+	return p.conn.Close()
 }
