@@ -31,7 +31,9 @@ import (
 
 //go:generate bash -xc "cd app; yarn ; yarn build"
 
-//go:embed app/dist/spa/*
+// nolint:typecheck
+//
+//go:embed app/dist/spa
 var staticFiles embed.FS
 
 // Options contains the options for the dashboard service.
