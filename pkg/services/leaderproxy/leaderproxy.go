@@ -222,7 +222,11 @@ func (i *Interceptor) newLeaderConn(ctx context.Context) (*grpc.ClientConn, erro
 }
 
 func proxyStream[S, R any](ctx context.Context, ss grpc.ServerStream, cs grpc.ClientStream) error {
-	defer cs.CloseSend()
+	defer func() {
+		if err := cs.CloseSend(); err != nil {
+			context.LoggerFrom(ctx).Error("error closing client stream", slog.String("error", err.Error()))
+		}
+	}()
 	go func() {
 		for {
 			var msg R
