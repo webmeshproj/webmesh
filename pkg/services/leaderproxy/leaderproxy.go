@@ -18,14 +18,10 @@ limitations under the License.
 package leaderproxy
 
 import (
-	"crypto/tls"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -35,23 +31,15 @@ import (
 )
 
 type Interceptor struct {
-	store     store.Store
-	tlsConfig *tls.Config
-	dialOpts  []grpc.DialOption
+	store    store.Store
+	dialOpts []grpc.DialOption
 }
 
 // New returns a new leader proxy interceptor.
-func New(store store.Store, tlsConfig *tls.Config) *Interceptor {
-	var creds credentials.TransportCredentials
-	if tlsConfig == nil {
-		creds = insecure.NewCredentials()
-	} else {
-		creds = credentials.NewTLS(tlsConfig)
-	}
+func New(store store.Store, dialOpts []grpc.DialOption) *Interceptor {
 	return &Interceptor{
-		store:     store,
-		tlsConfig: tlsConfig,
-		dialOpts:  []grpc.DialOption{grpc.WithTransportCredentials(creds)},
+		store:    store,
+		dialOpts: dialOpts,
 	}
 }
 

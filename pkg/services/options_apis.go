@@ -52,12 +52,8 @@ type APIOptions struct {
 	WebRTC bool `json:"webrtc,omitempty" yaml:"webrtc,omitempty" toml:"webrtc,omitempty"`
 	// STUNServers is a comma separated list of STUN servers to use if the WebRTC API is enabled.
 	STUNServers string `json:"stun-servers,omitempty" yaml:"stun-servers,omitempty" toml:"stun-servers,omitempty"`
-	// ProxyTLSCertFile is the path to the TLS certificate file for the proxy transport. If left unset,
-	// the server certificate will be used.
-	ProxyTLSCertFile string `json:"proxy-tls-cert-file,omitempty" yaml:"proxy-tls-cert-file,omitempty" toml:"proxy-tls-cert-file,omitempty"`
-	// ProxyTLSKeyFile is the path to the TLS key file for the proxy transport. If left unset,
-	// the server key will be used.
-	ProxyTLSKeyFile string `json:"proxy-tls-key-file,omitempty" yaml:"proxy-tls-key-file,omitempty" toml:"proxy-tls-key-file,omitempty"`
+	// ProxyAuth are options for authenticating the proxy transport.
+	ProxyAuth *ProxyAuth `json:"proxy-auth,omitempty" yaml:"proxy-auth,omitempty" toml:"proxy-auth,omitempty"`
 	// ProxyTLSCAFile is the path to the TLS CA file for verifying a peer node's certificate.
 	ProxyTLSCAFile string `json:"proxy-tls-ca-file,omitempty" yaml:"proxy-tls-ca-file,omitempty" toml:"proxy-tls-ca-file,omitempty"`
 	// ProxyVerifyChainOnly is true if only the chain should be verified when proxying connections.
@@ -66,6 +62,40 @@ type APIOptions struct {
 	ProxyInsecureSkipVerify bool `json:"proxy-insecure-skip-verify,omitempty" yaml:"proxy-insecure-skip-verify,omitempty" toml:"proxy-insecure-skip-verify,omitempty"`
 	// ProxyInsecure is true if the proxy transport is insecure.
 	ProxyInsecure bool `json:"proxy-insecure,omitempty" yaml:"proxy-insecure,omitempty" toml:"proxy-insecure,omitempty"`
+}
+
+// ProxyAuth are options for authenticating the proxy transport.
+type ProxyAuth struct {
+	// Basic are options for basic authentication.
+	Basic *BasicAuthOptions `json:"basic,omitempty" yaml:"basic,omitempty" toml:"basic,omitempty"`
+	// MTLS are options for mutual TLS.
+	MTLS *MTLSOptions `json:"mtls,omitempty" yaml:"mtls,omitempty" toml:"mtls,omitempty"`
+	// LDAP are options for LDAP authentication.
+	LDAP *LDAPAuthOptions `json:"ldap,omitempty" yaml:"ldap,omitempty" toml:"ldap,omitempty"`
+}
+
+// MTLSOptions are options for mutual TLS.
+type MTLSOptions struct {
+	// TLSCertFile is the path to a TLS certificate file to present when joining.
+	CertFile string `yaml:"cert-file,omitempty" json:"cert-file,omitempty" toml:"cert-file,omitempty"`
+	// TLSKeyFile is the path to a TLS key file for the certificate.
+	KeyFile string `yaml:"key-file,omitempty" json:"key-file,omitempty" toml:"tls-file,omitempty"`
+}
+
+// BasicAuthOptions are options for basic authentication.
+type BasicAuthOptions struct {
+	// Username is the username.
+	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty"`
+	// Password is the password.
+	Password string `json:"password,omitempty" yaml:"password,omitempty" toml:"password,omitempty"`
+}
+
+// LDAPAuthOptions are options for LDAP authentication.
+type LDAPAuthOptions struct {
+	// Username is the username.
+	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty"`
+	// Password is the password.
+	Password string `json:"password,omitempty" yaml:"password,omitempty" toml:"password,omitempty"`
 }
 
 // NewAPIOptions creates a new APIOptions with default values.
@@ -89,10 +119,6 @@ func (o *APIOptions) BindFlags(fs *flag.FlagSet) {
 		"Enable the WebRTC API.")
 	fs.StringVar(&o.STUNServers, "services.api.stun-servers", util.GetEnvDefault(WebRTCSTUNServersEnvVar, "stun:stun.l.google.com:19302"),
 		"STUN servers to use.")
-	fs.StringVar(&o.ProxyTLSCertFile, "services.api.proxy-tls-cert-file", util.GetEnvDefault(ProxyTLSCertFileEnvVar, ""),
-		"Path to the TLS certificate file for proxying.")
-	fs.StringVar(&o.ProxyTLSKeyFile, "services.api.proxy-tls-key-file", util.GetEnvDefault(ProxyTLSKeyFileEnvVar, ""),
-		"Path to the TLS key file for proxying.")
 	fs.StringVar(&o.ProxyTLSCAFile, "services.api.proxy-tls-ca-file", util.GetEnvDefault(ProxyTLSCAFileEnvVar, ""),
 		"Path to the TLS CA file for verifying the peer certificates.")
 	fs.BoolVar(&o.ProxyVerifyChainOnly, "services.api.proxy-verify-chain-only", util.GetEnvDefault(ProxyVerifyChainOnlyEnvVar, "false") == "true",
@@ -101,6 +127,56 @@ func (o *APIOptions) BindFlags(fs *flag.FlagSet) {
 		"Skip TLS verification when proxying connections.")
 	fs.BoolVar(&o.ProxyInsecure, "services.api.proxy-insecure", util.GetEnvDefault(ProxyInsecureEnvVar, "false") == "true",
 		"Don't use TLS for the leader proxy.")
+	fs.Func("services.api.proxy-auth.mtls.cert-file", "Path to a TLS certificate file to present when joining.", func(s string) error {
+		if o.ProxyAuth == nil {
+			o.ProxyAuth = &ProxyAuth{}
+		}
+		if o.ProxyAuth.MTLS == nil {
+			o.ProxyAuth.MTLS = &MTLSOptions{}
+		}
+		o.ProxyAuth.MTLS.CertFile = s
+		return nil
+	})
+	fs.Func("services.api.proxy-auth.mtls.key-file", "Path to a TLS key file for the certificate.", func(s string) error {
+		if o.ProxyAuth == nil {
+			o.ProxyAuth = &ProxyAuth{}
+		}
+		if o.ProxyAuth.MTLS == nil {
+			o.ProxyAuth.MTLS = &MTLSOptions{}
+		}
+		o.ProxyAuth.MTLS.KeyFile = s
+		return nil
+	})
+	fs.Func("services.api.proxy-auth.basic.username", "Username for basic authentication.", func(s string) error {
+		if o.ProxyAuth == nil {
+			o.ProxyAuth = &ProxyAuth{}
+		}
+		if o.ProxyAuth.Basic == nil {
+			o.ProxyAuth.Basic = &BasicAuthOptions{}
+		}
+		o.ProxyAuth.Basic.Username = s
+		return nil
+	})
+	fs.Func("services.api.proxy-auth.basic.password", "Password for basic authentication.", func(s string) error {
+		if o.ProxyAuth == nil {
+			o.ProxyAuth = &ProxyAuth{}
+		}
+		if o.ProxyAuth.Basic == nil {
+			o.ProxyAuth.Basic = &BasicAuthOptions{}
+		}
+		o.ProxyAuth.Basic.Password = s
+		return nil
+	})
+	fs.Func("services.api.proxy-auth.ldap.username", "Username for LDAP authentication.", func(s string) error {
+		if o.ProxyAuth == nil {
+			o.ProxyAuth = &ProxyAuth{}
+		}
+		if o.ProxyAuth.LDAP == nil {
+			o.ProxyAuth.LDAP = &LDAPAuthOptions{}
+		}
+		o.ProxyAuth.LDAP.Username = s
+		return nil
+	})
 }
 
 // Validate validates the options.

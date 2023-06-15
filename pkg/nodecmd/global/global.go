@@ -282,11 +282,19 @@ func (o *Options) Overlay(opts ...any) error {
 			if v.TLSKeyFile == "" {
 				v.TLSKeyFile = o.TLSKeyFile
 			}
-			if v.API.ProxyTLSCertFile == "" {
-				v.API.ProxyTLSCertFile = o.TLSCertFile
-			}
-			if v.API.ProxyTLSKeyFile == "" {
-				v.API.ProxyTLSKeyFile = o.TLSKeyFile
+			if o.TLSCertFile != "" && o.TLSKeyFile != "" {
+				if v.API.ProxyAuth == nil {
+					v.API.ProxyAuth = &services.ProxyAuth{}
+				}
+				if v.API.ProxyAuth.MTLS == nil {
+					v.API.ProxyAuth.MTLS = &services.MTLSOptions{}
+				}
+				if v.API.ProxyAuth.MTLS.CertFile == "" {
+					v.API.ProxyAuth.MTLS.CertFile = o.TLSCertFile
+				}
+				if v.API.ProxyAuth.MTLS.KeyFile == "" {
+					v.API.ProxyAuth.MTLS.KeyFile = o.TLSKeyFile
+				}
 			}
 			if v.API.ProxyTLSCAFile == "" {
 				v.API.ProxyTLSCAFile = o.TLSCAFile

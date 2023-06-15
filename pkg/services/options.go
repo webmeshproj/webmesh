@@ -35,6 +35,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/plugins/basicauth"
+	"github.com/webmeshproj/node/pkg/plugins/ldap"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/util"
@@ -182,20 +184,34 @@ func (o *Options) ServerOptions(store store.Store, log *slog.Logger) ([]grpc.Ser
 		unarymiddlewares = append(unarymiddlewares, store.Plugins().AuthUnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, store.Plugins().AuthStreamInterceptor())
 	}
-	var leaderProxyTLS *tls.Config
+	proxyTLS, err := o.ProxyTLSConfig()
+	if err != nil {
+		return nil, nil, err
+	}
 	if o.API.LeaderProxy {
 		log.Debug("registering leader proxy interceptors")
-		leaderProxyTLS, err := o.ProxyTLSConfig()
-		if err != nil {
-			return nil, nil, err
+		var creds []grpc.DialOption
+		if proxyTLS != nil {
+			// MTLS included in the proxy TLS config.
+			creds = append(creds, grpc.WithTransportCredentials(credentials.NewTLS(proxyTLS)))
+		} else {
+			creds = append(creds, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		}
-		leaderProxy := leaderproxy.New(store, leaderProxyTLS)
+		if o.API.ProxyAuth != nil {
+			if o.API.ProxyAuth.Basic != nil {
+				creds = append(creds, basicauth.NewCreds(o.API.ProxyAuth.Basic.Username, o.API.ProxyAuth.Basic.Password))
+			}
+			if o.API.ProxyAuth.LDAP != nil {
+				creds = append(creds, ldap.NewCreds(o.API.ProxyAuth.LDAP.Username, o.API.ProxyAuth.LDAP.Password))
+			}
+		}
+		leaderProxy := leaderproxy.New(store, creds)
 		unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
 	}
 	opts = append(opts, grpc.ChainUnaryInterceptor(unarymiddlewares...))
 	opts = append(opts, grpc.ChainStreamInterceptor(streammiddlewares...))
-	return opts, leaderProxyTLS, nil
+	return opts, proxyTLS, nil
 }
 
 // TLSConfig returns the TLS configuration.
@@ -219,14 +235,8 @@ func (o *Options) ProxyTLSConfig() (*tls.Config, error) {
 		return nil, nil
 	}
 	var config tls.Config
-	if o.API.ProxyTLSCertFile != "" && o.API.ProxyTLSKeyFile != "" {
-		cert, err := tls.LoadX509KeyPair(o.API.ProxyTLSCertFile, o.API.ProxyTLSKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("load x509 key pair: %w", err)
-		}
-		config.Certificates = []tls.Certificate{cert}
-	} else if !o.Insecure {
-		cert, err := tls.LoadX509KeyPair(o.TLSCertFile, o.TLSKeyFile)
+	if o.API.ProxyAuth != nil && o.API.ProxyAuth.MTLS != nil {
+		cert, err := tls.LoadX509KeyPair(o.API.ProxyAuth.MTLS.CertFile, o.API.ProxyAuth.MTLS.KeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("load x509 key pair: %w", err)
 		}
