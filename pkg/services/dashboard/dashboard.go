@@ -15,9 +15,8 @@ limitations under the License.
 */
 
 // Package dashboard contains a service that serves a web dashboard.
+// nolint
 package dashboard
-
-// nolint: typecheck
 
 import (
 	"crypto/tls"
