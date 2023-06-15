@@ -20,9 +20,7 @@ package dashboard
 
 import (
 	"crypto/tls"
-	"embed"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"strings"
 
@@ -30,10 +28,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-//go:generate bash -xc "cd app; yarn ; yarn build"
+// //go:generate bash -xc "cd app; yarn ; yarn build"
 
-//go:embed app/dist/spa
-var staticFiles embed.FS
+// //go:embed app/dist/spa
+// var staticFiles embed.FS
 
 // Options contains the options for the dashboard service.
 type Options struct {
@@ -52,12 +50,12 @@ func NewServer(backend *grpc.Server, opts *Options) (*Server, error) {
 	mux := http.NewServeMux()
 	root := strings.TrimSuffix(opts.Prefix, "/")
 	apiRoot := fmt.Sprintf("%s/api/", root)
-	staticRoot, err := fs.Sub(staticFiles, "app/dist/spa")
-	if err != nil {
-		return nil, fmt.Errorf("get static subdirectory: %w", err)
-	}
+	// staticRoot, err := fs.Sub(staticFiles, "app/dist/spa")
+	// if err != nil {
+	// 	return nil, fmt.Errorf("get static subdirectory: %w", err)
+	// }
 	mux.Handle(apiRoot, http.StripPrefix(apiRoot, grpcweb.WrapServer(backend)))
-	mux.Handle(root+"/", http.FileServer(http.FS(staticRoot)))
+	// mux.Handle(root+"/", http.FileServer(http.FS(staticRoot)))
 	srvr := &http.Server{
 		Addr:    opts.ListenAddress,
 		Handler: mux,
