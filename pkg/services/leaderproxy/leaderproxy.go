@@ -18,6 +18,8 @@ limitations under the License.
 package leaderproxy
 
 import (
+	"io"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
@@ -199,7 +201,7 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 		if err != nil {
 			return err
 		}
-		return handler(srv, &proxyDataChannelStream{ServerStream: ss, leaderStream: stream})
+		return proxyStream[v1.StartDataChannelRequest, v1.DataChannelOffer](ctx, ss, stream)
 	default:
 		return status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}
@@ -219,15 +221,37 @@ func (i *Interceptor) newLeaderConn(ctx context.Context) (*grpc.ClientConn, erro
 	return conn, nil
 }
 
-type proxyDataChannelStream struct {
-	grpc.ServerStream
-	leaderStream v1.WebRTC_StartDataChannelClient
-}
-
-func (s *proxyDataChannelStream) Send(m *v1.StartDataChannelRequest) error {
-	return s.leaderStream.Send(m)
-}
-
-func (s *proxyDataChannelStream) Recv() (*v1.DataChannelOffer, error) {
-	return s.leaderStream.Recv()
+func proxyStream[S, R any](ctx context.Context, ss grpc.ServerStream, cs grpc.ClientStream) error {
+	defer cs.CloseSend()
+	go func() {
+		for {
+			var msg R
+			err := cs.RecvMsg(&msg)
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				context.LoggerFrom(ctx).Error("error receiving message from leader", slog.String("error", err.Error()))
+				return
+			}
+			if err := ss.SendMsg(msg); err != nil {
+				context.LoggerFrom(ctx).Error("error sending message to client", slog.String("error", err.Error()))
+				return
+			}
+		}
+	}()
+	for {
+		var msg S
+		if err := ss.RecvMsg(&msg); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			context.LoggerFrom(ctx).Error("error receiving message from client", slog.String("error", err.Error()))
+			return err
+		}
+		if err := cs.SendMsg(msg); err != nil {
+			context.LoggerFrom(ctx).Error("error sending message to leader", slog.String("error", err.Error()))
+			return err
+		}
+	}
 }
