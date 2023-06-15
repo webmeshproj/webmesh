@@ -97,10 +97,10 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	log.Debug("registering node server")
 	// Always register the node server
 	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), !store.Plugins().HasAuth()))
-	// Register the reflection service
-	reflection.Register(server.srv)
 	// Register the health service
-	healthpb.RegisterHealthServer(server.srv, server)
+	healthpb.RegisterHealthServer(server, server)
+	// Register the reflection service
+	reflection.Register(server)
 	return server, nil
 }
 
@@ -152,6 +152,11 @@ func (s *Server) ListenAndServe() error {
 // RegisterService implements grpc.RegistrarService.
 func (s *Server) RegisterService(desc *grpc.ServiceDesc, impl any) {
 	s.srv.RegisterService(desc, impl)
+}
+
+// GetServiceInfo implements reflection.ServiceInfoProvider.
+func (s *Server) GetServiceInfo() map[string]grpc.ServiceInfo {
+	return s.srv.GetServiceInfo()
 }
 
 // Stop stops the gRPC server gracefully.
