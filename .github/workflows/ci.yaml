@@ -62,7 +62,9 @@ jobs:
       - name: Cache Node Modules
         uses: actions/cache@v3
         with:
-          path: pkg/services/dashboard/app/node_modules
+          path: |
+            pkg/services/dashboard/app/.yarn/cache
+            pkg/services/dashboard/app/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('pkg/services/dashboard/app/yarn.lock') }}
 
       - name: Setup Go
