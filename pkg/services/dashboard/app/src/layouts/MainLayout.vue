@@ -49,17 +49,35 @@ import EssentialLink from 'components/EssentialLink.vue';
 
 const linksList = [
   {
+    title: 'Status',
+    caption: 'System status',
+    icon: 'area_chart',
+    link: '#',
+  },
+  {
     title: 'Nodes',
     caption: 'Devices connected to the network',
     icon: 'devices_other',
     link: '#/nodes',
-    target: ''
+  },
+  {
+    title: 'Network',
+    caption: 'Network topology',
+    icon: 'device_hub',
+    link: '#/network',
+  },
+  {
+    title: 'RBAC',
+    caption: 'Role-based access control',
+    icon: 'security',
+    link: '#/rbac',
   },
   {
     title: 'Github',
     caption: 'github.com/webmeshproj',
     icon: 'code',
-    link: 'https://github.com/webmeshproj'
+    link: 'https://github.com/webmeshproj',
+    target: '_blank'
   },
 ];
 

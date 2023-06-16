@@ -33,6 +33,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/services/admin"
+	"github.com/webmeshproj/node/pkg/services/dashboard"
 	"github.com/webmeshproj/node/pkg/services/meshapi"
 	"github.com/webmeshproj/node/pkg/services/meshdns"
 	"github.com/webmeshproj/node/pkg/services/node"
@@ -44,17 +45,21 @@ import (
 
 // Server is the gRPC server.
 type Server struct {
-	opts    *Options
-	srv     *grpc.Server
-	turn    *turn.Server
-	meshdns *meshdns.Server
-	store   store.Store
-	log     *slog.Logger
+	opts      *Options
+	srv       *grpc.Server
+	turn      *turn.Server
+	meshdns   *meshdns.Server
+	dashboard *dashboard.Server
+	store     store.Store
+	log       *slog.Logger
 }
 
 // NewServer returns a new Server.
 func NewServer(store store.Store, o *Options) (*Server, error) {
 	log := slog.Default().With("component", "server")
+	if err := o.Validate(); err != nil {
+		return nil, err
+	}
 	opts, proxyTLSConfig, err := o.ServerOptions(store, log)
 	if err != nil {
 		return nil, err
@@ -94,12 +99,21 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 			RequestTimeout: o.MeshDNS.RequestTimeout,
 		})
 	}
-	log.Debug("registering node server")
+	if o.Dashboard.Enabled {
+		log.Debug("registering dashboard handlers")
+		server.dashboard, err = dashboard.NewServer(server.srv, o.Dashboard)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// Always register the node server
+	log.Debug("registering node server")
 	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), !store.Plugins().HasAuth()))
 	// Register the health service
+	log.Debug("registering health service")
 	healthpb.RegisterHealthServer(server, server)
 	// Register the reflection service
+	log.Debug("registering reflection service")
 	reflection.Register(server)
 	return server, nil
 }
@@ -137,6 +151,13 @@ func (s *Server) ListenAndServe() error {
 			}
 		}()
 	}
+	if s.dashboard != nil {
+		go func() {
+			if err := s.dashboard.ListenAndServe(); err != nil {
+				s.log.Error("dashboard server failed", slog.String("error", err.Error()))
+			}
+		}()
+	}
 	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
 	lis, err := net.Listen("tcp", s.opts.ListenAddress)
 	if err != nil {
@@ -171,6 +192,12 @@ func (s *Server) Stop() {
 		s.log.Info("Shutting down meshdns server")
 		if err := s.meshdns.Shutdown(); err != nil {
 			s.log.Error("meshdns server shutdown failed", slog.String("error", err.Error()))
+		}
+	}
+	if s.dashboard != nil {
+		s.log.Info("Shutting down dashboard server")
+		if err := s.dashboard.Shutdown(context.Background()); err != nil {
+			s.log.Error("dashboard server shutdown failed", slog.String("error", err.Error()))
 		}
 	}
 	s.log.Info("Shutting down gRPC server")

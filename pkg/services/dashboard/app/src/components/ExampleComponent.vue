@@ -21,7 +21,10 @@ import {
   toRef,
   Ref,
 } from 'vue';
+import { Status } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/node_pb';
+
 import { Todo, Meta } from './models';
+import { useClientStore } from 'src/stores/client-store';
 
 function useClickCount() {
   const clickCount = ref(0);
@@ -58,6 +61,10 @@ export default defineComponent({
     }
   },
   setup (props) {
+    const client = useClientStore();
+    client.serverStatus.then((status: Status) => {
+      console.log(status.toObject());
+    });
     return { ...useClickCount(), ...useDisplayTodo(toRef(props, 'todos')) };
   },
 });

@@ -42,7 +42,7 @@ type MetricsOptions struct {
 func NewMetricsOptions() *MetricsOptions {
 	return &MetricsOptions{
 		Enabled:       false,
-		ListenAddress: ":8080",
+		ListenAddress: ":8000",
 		Path:          "/metrics",
 	}
 }
@@ -51,7 +51,7 @@ func NewMetricsOptions() *MetricsOptions {
 func (o *MetricsOptions) BindFlags(fs *flag.FlagSet) {
 	fs.BoolVar(&o.Enabled, "services.metrics.enabled", util.GetEnvDefault(MetricsEnabledEnvVar, "false") == "true",
 		"Enable gRPC metrics.")
-	fs.StringVar(&o.ListenAddress, "services.metrics.listen-address", util.GetEnvDefault(MetricsListenAddressEnvVar, ":8080"),
+	fs.StringVar(&o.ListenAddress, "services.metrics.listen-address", util.GetEnvDefault(MetricsListenAddressEnvVar, ":8000"),
 		"gRPC metrics listen address.")
 	fs.StringVar(&o.Path, "services.metrics.path", util.GetEnvDefault(MetricsPathEnvVar, "/metrics"),
 		"gRPC metrics path.")

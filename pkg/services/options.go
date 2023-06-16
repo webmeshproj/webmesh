@@ -37,6 +37,7 @@ import (
 	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/plugins/basicauth"
 	"github.com/webmeshproj/node/pkg/plugins/ldap"
+	"github.com/webmeshproj/node/pkg/services/dashboard"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
 	"github.com/webmeshproj/node/pkg/store"
 	"github.com/webmeshproj/node/pkg/util"
@@ -67,6 +68,8 @@ type Options struct {
 	TURN *TURNOptions `json:"turn,omitempty" yaml:"turn,omitempty" toml:"turn,omitempty"`
 	// Metrics options
 	Metrics *MetricsOptions `json:"metrics,omitempty" yaml:"metrics,omitempty" toml:"metrics,omitempty"`
+	// Dashboard options
+	Dashboard *dashboard.Options `json:"dashboard,omitempty" yaml:"dashboard,omitempty" toml:"dashboard,omitempty"`
 }
 
 // NewOptions returns new Options with sensible defaults.
@@ -77,6 +80,7 @@ func NewOptions() *Options {
 		MeshDNS:       NewMeshDNSOptions(),
 		TURN:          NewTURNOptions(),
 		Metrics:       NewMetricsOptions(),
+		Dashboard:     dashboard.NewOptions(),
 	}
 }
 
@@ -95,6 +99,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 	o.MeshDNS.BindFlags(fs)
 	o.TURN.BindFlags(fs)
 	o.Metrics.BindFlags(fs)
+	o.Dashboard.BindFlags(fs)
 }
 
 // Validate validates the options.
@@ -121,6 +126,9 @@ func (o *Options) Validate() error {
 	}
 	if o.Metrics == nil {
 		o.Metrics = NewMetricsOptions()
+	}
+	if o.Dashboard == nil {
+		o.Dashboard = dashboard.NewOptions()
 	}
 	if err := o.API.Validate(); err != nil {
 		return err

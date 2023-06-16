@@ -47,7 +47,7 @@ export default defineComponent({
 
     target: {
       type: String,
-      default: '_blank'
+      default: ''
     }
   }
 });
