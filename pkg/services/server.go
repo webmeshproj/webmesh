@@ -70,9 +70,10 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 		store: store,
 		log:   log,
 	}
+	insecureServices := !store.Plugins().HasAuth()
 	if o.API.Admin {
 		log.Debug("registering admin api")
-		v1.RegisterAdminServer(server, admin.New(store))
+		v1.RegisterAdminServer(server, admin.New(store, insecureServices))
 	}
 	if o.API.Mesh {
 		log.Debug("registering mesh api")
@@ -108,7 +109,7 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	}
 	// Always register the node server
 	log.Debug("registering node server")
-	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), !store.Plugins().HasAuth()))
+	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), insecureServices))
 	// Register the health service
 	log.Debug("registering health service")
 	healthpb.RegisterHealthServer(server, server)

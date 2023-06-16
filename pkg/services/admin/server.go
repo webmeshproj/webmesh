@@ -37,11 +37,15 @@ type Server struct {
 }
 
 // New creates a new admin server.
-func New(store meshdb.Store) *Server {
+func New(store meshdb.Store, insecure bool) *Server {
+	rbacEval := rbac.NewStoreEvaluator(store)
+	if insecure {
+		rbacEval = rbac.NewNoopEvaluator()
+	}
 	return &Server{
 		store:      store,
 		rbac:       rbacdb.New(store),
-		rbacEval:   rbac.NewStoreEvaluator(store),
+		rbacEval:   rbacEval,
 		networking: networking.New(store),
 	}
 }
