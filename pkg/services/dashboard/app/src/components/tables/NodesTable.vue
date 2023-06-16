@@ -13,13 +13,8 @@
             row-key="id"
             class="sticky-header-column-table"
         >
-            <!-- Search Bar -->
-            <template v-slot:top-right>
-                <q-input borderless dense debounce="300" v-model="filter" placeholder="Search">
-                    <template v-slot:append>
-                        <q-icon name="search" />
-                    </template>
-                </q-input>
+            <template v-slot:top>
+                <TableHeader :refresh="refresh" :filterRef="filter" title="Mesh Nodes" />
             </template>
 
             <!-- Cluster Status Cell -->
@@ -42,7 +37,7 @@
                             :icon="props.row.expand ? 'remove' : 'add'"
                         />
                     </q-td>
-                    <q-td key="id" :props="props">
+                    <q-td key="id" :props="props" auto-width>
                         {{ props.row.getId() }}
                     </q-td>
                     <q-td key="status" :props="props">
@@ -109,6 +104,7 @@ import { Timestamp } from 'google-protobuf/google/protobuf/timestamp_pb';
 import { NodeList, MeshNode } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/mesh_pb';
 
 import { useClientStore } from 'stores/client-store';
+import TableHeader from 'components/tables/TableHeader.vue';
 import ClusterStatus from 'components/ClusterStatus.vue';
 
 function copyToClipboard(val: string): Promise<void> {
@@ -125,6 +121,7 @@ const columns = [
     },
     {
         name: 'id', required: true, label: 'ID', sortable: true, align: 'left',
+        field: (row: MeshNode) => row.getId()
     },
     { 
         name: 'status', label: 'Status', align: 'left',
@@ -160,19 +157,30 @@ async function listNodes(): Promise<MeshNode[]> {
     });
 }
 
-function useNodeList(): { loading: Ref<boolean>, nodes: Ref<MeshNode[]> } {
+function useNodeList(): { 
+    loading: Ref<boolean>, 
+    nodes: Ref<MeshNode[]>, 
+    refresh: () => void 
+} {
     const nodes = ref<MeshNode[]>([]);
     const loading = ref<boolean>(true);
     listNodes().then((n) => {
         nodes.value = n;
         loading.value = false;
     });
-    return { loading, nodes };
+    function refresh() {
+        loading.value = true;
+        listNodes().then((n) => {
+            nodes.value = n;
+            loading.value = false;
+        });
+    };
+    return { loading, nodes, refresh };
 }
 
 export default defineComponent({
     name: 'NodesTable',
-    components: { ClusterStatus },
+    components: { TableHeader, ClusterStatus },
     setup () {
         const filter = ref<string>('');
         return { formatTimestamp, copyToClipboard, columns, filter, ...useNodeList() };

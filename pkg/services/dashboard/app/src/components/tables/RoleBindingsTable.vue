@@ -11,7 +11,31 @@
             no-data-label="No role bindings defined in the mesh"
             :no-results-label="`No role bindings found matching filter: ${filter}`"
             row-key="name"
-        />
+        >
+            <template v-slot:top>
+                <TableHeader :refresh="refresh" :filterRef="filter" title="Role Bindings" />
+            </template>
+
+            <template v-slot:body="props">
+                <q-tr :props="props">
+                    <q-td key="name" :props="props" auto-width>
+                        {{ props.row.getName() }}
+                    </q-td>
+                    <q-td key="role" :props="props" auto-width>
+                        {{ props.row.getRole() }}
+                    </q-td>
+                    <q-td key="subjects" :props="props">
+                        <q-btn 
+                            size="sm" dense 
+                            @click="props.row.expand = !props.row.expand"
+                            :icon="props.row.expand ? 'remove' : 'add'"
+                        >
+                            {{ props.row.expand ? 'Collapse Subjects' : 'Expand Subjects' }}
+                        </q-btn>
+                    </q-td>
+                </q-tr>
+            </template>
+        </q-table>
     </div>
 </template>
   
@@ -19,8 +43,10 @@
 import { defineComponent, Ref, ref } from 'vue';
 
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
-import { RoleBindings, RoleBinding } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/rbac_pb';
+import { RoleBindings, RoleBinding, Subject } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/rbac_pb';
 import { useClientStore } from 'stores/client-store';
+
+import TableHeader from 'components/tables/TableHeader.vue';
 
 const columns = [
     { 
@@ -31,6 +57,10 @@ const columns = [
         name: 'role', label: 'Role', align: 'left',
         field: (row: RoleBinding) => row.getRole()
     },
+    {
+        name: 'subjects', label: 'Subjects', align: 'left',
+        field: (row: RoleBinding) => row.getSubjectsList().map((s) => s.getName()).join(', ')
+    }
 ];
 
 const clients = useClientStore();
@@ -47,21 +77,29 @@ async function listRoleBindings(): Promise<RoleBinding[]> {
     });
 }
 
-function useRoleBindingList(): { loading: Ref<boolean>, roleBindings: Ref<RoleBinding[]> } {
+function useRoleBindingList(): { loading: Ref<boolean>, roleBindings: Ref<RoleBinding[]>, refresh: () => void } {
     const roleBindings = ref<RoleBinding[]>([]);
     const loading = ref<boolean>(true);
     listRoleBindings().then((r) => {
         roleBindings.value = r;
         loading.value = false;
     });
-    return { loading, roleBindings };
+    function refresh() {
+        loading.value = true;
+        listRoleBindings().then((r) => {
+            roleBindings.value = r;
+            loading.value = false;
+        });
+    }
+    return { loading, roleBindings, refresh };
 }
 
 export default defineComponent({
     name: 'RoleBindingsTable',
+    components: { TableHeader },
     setup () {
         const filter = ref<string>('');
-        return { columns, filter, ...useRoleBindingList() };
+        return { Subject, columns, filter, ...useRoleBindingList() };
     }
 });
 </script>

@@ -51,6 +51,23 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 	if rbacdb.IsSystemRole(role.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot update system roles")
 	}
+	// Check if any rule has a wildcard and squash them down to a single wildcard rule.
+	for _, rule := range role.GetRules() {
+	Verbs:
+		for _, verb := range rule.GetVerbs() {
+			if verb == v1.RuleVerbs_VERB_ALL {
+				rule.Verbs = []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL}
+				break Verbs
+			}
+		}
+	Resources:
+		for _, resource := range rule.GetResources() {
+			if resource == v1.RuleResource_RESOURCE_ALL {
+				rule.Resources = []v1.RuleResource{v1.RuleResource_RESOURCE_ALL}
+				break Resources
+			}
+		}
+	}
 	err := s.rbac.PutRole(ctx, role)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
