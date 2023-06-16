@@ -37,7 +37,6 @@ import (
 )
 
 //go:generate bash -exc "cd app; yarn ; VERSION=`git describe --tags --always --dirty` yarn build"
-
 //go:embed app/dist/spa
 var staticFiles embed.FS
 
