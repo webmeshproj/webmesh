@@ -1,7 +1,11 @@
 <template>
-    <q-page class="row items-center justify-evenly">
-      <RolesTable />
-      <RoleBindingsTable />
+    <q-page>
+      <div class="full-width">
+        <RolesTable />
+      </div>
+      <div class="full-width">
+        <RoleBindingsTable />
+      </div>
     </q-page>
   </template>
   

@@ -2,8 +2,14 @@
     <div class="q-pa-md">
         <q-table
             title="Role Bindings"
+            :loading="loading"
             :rows="roleBindings"
             :columns="columns"
+            :filter="filter"
+            :dense="$q.screen.lt.md"
+            :grid="$q.screen.xs"
+            no-data-label="No role bindings defined in the mesh"
+            :no-results-label="`No role bindings found matching filter: ${filter}`"
             row-key="name"
         />
     </div>
@@ -41,18 +47,21 @@ async function listRoleBindings(): Promise<RoleBinding[]> {
     });
 }
 
-function useRoleBindingList(): { roleBindings: Ref<RoleBinding[]> } {
+function useRoleBindingList(): { loading: Ref<boolean>, roleBindings: Ref<RoleBinding[]> } {
     const roleBindings = ref<RoleBinding[]>([]);
+    const loading = ref<boolean>(true);
     listRoleBindings().then((r) => {
         roleBindings.value = r;
+        loading.value = false;
     });
-    return { roleBindings };
+    return { loading, roleBindings };
 }
 
 export default defineComponent({
     name: 'RoleBindingsTable',
     setup () {
-        return { columns, ...useRoleBindingList() };
+        const filter = ref<string>('');
+        return { columns, filter, ...useRoleBindingList() };
     }
 });
 </script>

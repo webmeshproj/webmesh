@@ -2,8 +2,14 @@
     <div class="q-pa-md">
         <q-table
             title="Roles"
+            :loading="loading"
             :rows="roles"
             :columns="columns"
+            :filter="filter"
+            :dense="$q.screen.lt.md"
+            :grid="$q.screen.xs"
+            no-data-label="No roles defined in the mesh"
+            :no-results-label="`No roles found matching filter: ${filter}`"
             row-key="name"
         />
     </div>
@@ -23,7 +29,7 @@ const columns = [
     },
     { 
         name: 'rules', label: 'Rules', align: 'left',
-        field: (row: Role) => row.getRulesList()
+        field: (row: Role) => row.getRulesList().toString()
     },
 ];
 
@@ -41,18 +47,21 @@ async function listRoles(): Promise<Role[]> {
     });
 }
 
-function useRoleList(): { roles: Ref<Role[]> } {
+function useRoleList(): { loading: Ref<boolean>, roles: Ref<Role[]> } {
     const roles = ref<Role[]>([]);
+    const loading = ref<boolean>(true);
     listRoles().then((r) => {
         roles.value = r;
+        loading.value = false;
     });
-    return { roles };
+    return { loading, roles };
 }
 
 export default defineComponent({
     name: 'RolesTable',
     setup () {
-        return { columns, ...useRoleList() };
+        const filter = ref<string>('');
+        return { columns, filter, ...useRoleList() };
     }
 });
 </script>

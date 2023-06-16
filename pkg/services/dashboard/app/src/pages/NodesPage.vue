@@ -1,6 +1,8 @@
 <template>
-    <q-page class="row items-center justify-evenly">
-      <NodesTable />
+    <q-page class="row">
+      <div class="full-width">
+        <NodesTable />
+      </div>
     </q-page>
   </template>
   
