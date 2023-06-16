@@ -18,13 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/context"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -44,9 +43,10 @@ func (s *Server) DeleteRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*em
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteRoleBindingAction.For(rb.GetName())); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate delete rolebinding action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete rolebindings")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if rbacdb.IsSystemRoleBinding(rb.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system rolebindings")

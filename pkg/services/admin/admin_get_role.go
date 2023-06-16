@@ -18,12 +18,11 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/node/pkg/context"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -40,9 +39,10 @@ func (s *Server) GetRole(ctx context.Context, role *v1.Role) (*v1.Role, error) {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, getRoleAction.For(role.GetName())); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate get role action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get roles")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	role, err := s.rbac.GetRole(ctx, role.GetName())
 	if err != nil {

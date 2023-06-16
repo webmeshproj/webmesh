@@ -18,12 +18,11 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -40,9 +39,10 @@ func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, erro
 		return nil, status.Error(codes.InvalidArgument, "route name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, getRouteAction.For(route.GetName())); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate get route action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network routes")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	route, err := s.networking.GetRoute(ctx, route.GetName())
 	if err != nil {

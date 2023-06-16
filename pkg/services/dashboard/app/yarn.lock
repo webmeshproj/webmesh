@@ -396,6 +396,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/google-protobuf@npm:^3.15.6":
+  version: 3.15.6
+  resolution: "@types/google-protobuf@npm:3.15.6"
+  checksum: e8f7cd9d263093cd0a72eb10ff0bb8221e28aa8b9f601eddbe19b286932aae96fbc9ccb1f3a744525e7811fa87a6aeefd431858b6e2034f14a2dc68710a86d54
+  languageName: node
+  linkType: hard
+
 "@types/har-format@npm:*":
   version: 1.2.11
   resolution: "@types/har-format@npm:1.2.11"
@@ -4810,6 +4817,7 @@ __metadata:
     "@buf/tinyzimmer_webmesh-api.grpc_web": latest
     "@quasar/app-vite": ^1.0.0
     "@quasar/extras": ^1.0.0
+    "@types/google-protobuf": ^3.15.6
     "@types/node": ^12.20.21
     "@typescript-eslint/eslint-plugin": ^5.10.0
     "@typescript-eslint/parser": ^5.10.0

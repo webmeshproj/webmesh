@@ -18,13 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -44,9 +43,10 @@ func (s *Server) DeleteNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emp
 		return nil, status.Error(codes.InvalidArgument, "acl name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteNetworkACLAction.For(acl.GetName())); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate delete network acl action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete network acls")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if networking.IsSystemNetworkACL(acl.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system network acls")

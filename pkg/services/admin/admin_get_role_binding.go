@@ -18,12 +18,11 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/node/pkg/context"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -40,9 +39,10 @@ func (s *Server) GetRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*v1.Ro
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, getRoleBindingAction.For(rb.GetName())); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate get rolebinding action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get rolebindings")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	rb, err := s.rbac.GetRoleBinding(ctx, rb.GetName())
 	if err != nil {

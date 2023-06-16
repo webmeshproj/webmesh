@@ -18,12 +18,11 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/node/pkg/context"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -40,9 +39,10 @@ func (s *Server) GetGroup(ctx context.Context, group *v1.Group) (*v1.Group, erro
 		return nil, status.Error(codes.InvalidArgument, "group name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, getGroupAction.For(group.GetName())); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate get group action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	group, err := s.rbac.GetGroup(ctx, group.GetName())
 	if err != nil {

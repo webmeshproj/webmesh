@@ -18,12 +18,11 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -40,9 +39,10 @@ func (s *Server) GetNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*v1.Net
 		return nil, status.Error(codes.InvalidArgument, "acl name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, getNetworkACLAction.For(acl.GetName())); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate get network acl action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network acls")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	out, err := s.networking.GetNetworkACL(ctx, acl.GetName())
 	if err != nil {

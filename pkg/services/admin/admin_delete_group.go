@@ -18,13 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -43,9 +42,10 @@ func (s *Server) DeleteGroup(ctx context.Context, group *v1.Group) (*emptypb.Emp
 		return nil, status.Error(codes.InvalidArgument, "group name is required")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, deleteGroupAction.For(group.GetName())); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate delete group action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete groups")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	err := s.rbac.DeleteGroup(ctx, group.GetName())
 	if err != nil {

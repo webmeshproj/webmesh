@@ -18,13 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"context"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -37,9 +36,10 @@ var listRoutesAction = rbac.Actions{
 
 func (s *Server) ListRoutes(ctx context.Context, _ *emptypb.Empty) (*v1.Routes, error) {
 	if ok, err := s.rbacEval.Evaluate(ctx, listRoutesAction); !ok {
+		if err != nil {
+			context.LoggerFrom(ctx).Error("failed to evaluate list routes action", "error", err)
+		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network routes")
-	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 	routes, err := s.networking.ListRoutes(ctx)
 	if err != nil {
