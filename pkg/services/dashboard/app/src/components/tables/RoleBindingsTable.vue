@@ -34,6 +34,11 @@
                         </q-btn>
                     </q-td>
                 </q-tr>
+                <q-tr v-show="props.row.expand">
+                    <q-td colspan="100%">
+                        <SubjectsTabs :subjects="props.row.getSubjectsList()" />
+                    </q-td>
+                </q-tr>
             </template>
         </q-table>
     </div>
@@ -41,12 +46,14 @@
   
 <script lang="ts">
 import { defineComponent, Ref, ref } from 'vue';
-
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
-import { RoleBindings, RoleBinding, Subject } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/rbac_pb';
-import { useClientStore } from 'stores/client-store';
+import { RoleBindings, RoleBinding } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/rbac_pb';
 
+import { useClientStore } from 'stores/client-store';
 import TableHeader from 'components/tables/TableHeader.vue';
+import SubjectsTabs from 'components/tables/SubjectsTabs.vue';
+
+const clients = useClientStore();
 
 const columns = [
     { 
@@ -59,11 +66,8 @@ const columns = [
     },
     {
         name: 'subjects', label: 'Subjects', align: 'left',
-        field: (row: RoleBinding) => row.getSubjectsList().map((s) => s.getName()).join(', ')
     }
 ];
-
-const clients = useClientStore();
 
 async function listRoleBindings(): Promise<RoleBinding[]> {
     return new Promise((resolve, reject) => {
@@ -77,7 +81,11 @@ async function listRoleBindings(): Promise<RoleBinding[]> {
     });
 }
 
-function useRoleBindingList(): { loading: Ref<boolean>, roleBindings: Ref<RoleBinding[]>, refresh: () => void } {
+function useRoleBindingList(): {
+    loading: Ref<boolean>,
+    roleBindings: Ref<RoleBinding[]>,
+    refresh: () => void
+} {
     const roleBindings = ref<RoleBinding[]>([]);
     const loading = ref<boolean>(true);
     listRoleBindings().then((r) => {
@@ -96,10 +104,10 @@ function useRoleBindingList(): { loading: Ref<boolean>, roleBindings: Ref<RoleBi
 
 export default defineComponent({
     name: 'RoleBindingsTable',
-    components: { TableHeader },
+    components: { TableHeader, SubjectsTabs },
     setup () {
         const filter = ref<string>('');
-        return { Subject, columns, filter, ...useRoleBindingList() };
+        return { columns, filter, ...useRoleBindingList() };
     }
 });
 </script>

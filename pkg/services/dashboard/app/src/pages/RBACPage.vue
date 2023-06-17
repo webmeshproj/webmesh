@@ -1,26 +1,30 @@
 <template>
-    <q-page>
+  <q-page>
       <div class="full-width">
-        <RolesTable />
+          <RolesTable />
       </div>
       <div class="full-width">
-        <RoleBindingsTable />
+          <RoleBindingsTable />
       </div>
-    </q-page>
-  </template>
+      <div class="full-width">
+          <GroupsTable />
+      </div>
+  </q-page>
+</template>
   
-  <script lang="ts">
-  import { defineComponent } from 'vue';
-  
-  import RolesTable from 'components/tables/RolesTable.vue';
-  import RoleBindingsTable from 'components/tables/RoleBindingsTable.vue';
+<script lang="ts">
+import { defineComponent } from 'vue';
 
-  export default defineComponent({
-    name: 'RBACPage',
-    components: { RolesTable, RoleBindingsTable },
-    setup () {
-      return { };
-    }
-  });
-  </script>
+import RolesTable from 'components/tables/RolesTable.vue';
+import RoleBindingsTable from 'components/tables/RoleBindingsTable.vue';
+import GroupsTable from 'components/tables/GroupsTable.vue';
+
+export default defineComponent({
+  name: 'RBACPage',
+  components: { RolesTable, RoleBindingsTable, GroupsTable },
+  setup () {
+    return { };
+  }
+});
+</script>
   
