@@ -23,7 +23,6 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -58,6 +57,8 @@ type Interface interface {
 
 // Options are options for configuring the wireguard interface.
 type Options struct {
+	// NodeID is the ID of the node. This is only used for metrics.
+	NodeID string
 	// ListenPort is the port to listen on.
 	ListenPort int
 	// Name is the name of the interface.
@@ -84,21 +85,21 @@ type Options struct {
 	NetworkV6 netip.Prefix
 	// IsPublic is true if this interface is public.
 	IsPublic bool
+	// Metrics is true if prometheus metrics should be enabled.
+	Metrics bool
+	// MetricsInterval is the interval at which to update metrics.
+	// Defaults to 30 seconds.
+	MetricsInterval time.Duration
 }
 
 type wginterface struct {
 	system.Interface
-	opts *Options
-	cli  *wgctrl.Client
-	log  *slog.Logger
-	// A map of peer ID's to public keys.
-	peers    map[string]wgtypes.Key
-	peersMux sync.Mutex
-}
-
-func isInterfaceNotExists(err error) bool {
-	_, ok := err.(net.UnknownNetworkError)
-	return ok || strings.Contains(err.Error(), "no such network interface")
+	opts           *Options
+	cli            *wgctrl.Client
+	log            *slog.Logger
+	peers          map[string]wgtypes.Key
+	peersMux       sync.Mutex
+	recorderCancel context.CancelFunc
 }
 
 // New creates a new wireguard interface.
@@ -108,7 +109,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		log.Info("forcing wireguard interface name", "name", opts.Name)
 		iface, err := net.InterfaceByName(opts.Name)
 		if err != nil {
-			if !isInterfaceNotExists(err) {
+			if !system.IsInterfaceNotExists(err) {
 				return nil, fmt.Errorf("failed to get interface: %w", err)
 			}
 		} else if iface != nil {
@@ -137,17 +138,33 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	handleErr := func(err error) error {
+		if err := iface.Destroy(ctx); err != nil {
+			log.Warn("failed to destroy interface", "error", err)
+		}
+		return err
+	}
 	cli, err := wgctrl.New()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create wireguard control client: %w", err)
+		return nil, handleErr(fmt.Errorf("failed to create wireguard control client: %w", err))
 	}
-	return &wginterface{
+	wg := &wginterface{
 		Interface: iface,
 		opts:      opts,
 		cli:       cli,
 		peers:     make(map[string]wgtypes.Key),
 		log:       log,
-	}, nil
+	}
+	if opts.Metrics {
+		recorder, err := NewMetricsRecorder(wg)
+		if err != nil {
+			return nil, handleErr(fmt.Errorf("failed to create metrics recorder: %w", err))
+		}
+		rctx, cancel := context.WithCancel(context.Background())
+		wg.recorderCancel = cancel
+		go recorder.Run(rctx, opts.MetricsInterval)
+	}
+	return wg, nil
 }
 
 // IsPublic returns true if the wireguard interface is publicly accessible.
@@ -168,6 +185,9 @@ func (w *wginterface) Peers() []string {
 
 // Close closes the wireguard interface.
 func (w *wginterface) Close(ctx context.Context) error {
+	if w.recorderCancel != nil {
+		w.recorderCancel()
+	}
 	w.cli.Close()
 	return w.Interface.Destroy(ctx)
 }
@@ -178,7 +198,6 @@ func (w *wginterface) Configure(ctx context.Context, key wgtypes.Key, listenPort
 		PrivateKey:   &key,
 		ListenPort:   &listenPort,
 		ReplacePeers: false,
-		Peers:        nil,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to configure wireguard interface: %w", err)

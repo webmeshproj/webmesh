@@ -29,18 +29,20 @@ import (
 )
 
 const (
-	WireguardListenPortEnvVar          = "WIREGUARD_LISTEN_PORT"
-	WireguardNameEnvVar                = "WIREGUARD_INTERFACE_NAME"
-	WireguardForceNameEnvVar           = "WIREGUARD_FORCE_INTERFACE_NAME"
-	WireguardForceTUNEnvVar            = "WIREGUARD_FORCE_TUN"
-	WireguardModprobeEnvVar            = "WIREGUARD_MODPROBE"
-	WireguardMasqueradeEnvVar          = "WIREGUARD_MASQUERADE"
-	WireguardAllowedIPsEnvVar          = "WIREGUARD_ALLOWED_IPS"
-	WireguardPersistentKeepaliveEnvVar = "WIREGUARD_PERSISTENT_KEEPALIVE"
-	WireguardMTUEnvVar                 = "WIREGUARD_MTU"
-	WireGuardEndpointsEnvVar           = "WIREGUARD_ENDPOINTS"
-	WireGuardKeyFileEnvVar             = "WIREGUARD_KEY_FILE"
-	WireGuardKeyRotationIntervalEnvVar = "WIREGUARD_KEY_ROTATION_INTERVAL"
+	WireguardListenPortEnvVar             = "WIREGUARD_LISTEN_PORT"
+	WireguardNameEnvVar                   = "WIREGUARD_INTERFACE_NAME"
+	WireguardForceNameEnvVar              = "WIREGUARD_FORCE_INTERFACE_NAME"
+	WireguardForceTUNEnvVar               = "WIREGUARD_FORCE_TUN"
+	WireguardModprobeEnvVar               = "WIREGUARD_MODPROBE"
+	WireguardMasqueradeEnvVar             = "WIREGUARD_MASQUERADE"
+	WireguardAllowedIPsEnvVar             = "WIREGUARD_ALLOWED_IPS"
+	WireguardPersistentKeepaliveEnvVar    = "WIREGUARD_PERSISTENT_KEEPALIVE"
+	WireguardMTUEnvVar                    = "WIREGUARD_MTU"
+	WireGuardEndpointsEnvVar              = "WIREGUARD_ENDPOINTS"
+	WireGuardKeyFileEnvVar                = "WIREGUARD_KEY_FILE"
+	WireGuardKeyRotationIntervalEnvVar    = "WIREGUARD_KEY_ROTATION_INTERVAL"
+	WireGuardPublishMetricsEnvVar         = "WIREGUARD_PUBLISH_METRICS"
+	WireGuardPublishMetricsIntervalEnvVar = "WIREGUARD_PUBLISH_METRICS_INTERVAL"
 )
 
 // DefaultInterfaceName is the default name of the WireGuard interface.
@@ -75,15 +77,22 @@ type WireGuardOptions struct {
 	// KeyRotationInterval is the interval to rotate wireguard keys.
 	// Set this to 0 to disable key rotation.
 	KeyRotationInterval time.Duration `json:"key-rotation-interval,omitempty" yaml:"key-rotation-interval,omitempty" toml:"key-rotation-interval,omitempty"`
+	// PublishMetrics enables publishing of WireGuard metrics. These are only exposed if the
+	// metrics server is enabled.
+	PublishMetrics bool `json:"publish-metrics,omitempty" yaml:"publish-metrics,omitempty" toml:"publish-metrics,omitempty"`
+	// PublishMetricsInterval is the interval at which to update WireGuard metrics.
+	PublishMetricsInterval time.Duration `json:"publish-metrics-interval,omitempty" yaml:"publish-metrics-interval,omitempty" toml:"publish-metrics-interval,omitempty"`
 }
 
 // WireGuardOptions returns a new WireGuardOptions with sensible defaults.
 func NewWireGuardOptions() *WireGuardOptions {
 	return &WireGuardOptions{
-		ListenPort:          51820,
-		InterfaceName:       DefaultInterfaceName,
-		MTU:                 system.DefaultMTU,
-		KeyRotationInterval: time.Hour * 24 * 7,
+		ListenPort:             51820,
+		InterfaceName:          DefaultInterfaceName,
+		MTU:                    system.DefaultMTU,
+		KeyRotationInterval:    time.Hour * 24 * 7,
+		PublishMetrics:         false,
+		PublishMetricsInterval: time.Second * 30,
 		Endpoints: func() []string {
 			if val, ok := os.LookupEnv(WireGuardEndpointsEnvVar); ok {
 				return strings.Split(val, ",")
@@ -122,6 +131,10 @@ packets are sent.`)
 		"The path to the WireGuard private key. If it does not exist it will be created.")
 	fl.DurationVar(&o.KeyRotationInterval, "wireguard.key-rotation-interval", util.GetEnvDurationDefault(WireGuardKeyRotationIntervalEnvVar, time.Hour*24*7),
 		"Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.")
+	fl.BoolVar(&o.PublishMetrics, "wireguard.publish-metrics", util.GetEnvDefault(WireGuardPublishMetricsEnvVar, "false") == "true",
+		"Publish WireGuard metrics.")
+	fl.DurationVar(&o.PublishMetricsInterval, "wireguard.publish-metrics-interval", util.GetEnvDurationDefault(WireGuardPublishMetricsIntervalEnvVar, time.Second*30),
+		"Interval at which to update WireGuard metrics.")
 }
 
 // Validate validates the options.
@@ -142,6 +155,9 @@ func (o *WireGuardOptions) Validate() error {
 	}
 	if o.KeyRotationInterval < 0 {
 		return errors.New("key rotation interval must be >= 0")
+	}
+	if o.PublishMetrics && o.PublishMetricsInterval < 0 {
+		return errors.New("publish metrics interval must be >= 0")
 	}
 	return nil
 }

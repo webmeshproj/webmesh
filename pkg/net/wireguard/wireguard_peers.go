@@ -59,7 +59,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	w.log.Debug("put peer", slog.Any("peer", peer))
 	// Check if we already have the peer under a different key
 	// and remove it if so.
-	if peerKey, ok := w.peers[peer.ID]; ok {
+	if peerKey, ok := w.peerKeyByID(peer.ID); ok {
 		if peerKey.String() != peer.PublicKey.String() {
 			// Remove the peer first
 			if err := w.DeletePeer(ctx, peer.ID); err != nil {
@@ -125,7 +125,8 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	w.log.Debug("configuring device with peer",
 		slog.Any("peer", &peerConfigMarshaler{peerCfg}))
 	err = w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
-		Peers: []wgtypes.PeerConfig{peerCfg},
+		Peers:        []wgtypes.PeerConfig{peerCfg},
+		ReplacePeers: false,
 	})
 	if err != nil {
 		return err
@@ -164,10 +165,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 
 // DeletePeer removes a peer from the wireguard configuration.
 func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
-	w.peersMux.Lock()
-	defer w.peersMux.Unlock()
-	if key, ok := w.peers[id]; ok {
-		delete(w.peers, id)
+	if key, ok := w.popPeerKey(id); ok {
 		return w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 			Peers: []wgtypes.PeerConfig{
 				{
@@ -180,10 +178,42 @@ func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
 	return nil
 }
 
+// registerPeer adds a peer to the peer map.
 func (w *wginterface) registerPeer(key wgtypes.Key, peer *Peer) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
 	w.peers[peer.ID] = key
+}
+
+// popPeerKey removes a peer from the peer map and returns the key.
+func (w *wginterface) popPeerKey(id string) (wgtypes.Key, bool) {
+	w.peersMux.Lock()
+	defer w.peersMux.Unlock()
+	for id, k := range w.peers {
+		delete(w.peers, id)
+		return k, true
+	}
+	return wgtypes.Key{}, false
+}
+
+// peerByPublicKey returns the peer with the given public key.
+func (w *wginterface) peerByPublicKey(lookup string) (string, bool) {
+	w.peersMux.Lock()
+	defer w.peersMux.Unlock()
+	for peerID, key := range w.peers {
+		if key.String() == lookup {
+			return peerID, true
+		}
+	}
+	return "", false
+}
+
+// peerKeyByID returns the public key of the peer with the given id.
+func (w *wginterface) peerKeyByID(id string) (wgtypes.Key, bool) {
+	w.peersMux.Lock()
+	defer w.peersMux.Unlock()
+	key, ok := w.peers[id]
+	return key, ok
 }
 
 type peerConfigMarshaler struct {

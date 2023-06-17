@@ -41,6 +41,7 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
 	wgopts := wireguard.Options{
+		NodeID:              s.ID(),
 		ListenPort:          s.opts.WireGuard.ListenPort,
 		Name:                s.opts.WireGuard.InterfaceName,
 		ForceName:           s.opts.WireGuard.ForceInterfaceName,
@@ -52,6 +53,8 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 		NetworkV4:           addressv4,
 		NetworkV6:           addressv6,
 		IsPublic:            s.opts.Mesh.PrimaryEndpoint != "",
+		Metrics:             s.opts.WireGuard.PublishMetrics,
+		MetricsInterval:     s.opts.WireGuard.PublishMetricsInterval,
 	}
 	s.log.Info("configuring wireguard interface", slog.Any("options", &wgopts))
 	var err error

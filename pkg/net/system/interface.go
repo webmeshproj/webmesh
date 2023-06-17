@@ -20,7 +20,9 @@ package system
 import (
 	"context"
 	"errors"
+	"net"
 	"net/netip"
+	"strings"
 )
 
 // ErrRouteExists is returned when a route already exists.
@@ -76,4 +78,10 @@ type Options struct {
 // IsRouteExists returns true if the given error is a route exists error.
 func IsRouteExists(err error) bool {
 	return errors.Is(err, ErrRouteExists)
+}
+
+// IsInterfaceNotExists returns true if the given error is an interface not exists error.
+func IsInterfaceNotExists(err error) bool {
+	_, ok := err.(net.UnknownNetworkError)
+	return ok || strings.Contains(err.Error(), "no such network interface")
 }
