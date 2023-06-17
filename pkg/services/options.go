@@ -185,7 +185,9 @@ func (o *Options) ServerOptions(store store.Store, log *slog.Logger) ([]grpc.Ser
 		metrics := prometheus.NewServerMetrics(prometheus.WithServerHandlingTimeHistogram())
 		unarymiddlewares = append(unarymiddlewares, metrics.UnaryServerInterceptor())
 		streammiddlewares = append(streammiddlewares, metrics.StreamServerInterceptor())
-		promapi.MustRegister(metrics)
+		if err := promapi.Register(metrics); err != nil {
+			return nil, nil, err
+		}
 	}
 	if store.Plugins().HasAuth() {
 		log.Debug("registering auth interceptor")

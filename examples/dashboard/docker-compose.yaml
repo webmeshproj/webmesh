@@ -31,12 +31,16 @@ services:
       - --bootstrap.default-network-policy=accept
       - --raft.data-dir=/data
       - --wireguard.key-file=/data/wireguard.key
+      - --wireguard.record-metrics
       - --services.api.mesh
       - --services.api.admin
       - --services.api.peer-discovery
+      - --services.metrics.enabled
+      - --services.metrics.listen-address=:8000
       - --services.dashboard.enabled
       - --services.dashboard.listen-address=:8080
     ports:
+      - 8000:8000
       - 8080:8080
       - 8443:8443
       - 51820:51820/udp

@@ -53,8 +53,8 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 		NetworkV4:           addressv4,
 		NetworkV6:           addressv6,
 		IsPublic:            s.opts.Mesh.PrimaryEndpoint != "",
-		Metrics:             s.opts.WireGuard.PublishMetrics,
-		MetricsInterval:     s.opts.WireGuard.PublishMetricsInterval,
+		Metrics:             s.opts.WireGuard.RecordMetrics,
+		MetricsInterval:     s.opts.WireGuard.RecordMetricsInterval,
 	}
 	s.log.Info("configuring wireguard interface", slog.Any("options", &wgopts))
 	var err error

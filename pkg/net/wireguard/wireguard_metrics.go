@@ -122,25 +122,14 @@ type MetricsRecorder struct {
 }
 
 // NewMetricsRecorder returns a new MetricsRecorder.
-func NewMetricsRecorder(wg Interface) (*MetricsRecorder, error) {
-	for _, collector := range []prometheus.Collector{
-		BytesSentTotal,
-		BytesRecvdTotal,
-		ConnectedPeers,
-		PeerBytesSentTotal,
-		PeerBytesRecvdTotal,
-	} {
-		if err := prometheus.Register(collector); err != nil {
-			return nil, fmt.Errorf("register prometheus collector: %w", err)
-		}
-	}
+func NewMetricsRecorder(wg Interface) *MetricsRecorder {
 	return &MetricsRecorder{
 		wg:        wg.(*wginterface),
 		connected: make(map[string]struct{}),
 		peerSent:  make(map[string]uint64),
 		peerRcvd:  make(map[string]uint64),
 		log:       slog.Default().With("component", "wireguard-metrics"),
-	}, nil
+	}
 }
 
 // Run starts the metrics recorder.

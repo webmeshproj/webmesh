@@ -88,7 +88,7 @@ type Options struct {
 	// Metrics is true if prometheus metrics should be enabled.
 	Metrics bool
 	// MetricsInterval is the interval at which to update metrics.
-	// Defaults to 30 seconds.
+	// Defaults to 15 seconds.
 	MetricsInterval time.Duration
 }
 
@@ -156,12 +156,12 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		log:       log,
 	}
 	if opts.Metrics {
-		recorder, err := NewMetricsRecorder(wg)
-		if err != nil {
-			return nil, handleErr(fmt.Errorf("failed to create metrics recorder: %w", err))
-		}
+		recorder := NewMetricsRecorder(wg)
 		rctx, cancel := context.WithCancel(context.Background())
 		wg.recorderCancel = cancel
+		if opts.MetricsInterval <= 0 {
+			opts.MetricsInterval = 15 * time.Second
+		}
 		go recorder.Run(rctx, opts.MetricsInterval)
 	}
 	return wg, nil
