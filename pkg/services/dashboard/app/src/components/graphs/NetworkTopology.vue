@@ -1,6 +1,44 @@
 <template>
-    <div v-if="loading"><q-skeleton height="600px" /></div>
-    <div v-if="!loading" id="network" style="height:600px"></div>
+    <div id="network" style="height:600px">
+        <q-inner-loading :showing="loading">
+            <q-spinner-grid size="xl" color="primary" />
+        </q-inner-loading>
+    </div>
+    <q-popup-proxy v-model="showDetails">
+            <q-card>
+                <q-card-section>
+                    <div class="text-h6">{{ nodeDetails?.getId() }}</div>
+                </q-card-section>
+
+                <q-card-section class="q-pa-md row">
+                    <div class="column col-6">
+                        <div class="text-subtitle1">Networking</div>
+                        <div><strong>Public Endpoint: </strong>{{  nodeDetails?.getPrimaryEndpoint() || 'N/A' }}</div>
+                        <div><strong>Mesh IPv4 Address: </strong> {{ nodeDetails?.getPrivateIpv4() }}</div>
+                        <div><strong>Mesh IPv6 Address: </strong> {{ nodeDetails?.getPrivateIpv6() }}</div>
+                    </div>
+                    <div class="column col-6">
+                        <div class="text-subtitle1">Mesh</div>
+                        <div>
+                            <strong>Cluster Status:</strong>
+                            <ClusterStatus v-if="nodeDetails" :status="nodeDetails?.getClusterStatus()" />
+                        </div>
+                        <div>
+                            <strong>Public Key:</strong>
+                            {{ nodeDetails?.getPublicKey() }}
+                            <q-btn size="xs" dense flat @click="() => {
+                                copyToClipboard(nodeDetails?.getPublicKey() || '');
+                            }">
+                                <q-icon name="content_copy" />
+                                <q-tooltip anchor="top right" self="top start">
+                                    Copy to clipboard
+                                </q-tooltip>
+                            </q-btn>
+                        </div>
+                    </div>
+                </q-card-section>
+            </q-card>
+    </q-popup-proxy>
 </template>
   
 <script lang="ts">
@@ -10,19 +48,27 @@ import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { GetNodeRequest, MeshNode, MeshGraph } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/mesh_pb';
 
 import { useClientStore } from 'stores/client-store';
-
-const clients = useClientStore();
-
-
+import ClusterStatus from 'components/ClusterStatus.vue';
 
 export default defineComponent({
     name: 'NetworkTopology',
+    components: { ClusterStatus },
     mounted () {
         this.buildNetworkGraph();
     },
+    computed: {
+        showDetails(): boolean { return this.detailsHovering || this.detailsSelected; }
+    },
     setup () {
+        const clients = useClientStore();
         const loading = ref<boolean>(true);
+        const detailsHovering = ref<boolean>(false);
+        const detailsSelected = ref<boolean>(false);
         
+        function copyToClipboard(val: string): Promise<void> {
+           return navigator?.clipboard.writeText(val);
+        }
+
         async function getNodeDetails(id: string): Promise<MeshNode> {
             return new Promise((resolve, reject) => {
                 const req = new GetNodeRequest();
@@ -55,21 +101,42 @@ export default defineComponent({
             });
         };
 
+        const nodeDetails = ref<MeshNode>();
+
         async function buildNetworkGraph(): Promise<void> {
             const data = await getNetworkGraph();
             const elem = document.getElementById('network');
             if (elem) {
                 const network = new Network(elem, data.data, data.options);
                 network.on('hoverNode', (ev: { node: string }) => {
-                    console.log(ev.node);
                     getNodeDetails(ev.node).then((node) => {
-                        console.log(node.toObject());
+                        nodeDetails.value = node;
+                        detailsHovering.value = true;
                     });
-                })
+                });
+                network.on('selectNode', (ev: { nodes: string[] }) => {
+                    getNodeDetails(ev.nodes[0]).then((node) => {
+                        nodeDetails.value = node;
+                        detailsSelected.value = true;
+                    });
+                });
+                network.on('deselectNode', () => {
+                    detailsSelected.value = false;
+                });
+                network.on('blurNode', () => {
+                    detailsHovering.value = false;
+                });
             }
         }
 
-        return { buildNetworkGraph, loading };
+        return { 
+            copyToClipboard,
+            buildNetworkGraph,
+            detailsHovering,
+            detailsSelected,
+            loading,
+            nodeDetails
+        };
     }
 });
 </script>
