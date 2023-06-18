@@ -5,7 +5,7 @@
         </q-inner-loading>
     </div>
     <q-popup-proxy v-model="showDetails">
-        <q-card>
+        <q-card v-if="nodeDetails">
             <q-card-section>
                 <div class="text-h6">{{ nodeDetails?.getId() }}</div>
             </q-card-section>
@@ -13,26 +13,18 @@
             <q-card-section class="q-pa-md row">
                 <div class="column col-6">
                     <div class="text-subtitle1">Networking</div>
-                    <div><strong>Public Endpoint: </strong>{{  nodeDetails?.getPrimaryEndpoint() || 'N/A' }}</div>
-                    <div><strong>Mesh IPv4 Address: </strong> {{ nodeDetails?.getPrivateIpv4() }}</div>
-                    <div><strong>Mesh IPv6 Address: </strong> {{ nodeDetails?.getPrivateIpv6() }}</div>
+                    <div><strong>Public Endpoint: </strong>{{  nodeDetails.getPrimaryEndpoint() || 'N/A' }}</div>
+                    <div><strong>Mesh IPv4 Address: </strong> {{ nodeDetails.getPrivateIpv4() || 'N/A' }}</div>
+                    <div><strong>Mesh IPv6 Address: </strong> {{ nodeDetails.getPrivateIpv6() }}</div>
                 </div>
                 <div class="column col-6">
                     <div class="text-subtitle1">Mesh</div>
                     <div>
                         <strong>Cluster Status:</strong>
-                        <ClusterStatus v-if="nodeDetails" :status="nodeDetails?.getClusterStatus()" />
+                        <ClusterStatus :status="nodeDetails.getClusterStatus()" />
                     </div>
-                    <div>
-                        <strong>Public Key:</strong> {{ nodeDetails?.getPublicKey() }}
-                        <q-btn size="xs" dense flat @click="() => {
-                            copyToClipboard(nodeDetails?.getPublicKey() || '');
-                        }">
-                            <q-icon name="content_copy" />
-                            <q-tooltip anchor="top right" self="top start">
-                                Copy to clipboard
-                            </q-tooltip>
-                        </q-btn>
+                    <div class="full-width">
+                        <PublicKey :publicKey="nodeDetails.getPublicKey()" />
                     </div>
                 </div>
             </q-card-section>
@@ -48,10 +40,11 @@ import { GetNodeRequest, MeshNode, MeshGraph } from '@buf/tinyzimmer_webmesh-api
 
 import { useClientStore } from 'stores/client-store';
 import ClusterStatus from 'components/ClusterStatus.vue';
+import PublicKey from 'components/PublicKey.vue';
 
 export default defineComponent({
     name: 'NetworkTopology',
-    components: { ClusterStatus },
+    components: { ClusterStatus, PublicKey },
     mounted () {
         this.buildNetworkGraph();
     },
@@ -65,11 +58,7 @@ export default defineComponent({
         const detailsSelected = ref<boolean>(false);
         const nodeDetails = ref<MeshNode>();
 
-        async function copyToClipboard(val: string): Promise<void> {
-           return await navigator?.clipboard.writeText(val);
-        }
-
-        async function getNodeDetails(id: string): Promise<MeshNode> {
+        function getNodeDetails(id: string): Promise<MeshNode> {
             return new Promise((resolve, reject) => {
                 const req = new GetNodeRequest();
                 req.setId(id)
@@ -83,7 +72,7 @@ export default defineComponent({
             });
         }
 
-        async function getNetworkGraph(): Promise<{data: Data, options: Options}> {
+        function getNetworkGraph(): Promise<{data: Data, options: Options}> {
             loading.value = true;
             return new Promise((resolve, reject) => {
                 clients.meshClient.getMeshGraph(new Empty(), {}, (err: Error, res: MeshGraph) => {
@@ -113,6 +102,9 @@ export default defineComponent({
                         detailsHovering.value = true;
                     });
                 });
+                network.on('blurNode', () => {
+                    detailsHovering.value = false;
+                });
                 network.on('selectNode', (ev: { nodes: string[] }) => {
                     getNodeDetails(ev.nodes[0]).then((node) => {
                         nodeDetails.value = node;
@@ -122,14 +114,10 @@ export default defineComponent({
                 network.on('deselectNode', () => {
                     detailsSelected.value = false;
                 });
-                network.on('blurNode', () => {
-                    detailsHovering.value = false;
-                });
             }
         }
 
         return { 
-            copyToClipboard,
             buildNetworkGraph,
             detailsHovering,
             detailsSelected,

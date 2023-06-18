@@ -64,15 +64,7 @@
                     <q-td colspan="100%">
                         <div class="row">
                             <div class="text-caption col-12">
-                                <strong>Public Key:</strong> {{ props.row.getPublicKey() }}
-                                <q-btn size="xs" dense flat @click="() => {
-                                    copyToClipboard(props.row.getPublicKey());
-                                }">
-                                    <q-icon name="content_copy" />
-                                    <q-tooltip anchor="top right" self="top start">
-                                        Copy to clipboard
-                                    </q-tooltip>
-                                </q-btn>
+                                <PublicKey :publicKey="props.row.getPublicKey() || 'N/A'" />
                             </div>
                             <div class="text-caption col-12">
                                 <strong>WireGuard Endpoints:</strong> {{  props.row.getWireguardEndpointsList().join(',') || 'N/A' }}
@@ -106,10 +98,7 @@ import { NodeList, MeshNode } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/mesh
 import { useClientStore } from 'stores/client-store';
 import TableHeader from 'components/tables/TableHeader.vue';
 import ClusterStatus from 'components/ClusterStatus.vue';
-
-function copyToClipboard(val: string): Promise<void> {
-    return navigator?.clipboard.writeText(val);
-}
+import PublicKey from 'components/PublicKey.vue';
 
 function formatTimestamp(val: Timestamp): string {
     return val.toDate().toLocaleString();
@@ -180,10 +169,10 @@ function useNodeList(): {
 
 export default defineComponent({
     name: 'NodesTable',
-    components: { TableHeader, ClusterStatus },
+    components: { TableHeader, ClusterStatus, PublicKey },
     setup () {
         const filter = ref<string>('');
-        return { formatTimestamp, copyToClipboard, columns, filter, ...useNodeList() };
+        return { formatTimestamp, columns, filter, ...useNodeList() };
     }
 });
 </script>
