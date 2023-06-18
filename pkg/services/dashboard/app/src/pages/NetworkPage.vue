@@ -1,18 +1,23 @@
 <template>
-    <q-page class="row items-center justify-evenly">
-
+    <q-page class="q-pa-md">
+        <div class="row justify-evenly">
+            <div class="text-h6">Network Topology</div>
+            <div class="column full-width">
+                <network-topology />
+            </div>
+        </div>
     </q-page>
-  </template>
+</template>
   
-  <script lang="ts">
-  import { defineComponent } from 'vue';
-  
-  export default defineComponent({
-    name: 'NetworkPage',
-    setup () {
+<script lang="ts">
+import { defineComponent } from 'vue';
+import NetworkTopology from '../components/graphs/NetworkTopology.vue';
 
-      return { };
+export default defineComponent({
+    name: 'NetworkPage',
+    components: { NetworkTopology },
+    setup () {
+        return { };
     }
-  });
-  </script>
-  
+});
+</script>

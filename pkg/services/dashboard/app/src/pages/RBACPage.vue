@@ -20,11 +20,11 @@ import RoleBindingsTable from 'components/tables/RoleBindingsTable.vue';
 import GroupsTable from 'components/tables/GroupsTable.vue';
 
 export default defineComponent({
-  name: 'RBACPage',
-  components: { RolesTable, RoleBindingsTable, GroupsTable },
-  setup () {
-    return { };
-  }
+    name: 'RBACPage',
+    components: { RolesTable, RoleBindingsTable, GroupsTable },
+    setup () {
+        return { };
+    }
 });
 </script>
   

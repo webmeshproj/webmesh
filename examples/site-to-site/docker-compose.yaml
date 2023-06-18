@@ -58,9 +58,16 @@ services:
       - --mesh.zone-awareness-id=site-1
       - --services.api.leader-proxy
       - --services.api.mesh
+      - --services.api.admin
       - --services.mesh-dns.enabled
+      - --services.metrics.enabled
+      - --services.metrics.listen-address=:8000
+      - --services.dashboard.enabled
+      - --services.dashboard.listen-address=:8080
       - --wireguard.key-file=/data/wireguard.key
     ports:
+      - 8000:8000
+      - 8080:8080
       - 8443:8443
       - 5354:5353/udp
     volumes:

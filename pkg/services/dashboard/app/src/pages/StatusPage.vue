@@ -8,9 +8,9 @@
 import { defineComponent } from 'vue';
 
 export default defineComponent({
-  name: 'IndexPage',
-  setup () {
-    return { };
-  }
+    name: 'StatusPage',
+    setup () {
+        return { };
+    }
 });
 </script>

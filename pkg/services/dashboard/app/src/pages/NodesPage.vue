@@ -1,21 +1,20 @@
 <template>
     <q-page class="row">
-      <div class="full-width">
-        <NodesTable />
-      </div>
+        <div class="full-width">
+            <NodesTable />
+        </div>
     </q-page>
-  </template>
+</template>
   
-  <script lang="ts">
-  import { defineComponent } from 'vue';
-  import NodesTable from 'components/tables/NodesTable.vue';
+<script lang="ts">
+import { defineComponent } from 'vue';
+import NodesTable from 'components/tables/NodesTable.vue';
 
-  export default defineComponent({
+export default defineComponent({
     name: 'NodesPage',
     components: { NodesTable },
     setup () {
-      return { };
+        return { };
     }
-  });
-  </script>
-  
+});
+</script>
