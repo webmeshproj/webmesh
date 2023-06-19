@@ -64,7 +64,7 @@
                     <q-td colspan="100%">
                         <div class="row">
                             <div class="text-caption col-12">
-                                <PublicKey :publicKey="props.row.getPublicKey() || 'N/A'" />
+                                <CopyableField title="Public Key" :value="props.row.getPublicKey()" />
                             </div>
                             <div class="text-caption col-12">
                                 <strong>WireGuard Endpoints:</strong> {{  props.row.getWireguardEndpointsList().join(',') || 'N/A' }}
@@ -98,7 +98,7 @@ import { NodeList, MeshNode } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/mesh
 import { useClientStore } from 'stores/client-store';
 import TableHeader from 'components/tables/TableHeader.vue';
 import ClusterStatus from 'components/ClusterStatus.vue';
-import PublicKey from 'components/PublicKey.vue';
+import CopyableField from 'components/CopyableField.vue';
 
 function formatTimestamp(val: Timestamp): string {
     return val.toDate().toLocaleString();
@@ -169,7 +169,7 @@ function useNodeList(): {
 
 export default defineComponent({
     name: 'NodesTable',
-    components: { TableHeader, ClusterStatus, PublicKey },
+    components: { TableHeader, ClusterStatus, CopyableField },
     setup () {
         const filter = ref<string>('');
         return { formatTimestamp, columns, filter, ...useNodeList() };

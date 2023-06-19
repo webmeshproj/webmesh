@@ -7,15 +7,16 @@
     <q-popup-proxy v-model="showDetails">
         <q-card v-if="nodeDetails">
             <q-card-section>
-                <div class="text-h6">{{ nodeDetails?.getId() }}</div>
+                <div class="text-h6">{{ nodeDetails.getId() }}</div>
             </q-card-section>
 
             <q-card-section class="q-pa-md row">
                 <div class="column col-6">
                     <div class="text-subtitle1">Networking</div>
-                    <div><strong>Public Endpoint: </strong>{{  nodeDetails.getPrimaryEndpoint() || 'N/A' }}</div>
-                    <div><strong>Mesh IPv4 Address: </strong> {{ nodeDetails.getPrivateIpv4() || 'N/A' }}</div>
-                    <div><strong>Mesh IPv6 Address: </strong> {{ nodeDetails.getPrivateIpv6() }}</div>
+                    <CopyableField title="Public Endpoint" :value="nodeDetails.getPrimaryEndpoint()" />
+                    <CopyableField title="Mesh IPv4 Address" :value="nodeDetails.getPrivateIpv4()" />
+                    <CopyableField title="Mesh IPv6 Address" :value="nodeDetails.getPrivateIpv6()" />
+                    <CopyableField title="Zone Awareness ID" :value="nodeDetails.getZoneAwarenessId()" />
                 </div>
                 <div class="column col-6">
                     <div class="text-subtitle1">Mesh</div>
@@ -23,9 +24,7 @@
                         <strong>Cluster Status:</strong>
                         <ClusterStatus :status="nodeDetails.getClusterStatus()" />
                     </div>
-                    <div class="full-width">
-                        <PublicKey :publicKey="nodeDetails.getPublicKey()" />
-                    </div>
+                    <CopyableField title="Public Key" :value="nodeDetails.getPublicKey()" />
                 </div>
             </q-card-section>
         </q-card>
@@ -40,11 +39,11 @@ import { GetNodeRequest, MeshNode, MeshGraph } from '@buf/tinyzimmer_webmesh-api
 
 import { useClientStore } from 'stores/client-store';
 import ClusterStatus from 'components/ClusterStatus.vue';
-import PublicKey from 'components/PublicKey.vue';
+import CopyableField from 'components/CopyableField.vue';
 
 export default defineComponent({
     name: 'NetworkTopology',
-    components: { ClusterStatus, PublicKey },
+    components: { ClusterStatus, CopyableField },
     mounted () {
         this.buildNetworkGraph();
     },
@@ -106,7 +105,8 @@ export default defineComponent({
                     detailsHovering.value = false;
                 });
                 network.on('selectNode', (ev: { nodes: string[] }) => {
-                    getNodeDetails(ev.nodes[0]).then((node) => {
+                    if (ev.nodes.length == 0) return;
+                    getNodeDetails(ev.nodes[ev.nodes.length - 1]).then((node) => {
                         nodeDetails.value = node;
                         detailsSelected.value = true;
                     });
