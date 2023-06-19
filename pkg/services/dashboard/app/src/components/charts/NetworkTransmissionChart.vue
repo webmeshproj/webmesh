@@ -31,12 +31,16 @@ ChartJS.register(
     PointElement,
     Filler
 );
+import 'chartjs-adapter-date-fns';
 
 export interface ChartData {
     labels: string[];
     datasets: {
         label: string;
-        data: number[];
+        data: {
+            x: number;
+            y: number;
+        }[];
         borderColor: string;
         backgroundColor: string;
         fill: boolean;
