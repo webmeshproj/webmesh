@@ -13,7 +13,7 @@
 <script lang="ts">
 import { defineComponent, ref, shallowRef } from 'vue';
 
-import { Status } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/node_pb';
+import { GetStatusRequest, Status } from '@buf/tinyzimmer_webmesh-api.grpc_web/v1/node_pb';
 import { useClientStore } from 'stores/client-store';
 import NetworkTransmissionChart, { ChartData } from './NetworkTransmissionChart.vue';
 
@@ -31,8 +31,8 @@ export default defineComponent({
     mounted() {
         const clients = useClientStore();
 
-        let firstTX = 0;
-        let firstRX = 0;
+        let lastTX = 0;
+        let lastRX = 0;
         const maxDataPoints = 20;
         const txObservations: number[] = [];
         const rxObservations: number[] = [];
@@ -41,14 +41,17 @@ export default defineComponent({
         const labels: string[] = [];
 
         const interval = setInterval(() => {
-            clients.serverStatus.then((status: Status) => {
+            clients.nodeClient.getStatus(new GetStatusRequest(), {}, (err: Error, status: Status) => {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
                 this.nodeID = status.getId();
                 const metrics = status.getInterfaceMetrics();
                 if (!metrics) return;
-                console.log(metrics.toObject())
-                if (firstTX === 0) {
-                    firstTX = metrics.getTotalTransmitBytes();
-                    firstRX = metrics.getTotalReceiveBytes();
+                if (lastTX === 0) {
+                    lastTX = metrics.getTotalTransmitBytes();
+                    lastRX = metrics.getTotalReceiveBytes();
                 }
                 if (labels.length >= maxDataPoints) {
                     labels.shift();
@@ -59,8 +62,10 @@ export default defineComponent({
                 }
                 const now = new Date();
                 labels.push(now.toUTCString());
-                txObservations.push(metrics.getTotalTransmitBytes() - firstTX);
-                rxObservations.push(metrics.getTotalReceiveBytes() - firstRX);
+                txObservations.push(metrics.getTotalTransmitBytes() - lastTX);
+                rxObservations.push(metrics.getTotalReceiveBytes() - lastRX);
+                lastTX = metrics.getTotalTransmitBytes();
+                lastRX = metrics.getTotalReceiveBytes();
                 const totalTX = txObservations.reduce((a, b) => a + b, 0);
                 const totalRX = rxObservations.reduce((a, b) => a + b, 0);
                 const txPerSec = totalTX / txObservations.length;
