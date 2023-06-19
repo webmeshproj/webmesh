@@ -80,7 +80,7 @@ export default defineComponent({
                             data: txDatasets,
                             borderColor: '#00b0ff',
                             backgroundColor: '#00b0ff',
-                            fill: true,
+                            fill: false,
                             cubicInterpolationMode: 'monotone',
                             tension: 0.4
                         },
@@ -89,7 +89,7 @@ export default defineComponent({
                             data: rxDatasets,
                             borderColor: '#ff4081',
                             backgroundColor: '#ff4081',
-                            fill: true,
+                            fill: false,
                             cubicInterpolationMode: 'monotone',
                             tension: 0.4
                         }
@@ -119,9 +119,9 @@ export default defineComponent({
                             second: 'HH:mm:ss'
                         }
                     },
-                    // ticks: {
-                    //     source: 'auto'
-                    // },
+                    ticks: {
+                        source: 'auto'
+                    },
                 }
             }
         });
