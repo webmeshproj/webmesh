@@ -23,6 +23,7 @@ import (
 	"os"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/node/pkg/context"
@@ -51,6 +52,7 @@ func Serve(ctx context.Context, plugin v1.PluginServer) error {
 		s.GracefulStop()
 	}()
 	v1.RegisterPluginServer(s, plugin)
+	slog.Default().Info("serving plugin", "address", ln.Addr().String())
 	if err := s.Serve(ln); err != nil {
 		return err
 	}

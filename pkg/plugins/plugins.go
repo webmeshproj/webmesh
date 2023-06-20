@@ -97,7 +97,7 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 			if cfg.Path != "" {
 				plugin, err = newExternalProcess(ctx, cfg.Path)
 			} else {
-				plugin, err = newExternalServer(ctx, cfg.Server)
+				plugin, err = newExternalServer(ctx, cfg)
 			}
 			if err != nil {
 				return nil, fmt.Errorf("plugin %q: %w", name, err)

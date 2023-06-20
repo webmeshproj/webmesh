@@ -18,6 +18,8 @@ package plugins
 
 import (
 	"bufio"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +30,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -215,9 +218,40 @@ type externalServerPlugin struct {
 	conn *grpc.ClientConn
 }
 
-func newExternalServer(ctx context.Context, addr string) (*externalServerPlugin, error) {
+func newExternalServer(ctx context.Context, cfg *Config) (*externalServerPlugin, error) {
 	// TODO: support TLS
-	c, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	var opt grpc.DialOption
+	if cfg.Insecure {
+		opt = grpc.WithTransportCredentials(insecure.NewCredentials())
+	} else {
+		var tlsConfig tls.Config
+		certPool, err := x509.SystemCertPool()
+		if err != nil {
+			certPool = x509.NewCertPool()
+		}
+		if cfg.TLSCAFile != "" {
+			caCert, err := os.ReadFile(cfg.TLSCAFile)
+			if err != nil {
+				return nil, fmt.Errorf("read CA file: %w", err)
+			}
+			if ok := certPool.AppendCertsFromPEM(caCert); !ok {
+				return nil, fmt.Errorf("append CA cert: %w", err)
+			}
+		}
+		tlsConfig.RootCAs = certPool
+		if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(cfg.TLSCertFile, cfg.TLSKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("load cert: %w", err)
+			}
+			tlsConfig.Certificates = []tls.Certificate{cert}
+		}
+		if cfg.TLSSkipVerify {
+			tlsConfig.InsecureSkipVerify = true
+		}
+		opt = grpc.WithTransportCredentials(credentials.NewTLS(&tlsConfig))
+	}
+	c, err := grpc.DialContext(ctx, cfg.Server, opt)
 	if err != nil {
 		return nil, fmt.Errorf("dial: %w", err)
 	}

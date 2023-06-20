@@ -6,6 +6,8 @@ networks:
       driver: default
       config:
         - subnet: 10.1.0.0/24
+          # Gateway is the same address as the host
+          gateway: 10.1.0.1
 
 volumes:
   bootstrap-node:
@@ -31,19 +33,7 @@ services:
       - --bootstrap.default-network-policy=accept
       - --raft.data-dir=/data
       - --wireguard.key-file=/data/wireguard.key
-      - --wireguard.record-metrics
-      - --services.api.mesh
-      - --services.api.admin
-      - --services.api.peer-discovery
-      - --services.metrics.enabled
-      - --services.metrics.listen-address=:8000
-      - --services.dashboard.enabled
-      - --services.dashboard.listen-address=:8080
-    ports:
-      - 8000:8000
-      - 8080:8080
-      - 8443:8443
-      - 51820:51820/udp
+      - --plugins.server=server=10.1.0.1:8081,insecure=true
     volumes:
       - bootstrap-node:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

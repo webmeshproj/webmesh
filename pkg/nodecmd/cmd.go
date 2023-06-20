@@ -20,6 +20,7 @@ package nodecmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -37,17 +38,24 @@ import (
 )
 
 var (
-	versionFlag = flag.Bool("version", false, "Print version information and exit")
-	configFlag  = flag.String("config", "", "Path to a configuration file")
-	printConfig = flag.Bool("print-config", false, "Print the configuration and exit")
-	opts        = NewOptions().BindFlags(flag.CommandLine)
+	fs          = flag.NewFlagSet("node", flag.ContinueOnError)
+	versionFlag = fs.Bool("version", false, "Print version information and exit")
+	configFlag  = fs.String("config", "", "Path to a configuration file")
+	printConfig = fs.Bool("print-config", false, "Print the configuration and exit")
+	opts        = NewOptions().BindFlags(fs)
 
 	log = slog.Default()
 )
 
 func Execute() error {
-	flag.Usage = usage
-	flag.Parse()
+	fs.Usage = usage
+	err := fs.Parse(os.Args[1:])
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+		return err
+	}
 
 	if *versionFlag {
 		fmt.Println("Webmesh Node")
@@ -68,7 +76,7 @@ func Execute() error {
 		}
 	}
 
-	err := opts.Global.Overlay(opts.Mesh, opts.Services)
+	err = opts.Global.Overlay(opts.Mesh, opts.Services)
 	if err != nil {
 		return err
 	}
@@ -226,14 +234,15 @@ be equivalent to the shown command line flag:
 
 `)
 
-	util.FlagsUsage("Global Configurations:", "global", "")
-	util.FlagsUsage("Mesh Configurations:", "mesh", "")
-	util.FlagsUsage("Authentication Configurations:", "auth", "")
-	util.FlagsUsage("Bootstrap Configurations:", "bootstrap", "")
-	util.FlagsUsage("Raft Configurations:", "raft", "")
-	util.FlagsUsage("TLS Configurations:", "tls", "")
-	util.FlagsUsage("WireGuard Configurations:", "wireguard", "")
-	util.FlagsUsage("Service Configurations:", "services", "")
+	util.FlagsUsage(fs, "Global Configurations:", "global", "")
+	util.FlagsUsage(fs, "Mesh Configurations:", "mesh", "")
+	util.FlagsUsage(fs, "Authentication Configurations:", "auth", "")
+	util.FlagsUsage(fs, "Bootstrap Configurations:", "bootstrap", "")
+	util.FlagsUsage(fs, "Raft Configurations:", "raft", "")
+	util.FlagsUsage(fs, "TLS Configurations:", "tls", "")
+	util.FlagsUsage(fs, "WireGuard Configurations:", "wireguard", "")
+	util.FlagsUsage(fs, "Service Configurations:", "services", "")
+	util.FlagsUsage(fs, "Plugin Configurations:", "plugins", "")
 
 	fmt.Fprint(os.Stderr, "General Flags\n\n")
 	fmt.Fprint(os.Stderr, "  --config         Load flags from the given configuration file\n")

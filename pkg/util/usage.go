@@ -25,11 +25,11 @@ import (
 )
 
 // FlagsUsage prints the usage of all flags with the given prefix.
-func FlagsUsage(title, prefix, notPrefix string) {
+func FlagsUsage(fs *flag.FlagSet, title, prefix, notPrefix string) {
 	t := tabwriter.NewWriter(os.Stderr, 1, 4, 4, ' ', 0)
 	defer t.Flush()
 	fmt.Fprintf(t, "%s\n\n", title)
-	flag.CommandLine.VisitAll(func(f *flag.Flag) {
+	fs.VisitAll(func(f *flag.Flag) {
 		if !strings.HasPrefix(f.Name, prefix) {
 			return
 		}
