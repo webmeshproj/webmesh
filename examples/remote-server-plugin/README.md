@@ -9,7 +9,7 @@ You can run the example with the following command:
 
 ```bash
 # Start the plugin server
-go run ./main.go -listen-addres :8081
+go run ./main.go -listen-address :8081
 
 # In another terminal, start the nodes
 docker-compose up
