@@ -6,6 +6,7 @@ There are several areas where help is needed/welcomed, including:
 - Documentation
 - Testing
 - Code (Specifically around the networking and Raft consensus code)
+- Frontend (Preferably in Vue by someone who actually knows what they're doing :stuck_out_tongue:)
 - Design/Architecture
 
 Protocol Buffers are used for all APIs and inter-node communcation.
