@@ -39,6 +39,7 @@ services:
       - --services.metrics.listen-address=:8000
       - --services.dashboard.enabled
       - --services.dashboard.listen-address=:8080
+      - --plugins.basic-auth.htpasswd-file=/etc/htpasswd
     ports:
       - 8000:8000
       - 8080:8080
@@ -46,6 +47,7 @@ services:
       - 51820:51820/udp
     volumes:
       - bootstrap-node:/data
+      - ./htpasswd:/etc/htpasswd
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   join-node:
@@ -60,5 +62,7 @@ services:
       - --raft.in-memory
       - --mesh.join-address=bootstrap-node:8443
       - --mesh.max-join-retries=15
+      - --auth.basic.username=join-node
+      - --auth.basic.password=dobad
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

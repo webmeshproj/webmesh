@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@buf/tinyzimmer_webmesh-api.grpc_web": "latest",
+    "@buf/tinyzimmer_webmesh-api.protocolbuffers_js": "latest",
     "@egjs/hammerjs": "^2.0.17",
     "@quasar/extras": "^1.0.0",
     "chart.js": "^4.3.0",

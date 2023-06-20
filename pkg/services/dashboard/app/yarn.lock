@@ -58,6 +58,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@buf/googleapis_googleapis.protocolbuffers_js@npm:3.21.2-20230329151039-5ae7f88519b0.3":
+  version: 3.21.2-20230329151039-5ae7f88519b0.3
+  resolution: "@buf/googleapis_googleapis.protocolbuffers_js@npm:3.21.2-20230329151039-5ae7f88519b0.3"
+  peerDependencies:
+    google-protobuf: ^3.21.2
+  checksum: 2122495fbca908ef3c63c468e35e4d36449bad26712bb84614d31de46477f5e3e4af13116a11d36774d42f435f16b09b8bbc1fd25a1cf820e1c696bb55e95800
+  languageName: node
+  linkType: hard
+
 "@buf/tinyzimmer_webmesh-api.grpc_web@npm:latest":
   version: 1.4.2-20230614115715-051f6cca7200.2
   resolution: "@buf/tinyzimmer_webmesh-api.grpc_web@npm:1.4.2-20230614115715-051f6cca7200.2"
@@ -67,6 +76,17 @@ __metadata:
     google-protobuf: ^3.21.2
     grpc-web: ^1.4.2
   checksum: 03ff7c46df8ae960fdc9d19219a7a89673d82c04246406b7b285c098950fcbfe8db5c3e07ccf0d1c3dff61124baf3bb4914d01b5530abc3f708c44aab8877471
+  languageName: node
+  linkType: hard
+
+"@buf/tinyzimmer_webmesh-api.protocolbuffers_js@npm:latest":
+  version: 3.21.2-20230614115715-051f6cca7200.3
+  resolution: "@buf/tinyzimmer_webmesh-api.protocolbuffers_js@npm:3.21.2-20230614115715-051f6cca7200.3"
+  dependencies:
+    "@buf/googleapis_googleapis.protocolbuffers_js": 3.21.2-20230329151039-5ae7f88519b0.3
+  peerDependencies:
+    google-protobuf: ^3.21.2
+  checksum: c91c3ee732fca465dca5854dc46f6b4b4fd5c94c67352f59ca1f21f754af08751f133ec2d70b34226ffccc4d8f33b253c15ffa35e79b17e82c3d6cb537a5a9e4
   languageName: node
   linkType: hard
 
@@ -4957,6 +4977,7 @@ __metadata:
   resolution: "webmesh-dashboard@workspace:."
   dependencies:
     "@buf/tinyzimmer_webmesh-api.grpc_web": latest
+    "@buf/tinyzimmer_webmesh-api.protocolbuffers_js": latest
     "@egjs/hammerjs": ^2.0.17
     "@quasar/app-vite": ^1.0.0
     "@quasar/extras": ^1.0.0

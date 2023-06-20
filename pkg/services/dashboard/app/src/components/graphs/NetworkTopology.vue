@@ -61,7 +61,7 @@ export default defineComponent({
             return new Promise((resolve, reject) => {
                 const req = new GetNodeRequest();
                 req.setId(id)
-                clients.meshClient.getNode(req, {}, (err: Error, res: MeshNode) => {
+                clients.meshClient.getNode(req, clients.rpcMetadata, (err: Error, res: MeshNode) => {
                     if (err) {
                         reject(err);
                     } else {
@@ -74,7 +74,7 @@ export default defineComponent({
         function getNetworkGraph(): Promise<{data: Data, options: Options}> {
             loading.value = true;
             return new Promise((resolve, reject) => {
-                clients.meshClient.getMeshGraph(new Empty(), {}, (err: Error, res: MeshGraph) => {
+                clients.meshClient.getMeshGraph(new Empty(), clients.rpcMetadata, (err: Error, res: MeshGraph) => {
                     if (err) {
                         reject(err);
                     } else {

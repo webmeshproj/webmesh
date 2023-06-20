@@ -136,7 +136,7 @@ const clients = useClientStore();
 
 async function listNodes(): Promise<MeshNode[]> {
     return new Promise((resolve, reject) => {
-        clients.meshClient.listNodes(new Empty(), {}, (err: Error, res: NodeList) => {
+        clients.meshClient.listNodes(new Empty(), clients.rpcMetadata, (err: Error, res: NodeList) => {
             if (err) {
                 reject(err);
                 return;

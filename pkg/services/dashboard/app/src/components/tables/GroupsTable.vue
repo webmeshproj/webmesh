@@ -102,7 +102,7 @@ const columns = [
 
 async function listGroups(): Promise<Group[]> {
     return new Promise((resolve, reject) => {
-        clients.adminClient.listGroups(new Empty(), {}, (err: Error, res: Groups) => {
+        clients.adminClient.listGroups(new Empty(), clients.rpcMetadata, (err: Error, res: Groups) => {
             if (err) {
                 reject(err);
                 return;
@@ -154,7 +154,7 @@ function nodesInGroup(group: Group): string[] {
 }
 
 export default defineComponent({
-    name: 'RoleBindingsTable',
+    name: 'GroupsTable',
     components: { TableHeader },
     setup () {
         const filter = ref<string>('');

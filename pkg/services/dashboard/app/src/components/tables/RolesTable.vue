@@ -85,7 +85,7 @@ const clients = useClientStore();
 
 async function listRoles(): Promise<Role[]> {
     return new Promise((resolve, reject) => {
-        clients.adminClient.listRoles(new Empty(), {}, (err: Error, res: Roles) => {
+        clients.adminClient.listRoles(new Empty(), clients.rpcMetadata, (err: Error, res: Roles) => {
             if (err) {
                 reject(err);
                 return;

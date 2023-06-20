@@ -35,7 +35,7 @@ export default defineComponent({
         const labels: string[] = [];
 
         const interval = setInterval(() => {
-            clients.nodeClient.getStatus(new GetStatusRequest(), {}, (err: Error, status: Status) => {
+            clients.nodeClient.getStatus(new GetStatusRequest(), clients.rpcMetadata, (err: Error, status: Status) => {
                 if (err) {
                     console.error(err);
                     return;

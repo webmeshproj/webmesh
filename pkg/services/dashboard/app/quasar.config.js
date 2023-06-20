@@ -17,7 +17,7 @@ module.exports = configure(function (/* ctx */) {
     eslint: {
       // fix: true,
       // include: [],
-      // exclude: [],
+      exclude: ["src/v1/*"],
       // rawOptions: {},
       warnings: true,
       errors: true
@@ -114,7 +114,10 @@ module.exports = configure(function (/* ctx */) {
       // directives: [],
 
       // Quasar plugins
-      plugins: []
+      plugins: [
+        'Dialog',
+        'Notify',
+      ]
     },
 
     // animations: 'all', // --- includes all animations

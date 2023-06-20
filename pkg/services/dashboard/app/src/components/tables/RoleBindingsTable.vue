@@ -71,7 +71,7 @@ const columns = [
 
 async function listRoleBindings(): Promise<RoleBinding[]> {
     return new Promise((resolve, reject) => {
-        clients.adminClient.listRoleBindings(new Empty(), {}, (err: Error, res: RoleBindings) => {
+        clients.adminClient.listRoleBindings(new Empty(), clients.rpcMetadata, (err: Error, res: RoleBindings) => {
             if (err) {
                 reject(err);
                 return;
