@@ -60,9 +60,14 @@ export default defineComponent({
     setup () {
         const nodeStatus = ref<Status>();
         const clients = useClientStore();
-        clients.serverStatus.then((status: Status) => {
-            nodeStatus.value = status;
-            console.log(status.toObject());
+        clients.authenticated.then((authenticated: boolean) => {
+            if (authenticated) {
+                clients.serverStatus.then((status: Status) => {
+                    nodeStatus.value = status;
+                });
+                return;
+            }
+            // TODO: handle unauthenticated
         });
         return { nodeStatus };
     }

@@ -26,7 +26,9 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -166,7 +168,7 @@ func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 		}
 		resp, err := m.auth.Authenticate(ctx, m.newAuthRequest(ctx))
 		if err != nil {
-			return nil, fmt.Errorf("authenticate: %w", err)
+			return nil, status.Errorf(codes.Unauthenticated, "authenticate: %v", err)
 		}
 		log := context.LoggerFrom(ctx).With("caller", resp.GetId())
 		ctx = context.WithAuthenticatedCaller(ctx, resp.GetId())
@@ -184,7 +186,7 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 		}
 		resp, err := m.auth.Authenticate(ss.Context(), m.newAuthRequest(ss.Context()))
 		if err != nil {
-			return fmt.Errorf("authenticate: %w", err)
+			return status.Errorf(codes.Unauthenticated, "authenticate: %v", err)
 		}
 		log := context.LoggerFrom(ss.Context()).With("caller", resp.GetId())
 		ctx := context.WithAuthenticatedCaller(ss.Context(), resp.GetId())
