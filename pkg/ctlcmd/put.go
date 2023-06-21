@@ -108,7 +108,7 @@ func init() {
 	putEdgeFlags := putEdgeCmd.Flags()
 	putEdgeFlags.StringVar(&putEdgeFrom, "from", "", "node to add the edge from")
 	putEdgeFlags.StringVar(&putEdgeTo, "to", "", "node to add the edge to")
-	putEdgeFlags.Int32Var(&putEdgeWeight, "weight", 0, "weight of the edge")
+	putEdgeFlags.Int32Var(&putEdgeWeight, "weight", 1, "weight of the edge")
 	putEdgeFlags.BoolVar(&putEdgeICE, "ice", false, "whether the edge is negotiated over ICE")
 	cobra.CheckErr(putEdgeCmd.RegisterFlagCompletionFunc("from", completeNodes(1)))
 	cobra.CheckErr(putEdgeCmd.RegisterFlagCompletionFunc("to", completeNodes(1)))

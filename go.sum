@@ -572,6 +572,8 @@ github.com/webmeshproj/api v0.1.3-0.20230621010629-1b45d4577fab h1:yEoFYpAUjHMYq
 github.com/webmeshproj/api v0.1.3-0.20230621010629-1b45d4577fab/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.1.3-0.20230621012709-5e624b9fc613 h1:E6OhuO9x7ciUANvvaNmH5QRRXHHerXmxrepjVP883m4=
 github.com/webmeshproj/api v0.1.3-0.20230621012709-5e624b9fc613/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.1.3-0.20230621033013-9f688fd5b991 h1:wbpBQLYrl99056Lu7/OBzcSo9MnOV8CqmHkk5xw/wqI=
+github.com/webmeshproj/api v0.1.3-0.20230621033013-9f688fd5b991/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

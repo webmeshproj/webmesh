@@ -47,6 +47,11 @@ var canPutRouteAction = &rbac.Action{
 	Resource: v1.RuleResource_RESOURCE_ROUTES,
 }
 
+var canPutEdgeAction = &rbac.Action{
+	Verb:     v1.RuleVerbs_VERB_PUT,
+	Resource: v1.RuleResource_RESOURCE_EDGES,
+}
+
 func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
 	if !s.store.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
@@ -81,14 +86,19 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 		// We can go ahead and check here if the node is allowed to do what
-		// they want. This is currently only supported with mTLS. But we
-		// should support external auth mechanisms in the future.
+		// they want.
 		var actions rbac.Actions
 		if req.GetAsVoter() {
 			actions = append(actions, canVoteAction)
 		}
 		if len(req.GetRoutes()) > 0 {
 			actions = append(actions, canPutRouteAction)
+		}
+		if len(req.GetDirectPeers()) > 0 {
+			for _, peer := range req.GetDirectPeers() {
+				actions = append(actions, canPutEdgeAction.For(peer))
+				actions = append(actions, canNegDataChannelAction[0].For(peer))
+			}
 		}
 		if len(actions) > 0 {
 			allowed, err := s.rbacEval.Evaluate(ctx, actions)
@@ -274,6 +284,23 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 				}
+			}
+		}
+	}
+
+	if len(req.GetDirectPeers()) > 0 {
+		// Put an ICE edge between the caller and all direct peers
+		for _, peer := range req.GetDirectPeers() {
+			err = s.peers.PutEdge(ctx, peers.Edge{
+				From:   peer,
+				To:     req.GetId(),
+				Weight: 1,
+				Attrs: map[string]string{
+					v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String(): "true",
+				},
+			})
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
 			}
 		}
 	}
