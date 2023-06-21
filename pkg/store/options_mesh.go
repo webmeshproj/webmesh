@@ -36,6 +36,7 @@ const (
 	GRPCAdvertisePortEnvVar      = "MESH_GRPC_PORT"
 	PrimaryEndpointEnvVar        = "MESH_PRIMARY_ENDPOINT"
 	NodeRoutesEnvVar             = "MESH_ROUTES"
+	NodeDirectPeersEnvVar        = "MESH_DIRECT_PEERS"
 	NoIPv4EnvVar                 = "MESH_NO_IPV4"
 	NoIPv6EnvVar                 = "MESH_NO_IPV6"
 )
@@ -61,6 +62,9 @@ type MeshOptions struct {
 	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
 	// If the node is not allowed to put routes in the mesh, the node will be unable to join.
 	Routes []string `json:"routes,omitempty" yaml:"routes,omitempty" toml:"routes,omitempty"`
+	// DirectPeers are peers to request direct edges to. If the node is not allowed to create edges
+	// and data channels, the node will be unable to join.
+	DirectPeers []string `json:"direct-peers,omitempty" yaml:"direct-peers,omitempty" toml:"direct-peers,omitempty"`
 	// GRPCPort is the port to advertise for gRPC.
 	GRPCPort int `json:"grpc-port,omitempty" yaml:"grpc-port,omitempty" toml:"grpc-port,omitempty"`
 	// NoIPv4 disables IPv4 usage.
@@ -78,7 +82,18 @@ func NewMeshOptions() *MeshOptions {
 			}
 			return nil
 		}(),
-
+		Routes: func() []string {
+			if val, ok := os.LookupEnv(NodeRoutesEnvVar); ok {
+				return strings.Split(val, ",")
+			}
+			return nil
+		}(),
+		DirectPeers: func() []string {
+			if val, ok := os.LookupEnv(NodeDirectPeersEnvVar); ok {
+				return strings.Split(val, ",")
+			}
+			return nil
+		}(),
 		MaxJoinRetries: 10,
 		GRPCPort:       8443,
 		JoinTimeout:    time.Minute,
@@ -118,6 +133,11 @@ This is only necessary if the node intends on being publicly accessible.`)
 	These routes are advertised to all peers. If the node is not allowed
 	to put routes in the mesh, the node will be unable to join.`, func(s string) error {
 		o.Routes = strings.Split(s, ",")
+		return nil
+	})
+	fl.Func("mesh.direct-peers", `Comma separated list of peers to request direct edges to.
+	If the node is not allowed to create edges and data channels, the node will be unable to join.`, func(s string) error {
+		o.DirectPeers = strings.Split(s, ",")
 		return nil
 	})
 	fl.BoolVar(&o.NoIPv4, "mesh.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",

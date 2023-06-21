@@ -121,8 +121,8 @@ func Random64(prefix netip.Prefix) (netip.Prefix, error) {
 	ip := prefix.Addr().AsSlice()
 
 	// Generate a random subnet
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	var subnet [2]byte
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	binary.BigEndian.PutUint16(subnet[:], uint16(r.Intn(65536)))
 	ip[6] = subnet[0]
 	ip[7] = subnet[1]

@@ -7,6 +7,12 @@ networks:
       config:
         - subnet: 10.250.0.0/24
           gateway: 10.250.0.100
+  ice-net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.251.0.0/24
+          gateway: 10.251.0.100
   site-1:
     ipam:
       driver: default
@@ -29,17 +35,41 @@ volumes:
   site-3-leader:
 
 services:
+  
+  # TURN Node
 
+  turn-node:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    networks:
+      ice-net:
+        ipv4_address: 10.251.0.1
+    hostname: turn-node
+    entrypoint:
+      - /node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.primary-endpoint=10.251.0.1
+      - --global.detect-private-endpoints
+      - --services.api.leader-proxy
+      - --services.api.webrtc
+      - --services.api.stun-servers=stun:10.251.0.1:3478
+      - --services.turn.enabled
+      - --services.turn.public-ip=10.251.0.1
+      - --mesh.join-address=site-1-leader:8443
+      - --mesh.max-join-retries=10
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+      
   # Site 1
 
   site-1-leader:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
     networks:
       public-net:
         ipv4_address: 10.250.0.1
       site-1:
+      ice-net:
     hostname: site-1-leader
     entrypoint:
       - /node
@@ -58,26 +88,26 @@ services:
       - --services.api.leader-proxy
       - --services.api.mesh
       - --services.api.admin
+      - --services.api.webrtc
       - --services.mesh-dns.enabled
-      - --services.metrics.enabled
-      - --services.metrics.listen-address=:8000
       - --services.dashboard.enabled
       - --services.dashboard.listen-address=:8080
       - --wireguard.key-file=/data/wireguard.key
     ports:
-      - 8000:8000
       - 8080:8080
       - 8443:8443
       - 5354:5353/udp
     volumes:
       - site-1-leader:/data
+    restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
-  site-1-follower-1:
+  site-1-follower:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       site-1:
-    hostname: site-1-follower-1
+      ice-net:
+    hostname: site-1-follower
     entrypoint:
       - /node
       - --global.insecure
@@ -86,38 +116,7 @@ services:
       - --mesh.join-address=site-1-leader:8443
       - --mesh.max-join-retries=10
       - --mesh.zone-awareness-id=site-1
-    restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-
-  site-1-follower-2:
-    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    networks:
-      site-1:
-    hostname: site-1-follower-2
-    entrypoint:
-      - /node
-      - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-address=site-1-leader:8443
-      - --mesh.max-join-retries=15
-      - --mesh.zone-awareness-id=site-1
-    restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-
-  site-1-follower-3:
-    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    networks:
-      site-1:
-    hostname: site-1-follower-3
-    entrypoint:
-      - /node
-      - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-address=site-1-leader:8443
-      - --mesh.max-join-retries=15
-      - --mesh.zone-awareness-id=site-1
+      - --mesh.direct-peers=site-2-follower,site-3-follower
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -129,6 +128,7 @@ services:
       public-net:
         ipv4_address: 10.250.0.2
       site-2:
+      ice-net:
     hostname: site-2-leader
     entrypoint:
       - /node
@@ -145,32 +145,19 @@ services:
       - --mesh.zone-awareness-id=site-2
       - --services.api.leader-proxy
       - --services.api.mesh
+      - --services.api.webrtc
       - --wireguard.key-file=/data/wireguard.key
     volumes:
       - site-2-leader:/data
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-
-  site-2-follower-1:
-    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    networks:
-      site-2:
-    hostname: site-2-follower-1
-    entrypoint:
-      - /node
-      - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-address=site-2-leader:8443
-      - --mesh.max-join-retries=15
-      - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
-  site-2-follower-2:
+  site-2-follower:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       site-2:
-    hostname: site-2-follower-2
+      ice-net:
+    hostname: site-2-follower
     entrypoint:
       - /node
       - --global.insecure
@@ -179,22 +166,7 @@ services:
       - --mesh.join-address=site-2-leader:8443
       - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-2
-    restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-
-  site-2-follower-3:
-    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    networks:
-      site-2:
-    hostname: site-2-follower-3
-    entrypoint:
-      - /node
-      - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-address=site-2-leader:8443
-      - --mesh.max-join-retries=15
-      - --mesh.zone-awareness-id=site-2
+      - --mesh.direct-peers=site-1-follower,site-3-follower
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -206,6 +178,7 @@ services:
       public-net:
         ipv4_address: 10.250.0.3
       site-3:
+      ice-net:
     hostname: site-3-leader
     entrypoint:
       - /node
@@ -222,32 +195,19 @@ services:
       - --mesh.zone-awareness-id=site-3
       - --services.api.leader-proxy
       - --services.api.mesh
+      - --services.api.webrtc
       - --wireguard.key-file=/data/wireguard.key
     volumes:
       - site-3-leader:/data
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-
-  site-3-follower-1:
-    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    networks:
-      site-3:
-    hostname: site-3-follower-1
-    entrypoint:
-      - /node
-      - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-address=site-3-leader:8443
-      - --mesh.max-join-retries=15
-      - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
-  site-3-follower-2:
+  site-3-follower:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       site-3:
-    hostname: site-3-follower-2
+      ice-net:
+    hostname: site-3-follower
     entrypoint:
       - /node
       - --global.insecure
@@ -256,21 +216,6 @@ services:
       - --mesh.join-address=site-3-leader:8443
       - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-3
-    restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-
-  site-3-follower-3:
-    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    networks:
-      site-3:
-    hostname: site-3-follower-3
-    entrypoint:
-      - /node
-      - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-address=site-3-leader:8443
-      - --mesh.max-join-retries=15
-      - --mesh.zone-awareness-id=site-3
+      - --mesh.direct-peers=site-1-follower,site-2-follower
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

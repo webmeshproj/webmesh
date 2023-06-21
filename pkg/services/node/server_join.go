@@ -56,9 +56,19 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if !s.store.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
+	if !s.ulaPrefix.IsValid() {
+		// We haven't loaded the ULA prefix yet, so do it now
+		var err error
+		s.ulaPrefix, err = s.meshstate.GetULAPrefix(ctx)
+		if err != nil {
+			// DB error, bail
+			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
+		}
+	}
 
 	// Validate inputs
 	if req.GetId() == "" {
+		// TODO: This is technically not required if we are using authenticated gRPC
 		return nil, status.Error(codes.InvalidArgument, "node id required")
 	}
 	if len(req.GetRoutes()) > 0 {
@@ -97,7 +107,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if len(req.GetDirectPeers()) > 0 {
 			for _, peer := range req.GetDirectPeers() {
 				actions = append(actions, canPutEdgeAction.For(peer))
-				actions = append(actions, canNegDataChannelAction[0].For(peer))
+				actions = append(actions, canNegDataChannelAction.For(peer)...)
 			}
 		}
 		if len(actions) > 0 {
@@ -111,14 +121,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 					slog.Any("actions", actions))
 				return nil, status.Error(codes.PermissionDenied, "not allowed")
 			}
-		}
-	}
-
-	if !s.ulaPrefix.IsValid() {
-		var err error
-		s.ulaPrefix, err = s.meshstate.GetULAPrefix(ctx)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
 		}
 	}
 
@@ -164,6 +166,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	} else {
 		// New peer, create it
 		log.Info("registering new peer")
+		// We always generate an IPv6 address for the peer, even if they
+		// choose not to use it. This helps enforce an upper bound on the
+		// number of peers we can have in the network (ULA/48 with /64 prefixes == 65536 peers,
+		// same as a /16 class B and the limit for direct WireGuard peers an interface can hold).
+		// However, closer to that upper bound, we'll need to use a non-random way
+		// (or at least a more efficient way than brute force) of generating
+		// IPv6 addresses. Currently the put will fail if the IPv6 address
+		// is already in use.
 		networkIPv6, err := util.Random64(s.ulaPrefix)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
@@ -358,10 +368,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if requiresICE {
 		iceAddrs, err := s.meshstate.ListPublicPeersWithFeature(ctx, s.proxyCreds, req.GetId(), v1.Feature_ICE_NEGOTIATION)
 		if err != nil {
-			return nil, err
+			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
 		}
 		for _, addr := range iceAddrs {
 			resp.IceServers = append(resp.IceServers, addr.String())
+		}
+		if len(resp.IceServers) == 0 {
+			log.Warn("no peers with ICE negotiation feature found, rejecting join request")
+			return nil, status.Errorf(codes.FailedPrecondition, "no peers with ICE negotiation feature found")
 		}
 	}
 

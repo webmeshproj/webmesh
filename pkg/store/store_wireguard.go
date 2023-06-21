@@ -230,7 +230,7 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 				iceAddrs, err := state.New(s).ListPublicPeersWithFeature(ctx, s.grpcCreds(ctx), s.ID(), v1.Feature_ICE_NEGOTIATION)
 				if err != nil {
 					// DB error, somethings wrong, bail.
-					return err
+					return fmt.Errorf("list public peers with feature: %w", err)
 				}
 				// Pick the first address that is not the peer we are trying to connect to.
 				var iceAddr netip.AddrPort
@@ -265,7 +265,6 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 					addr = &net.UDPAddr{
 						IP:   addr.IP.To4(),
 						Port: addr.Port,
-						Zone: addr.Zone,
 					}
 				}
 				peer.Endpoint = addr.AddrPort()
@@ -404,8 +403,24 @@ func (s *store) negotiateWireGuardICEConnection(ctx context.Context, server stri
 		return nil, fmt.Errorf("listen: %w", err)
 	}
 	localAddr := l.LocalAddr().(*net.UDPAddr)
-	// TODO: Monitor the connection and reopen it if it fails
-	go pc.Handle(l)
+	if localAddr.AddrPort().Addr().Is4In6() {
+		// This is an IPv4 address masquerading as an IPv6 address.
+		// We need to convert it to a real IPv4 address.
+		// This is a workaround for a bug in Go's net package.
+		localAddr = &net.UDPAddr{
+			IP:   localAddr.IP.To4(),
+			Port: localAddr.Port,
+		}
+	}
+	go func() {
+		// TODO: reopen the connection if it closes and we are still
+		// peered with the node.
+		defer pc.Close()
+		pc.Handle(l)
+		s.pcmux.Lock()
+		defer s.pcmux.Unlock()
+		delete(s.peerConns, peer.GetId())
+	}()
 	s.peerConns[peer.GetId()] = clientPeerConn{
 		peerConn:  pc,
 		localAddr: localAddr,

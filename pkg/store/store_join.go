@@ -147,6 +147,7 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 		PreferRaftIpv6:     s.opts.Raft.PreferIPv6,
 		AsVoter:            s.opts.Mesh.JoinAsVoter,
 		Routes:             s.opts.Mesh.Routes,
+		DirectPeers:        s.opts.Mesh.DirectPeers,
 	}
 	log.Debug("sending join request to node", slog.Any("req", req))
 	resp, err := client.Join(ctx, req)

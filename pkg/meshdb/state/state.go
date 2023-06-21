@@ -161,6 +161,9 @@ func (s *state) ListPublicPeersWithFeature(ctx context.Context, creds []grpc.Dia
 	if err != nil {
 		return nil, fmt.Errorf("list public addresses: %w", err)
 	}
+	if len(publicAddrs) == 0 {
+		return nil, nil
+	}
 	privateAddrs, err := s.ListPeerPrivateRPCAddresses(ctx, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("list private addresses: %w", err)

@@ -203,6 +203,9 @@ func (g *GraphStore) VertexCount() (int, error) {
 // If either vertex doesn't exit, ErrVertexNotFound should be returned for the respective
 // vertex. If the edge already exists, ErrEdgeAlreadyExists should be returned.
 func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
+	// We diverge from the suggested implementation and only check that one of the nodes
+	// exists. This is so joiners can add edges to nodes that are not yet in the graph.
+	// If this ends up causing problems, we can change it.
 	_, err := g.rdb.EitherNodeExists(context.Background(), models.EitherNodeExistsParams{
 		ID:   sourceNode,
 		ID_2: targetNode,
