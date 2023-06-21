@@ -14,11 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package portforward contains utilities for the port-forward subcommand.
-package portforward
+package datachannels
 
 import (
-	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -29,21 +27,14 @@ import (
 	"github.com/pion/datachannel"
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-// WebRTC is the WebRTC API.
-var WebRTC *webrtc.API
-
-func init() {
-	s := webrtc.SettingEngine{}
-	s.DetachDataChannels()
-	WebRTC = webrtc.NewAPI(webrtc.WithSettingEngine(s))
-}
-
-// Options are options for configuring the peer connection.
-type Options struct {
+// ClientOptions are options for configuring a client peer connection.
+type ClientOptions struct {
 	// Client is the webmesh client for performing ICE negotiation.
 	Client v1.WebRTCClient
 	// NodeID is the node ID to request for connection channels.
@@ -53,15 +44,16 @@ type Options struct {
 	// Destination is the destination address to request for connection channels.
 	Destination string
 	// Port is the destination port to request for connection channels.
+	// A port of 0 with the udp protocol indicates WireGuard interface traffic.
 	Port uint32
 }
 
-// PeerConnection is a WebRTC peer connection for port forwarding.
-type PeerConnection struct {
+// ClientPeerConnection is a WebRTC peer connection for port forwarding.
+type ClientPeerConnection struct {
 	// PeerConnection is the underlying WebRTC peer connection.
 	*webrtc.PeerConnection
 	// options are the options for configuring the peer connection.
-	options *Options
+	options *ClientOptions
 	// errors is a channel for receiving errors from the peer connection.
 	errors chan error
 	// ready is a channel for receiving a notification when the peer connection is ready.
@@ -75,10 +67,12 @@ type PeerConnection struct {
 	// count is the number of connections handled. It is used for
 	// incrementing the connection channel ID.
 	count atomic.Uint32
+	// logger is the logger to use for the connection.
+	logger *slog.Logger
 }
 
-// NewPeerConnection creates a new peer connection.
-func NewPeerConnection(ctx context.Context, opts *Options) (*PeerConnection, error) {
+// NewClientPeerConnection creates a new peer connection.
+func NewClientPeerConnection(ctx context.Context, opts *ClientOptions) (*ClientPeerConnection, error) {
 	// Send a request for a data channel.
 	neg, err := opts.Client.StartDataChannel(ctx)
 	if err != nil {
@@ -118,13 +112,14 @@ func NewPeerConnection(ctx context.Context, opts *Options) (*PeerConnection, err
 		return nil, fmt.Errorf("failed to create peer connection: %w", err)
 	}
 	// Build the peer connection
-	pc := &PeerConnection{
+	pc := &ClientPeerConnection{
 		PeerConnection: p,
 		options:        opts,
 		errors:         make(chan error, 5),
 		ready:          make(chan struct{}),
 		closed:         make(chan struct{}),
 		neg:            neg,
+		logger:         context.LoggerFrom(ctx).With("peer", opts.NodeID),
 	}
 	// Create the negotiation data channel
 	d, err := pc.CreateDataChannel(
@@ -148,16 +143,52 @@ func NewPeerConnection(ctx context.Context, opts *Options) (*PeerConnection, err
 }
 
 // Errors returns a channel for receiving errors from the peer connection.
-func (pc *PeerConnection) Errors() <-chan error { return pc.errors }
+func (pc *ClientPeerConnection) Errors() <-chan error { return pc.errors }
 
 // Ready returns a channel for receiving a notification when the peer connection is ready.
-func (pc *PeerConnection) Ready() <-chan struct{} { return pc.ready }
+func (pc *ClientPeerConnection) Ready() <-chan struct{} { return pc.ready }
 
 // Closed returns a channel for receiving a notification when the peer connection is closed.
-func (pc *PeerConnection) Closed() <-chan struct{} { return pc.closed }
+func (pc *ClientPeerConnection) Closed() <-chan struct{} { return pc.closed }
+
+// ListenAndServe creates a listener and passes incoming connections to the handler.
+func (pc *ClientPeerConnection) ListenAndServe(ctx context.Context, proto, addr string) error {
+	l, err := net.Listen(proto, addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", addr, err)
+	}
+	defer l.Close()
+	return pc.Serve(ctx, l)
+}
+
+// Serve handles connections on the given listener.
+func (pc *ClientPeerConnection) Serve(ctx context.Context, l net.Listener) error {
+	errs := make(chan error, 1)
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				if err == io.EOF || err == net.ErrClosed {
+					return
+				}
+				errs <- fmt.Errorf("failed to accept connection: %w", err)
+				return
+			}
+			go pc.Handle(conn)
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil
+	case <-pc.closed:
+		return nil
+	case err := <-errs:
+		return err
+	}
+}
 
 // Handle handles the given connection.
-func (pc *PeerConnection) Handle(conn net.Conn) {
+func (pc *ClientPeerConnection) Handle(conn net.Conn) {
 	connNumber := pc.count.Add(1)
 	if err := binary.Write(pc.channels, binary.BigEndian, connNumber); err != nil {
 		pc.errors <- fmt.Errorf("failed to write to negotiation data channel: %w", err)
@@ -175,12 +206,10 @@ func (pc *PeerConnection) Handle(conn net.Conn) {
 		return
 	}
 	d.OnClose(func() {
-		// TODO: Use a logger
-		fmt.Println("Connection data channel closed:", connNumber)
+		pc.logger.Debug("Connection data channel closed:", "conn", connNumber)
 	})
 	d.OnOpen(func() {
-		// TODO: Use a logger
-		fmt.Println("Connection data channel opened, proxying:", connNumber)
+		pc.logger.Debug("Connection data channel opened, proxying:", "conn", connNumber)
 		defer conn.Close()
 		defer d.Close()
 		rw, err := d.Detach()
@@ -201,10 +230,9 @@ func (pc *PeerConnection) Handle(conn net.Conn) {
 	})
 }
 
-func (pc *PeerConnection) onOpen(d *webrtc.DataChannel) func() {
+func (pc *ClientPeerConnection) onOpen(d *webrtc.DataChannel) func() {
 	return func() {
-		// TODO: Use a logger
-		fmt.Println("Negotiation data channel opened")
+		pc.logger.Info("Negotiation data channel opened")
 		defer close(pc.ready)
 		detached, err := d.Detach()
 		if err != nil {
@@ -215,7 +243,7 @@ func (pc *PeerConnection) onOpen(d *webrtc.DataChannel) func() {
 	}
 }
 
-func (pc *PeerConnection) onIceCandidate(candidate *webrtc.ICECandidate) {
+func (pc *ClientPeerConnection) onIceCandidate(candidate *webrtc.ICECandidate) {
 	if candidate == nil {
 		return
 	}
@@ -227,17 +255,15 @@ func (pc *PeerConnection) onIceCandidate(candidate *webrtc.ICECandidate) {
 	}
 }
 
-func (pc *PeerConnection) onConnectionStateChange(s webrtc.PeerConnectionState) {
-	// TODO: Use a logger
-	fmt.Printf("Peer connection state has changed to %s\n", s.String())
+func (pc *ClientPeerConnection) onConnectionStateChange(s webrtc.PeerConnectionState) {
+	pc.logger.Debug("Peer connection state has changed", "state", s.String())
 	if s == webrtc.PeerConnectionStateConnected {
 		err := pc.neg.CloseSend()
 		if err != nil {
 			pc.errors <- fmt.Errorf("failed to close negotiation stream: %w", err)
 		}
 	}
-	if s == webrtc.PeerConnectionStateClosed || s == webrtc.PeerConnectionStateDisconnected || s == webrtc.PeerConnectionStateFailed {
-		// Alternatively, we can wait for only Failed state which will attempt to reconnect for 30 seconds.
+	if s == webrtc.PeerConnectionStateFailed || s == webrtc.PeerConnectionStateClosed {
 		defer pc.Close()
 		select {
 		case <-pc.closed:
@@ -248,7 +274,7 @@ func (pc *PeerConnection) onConnectionStateChange(s webrtc.PeerConnectionState) 
 	}
 }
 
-func (pc *PeerConnection) negotiate(offer webrtc.SessionDescription) {
+func (pc *ClientPeerConnection) negotiate(offer webrtc.SessionDescription) {
 	// Set the remote SessionDescription
 	if err := pc.SetRemoteDescription(offer); err != nil {
 		pc.errors <- fmt.Errorf("failed to set remote description: %w", err)

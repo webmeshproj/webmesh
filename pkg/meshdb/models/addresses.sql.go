@@ -37,26 +37,103 @@ func (q *Queries) GetNodePublicRPCAddress(ctx context.Context, nodeID string) (i
 	return address, err
 }
 
-const GetPeerPrivateRPCAddresses = `-- name: GetPeerPrivateRPCAddresses :many
+const ListPeerPrivateRPCAddresses = `-- name: ListPeerPrivateRPCAddresses :many
 SELECT
+    node_id AS node_id,
     CAST(address AS TEXT) AS address
 FROM node_private_rpc_addresses
 WHERE node_id <> ?
 `
 
-func (q *Queries) GetPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]interface{}, error) {
-	rows, err := q.db.QueryContext(ctx, GetPeerPrivateRPCAddresses, nodeID)
+type ListPeerPrivateRPCAddressesRow struct {
+	NodeID  string      `json:"node_id"`
+	Address interface{} `json:"address"`
+}
+
+func (q *Queries) ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]ListPeerPrivateRPCAddressesRow, error) {
+	rows, err := q.db.QueryContext(ctx, ListPeerPrivateRPCAddresses, nodeID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []interface{}
+	var items []ListPeerPrivateRPCAddressesRow
 	for rows.Next() {
-		var address interface{}
-		if err := rows.Scan(&address); err != nil {
+		var i ListPeerPrivateRPCAddressesRow
+		if err := rows.Scan(&i.NodeID, &i.Address); err != nil {
 			return nil, err
 		}
-		items = append(items, address)
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const ListPeerPublicRPCAddresses = `-- name: ListPeerPublicRPCAddresses :many
+SELECT
+    node_id AS node_id,
+    CAST(address AS TEXT) AS address
+FROM node_public_rpc_addresses
+WHERE node_id <> ?
+`
+
+type ListPeerPublicRPCAddressesRow struct {
+	NodeID  string      `json:"node_id"`
+	Address interface{} `json:"address"`
+}
+
+func (q *Queries) ListPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]ListPeerPublicRPCAddressesRow, error) {
+	rows, err := q.db.QueryContext(ctx, ListPeerPublicRPCAddresses, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPeerPublicRPCAddressesRow
+	for rows.Next() {
+		var i ListPeerPublicRPCAddressesRow
+		if err := rows.Scan(&i.NodeID, &i.Address); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const ListPrivateRPCAddresses = `-- name: ListPrivateRPCAddresses :many
+SELECT
+    node_id AS node_id,
+    CAST(address AS TEXT) AS address
+FROM node_private_rpc_addresses
+`
+
+type ListPrivateRPCAddressesRow struct {
+	NodeID  string      `json:"node_id"`
+	Address interface{} `json:"address"`
+}
+
+func (q *Queries) ListPrivateRPCAddresses(ctx context.Context) ([]ListPrivateRPCAddressesRow, error) {
+	rows, err := q.db.QueryContext(ctx, ListPrivateRPCAddresses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPrivateRPCAddressesRow
+	for rows.Next() {
+		var i ListPrivateRPCAddressesRow
+		if err := rows.Scan(&i.NodeID, &i.Address); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

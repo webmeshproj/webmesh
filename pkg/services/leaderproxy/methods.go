@@ -77,4 +77,9 @@ var MethodPolicyMap = map[string]MethodPolicy{
 	v1.Admin_DeleteRoute_FullMethodName: RequireLeader,
 	v1.Admin_GetRoute_FullMethodName:    AllowNonLeader,
 	v1.Admin_ListRoutes_FullMethodName:  AllowNonLeader,
+
+	v1.Admin_PutEdge_FullMethodName:    RequireLeader,
+	v1.Admin_DeleteEdge_FullMethodName: RequireLeader,
+	v1.Admin_GetEdge_FullMethodName:    AllowNonLeader,
+	v1.Admin_ListEdges_FullMethodName:  AllowNonLeader,
 }

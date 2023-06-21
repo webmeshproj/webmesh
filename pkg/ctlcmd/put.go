@@ -50,6 +50,11 @@ var (
 	putRouteNode    string
 	putRouteCIDRs   []string
 	putRouteNextHop string
+
+	putEdgeFrom   string
+	putEdgeTo     string
+	putEdgeWeight int32
+	putEdgeICE    bool
 )
 
 func init() {
@@ -100,11 +105,22 @@ func init() {
 	cobra.CheckErr(putRouteCmd.RegisterFlagCompletionFunc("node", completeNodes(1)))
 	cobra.CheckErr(putRouteCmd.RegisterFlagCompletionFunc("next-hop", completeNodes(1)))
 
+	putEdgeFlags := putEdgeCmd.Flags()
+	putEdgeFlags.StringVar(&putEdgeFrom, "from", "", "node to add the edge from")
+	putEdgeFlags.StringVar(&putEdgeTo, "to", "", "node to add the edge to")
+	putEdgeFlags.Int32Var(&putEdgeWeight, "weight", 0, "weight of the edge")
+	putEdgeFlags.BoolVar(&putEdgeICE, "ice", false, "whether the edge is negotiated over ICE")
+	cobra.CheckErr(putEdgeCmd.RegisterFlagCompletionFunc("from", completeNodes(1)))
+	cobra.CheckErr(putEdgeCmd.RegisterFlagCompletionFunc("to", completeNodes(1)))
+	cobra.CheckErr(putEdgeCmd.MarkFlagRequired("from"))
+	cobra.CheckErr(putEdgeCmd.MarkFlagRequired("to"))
+
 	putCmd.AddCommand(putRoleCmd)
 	putCmd.AddCommand(putRoleBindingCmd)
 	putCmd.AddCommand(putGroupCmd)
 	putCmd.AddCommand(putNetworkACLCmd)
 	putCmd.AddCommand(putRouteCmd)
+	putCmd.AddCommand(putEdgeCmd)
 
 	rootCmd.AddCommand(putCmd)
 }
@@ -286,7 +302,7 @@ var putGroupCmd = &cobra.Command{
 var putNetworkACLCmd = &cobra.Command{
 	Use:               "networkacls [NAME]",
 	Short:             "Create or update a networkacl in the mesh",
-	Aliases:           []string{"networkacl", "nacl", "acl"},
+	Aliases:           []string{"networkacl", "nacl", "nacls", "acl", "acls"},
 	Args:              cobra.MaximumNArgs(1),
 	ValidArgsFunction: completeNetworkACLs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -366,6 +382,34 @@ var putRouteCmd = &cobra.Command{
 			return err
 		}
 		cmd.Println("put route", route.Name)
+		return nil
+	},
+}
+
+var putEdgeCmd = &cobra.Command{
+	Use:     "edges [NAME]",
+	Short:   "Create or update an edge in the mesh",
+	Aliases: []string{"edge"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		edge := &v1.MeshEdge{
+			Source:     putEdgeFrom,
+			Target:     putEdgeTo,
+			Weight:     putEdgeWeight,
+			Attributes: make(map[string]string),
+		}
+		if putEdgeICE {
+			edge.Attributes[v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String()] = "true"
+		}
+		_, err = client.PutEdge(cmd.Context(), edge)
+		if err != nil {
+			return err
+		}
+		cmd.Println("put edge from", edge.GetSource(), "to", edge.GetTarget())
 		return nil
 	},
 }

@@ -21,12 +21,25 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 )
 
+var (
+	deleteEdgeFrom string
+	deleteEdgeTo   string
+)
+
 func init() {
 	deleteCmd.AddCommand(deleteRolesCmd)
 	deleteCmd.AddCommand(deleteRoleBindingsCmd)
 	deleteCmd.AddCommand(deleteGroupsCmd)
 	deleteCmd.AddCommand(deleteNetworkACLsCmd)
 	deleteCmd.AddCommand(deleteRoutesCmd)
+
+	deleteEdgesCmd.Flags().StringVar(&getEdgeFrom, "from", "", "The source node ID")
+	deleteEdgesCmd.Flags().StringVar(&getEdgeTo, "to", "", "The destination node ID")
+	cobra.CheckErr(deleteEdgesCmd.RegisterFlagCompletionFunc("from", completeNodes(1)))
+	cobra.CheckErr(deleteEdgesCmd.RegisterFlagCompletionFunc("to", completeNodes(1)))
+	cobra.CheckErr(deleteEdgesCmd.MarkFlagRequired("from"))
+	cobra.CheckErr(deleteEdgesCmd.MarkFlagRequired("to"))
+	deleteCmd.AddCommand(deleteEdgesCmd)
 
 	rootCmd.AddCommand(deleteCmd)
 }
@@ -108,7 +121,7 @@ var deleteGroupsCmd = &cobra.Command{
 var deleteNetworkACLsCmd = &cobra.Command{
 	Use:               "networkacls",
 	Short:             "Delete networkacls from the mesh",
-	Aliases:           []string{"networkacl", "nacl", "acl"},
+	Aliases:           []string{"networkacl", "nacl", "nacls", "acl", "acls"},
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeNetworkACLs(-1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -148,5 +161,23 @@ var deleteRoutesCmd = &cobra.Command{
 			cmd.Println("Deleted route", arg)
 		}
 		return nil
+	},
+}
+
+var deleteEdgesCmd = &cobra.Command{
+	Use:     "edges",
+	Short:   "Delete edges from the mesh",
+	Aliases: []string{"edge"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		_, err = client.DeleteEdge(cmd.Context(), &v1.MeshEdge{
+			Source: deleteEdgeFrom,
+			Target: deleteEdgeTo,
+		})
+		return err
 	},
 }

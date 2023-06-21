@@ -179,6 +179,15 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	case v1.Admin_ListRoutes_FullMethodName:
 		return v1.NewAdminClient(conn).ListRoutes(ctx, req.(*emptypb.Empty))
 
+	case v1.Admin_PutEdge_FullMethodName:
+		return v1.NewAdminClient(conn).PutEdge(ctx, req.(*v1.MeshEdge))
+	case v1.Admin_DeleteEdge_FullMethodName:
+		return v1.NewAdminClient(conn).DeleteEdge(ctx, req.(*v1.MeshEdge))
+	case v1.Admin_GetEdge_FullMethodName:
+		return v1.NewAdminClient(conn).GetEdge(ctx, req.(*v1.MeshEdge))
+	case v1.Admin_ListEdges_FullMethodName:
+		return v1.NewAdminClient(conn).ListEdges(ctx, req.(*emptypb.Empty))
+
 	default:
 		return nil, status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}

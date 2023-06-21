@@ -199,7 +199,17 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 			return fmt.Errorf("parse peer key: %w", err)
 		}
 		var endpoint netip.AddrPort
-		addr, err := net.ResolveUDPAddr("udp", peer.GetPrimaryEndpoint())
+		var addr *net.UDPAddr
+		if peer.GetIce() {
+			// We are peered with this node via ICE.
+			if len(resp.GetIceServers()) == 0 {
+				return fmt.Errorf("no ICE servers provided")
+			}
+			// TODO: Try all ICE servers
+			addr, err = s.negotiateWireGuardICEConnection(ctx, resp.GetIceServers()[0], peer)
+		} else {
+			addr, err = net.ResolveUDPAddr("udp", peer.GetPrimaryEndpoint())
+		}
 		if err != nil {
 			log.Error("could not resolve peer primary endpoint", slog.String("error", err.Error()))
 		} else {
@@ -215,7 +225,7 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 			}
 			endpoint = addr.AddrPort()
 		}
-		if s.opts.Mesh.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() != "" {
+		if !peer.GetIce() && s.opts.Mesh.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() != "" {
 			if peer.GetZoneAwarenessId() == s.opts.Mesh.ZoneAwarenessID {
 				if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetWireguardEndpoints()) > 0 {
 					// We share zone awareness with the peer and their primary endpoint
@@ -304,6 +314,10 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 }
 
 func (s *store) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
+	return grpc.DialContext(ctx, addr, s.grpcCreds(ctx)...)
+}
+
+func (s *store) grpcCreds(ctx context.Context) []grpc.DialOption {
 	log := context.LoggerFrom(ctx)
 	var opts []grpc.DialOption
 	if s.opts.TLS.Insecure {
@@ -322,5 +336,5 @@ func (s *store) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn,
 			opts = append(opts, ldap.NewCreds(s.opts.Auth.LDAP.Username, s.opts.Auth.LDAP.Password))
 		}
 	}
-	return grpc.DialContext(ctx, addr, opts...)
+	return opts
 }

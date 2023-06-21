@@ -22,6 +22,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -31,6 +32,7 @@ type Server struct {
 	v1.UnimplementedAdminServer
 
 	store      meshdb.Store
+	peers      peers.Peers
 	rbac       rbacdb.RBAC
 	rbacEval   rbac.Evaluator
 	networking networking.Networking
@@ -44,6 +46,7 @@ func New(store meshdb.Store, insecure bool) *Server {
 	}
 	return &Server{
 		store:      store,
+		peers:      peers.New(store),
 		rbac:       rbacdb.New(store),
 		rbacEval:   rbacEval,
 		networking: networking.New(store),

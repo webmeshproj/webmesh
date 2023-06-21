@@ -18,21 +18,30 @@ limitations under the License.
 package webrtc
 
 import (
+	"fmt"
 	"io"
+	"net"
+	"strconv"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/services/datachannels"
+	"github.com/webmeshproj/node/pkg/net/datachannels"
+	"github.com/webmeshproj/node/pkg/services/rbac"
 )
+
+var canNegDataChannelAction = rbac.Actions{
+	{
+		Verb:     v1.RuleVerbs_VERB_PUT,
+		Resource: v1.RuleResource_RESOURCE_DATA_CHANNELS,
+	},
+}
 
 func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error {
 	// Determine the remote address of the peer.
@@ -73,9 +82,13 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 		log.Error("request has empty node ID")
 		return status.Error(codes.InvalidArgument, "node ID must be provided in request")
 	}
-	if r.GetPort() == 0 || r.GetPort() > 65535 {
-		log.Error("request has invalid port")
-		return status.Error(codes.InvalidArgument, "invalid port provided in request")
+	allowed, err := s.rbacEval.Evaluate(stream.Context(), canNegDataChannelAction.For(r.GetNodeId()))
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to evaluate data channel permissions: %v", err)
+	}
+	if !allowed {
+		log.Warn("not allowed to negotiate data channel")
+		return status.Error(codes.PermissionDenied, "not allowed")
 	}
 	// Set defaults.
 	if r.GetDst() == "" {
@@ -83,6 +96,14 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 	}
 	if r.GetProto() == "" {
 		r.Proto = "tcp"
+	}
+	if r.GetPort() > 65535 {
+		log.Error("request has invalid port")
+		return status.Error(codes.InvalidArgument, "invalid port provided in request")
+	}
+	if r.GetPort() == 0 && r.GetProto() != "udp" {
+		log.Error("request has invalid port")
+		return status.Error(codes.InvalidArgument, "invalid port provided in request")
 	}
 	if r.GetNodeId() == string(s.store.ID()) {
 		// We are the destination node.
@@ -93,10 +114,21 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 
 func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_StartDataChannelServer, r *v1.StartDataChannelRequest, remoteAddr string) error {
 	log.Info("handling negotiation locally")
-	conn, err := datachannels.NewPeerConnection(&datachannels.OfferOptions{
+	var dstAddress string
+	if r.GetPort() == 0 && r.GetProto() == "udp" {
+		// Lookup our WireGuard port.
+		port, err := s.store.WireGuard().ListenPort()
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to get WireGuard listen port: %v", err)
+		}
+		dstAddress = fmt.Sprintf("127.0.0.1:%d", port)
+	} else {
+		dstAddress = net.JoinHostPort(r.GetDst(), strconv.Itoa(int(r.GetPort())))
+	}
+	conn, err := datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
 		Proto:       r.GetProto(),
 		SrcAddress:  remoteAddr,
-		DstAddress:  r.GetDst(),
+		DstAddress:  dstAddress,
 		STUNServers: s.stunServers,
 	})
 	if err != nil {
@@ -319,13 +351,7 @@ func (s *Server) newPeerClient(ctx context.Context, id string) (v1.NodeClient, i
 		context.LoggerFrom(ctx).Error("failed to get peer address", slog.String("error", err.Error()))
 		return nil, nil, status.Error(codes.NotFound, "failed to get peer address")
 	}
-	var creds credentials.TransportCredentials
-	if s.tlsConfig == nil {
-		creds = insecure.NewCredentials()
-	} else {
-		creds = credentials.NewTLS(s.tlsConfig)
-	}
-	conn, err := grpc.DialContext(ctx, addr.String(), grpc.WithTransportCredentials(creds))
+	conn, err := grpc.DialContext(ctx, addr.String(), s.proxyCreds...)
 	if err != nil {
 		return nil, nil, status.Errorf(codes.FailedPrecondition, "could not connect to node %s: %s", id, err.Error())
 	}

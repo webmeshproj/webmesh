@@ -17,7 +17,6 @@ limitations under the License.
 package store
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/netip"
@@ -25,11 +24,14 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
+	"github.com/webmeshproj/node/pkg/net/datachannels"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/mesh"
 	"github.com/webmeshproj/node/pkg/net/system"
@@ -217,8 +219,41 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 				return fmt.Errorf("parse peer allowed route: %w", err)
 			}
 		}
-		// Resolve the endpoint and check for zone awareness
-		if wgPeer.GetPrimaryEndpoint() != "" {
+		if wgPeer.GetIce() {
+			// We are using ICE with this peer.
+			// If we are already peered with this peer, we don't need to do anything.
+			// Otherwise, we need to negotiate a new connection.
+			if conn, ok := s.peerConns[peer.ID]; ok {
+				peer.Endpoint = conn.localAddr.AddrPort()
+			} else {
+				// We need to negotiate a new connection.
+				iceAddrs, err := state.New(s).ListPublicPeersWithFeature(ctx, s.grpcCreds(ctx), s.ID(), v1.Feature_ICE_NEGOTIATION)
+				if err != nil {
+					// DB error, somethings wrong, bail.
+					return err
+				}
+				// Pick the first address that is not the peer we are trying to connect to.
+				var iceAddr netip.AddrPort
+				for node, addr := range iceAddrs {
+					if node != peer.ID {
+						iceAddr = addr
+						break
+					}
+				}
+				// If any of these fail, there is still a chance the peer will be able to connect to us.
+				if !iceAddr.IsValid() {
+					s.log.Error("no ice addresses found, cannot connect to peer directly", slog.String("peer", peer.ID))
+				} else {
+					l, err := s.negotiateWireGuardICEConnection(ctx, iceAddr.String(), wgPeer)
+					if err != nil {
+						s.log.Error("could not negotiate ice connection, cannot connect to peer directly", slog.String("peer", peer.ID), slog.String("error", err.Error()))
+					} else {
+						peer.Endpoint = l.AddrPort()
+					}
+				}
+			}
+		} else if wgPeer.GetPrimaryEndpoint() != "" {
+			// Resolve the endpoint and check for zone awareness
 			addr, err := net.ResolveUDPAddr("udp", wgPeer.GetPrimaryEndpoint())
 			if err != nil {
 				s.log.Error("could not resolve primary udp addr", slog.String("error", err.Error()))
@@ -328,4 +363,52 @@ func (s *store) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
 		}
 	}
 	return key, nil
+}
+
+func (s *store) negotiateWireGuardICEConnection(ctx context.Context, server string, peer *v1.WireGuardPeer) (*net.UDPAddr, error) {
+	s.pcmux.Lock()
+	defer s.pcmux.Unlock()
+
+	log := context.LoggerFrom(ctx)
+	log.Info("negotiating wireguard ICE connection", slog.String("server", server), slog.String("peer", peer.GetId()))
+	conn, err := s.newGRPCConn(ctx, server)
+	if err != nil {
+		return nil, fmt.Errorf("dial webRTC server: %w", err)
+	}
+	defer conn.Close()
+	pc, err := datachannels.NewClientPeerConnection(ctx, &datachannels.ClientOptions{
+		Client:      v1.NewWebRTCClient(conn),
+		NodeID:      peer.GetId(),
+		Protocol:    "udp",
+		Destination: "127.0.0.1",
+		Port:        0,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create peer connection: %w", err)
+	}
+	select {
+	case <-ctx.Done():
+		defer pc.Close()
+		return nil, ctx.Err()
+	case err := <-pc.Errors():
+		defer pc.Close()
+		return nil, fmt.Errorf("peer connection error: %w", err)
+	case <-pc.Closed():
+		return nil, fmt.Errorf("peer connection failed to become ready")
+	case <-pc.Ready():
+		log.Info("wireguard ICE connection ready", slog.String("peer", peer.GetId()))
+	}
+	l, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IP{127, 0, 0, 1}, Port: 0})
+	if err != nil {
+		defer pc.Close()
+		return nil, fmt.Errorf("listen: %w", err)
+	}
+	localAddr := l.LocalAddr().(*net.UDPAddr)
+	// TODO: Monitor the connection and reopen it if it fails
+	go pc.Handle(l)
+	s.peerConns[peer.GetId()] = clientPeerConn{
+		peerConn:  pc,
+		localAddr: localAddr,
+	}
+	return localAddr, nil
 }

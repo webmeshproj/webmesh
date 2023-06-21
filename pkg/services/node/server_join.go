@@ -318,7 +318,25 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err)
 	}
+	var requiresICE bool
+	for _, peer := range peers {
+		if peer.PrimaryEndpoint == "" || peer.Ice {
+			requiresICE = true
+			break
+		}
+	}
 	resp.Peers = peers
+
+	// If the caller needs ICE servers, find all the eligible peers and return them
+	if requiresICE {
+		iceAddrs, err := s.meshstate.ListPublicPeersWithFeature(ctx, s.proxyCreds, req.GetId(), v1.Feature_ICE_NEGOTIATION)
+		if err != nil {
+			return nil, err
+		}
+		for _, addr := range iceAddrs {
+			resp.IceServers = append(resp.IceServers, addr.String())
+		}
+	}
 
 	// Notify any watchers that a new peer has joined
 	go func() {

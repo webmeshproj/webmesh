@@ -22,13 +22,13 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/pion/webrtc/v3"
 	"github.com/spf13/cobra"
 
 	"github.com/webmeshproj/node/pkg/ctlcmd/portforward"
+	"github.com/webmeshproj/node/pkg/net/datachannels"
 )
 
 func init() {
@@ -67,17 +67,12 @@ func portForward(cmd *cobra.Command, nodeID string, portForwardSpec string) erro
 	if err != nil {
 		return fmt.Errorf("failed to parse port forward spec: %w", err)
 	}
-	l, err := net.Listen(portForwardProtocol, net.JoinHostPort(portForwardAddress, strconv.Itoa(int(spec.LocalPort))))
-	if err != nil {
-		return fmt.Errorf("failed to listen on %s:%d: %w", portForwardAddress, spec.LocalPort, err)
-	}
-	defer l.Close()
 	client, closer, err := cliConfig.NewWebRTCClient()
 	if err != nil {
 		return err
 	}
 	defer closer.Close()
-	pc, err := portforward.NewPeerConnection(cmd.Context(), &portforward.Options{
+	pc, err := datachannels.NewClientPeerConnection(cmd.Context(), &datachannels.ClientOptions{
 		Client:      client,
 		NodeID:      nodeID,
 		Protocol:    portForwardProtocol,
@@ -110,20 +105,17 @@ func portForward(cmd *cobra.Command, nodeID string, portForwardSpec string) erro
 		os.Exit(1)
 	}
 
-	// Handle incoming connections
+	portForwardAddr := net.JoinHostPort(portForwardAddress, strconv.Itoa(int(spec.LocalPort)))
+
+	// Start the listener
 	go func() {
 		cmd.Println("Forwarding connections",
-			"from", l.Addr(),
+			"from", portForwardAddr,
 			"via", nodeID,
 			"to", spec.RemoteString(),
 		)
-		for {
-			conn, err := l.Accept()
-			if err != nil && err != net.ErrClosed && !strings.Contains(err.Error(), "use of closed network connection") {
-				cmd.Printf("Failed to accept connection: %v\n", err)
-				return
-			}
-			go pc.Handle(conn)
+		if err := pc.ListenAndServe(cmd.Context(), portForwardProtocol, portForwardAddr); err != nil {
+			cmd.Printf("Failed to serve: %v\n", err)
 		}
 	}()
 

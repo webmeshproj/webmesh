@@ -156,7 +156,7 @@ func (o *Options) ListenPort() (int, error) {
 }
 
 // ServerOptions converts the options to gRPC server options.
-func (o *Options) ServerOptions(store store.Store, log *slog.Logger) ([]grpc.ServerOption, *tls.Config, error) {
+func (o *Options) ServerOptions(store store.Store, log *slog.Logger) (srvrOptions []grpc.ServerOption, proxyOptions []grpc.DialOption, err error) {
 	var opts []grpc.ServerOption
 	if !o.Insecure {
 		tlsConfig, err := o.TLSConfig()
@@ -198,30 +198,29 @@ func (o *Options) ServerOptions(store store.Store, log *slog.Logger) ([]grpc.Ser
 	if err != nil {
 		return nil, nil, err
 	}
+	var proxyCreds []grpc.DialOption
+	if proxyTLS != nil {
+		proxyCreds = append(proxyCreds, grpc.WithTransportCredentials(credentials.NewTLS(proxyTLS)))
+	} else {
+		proxyCreds = append(proxyCreds, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+	if o.API.ProxyAuth != nil {
+		if o.API.ProxyAuth.Basic != nil {
+			proxyCreds = append(proxyCreds, basicauth.NewCreds(o.API.ProxyAuth.Basic.Username, o.API.ProxyAuth.Basic.Password))
+		}
+		if o.API.ProxyAuth.LDAP != nil {
+			proxyCreds = append(proxyCreds, ldap.NewCreds(o.API.ProxyAuth.LDAP.Username, o.API.ProxyAuth.LDAP.Password))
+		}
+	}
 	if o.API.LeaderProxy {
 		log.Debug("registering leader proxy interceptors")
-		var creds []grpc.DialOption
-		if proxyTLS != nil {
-			// MTLS included in the proxy TLS config.
-			creds = append(creds, grpc.WithTransportCredentials(credentials.NewTLS(proxyTLS)))
-		} else {
-			creds = append(creds, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		}
-		if o.API.ProxyAuth != nil {
-			if o.API.ProxyAuth.Basic != nil {
-				creds = append(creds, basicauth.NewCreds(o.API.ProxyAuth.Basic.Username, o.API.ProxyAuth.Basic.Password))
-			}
-			if o.API.ProxyAuth.LDAP != nil {
-				creds = append(creds, ldap.NewCreds(o.API.ProxyAuth.LDAP.Username, o.API.ProxyAuth.LDAP.Password))
-			}
-		}
-		leaderProxy := leaderproxy.New(store, creds)
+		leaderProxy := leaderproxy.New(store, proxyCreds)
 		unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
 	}
 	opts = append(opts, grpc.ChainUnaryInterceptor(unarymiddlewares...))
 	opts = append(opts, grpc.ChainStreamInterceptor(streammiddlewares...))
-	return opts, proxyTLS, nil
+	return opts, proxyCreds, nil
 }
 
 // TLSConfig returns the TLS configuration.

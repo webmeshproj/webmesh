@@ -18,12 +18,12 @@ limitations under the License.
 package webrtc
 
 import (
-	"crypto/tls"
-
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
+	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
 // Server is the webmesh WebRTC service.
@@ -32,16 +32,24 @@ type Server struct {
 
 	store       meshdb.Store
 	meshstate   state.State
+	rbacEval    rbac.Evaluator
 	stunServers []string
-	tlsConfig   *tls.Config
+	proxyCreds  []grpc.DialOption
 }
 
 // NewServer returns a new Server.
-func NewServer(store meshdb.Store, tlsConfig *tls.Config, stunServers []string) *Server {
+func NewServer(store meshdb.Store, proxyCreds []grpc.DialOption, stunServers []string, insecure bool) *Server {
+	var rbaceval rbac.Evaluator
+	if insecure {
+		rbaceval = rbac.NewNoopEvaluator()
+	} else {
+		rbaceval = rbac.NewStoreEvaluator(store)
+	}
 	return &Server{
 		store:       store,
 		meshstate:   state.New(store),
+		rbacEval:    rbaceval,
 		stunServers: stunServers,
-		tlsConfig:   tlsConfig,
+		proxyCreds:  proxyCreds,
 	}
 }

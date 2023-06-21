@@ -41,6 +41,8 @@ type Interface interface {
 
 	// Configure configures the wireguard interface to use the given key and listen port.
 	Configure(ctx context.Context, key wgtypes.Key, listenPort int) error
+	// ListenPort returns the current listen port of the wireguard interface.
+	ListenPort() (int, error)
 	// PutPeer updates a peer in the wireguard configuration.
 	PutPeer(ctx context.Context, peer *Peer) error
 	// DeletePeer removes a peer from the wireguard configuration.
@@ -165,6 +167,15 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		go recorder.Run(rctx, opts.MetricsInterval)
 	}
 	return wg, nil
+}
+
+// ListenPort returns the current listen port of the wireguard interface.
+func (w *wginterface) ListenPort() (int, error) {
+	iface, err := w.cli.Device(w.opts.Name)
+	if err != nil {
+		return 0, err
+	}
+	return iface.ListenPort, nil
 }
 
 // IsPublic returns true if the wireguard interface is publicly accessible.

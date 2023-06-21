@@ -24,6 +24,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -36,6 +37,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/node/pkg/net/datachannels"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
@@ -114,9 +116,9 @@ type Store interface {
 	// Raft returns the Raft interface. Note that the returned value
 	// may be nil if the store is not open.
 	Raft() *raft.Raft
-	// Wireguard returns the Wireguard interface. Note that the returned value
+	// WireGuard returns the WireGuard interface. Note that the returned value
 	// may be nil if the store is not open.
-	Wireguard() wireguard.Interface
+	WireGuard() wireguard.Interface
 	// Plugins returns the plugin manager.
 	Plugins() plugins.Manager
 }
@@ -249,10 +251,18 @@ type store struct {
 	masquerading bool
 	wgmux        sync.Mutex
 
+	peerConns map[string]clientPeerConn
+	pcmux     sync.Mutex
+
 	open atomic.Bool
 
 	// a flag set on test stores to indicate skipping wireguard setup
 	noWG bool
+}
+
+type clientPeerConn struct {
+	peerConn  *datachannels.ClientPeerConnection
+	localAddr *net.UDPAddr
 }
 
 // ID returns the node ID.
@@ -286,9 +296,9 @@ func (s *store) ReadDB() meshdb.DBTX {
 // Raft returns the Raft interface.
 func (s *store) Raft() *raft.Raft { return s.raft }
 
-// Wireguard returns the Wireguard interface. Note that the returned value
+// WireGuard returns the WireGuard interface. Note that the returned value
 // may be nil if the store is not open.
-func (s *store) Wireguard() wireguard.Interface { return s.wg }
+func (s *store) WireGuard() wireguard.Interface { return s.wg }
 
 // Plugins returns the plugin manager.
 func (s *store) Plugins() plugins.Manager { return s.plugins }

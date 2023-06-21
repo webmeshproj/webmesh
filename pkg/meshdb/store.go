@@ -24,6 +24,7 @@ import (
 
 	"github.com/hashicorp/raft"
 
+	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
 )
 
@@ -45,6 +46,9 @@ type Store interface {
 	IsLeader() bool
 	// Plugins returns the plugins for the current node.
 	Plugins() plugins.Manager
+	// WireGuard returns the Wireguard interface. Note that the returned value
+	// may be nil if the store is not open.
+	WireGuard() wireguard.Interface
 }
 
 type DBTX interface {

@@ -24,6 +24,11 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+var (
+	getEdgeFrom string
+	getEdgeTo   string
+)
+
 func init() {
 	getCmd.AddCommand(getNodesCmd)
 	getCmd.AddCommand(getGraphCmd)
@@ -32,6 +37,12 @@ func init() {
 	getCmd.AddCommand(getGroupsCmd)
 	getCmd.AddCommand(getNetworkACLsCmd)
 	getCmd.AddCommand(getRoutesCmd)
+
+	getEdgesCmd.Flags().StringVar(&getEdgeFrom, "from", "", "The source node ID")
+	getEdgesCmd.Flags().StringVar(&getEdgeTo, "to", "", "The destination node ID")
+	cobra.CheckErr(getEdgesCmd.RegisterFlagCompletionFunc("from", completeNodes(1)))
+	cobra.CheckErr(getEdgesCmd.RegisterFlagCompletionFunc("to", completeNodes(1)))
+	getCmd.AddCommand(getEdgesCmd)
 
 	rootCmd.AddCommand(getCmd)
 }
@@ -173,7 +184,7 @@ var getGroupsCmd = &cobra.Command{
 var getNetworkACLsCmd = &cobra.Command{
 	Use:               "networkacls",
 	Short:             "Get network ACLs from the mesh",
-	Aliases:           []string{"networkacl", "nacl", "acl"},
+	Aliases:           []string{"networkacl", "nacl", "nacls", "acl", "acls"},
 	Args:              cobra.MaximumNArgs(1),
 	ValidArgsFunction: completeNetworkACLs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -219,6 +230,48 @@ var getRoutesCmd = &cobra.Command{
 		resp, err := client.ListRoutes(cmd.Context(), &emptypb.Empty{})
 		if err != nil {
 			return err
+		}
+		return encodeListToStdout(cmd, resp.Items)
+	},
+}
+
+var getEdgesCmd = &cobra.Command{
+	Use:     "edges",
+	Short:   "Get edges from the mesh",
+	Aliases: []string{"edge"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, closer, err := cliConfig.NewAdminClient()
+		if err != nil {
+			return err
+		}
+		defer closer.Close()
+		if getEdgeFrom != "" && getEdgeTo != "" {
+			resp, err := client.GetEdge(cmd.Context(), &v1.MeshEdge{
+				Source: getEdgeFrom,
+				Target: getEdgeTo,
+			})
+			if err != nil {
+				return err
+			}
+			return encodeToStdout(cmd, resp)
+		}
+		resp, err := client.ListEdges(cmd.Context(), &emptypb.Empty{})
+		if err != nil {
+			return err
+		}
+		// Filter the list if the user has specified a source or target
+		if getEdgeFrom != "" || getEdgeTo != "" {
+			filtered := make([]*v1.MeshEdge, 0)
+			for _, edge := range resp.Items {
+				if getEdgeFrom != "" && getEdgeFrom != edge.Source {
+					continue
+				}
+				if getEdgeTo != "" && getEdgeTo != edge.Target {
+					continue
+				}
+				filtered = append(filtered, edge)
+			}
+			resp.Items = filtered
 		}
 		return encodeListToStdout(cmd, resp.Items)
 	},

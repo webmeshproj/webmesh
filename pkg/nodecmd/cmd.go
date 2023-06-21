@@ -165,6 +165,32 @@ func Execute() error {
 	}()
 	log.Info("raft store is ready, starting services")
 
+	if opts.Mesh.Auth != nil {
+		// TODO: Copy these options to the proxy options
+		// but this should be better integrated.
+		if opts.Services.API.ProxyAuth == nil {
+			opts.Services.API.ProxyAuth = &services.ProxyAuth{}
+		}
+		if opts.Mesh.Auth.Basic != nil {
+			opts.Services.API.ProxyAuth.Basic = &services.BasicAuthOptions{
+				Username: opts.Mesh.Auth.Basic.Username,
+				Password: opts.Mesh.Auth.Basic.Password,
+			}
+		}
+		if opts.Mesh.Auth.LDAP != nil {
+			opts.Services.API.ProxyAuth.LDAP = &services.LDAPAuthOptions{
+				Username: opts.Mesh.Auth.LDAP.Username,
+				Password: opts.Mesh.Auth.LDAP.Password,
+			}
+		}
+		if opts.Mesh.Auth.MTLS != nil {
+			opts.Services.API.ProxyAuth.MTLS = &services.MTLSOptions{
+				CertFile: opts.Mesh.Auth.MTLS.CertFile,
+				KeyFile:  opts.Mesh.Auth.MTLS.KeyFile,
+			}
+		}
+	}
+
 	// Create the services
 	srv, err := services.NewServer(st, opts.Services)
 	if err != nil {

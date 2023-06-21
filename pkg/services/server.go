@@ -60,12 +60,12 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err
 	}
-	opts, proxyTLSConfig, err := o.ServerOptions(store, log)
+	serveOpts, proxyCreds, err := o.ServerOptions(store, log)
 	if err != nil {
 		return nil, err
 	}
 	server := &Server{
-		srv:   grpc.NewServer(opts...),
+		srv:   grpc.NewServer(serveOpts...),
 		opts:  o,
 		store: store,
 		log:   log,
@@ -89,7 +89,7 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	if o.API.WebRTC {
 		log.Debug("registering webrtc api")
 		stunURLs := strings.Split(o.API.STUNServers, ",")
-		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, proxyTLSConfig, stunURLs))
+		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, proxyCreds, stunURLs, insecureServices))
 	}
 	if o.MeshDNS.Enabled {
 		log.Debug("registering mesh dns")
@@ -112,7 +112,7 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	}
 	// Always register the node server
 	log.Debug("registering node server")
-	v1.RegisterNodeServer(server, node.NewServer(store, proxyTLSConfig, o.ToFeatureSet(), insecureServices))
+	v1.RegisterNodeServer(server, node.NewServer(store, proxyCreds, o.ToFeatureSet(), insecureServices))
 	// Register the health service
 	log.Debug("registering health service")
 	healthpb.RegisterHealthServer(server, server)

@@ -18,21 +18,14 @@ package node
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"time"
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/version"
 )
 
@@ -54,7 +47,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 			return nil, err
 		}
 	}
-	ifaceMetrics, err := s.store.Wireguard().Metrics()
+	ifaceMetrics, err := s.store.WireGuard().Metrics()
 	if err != nil {
 		return nil, err
 	}
@@ -92,23 +85,9 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 }
 
 func (s *Server) getRemoteNodeStatus(ctx context.Context, nodeID string) (*v1.Status, error) {
-	addr, err := s.meshstate.GetNodePrivateRPCAddress(ctx, nodeID)
+	conn, err := s.newPrivateRemoteNodeConn(ctx, nodeID)
 	if err != nil {
-		if errors.Is(err, state.ErrNodeNotFound) {
-			return nil, status.Errorf(codes.NotFound, "node %s not found", nodeID)
-		}
-		return nil, status.Errorf(codes.FailedPrecondition, "could not find rpc address for node %s: %s", nodeID, err.Error())
-	}
-	var creds credentials.TransportCredentials
-	if s.tlsConfig == nil {
-		creds = insecure.NewCredentials()
-	} else {
-		creds = credentials.NewTLS(s.tlsConfig)
-	}
-	s.log.Info("dialing node for status", slog.String("node", nodeID), slog.String("addr", addr.String()))
-	conn, err := grpc.DialContext(ctx, addr.String(), grpc.WithTransportCredentials(creds))
-	if err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, "could not connect to node %s: %s", nodeID, err.Error())
+		return nil, err
 	}
 	defer conn.Close()
 	return v1.NewNodeClient(conn).GetStatus(ctx, &v1.GetStatusRequest{

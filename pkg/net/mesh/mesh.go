@@ -55,7 +55,7 @@ func WireGuardPeersFor(ctx context.Context, store meshdb.Store, peerID string) (
 	}
 	directAdjacents := adjacencyMap[peerID]
 	out := make([]*v1.WireGuardPeer, 0, len(directAdjacents))
-	for adjacent := range directAdjacents {
+	for adjacent, edge := range directAdjacents {
 		node, err := graph.Vertex(adjacent)
 		if err != nil {
 			return nil, fmt.Errorf("get vertex: %w", err)
@@ -92,6 +92,13 @@ func WireGuardPeersFor(ctx context.Context, store meshdb.Store, peerID string) (
 				}
 				return ""
 			}(),
+		}
+		if edge.Properties.Attributes != nil {
+			// Check if the ICE attribute is set
+			ice, ok := edge.Properties.Attributes[v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String()]
+			if ok && ice == "true" {
+				peer.Ice = true
+			}
 		}
 		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, peerID, ourRoutes, &node)
 		if err != nil {
