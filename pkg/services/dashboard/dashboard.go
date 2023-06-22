@@ -36,8 +36,8 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-//go:generate bash -exc "cd app; yarn ; VERSION=`git describe --tags --always --dirty` yarn build"
-//go:embed app/dist/spa
+//go:generate bash -exc "cd app; yarn ; VERSION=`git describe --tags --always --dirty` yarn build ; touch dist/spa/.gitkeep ;"
+//go:embed app/dist/*
 var staticFiles embed.FS
 
 const (
