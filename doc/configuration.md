@@ -1,6 +1,6 @@
 # Configuration
 
-For now this is just the help output from running the node with no arguments.
+For now this is just the help output from running the node with the `--help` flag.
 It explains the flags and environment variables that can be used to configure the node.
 
 The configuration file can be in YAML, JSON, or TOML format and is specified via the `--config` flag.
@@ -69,14 +69,17 @@ Global Configurations:
 
 Mesh Configurations:
 
-    --mesh.grpc-port                (default: 8443)        GRPC advertise port.
-    --mesh.join-address                                    Address of a node to join.
-    --mesh.join-as-voter            (default: false)       Join the cluster as a voter. Default behavior is to join as an observer.
-    --mesh.join-timeout             (default: 1m0s)        Join timeout.
-    --mesh.key-rotation-interval    (default: 168h0m0s)    Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.
-    --mesh.max-join-retries         (default: 10)          Maximum number of join retries.
-    --mesh.no-ipv4                  (default: false)       Do not request IPv4 assignments when joining.
-    --mesh.no-ipv6                  (default: false)       Do not request IPv6 assignments when joining.
+
+    --mesh.direct-peers        Comma separated list of peers to request direct edges to.
+                                   If the node is not allowed to create edges and data channels, the node will be unable to join.
+
+    --mesh.grpc-port           (default: 8443)     GRPC advertise port.
+    --mesh.join-address                            Address of a node to join.
+    --mesh.join-as-voter       (default: false)    Join the cluster as a voter. Default behavior is to join as an observer.
+    --mesh.join-timeout        (default: 1m0s)     Join timeout.
+    --mesh.max-join-retries    (default: 10)       Maximum number of join retries.
+    --mesh.no-ipv4             (default: false)    Do not request IPv4 assignments when joining.
+    --mesh.no-ipv6             (default: false)    Do not request IPv6 assignments when joining.
 
     --mesh.node-id    (default: <hostname>)    Store node ID. If not set, the ID comes from the following decision tree.
                                                1. If mTLS is enabled, the node ID is the CN of the client certificate.
@@ -93,8 +96,7 @@ Mesh Configurations:
                              These routes are advertised to all peers. If the node is not allowed
                              to put routes in the mesh, the node will be unable to join.
 
-    --mesh.wireguard-endpoints        Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.
-    --mesh.zone-awareness-id          Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.
+    --mesh.zone-awareness-id        Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.
 
 Authentication Configurations:
 
@@ -150,13 +152,13 @@ Raft Configurations:
                                                        All nodes must use the same log format for the lifetime of the cluster.
 
     --raft.log-level               (default: info)     Raft log level.
-    --raft.max-append-entries      (default: 16)       Raft max append entries.
+    --raft.max-append-entries      (default: 15)       Raft max append entries.
     --raft.observer-chan-buffer    (default: 100)      Raft observer channel buffer size.
     --raft.prefer-ipv6             (default: false)    Prefer IPv6 when connecting to raft peers.
     --raft.shutdown-timeout        (default: 1m0s)     Timeout for graceful shutdown.
-    --raft.snapshot-interval       (default: 5m0s)     Raft snapshot interval.
+    --raft.snapshot-interval       (default: 3m0s)     Raft snapshot interval.
     --raft.snapshot-retention      (default: 3)        Raft snapshot retention.
-    --raft.snapshot-threshold      (default: 50)       Raft snapshot threshold.
+    --raft.snapshot-threshold      (default: 5)        Raft snapshot threshold.
     --raft.startup-timeout         (default: 3m0s)     Timeout for startup.
 
 TLS Configurations:
@@ -168,23 +170,24 @@ TLS Configurations:
 
 WireGuard Configurations:
 
-
-    --wireguard.endpoint-overrides        EndpointOverrides is a map of peer IDs to endpoint overrides.
-                                          The format is similar to allowed-ips, but the value is a single endpoint.
-
-    --wireguard.force-interface-name    (default: false)       Force the use of the given name by deleting any pre-existing interface with the same name.
-    --wireguard.force-tun               (default: false)       Force the use of a TUN interface.
-    --wireguard.interface-name          (default: webmesh0)    The WireGuard interface name.
-    --wireguard.listen-port             (default: 51820)       The WireGuard listen port.
-    --wireguard.masquerade              (default: false)       Masquerade traffic from the WireGuard interface.
-    --wireguard.modprobe                (default: false)       Attempt to load the WireGuard kernel module.
-    --wireguard.mtu                     (default: 1350)        The MTU to use for the interface.
+    --wireguard.endpoints                                       Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.
+    --wireguard.force-interface-name     (default: false)       Force the use of the given name by deleting any pre-existing interface with the same name.
+    --wireguard.force-tun                (default: false)       Force the use of a TUN interface.
+    --wireguard.interface-name           (default: webmesh0)    The WireGuard interface name.
+    --wireguard.key-file                                        The path to the WireGuard private key. If it does not exist it will be created.
+    --wireguard.key-rotation-interval    (default: 168h0m0s)    Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.
+    --wireguard.listen-port              (default: 51820)       The WireGuard listen port.
+    --wireguard.masquerade               (default: false)       Masquerade traffic from the WireGuard interface.
+    --wireguard.modprobe                 (default: false)       Attempt to load the WireGuard kernel module.
+    --wireguard.mtu                      (default: 1350)        The MTU to use for the interface.
 
     --wireguard.persistent-keepalive    (default: 0s)    PersistentKeepAlive is the interval at which to send keepalive packets
                                                          to peers. If unset, keepalive packets will automatically be sent to publicly
                                                          accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
                                                          packets are sent.
 
+    --wireguard.record-metrics             (default: false)    Publish WireGuard metrics.
+    --wireguard.record-metrics-interval    (default: 15s)      Interval at which to update WireGuard metrics.
 
 Service Configurations:
 
@@ -192,14 +195,22 @@ Service Configurations:
     --services.api.leader-proxy                  (default: false)                           Enable the leader proxy.
     --services.api.mesh                          (default: false)                           Enable the mesh API.
     --services.api.peer-discovery                (default: false)                           Enable the peer discovery API.
+    --services.api.proxy-auth.basic.password                                                Password for basic authentication.
+    --services.api.proxy-auth.basic.username                                                Username for basic authentication.
+    --services.api.proxy-auth.ldap.username                                                 Username for LDAP authentication.
+    --services.api.proxy-auth.mtls.cert-file                                                Path to a TLS certificate file to present when joining.
+    --services.api.proxy-auth.mtls.key-file                                                 Path to a TLS key file for the certificate.
     --services.api.proxy-insecure                (default: false)                           Don't use TLS for the leader proxy.
     --services.api.proxy-insecure-skip-verify    (default: false)                           Skip TLS verification when proxying connections.
     --services.api.proxy-tls-ca-file                                                        Path to the TLS CA file for verifying the peer certificates.
-    --services.api.proxy-tls-cert-file                                                      Path to the TLS certificate file for proxying.
-    --services.api.proxy-tls-key-file                                                       Path to the TLS key file for proxying.
     --services.api.proxy-verify-chain-only       (default: false)                           Only verify the TLS chain when proxying connections.
     --services.api.stun-servers                  (default: stun:stun.l.google.com:19302)    STUN servers to use.
     --services.api.webrtc                        (default: false)                           Enable the WebRTC API.
+    --services.dashboard.enabled                 (default: false)                           Enable the web dashboard.
+    --services.dashboard.listen-address          (default: :8080)                           The address for the dashboard to listen on.
+    --services.dashboard.prefix                  (default: /)                               The path prefix to use for the dashboard.
+    --services.dashboard.tls-cert-file                                                      The path to a certificate file to use for TLS.
+    --services.dashboard.tls-key-file                                                       The path to a key file to use for TLS.
     --services.insecure                          (default: false)                           Don't use TLS for the gRPC server.
     --services.listen-address                    (default: :8443)                           gRPC server listen address.
     --services.mesh-dns.domain                   (default: webmesh.internal)                Domain to use for mesh DNS.
@@ -211,7 +222,7 @@ Service Configurations:
     --services.mesh-dns.reuse-port               (default: 0)                               Enable SO_REUSEPORT for mesh DNS.
     --services.mesh-dns.tsig-key                                                            TSIG key to use for mesh DNS.
     --services.metrics.enabled                   (default: false)                           Enable gRPC metrics.
-    --services.metrics.listen-address            (default: :8080)                           gRPC metrics listen address.
+    --services.metrics.listen-address            (default: :8000)                           gRPC metrics listen address.
     --services.metrics.path                      (default: /metrics)                        gRPC metrics path.
     --services.tls-cert-file                                                                gRPC server TLS certificate file.
     --services.tls-key-file                                                                 gRPC server TLS key file.
@@ -222,6 +233,30 @@ Service Configurations:
     --services.turn.public-ip                                                               The address advertised for STUN requests.
     --services.turn.server-realm                 (default: webmesh.io)                      Realm used for TURN server authentication.
     --services.turn.stun-port-range              (default: 49152-65535)                     Port range to use for STUN.
+
+Plugin Configurations:
+
+    --plugins.basic-auth.htpasswd-file          Enables the basic auth plugin with the path to a htpasswd file
+    --plugins.ldap.bind-dn                      Enables the ldap plugin with the bind DN
+    --plugins.ldap.bind-password                Enables the ldap plugin with the bind password
+    --plugins.ldap.ca-file                      Enables the ldap plugin with the path to a CA for verifying certificates
+    --plugins.ldap.node-id-attribute            Enables the ldap plugin with the node ID attribute
+    --plugins.ldap.server                       Enables the ldap plugin with the server address
+    --plugins.ldap.user-base-dn                 Enables the ldap plugin with the user base DN
+    --plugins.ldap.user-disabled-value          Enables the ldap plugin with the user disabled value
+    --plugins.ldap.user-id-attribute            Enables the ldap plugin with the user ID attribute
+    --plugins.ldap.user-status-attribute        Enables the ldap plugin with the user status attribute
+
+    --plugins.local        A configuration for a local executable plugin.
+                           Provided in the format of path=/path/to/executable,config1=val1,config2=val2,...
+
+    --plugins.localstore.data-dir        Enables the localstore plugin with the path to a data directory
+    --plugins.mtls.ca-file               Enables the mTLS plugin with the path to a CA for verifying certificates
+
+    --plugins.server        A configuration for a remote server plugin. Configurations are the same as the local plugin,
+                            but with the addition of server configurations in the format of:
+                            server=rpcserver.com:8443[,insecure=true][,tls-ca-file=ca.crt][,tls-key-file=tls.key][,tls-cert-file=tls.crt]
+
 
 General Flags
 

@@ -43,6 +43,7 @@ services:
     networks:
       ice-net:
         ipv4_address: 10.251.0.1
+      public-net:
     hostname: turn-node
     entrypoint:
       - /node
