@@ -1,4 +1,6 @@
-dist/
+dist/node_*
+dist/wmctl_*
+dist/sha256sums.txt
 bin/
 *.sqlite
 .vscode
