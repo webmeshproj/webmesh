@@ -11,6 +11,7 @@ LDFLAGS     ?= -s -w -extldflags=-static \
 			   -X $(VERSION_PKG).Version=$(VERSION) \
 			   -X $(VERSION_PKG).Commit=$(COMMIT) \
 			   -X $(VERSION_PKG).BuildDate=$(DATE)
+
 BUILD_TAGS  ?= osusergo,netgo,sqlite_omit_load_extension,sqlite_vacuum_incr,sqlite_json
 
 ARCH  ?= $(shell go env GOARCH)
