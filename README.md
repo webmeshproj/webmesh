@@ -1,9 +1,7 @@
-# Webmesh Node
+# What is Webmesh?
 
-This repository contains the core functionality of the Webmesh Project.
-It implements the [API](https://github.com/webmeshproj/api) in Go.
+Webmesh is a project that aims to provide a simple, secure, and scalable way to connect devices and services across the internet.
 
-This project aims to provide distributed and decentralized communication for devices and services across the internet.
 It is inspired by several other projects that have emerged over the years such as TailScale, ZeroTier, and OpenZiti.
 The core difference, however, is that every node in the network is also, optionally, a controller server.
 Another core aim is to offload as much networking onto pre-existing protocols as possible and strive to maintain a simple codebase.
@@ -30,6 +28,11 @@ Examples of different topologies and usages can be found in the [examples](examp
 More examples and documentation will be added as the project matures.
 
 **This project is not yet ready for production use, but I hope to rapidly get there**
+
+# Webmesh Node
+
+This repository contains the core functionality of the Webmesh Project.
+It implements the [API](https://github.com/webmeshproj/api) in Go.
 
 ## Getting Started
 
