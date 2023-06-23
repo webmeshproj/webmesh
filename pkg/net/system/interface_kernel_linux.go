@@ -32,40 +32,6 @@ type linuxKernelInterface struct {
 	log  *slog.Logger
 }
 
-// New creates a new wireguard interface.
-func New(ctx context.Context, opts *Options) (Interface, error) {
-	if opts.MTU == 0 {
-		opts.MTU = DefaultMTU
-	}
-	if opts.ForceTUN {
-		return NewTUN(ctx, opts)
-	}
-	logger := slog.Default().With(
-		slog.String("component", "wireguard"),
-		slog.String("type", "kernel"),
-		slog.String("facility", "device"))
-	if opts.Modprobe {
-		err := modprobe.Load("wireguard", "")
-		if err != nil {
-			// Try to fallback to TUN
-			logger.Error("load wireguard kernel module, falling back to TUN", slog.String("error", err.Error()))
-			return NewTUN(ctx, opts)
-		}
-	}
-	if !opts.DefaultGateway.IsValid() {
-		defaultGateway, err := GetDefaultGateway(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("detect current default gateway")
-		}
-		opts.DefaultGateway = defaultGateway
-	}
-	iface := &linuxKernelInterface{
-		opts: opts,
-		log:  logger,
-	}
-	return iface, iface.create(ctx)
-}
-
 // Name returns the real name of the interface.
 func (l *linuxKernelInterface) Name() string {
 	return l.opts.Name

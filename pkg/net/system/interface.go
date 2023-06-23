@@ -75,6 +75,11 @@ type Options struct {
 	MTU uint32
 }
 
+// New creates a new interface using the given options.
+func New(ctx context.Context, opts *Options) (Interface, error) {
+	return newInterface(ctx, opts)
+}
+
 // IsRouteExists returns true if the given error is a route exists error.
 func IsRouteExists(err error) bool {
 	return errors.Is(err, ErrRouteExists)

@@ -56,7 +56,7 @@ type Options struct {
 	GRPCPort uint16
 }
 
-// New returns a new firewall manager for the given interface.
+// New returns a new firewall manager for the given options.
 func New(opts *Options) (Firewall, error) {
 	return newFirewall(opts)
 }
