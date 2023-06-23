@@ -22,8 +22,6 @@ import (
 	"net"
 	"net/netip"
 	"time"
-
-	"github.com/vishvananda/netlink"
 )
 
 // EndpointDetectOpts contains options for endpoint detection.
@@ -192,14 +190,14 @@ func detectFromInterfaces(opts *EndpointDetectOpts) (PrefixList, error) {
 				continue
 			}
 			if addr.Is6() && opts.DetectIPv6 {
-				prefix, err := ifaceNetwork(iface.Name, true)
+				prefix, err := ifaceNetwork(iface.Name, addr, true)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get network for interface %s: %w", iface.Name, err)
 				}
 				ips = append(ips, prefix)
 			}
 			if addr.Is4() {
-				prefix, err := ifaceNetwork(iface.Name, false)
+				prefix, err := ifaceNetwork(iface.Name, addr, false)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get network for interface %s: %w", iface.Name, err)
 				}
@@ -208,28 +206,4 @@ func detectFromInterfaces(opts *EndpointDetectOpts) (PrefixList, error) {
 		}
 	}
 	return ips, nil
-}
-
-// TODO: This is a linux-only implementation.
-func ifaceNetwork(ifaceName string, ipv6 bool) (netip.Prefix, error) {
-	family := netlink.FAMILY_V4
-	if ipv6 {
-		family = netlink.FAMILY_V6
-	}
-	link, err := netlink.LinkByName(ifaceName)
-	if err != nil {
-		return netip.Prefix{}, err
-	}
-	addrs, err := netlink.AddrList(link, family)
-	if err != nil {
-		return netip.Prefix{}, err
-	}
-	if len(addrs) == 0 {
-		return netip.Prefix{}, fmt.Errorf("no addresses found for interface %s", ifaceName)
-	}
-	// Return the first address on the interface.
-	addr := addrs[0]
-	ip, _ := netip.ParseAddr(addr.IP.String())
-	ones, _ := addr.Mask.Size()
-	return netip.PrefixFrom(ip, ones), nil
 }
