@@ -63,8 +63,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            pkg/services/dashboard/app/.yarn/cache
-            pkg/services/dashboard/app/node_modules
+            web/dashboard/.yarn/cache
+            web/dashboard/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('pkg/services/dashboard/app/yarn.lock') }}
 
       - name: Setup Go
