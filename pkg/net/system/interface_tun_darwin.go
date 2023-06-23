@@ -29,7 +29,7 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-type linuxTUNInterface struct {
+type darwinTUNInterface struct {
 	opts *Options
 	log  *slog.Logger
 	dev  *device.Device
@@ -116,32 +116,32 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 }
 
 // Name returns the real name of the interface.
-func (l *linuxTUNInterface) Name() string {
+func (l *darwinTUNInterface) Name() string {
 	return l.opts.Name
 }
 
 // AddressV4 should return the current private address of this interface
-func (l *linuxTUNInterface) AddressV4() netip.Prefix {
+func (l *darwinTUNInterface) AddressV4() netip.Prefix {
 	return l.opts.NetworkV4
 }
 
 // AddressV6 should return the current private address of this interface
-func (l *linuxTUNInterface) AddressV6() netip.Prefix {
+func (l *darwinTUNInterface) AddressV6() netip.Prefix {
 	return l.opts.NetworkV6
 }
 
 // Up activates the interface
-func (l *linuxTUNInterface) Up(ctx context.Context) error {
+func (l *darwinTUNInterface) Up(ctx context.Context) error {
 	return ActivateInterface(ctx, l.opts.Name)
 }
 
 // Down deactivates the interface
-func (l *linuxTUNInterface) Down(ctx context.Context) error {
+func (l *darwinTUNInterface) Down(ctx context.Context) error {
 	return DeactivateInterface(ctx, l.opts.Name)
 }
 
 // Destroy destroys the interface
-func (l *linuxTUNInterface) Destroy(ctx context.Context) error {
+func (l *darwinTUNInterface) Destroy(ctx context.Context) error {
 	l.uapi.Close()
 	l.dev.Close()
 	// The interface destroys itself when the TUN is closed
@@ -149,11 +149,11 @@ func (l *linuxTUNInterface) Destroy(ctx context.Context) error {
 }
 
 // AddRoute adds a route for the given network.
-func (l *linuxTUNInterface) AddRoute(ctx context.Context, network netip.Prefix) error {
+func (l *darwinTUNInterface) AddRoute(ctx context.Context, network netip.Prefix) error {
 	return AddRoute(ctx, l.opts.Name, network)
 }
 
 // RemoveRoute removes the route for the given network.
-func (l *linuxTUNInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
+func (l *darwinTUNInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
 	return RemoveRoute(ctx, l.opts.Name, network)
 }
