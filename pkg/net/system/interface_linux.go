@@ -32,6 +32,7 @@ import (
 	"github.com/jsimonetti/rtnetlink"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
+	"pault.ag/go/modprobe"
 )
 
 func newInterface(ctx context.Context, opts *Options) (Interface, error) {

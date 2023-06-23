@@ -24,7 +24,6 @@ import (
 	"github.com/jsimonetti/rtnetlink"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
-	"pault.ag/go/modprobe"
 )
 
 type linuxKernelInterface struct {
