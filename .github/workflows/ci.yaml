@@ -13,6 +13,7 @@ env:
   PLATFORMS: linux/amd64,linux/arm64,linux/arm
 
 jobs:
+
   tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -40,8 +41,8 @@ jobs:
           args: --timeout 10m
           skip-pkg-cache: true
 
-  build-publish:
-    name: Build and Publish Artifacts
+  build-publish-linux:
+    name: Build and Publish Linux Artifacts
     runs-on: ubuntu-latest
     needs: [tests]
     permissions:
@@ -154,6 +155,56 @@ jobs:
           cosign sign --yes --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.distroless-build.outputs.digest }}
 
       - name: Upload CLI Artifacts
+        uses: softprops/action-gh-release@v1
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          name: "Release ${{ github.ref_name }}"
+          files: |
+            dist/*
+
+  build-publish-darwin:
+    name: Build and Publish macOS Artifacts
+    runs-on: macos-12
+    needs: [tests]
+    permissions:
+      contents: "write"
+      id-token: "write"
+      packages: "write"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 18
+
+      - name: Cache Node Modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            web/dashboard/.yarn/cache
+            web/dashboard/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('web/dashboard/yarn.lock') }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+          cache-dependency-path: go.sum
+
+      - name: Download Go Modules
+        shell: bash
+        run: go mod download -x
+
+      - name: Build Release Binaries
+        shell: bash
+        run: make dist-darwin -j $(nproc)
+
+      - name: Upload Artifacts
         uses: softprops/action-gh-release@v1
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:

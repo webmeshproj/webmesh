@@ -60,6 +60,7 @@ build-image: ## Build the node build image.
 
 .PHONY: dist
 dist: generate ## Build node binaries for all platforms.
+	rm -rf $(DIST)
 	mkdir -p $(DIST)
 	docker run --rm \
 		-u $(shell id -u):$(shell id -g) \
@@ -69,7 +70,13 @@ dist: generate ## Build node binaries for all platforms.
 		-e GOPATH=/go \
 		-w /build \
 		$(BUILD_IMAGE) make -j $(shell nproc) dist-node dist-ctl
-	cd "$(DIST)" ; sha256sum * > sha256sums.txt
+	cd "$(DIST)" ; sha256sum * > sha256sums-linux.txt
+
+dist-darwin: generate ## Build node binaries for darwin.
+	rm -rf $(DIST)
+	$(MAKE) dist-node-darwin dist-ctl-darwin
+	upx --best --lzma $(DIST)/$(NAME)_*
+	cd "$(DIST)" ; shasum -a 256 * > sha256sums-darwin.txt
 
 dist-node: ## Build node binaries for all platforms, this is called within the build image.
 	$(MAKE) \
@@ -102,6 +109,14 @@ dist-ctl-linux-arm64:
 
 dist-ctl-linux-arm:
 	$(call dist-build,$(CTL),linux,arm,arm-linux-musleabihf-gcc)
+
+dist-node-darwin:
+	$(call dist-build,$(NAME),darwin,amd64,)
+	$(call dist-build,$(NAME),darwin,arm64,)
+
+dist-ctl-darwin:
+	$(call dist-build,$(CTL),darwin,amd64,)
+	$(call dist-build,$(CTL),darwin,arm64,)
 
 define dist-build
 	CGO_ENABLED=1 GOOS=$(2) GOARCH=$(3) CC=$(4) \
