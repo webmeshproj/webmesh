@@ -11,23 +11,15 @@
           @click="toggleLeftDrawer"
         />
 
-        <q-toolbar-title>
-          Webmesh Dashboard
-        </q-toolbar-title>
+        <q-toolbar-title> Webmesh Dashboard </q-toolbar-title>
 
         <div>Webmesh v{{ version }}</div>
       </q-toolbar>
     </q-header>
 
-    <q-drawer
-      v-model="leftDrawerOpen"
-      show-if-above
-      bordered
-    >
+    <q-drawer v-model="leftDrawerOpen" show-if-above bordered>
       <q-list>
-        <q-item-label header>
-          Resources
-        </q-item-label>
+        <q-item-label header> Resources </q-item-label>
 
         <EssentialLink
           v-for="link in essentialLinks"
@@ -77,7 +69,7 @@ const linksList = [
     caption: 'github.com/webmeshproj',
     icon: 'code',
     link: 'https://github.com/webmeshproj',
-    target: '_blank'
+    target: '_blank',
   },
 ];
 
@@ -85,20 +77,20 @@ export default defineComponent({
   name: 'MainLayout',
 
   components: {
-    EssentialLink
+    EssentialLink,
   },
 
-  setup () {
-    const leftDrawerOpen = ref(false)
-    const version = process.env.VERSION?.toString()
+  setup() {
+    const leftDrawerOpen = ref(false);
+    const version = process.env.VERSION?.toString();
     return {
       essentialLinks: linksList,
       leftDrawerOpen,
       version,
-      toggleLeftDrawer () {
-        leftDrawerOpen.value = !leftDrawerOpen.value
-      }
-    }
-  }
+      toggleLeftDrawer() {
+        leftDrawerOpen.value = !leftDrawerOpen.value;
+      },
+    };
+  },
 });
 </script>
