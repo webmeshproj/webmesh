@@ -75,7 +75,7 @@ dist: generate ## Build node binaries for all platforms.
 dist-darwin: generate ## Build node binaries for darwin.
 	rm -rf $(DIST)
 	$(MAKE) dist-node-darwin dist-ctl-darwin
-	upx --best --lzma $(DIST)/$(NAME)_*
+	upx --best --lzma $(DIST)/*
 	cd "$(DIST)" ; shasum -a 256 * > sha256sums-darwin.txt
 
 dist-node: ## Build node binaries for all platforms, this is called within the build image.
