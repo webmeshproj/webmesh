@@ -36,8 +36,8 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-//go:generate bash -exc "cd app; yarn ; VERSION=`git describe --tags --always --dirty` yarn build ; touch dist/spa/.gitkeep ;"
-//go:embed app/dist/**/*
+//go:generate ../../../web/dashboard/embed.sh
+//go:embed static/**
 var staticFiles embed.FS
 
 const (
@@ -91,7 +91,7 @@ func NewServer(backend *grpc.Server, opts *Options) (*Server, error) {
 	mux := http.NewServeMux()
 	root := strings.TrimSuffix(opts.Prefix, "/")
 	apiRoot := fmt.Sprintf("%s/api/", root)
-	staticRoot, err := fs.Sub(staticFiles, "app/dist/spa")
+	staticRoot, err := fs.Sub(staticFiles, "static/dashboard")
 	if err != nil {
 		return nil, fmt.Errorf("get static subdirectory: %w", err)
 	}
