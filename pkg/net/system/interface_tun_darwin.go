@@ -18,15 +18,11 @@ package system
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/netip"
 
 	"golang.org/x/exp/slog"
-	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
-	"golang.zx2c4.com/wireguard/ipc"
-	"golang.zx2c4.com/wireguard/tun"
 )
 
 type darwinTUNInterface struct {
@@ -34,85 +30,6 @@ type darwinTUNInterface struct {
 	log  *slog.Logger
 	dev  *device.Device
 	uapi net.Listener
-}
-
-func newInterface(ctx context.Context, opts *Options) (Interface, error) {
-	logger := slog.Default().With(
-		slog.String("component", "wireguard"),
-		slog.String("type", "tun"),
-		slog.String("facility", "device"))
-	if !opts.DefaultGateway.IsValid() {
-		defaultGateway, err := GetDefaultGateway(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect current default gateway")
-		}
-		opts.DefaultGateway = defaultGateway
-	}
-
-	// Create the TUN device
-	tun, err := tun.CreateTUN(opts.Name, device.DefaultMTU)
-	if err != nil {
-		return nil, err
-	}
-	// Get the real name of the interface
-	realName, err := tun.Name()
-	if err == nil {
-		opts.Name = realName
-	}
-
-	// Open the UAPI socket
-	fileuapi, err := ipc.UAPIOpen(opts.Name)
-	if err != nil {
-		tun.Close()
-		return nil, err
-	}
-
-	// Create the tunnel device
-	device := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(
-		func() int {
-			if logger.Handler().Enabled(context.Background(), slog.LevelDebug) {
-				return device.LogLevelVerbose
-			}
-			return device.LogLevelError
-		}(),
-		fmt.Sprintf("(%s) ", opts.Name),
-	))
-
-	// Listen for UAPI connections
-	uapi, err := ipc.UAPIListen(opts.Name, fileuapi)
-	if err != nil {
-		device.Close()
-		return nil, err
-	}
-
-	// Handle UAPI connections
-	go func() {
-		for {
-			conn, err := uapi.Accept()
-			if err != nil {
-				return
-			}
-			go device.IpcHandle(conn)
-		}
-	}()
-
-	iface := &linuxTUNInterface{
-		opts: opts,
-		log:  logger,
-		dev:  device,
-		uapi: uapi,
-	}
-	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
-		if addr.IsValid() {
-			err = SetInterfaceAddress(ctx, opts.Name, addr)
-			if err != nil {
-				iface.uapi.Close()
-				iface.dev.Close()
-				return nil, fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
-			}
-		}
-	}
-	return iface, nil
 }
 
 // Name returns the real name of the interface.

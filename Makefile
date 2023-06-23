@@ -44,7 +44,7 @@ build-ctl: fmt vet ## Build wmctl binary for the local platform.
 
 lint: ## Run linters.
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	golangci-lint run
+	$(shell go env GOPATH)/bin/golangci-lint run
 
 BUILD_IMAGE ?= $(REPO)/node-buildx:latest
 build-image: ## Build the node build image.

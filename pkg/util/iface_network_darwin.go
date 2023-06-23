@@ -17,10 +17,52 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"net/netip"
+	"strconv"
+	"strings"
 )
 
 func ifaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Prefix, error) {
-	return netip.Prefix{}, fmt.Errorf("not implemented")
+	out, err := ExecOutput(context.Background(), "ifconfig", ifaceName)
+	if err != nil {
+		return netip.Prefix{}, fmt.Errorf("ifconfig %s: %w: %s", ifaceName, err, out)
+	}
+	strPrefix := "inet"
+	if ipv6 {
+		strPrefix = "inet6"
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, strPrefix) {
+			fields := strings.Fields(line)
+			if len(fields) < 4 {
+				continue
+			}
+			addr, prefix := fields[1], fields[3]
+			if addr != forAddr.String() {
+				continue
+			}
+			ip, err := netip.ParseAddr(addr)
+			if err != nil {
+				return netip.Prefix{}, fmt.Errorf("parse %s: %w", addr, err)
+			}
+			if ipv6 {
+				// We have a raw prefixlen in the field
+				bits, err := strconv.Atoi(prefix)
+				if err != nil {
+					return netip.Prefix{}, fmt.Errorf("parse %s: %w", prefix, err)
+				}
+				return netip.PrefixFrom(ip, bits), nil
+			}
+			// We have a hex prefix in the field
+			bits, err := strconv.ParseUint(prefix, 16, 32)
+			if err != nil {
+				return netip.Prefix{}, fmt.Errorf("parse %s: %w", prefix, err)
+			}
+			return netip.PrefixFrom(ip, int(bits)), nil
+		}
+	}
+	return netip.Prefix{}, fmt.Errorf("no %s address found for %s", forAddr, ifaceName)
 }
