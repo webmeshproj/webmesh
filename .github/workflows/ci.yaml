@@ -13,7 +13,6 @@ env:
   PLATFORMS: linux/amd64,linux/arm64,linux/arm
 
 jobs:
-
   tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -200,9 +199,13 @@ jobs:
         shell: bash
         run: go mod download -x
 
+      - name: Install UPX
+        shell: bash
+        run: brew install upx
+
       - name: Build Release Binaries
         shell: bash
-        run: make dist-darwin -j $(nproc)
+        run: make dist-darwin -j 2
 
       - name: Upload Artifacts
         uses: softprops/action-gh-release@v1
