@@ -7,15 +7,23 @@ VERSION_PKG := github.com/webmeshproj/$(NAME)/pkg/version
 VERSION     := $(shell git describe --tags --always --dirty)
 COMMIT      := $(shell git rev-parse HEAD)
 DATE        := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-LDFLAGS     ?= -s -w -extldflags=-static \
-			   -X $(VERSION_PKG).Version=$(VERSION) \
-			   -X $(VERSION_PKG).Commit=$(COMMIT) \
-			   -X $(VERSION_PKG).BuildDate=$(DATE)
-
 BUILD_TAGS  ?= osusergo,netgo,sqlite_omit_load_extension,sqlite_vacuum_incr,sqlite_json
 
 ARCH  ?= $(shell go env GOARCH)
 OS    ?= $(shell go env GOOS)
+
+ifeq ($(OS),darwin)
+	# We can't do static builds on darwin
+	EXTLDFLAGS :=
+else
+	EXTLDFLAGS := -static
+endif
+
+LDFLAGS ?= -s -w -extldflags=$(EXTLDFLAGS) \
+			-X $(VERSION_PKG).Version=$(VERSION) \
+			-X $(VERSION_PKG).Commit=$(COMMIT) \
+			-X $(VERSION_PKG).BuildDate=$(DATE)
+
 DIST  := $(CURDIR)/dist
 
 default: build
