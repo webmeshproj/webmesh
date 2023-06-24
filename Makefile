@@ -3,6 +3,8 @@ CTL   ?= wmctl
 REPO  ?= ghcr.io/webmeshproj
 IMAGE ?= $(REPO)/$(NAME):latest
 
+BUILD_IMAGE ?= $(REPO)/node-buildx:latest
+
 VERSION_PKG := github.com/webmeshproj/$(NAME)/pkg/version
 VERSION     := $(shell git describe --tags --always --dirty)
 COMMIT      := $(shell git rev-parse HEAD)
@@ -54,15 +56,15 @@ lint: ## Run linters.
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	$(shell go env GOPATH)/bin/golangci-lint run
 
-BUILD_IMAGE ?= $(REPO)/node-buildx:latest
-build-image: ## Build the node build image.
-	docker buildx build -t $(BUILD_IMAGE) -f Dockerfile.build --load .
+DOCKER ?= docker
 
-.PHONY: dist
-dist: generate ## Build node binaries for all platforms.
+build-image: ## Build the node build image.
+	$(DOCKER) build -t $(BUILD_IMAGE) -f Dockerfile.build .
+
+dist-linux: generate ## Build binaries for all Linux platforms.
 	rm -rf $(DIST)
 	mkdir -p $(DIST)
-	docker run --rm \
+	docker run --rm -it \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(CURDIR):/build" \
 		-v "$(shell go env GOCACHE):/.cache/go-build" \
@@ -72,20 +74,20 @@ dist: generate ## Build node binaries for all platforms.
 		$(BUILD_IMAGE) make -j $(shell nproc) dist-node dist-ctl
 	cd "$(DIST)" ; sha256sum * > sha256sums-linux.txt
 
-dist-darwin: generate ## Build node binaries for darwin.
+dist-darwin: generate ## Build binaries for all Darwin platforms.
 	rm -rf $(DIST)
 	$(MAKE) dist-node-darwin dist-ctl-darwin
 	upx --best --lzma $(DIST)/*
 	cd "$(DIST)" ; shasum -a 256 * > sha256sums-darwin.txt
 
-dist-node: ## Build node binaries for all platforms, this is called within the build image.
+dist-node:
 	$(MAKE) \
 		dist-node-linux-amd64 \
 		dist-node-linux-arm64 \
 		dist-node-linux-arm
 	upx --best --lzma $(DIST)/$(NAME)_*
 
-dist-ctl: ## Build wmctl binaries for all platforms, this is called within the build image.
+dist-ctl:
 	$(MAKE) \
 		dist-ctl-linux-amd64 \
 		dist-ctl-linux-arm64 \
@@ -128,23 +130,21 @@ define dist-build
 			cmd/$(1)/main.go
 endef
 
-DOCKER ?= docker
-
 docker-build: build ## Build the node docker image
-	docker build \
+	$(DOCKER) build \
 		-f Dockerfile \
 		-t $(IMAGE) .
 
 docker-build-distroless: build ## Build the distroless node docker image
-	docker build \
+	$(DOCKER) build \
 		-f Dockerfile.distroless \
 		-t $(IMAGE)-distroless .
 
 docker-push: docker-build ## Push the node docker image
-	docker push $(IMAGE)
+	$(DOCKER) push $(IMAGE)
 
 docker-push-distroless: docker-build-distroless ## Push the distroless node docker image
-	docker push $(IMAGE)-distroless
+	$(DOCKER) push $(IMAGE)-distroless
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
