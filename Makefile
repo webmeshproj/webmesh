@@ -64,7 +64,7 @@ build-image: ## Build the node build image.
 dist-linux: generate ## Build binaries for all Linux platforms.
 	rm -rf $(DIST)
 	mkdir -p $(DIST)
-	docker run --rm -it \
+	docker run --rm \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(CURDIR):/build" \
 		-v "$(shell go env GOCACHE):/.cache/go-build" \
