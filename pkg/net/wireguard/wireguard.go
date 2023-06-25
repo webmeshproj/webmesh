@@ -41,8 +41,8 @@ var DefaultInterfaceName = "webmesh0"
 func init() {
 	switch runtime.GOOS {
 	case "darwin":
-		// macOS TUN interfaces are named utunX, where X is a number.
-		DefaultInterfaceName = "utun0"
+		// macOS TUN interfaces have to be named "utun" followed by a number.
+		DefaultInterfaceName = "utun+"
 	}
 }
 
