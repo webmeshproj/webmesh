@@ -98,10 +98,10 @@ func NewServer(backend *grpc.Server, opts *Options) (*Server, error) {
 		return nil, fmt.Errorf("get static subdirectory: %w", err)
 	}
 	mux.Handle(apiRoot, http.StripPrefix(apiRoot, grpcweb.WrapServer(backend)))
-	if root == "/" {
-		mux.Handle(root, http.FileServer(http.FS(staticRoot)))
+	if root == "" {
+		mux.Handle("/", http.FileServer(http.FS(staticRoot)))
 	} else {
-		mux.Handle(root, http.StripPrefix(root, http.FileServer(http.FS(staticRoot))))
+		mux.Handle(root+"/", http.StripPrefix(root, http.FileServer(http.FS(staticRoot))))
 	}
 	srvr := &http.Server{
 		Addr:    opts.ListenAddress,
