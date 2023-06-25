@@ -113,7 +113,7 @@ func (s *store) join(ctx context.Context, joinAddr string, maxRetries int) error
 				return ctx.Err()
 			}
 			err = fmt.Errorf("join node: %w", err)
-			log.Error("join request failed", slog.String("error", err.Error()))
+			log.Error("join failed", slog.String("error", err.Error()))
 			tries++
 			time.Sleep(time.Second)
 			continue

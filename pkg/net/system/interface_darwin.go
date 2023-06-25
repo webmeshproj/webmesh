@@ -47,7 +47,7 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 	// Create the TUN device
 	tun, err := tun.CreateTUN(opts.Name, device.DefaultMTU)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create tun: %w", err)
 	}
 	// Get the real name of the interface
 	realName, err := tun.Name()
@@ -59,7 +59,7 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 	fileuapi, err := ipc.UAPIOpen(opts.Name)
 	if err != nil {
 		tun.Close()
-		return nil, err
+		return nil, fmt.Errorf("open uapi: %w", err)
 	}
 
 	// Create the tunnel device
@@ -77,7 +77,7 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 	uapi, err := ipc.UAPIListen(opts.Name, fileuapi)
 	if err != nil {
 		device.Close()
-		return nil, err
+		return nil, fmt.Errorf("listen uapi: %w", err)
 	}
 
 	// Handle UAPI connections
@@ -152,15 +152,25 @@ func DestroyInterface(ctx context.Context, name string) error {
 
 // SetInterfaceAddress sets the address of the interface with the given name.
 func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
-	return util.Exec(ctx, "ifconfig", name, "inet", addr.String())
+	if addr.Addr().Is4() {
+		return util.Exec(ctx, "ifconfig", name, "inet", addr.String(), addr.Addr().String())
+	}
+	return util.Exec(ctx, "ifconfig", name, "inet6", addr.String(), "prefixlen", fmt.Sprintf("%d", addr.Bits()), "alias")
 }
 
 // AddRoute adds a route to the interface with the given name.
 func AddRoute(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	return util.Exec(ctx, "route", "-n", "add", "-net", addr.String(), "-interface", ifaceName)
+	return util.Exec(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
 }
 
 // RemoveRoute removes a route from the interface with the given name.
 func RemoveRoute(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	return util.Exec(ctx, "route", "-n", "delete", "-net", addr.String(), "-interface", ifaceName)
+	return util.Exec(ctx, "route", "-n", "delete", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
+}
+
+func getFamily(addr netip.Addr) string {
+	if addr.Is4() {
+		return "inet"
+	}
+	return "inet6"
 }

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/webmeshproj/node/pkg/net/system"
+	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -44,9 +45,6 @@ const (
 	WireGuardRecordMetricsEnvVar         = "WIREGUARD_RECORD_METRICS"
 	WireGuardRecordMetricsIntervalEnvVar = "WIREGUARD_RECORD_METRICS_INTERVAL"
 )
-
-// DefaultInterfaceName is the default name of the WireGuard interface.
-const DefaultInterfaceName = "webmesh0"
 
 // WireGuardOptions are options for configuring the WireGuard interface.
 type WireGuardOptions struct {
@@ -88,7 +86,7 @@ type WireGuardOptions struct {
 func NewWireGuardOptions() *WireGuardOptions {
 	return &WireGuardOptions{
 		ListenPort:            51820,
-		InterfaceName:         DefaultInterfaceName,
+		InterfaceName:         wireguard.DefaultInterfaceName,
 		MTU:                   system.DefaultMTU,
 		KeyRotationInterval:   time.Hour * 24 * 7,
 		RecordMetrics:         false,
@@ -106,7 +104,7 @@ func NewWireGuardOptions() *WireGuardOptions {
 func (o *WireGuardOptions) BindFlags(fl *flag.FlagSet) {
 	fl.IntVar(&o.ListenPort, "wireguard.listen-port", util.GetEnvIntDefault(WireguardListenPortEnvVar, 51820),
 		"The WireGuard listen port.")
-	fl.StringVar(&o.InterfaceName, "wireguard.interface-name", util.GetEnvDefault(WireguardNameEnvVar, DefaultInterfaceName),
+	fl.StringVar(&o.InterfaceName, "wireguard.interface-name", util.GetEnvDefault(WireguardNameEnvVar, wireguard.DefaultInterfaceName),
 		"The WireGuard interface name.")
 	fl.BoolVar(&o.ForceInterfaceName, "wireguard.force-interface-name", util.GetEnvDefault(WireguardForceNameEnvVar, "false") == "true",
 		"Force the use of the given name by deleting any pre-existing interface with the same name.")

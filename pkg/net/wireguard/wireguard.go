@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -33,6 +34,17 @@ import (
 
 	"github.com/webmeshproj/node/pkg/net/system"
 )
+
+// DefaultInterfaceName is the default name to use for the WireGuard interface.
+var DefaultInterfaceName = "webmesh0"
+
+func init() {
+	switch runtime.GOOS {
+	case "darwin":
+		// macOS TUN interfaces are named utunX, where X is a number.
+		DefaultInterfaceName = "utun0"
+	}
+}
 
 // Interface is a high-level interface for managing wireguard connections.
 type Interface interface {
@@ -138,7 +150,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		MTU:       uint32(opts.MTU),
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new interface: %w", err)
 	}
 	handleErr := func(err error) error {
 		if err := iface.Destroy(ctx); err != nil {
