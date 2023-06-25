@@ -72,7 +72,7 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 	}
 	insecureServices := !store.Plugins().HasAuth()
 	if insecureServices {
-		log.Warn("running services without authenication")
+		log.Warn("running services without authentication")
 	}
 	if o.API.Admin {
 		log.Debug("registering admin api")

@@ -44,6 +44,7 @@ func (s *store) Close() error {
 		defer func() {
 			s.wgmux.Lock()
 			defer s.wgmux.Unlock()
+			s.log.Debug("clearing firewall rules")
 			if err := s.fw.Clear(ctx); err != nil {
 				s.log.Error("error clearing firewall rules", slog.String("error", err.Error()))
 			}
@@ -55,6 +56,7 @@ func (s *store) Close() error {
 		defer func() {
 			s.wgmux.Lock()
 			defer s.wgmux.Unlock()
+			s.log.Debug("closing wireguard interface")
 			if err := s.wg.Close(ctx); err != nil {
 				s.log.Error("error closing wireguard interface", slog.String("error", err.Error()))
 			}
@@ -62,7 +64,7 @@ func (s *store) Close() error {
 	}
 	if s.plugins != nil {
 		// Close the plugins
-		s.log.Debug("closing plugins")
+		s.log.Debug("closing plugin manager")
 		err := s.plugins.Close()
 		if err != nil {
 			s.log.Error("error closing plugins", slog.String("error", err.Error()))
