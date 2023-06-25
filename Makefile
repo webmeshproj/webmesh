@@ -53,8 +53,7 @@ build-ctl: fmt vet ## Build wmctl binary for the local platform.
 		cmd/$(CTL)/main.go
 
 lint: ## Run linters.
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	$(shell go env GOPATH)/bin/golangci-lint run
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run
 
 DOCKER ?= docker
 

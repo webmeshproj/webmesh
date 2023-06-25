@@ -40,6 +40,8 @@ import (
 //go:embed static/**
 var staticFiles embed.FS
 
+const staticAssetsPath = "static/dashboard"
+
 const (
 	DashboardEnabledEnvVar = "SERVICES_DASHBOARD_ENABLED"
 	DashboardListenEnvVar  = "SERVICES_DASHBOARD_LISTEN_ADDRESS"
@@ -91,12 +93,16 @@ func NewServer(backend *grpc.Server, opts *Options) (*Server, error) {
 	mux := http.NewServeMux()
 	root := strings.TrimSuffix(opts.Prefix, "/")
 	apiRoot := fmt.Sprintf("%s/api/", root)
-	staticRoot, err := fs.Sub(staticFiles, "static/dashboard")
+	staticRoot, err := fs.Sub(staticFiles, staticAssetsPath)
 	if err != nil {
 		return nil, fmt.Errorf("get static subdirectory: %w", err)
 	}
 	mux.Handle(apiRoot, http.StripPrefix(apiRoot, grpcweb.WrapServer(backend)))
-	mux.Handle(root+"/", http.FileServer(http.FS(staticRoot)))
+	if root == "/" {
+		mux.Handle(root, http.FileServer(http.FS(staticRoot)))
+	} else {
+		mux.Handle(root, http.StripPrefix(root, http.FileServer(http.FS(staticRoot))))
+	}
 	srvr := &http.Server{
 		Addr:    opts.ListenAddress,
 		Handler: logRequest(mux),
