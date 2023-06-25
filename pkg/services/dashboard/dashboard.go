@@ -74,7 +74,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		"The path to a certificate file to use for TLS.")
 	fs.StringVar(&o.TLSKeyFile, "services.dashboard.tls-key-file", util.GetEnvDefault(DashboardTLSKeyEnvVar, ""),
 		"The path to a key file to use for TLS.")
-	fs.StringVar(&o.Prefix, "services.dashboard.prefix", util.GetEnvDefault(DashboardPrefixEnvVar, "/"),
+	fs.StringVar(&o.Prefix, "services.dashboard.prefix", util.GetEnvDefault(DashboardPrefixEnvVar, ""),
 		"The path prefix to use for the dashboard.")
 }
 
@@ -83,7 +83,6 @@ func NewOptions() *Options {
 	return &Options{
 		Enabled:       false,
 		ListenAddress: ":8080",
-		Prefix:        "/",
 	}
 }
 
@@ -101,7 +100,8 @@ func NewServer(backend *grpc.Server, opts *Options) (*Server, error) {
 	if root == "" {
 		mux.Handle("/", http.FileServer(http.FS(staticRoot)))
 	} else {
-		mux.Handle(root+"/", http.StripPrefix(root, http.FileServer(http.FS(staticRoot))))
+		root = root + "/"
+		mux.Handle(root, http.StripPrefix(root, http.FileServer(http.FS(staticRoot))))
 	}
 	srvr := &http.Server{
 		Addr:    opts.ListenAddress,
