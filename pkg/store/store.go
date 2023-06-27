@@ -192,6 +192,10 @@ func New(opts *Options) (Store, error) {
 // The context is used to enforce startup timeouts.
 func NewTestStore(ctx context.Context) (Store, error) {
 	opts := NewOptions()
+	opts.Raft.ConnectionTimeout = 100 * time.Millisecond
+	opts.Raft.HeartbeatTimeout = 100 * time.Millisecond
+	opts.Raft.ElectionTimeout = 100 * time.Millisecond
+	opts.Raft.LeaderLeaseTimeout = 100 * time.Millisecond
 	opts.Raft.ListenAddress = ":0"
 	opts.Raft.InMemory = true
 	opts.TLS.Insecure = true
@@ -227,7 +231,7 @@ type store struct {
 	plugins   plugins.Manager
 
 	readyErr       chan error
-	firstBootstrap bool
+	firstBootstrap atomic.Bool
 
 	raft             *raft.Raft
 	lastAppliedIndex atomic.Uint64
@@ -345,7 +349,7 @@ func (s *store) ReadyNotify(ctx context.Context) <-chan struct{} {
 // will block until the store is ready and then return nil or the error from
 // the context.
 func (s *store) ReadyError(ctx context.Context) <-chan error {
-	if !s.firstBootstrap {
+	if !s.firstBootstrap.Load() {
 		go func() {
 			defer close(s.readyErr)
 			<-s.ReadyNotify(ctx)

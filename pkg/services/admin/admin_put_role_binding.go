@@ -37,7 +37,7 @@ var putRoleBindingAction = rbac.Actions{
 
 func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if rb.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "rolebinding name cannot be empty")
@@ -50,6 +50,19 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 	}
 	if rbacdb.IsSystemRoleBinding(rb.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot update system rolebindings")
+	}
+	if rb.GetRole() == "" {
+		return nil, status.Error(codes.InvalidArgument, "rolebinding must have a role")
+	}
+	if len(rb.GetSubjects()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "rolebinding must have at least one subject")
+	}
+	// Squash subjects if an all subject is present
+	for _, subject := range rb.GetSubjects() {
+		if subject.GetName() == "*" && subject.GetType() == v1.SubjectType_SUBJECT_ALL {
+			rb.Subjects = []*v1.Subject{subject}
+			break
+		}
 	}
 	err := s.rbac.PutRoleBinding(ctx, rb)
 	if err != nil {

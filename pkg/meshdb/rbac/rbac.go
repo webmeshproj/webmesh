@@ -429,7 +429,25 @@ func dbRoleBindingToAPIRoleBinding(dbRoleBinding *models.RoleBinding) *v1.RoleBi
 			})
 		}
 	}
-	// TODO: This should check for the "all" case and squash down to a single subject.
+	// Check for the all case and squash down to a single subject.
+	if len(out.Subjects) == 3 {
+		alls := make([]bool, 3)
+		for i, subject := range out.Subjects {
+			if subject.Name == "*" {
+				alls[i] = true
+			} else {
+				alls[i] = false
+			}
+		}
+		if alls[0] && alls[1] && alls[2] {
+			out.Subjects = []*v1.Subject{
+				{
+					Type: v1.SubjectType_SUBJECT_ALL,
+					Name: "*",
+				},
+			}
+		}
+	}
 	return out
 }
 

@@ -37,7 +37,7 @@ var deleteRoleBindingAction = rbac.Actions{
 
 func (s *Server) DeleteRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if rb.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")

@@ -36,7 +36,7 @@ var deleteEdgeAction = rbac.Actions{
 
 func (s *Server) DeleteEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if edge.GetSource() == "" {
 		return nil, status.Error(codes.InvalidArgument, "edge source is required")

@@ -70,9 +70,6 @@ func (s *store) Open() error {
 	if err != nil {
 		return fmt.Errorf("failed to load plugins: %w", err)
 	}
-	// Register a raft db driver.
-	raftDriverName := uuid.NewString()
-	sql.Register(raftDriverName, &raftDBDriver{s})
 	// If bootstrap and force are set, clear the data directory.
 	if s.opts.Bootstrap.Enabled && s.opts.Bootstrap.Force {
 		err = os.RemoveAll(s.opts.Raft.DataDir)
@@ -123,7 +120,10 @@ func (s *store) Open() error {
 	}
 	// Create the data stores.
 	log.Debug("creating data store")
-	dataPath := "file:raftdata?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
+	raftDriverName := uuid.NewString()
+	sql.Register(raftDriverName, &raftDBDriver{s})
+	// Giving the db a unique name is useful for testing.
+	dataPath := fmt.Sprintf("file:%s?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full", raftDriverName)
 	s.weakData, err = sql.Open("sqlite3", dataPath)
 	if err != nil {
 		return handleErr(fmt.Errorf("open data sqlite: %w", err))

@@ -52,6 +52,12 @@ build-ctl: fmt vet ## Build wmctl binary for the local platform.
 		-o "$(DIST)/$(CTL)_$(OS)_$(ARCH)" \
 		cmd/$(CTL)/main.go
 
+COVERAGE_FILE ?= coverage.out
+TEST_ARGS     ?= -v -race -cover -tags "$(BUILD_TAGS)" -coverprofile=$(COVERAGE_FILE) -covermode=atomic
+test: fmt vet
+	go test $(TEST_ARGS) ./...
+	go tool cover -func=$(COVERAGE_FILE)
+
 lint: ## Run linters.
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run
 

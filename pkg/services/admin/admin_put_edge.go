@@ -37,7 +37,7 @@ var putEdgeAction = rbac.Actions{
 
 func (s *Server) PutEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if edge.GetSource() == "" {
 		return nil, status.Error(codes.InvalidArgument, "source cannot be empty")

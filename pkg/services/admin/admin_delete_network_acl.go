@@ -37,7 +37,7 @@ var deleteNetworkACLAction = rbac.Actions{
 
 func (s *Server) DeleteNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if acl.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "acl name is required")

@@ -63,7 +63,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 		// Try to rejoin one of the bootstrap servers
 		return s.rejoinBootstrapServer(ctx)
 	}
-	s.firstBootstrap = true
+	s.firstBootstrap.Store(true)
 	if s.opts.Bootstrap.AdvertiseAddress == "" && s.opts.Bootstrap.Servers == "" {
 		s.opts.Bootstrap.AdvertiseAddress = fmt.Sprintf("localhost:%d", s.sl.ListenPort())
 	} else if s.opts.Bootstrap.AdvertiseAddress == "" {
@@ -428,10 +428,6 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("create node: %w", err)
 		}
-		err = s.raft.Barrier(time.Second * 5).Error()
-		if err != nil {
-			return fmt.Errorf("barrier: %w", err)
-		}
 	}
 	// Do the loop again for edges
 	for _, server := range cfg.Servers {
@@ -488,6 +484,10 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if !s.opts.Mesh.NoIPv6 {
 		networkv6 = networkIPv6
 		meshnetworkv6 = ula
+	}
+	err = s.raft.Barrier(time.Second * 5).Error()
+	if err != nil {
+		return fmt.Errorf("barrier: %w", err)
 	}
 	if s.noWG {
 		return nil

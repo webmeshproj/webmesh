@@ -18,6 +18,9 @@ limitations under the License.
 package admin
 
 import (
+	"fmt"
+	"net/netip"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,7 +39,7 @@ var putRouteAction = rbac.Actions{
 
 func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if route.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "route name is required")
@@ -52,6 +55,12 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 	}
 	if len(route.GetDestinationCidrs()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "at least one destination CIDR is required")
+	}
+	// Validate the CIDRs.
+	for _, cidr := range route.GetDestinationCidrs() {
+		if _, err := netip.ParsePrefix(cidr); err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid CIDR %q: %v", cidr, err))
+		}
 	}
 	err := s.networking.PutRoute(ctx, route)
 	if err != nil {

@@ -37,7 +37,7 @@ var deleteRoleAction = rbac.Actions{
 
 func (s *Server) DeleteRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")

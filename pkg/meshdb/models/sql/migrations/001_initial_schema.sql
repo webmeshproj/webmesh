@@ -22,8 +22,8 @@ CREATE TABLE nodes (
 
 -- Tracks edges between nodes for the mesh graph.
 CREATE TABLE node_edges (
-    src_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
-    dst_node_id  TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
+    src_node_id  TEXT NOT NULL,
+    dst_node_id  TEXT NOT NULL,
     weight       INTEGER NOT NULL DEFAULT 1,
     attrs        TEXT
 );

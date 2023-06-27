@@ -37,7 +37,7 @@ var putRoleAction = rbac.Actions{
 
 func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
@@ -51,10 +51,22 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 	if rbacdb.IsSystemRole(role.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot update system roles")
 	}
+	if len(role.GetRules()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "role must have at least one rule")
+	}
 	// Check if any rule has a wildcard and squash them down to a single wildcard rule.
 	for _, rule := range role.GetRules() {
+		if len(rule.GetVerbs()) == 0 {
+			return nil, status.Error(codes.InvalidArgument, "rule must have at least one verb")
+		}
+		if len(rule.GetResources()) == 0 {
+			return nil, status.Error(codes.InvalidArgument, "rule must have at least one resource")
+		}
 	Verbs:
 		for _, verb := range rule.GetVerbs() {
+			if _, ok := v1.RuleVerbs_name[int32(verb)]; !ok {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid verb: %v", verb)
+			}
 			if verb == v1.RuleVerbs_VERB_ALL {
 				rule.Verbs = []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL}
 				break Verbs
@@ -62,6 +74,9 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 		}
 	Resources:
 		for _, resource := range rule.GetResources() {
+			if _, ok := v1.RuleResource_name[int32(resource)]; !ok {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid resource: %v", resource)
+			}
 			if resource == v1.RuleResource_RESOURCE_ALL {
 				rule.Resources = []v1.RuleResource{v1.RuleResource_RESOURCE_ALL}
 				break Resources

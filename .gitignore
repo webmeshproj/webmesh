@@ -2,3 +2,4 @@ dist/
 bin/
 *.sqlite
 .vscode
+coverage.out

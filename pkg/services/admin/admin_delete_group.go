@@ -36,7 +36,7 @@ var deleteGroupAction = rbac.Actions{
 
 func (s *Server) DeleteGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if group.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name is required")

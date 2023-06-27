@@ -36,7 +36,7 @@ var deleteRouteAction = rbac.Actions{
 
 func (s *Server) DeleteRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty, error) {
 	if !s.store.IsLeader() {
-		return nil, status.Error(codes.Unavailable, "not the leader")
+		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if route.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "route name is required")
