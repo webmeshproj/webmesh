@@ -15,3 +15,41 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/rbac"
+)
+
+func TestDeleteRoleBinding(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	tc := []testCase[v1.RoleBinding]{
+		{
+			name: "no rolebinding name",
+			code: codes.InvalidArgument,
+			req:  &v1.RoleBinding{},
+		},
+		{
+			name: "system rolebinding",
+			code: codes.InvalidArgument,
+			req:  &v1.RoleBinding{Name: rbac.MeshAdminRoleBinding},
+		},
+		{
+			name: "any other rolebinding",
+			code: codes.OK,
+			req:  &v1.RoleBinding{Name: "foo"},
+		},
+	}
+
+	runTestCases(t, tc, server.DeleteRoleBinding)
+}

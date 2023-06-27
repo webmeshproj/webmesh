@@ -54,6 +54,11 @@ func IsSystemRoleBinding(name string) bool {
 	return name == MeshAdminRoleBinding || name == BootstrapVotersRoleBinding
 }
 
+// IsSystemGroup returns true if the group is a system group.
+func IsSystemGroup(name string) bool {
+	return name == VotersGroup
+}
+
 // ErrRoleNotFound is returned when a role is not found.
 var ErrRoleNotFound = fmt.Errorf("role not found")
 

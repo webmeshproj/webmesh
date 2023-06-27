@@ -41,6 +41,9 @@ import (
 // ErrNodeNotFound is returned when a node is not found.
 var ErrNodeNotFound = errors.New("node not found")
 
+// ErrEdgeNotFound is returned when an edge is not found.
+var ErrEdgeNotFound = graph.ErrEdgeNotFound
+
 // Graph is the graph.Graph implementation for the mesh network.
 type Graph graph.Graph[string, Node]
 
@@ -50,8 +53,8 @@ func graphHasher(n Node) string { return n.ID }
 // InvalidNodeIDChars are the characters that are not allowed in node IDs.
 var InvalidNodeIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', ','}
 
-// NodeIDIsValid returns true if the given node ID is valid.
-func NodeIDIsValid(id string) bool {
+// IsValidID returns true if the given node ID is valid.
+func IsValidID(id string) bool {
 	if len(id) == 0 {
 		return false
 	}

@@ -15,3 +15,41 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
+)
+
+func TestDeleteNetworkACL(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	tc := []testCase[v1.NetworkACL]{
+		{
+			name: "no acl name",
+			code: codes.InvalidArgument,
+			req:  &v1.NetworkACL{},
+		},
+		{
+			name: "system acl",
+			code: codes.InvalidArgument,
+			req:  &v1.NetworkACL{Name: networking.BootstrapNodesNetworkACLName},
+		},
+		{
+			name: "any other acl",
+			code: codes.OK,
+			req:  &v1.NetworkACL{Name: "foo"},
+		},
+	}
+
+	runTestCases(t, tc, server.DeleteNetworkACL)
+}

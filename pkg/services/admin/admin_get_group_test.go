@@ -15,3 +15,41 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/rbac"
+)
+
+func TestGetGroup(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	tc := []testCase[v1.Group]{
+		{
+			name: "no group name",
+			code: codes.InvalidArgument,
+			req:  &v1.Group{},
+		},
+		{
+			name: "non-existent group",
+			req:  &v1.Group{Name: "non-existent-group"},
+			code: codes.NotFound,
+		},
+		{
+			name: "existing system group",
+			req:  &v1.Group{Name: rbac.VotersGroup},
+			code: codes.OK,
+		},
+	}
+
+	runTestCases(t, tc, server.GetGroup)
+}

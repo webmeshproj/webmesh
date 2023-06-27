@@ -15,3 +15,49 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+)
+
+func TestGetRoute(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	// Pre populate the store with a route
+	_, err := server.PutRoute(ctx, &v1.Route{
+		Name:             "foo",
+		Node:             "foo",
+		DestinationCidrs: []string{"0.0.0.0/0"},
+	})
+	if err != nil {
+		t.Fatalf("failed to put route: %v", err)
+	}
+
+	tc := []testCase[v1.Route]{
+		{
+			name: "no route name",
+			code: codes.InvalidArgument,
+			req:  &v1.Route{},
+		},
+		{
+			name: "non-existent route",
+			req:  &v1.Route{Name: "non-existent"},
+			code: codes.NotFound,
+		},
+		{
+			name: "existing route",
+			req:  &v1.Route{Name: "foo"},
+		},
+	}
+
+	runTestCases(t, tc, server.GetRoute)
+}

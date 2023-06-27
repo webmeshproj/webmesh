@@ -31,7 +31,7 @@ import (
 func TestPutEdge(t *testing.T) {
 	t.Parallel()
 
-	server, closer := newTestServer(t)
+	server, closer := newTestServer(context.Background(), t)
 	defer closer()
 
 	// Pre register the nodes

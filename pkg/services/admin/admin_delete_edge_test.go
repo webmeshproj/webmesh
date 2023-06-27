@@ -15,3 +15,40 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+)
+
+func TestDeleteEdge(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	tc := []testCase[v1.MeshEdge]{
+		{
+			name: "no source",
+			code: codes.InvalidArgument,
+			req:  &v1.MeshEdge{Source: "", Target: "bar"},
+		},
+		{
+			name: "no target",
+			code: codes.InvalidArgument,
+			req:  &v1.MeshEdge{Source: "foo", Target: ""},
+		},
+		{
+			name: "valid request",
+			code: codes.OK,
+			req:  &v1.MeshEdge{Source: "foo", Target: "bar"},
+		},
+	}
+
+	runTestCases(t, tc, server.DeleteEdge)
+}

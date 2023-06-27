@@ -15,3 +15,73 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"net/netip"
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
+)
+
+func TestGetEdge(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	// Place a dummy peer
+	key, err := wgtypes.GenerateKey()
+	if err != nil {
+		t.Errorf("GenerateKey() error = %v", err)
+		return
+	}
+	_, err = peers.New(server.store).Put(ctx, &peers.PutOptions{
+		ID:          "foo",
+		PublicKey:   key.PublicKey(),
+		NetworkIPv6: netip.MustParsePrefix("2001:db8::/64"),
+	})
+	if err != nil {
+		t.Errorf("Put() error = %v", err)
+		return
+	}
+	// Place an edge from us to the dummy peer
+	_, err = server.PutEdge(ctx, &v1.MeshEdge{
+		Source: server.store.ID(),
+		Target: "foo",
+	})
+	if err != nil {
+		t.Errorf("PutEdge() error = %v", err)
+		return
+	}
+
+	tc := []testCase[v1.MeshEdge]{
+		{
+			name: "no source node",
+			code: codes.InvalidArgument,
+			req:  &v1.MeshEdge{Source: "", Target: "bar"},
+		},
+		{
+			name: "no target node",
+			code: codes.InvalidArgument,
+			req:  &v1.MeshEdge{Source: "foo", Target: ""},
+		},
+		{
+			name: "non-existent edge",
+			req:  &v1.MeshEdge{Source: "foo", Target: "bar"},
+			code: codes.NotFound,
+		},
+		{
+			name: "existing edge",
+			req:  &v1.MeshEdge{Source: server.store.ID(), Target: "foo"},
+			code: codes.OK,
+		},
+	}
+
+	runTestCases(t, tc, server.GetEdge)
+}

@@ -67,7 +67,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 		if _, ok := v1.SubjectType_name[int32(subject.GetType())]; !ok {
 			return nil, status.Error(codes.InvalidArgument, "subject type must be valid")
 		}
-		if !peers.NodeIDIsValid(subject.GetName()) {
+		if !peers.IsValidID(subject.GetName()) {
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}

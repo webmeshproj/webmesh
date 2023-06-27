@@ -27,9 +27,9 @@ import (
 	"github.com/webmeshproj/node/pkg/store"
 )
 
-func newTestServer(t *testing.T) (*Server, func()) {
+func newTestServer(ctx context.Context, t *testing.T) (*Server, func()) {
 	t.Helper()
-	store, err := store.NewTestStore(context.Background())
+	store, err := store.NewTestStore(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("error creating test store: %w", err))
 	}
@@ -73,7 +73,7 @@ func runTestCase[REQ, RESP any](t *testing.T, tc testCase[REQ], tf testFunc[REQ,
 					t.Fatalf("expected error to be a status error")
 				}
 				if status.Code() != tc.code {
-					t.Errorf("expected error: %v, got: %v", tc.code, status.Code())
+					t.Errorf("expected error: %v, got: %v: %v", tc.code, status.Code(), status.Message())
 				}
 			}
 		}

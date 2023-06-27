@@ -61,7 +61,7 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 			return nil, status.Error(codes.InvalidArgument, "subject type must be one of: USER, NODE, ALL")
 		}
 		// Make sure the subject name is a valid node ID
-		if !peers.NodeIDIsValid(subject.GetName()) {
+		if !peers.IsValidID(subject.GetName()) {
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}

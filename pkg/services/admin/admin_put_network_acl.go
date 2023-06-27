@@ -72,7 +72,7 @@ func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptyp
 	if len(acl.GetSourceNodes()) > 0 || len(acl.GetDestinationNodes()) > 0 {
 		nodes := append(acl.GetSourceNodes(), acl.GetDestinationNodes()...)
 		for _, node := range nodes {
-			if !peers.NodeIDIsValid(node) {
+			if !peers.IsValidID(node) {
 				return nil, status.Errorf(codes.InvalidArgument, "invalid node id: %s", node)
 			}
 		}

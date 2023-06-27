@@ -15,3 +15,57 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+
+	"github.com/webmeshproj/node/pkg/context"
+)
+
+func TestListNetworkACLs(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	// No empty condition due to system acls created during bootstrap
+
+	// Place a network acl
+	_, err := server.PutNetworkACL(ctx, &v1.NetworkACL{
+		Name:             "test-acl",
+		SourceNodes:      []string{"foo"},
+		DestinationCidrs: []string{"0.0.0.0/0"},
+	})
+	if err != nil {
+		t.Errorf("PutNetworkACL() error = %v", err)
+		return
+	}
+	var acl *v1.NetworkACL
+	acls, err := server.ListNetworkACLs(ctx, nil)
+	if err != nil {
+		t.Errorf("ListNetworkACLs() error = %v", err)
+		return
+	}
+	for _, a := range acls.GetItems() {
+		if a.GetName() == "test-acl" {
+			acl = a
+			break
+		}
+	}
+	if acl == nil {
+		t.Errorf("ListNetworkACLs() did not return the expected ACL")
+	}
+	if len(acl.GetSourceNodes()) != 1 {
+		t.Errorf("ListNetworkACLs() returned an ACL with unexpected source nodes")
+	} else if acl.GetSourceNodes()[0] != "foo" {
+		t.Errorf("ListNetworkACLs() returned an ACL with unexpected source nodes")
+	}
+	if len(acl.GetDestinationCidrs()) != 1 {
+		t.Errorf("ListNetworkACLs() returned an ACL with unexpected destination cidrs")
+	} else if acl.GetDestinationCidrs()[0] != "0.0.0.0/0" {
+		t.Errorf("ListNetworkACLs() returned an ACL with unexpected destination cidrs")
+	}
+}

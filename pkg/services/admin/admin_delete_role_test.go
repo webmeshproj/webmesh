@@ -15,3 +15,41 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/rbac"
+)
+
+func TestDeleteRole(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	tc := []testCase[v1.Role]{
+		{
+			name: "no role name",
+			code: codes.InvalidArgument,
+			req:  &v1.Role{},
+		},
+		{
+			name: "system role",
+			code: codes.InvalidArgument,
+			req:  &v1.Role{Name: rbac.MeshAdminRole},
+		},
+		{
+			name: "any other role",
+			code: codes.OK,
+			req:  &v1.Role{Name: "foo"},
+		},
+	}
+
+	runTestCases(t, tc, server.DeleteRole)
+}

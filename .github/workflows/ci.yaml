@@ -40,6 +40,10 @@ jobs:
           args: --timeout 10m
           skip-pkg-cache: true
 
+      - name: Run Unit Tests
+        shell: bash
+        run: make test
+
   build-publish-linux:
     name: Build and Publish Linux Artifacts
     runs-on: ubuntu-latest

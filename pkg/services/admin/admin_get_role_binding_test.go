@@ -15,3 +15,41 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/rbac"
+)
+
+func TestGetRoleBinding(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	tc := []testCase[v1.RoleBinding]{
+		{
+			name: "no rolebinding name",
+			code: codes.InvalidArgument,
+			req:  &v1.RoleBinding{},
+		},
+		{
+			name: "non-existent rolebinding",
+			req:  &v1.RoleBinding{Name: "non-existent-rolebinding"},
+			code: codes.NotFound,
+		},
+		{
+			name: "existing system rolebinding",
+			req:  &v1.RoleBinding{Name: rbac.MeshAdminRoleBinding},
+			code: codes.OK,
+		},
+	}
+
+	runTestCases(t, tc, server.GetRoleBinding)
+}

@@ -24,8 +24,10 @@ import (
 )
 
 func TestListRoutes(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	server, close := newTestServer(t)
+	server, close := newTestServer(context.Background(), t)
 	defer close()
 
 	// Empty condition

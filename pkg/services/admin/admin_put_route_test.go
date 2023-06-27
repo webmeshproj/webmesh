@@ -28,7 +28,7 @@ func TestPutRoute(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	server, closer := newTestServer(t)
+	server, closer := newTestServer(ctx, t)
 	defer closer()
 
 	tt := []testCase[v1.Route]{

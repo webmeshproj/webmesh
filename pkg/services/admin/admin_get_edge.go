@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -50,6 +51,9 @@ func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, 
 	}
 	graphEdge, err := s.peers.Graph().Edge(edge.GetSource(), edge.GetTarget())
 	if err != nil {
+		if err == peers.ErrEdgeNotFound {
+			return nil, status.Errorf(codes.NotFound, "edge %q to %q not found", edge.GetSource(), edge.GetTarget())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &v1.MeshEdge{

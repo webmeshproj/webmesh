@@ -46,7 +46,7 @@ func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, erro
 	}
 	route, err := s.networking.GetRoute(ctx, route.GetName())
 	if err != nil {
-		if err == networking.ErrACLNotFound {
+		if err == networking.ErrRouteNotFound {
 			return nil, status.Errorf(codes.NotFound, "network route %q not found", route.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())

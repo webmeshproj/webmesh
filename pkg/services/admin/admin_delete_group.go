@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
+	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -46,6 +47,9 @@ func (s *Server) DeleteGroup(ctx context.Context, group *v1.Group) (*emptypb.Emp
 			context.LoggerFrom(ctx).Error("failed to evaluate delete group action", "error", err)
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete groups")
+	}
+	if rbacdb.IsSystemGroup(group.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "cannot delete system groups")
 	}
 	err := s.rbac.DeleteGroup(ctx, group.GetName())
 	if err != nil {

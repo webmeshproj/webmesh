@@ -15,3 +15,41 @@ limitations under the License.
 */
 
 package admin
+
+import (
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/networking"
+)
+
+func TestGetNetworkACL(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	server, close := newTestServer(ctx, t)
+	defer close()
+
+	tc := []testCase[v1.NetworkACL]{
+		{
+			name: "no acl name",
+			code: codes.InvalidArgument,
+			req:  &v1.NetworkACL{},
+		},
+		{
+			name: "non-existent networkacl",
+			req:  &v1.NetworkACL{Name: "non-existent-networkacl"},
+			code: codes.NotFound,
+		},
+		{
+			name: "existing system networkacl",
+			req:  &v1.NetworkACL{Name: networking.BootstrapNodesNetworkACLName},
+			code: codes.OK,
+		},
+	}
+
+	runTestCases(t, tc, server.GetNetworkACL)
+}
