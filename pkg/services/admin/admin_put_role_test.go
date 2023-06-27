@@ -222,7 +222,5 @@ func TestPutRole(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		runTestCase(t, tc, server.PutRole)
-	}
+	runTestCases(t, tt, server.PutRole)
 }

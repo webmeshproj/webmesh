@@ -285,6 +285,11 @@ func (r *rbac) PutGroup(ctx context.Context, role *v1.Group) error {
 			nodes = append(nodes, subject.GetName())
 		case v1.SubjectType_SUBJECT_USER:
 			users = append(users, subject.GetName())
+		case v1.SubjectType_SUBJECT_ALL:
+			if subject.GetName() == "*" {
+				nodes = append(nodes, subject.GetName())
+				users = append(users, subject.GetName())
+			}
 		}
 	}
 	if len(nodes) > 0 {
@@ -470,6 +475,25 @@ func dbGroupToAPIGroup(dbGroup *models.Group) *v1.Group {
 				Type: v1.SubjectType_SUBJECT_NODE,
 				Name: node,
 			})
+		}
+	}
+	// Check for the all case and squash down to a single subject.
+	if len(out.Subjects) == 2 {
+		alls := make([]bool, 2)
+		for i, subject := range out.Subjects {
+			if subject.Name == "*" {
+				alls[i] = true
+			} else {
+				alls[i] = false
+			}
+		}
+		if alls[0] && alls[1] {
+			out.Subjects = []*v1.Subject{
+				{
+					Type: v1.SubjectType_SUBJECT_ALL,
+					Name: "*",
+				},
+			}
 		}
 	}
 	return out

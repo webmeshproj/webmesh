@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
@@ -62,6 +63,12 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 		if subject.GetName() == "*" && subject.GetType() == v1.SubjectType_SUBJECT_ALL {
 			rb.Subjects = []*v1.Subject{subject}
 			break
+		}
+		if _, ok := v1.SubjectType_name[int32(subject.GetType())]; !ok {
+			return nil, status.Error(codes.InvalidArgument, "subject type must be valid")
+		}
+		if !peers.NodeIDIsValid(subject.GetName()) {
+			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}
 	err := s.rbac.PutRoleBinding(ctx, rb)

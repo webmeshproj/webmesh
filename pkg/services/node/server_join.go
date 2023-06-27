@@ -70,6 +70,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if req.GetId() == "" {
 		// TODO: This is technically not required if we are using authenticated gRPC
 		return nil, status.Error(codes.InvalidArgument, "node id required")
+	} else if !peers.NodeIDIsValid(req.GetId()) {
+		// TODO: Have a list of invalid characters
+		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if len(req.GetRoutes()) > 0 {
 		for _, route := range req.GetRoutes() {

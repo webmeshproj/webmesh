@@ -63,6 +63,15 @@ func TestPutRoute(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid node",
+			code: codes.InvalidArgument,
+			req: &v1.Route{
+				Name:             "test",
+				Node:             ",test",
+				DestinationCidrs: []string{"0.0.0.0/0"},
+			},
+		},
+		{
 			name: "single invalid destination cidr",
 			code: codes.InvalidArgument,
 			req: &v1.Route{
@@ -123,7 +132,5 @@ func TestPutRoute(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		runTestCase(t, tc, server.PutRoute)
-	}
+	runTestCases(t, tt, server.PutRoute)
 }

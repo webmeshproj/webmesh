@@ -52,6 +52,9 @@ func (s *Server) PutEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty
 			}
 			return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put the given edge")
 		}
+		if !peers.NodeIDIsValid(id) {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid node ID: %s", id)
+		}
 	}
 	err := s.peers.PutEdge(ctx, peers.Edge{
 		From:   edge.GetSource(),

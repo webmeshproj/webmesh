@@ -27,6 +27,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -52,6 +53,8 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 	}
 	if route.GetNode() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node name is required")
+	} else if !peers.NodeIDIsValid(route.GetNode()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid node ID")
 	}
 	if len(route.GetDestinationCidrs()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "at least one destination CIDR is required")

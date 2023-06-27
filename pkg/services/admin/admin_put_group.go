@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/services/rbac"
 )
 
@@ -49,6 +50,20 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 	}
 	if len(group.GetSubjects()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "group must have at least one node or user")
+	}
+	for _, subject := range group.GetSubjects() {
+		// Squash subjects if an all subject is present
+		if subject.GetName() == "*" && subject.GetType() == v1.SubjectType_SUBJECT_ALL {
+			group.Subjects = []*v1.Subject{subject}
+			break
+		}
+		if _, ok := v1.SubjectType_name[int32(subject.GetType())]; !ok {
+			return nil, status.Error(codes.InvalidArgument, "subject type must be one of: USER, NODE, ALL")
+		}
+		// Make sure the subject name is a valid node ID
+		if !peers.NodeIDIsValid(subject.GetName()) {
+			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
+		}
 	}
 	err := s.rbac.PutGroup(ctx, group)
 	if err != nil {

@@ -45,8 +45,20 @@ type testCase[REQ any] struct {
 
 type testFunc[REQ, RESP any] func(context.Context, *REQ) (RESP, error)
 
+func runTestCases[REQ, RESP any](t *testing.T, tt []testCase[REQ], tf testFunc[REQ, RESP]) {
+	t.Helper()
+	for _, tc := range tt {
+		runTestCase[REQ, RESP](t, tc, tf)
+	}
+}
+
 func runTestCase[REQ, RESP any](t *testing.T, tc testCase[REQ], tf testFunc[REQ, RESP]) {
+	t.Helper()
 	t.Run(tc.name, func(t *testing.T) {
+		if tc.req == nil {
+			var req REQ
+			tc.req = &req
+		}
 		_, err := tf(context.Background(), tc.req)
 		if tc.code == codes.OK {
 			if err != nil {

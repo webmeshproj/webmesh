@@ -89,6 +89,34 @@ func TestPutRoleBinding(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid subjects",
+			code: codes.InvalidArgument,
+			req: &v1.RoleBinding{
+				Name: "test-rolebinding",
+				Role: "test-role",
+				Subjects: []*v1.Subject{
+					{
+						Name: "invalid,subject",
+						Type: v1.SubjectType_SUBJECT_USER,
+					},
+				},
+			},
+		},
+		{
+			name: "invalid subject type",
+			code: codes.InvalidArgument,
+			req: &v1.RoleBinding{
+				Name: "test-rolebinding",
+				Role: "test-role",
+				Subjects: []*v1.Subject{
+					{
+						Name: "subject",
+						Type: -1,
+					},
+				},
+			},
+		},
+		{
 			name: "squash all subjects",
 			code: codes.OK,
 			req: &v1.RoleBinding{
@@ -125,9 +153,54 @@ func TestPutRoleBinding(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "valid rolebinding",
+			code: codes.OK,
+			req: &v1.RoleBinding{
+				Name: "test-rolebinding",
+				Role: "test-role",
+				Subjects: []*v1.Subject{
+					{
+						Name: "*",
+						Type: v1.SubjectType_SUBJECT_ALL,
+					},
+				},
+			},
+			tval: func(t *testing.T) {
+				rb, err := server.GetRoleBinding(context.Background(), &v1.RoleBinding{Name: "test-rolebinding"})
+				if err != nil {
+					t.Error("expected no error, got", err)
+					return
+				}
+				if len(rb.Subjects) != 1 {
+					t.Error("expected 1 subject, got", len(rb.Subjects))
+					return
+				}
+				if rb.Subjects[0].Name != "*" {
+					t.Error("expected subject name to be '*', got", rb.Subjects[0].Name)
+					return
+				}
+				if rb.Subjects[0].Type != v1.SubjectType_SUBJECT_ALL {
+					t.Error("expected subject type to be 'all', got", rb.Subjects[0].Type)
+					return
+				}
+			},
+		},
+		{
+			name: "invalid rolebinding non-existent role",
+			code: codes.Internal,
+			req: &v1.RoleBinding{
+				Name: "test-rolebinding",
+				Role: "non-existing-role",
+				Subjects: []*v1.Subject{
+					{
+						Name: "*",
+						Type: v1.SubjectType_SUBJECT_ALL,
+					},
+				},
+			},
+		},
 	}
 
-	for _, tc := range tt {
-		runTestCase(t, tc, server.PutRoleBinding)
-	}
+	runTestCases(t, tt, server.PutRoleBinding)
 }
