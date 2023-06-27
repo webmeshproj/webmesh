@@ -32,7 +32,7 @@ import (
 var putRoleBindingAction = rbac.Actions{
 	{
 		Resource: v1.RuleResource_RESOURCE_ROLE_BINDINGS,
-		Verb:     v1.RuleVerbs_VERB_PUT,
+		Verb:     v1.RuleVerb_VERB_PUT,
 	},
 }
 

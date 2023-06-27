@@ -38,7 +38,7 @@ import (
 
 var canNegDataChannelAction = rbac.Actions{
 	{
-		Verb:     v1.RuleVerbs_VERB_PUT,
+		Verb:     v1.RuleVerb_VERB_PUT,
 		Resource: v1.RuleResource_RESOURCE_DATA_CHANNELS,
 	},
 }

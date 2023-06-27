@@ -29,7 +29,7 @@ import (
 var getEdgeAction = rbac.Actions{
 	{
 		Resource: v1.RuleResource_RESOURCE_EDGES,
-		Verb:     v1.RuleVerbs_VERB_GET,
+		Verb:     v1.RuleVerb_VERB_GET,
 	},
 }
 

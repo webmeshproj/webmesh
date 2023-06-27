@@ -49,7 +49,7 @@ func EvalRole(role *v1.Role, action *v1.RBACAction) bool {
 func EvalRule(rule *v1.Rule, action *v1.RBACAction) bool {
 	var verbMatch bool
 	for _, verb := range rule.GetVerbs() {
-		if verb == action.GetVerb() || verb == v1.RuleVerbs_VERB_ALL {
+		if verb == action.GetVerb() || verb == v1.RuleVerb_VERB_ALL {
 			verbMatch = true
 			break
 		}

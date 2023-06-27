@@ -15,6 +15,7 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/raft v1.5.0
 	github.com/hashicorp/raft-boltdb v0.0.0-20230125174641-2a8082862702
+	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/jsimonetti/rtnetlink v1.3.3
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/miekg/dns v1.1.54
@@ -31,7 +32,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.0.0
-	github.com/webmeshproj/api v0.1.3-0.20230621033013-9f688fd5b991
+	github.com/webmeshproj/api v0.1.3
 	golang.org/x/crypto v0.9.0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sync v0.1.0
@@ -59,7 +60,6 @@ require (
 	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
-	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect

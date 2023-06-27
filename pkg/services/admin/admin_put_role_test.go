@@ -68,7 +68,7 @@ func TestPutRole(t *testing.T) {
 				Rules: []*v1.Rule{
 					{
 						Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
-						Verbs:     []v1.RuleVerbs{},
+						Verbs:     []v1.RuleVerb{},
 					},
 				},
 			},
@@ -81,7 +81,7 @@ func TestPutRole(t *testing.T) {
 				Rules: []*v1.Rule{
 					{
 						Resources: []v1.RuleResource{},
-						Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL},
+						Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
 					},
 				},
 			},
@@ -94,7 +94,7 @@ func TestPutRole(t *testing.T) {
 				Rules: []*v1.Rule{
 					{
 						Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
-						Verbs:     []v1.RuleVerbs{-1},
+						Verbs:     []v1.RuleVerb{-1},
 					},
 				},
 			},
@@ -107,7 +107,7 @@ func TestPutRole(t *testing.T) {
 				Rules: []*v1.Rule{
 					{
 						Resources: []v1.RuleResource{-1},
-						Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL},
+						Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
 					},
 				},
 			},
@@ -120,7 +120,7 @@ func TestPutRole(t *testing.T) {
 				Rules: []*v1.Rule{
 					{
 						Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
-						Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL, v1.RuleVerbs_VERB_GET},
+						Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL, v1.RuleVerb_VERB_GET},
 					},
 				},
 			},
@@ -138,8 +138,8 @@ func TestPutRole(t *testing.T) {
 					t.Errorf("expected 1 verb, got: %v", len(role.Rules[0].Verbs))
 					return
 				}
-				if role.Rules[0].Verbs[0] != v1.RuleVerbs_VERB_ALL {
-					t.Errorf("expected verb: %v, got: %v", v1.RuleVerbs_VERB_ALL, role.Rules[0].Verbs[0])
+				if role.Rules[0].Verbs[0] != v1.RuleVerb_VERB_ALL {
+					t.Errorf("expected verb: %v, got: %v", v1.RuleVerb_VERB_ALL, role.Rules[0].Verbs[0])
 					return
 				}
 			},
@@ -152,7 +152,7 @@ func TestPutRole(t *testing.T) {
 				Rules: []*v1.Rule{
 					{
 						Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL, v1.RuleResource_RESOURCE_NETWORK_ACLS},
-						Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL},
+						Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
 					},
 				},
 			},
@@ -184,7 +184,7 @@ func TestPutRole(t *testing.T) {
 				Rules: []*v1.Rule{
 					{
 						Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_NETWORK_ACLS, v1.RuleResource_RESOURCE_ROLES},
-						Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_GET, v1.RuleVerbs_VERB_PUT},
+						Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_GET, v1.RuleVerb_VERB_PUT},
 					},
 				},
 			},
@@ -212,11 +212,11 @@ func TestPutRole(t *testing.T) {
 					t.Errorf("expected 2 verbs, got: %v", len(role.Rules[0].Verbs))
 					return
 				}
-				if role.Rules[0].Verbs[0] != v1.RuleVerbs_VERB_GET {
-					t.Errorf("expected verb: %v, got: %v", v1.RuleVerbs_VERB_GET, role.Rules[0].Verbs[0])
+				if role.Rules[0].Verbs[0] != v1.RuleVerb_VERB_GET {
+					t.Errorf("expected verb: %v, got: %v", v1.RuleVerb_VERB_GET, role.Rules[0].Verbs[0])
 				}
-				if role.Rules[0].Verbs[1] != v1.RuleVerbs_VERB_PUT {
-					t.Errorf("expected verb: %v, got: %v", v1.RuleVerbs_VERB_PUT, role.Rules[0].Verbs[1])
+				if role.Rules[0].Verbs[1] != v1.RuleVerb_VERB_PUT {
+					t.Errorf("expected verb: %v, got: %v", v1.RuleVerb_VERB_PUT, role.Rules[0].Verbs[1])
 				}
 			},
 		},

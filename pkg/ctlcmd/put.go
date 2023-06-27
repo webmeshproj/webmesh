@@ -166,18 +166,18 @@ var putRoleCmd = &cobra.Command{
 						}
 						return resources
 					}(),
-					Verbs: func() []v1.RuleVerbs {
-						verbs := make([]v1.RuleVerbs, len(putRoleVerbs))
+					Verbs: func() []v1.RuleVerb {
+						verbs := make([]v1.RuleVerb, len(putRoleVerbs))
 						for i, verb := range putRoleVerbs {
 							switch verb {
 							case "put":
-								verbs[i] = v1.RuleVerbs_VERB_PUT
+								verbs[i] = v1.RuleVerb_VERB_PUT
 							case "get":
-								verbs[i] = v1.RuleVerbs_VERB_GET
+								verbs[i] = v1.RuleVerb_VERB_GET
 							case "delete":
-								verbs[i] = v1.RuleVerbs_VERB_DELETE
+								verbs[i] = v1.RuleVerb_VERB_DELETE
 							case "*":
-								verbs[i] = v1.RuleVerbs_VERB_ALL
+								verbs[i] = v1.RuleVerb_VERB_ALL
 							}
 						}
 						return verbs

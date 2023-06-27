@@ -30,7 +30,7 @@ import (
 var deleteRouteAction = rbac.Actions{
 	{
 		Resource: v1.RuleResource_RESOURCE_ROUTES,
-		Verb:     v1.RuleVerbs_VERB_DELETE,
+		Verb:     v1.RuleVerb_VERB_DELETE,
 	},
 }
 

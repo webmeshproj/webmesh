@@ -34,7 +34,7 @@ import (
 var putRouteAction = rbac.Actions{
 	{
 		Resource: v1.RuleResource_RESOURCE_ROUTES,
-		Verb:     v1.RuleVerbs_VERB_PUT,
+		Verb:     v1.RuleVerb_VERB_PUT,
 	},
 }
 

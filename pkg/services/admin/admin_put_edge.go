@@ -31,7 +31,7 @@ import (
 var putEdgeAction = rbac.Actions{
 	{
 		Resource: v1.RuleResource_RESOURCE_EDGES,
-		Verb:     v1.RuleVerbs_VERB_PUT,
+		Verb:     v1.RuleVerb_VERB_PUT,
 	},
 }
 

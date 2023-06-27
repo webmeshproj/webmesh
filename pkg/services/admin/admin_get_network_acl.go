@@ -30,7 +30,7 @@ import (
 var getNetworkACLAction = rbac.Actions{
 	{
 		Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
-		Verb:     v1.RuleVerbs_VERB_GET,
+		Verb:     v1.RuleVerb_VERB_GET,
 	},
 }
 

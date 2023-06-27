@@ -241,7 +241,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		Rules: []*v1.Rule{
 			{
 				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
-				Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL},
+				Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
 			},
 		},
 	})
@@ -273,7 +273,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		Rules: []*v1.Rule{
 			{
 				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_VOTES},
-				Verbs:     []v1.RuleVerbs{v1.RuleVerbs_VERB_PUT},
+				Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_PUT},
 			},
 		},
 	})

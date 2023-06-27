@@ -31,7 +31,7 @@ import (
 var putRoleAction = rbac.Actions{
 	{
 		Resource: v1.RuleResource_RESOURCE_ROLES,
-		Verb:     v1.RuleVerbs_VERB_PUT,
+		Verb:     v1.RuleVerb_VERB_PUT,
 	},
 }
 
@@ -64,11 +64,11 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 		}
 	Verbs:
 		for _, verb := range rule.GetVerbs() {
-			if _, ok := v1.RuleVerbs_name[int32(verb)]; !ok {
+			if _, ok := v1.RuleVerb_name[int32(verb)]; !ok {
 				return nil, status.Errorf(codes.InvalidArgument, "invalid verb: %v", verb)
 			}
-			if verb == v1.RuleVerbs_VERB_ALL {
-				rule.Verbs = []v1.RuleVerbs{v1.RuleVerbs_VERB_ALL}
+			if verb == v1.RuleVerb_VERB_ALL {
+				rule.Verbs = []v1.RuleVerb{v1.RuleVerb_VERB_ALL}
 				break Verbs
 			}
 		}

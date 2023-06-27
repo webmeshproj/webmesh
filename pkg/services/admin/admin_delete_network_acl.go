@@ -31,7 +31,7 @@ import (
 var deleteNetworkACLAction = rbac.Actions{
 	{
 		Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
-		Verb:     v1.RuleVerbs_VERB_DELETE,
+		Verb:     v1.RuleVerb_VERB_DELETE,
 	},
 }
 

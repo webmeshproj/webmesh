@@ -38,17 +38,17 @@ import (
 )
 
 var canVoteAction = &rbac.Action{
-	Verb:     v1.RuleVerbs_VERB_PUT,
+	Verb:     v1.RuleVerb_VERB_PUT,
 	Resource: v1.RuleResource_RESOURCE_VOTES,
 }
 
 var canPutRouteAction = &rbac.Action{
-	Verb:     v1.RuleVerbs_VERB_PUT,
+	Verb:     v1.RuleVerb_VERB_PUT,
 	Resource: v1.RuleResource_RESOURCE_ROUTES,
 }
 
 var canPutEdgeAction = &rbac.Action{
-	Verb:     v1.RuleVerbs_VERB_PUT,
+	Verb:     v1.RuleVerb_VERB_PUT,
 	Resource: v1.RuleResource_RESOURCE_EDGES,
 }
 
