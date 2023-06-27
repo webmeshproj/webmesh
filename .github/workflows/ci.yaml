@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: go mod download -x
 
-      - name: Run linting
+      - name: Run Linting
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.53.2
