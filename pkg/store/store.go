@@ -102,17 +102,8 @@ type Store interface {
 	DemoteVoter(ctx context.Context, id string) error
 	// RemoveServer removes a peer from the cluster with timeout enforced by the context.
 	RemoveServer(ctx context.Context, id string, wait bool) error
-	// WriteDB returns a DB interface for use by the application. This
-	// interface will ensure consistency with the Raft log. Transactions
-	// are executed in the order they are received by the leader node.
-	WriteDB() meshdb.DBTX
-	// ReadDB returns a DB interface for use by the application. This
-	// interface will not ensure consistency with the Raft log. It is
-	// intended for use in read-only operations that do not require
-	// immediate consistency. It takes a read lock on the data store
-	// to ensure that no modifications are happening while the transaction
-	// is in progress and that SQLite itself is not busy.
-	ReadDB() meshdb.DBTX
+	// DB returns a DB interface for use by the application.
+	DB() meshdb.DB
 	// Raft returns the Raft interface. Note that the returned value
 	// may be nil if the store is not open.
 	Raft() *raft.Raft
@@ -279,20 +270,28 @@ func (s *store) IsOpen() bool {
 	return s.open.Load()
 }
 
-// WriteDB returns a DB interface for use by the application. This
-// interface will ensure consistency with the Raft log. Transactions
-// are executed in the order they are received by the leader node.
+// DB returns a DB interface for use by the application.
+func (s *store) DB() meshdb.DB {
+	return &storeDB{s}
+}
+
+type storeDB struct {
+	s *store
+}
+
+// Read returns a DB interface for use by the application.
+func (s *storeDB) Read() meshdb.DBTX { return s.s.ReadDB() }
+
+// Write returns a DB interface for use by the application.
+func (s *storeDB) Write() meshdb.DBTX { return s.s.WriteDB() }
+
+// WriteDB returns a DB interface for use by the application.
 func (s *store) WriteDB() meshdb.DBTX {
 	// Locks are taken during the application of log entries
 	return s.raftData
 }
 
-// ReadDB returns a DB interface for use by the application. This
-// interface will not ensure consistency with the Raft log. It is
-// intended for use in read-only operations that do not require
-// immediate consistency. It takes a read lock on the data store
-// to ensure that no modifications are happening while the transaction
-// is in progress and that SQLite itself is not busy.
+// ReadDB returns a DB interface for use by the application.
 func (s *store) ReadDB() meshdb.DBTX {
 	return &roLockableDB{DB: s.weakData, mux: s.dataMux.RLocker()}
 }
@@ -344,10 +343,7 @@ func (s *store) ReadyNotify(ctx context.Context) <-chan struct{} {
 }
 
 // ReadyError returns a channel that will receive an error if the store
-// fails to become ready or nil. This is only applicable during an initial
-// bootstrap. If the store is already bootstrapped then this channel
-// will block until the store is ready and then return nil or the error from
-// the context.
+// fails to become ready or nil.
 func (s *store) ReadyError(ctx context.Context) <-chan error {
 	if !s.firstBootstrap.Load() {
 		go func() {

@@ -36,6 +36,6 @@ type Server struct {
 func NewServer(store meshdb.Store) *Server {
 	return &Server{
 		store: store,
-		peers: peers.New(store),
+		peers: peers.New(store.DB()),
 	}
 }

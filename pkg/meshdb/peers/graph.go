@@ -36,30 +36,23 @@ import (
 // GraphStore implements graph.Store[string, Node] where
 // string is the node ID and Node is the node itself.
 type GraphStore struct {
-	rdb models.Querier
-	wdb models.Querier
+	meshdb.DB
 }
 
 // NewGraph creates a new Graph instance.
-func NewGraph(store meshdb.Store) Graph {
-	return graph.NewWithStore(graphHasher, NewGraphStore(store))
+func NewGraph(db meshdb.DB) Graph {
+	return graph.NewWithStore(graphHasher, NewGraphStore(db))
 }
 
 // NewGraphStore creates a new GraphStore instance.
-func NewGraphStore(store meshdb.Store) graph.Store[string, Node] {
-	return graph.Store[string, Node](&GraphStore{
-		rdb: models.New(store.ReadDB()),
-		wdb: models.New(store.WriteDB()),
-	})
+func NewGraphStore(db meshdb.DB) graph.Store[string, Node] {
+	return graph.Store[string, Node](&GraphStore{db})
 }
 
 // AddVertex should add the given vertex with the given hash value and vertex properties to the
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no
 // error should be returned.
 func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexProperties) error {
-	if g.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
 	params := models.InsertNodeParams{
 		ID: node.ID,
 		PublicKey: sql.NullString{
@@ -95,7 +88,7 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 			Valid:  true,
 		}
 	}
-	_, err := g.wdb.InsertNode(context.Background(), params)
+	_, err := models.New(g.Write()).InsertNode(context.Background(), params)
 	if err != nil {
 		var sqliteErr *sqlite3.Error
 		if errors.As(err, &sqliteErr) && sqliteErr.Code == sqlite3.ErrConstraint {
@@ -109,7 +102,7 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 // Vertex should return the vertex and vertex properties with the given hash value. If the
 // vertex doesn't exist, ErrVertexNotFound should be returned.
 func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexProperties, err error) {
-	dbnode, err := g.rdb.GetNode(context.Background(), nodeID)
+	dbnode, err := models.New(g.Read()).GetNode(context.Background(), nodeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			err = graph.ErrVertexNotFound
@@ -157,17 +150,14 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 // exist, ErrVertexNotFound should be returned. If the vertex has edges to other vertices,
 // ErrVertexHasEdges should be returned.
 func (g *GraphStore) RemoveVertex(nodeID string) error {
-	if g.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
-	_, err := g.rdb.GetNode(context.Background(), nodeID)
+	_, err := models.New(g.Read()).GetNode(context.Background(), nodeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			err = graph.ErrVertexNotFound
 		}
 		return err
 	}
-	_, err = g.rdb.NodeHasEdges(context.Background(), models.NodeHasEdgesParams{
+	_, err = models.New(g.Read()).NodeHasEdges(context.Background(), models.NodeHasEdgesParams{
 		SrcNodeID: nodeID,
 		DstNodeID: nodeID,
 	})
@@ -176,7 +166,7 @@ func (g *GraphStore) RemoveVertex(nodeID string) error {
 	} else if err == nil {
 		return graph.ErrVertexHasEdges
 	}
-	if err := g.wdb.DeleteNode(context.Background(), nodeID); err != nil {
+	if err := models.New(g.Write()).DeleteNode(context.Background(), nodeID); err != nil {
 		return fmt.Errorf("delete node: %w", err)
 	}
 	return nil
@@ -184,7 +174,7 @@ func (g *GraphStore) RemoveVertex(nodeID string) error {
 
 // ListVertices should return all vertices in the graph in a slice.
 func (g *GraphStore) ListVertices() ([]string, error) {
-	ids, err := g.rdb.ListNodeIDs(context.Background())
+	ids, err := models.New(g.Read()).ListNodeIDs(context.Background())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return []string{}, nil
@@ -197,7 +187,7 @@ func (g *GraphStore) ListVertices() ([]string, error) {
 // VertexCount should return the number of vertices in the graph. This should be equal to the
 // length of the slice returned by ListVertices.
 func (g *GraphStore) VertexCount() (int, error) {
-	count, err := g.rdb.GetNodeCount(context.Background())
+	count, err := models.New(g.Read()).GetNodeCount(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("get node count: %w", err)
 	}
@@ -209,13 +199,10 @@ func (g *GraphStore) VertexCount() (int, error) {
 // If either vertex doesn't exit, ErrVertexNotFound should be returned for the respective
 // vertex. If the edge already exists, ErrEdgeAlreadyExists should be returned.
 func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
-	if g.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
 	// We diverge from the suggested implementation and only check that one of the nodes
 	// exists. This is so joiners can add edges to nodes that are not yet in the graph.
 	// If this ends up causing problems, we can change it.
-	_, err := g.rdb.EitherNodeExists(context.Background(), models.EitherNodeExistsParams{
+	_, err := models.New(g.Read()).EitherNodeExists(context.Background(), models.EitherNodeExistsParams{
 		ID:   sourceNode,
 		ID_2: targetNode,
 	})
@@ -240,7 +227,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 			Valid:  true,
 		}
 	}
-	err = g.wdb.InsertNodeEdge(context.Background(), params)
+	err = models.New(g.Write()).InsertNodeEdge(context.Background(), params)
 	if err != nil {
 		var sqlerr *sqlite3.Error
 		if errors.As(err, &sqlerr) && sqlerr.Code == sqlite3.ErrConstraint {
@@ -254,10 +241,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 // UpdateEdge should update the edge between the given vertices with the data of the given
 // Edge instance. If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
-	if g.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
-	_, err := g.rdb.NodeEdgeExists(context.Background(), models.NodeEdgeExistsParams{
+	_, err := models.New(g.Read()).NodeEdgeExists(context.Background(), models.NodeEdgeExistsParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
 	})
@@ -282,7 +266,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[s
 			Valid:  true,
 		}
 	}
-	err = g.wdb.UpdateNodeEdge(context.Background(), params)
+	err = models.New(g.Write()).UpdateNodeEdge(context.Background(), params)
 	if err != nil {
 		return fmt.Errorf("update node edge: %w", err)
 	}
@@ -296,10 +280,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[s
 // be returned. If the edge doesn't exist, it is up to you whether ErrEdgeNotFound or no error
 // should be returned.
 func (g *GraphStore) RemoveEdge(sourceNode, targetNode string) error {
-	if g.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
-	return g.wdb.DeleteNodeEdge(context.Background(), models.DeleteNodeEdgeParams{
+	return models.New(g.Write()).DeleteNodeEdge(context.Background(), models.DeleteNodeEdgeParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
 	})
@@ -314,7 +295,7 @@ func (g *GraphStore) RemoveEdge(sourceNode, targetNode string) error {
 //
 // If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) Edge(sourceNode, targetNode string) (graph.Edge[string], error) {
-	edge, err := g.rdb.GetNodeEdge(context.Background(), models.GetNodeEdgeParams{
+	edge, err := models.New(g.Read()).GetNodeEdge(context.Background(), models.GetNodeEdgeParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
 	})
@@ -343,7 +324,7 @@ func (g *GraphStore) Edge(sourceNode, targetNode string) (graph.Edge[string], er
 
 // ListEdges should return all edges in the graph in a slice.
 func (g *GraphStore) ListEdges() ([]graph.Edge[string], error) {
-	edges, err := g.rdb.ListNodeEdges(context.Background())
+	edges, err := models.New(g.Read()).ListNodeEdges(context.Background())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return []graph.Edge[string]{}, nil

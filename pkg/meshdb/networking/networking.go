@@ -85,23 +85,16 @@ type Networking interface {
 type AdjacencyMap map[string]map[string]graph.Edge[string]
 
 // New returns a new Networking interface.
-func New(rdb, wdb meshdb.DBTX) Networking {
-	return &networking{
-		rdb: rdb,
-		wdb: wdb,
-	}
+func New(db meshdb.DB) Networking {
+	return &networking{db}
 }
 
 type networking struct {
-	rdb meshdb.DBTX
-	wdb meshdb.DBTX
+	meshdb.DB
 }
 
 // PutNetworkACL creates or updates a NetworkACL.
 func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error {
-	if n.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
 	if IsSystemNetworkACL(acl.GetName()) {
 		// Allow if the system NetworkACL doesn't exist yet
 		_, err := n.GetNetworkACL(ctx, acl.GetName())
@@ -112,7 +105,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 			return fmt.Errorf("cannot update system network acl %s", acl.GetName())
 		}
 	}
-	q := models.New(n.wdb)
+	q := models.New(n.Write())
 	params := models.PutNetworkACLParams{
 		Name:       acl.GetName(),
 		Priority:   int64(acl.GetPriority()),
@@ -175,7 +168,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 
 // GetNetworkACL returns a NetworkACL by name.
 func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, error) {
-	q := models.New(n.rdb)
+	q := models.New(n.Read())
 	acl, err := q.GetNetworkACL(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -183,18 +176,15 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, erro
 		}
 		return nil, fmt.Errorf("get network acl: %w", err)
 	}
-	return dbACLToAPIACL(n.rdb, &acl), nil
+	return dbACLToAPIACL(n.Read(), &acl), nil
 }
 
 // DeleteNetworkACL deletes a NetworkACL by name.
 func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
-	if n.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
 	if IsSystemNetworkACL(name) {
 		return fmt.Errorf("cannot delete system network acl %s", name)
 	}
-	q := models.New(n.wdb)
+	q := models.New(n.Write())
 	err := q.DeleteNetworkACL(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete network acl: %w", err)
@@ -204,14 +194,14 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 
 // ListNetworkACLs returns a list of NetworkACLs.
 func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
-	q := models.New(n.rdb)
+	q := models.New(n.Read())
 	acls, err := q.ListNetworkACLs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network acls: %w", err)
 	}
 	out := make(ACLs, len(acls))
 	for i, acl := range acls {
-		out[i] = dbACLToAPIACL(n.rdb, &acl)
+		out[i] = dbACLToAPIACL(n.Read(), &acl)
 	}
 	out.Sort(SortDescending)
 	return out, nil
@@ -219,10 +209,7 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 
 // PutRoute creates or updates a Route.
 func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
-	if n.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
-	q := models.New(n.wdb)
+	q := models.New(n.Write())
 	params := models.PutNetworkRouteParams{
 		Name:      route.GetName(),
 		Node:      route.GetNode(),
@@ -245,7 +232,7 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 
 // GetRoute returns a Route by name.
 func (n *networking) GetRoute(ctx context.Context, name string) (*v1.Route, error) {
-	q := models.New(n.rdb)
+	q := models.New(n.Read())
 	route, err := q.GetNetworkRoute(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -258,7 +245,7 @@ func (n *networking) GetRoute(ctx context.Context, name string) (*v1.Route, erro
 
 // GetRoutesByNode returns a list of Routes for a given Node.
 func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) ([]*v1.Route, error) {
-	q := models.New(n.rdb)
+	q := models.New(n.Read())
 	routes, err := q.ListNetworkRoutesByNode(ctx, nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes by node: %w", err)
@@ -272,7 +259,7 @@ func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) ([]*v
 
 // GetRoutesByCIDR returns a list of Routes for a given CIDR.
 func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr string) ([]*v1.Route, error) {
-	q := models.New(n.rdb)
+	q := models.New(n.Read())
 	routes, err := q.ListNetworkRoutesByDstCidr(ctx, cidr)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes by cidr: %w", err)
@@ -286,10 +273,7 @@ func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr string) ([]*v1.Ro
 
 // DeleteRoute deletes a Route by name.
 func (n *networking) DeleteRoute(ctx context.Context, name string) error {
-	if n.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
-	q := models.New(n.wdb)
+	q := models.New(n.Write())
 	err := q.DeleteNetworkRoute(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete network route: %w", err)
@@ -299,7 +283,7 @@ func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 
 // ListRoutes returns a list of Routes.
 func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
-	q := models.New(n.rdb)
+	q := models.New(n.Read())
 	routes, err := q.ListNetworkRoutes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes: %w", err)

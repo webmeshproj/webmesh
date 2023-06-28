@@ -233,7 +233,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 
 	// Initialize the RBAC system.
-	rb := rbac.New(s.ReadDB(), s.WriteDB())
+	rb := rbac.New(s.DB())
 
 	// Create an admin role and add the admin user/node to it.
 	err = rb.PutRole(ctx, &v1.Role{
@@ -324,7 +324,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 
 	// Initialize the Networking system.
-	nw := networking.New(s.ReadDB(), s.WriteDB())
+	nw := networking.New(s.DB())
 
 	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
@@ -379,7 +379,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("generate random IPv6: %w", err)
 	}
-	p := peers.New(s)
+	p := peers.New(s.DB())
 	params := &peers.PutOptions{
 		ID:                 s.ID(),
 		NetworkIPv6:        networkIPv6,

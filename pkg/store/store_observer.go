@@ -56,7 +56,8 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					}
 				case raft.LeaderObservation:
 					s.log.Debug("LeaderObservation", slog.Any("data", data))
-					node, err := peers.New(s).Get(ctx, string(data.LeaderID))
+					p := peers.New(s.DB())
+					node, err := p.Get(ctx, string(data.LeaderID))
 					if err != nil {
 						s.log.Error("failed to get leader", slog.String("error", err.Error()))
 						continue
@@ -88,7 +89,8 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 									if err := s.RemoveServer(ctx, string(data.PeerID), false); err != nil {
 										s.log.Error("remove non-voting peer", slog.String("error", err.Error()))
 									}
-									if err := peers.New(s).Delete(ctx, string(data.PeerID)); err != nil {
+									p := peers.New(s.DB())
+									if err := p.Delete(ctx, string(data.PeerID)); err != nil {
 										s.log.Error("remove node", slog.String("error", err.Error()))
 									}
 								}

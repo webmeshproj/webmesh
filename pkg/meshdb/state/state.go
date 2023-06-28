@@ -58,16 +58,17 @@ type State interface {
 var ErrNodeNotFound = sql.ErrNoRows
 
 type state struct {
-	q models.Querier
+	meshdb.DB
 }
 
 // New returns a new State.
-func New(rdb meshdb.DBTX) State {
-	return &state{q: models.New(rdb)}
+func New(db meshdb.DB) State {
+	return &state{db}
 }
 
 func (s *state) GetULAPrefix(ctx context.Context) (netip.Prefix, error) {
-	prefix, err := s.q.GetULAPrefix(ctx)
+	q := models.New(s.Read())
+	prefix, err := q.GetULAPrefix(ctx)
 	if err != nil {
 		return netip.Prefix{}, err
 	}
@@ -75,7 +76,8 @@ func (s *state) GetULAPrefix(ctx context.Context) (netip.Prefix, error) {
 }
 
 func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
-	prefix, err := s.q.GetIPv4Prefix(ctx)
+	q := models.New(s.Read())
+	prefix, err := q.GetIPv4Prefix(ctx)
 	if err != nil {
 		return netip.Prefix{}, err
 	}
@@ -83,7 +85,8 @@ func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
 }
 
 func (s *state) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (netip.AddrPort, error) {
-	addr, err := s.q.GetNodePrivateRPCAddress(ctx, nodeID)
+	q := models.New(s.Read())
+	addr, err := q.GetNodePrivateRPCAddress(ctx, nodeID)
 	if err != nil {
 		return netip.AddrPort{}, err
 	}
@@ -91,7 +94,8 @@ func (s *state) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (ne
 }
 
 func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {
-	addrs, err := s.q.ListPublicRPCAddresses(ctx)
+	q := models.New(s.Read())
+	addrs, err := q.ListPublicRPCAddresses(ctx)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -113,7 +117,8 @@ func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.Ad
 }
 
 func (s *state) ListPeerPublicRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error) {
-	addrs, err := s.q.ListPeerPublicRPCAddresses(ctx, nodeID)
+	q := models.New(s.Read())
+	addrs, err := q.ListPeerPublicRPCAddresses(ctx, nodeID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -135,7 +140,8 @@ func (s *state) ListPeerPublicRPCAddresses(ctx context.Context, nodeID string) (
 }
 
 func (s *state) ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error) {
-	addrs, err := s.q.ListPeerPrivateRPCAddresses(ctx, nodeID)
+	q := models.New(s.Read())
+	addrs, err := q.ListPeerPrivateRPCAddresses(ctx, nodeID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil

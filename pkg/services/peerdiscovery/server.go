@@ -41,7 +41,7 @@ type Server struct {
 func NewServer(store meshdb.Store) *Server {
 	return &Server{
 		store: store,
-		state: state.New(store.ReadDB()),
+		state: state.New(store.DB()),
 	}
 }
 
@@ -75,7 +75,7 @@ func (s *Server) ListPeers(ctx context.Context, _ *emptypb.Empty) (*v1.ListRaftP
 	// peers the caller has access to.
 	caller, ok := context.AuthenticatedCallerFrom(ctx)
 	if ok {
-		n := networking.New(s.store.ReadDB(), s.store.WriteDB())
+		n := networking.New(s.store.DB())
 		nacls, err := n.ListNetworkACLs(ctx)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list network ACLs: %v", err)

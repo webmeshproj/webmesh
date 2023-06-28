@@ -63,7 +63,7 @@ func NewServer(store meshdb.Store, o *Options) *Server {
 	}
 	return &Server{
 		store:   store,
-		peers:   peers.New(store),
+		peers:   peers.New(store.DB()),
 		opts:    o,
 		soa:     fmt.Sprintf("%s.%s", store.ID(), o.Domain),
 		timeout: timeout,

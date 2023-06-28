@@ -47,7 +47,7 @@ func NewServer(store meshdb.Store, proxyCreds []grpc.DialOption, stunServers []s
 	}
 	return &Server{
 		store:       store,
-		meshstate:   state.New(store.ReadDB()),
+		meshstate:   state.New(store.DB()),
 		rbacEval:    rbaceval,
 		stunServers: stunServers,
 		proxyCreds:  proxyCreds,

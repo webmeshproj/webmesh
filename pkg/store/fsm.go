@@ -86,7 +86,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 					return
 				}
 				ctx := context.Background()
-				nw := networking.New(s.ReadDB(), s.WriteDB())
+				nw := networking.New(s.DB())
 				routes, err := nw.GetRoutesByNode(ctx, s.ID())
 				if err != nil {
 					s.log.Error("error getting routes by node", slog.String("error", err.Error()))
@@ -136,7 +136,7 @@ func (s *store) Apply(l *raft.Log) any {
 					return
 				}
 				ctx := context.Background()
-				nw := networking.New(s.ReadDB(), s.WriteDB())
+				nw := networking.New(s.DB())
 				routes, err := nw.GetRoutesByNode(ctx, s.ID())
 				if err != nil {
 					s.log.Error("error getting routes by node", slog.String("error", err.Error()))

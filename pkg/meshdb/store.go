@@ -21,24 +21,24 @@ package meshdb
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
+	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
 )
 
 // Store is the interface for interacting with the mesh database. It is a reduced
-// version of the store.Store interface, and is used by the meshdb package to
-// interact with the database.
+// version of the store.Store interface.
 type Store interface {
 	// ID returns the ID of the node.
 	ID() string
-	// WriteDB returns the underlying write database.
-	WriteDB() DBTX
-	// ReadDB returns the underlying read database.
-	ReadDB() DBTX
+	// DB returns a DB interface for use by the application.
+	DB() DB
 	// Raft returns the underlying Raft database.
 	Raft() *raft.Raft
 	// Leader returns the current Raft leader.
@@ -52,9 +52,13 @@ type Store interface {
 	WireGuard() wireguard.Interface
 }
 
-// ErrReadOnly is a generic error returned when a write operation is attempted
-// on a database querier that does not support writes.
-var ErrReadOnly = errors.New("read-only")
+// DB is the interface for interacting with the mesh database.
+type DB interface {
+	// Read returns a database querier for read operations.
+	Read() DBTX
+	// Write returns a database querier for write operations.
+	Write() DBTX
+}
 
 // DBTX is the interface for interacting with a database transaction.
 type DBTX interface {
@@ -62,4 +66,32 @@ type DBTX interface {
 	PrepareContext(context.Context, string) (*sql.Stmt, error)
 	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
 	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+}
+
+// NewTestDB returns a new in-memory database for testing. Read and Write
+// operations are performed on the same database.
+func NewTestDB() (DB, error) {
+	dataPath := fmt.Sprintf("file:%s?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full", uuid.NewString())
+	db, err := sql.Open("sqlite3", dataPath)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	err = models.MigrateRaftDB(db)
+	if err != nil {
+		defer db.Close()
+		return nil, fmt.Errorf("migrate database: %w", err)
+	}
+	return &testDB{db: db}, nil
+}
+
+type testDB struct {
+	db *sql.DB
+}
+
+func (t *testDB) Read() DBTX {
+	return t.db
+}
+
+func (t *testDB) Write() DBTX {
+	return t.db
 }

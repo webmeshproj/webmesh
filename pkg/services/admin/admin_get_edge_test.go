@@ -41,7 +41,7 @@ func TestGetEdge(t *testing.T) {
 		t.Errorf("GenerateKey() error = %v", err)
 		return
 	}
-	_, err = peers.New(server.store).Put(ctx, &peers.PutOptions{
+	_, err = peers.New(server.store.DB()).Put(ctx, &peers.PutOptions{
 		ID:          "foo",
 		PublicKey:   key.PublicKey(),
 		NetworkIPv6: netip.MustParsePrefix("2001:db8::/64"),

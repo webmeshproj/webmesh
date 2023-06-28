@@ -104,22 +104,16 @@ type RBAC interface {
 }
 
 // New returns a new RBAC.
-func New(rdb, wdb meshdb.DBTX) RBAC {
-	return &rbac{
-		rdb: rdb,
-		wdb: wdb,
-	}
+func New(db meshdb.DB) RBAC {
+	return &rbac{db}
 }
 
 type rbac struct {
-	rdb, wdb meshdb.DBTX
+	meshdb.DB
 }
 
 // PutRole creates or updates a role.
 func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
-	if r.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
 	if IsSystemRole(role.GetName()) {
 		// Allow if the role doesn't exist yet.
 		_, err := r.GetRole(ctx, role.GetName())
@@ -130,7 +124,7 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 			return fmt.Errorf("cannot modify system role %q", role.GetName())
 		}
 	}
-	q := models.New(r.wdb)
+	q := models.New(r.Write())
 	rules, err := json.Marshal(role.GetRules())
 	if err != nil {
 		return err
@@ -150,7 +144,7 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 
 // GetRole returns a role by name.
 func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
-	role, err := models.New(r.rdb).GetRole(ctx, name)
+	role, err := models.New(r.Read()).GetRole(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrRoleNotFound
@@ -162,13 +156,10 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 
 // DeleteRole deletes a role by name.
 func (r *rbac) DeleteRole(ctx context.Context, name string) error {
-	if r.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
 	if IsSystemRole(name) {
 		return fmt.Errorf("cannot delete system role %q", name)
 	}
-	q := models.New(r.wdb)
+	q := models.New(r.Write())
 	err := q.DeleteRole(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete db role: %w", err)
@@ -178,7 +169,7 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 
 // ListRoles returns a list of all roles.
 func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
-	roles, err := models.New(r.rdb).ListRoles(ctx)
+	roles, err := models.New(r.Read()).ListRoles(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list db roles: %w", err)
 	}
@@ -194,9 +185,6 @@ func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
 
 // PutRoleBinding creates or updates a rolebinding.
 func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) error {
-	if r.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
 	if IsSystemRoleBinding(rolebinding.GetName()) {
 		// Allow if the rolebinding doesn't exist yet.
 		_, err := r.GetRoleBinding(ctx, rolebinding.GetName())
@@ -207,7 +195,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 			return fmt.Errorf("cannot modify system rolebinding %q", rolebinding.GetName())
 		}
 	}
-	q := models.New(r.wdb)
+	q := models.New(r.Write())
 	params := models.PutRoleBindingParams{
 		Name:      rolebinding.GetName(),
 		RoleName:  rolebinding.GetRole(),
@@ -247,7 +235,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 
 // GetRoleBinding returns a rolebinding by name.
 func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding, error) {
-	q := models.New(r.rdb)
+	q := models.New(r.Read())
 	rb, err := q.GetRoleBinding(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -260,13 +248,10 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding
 
 // DeleteRoleBinding deletes a rolebinding by name.
 func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
-	if r.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
 	if IsSystemRoleBinding(name) {
 		return fmt.Errorf("cannot delete system rolebinding %q", BootstrapVotersRoleBinding)
 	}
-	q := models.New(r.wdb)
+	q := models.New(r.Write())
 	err := q.DeleteRoleBinding(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete db rolebinding: %w", err)
@@ -276,7 +261,7 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 
 // ListRoleBindings returns a list of all rolebindings.
 func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) {
-	q := models.New(r.rdb)
+	q := models.New(r.Read())
 	rbs, err := q.ListRoleBindings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list db rolebindings: %w", err)
@@ -290,10 +275,7 @@ func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) 
 
 // PutGroup creates or updates a group.
 func (r *rbac) PutGroup(ctx context.Context, role *v1.Group) error {
-	if r.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
-	q := models.New(r.wdb)
+	q := models.New(r.Write())
 	params := models.PutGroupParams{
 		Name:      role.GetName(),
 		CreatedAt: time.Now().UTC(),
@@ -328,7 +310,7 @@ func (r *rbac) PutGroup(ctx context.Context, role *v1.Group) error {
 
 // GetGroup returns a group by name.
 func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
-	q := models.New(r.rdb)
+	q := models.New(r.Read())
 	group, err := q.GetGroup(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -341,10 +323,7 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 
 // DeleteGroup deletes a group by name.
 func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
-	if r.wdb == nil {
-		return meshdb.ErrReadOnly
-	}
-	q := models.New(r.wdb)
+	q := models.New(r.Write())
 	err := q.DeleteGroup(ctx, name)
 	if err != nil {
 		return fmt.Errorf("delete db group: %w", err)
@@ -354,7 +333,7 @@ func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 
 // ListGroups returns a list of all groups.
 func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
-	q := models.New(r.rdb)
+	q := models.New(r.Read())
 	groups, err := q.ListGroups(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list db groups: %w", err)
@@ -368,7 +347,7 @@ func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
 
 // ListNodeRoles returns a list of all roles for a node.
 func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (RolesList, error) {
-	roles, err := models.New(r.rdb).ListBoundRolesForNode(ctx, models.ListBoundRolesForNodeParams{
+	roles, err := models.New(r.Read()).ListBoundRolesForNode(ctx, models.ListBoundRolesForNodeParams{
 		NodeIds: sql.NullString{
 			String: nodeID,
 			Valid:  true,
@@ -393,7 +372,7 @@ func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (RolesList, err
 
 // ListUserRoles returns a list of all roles for a user.
 func (r *rbac) ListUserRoles(ctx context.Context, user string) (RolesList, error) {
-	roles, err := models.New(r.rdb).ListBoundRolesForUser(ctx, models.ListBoundRolesForUserParams{
+	roles, err := models.New(r.Read()).ListBoundRolesForUser(ctx, models.ListBoundRolesForUserParams{
 		UserNames: sql.NullString{
 			String: user,
 			Valid:  true,

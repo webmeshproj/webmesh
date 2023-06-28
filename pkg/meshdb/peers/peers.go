@@ -185,15 +185,15 @@ type PutOptions struct {
 }
 
 // New returns a new Peers interface.
-func New(store meshdb.Store) Peers {
+func New(db meshdb.DB) Peers {
 	return &peers{
-		store: store,
-		graph: NewGraph(store),
+		db:    db,
+		graph: NewGraph(db),
 	}
 }
 
 type peers struct {
-	store meshdb.Store
+	db    meshdb.DB
 	graph Graph
 }
 
@@ -249,7 +249,7 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("get edges: %w", err)
 	}
 	if len(edges) > 0 {
-		q := models.New(p.store.WriteDB())
+		q := models.New(p.db.Write())
 		err = q.DeleteNodeEdges(ctx, models.DeleteNodeEdgesParams{
 			SrcNodeID: id,
 			DstNodeID: id,
@@ -271,7 +271,7 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 }
 
 func (p *peers) List(ctx context.Context) ([]Node, error) {
-	q := models.New(p.store.ReadDB())
+	q := models.New(p.db.Read())
 	nodes, err := q.ListNodes(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -324,7 +324,7 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 
 // ListPublicNodes lists all public nodes.
 func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
-	q := models.New(p.store.ReadDB())
+	q := models.New(p.db.Read())
 	nodes, err := q.ListPublicNodes(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -377,7 +377,7 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 
 // ListByZoneID lists all nodes in a zone.
 func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error) {
-	q := models.New(p.store.ReadDB())
+	q := models.New(p.db.Read())
 	nodes, err := q.ListNodesByZone(ctx, sql.NullString{String: zoneID, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -430,7 +430,7 @@ func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
 
 // ListIDs returns a list of node IDs.
 func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
-	ids, err := models.New(p.store.ReadDB()).ListNodeIDs(ctx)
+	ids, err := models.New(p.db.Read()).ListNodeIDs(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return []string{}, nil
