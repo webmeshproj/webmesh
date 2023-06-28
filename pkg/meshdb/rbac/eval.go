@@ -72,7 +72,6 @@ func EvalRule(rule *v1.Rule, action *v1.RBACAction) bool {
 		return false
 	}
 	if action.GetResourceName() == "" || allResources {
-		// The rule matches all resource names
 		return true
 	}
 	for _, resourceName := range rule.GetResourceNames() {
