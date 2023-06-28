@@ -34,7 +34,7 @@ import (
 // Peers are filtered by network ACLs.
 func WireGuardPeersFor(ctx context.Context, store meshdb.Store, peerID string) ([]*v1.WireGuardPeer, error) {
 	graph := peers.New(store).Graph()
-	nw := networking.New(store)
+	nw := networking.New(store.ReadDB(), store.WriteDB())
 	adjacencyMap, err := nw.FilterGraph(ctx, graph, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)

@@ -21,6 +21,7 @@ package meshdb
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/hashicorp/raft"
 
@@ -34,8 +35,8 @@ import (
 type Store interface {
 	// ID returns the ID of the node.
 	ID() string
-	// DB returns the underlying database.
-	DB() DBTX
+	// WriteDB returns the underlying write database.
+	WriteDB() DBTX
 	// ReadDB returns the underlying read database.
 	ReadDB() DBTX
 	// Raft returns the underlying Raft database.
@@ -51,6 +52,11 @@ type Store interface {
 	WireGuard() wireguard.Interface
 }
 
+// ErrReadOnly is a generic error returned when a write operation is attempted
+// on a database querier that does not support writes.
+var ErrReadOnly = errors.New("read-only")
+
+// DBTX is the interface for interacting with a database transaction.
 type DBTX interface {
 	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
 	PrepareContext(context.Context, string) (*sql.Stmt, error)

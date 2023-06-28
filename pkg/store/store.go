@@ -102,10 +102,10 @@ type Store interface {
 	DemoteVoter(ctx context.Context, id string) error
 	// RemoveServer removes a peer from the cluster with timeout enforced by the context.
 	RemoveServer(ctx context.Context, id string, wait bool) error
-	// DB returns a DB interface for use by the application. This
+	// WriteDB returns a DB interface for use by the application. This
 	// interface will ensure consistency with the Raft log. Transactions
 	// are executed in the order they are received by the leader node.
-	DB() meshdb.DBTX
+	WriteDB() meshdb.DBTX
 	// ReadDB returns a DB interface for use by the application. This
 	// interface will not ensure consistency with the Raft log. It is
 	// intended for use in read-only operations that do not require
@@ -279,10 +279,10 @@ func (s *store) IsOpen() bool {
 	return s.open.Load()
 }
 
-// DB returns a DB interface for use by the application. This
+// WriteDB returns a DB interface for use by the application. This
 // interface will ensure consistency with the Raft log. Transactions
 // are executed in the order they are received by the leader node.
-func (s *store) DB() meshdb.DBTX {
+func (s *store) WriteDB() meshdb.DBTX {
 	// Locks are taken during the application of log entries
 	return s.raftData
 }
@@ -294,7 +294,7 @@ func (s *store) DB() meshdb.DBTX {
 // to ensure that no modifications are happening while the transaction
 // is in progress and that SQLite itself is not busy.
 func (s *store) ReadDB() meshdb.DBTX {
-	return &lockableDB{DB: s.weakData, mux: s.dataMux.RLocker()}
+	return &roLockableDB{DB: s.weakData, mux: s.dataMux.RLocker()}
 }
 
 // Raft returns the Raft interface.

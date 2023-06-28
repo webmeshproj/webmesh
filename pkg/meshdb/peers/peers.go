@@ -249,7 +249,7 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("get edges: %w", err)
 	}
 	if len(edges) > 0 {
-		q := models.New(p.store.DB())
+		q := models.New(p.store.WriteDB())
 		err = q.DeleteNodeEdges(ctx, models.DeleteNodeEdgesParams{
 			SrcNodeID: id,
 			DstNodeID: id,

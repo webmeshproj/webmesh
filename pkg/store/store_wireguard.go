@@ -136,7 +136,7 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	var meshnetworkv6 netip.Prefix
 	var err error
 	if !s.opts.Mesh.NoIPv6 {
-		meshnetworkv6, err = state.New(s).GetULAPrefix(ctx)
+		meshnetworkv6, err = state.New(s.ReadDB()).GetULAPrefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ula prefix: %w", err)
 		}
@@ -227,7 +227,7 @@ func (s *store) walkMeshDescendants(ctx context.Context) error {
 				peer.Endpoint = conn.localAddr.AddrPort()
 			} else {
 				// We need to negotiate a new connection.
-				iceAddrs, err := state.New(s).ListPublicPeersWithFeature(ctx, s.grpcCreds(ctx), s.ID(), v1.Feature_ICE_NEGOTIATION)
+				iceAddrs, err := state.New(s.ReadDB()).ListPublicPeersWithFeature(ctx, s.grpcCreds(ctx), s.ID(), v1.Feature_ICE_NEGOTIATION)
 				if err != nil {
 					// DB error, somethings wrong, bail.
 					return fmt.Errorf("list public peers with feature: %w", err)

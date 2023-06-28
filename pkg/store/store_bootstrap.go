@@ -212,7 +212,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 }
 
 func (s *store) initialBootstrapLeader(ctx context.Context) error {
-	q := models.New(s.DB())
+	q := models.New(s.WriteDB())
 	cfg := s.raft.GetConfiguration().Configuration()
 
 	// Set initial cluster configurations to the raft log
@@ -233,7 +233,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 
 	// Initialize the RBAC system.
-	rb := rbac.New(s)
+	rb := rbac.New(s.ReadDB(), s.WriteDB())
 
 	// Create an admin role and add the admin user/node to it.
 	err = rb.PutRole(ctx, &v1.Role{
@@ -324,12 +324,12 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 
 	// Initialize the Networking system.
-	n := networking.New(s)
+	nw := networking.New(s.ReadDB(), s.WriteDB())
 
 	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
 	// TODO: This should be filtered to only apply to internal traffic.
-	err = n.PutNetworkACL(ctx, &v1.NetworkACL{
+	err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
 		Name:             networking.BootstrapNodesNetworkACLName,
 		Priority:         math.MaxInt32,
 		SourceNodes:      []string{"group:" + rbac.VotersGroup},
@@ -343,7 +343,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 
 	// Apply a default accept policy if configured
 	if s.opts.Bootstrap.DefaultNetworkPolicy == string(NetworkPolicyAccept) {
-		err = n.PutNetworkACL(ctx, &v1.NetworkACL{
+		err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
 			Name:             "default-accept",
 			Priority:         math.MinInt32,
 			SourceNodes:      []string{"*"},
@@ -359,7 +359,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 
 	// If we have routes configured, add them to the db
 	if len(s.opts.Mesh.Routes) > 0 {
-		err = n.PutRoute(ctx, &v1.Route{
+		err = nw.PutRoute(ctx, &v1.Route{
 			Name:             fmt.Sprintf("%s-auto", s.nodeID),
 			Node:             s.ID(),
 			DestinationCidrs: s.opts.Mesh.Routes,

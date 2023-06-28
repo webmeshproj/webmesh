@@ -49,7 +49,7 @@ func NewGraph(store meshdb.Store) Graph {
 func NewGraphStore(store meshdb.Store) graph.Store[string, Node] {
 	return graph.Store[string, Node](&GraphStore{
 		rdb: models.New(store.ReadDB()),
-		wdb: models.New(store.DB()),
+		wdb: models.New(store.WriteDB()),
 	})
 }
 
@@ -57,6 +57,9 @@ func NewGraphStore(store meshdb.Store) graph.Store[string, Node] {
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no
 // error should be returned.
 func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexProperties) error {
+	if g.wdb == nil {
+		return meshdb.ErrReadOnly
+	}
 	params := models.InsertNodeParams{
 		ID: node.ID,
 		PublicKey: sql.NullString{
@@ -154,6 +157,9 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 // exist, ErrVertexNotFound should be returned. If the vertex has edges to other vertices,
 // ErrVertexHasEdges should be returned.
 func (g *GraphStore) RemoveVertex(nodeID string) error {
+	if g.wdb == nil {
+		return meshdb.ErrReadOnly
+	}
 	_, err := g.rdb.GetNode(context.Background(), nodeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -203,6 +209,9 @@ func (g *GraphStore) VertexCount() (int, error) {
 // If either vertex doesn't exit, ErrVertexNotFound should be returned for the respective
 // vertex. If the edge already exists, ErrEdgeAlreadyExists should be returned.
 func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
+	if g.wdb == nil {
+		return meshdb.ErrReadOnly
+	}
 	// We diverge from the suggested implementation and only check that one of the nodes
 	// exists. This is so joiners can add edges to nodes that are not yet in the graph.
 	// If this ends up causing problems, we can change it.
@@ -245,6 +254,9 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 // UpdateEdge should update the edge between the given vertices with the data of the given
 // Edge instance. If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
+	if g.wdb == nil {
+		return meshdb.ErrReadOnly
+	}
 	_, err := g.rdb.NodeEdgeExists(context.Background(), models.NodeEdgeExistsParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,
@@ -284,6 +296,9 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[s
 // be returned. If the edge doesn't exist, it is up to you whether ErrEdgeNotFound or no error
 // should be returned.
 func (g *GraphStore) RemoveEdge(sourceNode, targetNode string) error {
+	if g.wdb == nil {
+		return meshdb.ErrReadOnly
+	}
 	return g.wdb.DeleteNodeEdge(context.Background(), models.DeleteNodeEdgeParams{
 		SrcNodeID: sourceNode,
 		DstNodeID: targetNode,

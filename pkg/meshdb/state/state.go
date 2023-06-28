@@ -62,8 +62,8 @@ type state struct {
 }
 
 // New returns a new State.
-func New(st meshdb.Store) State {
-	return &state{q: models.New(st.ReadDB())}
+func New(rdb meshdb.DBTX) State {
+	return &state{q: models.New(rdb)}
 }
 
 func (s *state) GetULAPrefix(ctx context.Context) (netip.Prefix, error) {

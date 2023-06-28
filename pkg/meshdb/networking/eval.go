@@ -49,7 +49,7 @@ func (a ACLs) Proto() []*v1.NetworkACL {
 // ACL is a Network ACL. It contains a reference to the database for evaluating group membership.
 type ACL struct {
 	v1.NetworkACL
-	store meshdb.Store
+	rdb meshdb.DBTX
 }
 
 // Proto returns the protobuf representation of the ACL.
@@ -118,7 +118,7 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 						continue
 					}
 					groupName := strings.TrimPrefix(node, "group:")
-					group, err := models.New(acl.store.ReadDB()).GetGroup(ctx, groupName)
+					group, err := models.New(acl.rdb).GetGroup(ctx, groupName)
 					if err != nil {
 						if err != sql.ErrNoRows {
 							slog.Default().Error("failed to get group", "group", groupName, "error", err)
@@ -157,7 +157,7 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 						continue
 					}
 					groupName := strings.TrimPrefix(node, "group:")
-					group, err := models.New(acl.store.ReadDB()).GetGroup(ctx, groupName)
+					group, err := models.New(acl.rdb).GetGroup(ctx, groupName)
 					if err != nil {
 						if err != sql.ErrNoRows {
 							slog.Default().Error("failed to get group", "group", groupName, "error", err)

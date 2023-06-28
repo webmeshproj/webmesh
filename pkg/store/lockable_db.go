@@ -19,28 +19,88 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
+
+	"github.com/mattn/go-sqlite3"
+	"golang.org/x/exp/slog"
 )
 
-type lockableDB struct {
+var ErrStatementNotReadOnly = fmt.Errorf("statement is not read-only")
+
+type roLockableDB struct {
 	*sql.DB
 	mux sync.Locker
 }
 
-func (d *lockableDB) ExecContext(ctx context.Context, stmt string, args ...any) (sql.Result, error) {
+func (d *roLockableDB) ExecContext(ctx context.Context, stmt string, args ...any) (sql.Result, error) {
 	d.mux.Lock()
 	defer d.mux.Unlock()
+	readonly, err := d.isReadonly(ctx, stmt)
+	if err != nil {
+		return nil, fmt.Errorf("exec, check readonly: %w", err)
+	}
+	if !readonly {
+		return nil, ErrStatementNotReadOnly
+	}
 	return d.DB.ExecContext(ctx, stmt, args...)
 }
 
-func (d *lockableDB) QueryContext(ctx context.Context, stmt string, args ...any) (*sql.Rows, error) {
+func (d *roLockableDB) QueryContext(ctx context.Context, stmt string, args ...any) (*sql.Rows, error) {
 	d.mux.Lock()
 	defer d.mux.Unlock()
+	readonly, err := d.isReadonly(ctx, stmt)
+	if err != nil {
+		return nil, fmt.Errorf("query, check readonly: %w", err)
+	}
+	if !readonly {
+		return nil, ErrStatementNotReadOnly
+	}
 	return d.DB.QueryContext(ctx, stmt, args...)
 }
 
-func (d *lockableDB) QueryRowContext(ctx context.Context, stmt string, args ...any) *sql.Row {
+func (d *roLockableDB) QueryRowContext(ctx context.Context, stmt string, args ...any) *sql.Row {
 	d.mux.Lock()
 	defer d.mux.Unlock()
+	readonly, err := d.isReadonly(ctx, stmt)
+	if err != nil {
+		// send a bad query
+		slog.Default().Error("query, check readonly", slog.String("error", err.Error()))
+		return d.DB.QueryRowContext(ctx, "SELECT 1 WHERE 0")
+	} else if !readonly {
+		// send a bad query
+		slog.Default().Error("query, check readonly", slog.String("error", ErrStatementNotReadOnly.Error()))
+		return d.DB.QueryRowContext(ctx, "SELECT 1 WHERE 0")
+	}
 	return d.DB.QueryRowContext(ctx, stmt, args...)
+}
+
+func (d *roLockableDB) isReadonly(ctx context.Context, stmt string) (bool, error) {
+	if stmt == "" {
+		return false, nil
+	}
+	c, err := d.DB.Conn(ctx)
+	if err != nil {
+		return false, fmt.Errorf("acquire conn: %w", err)
+	}
+	defer c.Close()
+	var readonly bool
+	err = c.Raw(func(driverConn interface{}) error {
+		conn, ok := driverConn.(*sqlite3.SQLiteConn)
+		if !ok {
+			return fmt.Errorf("raw conn is not sqlite3")
+		}
+		stmt, err := conn.PrepareContext(ctx, stmt)
+		if err != nil {
+			return fmt.Errorf("prepare: %w", err)
+		}
+		defer stmt.Close()
+		sqlstmt, ok := stmt.(*sqlite3.SQLiteStmt)
+		if !ok {
+			return fmt.Errorf("stmt is not sqlite3")
+		}
+		readonly = sqlstmt.Readonly()
+		return nil
+	})
+	return readonly, err
 }

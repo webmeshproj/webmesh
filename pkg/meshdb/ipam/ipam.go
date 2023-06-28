@@ -45,12 +45,13 @@ type IPAM interface {
 }
 
 // New returns a new IPAM service.
-func New(store meshdb.Store) IPAM {
-	return &ipam{store: store}
+func New(rdb, wdb meshdb.DBTX) IPAM {
+	return &ipam{rdb: rdb, wdb: wdb}
 }
 
 type ipam struct {
-	store    meshdb.Store
+	rdb      meshdb.DBTX
+	wdb      meshdb.DBTX
 	prefixv4 netip.Prefix
 	mux      sync.Mutex
 }
@@ -60,12 +61,15 @@ func (i *ipam) PrefixV4() netip.Prefix { return i.prefixv4 }
 
 // Acquire acquires a lease for the given node.
 func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix, err error) {
+	if i.wdb == nil {
+		return netip.Prefix{}, meshdb.ErrReadOnly
+	}
 	i.mux.Lock()
 	defer i.mux.Unlock()
-	rdb := models.New(i.store.ReadDB())
+	rdb := models.New(i.rdb)
 	if !i.prefixv4.IsValid() {
 		var ipv4 string
-		ipv4, err = models.New(i.store.ReadDB()).GetIPv4Prefix(ctx)
+		ipv4, err = models.New(i.rdb).GetIPv4Prefix(ctx)
 		if err != nil {
 			err = fmt.Errorf("get ipv4 prefix: %w", err)
 			return
@@ -99,7 +103,7 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix
 			err = fmt.Errorf("failed to generate random IPv4 prefix: %w", err)
 			return
 		}
-		dblease, err = models.New(i.store.DB()).InsertNodeLease(ctx, models.InsertNodeLeaseParams{
+		dblease, err = models.New(i.wdb).InsertNodeLease(ctx, models.InsertNodeLeaseParams{
 			NodeID:    nodeID,
 			Ipv4:      allocated.String(),
 			CreatedAt: time.Now().UTC(),
@@ -131,5 +135,8 @@ func (i *ipam) Acquire(ctx context.Context, nodeID string) (address netip.Prefix
 func (i *ipam) Release(ctx context.Context, nodeID string) error {
 	i.mux.Lock()
 	defer i.mux.Unlock()
-	return models.New(i.store.DB()).ReleaseNodeLease(ctx, nodeID)
+	if i.wdb == nil {
+		return meshdb.ErrReadOnly
+	}
+	return models.New(i.wdb).ReleaseNodeLease(ctx, nodeID)
 }
