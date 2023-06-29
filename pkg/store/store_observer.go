@@ -48,7 +48,7 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					s.log.Debug("RaftState", slog.String("data", data.String()))
 				case raft.PeerObservation:
 					s.log.Debug("PeerObservation", slog.Any("data", data))
-					if s.noWG {
+					if s.testStore {
 						continue
 					}
 					if err := s.refreshWireguardPeers(ctx); err != nil {

@@ -69,7 +69,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 	if (edgeChange || routeChange) && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
 			go func() {
-				if s.noWG {
+				if s.testStore {
 					return
 				}
 				s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
@@ -82,7 +82,7 @@ func (s *store) ApplyBatch(logs []*raft.Log) []any {
 	if routeChange && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
 			go func() {
-				if s.noWG {
+				if s.testStore {
 					return
 				}
 				ctx := context.Background()
@@ -119,7 +119,7 @@ func (s *store) Apply(l *raft.Log) any {
 	if (edgeChange || routeChange) && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
 			go func() {
-				if s.noWG {
+				if s.testStore {
 					return
 				}
 				s.log.Debug("applied node edge change, refreshing wireguard peers")
@@ -132,7 +132,7 @@ func (s *store) Apply(l *raft.Log) any {
 	if routeChange && s.wg != nil {
 		if s.raft.AppliedIndex() == s.lastAppliedIndex.Load() {
 			go func() {
-				if s.noWG {
+				if s.testStore {
 					return
 				}
 				ctx := context.Background()

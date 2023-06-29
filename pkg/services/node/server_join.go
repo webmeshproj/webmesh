@@ -334,7 +334,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if req.GetAsVoter() {
 		log.Info("adding candidate to cluster", slog.String("raft_address", raftAddress))
 		if err := s.store.AddVoter(ctx, req.GetId(), raftAddress); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to add candidate: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to add voter: %v", err)
 		}
 	} else {
 		log.Info("adding non-voter to cluster", slog.String("raft_address", raftAddress))

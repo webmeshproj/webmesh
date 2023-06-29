@@ -179,39 +179,6 @@ func New(opts *Options) (Store, error) {
 	}, nil
 }
 
-// NewTestStore creates a new test store and waits for it to be ready.
-// The context is used to enforce startup timeouts.
-func NewTestStore(ctx context.Context) (Store, error) {
-	opts := NewOptions()
-	opts.Raft.ConnectionTimeout = 100 * time.Millisecond
-	opts.Raft.HeartbeatTimeout = 100 * time.Millisecond
-	opts.Raft.ElectionTimeout = 100 * time.Millisecond
-	opts.Raft.LeaderLeaseTimeout = 100 * time.Millisecond
-	opts.Raft.ListenAddress = ":0"
-	opts.Raft.InMemory = true
-	opts.TLS.Insecure = true
-	opts.Bootstrap.Enabled = true
-	opts.Mesh.NodeID = uuid.NewString()
-	deadline, ok := ctx.Deadline()
-	if ok {
-		opts.Raft.StartupTimeout = time.Until(deadline)
-	}
-	st, err := New(opts)
-	if err != nil {
-		return nil, err
-	}
-	stor := st.(*store)
-	stor.noWG = true
-	if err := stor.Open(); err != nil {
-		return nil, err
-	}
-	err = <-stor.ReadyError(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return stor, nil
-}
-
 type store struct {
 	sl   streamlayer.StreamLayer
 	opts *Options
@@ -251,8 +218,8 @@ type store struct {
 
 	open atomic.Bool
 
-	// a flag set on test stores to indicate skipping wireguard setup
-	noWG bool
+	// a flag set on test stores to indicate skipping certain operations
+	testStore bool
 }
 
 type clientPeerConn struct {

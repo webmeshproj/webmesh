@@ -502,7 +502,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("barrier: %w", err)
 	}
-	if s.noWG {
+	if s.testStore {
 		return nil
 	}
 	s.log.Info("configuring wireguard interface")
@@ -521,6 +521,9 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 }
 
 func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raft.ServerID]int64) error {
+	if s.testStore {
+		return nil
+	}
 	// We "join" the cluster again through the usual workflow of adding a voter.
 	leader, err := s.Leader()
 	if err != nil {

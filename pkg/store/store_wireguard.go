@@ -130,7 +130,7 @@ func (s *store) refreshWireguardPeers(ctx context.Context) error {
 }
 
 func (s *store) recoverWireguard(ctx context.Context) error {
-	if s.noWG {
+	if s.testStore {
 		return nil
 	}
 	var meshnetworkv6 netip.Prefix
