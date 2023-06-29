@@ -72,6 +72,7 @@ func (s *store) Open() error {
 	}
 	// If bootstrap and force are set, clear the data directory.
 	if s.opts.Bootstrap.Enabled && s.opts.Bootstrap.Force {
+		log.Warn("force bootstrap enabled, clearing data directory")
 		err = os.RemoveAll(s.opts.Raft.DataDir)
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove all %q: %w", s.opts.Raft.DataDir, err)

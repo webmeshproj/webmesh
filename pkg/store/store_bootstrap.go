@@ -23,6 +23,7 @@ import (
 	"math"
 	"net"
 	"net/netip"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -42,14 +43,14 @@ import (
 func (s *store) bootstrap(ctx context.Context) error {
 	version, err := models.GetDBVersion(s.weakData)
 	if err != nil {
-		return fmt.Errorf("get raft schema version: %w", err)
+		return fmt.Errorf("get db schema version: %w", err)
 	}
-	s.log.Info("current raft schema version", slog.Int("version", int(version)))
+	s.log.Info("current db schema version", slog.Int("version", int(version)))
 	if version != 0 {
 		// We have a version, so the cluster is already bootstrapped.
 		s.log.Info("cluster already bootstrapped, migrating schema to latest version")
 		if err = models.MigrateRaftDB(s.weakData); err != nil {
-			return fmt.Errorf("raft db migrate: %w", err)
+			return fmt.Errorf("db migrate: %w", err)
 		}
 		// We rejoin as a voter no matter what
 		s.opts.Mesh.JoinAsVoter = true
@@ -63,12 +64,31 @@ func (s *store) bootstrap(ctx context.Context) error {
 		// Try to rejoin one of the bootstrap servers
 		return s.rejoinBootstrapServer(ctx)
 	}
+	if s.opts.Bootstrap.RestoreSnapshot != "" {
+		s.log.Info("restoring snapshot from file", slog.String("file", s.opts.Bootstrap.RestoreSnapshot))
+		f, err := os.Open(s.opts.Bootstrap.RestoreSnapshot)
+		if err != nil {
+			return fmt.Errorf("open snapshot file: %w", err)
+		}
+		defer f.Close()
+		if err := s.snapshotter.Restore(ctx, f); err != nil {
+			return fmt.Errorf("restore snapshot: %w", err)
+		}
+		s.log.Info("migrating schema to latest version")
+		if err = models.MigrateRaftDB(s.weakData); err != nil {
+			return fmt.Errorf("db migrate: %w", err)
+		}
+		// We're done here, but restore procedure needs to be documented
+		return nil
+	}
 	s.firstBootstrap.Store(true)
+	s.log.Info("migrating schema to latest version")
+	if err = models.MigrateRaftDB(s.weakData); err != nil {
+		return fmt.Errorf("db migrate: %w", err)
+	}
 	if s.opts.Bootstrap.AdvertiseAddress == "" && s.opts.Bootstrap.Servers == "" {
 		s.opts.Bootstrap.AdvertiseAddress = fmt.Sprintf("localhost:%d", s.sl.ListenPort())
 	} else if s.opts.Bootstrap.AdvertiseAddress == "" {
-		// Validate() doesn't allow this on the options
-		// but lets go ahead and support it anyway.
 		s.opts.Bootstrap.AdvertiseAddress = s.opts.Bootstrap.Servers
 	}
 	// There is a chance we are waiting for DNS to resolve.
@@ -140,9 +160,6 @@ func (s *store) bootstrap(ctx context.Context) error {
 		// there were other servers to bootstrap with, then
 		// we might just need to rejoin the cluster.
 		if errors.Is(err, raft.ErrCantBootstrap) {
-			if err = models.MigrateRaftDB(s.weakData); err != nil {
-				return fmt.Errorf("raft db migrate: %w", err)
-			}
 			if s.opts.Bootstrap.Servers != "" {
 				s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 				s.opts.Mesh.JoinAsVoter = true
@@ -155,10 +172,6 @@ func (s *store) bootstrap(ctx context.Context) error {
 			return s.recoverWireguard(ctx)
 		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
-	}
-	s.log.Info("migrating raft schema to latest version")
-	if err = models.MigrateRaftDB(s.weakData); err != nil {
-		return fmt.Errorf("raft db migrate: %w", err)
 	}
 	go func() {
 		deadline, ok := ctx.Deadline()
