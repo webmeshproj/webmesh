@@ -34,6 +34,7 @@ import (
 // Plugin is the mTLS plugin.
 type Plugin struct {
 	v1.UnimplementedPluginServer
+	v1.UnimplementedAuthPluginServer
 
 	config *tls.Config
 }
@@ -80,6 +81,10 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 		return nil, fmt.Errorf("failed to parse CA file %q", config.CAFile)
 	}
 	p.config.ClientCAs = roots
+	return &emptypb.Empty{}, nil
+}
+
+func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, nil
 }
 

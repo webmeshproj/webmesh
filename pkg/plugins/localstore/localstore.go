@@ -45,6 +45,7 @@ import (
 // Plugin is the localstore plugin.
 type Plugin struct {
 	v1.UnimplementedPluginServer
+	v1.UnimplementedStoragePluginServer
 
 	data                          *sql.DB
 	mux                           sync.Mutex
@@ -109,6 +110,10 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 		p.lastAppliedIndex.Store(binary.BigEndian.Uint64(data))
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, p.data.Close()
 }
 
 func (p *Plugin) Store(ctx context.Context, log *v1.StoreLogRequest) (*v1.RaftApplyResponse, error) {

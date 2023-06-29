@@ -45,6 +45,8 @@ var ErrUserDisabled = fmt.Errorf("user disabled")
 // Plugin is the ldap plugin.
 type Plugin struct {
 	v1.UnimplementedPluginServer
+	v1.UnimplementedAuthPluginServer
+
 	config Config
 	mux    sync.RWMutex
 }
@@ -198,6 +200,10 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 	return &v1.AuthenticationResponse{
 		Id: nodeID,
 	}, nil
+}
+
+func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
 }
 
 func (p *Plugin) bind(ctx context.Context, conn *ldap.Conn) error {

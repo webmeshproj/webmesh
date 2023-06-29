@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -37,9 +36,15 @@ import (
 	"github.com/webmeshproj/node/pkg/context"
 )
 
-type PluginClientCloser interface {
+type PluginClient interface {
 	v1.PluginClient
-	io.Closer
+
+	// Storage returns a storage client.
+	Storage() v1.StoragePluginClient
+	// Auth returns an auth client.
+	Auth() v1.AuthPluginClient
+	// Events returns an events client.
+	Events() v1.WatchPluginClient
 }
 
 // inProcessClient creates a plugin client from a plugin server.
@@ -61,27 +66,68 @@ func (p *inProcessPlugin) Configure(ctx context.Context, in *v1.PluginConfigurat
 	return p.server.Configure(ctx, in)
 }
 
+func (p *inProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return p.server.Close(context.Background(), &emptypb.Empty{})
+}
+
+// Storage returns a storage client.
+func (p *inProcessPlugin) Storage() v1.StoragePluginClient {
+	cli, ok := p.server.(v1.StoragePluginServer)
+	if !ok {
+		return nil
+	}
+	return &inProcessStoragePlugin{cli}
+}
+
+// Auth returns an auth client.
+func (p *inProcessPlugin) Auth() v1.AuthPluginClient {
+	cli, ok := p.server.(v1.AuthPluginServer)
+	if !ok {
+		return nil
+	}
+	return &inProcessAuthPlugin{cli}
+}
+
+// Events returns an events client.
+func (p *inProcessPlugin) Events() v1.WatchPluginClient {
+	cli, ok := p.server.(v1.WatchPluginServer)
+	if !ok {
+		return nil
+	}
+	return &inProcessWatchPlugin{cli}
+}
+
+type inProcessStoragePlugin struct {
+	server v1.StoragePluginServer
+}
+
 // Store applies a raft log entry to the store.
-func (p *inProcessPlugin) Store(ctx context.Context, in *v1.StoreLogRequest, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
+func (p *inProcessStoragePlugin) Store(ctx context.Context, in *v1.StoreLogRequest, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
 	return p.server.Store(ctx, in)
 }
 
 // RestoreSnapshot restores a snapshot.
-func (p *inProcessPlugin) RestoreSnapshot(ctx context.Context, in *v1.DataSnapshot, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (p *inProcessStoragePlugin) RestoreSnapshot(ctx context.Context, in *v1.DataSnapshot, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	return p.server.RestoreSnapshot(ctx, in)
 }
 
+type inProcessAuthPlugin struct {
+	server v1.AuthPluginServer
+}
+
 // Authenticate authenticates a request.
-func (p *inProcessPlugin) Authenticate(ctx context.Context, in *v1.AuthenticationRequest, opts ...grpc.CallOption) (*v1.AuthenticationResponse, error) {
+func (p *inProcessAuthPlugin) Authenticate(ctx context.Context, in *v1.AuthenticationRequest, opts ...grpc.CallOption) (*v1.AuthenticationResponse, error) {
 	return p.server.Authenticate(ctx, in)
 }
 
-// Emit emits a watch event.
-func (p *inProcessPlugin) Emit(ctx context.Context, in *v1.Event, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	return p.server.Emit(ctx, in)
+type inProcessWatchPlugin struct {
+	server v1.WatchPluginServer
 }
 
-func (p *inProcessPlugin) Close() error { return nil }
+// Emit emits a watch event.
+func (p *inProcessWatchPlugin) Emit(ctx context.Context, in *v1.Event, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return p.server.Emit(ctx, in)
+}
 
 type externalProcessPlugin struct {
 	path string
@@ -98,56 +144,23 @@ func newExternalProcess(ctx context.Context, path string) (*externalProcessPlugi
 
 // GetInfo returns the information for the plugin.
 func (p *externalProcessPlugin) GetInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*v1.PluginInfo, error) {
-	if err := p.checkProcess(ctx); err != nil {
-		return nil, err
-	}
 	return p.cli.GetInfo(ctx, in)
 }
 
 // Configure configures the plugin.
 func (p *externalProcessPlugin) Configure(ctx context.Context, in *v1.PluginConfiguration, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	if err := p.checkProcess(ctx); err != nil {
-		return nil, err
-	}
 	return p.cli.Configure(ctx, in)
 }
 
-// Store applies a raft log entry to the store.
-func (p *externalProcessPlugin) Store(ctx context.Context, in *v1.StoreLogRequest, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
-	if err := p.checkProcess(ctx); err != nil {
-		return nil, err
-	}
-	return p.cli.Store(ctx, in)
-}
-
-// RestoreSnapshot restores a snapshot.
-func (p *externalProcessPlugin) RestoreSnapshot(ctx context.Context, in *v1.DataSnapshot, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	if err := p.checkProcess(ctx); err != nil {
-		return nil, err
-	}
-	return p.cli.RestoreSnapshot(ctx, in)
-}
-
-// Authenticate authenticates a request.
-func (p *externalProcessPlugin) Authenticate(ctx context.Context, in *v1.AuthenticationRequest, opts ...grpc.CallOption) (*v1.AuthenticationResponse, error) {
-	if err := p.checkProcess(ctx); err != nil {
-		return nil, err
-	}
-	return p.cli.Authenticate(ctx, in)
-}
-
-// Emit emits a watch event.
-func (p *externalProcessPlugin) Emit(ctx context.Context, in *v1.Event, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	if err := p.checkProcess(ctx); err != nil {
-		return nil, err
-	}
-	return p.cli.Emit(ctx, in)
-}
-
-func (p *externalProcessPlugin) Close() error {
+func (p *externalProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
-	errs := make([]error, 0, 2)
+	errs := make([]error, 0, 3)
+	if p.cli != nil {
+		if _, err := p.cli.Close(ctx, in); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	if p.conn != nil {
 		if err := p.conn.Close(); err != nil {
 			errs = append(errs, err)
@@ -159,9 +172,24 @@ func (p *externalProcessPlugin) Close() error {
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("close: %v", errs)
+		return nil, fmt.Errorf("close: %v", errs)
 	}
-	return nil
+	return &emptypb.Empty{}, nil
+}
+
+// Storage returns a storage client.
+func (p *externalProcessPlugin) Storage() v1.StoragePluginClient {
+	return v1.NewStoragePluginClient(p.conn)
+}
+
+// Auth returns an auth client.
+func (p *externalProcessPlugin) Auth() v1.AuthPluginClient {
+	return v1.NewAuthPluginClient(p.conn)
+}
+
+// Events returns an events client.
+func (p *externalProcessPlugin) Events() v1.WatchPluginClient {
+	return v1.NewWatchPluginClient(p.conn)
 }
 
 // checkProcess checks if the process is running and restarts it if it is not.
@@ -169,6 +197,9 @@ func (p *externalProcessPlugin) checkProcess(ctx context.Context) error {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 	if p.cmd.ProcessState != nil {
+		if p.conn != nil {
+			_ = p.conn.Close()
+		}
 		_, ok := ctx.Deadline()
 		if !ok {
 			var cancel context.CancelFunc
@@ -205,7 +236,13 @@ func (p *externalProcessPlugin) start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("read address: %w", err)
 	}
-	p.conn, err = grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	interceptor := func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		if err := p.checkProcess(ctx); err != nil {
+			return err
+		}
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+	p.conn, err = grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithUnaryInterceptor(interceptor))
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
@@ -258,6 +295,25 @@ func newExternalServer(ctx context.Context, cfg *Config) (*externalServerPlugin,
 	return &externalServerPlugin{v1.NewPluginClient(c), c}, nil
 }
 
-func (p *externalServerPlugin) Close() error {
-	return p.conn.Close()
+func (p *externalServerPlugin) Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	_, err := p.PluginClient.Close(ctx, in, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, p.conn.Close()
+}
+
+// Storage returns a storage client.
+func (p *externalServerPlugin) Storage() v1.StoragePluginClient {
+	return v1.NewStoragePluginClient(p.conn)
+}
+
+// Auth returns an auth client.
+func (p *externalServerPlugin) Auth() v1.AuthPluginClient {
+	return v1.NewAuthPluginClient(p.conn)
+}
+
+// Events returns an events client.
+func (p *externalServerPlugin) Events() v1.WatchPluginClient {
+	return v1.NewWatchPluginClient(p.conn)
 }

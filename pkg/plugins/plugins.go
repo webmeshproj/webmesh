@@ -41,7 +41,7 @@ import (
 
 var (
 	// BuiltIns are the built-in plugins.
-	BuiltIns = map[string]PluginClientCloser{
+	BuiltIns = map[string]PluginClient{
 		"mtls":       inProcessClient(&mtls.Plugin{}),
 		"basic-auth": inProcessClient(&basicauth.Plugin{}),
 		"ldap":       inProcessClient(&ldap.Plugin{}),
@@ -74,16 +74,16 @@ type Manager interface {
 
 // New creates a new plugin manager.
 func New(ctx context.Context, opts *Options) (Manager, error) {
-	var auth PluginClientCloser
-	registered := make(map[string]PluginClientCloser)
-	stores := make([]PluginClientCloser, 0)
-	emitters := make([]PluginClientCloser, 0)
+	var auth PluginClient
+	registered := make(map[string]PluginClient)
+	stores := make([]PluginClient, 0)
+	emitters := make([]PluginClient, 0)
 	log := slog.Default()
 	for name, cfg := range opts.Plugins {
 		log.Info("loading plugin", "name", name)
 		log.Debug("plugin configuration", "config", cfg)
 		// Load the plugin.
-		var plugin PluginClientCloser
+		var plugin PluginClient
 		if builtIn, ok := BuiltIns[name]; ok {
 			plugin = builtIn
 		} else {
@@ -141,10 +141,10 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 }
 
 type manager struct {
-	auth     PluginClientCloser
-	stores   []PluginClientCloser
-	emitters []PluginClientCloser
-	plugins  map[string]PluginClientCloser
+	auth     PluginClient
+	stores   []PluginClient
+	emitters []PluginClient
+	plugins  map[string]PluginClient
 	log      *slog.Logger
 }
 
@@ -166,7 +166,7 @@ func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 		if m.auth == nil {
 			return handler(ctx, req)
 		}
-		resp, err := m.auth.Authenticate(ctx, m.newAuthRequest(ctx))
+		resp, err := m.auth.Auth().Authenticate(ctx, m.newAuthRequest(ctx))
 		if err != nil {
 			return nil, status.Errorf(codes.Unauthenticated, "authenticate: %v", err)
 		}
@@ -184,7 +184,7 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 		if m.auth == nil {
 			return handler(srv, ss)
 		}
-		resp, err := m.auth.Authenticate(ss.Context(), m.newAuthRequest(ss.Context()))
+		resp, err := m.auth.Auth().Authenticate(ss.Context(), m.newAuthRequest(ss.Context()))
 		if err != nil {
 			return status.Errorf(codes.Unauthenticated, "authenticate: %v", err)
 		}
@@ -203,7 +203,7 @@ func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) (
 	out := make([]*v1.RaftApplyResponse, len(m.stores))
 	errs := make([]error, 0)
 	for i, store := range m.stores {
-		resp, err := store.Store(ctx, entry)
+		resp, err := store.Storage().Store(ctx, entry)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -229,7 +229,7 @@ func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, da
 	}
 	errs := make([]error, 0)
 	for _, store := range m.stores {
-		_, err := store.RestoreSnapshot(ctx, &v1.DataSnapshot{
+		_, err := store.Storage().RestoreSnapshot(ctx, &v1.DataSnapshot{
 			Term:  meta.Term,
 			Index: meta.Index,
 			Data:  snapsot,
@@ -251,7 +251,7 @@ func (m *manager) Emit(ctx context.Context, ev *v1.Event) error {
 	}
 	errs := make([]error, 0)
 	for _, emitter := range m.emitters {
-		_, err := emitter.Emit(ctx, ev)
+		_, err := emitter.Events().Emit(ctx, ev)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -266,9 +266,12 @@ func (m *manager) Emit(ctx context.Context, ev *v1.Event) error {
 func (m *manager) Close() error {
 	errs := make([]error, 0)
 	for _, p := range m.plugins {
-		err := p.Close()
+		_, err := p.Close(context.Background(), &emptypb.Empty{})
 		if err != nil {
-			errs = append(errs, err)
+			// Don't report unimplemented close methods.
+			if status.Code(err) != codes.Unimplemented {
+				errs = append(errs, err)
+			}
 		}
 	}
 	if len(errs) > 0 {

@@ -39,6 +39,7 @@ import (
 // Plugin is the basicauth plugin.
 type Plugin struct {
 	v1.UnimplementedPluginServer
+	v1.UnimplementedAuthPluginServer
 
 	users map[string]string
 	mux   sync.RWMutex
@@ -115,6 +116,10 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 	return &v1.AuthenticationResponse{
 		Id: username,
 	}, nil
+}
+
+func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
 }
 
 func (p *Plugin) verify(username, password string) bool {
