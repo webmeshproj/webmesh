@@ -35,8 +35,8 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net/datachannels"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
@@ -392,11 +392,12 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 		return "", err
 	}
 	s.log.Debug("looking up rpc address for leader", slog.String("leader", string(leader)))
-	addr, err := models.New(s.ReadDB()).GetNodePrivateRPCAddress(ctx, string(leader))
+	state := state.New(s.DB())
+	addr, err := state.GetNodePrivateRPCAddress(ctx, string(leader))
 	if err != nil {
 		return "", err
 	}
-	return addr.(string), nil
+	return addr.String(), nil
 }
 
 // Stepdown forces this node to relinquish leadership to another node in

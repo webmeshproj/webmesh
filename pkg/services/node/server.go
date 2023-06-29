@@ -51,7 +51,7 @@ type Server struct {
 	rbacEval   rbac.Evaluator
 	networking networking.Networking
 
-	ulaPrefix  netip.Prefix
+	ipv6Prefix netip.Prefix
 	features   []v1.Feature
 	startedAt  time.Time
 	log        *slog.Logger

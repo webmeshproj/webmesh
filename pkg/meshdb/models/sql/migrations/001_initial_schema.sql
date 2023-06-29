@@ -98,42 +98,6 @@ CREATE TABLE network_routes (
     updated_at TIMESTAMP NOT NULL
 );
 
--- Views for more convenient querying.
-
-CREATE VIEW node_private_rpc_addresses AS
-SELECT
-    nodes.id as node_id,
-    SUBSTR(
-        COALESCE(leases.ipv4, nodes.network_ipv6, ''),
-        0,
-        INSTR(COALESCE(leases.ipv4, nodes.network_ipv6, ''), '/')
-    )
-    || ':'
-    || CAST(nodes.grpc_port AS TEXT) AS address
-FROM nodes 
-LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
-
-CREATE VIEW node_public_rpc_addresses AS
-SELECT
-    nodes.id as node_id,
-    nodes.primary_endpoint
-    || ':'
-    || CAST(nodes.grpc_port AS TEXT) AS address
-FROM nodes WHERE nodes.primary_endpoint IS NOT NULL;
-
-CREATE VIEW node_private_raft_addresses AS
-SELECT
-    nodes.id as node_id,
-    SUBSTR(
-        COALESCE(leases.ipv4, nodes.network_ipv6, ''),
-        0,
-        INSTR(COALESCE(leases.ipv4, nodes.network_ipv6, ''), '/')
-    )
-    || ':'
-    || CAST(nodes.raft_port AS TEXT) AS address
-FROM nodes
-LEFT OUTER JOIN leases ON nodes.id = leases.node_id;
-
 -- +goose Down
 
 DROP TABLE network_routes;
@@ -146,7 +110,3 @@ DROP TABLE leases;
 DROP TABLE node_edges;
 DROP TABLE nodes;
 DROP TABLE mesh_state;
-
-DROP VIEW node_private_rpc_addresses;
-DROP VIEW node_public_rpc_addresses;
-DROP VIEW node_private_raft_addresses;

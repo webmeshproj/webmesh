@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/netip"
+	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
@@ -33,8 +34,8 @@ import (
 
 // State is the interface for querying mesh state.
 type State interface {
-	// GetULAPrefix returns the ULA prefix.
-	GetULAPrefix(ctx context.Context) (netip.Prefix, error)
+	// GetIPv6Prefix returns the IPv6 prefix.
+	GetIPv6Prefix(ctx context.Context) (netip.Prefix, error)
 	// GetIPv4Prefix returns the IPv4 prefix.
 	GetIPv4Prefix(ctx context.Context) (netip.Prefix, error)
 	// GetNodePrivateRPCAddress returns the private gRPC address for a node.
@@ -66,9 +67,9 @@ func New(db meshdb.DB) State {
 	return &state{db}
 }
 
-func (s *state) GetULAPrefix(ctx context.Context) (netip.Prefix, error) {
+func (s *state) GetIPv6Prefix(ctx context.Context) (netip.Prefix, error) {
 	q := models.New(s.Read())
-	prefix, err := q.GetULAPrefix(ctx)
+	prefix, err := q.GetIPv6Prefix(ctx)
 	if err != nil {
 		return netip.Prefix{}, err
 	}
@@ -86,78 +87,103 @@ func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
 
 func (s *state) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (netip.AddrPort, error) {
 	q := models.New(s.Read())
-	addr, err := q.GetNodePrivateRPCAddress(ctx, nodeID)
+	node, err := q.GetNode(ctx, nodeID)
 	if err != nil {
 		return netip.AddrPort{}, err
 	}
-	return netip.ParseAddrPort(addr.(string))
+	var addr netip.Addr
+	if node.PrivateAddressV4 != "" {
+		ip := strings.Split(node.PrivateAddressV4, "/")[0]
+		addr, err = netip.ParseAddr(ip)
+	} else {
+		addr, err = netip.ParseAddr(node.NetworkIpv6.String)
+	}
+	if err != nil {
+		return netip.AddrPort{}, fmt.Errorf("parse address for node %s: %v", node.ID, err)
+	}
+	return netip.AddrPortFrom(addr, uint16(node.GrpcPort)), nil
 }
 
 func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {
 	q := models.New(s.Read())
-	addrs, err := q.ListPublicRPCAddresses(ctx)
+	nodes, err := q.ListNodes(ctx)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	if len(addrs) == 0 {
+	if len(nodes) == 0 {
 		return nil, nil
 	}
-	out := make(map[string]netip.AddrPort, len(addrs))
-	for _, addr := range addrs {
-		a, err := netip.ParseAddrPort(addr.Address.(string))
-		if err != nil {
-			return nil, err
+	out := make(map[string]netip.AddrPort)
+	for _, node := range nodes {
+		if !node.PrimaryEndpoint.Valid {
+			continue
 		}
-		out[addr.NodeID] = a
+		addr, err := netip.ParseAddr(node.PrimaryEndpoint.String)
+		if err != nil {
+			return nil, fmt.Errorf("parse address for node %s: %v", node.ID, err)
+		}
+		out[node.ID] = netip.AddrPortFrom(addr, uint16(node.GrpcPort))
 	}
 	return out, nil
 }
 
 func (s *state) ListPeerPublicRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error) {
 	q := models.New(s.Read())
-	addrs, err := q.ListPeerPublicRPCAddresses(ctx, nodeID)
+	nodes, err := q.ListNodes(ctx)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	if len(addrs) == 0 {
+	if len(nodes) == 0 {
 		return nil, nil
 	}
-	out := make(map[string]netip.AddrPort, len(addrs))
-	for _, addr := range addrs {
-		a, err := netip.ParseAddrPort(addr.Address.(string))
-		if err != nil {
-			return nil, err
+	out := make(map[string]netip.AddrPort)
+	for _, node := range nodes {
+		if node.ID == nodeID || !node.PrimaryEndpoint.Valid {
+			continue
 		}
-		out[addr.NodeID] = a
+		addr, err := netip.ParseAddr(node.PrimaryEndpoint.String)
+		if err != nil {
+			return nil, fmt.Errorf("parse address for node %s: %v", node.ID, err)
+		}
+		out[node.ID] = netip.AddrPortFrom(addr, uint16(node.GrpcPort))
 	}
 	return out, nil
 }
 
 func (s *state) ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error) {
 	q := models.New(s.Read())
-	addrs, err := q.ListPeerPrivateRPCAddresses(ctx, nodeID)
+	nodes, err := q.ListNodes(ctx)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	if len(addrs) == 0 {
+	if len(nodes) == 0 {
 		return nil, nil
 	}
-	out := make(map[string]netip.AddrPort, len(addrs))
-	for _, addr := range addrs {
-		a, err := netip.ParseAddrPort(addr.Address.(string))
-		if err != nil {
-			return nil, err
+	out := make(map[string]netip.AddrPort)
+	for _, node := range nodes {
+		if node.ID == nodeID {
+			continue
 		}
-		out[addr.NodeID] = a
+		var addr netip.Addr
+		if node.PrivateAddressV4 != "" {
+			ip := strings.Split(node.PrivateAddressV4, "/")[0]
+			addr, err = netip.ParseAddr(ip)
+		} else {
+			addr, err = netip.ParseAddr(node.NetworkIpv6.String)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("parse address for node %s: %v", node.ID, err)
+		}
+		out[node.ID] = netip.AddrPortFrom(addr, uint16(node.GrpcPort))
 	}
 	return out, nil
 }

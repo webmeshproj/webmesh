@@ -56,10 +56,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if !s.store.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
-	if !s.ulaPrefix.IsValid() {
-		// We haven't loaded the ULA prefix yet, so do it now
+	if !s.ipv6Prefix.IsValid() {
+		// We haven't loaded the IPv6 prefix yet, so do it now
 		var err error
-		s.ulaPrefix, err = s.meshstate.GetULAPrefix(ctx)
+		s.ipv6Prefix, err = s.meshstate.GetIPv6Prefix(ctx)
 		if err != nil {
 			// DB error, bail
 			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
@@ -177,7 +177,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// (or at least a more efficient way than brute force) of generating
 		// IPv6 addresses. Currently the put will fail if the IPv6 address
 		// is already in use.
-		networkIPv6, err := util.Random64(s.ulaPrefix)
+		networkIPv6, err := util.Random64(s.ipv6Prefix)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
 		}
@@ -345,7 +345,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Start building the response
 	resp := &v1.JoinResponse{
-		NetworkIpv6: s.ulaPrefix.String(),
+		NetworkIpv6: s.ipv6Prefix.String(),
 		AddressIpv6: peer.NetworkIPv6.String(),
 		AddressIpv4: func() string {
 			if lease.IsValid() {

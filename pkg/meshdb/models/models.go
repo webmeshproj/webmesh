@@ -71,21 +71,6 @@ type NodeEdge struct {
 	Attrs     sql.NullString `json:"attrs"`
 }
 
-type NodePrivateRaftAddress struct {
-	NodeID  string       `json:"node_id"`
-	Address sql.NullBool `json:"address"`
-}
-
-type NodePrivateRpcAddress struct {
-	NodeID  string       `json:"node_id"`
-	Address sql.NullBool `json:"address"`
-}
-
-type NodePublicRpcAddress struct {
-	NodeID  string       `json:"node_id"`
-	Address sql.NullBool `json:"address"`
-}
-
 type Role struct {
 	Name      string    `json:"name"`
 	RulesJson string    `json:"rules_json"`

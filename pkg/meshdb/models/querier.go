@@ -21,16 +21,14 @@ type Querier interface {
 	EitherNodeExists(ctx context.Context, arg EitherNodeExistsParams) (int64, error)
 	GetGroup(ctx context.Context, name string) (Group, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
+	GetIPv6Prefix(ctx context.Context) (string, error)
 	GetNetworkACL(ctx context.Context, name string) (NetworkAcl, error)
 	GetNetworkRoute(ctx context.Context, name string) (NetworkRoute, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
 	GetNodeCount(ctx context.Context) (int64, error)
 	GetNodeEdge(ctx context.Context, arg GetNodeEdgeParams) (NodeEdge, error)
-	GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
-	GetNodePublicRPCAddress(ctx context.Context, nodeID string) (interface{}, error)
 	GetRole(ctx context.Context, name string) (Role, error)
 	GetRoleBinding(ctx context.Context, name string) (RoleBinding, error)
-	GetULAPrefix(ctx context.Context) (string, error)
 	InsertNode(ctx context.Context, arg InsertNodeParams) (Node, error)
 	InsertNodeEdge(ctx context.Context, arg InsertNodeEdgeParams) error
 	InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error)
@@ -46,11 +44,7 @@ type Querier interface {
 	ListNodeIDs(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]ListNodesRow, error)
 	ListNodesByZone(ctx context.Context, zoneAwarenessID sql.NullString) ([]ListNodesByZoneRow, error)
-	ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) ([]ListPeerPrivateRPCAddressesRow, error)
-	ListPeerPublicRPCAddresses(ctx context.Context, nodeID string) ([]ListPeerPublicRPCAddressesRow, error)
-	ListPrivateRPCAddresses(ctx context.Context) ([]ListPrivateRPCAddressesRow, error)
 	ListPublicNodes(ctx context.Context) ([]ListPublicNodesRow, error)
-	ListPublicRPCAddresses(ctx context.Context) ([]ListPublicRPCAddressesRow, error)
 	ListRoleBindings(ctx context.Context) ([]RoleBinding, error)
 	ListRoles(ctx context.Context) ([]Role, error)
 	NodeEdgeExists(ctx context.Context, arg NodeEdgeExistsParams) (int64, error)
@@ -63,7 +57,7 @@ type Querier interface {
 	PutRoleBinding(ctx context.Context, arg PutRoleBindingParams) error
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
 	SetIPv4Prefix(ctx context.Context, value string) error
-	SetULAPrefix(ctx context.Context, value string) error
+	SetIPv6Prefix(ctx context.Context, value string) error
 	UpdateNodeEdge(ctx context.Context, arg UpdateNodeEdgeParams) error
 }
 

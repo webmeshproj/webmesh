@@ -20,12 +20,12 @@ func (q *Queries) GetIPv4Prefix(ctx context.Context) (string, error) {
 	return value, err
 }
 
-const GetULAPrefix = `-- name: GetULAPrefix :one
-SELECT value FROM mesh_state WHERE key = 'ULAPrefix'
+const GetIPv6Prefix = `-- name: GetIPv6Prefix :one
+SELECT value FROM mesh_state WHERE key = 'IPv6Prefix'
 `
 
-func (q *Queries) GetULAPrefix(ctx context.Context) (string, error) {
-	row := q.db.QueryRowContext(ctx, GetULAPrefix)
+func (q *Queries) GetIPv6Prefix(ctx context.Context) (string, error) {
+	row := q.db.QueryRowContext(ctx, GetIPv6Prefix)
 	var value string
 	err := row.Scan(&value)
 	return value, err
@@ -41,12 +41,12 @@ func (q *Queries) SetIPv4Prefix(ctx context.Context, value string) error {
 	return err
 }
 
-const SetULAPrefix = `-- name: SetULAPrefix :exec
-INSERT into mesh_state (key, value) VALUES ('ULAPrefix', ?)
+const SetIPv6Prefix = `-- name: SetIPv6Prefix :exec
+INSERT into mesh_state (key, value) VALUES ('IPv6Prefix', ?)
 ON CONFLICT (key) DO UPDATE SET value = excluded.value
 `
 
-func (q *Queries) SetULAPrefix(ctx context.Context, value string) error {
-	_, err := q.db.ExecContext(ctx, SetULAPrefix, value)
+func (q *Queries) SetIPv6Prefix(ctx context.Context, value string) error {
+	_, err := q.db.ExecContext(ctx, SetIPv6Prefix, value)
 	return err
 }

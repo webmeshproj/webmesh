@@ -136,7 +136,7 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	var meshnetworkv6 netip.Prefix
 	var err error
 	if !s.opts.Mesh.NoIPv6 {
-		meshnetworkv6, err = state.New(s.DB()).GetULAPrefix(ctx)
+		meshnetworkv6, err = state.New(s.DB()).GetIPv6Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ula prefix: %w", err)
 		}

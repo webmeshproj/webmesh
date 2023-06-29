@@ -223,7 +223,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		return fmt.Errorf("generate ULA: %w", err)
 	}
 	s.log.Info("generated IPv6 ULA", slog.String("ula", ula.String()))
-	err = q.SetULAPrefix(ctx, ula.String())
+	err = q.SetIPv6Prefix(ctx, ula.String())
 	if err != nil {
 		return fmt.Errorf("set ULA prefix to db: %w", err)
 	}
