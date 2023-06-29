@@ -70,18 +70,18 @@ type DBTX interface {
 
 // NewTestDB returns a new in-memory database for testing. Read and Write
 // operations are performed on the same database.
-func NewTestDB() (DB, error) {
+func NewTestDB() (DB, func(), error) {
 	dataPath := fmt.Sprintf("file:%s?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full", uuid.NewString())
 	db, err := sql.Open("sqlite3", dataPath)
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		return nil, nil, fmt.Errorf("open database: %w", err)
 	}
 	err = models.MigrateRaftDB(db)
 	if err != nil {
 		defer db.Close()
-		return nil, fmt.Errorf("migrate database: %w", err)
+		return nil, nil, fmt.Errorf("migrate database: %w", err)
 	}
-	return &testDB{db: db}, nil
+	return &testDB{db: db}, func() { db.Close() }, nil
 }
 
 type testDB struct {

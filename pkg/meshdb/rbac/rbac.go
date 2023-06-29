@@ -68,6 +68,15 @@ var ErrRoleBindingNotFound = fmt.Errorf("rolebinding not found")
 // ErrGroupNotFound is returned when a group is not found.
 var ErrGroupNotFound = fmt.Errorf("group not found")
 
+// ErrIsSystemRole is returned when a system role is being modified.
+var ErrIsSystemRole = fmt.Errorf("cannot modify system role")
+
+// ErrIsSystemRoleBinding is returned when a system rolebinding is being modified.
+var ErrIsSystemRoleBinding = fmt.Errorf("cannot modify system rolebinding")
+
+// ErrIsSystemGroup is returned when a system group is being modified.
+var ErrIsSystemGroup = fmt.Errorf("cannot modify system group")
+
 // RBAC is the interface to the database models for RBAC.
 type RBAC interface {
 	// PutRole creates or updates a role.
@@ -89,7 +98,7 @@ type RBAC interface {
 	ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error)
 
 	// PutGroup creates or updates a group.
-	PutGroup(ctx context.Context, role *v1.Group) error
+	PutGroup(ctx context.Context, group *v1.Group) error
 	// GetGroup returns a group by name.
 	GetGroup(ctx context.Context, name string) (*v1.Group, error)
 	// DeleteGroup deletes a group by name.
@@ -121,8 +130,14 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 			return err
 		}
 		if err == nil {
-			return fmt.Errorf("cannot modify system role %q", role.GetName())
+			return fmt.Errorf("%w %q", ErrIsSystemRole, role.GetName())
 		}
+	}
+	if role.GetName() == "" {
+		return fmt.Errorf("role name cannot be empty")
+	}
+	if len(role.GetRules()) == 0 {
+		return fmt.Errorf("role rules cannot be empty")
 	}
 	q := models.New(r.Write())
 	rules, err := json.Marshal(role.GetRules())
@@ -157,7 +172,7 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 // DeleteRole deletes a role by name.
 func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 	if IsSystemRole(name) {
-		return fmt.Errorf("cannot delete system role %q", name)
+		return fmt.Errorf("%w %q", ErrIsSystemRole, name)
 	}
 	q := models.New(r.Write())
 	err := q.DeleteRole(ctx, name)
@@ -192,8 +207,17 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 			return err
 		}
 		if err == nil {
-			return fmt.Errorf("cannot modify system rolebinding %q", rolebinding.GetName())
+			return fmt.Errorf("%w %q", ErrIsSystemRoleBinding, rolebinding.GetName())
 		}
+	}
+	if rolebinding.GetName() == "" {
+		return fmt.Errorf("rolebinding name cannot be empty")
+	}
+	if rolebinding.GetRole() == "" {
+		return fmt.Errorf("rolebinding role cannot be empty")
+	}
+	if len(rolebinding.GetSubjects()) == 0 {
+		return fmt.Errorf("rolebinding subjects cannot be empty")
 	}
 	q := models.New(r.Write())
 	params := models.PutRoleBindingParams{
@@ -249,7 +273,7 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding
 // DeleteRoleBinding deletes a rolebinding by name.
 func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 	if IsSystemRoleBinding(name) {
-		return fmt.Errorf("cannot delete system rolebinding %q", BootstrapVotersRoleBinding)
+		return fmt.Errorf("%w %q", ErrIsSystemRoleBinding, name)
 	}
 	q := models.New(r.Write())
 	err := q.DeleteRoleBinding(ctx, name)
@@ -274,15 +298,21 @@ func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) 
 }
 
 // PutGroup creates or updates a group.
-func (r *rbac) PutGroup(ctx context.Context, role *v1.Group) error {
+func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
+	if group.GetName() == "" {
+		return fmt.Errorf("group name cannot be empty")
+	}
+	if len(group.GetSubjects()) == 0 {
+		return fmt.Errorf("group subjects cannot be empty")
+	}
 	q := models.New(r.Write())
 	params := models.PutGroupParams{
-		Name:      role.GetName(),
+		Name:      group.GetName(),
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	}
 	var users, nodes []string
-	for _, subject := range role.GetSubjects() {
+	for _, subject := range group.GetSubjects() {
 		switch subject.GetType() {
 		case v1.SubjectType_SUBJECT_NODE:
 			nodes = append(nodes, subject.GetName())
@@ -323,6 +353,9 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 
 // DeleteGroup deletes a group by name.
 func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
+	if IsSystemGroup(name) {
+		return fmt.Errorf("%w %q", ErrIsSystemGroup, name)
+	}
 	q := models.New(r.Write())
 	err := q.DeleteGroup(ctx, name)
 	if err != nil {
