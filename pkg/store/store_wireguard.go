@@ -85,22 +85,18 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 	if err != nil {
 		return fmt.Errorf("wireguard configure: %w", err)
 	}
-	// if addressv4.IsValid() {
-	// 	err = s.wg.AddRoute(ctx, addressv4)
-	// 	if err != nil && !system.IsRouteExists(err) {
-	// 		return fmt.Errorf("wireguard add ipv4 route: %w", err)
-	// 	}
-	// }
-	// if addressv6.IsValid() {
-	// 	err = s.wg.AddRoute(ctx, addressv6)
-	// 	if err != nil && !system.IsRouteExists(err) {
-	// 		return fmt.Errorf("wireguard add ipv6 route: %w", err)
-	// 	}
-	// }
-	if meshNetworkV6.IsValid() && !s.opts.Mesh.NoIPv6 {
-		err = s.wg.AddRoute(ctx, meshNetworkV6)
-		if err != nil && !system.IsRouteExists(err) {
-			return fmt.Errorf("wireguard add mesh network route: %w", err)
+	if !s.opts.Mesh.NoIPv6 {
+		if meshNetworkV6.IsValid() {
+			err = s.wg.AddRoute(ctx, meshNetworkV6)
+			if err != nil && !system.IsRouteExists(err) {
+				return fmt.Errorf("wireguard add mesh network route: %w", err)
+			}
+		}
+		if addressv6.IsValid() {
+			err = s.wg.AddRoute(ctx, addressv6)
+			if err != nil && !system.IsRouteExists(err) {
+				return fmt.Errorf("wireguard add ipv6 route: %w", err)
+			}
 		}
 	}
 	err = s.fw.AddWireguardForwarding(ctx, s.wg.Name())
