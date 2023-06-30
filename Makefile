@@ -9,7 +9,7 @@ VERSION_PKG := github.com/webmeshproj/$(NAME)/pkg/version
 VERSION     := $(shell git describe --tags --always --dirty)
 COMMIT      := $(shell git rev-parse HEAD)
 DATE        := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-BUILD_TAGS  ?= osusergo,netgo,sqlite_omit_load_extension,sqlite_vacuum_incr,sqlite_json
+BUILD_TAGS  ?= osusergo,netgo,sqlite_omit_load_extension,sqlite_vacuum_incr,sqlite_foreign_keys
 
 ARCH  ?= $(shell go env GOARCH)
 OS    ?= $(shell go env GOOS)

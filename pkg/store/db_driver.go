@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -202,11 +203,11 @@ func (s *raftDBStatement) ExecContext(ctx context.Context, args []driver.NamedVa
 		return nil, fmt.Errorf("marshal log entry: %w", err)
 	}
 	f := s.raft.Apply(data, timeout)
-	if f.Error() != nil {
-		if f.Error() == raft.ErrNotLeader {
+	if err := f.Error(); err != nil {
+		if errors.Is(err, raft.ErrNotLeader) {
 			return nil, ErrNotLeader
 		}
-		return nil, fmt.Errorf("apply log entry: %w", f.Error())
+		return nil, fmt.Errorf("apply log entry: %w", err)
 	}
 	resp := f.Response().(*v1.RaftApplyResponse)
 	if resp.GetError() != "" {
@@ -259,11 +260,11 @@ func (s *raftDBStatement) QueryContext(ctx context.Context, args []driver.NamedV
 		return nil, fmt.Errorf("marshal log entry: %w", err)
 	}
 	f := s.raft.Apply(data, timeout)
-	if f.Error() != nil {
-		if f.Error() == raft.ErrNotLeader {
+	if err := f.Error(); err != nil {
+		if errors.Is(err, raft.ErrNotLeader) {
 			return nil, ErrNotLeader
 		}
-		return nil, fmt.Errorf("apply log entry: %w", f.Error())
+		return nil, fmt.Errorf("apply log entry: %w", err)
 	}
 	resp := f.Response().(*v1.RaftApplyResponse)
 	if resp.GetError() != "" {
@@ -358,7 +359,6 @@ func (q *queryResult) Next(dest []driver.Value) error {
 			dest[i] = nil
 			continue
 		}
-
 		switch v.Type {
 		case v1.SQLParameterType_SQL_PARAM_INT64:
 			dest[i] = v.GetInt64()

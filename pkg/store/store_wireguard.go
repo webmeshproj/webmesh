@@ -39,7 +39,16 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, addressv4, addressv6, meshNetworkV6 netip.Prefix) error {
+// ConfigureWireGuardOptions are the options for configuring the wireguard interface.
+type ConfigureWireGuardOptions struct {
+	Key           wgtypes.Key
+	AddressV4     netip.Prefix
+	AddressV6     netip.Prefix
+	MeshNetworkV4 netip.Prefix
+	MeshNetworkV6 netip.Prefix
+}
+
+func (s *store) configureWireguard(ctx context.Context, opts *ConfigureWireGuardOptions) error {
 	s.wgmux.Lock()
 	defer s.wgmux.Unlock()
 	wgopts := wireguard.Options{
@@ -52,8 +61,8 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 		PersistentKeepAlive: s.opts.WireGuard.PersistentKeepAlive,
 		EndpointOverrides:   map[string]netip.AddrPort{},
 		MTU:                 s.opts.WireGuard.MTU,
-		NetworkV4:           addressv4,
-		NetworkV6:           addressv6,
+		NetworkV4:           opts.AddressV4,
+		NetworkV6:           opts.AddressV6,
 		IsPublic:            s.opts.Mesh.PrimaryEndpoint != "",
 		Metrics:             s.opts.WireGuard.RecordMetrics,
 		MetricsInterval:     s.opts.WireGuard.RecordMetricsInterval,
@@ -81,21 +90,29 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 			return fmt.Errorf("wireguard up: %w", err)
 		}
 	}
-	err = s.wg.Configure(ctx, key, s.opts.WireGuard.ListenPort)
+	err = s.wg.Configure(ctx, opts.Key, s.opts.WireGuard.ListenPort)
 	if err != nil {
 		return fmt.Errorf("wireguard configure: %w", err)
 	}
 	if !s.opts.Mesh.NoIPv6 {
-		if meshNetworkV6.IsValid() {
-			err = s.wg.AddRoute(ctx, meshNetworkV6)
+		if opts.MeshNetworkV6.IsValid() {
+			err = s.wg.AddRoute(ctx, opts.MeshNetworkV6)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("wireguard add mesh network route: %w", err)
 			}
 		}
-		if addressv6.IsValid() {
-			err = s.wg.AddRoute(ctx, addressv6)
+		if opts.AddressV6.IsValid() {
+			err = s.wg.AddRoute(ctx, opts.AddressV6)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("wireguard add ipv6 route: %w", err)
+			}
+		}
+	}
+	if !s.opts.Mesh.NoIPv4 {
+		if opts.MeshNetworkV4.IsValid() {
+			err = s.wg.AddRoute(ctx, opts.MeshNetworkV4)
+			if err != nil && !system.IsRouteExists(err) {
+				return fmt.Errorf("wireguard add mesh network route: %w", err)
 			}
 		}
 	}
@@ -128,12 +145,18 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	if s.testStore {
 		return nil
 	}
-	var meshnetworkv6 netip.Prefix
+	var meshnetworkv4, meshnetworkv6 netip.Prefix
 	var err error
 	if !s.opts.Mesh.NoIPv6 {
 		meshnetworkv6, err = state.New(s.DB()).GetIPv6Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ula prefix: %w", err)
+		}
+	}
+	if !s.opts.Mesh.NoIPv4 {
+		meshnetworkv4, err = state.New(s.DB()).GetIPv4Prefix(ctx)
+		if err != nil {
+			return fmt.Errorf("get ipv4 prefix: %w", err)
 		}
 	}
 	p := peers.New(s.DB())
@@ -145,17 +168,24 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get current wireguard key: %w", err)
 	}
-	err = s.configureWireguard(ctx, wireguardKey, func() netip.Prefix {
-		if s.opts.Mesh.NoIPv4 {
-			return netip.Prefix{}
-		}
-		return self.PrivateIPv4
-	}(), func() netip.Prefix {
-		if s.opts.Mesh.NoIPv6 {
-			return netip.Prefix{}
-		}
-		return self.PrivateIPv6
-	}(), meshnetworkv6)
+	opts := &ConfigureWireGuardOptions{
+		Key: wireguardKey,
+		AddressV4: func() netip.Prefix {
+			if s.opts.Mesh.NoIPv4 {
+				return netip.Prefix{}
+			}
+			return self.PrivateIPv4
+		}(),
+		AddressV6: func() netip.Prefix {
+			if s.opts.Mesh.NoIPv6 {
+				return netip.Prefix{}
+			}
+			return self.PrivateIPv6
+		}(),
+		MeshNetworkV4: meshnetworkv4,
+		MeshNetworkV6: meshnetworkv6,
+	}
+	err = s.configureWireguard(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

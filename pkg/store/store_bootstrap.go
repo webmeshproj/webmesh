@@ -231,6 +231,10 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	// Set initial cluster configurations to the raft log
 	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
 		slog.String("ipv4-network", s.opts.Bootstrap.IPv4Network))
+	meshnetworkv4, err := netip.ParsePrefix(s.opts.Bootstrap.IPv4Network)
+	if err != nil {
+		return fmt.Errorf("parse IPv4 network: %w", err)
+	}
 	meshnetworkv6, err := util.GenerateULA()
 	if err != nil {
 		return fmt.Errorf("generate ULA: %w", err)
@@ -504,7 +508,24 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		return nil
 	}
 	s.log.Info("configuring wireguard interface")
-	err = s.configureWireguard(ctx, wireguardKey, privatev4, privatev6, meshnetworkv6)
+	opts := &ConfigureWireGuardOptions{
+		Key:       wireguardKey,
+		AddressV4: privatev4,
+		AddressV6: privatev6,
+		MeshNetworkV4: func() netip.Prefix {
+			if s.opts.Mesh.NoIPv4 {
+				return netip.Prefix{}
+			}
+			return meshnetworkv4
+		}(),
+		MeshNetworkV6: func() netip.Prefix {
+			if s.opts.Mesh.NoIPv6 {
+				return netip.Prefix{}
+			}
+			return meshnetworkv6
+		}(),
+	}
+	err = s.configureWireguard(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

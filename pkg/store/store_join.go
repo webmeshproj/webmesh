@@ -155,20 +155,26 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 		return fmt.Errorf("join request: %w", err)
 	}
 	log.Debug("received join response", slog.Any("resp", resp))
-	var addressv4, addressv6, networkv6 netip.Prefix
-	if resp.AddressIpv4 != "" && !s.opts.Mesh.NoIPv4 {
-		addressv4, err = netip.ParsePrefix(resp.AddressIpv4)
-		if err != nil {
-			return fmt.Errorf("parse ipv4 address: %w", err)
+	var addressv4, addressv6, networkv4, networkv6 netip.Prefix
+	if !s.opts.Mesh.NoIPv4 {
+		if resp.AddressIpv4 != "" {
+			addressv4, err = netip.ParsePrefix(resp.AddressIpv4)
+			if err != nil {
+				return fmt.Errorf("parse ipv4 address: %w", err)
+			}
 		}
-	}
-	if resp.AddressIpv6 != "" && !s.opts.Mesh.NoIPv6 {
-		addressv6, err = netip.ParsePrefix(resp.AddressIpv6)
+		networkv4, err = netip.ParsePrefix(resp.NetworkIpv4)
 		if err != nil {
-			return fmt.Errorf("parse ipv6 address: %w", err)
+			return fmt.Errorf("parse ipv4 network: %w", err)
 		}
 	}
 	if !s.opts.Mesh.NoIPv6 {
+		if resp.AddressIpv6 != "" {
+			addressv6, err = netip.ParsePrefix(resp.AddressIpv6)
+			if err != nil {
+				return fmt.Errorf("parse ipv6 address: %w", err)
+			}
+		}
 		networkv6, err = netip.ParsePrefix(resp.NetworkIpv6)
 		if err != nil {
 			return fmt.Errorf("parse ipv6 network: %w", err)
@@ -177,7 +183,14 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 	log.Info("configuring wireguard",
 		slog.String("networkv4", addressv4.String()),
 		slog.String("networkv6", addressv6.String()))
-	err = s.configureWireguard(ctx, key, addressv4, addressv6, networkv6)
+	opts := &ConfigureWireGuardOptions{
+		Key:           key,
+		AddressV4:     addressv4,
+		AddressV6:     addressv6,
+		MeshNetworkV4: networkv4,
+		MeshNetworkV6: networkv6,
+	}
+	err = s.configureWireguard(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

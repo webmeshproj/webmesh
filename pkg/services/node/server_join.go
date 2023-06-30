@@ -363,6 +363,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Start building the response
 	resp := &v1.JoinResponse{
+		NetworkIpv4: s.ipv4Prefix.String(),
 		NetworkIpv6: s.ipv6Prefix.String(),
 		AddressIpv6: leasev6.String(),
 		AddressIpv4: func() string {
