@@ -210,10 +210,6 @@ func setupTest(t *testing.T) (*state, func()) {
 			String: publicNodePublicAddr,
 			Valid:  true,
 		},
-		NetworkIpv6: sql.NullString{
-			String: "fd00:dead:1::/64",
-			Valid:  true,
-		},
 		GrpcPort:  int64(rpcPort),
 		RaftPort:  2,
 		CreatedAt: time.Now(),
@@ -229,10 +225,6 @@ func setupTest(t *testing.T) (*state, func()) {
 			String: "private",
 			Valid:  true,
 		},
-		NetworkIpv6: sql.NullString{
-			String: "fd00:dead:2::/64",
-			Valid:  true,
-		},
 		GrpcPort:  int64(rpcPort),
 		RaftPort:  2,
 		CreatedAt: time.Now(),
@@ -243,8 +235,11 @@ func setupTest(t *testing.T) (*state, func()) {
 	}
 	// Leases for each
 	_, err = q.InsertNodeLease(ctx, models.InsertNodeLeaseParams{
-		NodeID:    publicNode,
-		Ipv4:      publicNodePrivateAddr,
+		NodeID: publicNode,
+		Ipv4: sql.NullString{
+			String: publicNodePrivateAddr,
+			Valid:  true,
+		},
 		CreatedAt: time.Now(),
 	})
 	if err != nil {
@@ -252,8 +247,11 @@ func setupTest(t *testing.T) (*state, func()) {
 	}
 	// Leases for each
 	_, err = q.InsertNodeLease(ctx, models.InsertNodeLeaseParams{
-		NodeID:    privateNode,
-		Ipv4:      privateNodePrivateAddr,
+		NodeID: privateNode,
+		Ipv4: sql.NullString{
+			String: privateNodePrivateAddr,
+			Valid:  true,
+		},
 		CreatedAt: time.Now(),
 	})
 	if err != nil {

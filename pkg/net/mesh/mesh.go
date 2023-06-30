@@ -87,8 +87,8 @@ func WireGuardPeersFor(ctx context.Context, store meshdb.Store, peerID string) (
 				return ""
 			}(),
 			AddressIpv6: func() string {
-				if node.NetworkIPv6.IsValid() {
-					return node.NetworkIPv6.String()
+				if node.PrivateIPv6.IsValid() {
+					return node.PrivateIPv6.String()
 				}
 				return ""
 			}(),
@@ -131,8 +131,8 @@ func recursePeers(
 	if node.PrivateIPv4.IsValid() {
 		allowedIPs = append(allowedIPs, node.PrivateIPv4)
 	}
-	if node.NetworkIPv6.IsValid() {
-		allowedIPs = append(allowedIPs, node.NetworkIPv6)
+	if node.PrivateIPv6.IsValid() {
+		allowedIPs = append(allowedIPs, node.PrivateIPv6)
 	}
 	// Does this peer expose routes?
 	routes, err := nw.GetRoutesByNode(ctx, node.ID)
@@ -210,8 +210,8 @@ func recurseEdges(
 		if targetNode.PrivateIPv4.IsValid() {
 			allowedIPs = append(allowedIPs, targetNode.PrivateIPv4)
 		}
-		if targetNode.NetworkIPv6.IsValid() {
-			allowedIPs = append(allowedIPs, targetNode.NetworkIPv6)
+		if targetNode.PrivateIPv6.IsValid() {
+			allowedIPs = append(allowedIPs, targetNode.PrivateIPv6)
 		}
 		// Does this peer expose routes?
 		routes, err := nw.GetRoutesByNode(ctx, targetNode.ID)

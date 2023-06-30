@@ -51,34 +51,6 @@ func VerifyChainOnly(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) er
 	return err
 }
 
-// Next32 returns the next IPv4 address in the given CIDR that
-// is not in the given set. The bits on the returned address are
-// set to the bits of the given CIDR.
-func Next32(cidr netip.Prefix, set map[netip.Prefix]struct{}) (netip.Prefix, error) {
-	ip := cidr.Addr().Next()
-	for cidr.Contains(ip) {
-		prefix := netip.PrefixFrom(ip, cidr.Bits())
-		if _, ok := set[prefix]; !ok {
-			return prefix, nil
-		}
-		ip = ip.Next()
-	}
-	return netip.Prefix{}, fmt.Errorf("no more addresses in %s", cidr)
-}
-
-// ToPrefixSet converts a slice of prefixes to a set.
-func ToPrefixSet(addrs []string) (map[netip.Prefix]struct{}, error) {
-	set := make(map[netip.Prefix]struct{})
-	for _, addr := range addrs {
-		ip, err := netip.ParsePrefix(addr)
-		if err != nil {
-			return nil, err
-		}
-		set[ip] = struct{}{}
-	}
-	return set, nil
-}
-
 // GenerateULA generates a unique local address with a /48 prefix
 // according to RFC 4193. The network is returned as a netip.Prefix.
 func GenerateULA() (netip.Prefix, error) {

@@ -30,7 +30,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/node/pkg/meshdb/ipam"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
@@ -45,12 +44,12 @@ type Server struct {
 
 	store      store.Store
 	peers      peers.Peers
-	ipam       ipam.IPAM
 	meshstate  state.State
 	rbac       rbacdb.RBAC
 	rbacEval   rbac.Evaluator
 	networking networking.Networking
 
+	ipv4Prefix netip.Prefix
 	ipv6Prefix netip.Prefix
 	features   []v1.Feature
 	startedAt  time.Time
@@ -74,7 +73,6 @@ func NewServer(store store.Store, proxyCreds []grpc.DialOption, features []v1.Fe
 	return &Server{
 		store:      store,
 		peers:      peers.New(store.DB()),
-		ipam:       ipam.New(store.DB()),
 		meshstate:  state.New(store.DB()),
 		rbac:       rbacdb.New(store.DB()),
 		rbacEval:   rbaceval,

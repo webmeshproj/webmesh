@@ -72,6 +72,8 @@ type Peers interface {
 	Graph() Graph
 	// Put creates or updates a node.
 	Put(ctx context.Context, opts *PutOptions) (Node, error)
+	// PutLease creates or updates a node lease.
+	PutLease(ctx context.Context, opts *PutLeaseOptions) error
 	// Get gets a node by ID.
 	Get(ctx context.Context, id string) (Node, error)
 	// Delete deletes a node.
@@ -107,8 +109,8 @@ type Node struct {
 	ZoneAwarenessID string
 	// PrivateIPv4 is the node's private IPv4 address.
 	PrivateIPv4 netip.Prefix
-	// NetworkIPv6 is the node's IPv6 network.
-	NetworkIPv6 netip.Prefix
+	// PrivateIPv6 is the node's IPv6 network.
+	PrivateIPv6 netip.Prefix
 	// GRPCPort is the node's GRPC port.
 	GRPCPort int
 	// RaftPort is the node's Raft port.
@@ -141,8 +143,8 @@ func (n Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
 			return ""
 		}(),
 		PrivateIpv6: func() string {
-			if n.NetworkIPv6.IsValid() {
-				return n.NetworkIPv6.String()
+			if n.PrivateIPv6.IsValid() {
+				return n.PrivateIPv6.String()
 			}
 			return ""
 		}(),
@@ -164,7 +166,7 @@ type Edge struct {
 	Attrs map[string]string
 }
 
-// CreateOptions are options for creating a node.
+// PutOptions are options for creating or updating a node.
 type PutOptions struct {
 	// ID is the node's ID.
 	ID string
@@ -176,12 +178,20 @@ type PutOptions struct {
 	WireGuardEndpoints []string
 	// ZoneAwarenessID is the node's zone awareness ID.
 	ZoneAwarenessID string
-	// NetworkIPv6 is true if the node's network is IPv6.
-	NetworkIPv6 netip.Prefix
 	// GRPCPort is the node's GRPC port.
 	GRPCPort int
 	// RaftPort is the node's Raft port.
 	RaftPort int
+}
+
+// PutLeaseOptions are options for creating or updating a node lease.
+type PutLeaseOptions struct {
+	// ID is the node's ID.
+	ID string
+	// IPv4 is the node's IPv4 address.
+	IPv4 netip.Prefix
+	// IPv6 is the node's IPv6 network.
+	IPv6 netip.Prefix
 }
 
 // New returns a new Peers interface.
@@ -216,7 +226,6 @@ func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
 		PrimaryEndpoint:    opts.PrimaryEndpoint,
 		WireGuardEndpoints: wgendpoints,
 		ZoneAwarenessID:    opts.ZoneAwarenessID,
-		NetworkIPv6:        opts.NetworkIPv6,
 		GRPCPort:           opts.GRPCPort,
 		RaftPort:           opts.RaftPort,
 		CreatedAt:          time.Now().UTC(),
@@ -230,6 +239,25 @@ func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
 		return Node{}, fmt.Errorf("get vertex: %w", err)
 	}
 	return out, nil
+}
+
+func (p *peers) PutLease(ctx context.Context, opts *PutLeaseOptions) error {
+	q := models.New(p.db.Write())
+	params := models.InsertNodeLeaseParams{
+		NodeID:    opts.ID,
+		CreatedAt: time.Now().UTC(),
+	}
+	if opts.IPv4.IsValid() {
+		params.Ipv4 = sql.NullString{String: opts.IPv4.String(), Valid: true}
+	}
+	if opts.IPv6.IsValid() {
+		params.Ipv6 = sql.NullString{String: opts.IPv6.String(), Valid: true}
+	}
+	_, err := q.InsertNodeLease(ctx, params)
+	if err != nil {
+		return fmt.Errorf("insert node lease: %w", err)
+	}
+	return nil
 }
 
 func (p *peers) Get(ctx context.Context, id string) (Node, error) {
@@ -299,8 +327,8 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 				return nil, fmt.Errorf("parse node network IPv4: %w", err)
 			}
 		}
-		if node.NetworkIpv6.Valid {
-			networkv6, err = netip.ParsePrefix(node.NetworkIpv6.String)
+		if node.PrivateAddressV6 != "" {
+			networkv6, err = netip.ParsePrefix(node.PrivateAddressV6)
 			if err != nil {
 				return nil, fmt.Errorf("parse node network IPv6: %w", err)
 			}
@@ -312,7 +340,7 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 			WireGuardEndpoints: wireguardEndpoints,
 			ZoneAwarenessID:    node.ZoneAwarenessID.String,
 			PrivateIPv4:        networkv4,
-			NetworkIPv6:        networkv6,
+			PrivateIPv6:        networkv6,
 			GRPCPort:           int(node.GrpcPort),
 			RaftPort:           int(node.RaftPort),
 			UpdatedAt:          node.UpdatedAt,
@@ -352,8 +380,8 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 				return nil, fmt.Errorf("parse node network IPv4: %w", err)
 			}
 		}
-		if node.NetworkIpv6.Valid {
-			networkv6, err = netip.ParsePrefix(node.NetworkIpv6.String)
+		if node.PrivateAddressV6 != "" {
+			networkv6, err = netip.ParsePrefix(node.PrivateAddressV6)
 			if err != nil {
 				return nil, fmt.Errorf("parse node network IPv6: %w", err)
 			}
@@ -365,7 +393,7 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 			WireGuardEndpoints: wireguardEndpoints,
 			ZoneAwarenessID:    node.ZoneAwarenessID.String,
 			PrivateIPv4:        networkv4,
-			NetworkIPv6:        networkv6,
+			PrivateIPv6:        networkv6,
 			GRPCPort:           int(node.GrpcPort),
 			RaftPort:           int(node.RaftPort),
 			UpdatedAt:          node.UpdatedAt,
@@ -405,8 +433,8 @@ func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
 				return nil, fmt.Errorf("parse node network IPv4: %w", err)
 			}
 		}
-		if node.NetworkIpv6.Valid {
-			networkv6, err = netip.ParsePrefix(node.NetworkIpv6.String)
+		if node.PrivateAddressV6 != "" {
+			networkv6, err = netip.ParsePrefix(node.PrivateAddressV6)
 			if err != nil {
 				return nil, fmt.Errorf("parse node network IPv6: %w", err)
 			}
@@ -418,7 +446,7 @@ func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
 			WireGuardEndpoints: wireguardEndpoints,
 			ZoneAwarenessID:    node.ZoneAwarenessID.String,
 			PrivateIPv4:        networkv4,
-			NetworkIPv6:        networkv6,
+			PrivateIPv6:        networkv6,
 			GRPCPort:           int(node.GrpcPort),
 			RaftPort:           int(node.RaftPort),
 			UpdatedAt:          node.UpdatedAt,

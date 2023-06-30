@@ -15,7 +15,6 @@ CREATE TABLE nodes (
     primary_endpoint      TEXT,
     wireguard_endpoints   TEXT,
     zone_awareness_id     TEXT,
-    network_ipv6          TEXT UNIQUE,
     created_at            TIMESTAMP NOT NULL,
     updated_at            TIMESTAMP NOT NULL
 );
@@ -28,16 +27,19 @@ CREATE TABLE node_edges (
     attrs        TEXT
 );
 
--- Tracks IPv4 leases for nodes.
+-- Tracks IP leases for nodes.
 CREATE TABLE leases (
     node_id     TEXT NOT NULL UNIQUE REFERENCES nodes (id) ON DELETE CASCADE,
-    ipv4        TEXT NOT NULL UNIQUE,
-    created_at  TIMESTAMP NOT NULL
+    ipv4        TEXT UNIQUE,
+    ipv6        TEXT UNIQUE,
+    created_at  TIMESTAMP NOT NULL,
+
+    CONSTRAINT ipv4_or_ipv6 CHECK (ipv4 IS NOT NULL OR ipv6 IS NOT NULL)
 );
 
--- Tracks users. Users are simply certificates signed by the CA that are not
--- necessarily associated with a node. It's possible the two concepts should
--- be merged. However, for now, there may be use cases where a user is purely
+-- Tracks users. Users are simply registered nodes that are not persistently
+-- connected to the network. It's possible the two concepts should be eventually
+-- merged. However, for now, there may be use cases where a user is purely
 -- for administrative purposes and never actually joins as a node.
 CREATE TABLE users (
     name         TEXT NOT NULL PRIMARY KEY,

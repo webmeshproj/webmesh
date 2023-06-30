@@ -231,12 +231,12 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	// Set initial cluster configurations to the raft log
 	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
 		slog.String("ipv4-network", s.opts.Bootstrap.IPv4Network))
-	ula, err := util.GenerateULA()
+	meshnetworkv6, err := util.GenerateULA()
 	if err != nil {
 		return fmt.Errorf("generate ULA: %w", err)
 	}
-	s.log.Info("generated IPv6 ULA", slog.String("ula", ula.String()))
-	err = q.SetIPv6Prefix(ctx, ula.String())
+	s.log.Info("generated IPv6 Mesh Network", slog.String("ula", meshnetworkv6.String()))
+	err = q.SetIPv6Prefix(ctx, meshnetworkv6.String())
 	if err != nil {
 		return fmt.Errorf("set ULA prefix to db: %w", err)
 	}
@@ -387,15 +387,9 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 
-	// Generate an IPv6 address for the node.
-	networkIPv6, err := util.Random64(ula)
-	if err != nil {
-		return fmt.Errorf("generate random IPv6: %w", err)
-	}
 	p := peers.New(s.DB())
 	params := &peers.PutOptions{
 		ID:                 s.ID(),
-		NetworkIPv6:        networkIPv6,
 		GRPCPort:           s.opts.Mesh.GRPCPort,
 		RaftPort:           s.sl.ListenPort(),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
@@ -428,15 +422,9 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("generate private key: %w", err)
 		}
-		// Generate an IPv6 address for the node.
-		networkIPv6, err := util.Random64(ula)
-		if err != nil {
-			return fmt.Errorf("generate random IPv6: %w", err)
-		}
 		_, err = p.Put(ctx, &peers.PutOptions{
-			ID:          string(server.ID),
-			PublicKey:   key.PublicKey(),
-			NetworkIPv6: networkIPv6,
+			ID:        string(server.ID),
+			PublicKey: key.PublicKey(),
 		})
 		if err != nil {
 			return fmt.Errorf("create node: %w", err)
@@ -470,33 +458,43 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 			}
 		}
 	}
-	var networkv4 netip.Prefix
-	var raftAddr string
-	if !s.opts.Mesh.NoIPv4 && !s.opts.Raft.PreferIPv6 {
-		// Grab the first IP address in the network
-		networkcidrv4, err := netip.ParsePrefix(s.opts.Bootstrap.IPv4Network)
-		if err != nil {
-			return fmt.Errorf("parse IPv4 prefix: %w", err)
-		}
-		networkv4 = netip.PrefixFrom(networkcidrv4.Addr().Next(), networkcidrv4.Bits())
-		_, err = q.InsertNodeLease(ctx, models.InsertNodeLeaseParams{
-			NodeID: s.ID(),
-			Ipv4:   networkv4.String(),
+	var privatev4, privatev6 netip.Prefix
+	if !s.opts.Mesh.NoIPv4 {
+		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
+			NodeId:  s.ID(),
+			Subnet:  s.opts.Bootstrap.IPv4Network,
+			Version: v1.AllocateIPRequest_IP_VERSION_4,
 		})
 		if err != nil {
-			return fmt.Errorf("insert node lease: %w", err)
+			return fmt.Errorf("allocate IPv4 address: %w", err)
 		}
-		s.log.Info("acquired IPv4 address for node",
-			slog.String("server-id", s.ID()),
-			slog.String("address", networkv4.String()))
-		raftAddr = net.JoinHostPort(networkv4.Addr().String(), strconv.Itoa(int(s.sl.ListenPort())))
-	} else {
-		raftAddr = net.JoinHostPort(networkIPv6.Addr().String(), strconv.Itoa(int(s.sl.ListenPort())))
 	}
-	var networkv6, meshnetworkv6 netip.Prefix
 	if !s.opts.Mesh.NoIPv6 {
-		networkv6 = networkIPv6
-		meshnetworkv6 = ula
+		privatev6, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
+			NodeId:  s.ID(),
+			Subnet:  meshnetworkv6.String(),
+			Version: v1.AllocateIPRequest_IP_VERSION_6,
+		})
+		if err != nil {
+			return fmt.Errorf("allocate IPv4 address: %w", err)
+		}
+	}
+	// Write the leases to the database
+	err = p.PutLease(ctx, &peers.PutLeaseOptions{
+		ID:   s.ID(),
+		IPv4: privatev4,
+		IPv6: privatev6,
+	})
+	if err != nil {
+		return fmt.Errorf("create lease: %w", err)
+	}
+
+	// Determine what our raft address will be
+	var raftAddr string
+	if !s.opts.Mesh.NoIPv4 && !s.opts.Raft.PreferIPv6 {
+		raftAddr = net.JoinHostPort(privatev4.Addr().String(), strconv.Itoa(int(s.sl.ListenPort())))
+	} else {
+		raftAddr = net.JoinHostPort(privatev6.Addr().String(), strconv.Itoa(int(s.sl.ListenPort())))
 	}
 	err = s.raft.Barrier(time.Second * 5).Error()
 	if err != nil {
@@ -506,7 +504,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		return nil
 	}
 	s.log.Info("configuring wireguard interface")
-	err = s.configureWireguard(ctx, wireguardKey, networkv4, networkv6, meshnetworkv6)
+	err = s.configureWireguard(ctx, wireguardKey, privatev4, privatev6, meshnetworkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}

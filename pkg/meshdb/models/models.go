@@ -18,9 +18,10 @@ type Group struct {
 }
 
 type Lease struct {
-	NodeID    string    `json:"node_id"`
-	Ipv4      string    `json:"ipv4"`
-	CreatedAt time.Time `json:"created_at"`
+	NodeID    string         `json:"node_id"`
+	Ipv4      sql.NullString `json:"ipv4"`
+	Ipv6      sql.NullString `json:"ipv6"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type MeshState struct {
@@ -59,7 +60,6 @@ type Node struct {
 	PrimaryEndpoint    sql.NullString `json:"primary_endpoint"`
 	WireguardEndpoints sql.NullString `json:"wireguard_endpoints"`
 	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
-	NetworkIpv6        sql.NullString `json:"network_ipv6"`
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }

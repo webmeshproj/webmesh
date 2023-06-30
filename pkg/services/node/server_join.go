@@ -34,7 +34,6 @@ import (
 	"github.com/webmeshproj/node/pkg/net/mesh"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
 	"github.com/webmeshproj/node/pkg/services/rbac"
-	"github.com/webmeshproj/node/pkg/util"
 )
 
 var canVoteAction = &rbac.Action{
@@ -56,13 +55,20 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if !s.store.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
+	// Check if we haven't loaded out prefixes into memory yet
+	var err error
 	if !s.ipv6Prefix.IsValid() {
-		// We haven't loaded the IPv6 prefix yet, so do it now
-		var err error
 		s.ipv6Prefix, err = s.meshstate.GetIPv6Prefix(ctx)
 		if err != nil {
 			// DB error, bail
-			return nil, status.Errorf(codes.Internal, "failed to get ULA prefix: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to get IPv6 prefix: %v", err)
+		}
+	}
+	if !s.ipv4Prefix.IsValid() {
+		s.ipv4Prefix, err = s.meshstate.GetIPv4Prefix(ctx)
+		if err != nil {
+			// DB error, bail
+			return nil, status.Errorf(codes.Internal, "failed to get IPv4 prefix: %v", err)
 		}
 	}
 
@@ -159,7 +165,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
 			WireGuardEndpoints: req.GetWireguardEndpoints(),
 			ZoneAwarenessID:    req.GetZoneAwarenessId(),
-			NetworkIPv6:        peer.NetworkIPv6,
 			GRPCPort:           int(req.GetGrpcPort()),
 			RaftPort:           int(req.GetRaftPort()),
 		})
@@ -169,25 +174,12 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	} else {
 		// New peer, create it
 		log.Info("registering new peer")
-		// We always generate an IPv6 address for the peer, even if they
-		// choose not to use it. This helps enforce an upper bound on the
-		// number of peers we can have in the network (ULA/48 with /64 prefixes == 65536 peers,
-		// same as a /16 class B and the limit for direct WireGuard peers an interface can hold).
-		// However, closer to that upper bound, we'll need to use a non-random way
-		// (or at least a more efficient way than brute force) of generating
-		// IPv6 addresses. Currently the put will fail if the IPv6 address
-		// is already in use.
-		networkIPv6, err := util.Random64(s.ipv6Prefix)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to generate IPv6 address: %v", err)
-		}
 		peer, err = s.peers.Put(ctx, &peers.PutOptions{
 			ID:                 req.GetId(),
 			PublicKey:          publicKey,
 			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
 			WireGuardEndpoints: req.GetWireguardEndpoints(),
 			ZoneAwarenessID:    req.GetZoneAwarenessId(),
-			NetworkIPv6:        networkIPv6,
 			GRPCPort:           int(req.GetGrpcPort()),
 			RaftPort:           int(req.GetRaftPort()),
 		})
@@ -229,17 +221,43 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
-	// Acquire an IPv4 address for the peer if requested
-	var lease netip.Prefix
+	var leasev4, leasev6 netip.Prefix
+	// We always try to generate an IPv6 address for the peer, even if they choose not to
+	// use it. This helps enforce an upper bound on the umber of peers we can have in the network
+	// (ULA/48 with /64 prefixes == 65536 peers same as a /16 class B and the limit for direct WireGuard
+	// peers an interface can hold).
+	log.Debug("assigning IPv6 address to peer")
+	leasev6, err = s.store.Plugins().AllocateIP(ctx, &v1.AllocateIPRequest{
+		NodeId:  req.GetId(),
+		Subnet:  s.ipv6Prefix.String(),
+		Version: v1.AllocateIPRequest_IP_VERSION_6,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to allocate IPv6 address: %v", err)
+	}
+	log.Debug("assigned IPv6 address to peer", slog.String("ipv6", leasev6.String()))
+	// Acquire an IPv4 address for the peer only if requested
 	if req.GetAssignIpv4() {
 		log.Debug("assigning IPv4 address to peer")
-		lease, err = s.ipam.Acquire(ctx, req.GetId())
+		leasev4, err = s.store.Plugins().AllocateIP(ctx, &v1.AllocateIPRequest{
+			NodeId:  req.GetId(),
+			Subnet:  s.ipv4Prefix.String(),
+			Version: v1.AllocateIPRequest_IP_VERSION_4,
+		})
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to assign IPv4: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to allocate IPv4 address: %v", err)
 		}
-		log.Info("assigned IPv4 address to peer", slog.String("ipv4", lease.String()))
+		log.Debug("assigned IPv4 address to peer", slog.String("ipv4", leasev4.String()))
 	}
-
+	// Persist the peer's addresses
+	err = s.peers.PutLease(ctx, &peers.PutLeaseOptions{
+		ID:   req.GetId(),
+		IPv4: leasev4,
+		IPv6: leasev6,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to persist peer's addresses: %v", err)
+	}
 	// Add an edge from the joining server to the caller
 	joiningServer := string(s.store.ID())
 	if proxiedFrom, ok := leaderproxy.ProxiedFrom(ctx); ok {
@@ -322,14 +340,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	var raftAddress string
 	if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
 		// Prefer IPv4 for raft
-		raftAddress = net.JoinHostPort(lease.Addr().String(), strconv.Itoa(peer.RaftPort))
+		raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(peer.RaftPort))
 	} else {
 		// Use IPv6
 		// TODO: doesn't work when we are IPv4 only. Need to fix this.
 		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
 		// We may as well use IPv4 for everything in that case. Leave it for now,
 		// but need to document these requirements fully for dual-stack setups.
-		raftAddress = net.JoinHostPort(peer.NetworkIPv6.Addr().String(), strconv.Itoa(peer.RaftPort))
+		raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(peer.RaftPort))
 	}
 	if req.GetAsVoter() {
 		log.Info("adding candidate to cluster", slog.String("raft_address", raftAddress))
@@ -346,10 +364,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Start building the response
 	resp := &v1.JoinResponse{
 		NetworkIpv6: s.ipv6Prefix.String(),
-		AddressIpv6: peer.NetworkIPv6.String(),
+		AddressIpv6: leasev6.String(),
 		AddressIpv4: func() string {
-			if lease.IsValid() {
-				return lease.String()
+			if leasev4.IsValid() {
+				return leasev4.String()
 			}
 			return ""
 		}(),

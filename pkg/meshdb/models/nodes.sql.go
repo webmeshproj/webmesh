@@ -45,8 +45,8 @@ SELECT
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
+    COALESCE(leases.ipv6, '') AS private_address_v6,
     nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
@@ -62,8 +62,8 @@ type GetNodeRow struct {
 	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
 	GrpcPort           int64          `json:"grpc_port"`
 	RaftPort           int64          `json:"raft_port"`
-	NetworkIpv6        sql.NullString `json:"network_ipv6"`
 	PrivateAddressV4   string         `json:"private_address_v4"`
+	PrivateAddressV6   string         `json:"private_address_v6"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 	CreatedAt          time.Time      `json:"created_at"`
 }
@@ -79,8 +79,8 @@ func (q *Queries) GetNode(ctx context.Context, id string) (GetNodeRow, error) {
 		&i.ZoneAwarenessID,
 		&i.GrpcPort,
 		&i.RaftPort,
-		&i.NetworkIpv6,
 		&i.PrivateAddressV4,
+		&i.PrivateAddressV6,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
@@ -105,22 +105,20 @@ INSERT INTO nodes (
     primary_endpoint,
     wireguard_endpoints,
     zone_awareness_id,
-    network_ipv6,
     grpc_port,
     raft_port,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (id) DO UPDATE SET
     public_key = EXCLUDED.public_key,
     primary_endpoint = EXCLUDED.primary_endpoint,
     wireguard_endpoints = EXCLUDED.wireguard_endpoints,
     zone_awareness_id = EXCLUDED.zone_awareness_id,
-    network_ipv6 = EXCLUDED.network_ipv6,
     grpc_port = EXCLUDED.grpc_port,
     raft_port = EXCLUDED.raft_port,
     updated_at = EXCLUDED.updated_at
-RETURNING id, public_key, raft_port, grpc_port, primary_endpoint, wireguard_endpoints, zone_awareness_id, network_ipv6, created_at, updated_at
+RETURNING id, public_key, raft_port, grpc_port, primary_endpoint, wireguard_endpoints, zone_awareness_id, created_at, updated_at
 `
 
 type InsertNodeParams struct {
@@ -129,7 +127,6 @@ type InsertNodeParams struct {
 	PrimaryEndpoint    sql.NullString `json:"primary_endpoint"`
 	WireguardEndpoints sql.NullString `json:"wireguard_endpoints"`
 	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
-	NetworkIpv6        sql.NullString `json:"network_ipv6"`
 	GrpcPort           int64          `json:"grpc_port"`
 	RaftPort           int64          `json:"raft_port"`
 	CreatedAt          time.Time      `json:"created_at"`
@@ -143,7 +140,6 @@ func (q *Queries) InsertNode(ctx context.Context, arg InsertNodeParams) (Node, e
 		arg.PrimaryEndpoint,
 		arg.WireguardEndpoints,
 		arg.ZoneAwarenessID,
-		arg.NetworkIpv6,
 		arg.GrpcPort,
 		arg.RaftPort,
 		arg.CreatedAt,
@@ -158,7 +154,6 @@ func (q *Queries) InsertNode(ctx context.Context, arg InsertNodeParams) (Node, e
 		&i.PrimaryEndpoint,
 		&i.WireguardEndpoints,
 		&i.ZoneAwarenessID,
-		&i.NetworkIpv6,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -201,8 +196,8 @@ SELECT
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
+    COALESCE(leases.ipv6, '') AS private_address_v6,
     nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
@@ -217,8 +212,8 @@ type ListNodesRow struct {
 	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
 	GrpcPort           int64          `json:"grpc_port"`
 	RaftPort           int64          `json:"raft_port"`
-	NetworkIpv6        sql.NullString `json:"network_ipv6"`
 	PrivateAddressV4   string         `json:"private_address_v4"`
+	PrivateAddressV6   string         `json:"private_address_v6"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 	CreatedAt          time.Time      `json:"created_at"`
 }
@@ -240,8 +235,8 @@ func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 			&i.ZoneAwarenessID,
 			&i.GrpcPort,
 			&i.RaftPort,
-			&i.NetworkIpv6,
 			&i.PrivateAddressV4,
+			&i.PrivateAddressV6,
 			&i.UpdatedAt,
 			&i.CreatedAt,
 		); err != nil {
@@ -267,8 +262,8 @@ SELECT
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
+    COALESCE(leases.ipv6, '') AS private_address_v6,
     nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
@@ -284,8 +279,8 @@ type ListNodesByZoneRow struct {
 	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
 	GrpcPort           int64          `json:"grpc_port"`
 	RaftPort           int64          `json:"raft_port"`
-	NetworkIpv6        sql.NullString `json:"network_ipv6"`
 	PrivateAddressV4   string         `json:"private_address_v4"`
+	PrivateAddressV6   string         `json:"private_address_v6"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 	CreatedAt          time.Time      `json:"created_at"`
 }
@@ -307,8 +302,8 @@ func (q *Queries) ListNodesByZone(ctx context.Context, zoneAwarenessID sql.NullS
 			&i.ZoneAwarenessID,
 			&i.GrpcPort,
 			&i.RaftPort,
-			&i.NetworkIpv6,
 			&i.PrivateAddressV4,
+			&i.PrivateAddressV6,
 			&i.UpdatedAt,
 			&i.CreatedAt,
 		); err != nil {
@@ -334,8 +329,8 @@ SELECT
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
+    COALESCE(leases.ipv6, '') AS private_address_v6,
     nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
@@ -351,8 +346,8 @@ type ListPublicNodesRow struct {
 	ZoneAwarenessID    sql.NullString `json:"zone_awareness_id"`
 	GrpcPort           int64          `json:"grpc_port"`
 	RaftPort           int64          `json:"raft_port"`
-	NetworkIpv6        sql.NullString `json:"network_ipv6"`
 	PrivateAddressV4   string         `json:"private_address_v4"`
+	PrivateAddressV6   string         `json:"private_address_v6"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 	CreatedAt          time.Time      `json:"created_at"`
 }
@@ -374,8 +369,8 @@ func (q *Queries) ListPublicNodes(ctx context.Context) ([]ListPublicNodesRow, er
 			&i.ZoneAwarenessID,
 			&i.GrpcPort,
 			&i.RaftPort,
-			&i.NetworkIpv6,
 			&i.PrivateAddressV4,
+			&i.PrivateAddressV6,
 			&i.UpdatedAt,
 			&i.CreatedAt,
 		); err != nil {

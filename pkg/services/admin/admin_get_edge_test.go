@@ -17,7 +17,6 @@ limitations under the License.
 package admin
 
 import (
-	"net/netip"
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -42,9 +41,8 @@ func TestGetEdge(t *testing.T) {
 		return
 	}
 	_, err = peers.New(server.store.DB()).Put(ctx, &peers.PutOptions{
-		ID:          "foo",
-		PublicKey:   key.PublicKey(),
-		NetworkIPv6: netip.MustParsePrefix("2001:db8::/64"),
+		ID:        "foo",
+		PublicKey: key.PublicKey(),
 	})
 	if err != nil {
 		t.Errorf("Put() error = %v", err)

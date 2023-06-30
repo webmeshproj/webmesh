@@ -149,10 +149,10 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 		}
 		if prefix.Addr().Is4() && w.opts.NetworkV4.IsValid() {
-			if w.opts.NetworkV4.Contains(addr) {
-				// Don't readd routes to our own network
-				continue
-			}
+			// if w.opts.NetworkV4.Contains(addr) {
+			// 	// Don't readd routes to our own network
+			// 	continue
+			// }
 			w.log.Debug("adding ipv4 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {

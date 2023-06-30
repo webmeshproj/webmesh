@@ -32,7 +32,8 @@ type Querier interface {
 	InsertNode(ctx context.Context, arg InsertNodeParams) (Node, error)
 	InsertNodeEdge(ctx context.Context, arg InsertNodeEdgeParams) error
 	InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error)
-	ListAllocatedIPv4(ctx context.Context) ([]string, error)
+	ListAllocatedIPv4(ctx context.Context) ([]sql.NullString, error)
+	ListAllocatedIPv6(ctx context.Context) ([]sql.NullString, error)
 	ListBoundRolesForNode(ctx context.Context, arg ListBoundRolesForNodeParams) ([]Role, error)
 	ListBoundRolesForUser(ctx context.Context, arg ListBoundRolesForUserParams) ([]Role, error)
 	ListGroups(ctx context.Context) ([]Group, error)

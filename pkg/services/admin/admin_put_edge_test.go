@@ -18,7 +18,6 @@ package admin
 
 import (
 	"context"
-	"net/netip"
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -36,21 +35,18 @@ func TestPutEdge(t *testing.T) {
 
 	// Pre register the nodes
 	p := peers.New(server.store.DB())
-	prefix := netip.MustParsePrefix("fe80::/64")
 	for _, peer := range []string{"foo", "baz"} {
 		key, err := wgtypes.GenerateKey()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		_, err = p.Put(context.Background(), &peers.PutOptions{
-			ID:          peer,
-			PublicKey:   key.PublicKey(),
-			NetworkIPv6: prefix,
+			ID:        peer,
+			PublicKey: key.PublicKey(),
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		prefix = netip.PrefixFrom(prefix.Addr().Next(), prefix.Bits())
 	}
 
 	tt := []testCase[v1.MeshEdge]{

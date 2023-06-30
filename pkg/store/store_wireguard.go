@@ -85,19 +85,19 @@ func (s *store) configureWireguard(ctx context.Context, key wgtypes.Key, address
 	if err != nil {
 		return fmt.Errorf("wireguard configure: %w", err)
 	}
-	if addressv4.IsValid() {
-		err = s.wg.AddRoute(ctx, addressv4)
-		if err != nil && !system.IsRouteExists(err) {
-			return fmt.Errorf("wireguard add ipv4 route: %w", err)
-		}
-	}
-	if addressv6.IsValid() {
-		err = s.wg.AddRoute(ctx, addressv6)
-		if err != nil && !system.IsRouteExists(err) {
-			return fmt.Errorf("wireguard add ipv6 route: %w", err)
-		}
-	}
-	if meshNetworkV6.IsValid() {
+	// if addressv4.IsValid() {
+	// 	err = s.wg.AddRoute(ctx, addressv4)
+	// 	if err != nil && !system.IsRouteExists(err) {
+	// 		return fmt.Errorf("wireguard add ipv4 route: %w", err)
+	// 	}
+	// }
+	// if addressv6.IsValid() {
+	// 	err = s.wg.AddRoute(ctx, addressv6)
+	// 	if err != nil && !system.IsRouteExists(err) {
+	// 		return fmt.Errorf("wireguard add ipv6 route: %w", err)
+	// 	}
+	// }
+	if meshNetworkV6.IsValid() && !s.opts.Mesh.NoIPv6 {
 		err = s.wg.AddRoute(ctx, meshNetworkV6)
 		if err != nil && !system.IsRouteExists(err) {
 			return fmt.Errorf("wireguard add mesh network route: %w", err)
@@ -124,9 +124,8 @@ func (s *store) refreshWireguardPeers(ctx context.Context) error {
 	err := s.walkMeshDescendants(ctx)
 	if err != nil {
 		s.log.Error("walk mesh descendants", slog.String("error", err.Error()))
-		return nil
 	}
-	return nil
+	return err
 }
 
 func (s *store) recoverWireguard(ctx context.Context) error {
@@ -159,7 +158,7 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 		if s.opts.Mesh.NoIPv6 {
 			return netip.Prefix{}
 		}
-		return self.NetworkIPv6
+		return self.PrivateIPv6
 	}(), meshnetworkv6)
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)

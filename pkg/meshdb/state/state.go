@@ -93,10 +93,11 @@ func (s *state) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (ne
 	}
 	var addr netip.Addr
 	if node.PrivateAddressV4 != "" {
+		// Prefer IPv4
 		ip := strings.Split(node.PrivateAddressV4, "/")[0]
 		addr, err = netip.ParseAddr(ip)
 	} else {
-		addr, err = netip.ParseAddr(node.NetworkIpv6.String)
+		addr, err = netip.ParseAddr(node.PrivateAddressV6)
 	}
 	if err != nil {
 		return netip.AddrPort{}, fmt.Errorf("parse address for node %s: %v", node.ID, err)
@@ -175,10 +176,11 @@ func (s *state) ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) 
 		}
 		var addr netip.Addr
 		if node.PrivateAddressV4 != "" {
+			// Prefer IPv4
 			ip := strings.Split(node.PrivateAddressV4, "/")[0]
 			addr, err = netip.ParseAddr(ip)
 		} else {
-			addr, err = netip.ParseAddr(node.NetworkIpv6.String)
+			addr, err = netip.ParseAddr(node.PrivateAddressV6)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("parse address for node %s: %v", node.ID, err)

@@ -20,6 +20,7 @@ package plugins
 import (
 	"fmt"
 	"io"
+	"net/netip"
 	"strings"
 
 	"github.com/hashicorp/raft"
@@ -34,6 +35,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/plugins/basicauth"
+	"github.com/webmeshproj/node/pkg/plugins/ipam"
 	"github.com/webmeshproj/node/pkg/plugins/ldap"
 	"github.com/webmeshproj/node/pkg/plugins/localstore"
 	"github.com/webmeshproj/node/pkg/plugins/mtls"
@@ -42,11 +44,16 @@ import (
 var (
 	// BuiltIns are the built-in plugins.
 	BuiltIns = map[string]PluginClient{
+		"ipam":       inProcessClient(&ipam.Plugin{}),
 		"mtls":       inProcessClient(&mtls.Plugin{}),
 		"basic-auth": inProcessClient(&basicauth.Plugin{}),
 		"ldap":       inProcessClient(&ldap.Plugin{}),
 		"localstore": inProcessClient(&localstore.Plugin{}),
 	}
+
+	// ErrUnsupported is returned when a plugin capability is not supported
+	// by any of the registered plugins.
+	ErrUnsupported = status.Error(codes.Unimplemented, "unsupported plugin capability")
 )
 
 // Manager is the interface for managing plugins.
@@ -61,6 +68,9 @@ type Manager interface {
 	// AuthStreamInterceptor returns a stream interceptor for the configured auth plugin.
 	// If no plugin is configured, the returned function is a pass-through.
 	AuthStreamInterceptor() grpc.StreamServerInterceptor
+	// AllocateIP calls the configured IPAM plugin to allocate an IP address for the given request.
+	// If the requested version does not have a registered plugin, ErrUnsupported is returned.
+	AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (netip.Prefix, error)
 	// ApplyRaftLog applies a raft log entry to all storage plugins. Responses are still returned
 	// even if an error occurs.
 	ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) ([]*v1.RaftApplyResponse, error)
@@ -74,7 +84,7 @@ type Manager interface {
 
 // New creates a new plugin manager.
 func New(ctx context.Context, opts *Options) (Manager, error) {
-	var auth PluginClient
+	var auth, ipamv4, ipamv6 PluginClient
 	registered := make(map[string]PluginClient)
 	stores := make([]PluginClient, 0)
 	emitters := make([]PluginClient, 0)
@@ -109,13 +119,17 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 			return nil, fmt.Errorf("get plugin info: %w", err)
 		}
 		for _, cap := range info.Capabilities {
-			if cap == v1.PluginCapability_PLUGIN_CAPABILITY_AUTH {
+			switch cap {
+			case v1.PluginCapability_PLUGIN_CAPABILITY_AUTH:
+				// TODO: allow multiple auth plugins.
 				auth = plugin
-			}
-			if cap == v1.PluginCapability_PLUGIN_CAPABILITY_STORE {
+			case v1.PluginCapability_PLUGIN_CAPABILITY_IPAMV4:
+				ipamv4 = plugin
+			case v1.PluginCapability_PLUGIN_CAPABILITY_IPAMV6:
+				ipamv6 = plugin
+			case v1.PluginCapability_PLUGIN_CAPABILITY_STORE:
 				stores = append(stores, plugin)
-			}
-			if cap == v1.PluginCapability_PLUGIN_CAPABILITY_WATCH {
+			case v1.PluginCapability_PLUGIN_CAPABILITY_WATCH:
 				emitters = append(emitters, plugin)
 			}
 		}
@@ -129,10 +143,22 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 		if err != nil {
 			return nil, fmt.Errorf("configure plugin %q: %w", name, err)
 		}
-		registered[info.Name] = plugin
+		registered[name] = plugin
+	}
+	// If both IPAM plugins are unconfigured, use the in-process IPAM plugin.
+	if ipamv4 == nil && ipamv6 == nil {
+		ipam := BuiltIns["ipam"]
+		if _, err := ipam.Configure(ctx, &v1.PluginConfiguration{}); err != nil {
+			return nil, fmt.Errorf("configure in-process IPAM plugin: %w", err)
+		}
+		ipamv4 = ipam
+		ipamv6 = ipam
+		stores = append(stores, ipam)
 	}
 	return &manager{
 		auth:     auth,
+		ipamv4:   ipamv4,
+		ipamv6:   ipamv6,
 		stores:   stores,
 		emitters: emitters,
 		plugins:  registered,
@@ -142,6 +168,8 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 
 type manager struct {
 	auth     PluginClient
+	ipamv4   PluginClient
+	ipamv6   PluginClient
 	stores   []PluginClient
 	emitters []PluginClient
 	plugins  map[string]PluginClient
@@ -193,6 +221,42 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 		ctx = context.WithLogger(ctx, log)
 		return handler(srv, &authenticatedServerStream{ss, ctx})
 	}
+}
+
+// AllocateIP calls the configured IPAM plugin to allocate an IP address for the given request.
+// If the requested version does not have a registered plugin, ErrUnsupported is returned.
+func (m *manager) AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (netip.Prefix, error) {
+	var addr netip.Prefix
+	var err error
+	switch req.GetVersion() {
+	case v1.AllocateIPRequest_IP_VERSION_4:
+		if m.ipamv4 == nil {
+			return addr, ErrUnsupported
+		}
+		res, err := m.ipamv4.IPAM().Allocate(ctx, req)
+		if err != nil {
+			return addr, fmt.Errorf("allocate IPv4: %w", err)
+		}
+		addr, err = netip.ParsePrefix(res.GetIp())
+		if err != nil {
+			return addr, fmt.Errorf("parse IPv4 address: %w", err)
+		}
+	case v1.AllocateIPRequest_IP_VERSION_6:
+		if m.ipamv6 == nil {
+			return addr, ErrUnsupported
+		}
+		res, err := m.ipamv6.IPAM().Allocate(ctx, req)
+		if err != nil {
+			return addr, fmt.Errorf("allocate IPv6: %w", err)
+		}
+		addr, err = netip.ParsePrefix(res.GetIp())
+		if err != nil {
+			return addr, fmt.Errorf("parse IPv6 address: %w", err)
+		}
+	default:
+		err = fmt.Errorf("unsupported IP version: %v", req.GetVersion())
+	}
+	return addr, err
 }
 
 // ApplyRaftLog applies a raft log entry to all storage plugins.

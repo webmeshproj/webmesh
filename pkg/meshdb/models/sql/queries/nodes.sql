@@ -14,18 +14,16 @@ INSERT INTO nodes (
     primary_endpoint,
     wireguard_endpoints,
     zone_awareness_id,
-    network_ipv6,
     grpc_port,
     raft_port,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (id) DO UPDATE SET
     public_key = EXCLUDED.public_key,
     primary_endpoint = EXCLUDED.primary_endpoint,
     wireguard_endpoints = EXCLUDED.wireguard_endpoints,
     zone_awareness_id = EXCLUDED.zone_awareness_id,
-    network_ipv6 = EXCLUDED.network_ipv6,
     grpc_port = EXCLUDED.grpc_port,
     raft_port = EXCLUDED.raft_port,
     updated_at = EXCLUDED.updated_at
@@ -43,8 +41,8 @@ SELECT
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
+    COALESCE(leases.ipv6, '') AS private_address_v6,
     nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
@@ -63,8 +61,8 @@ SELECT
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
+    COALESCE(leases.ipv6, '') AS private_address_v6,
     nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
@@ -79,8 +77,8 @@ SELECT
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
+    COALESCE(leases.ipv6, '') AS private_address_v6,
     nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 
@@ -96,8 +94,8 @@ SELECT
     nodes.zone_awareness_id AS zone_awareness_id,
     nodes.grpc_port AS grpc_port,
     nodes.raft_port AS raft_port,
-    nodes.network_ipv6 AS network_ipv6,
     COALESCE(leases.ipv4, '') AS private_address_v4,
+    COALESCE(leases.ipv6, '') AS private_address_v6,
     nodes.updated_at AS updated_at,
     nodes.created_at AS created_at
 FROM nodes 

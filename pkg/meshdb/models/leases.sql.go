@@ -7,24 +7,36 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
 const InsertNodeLease = `-- name: InsertNodeLease :one
-INSERT OR REPLACE INTO leases (node_id, ipv4, created_at) VALUES (?, ?, ?)
-RETURNING node_id, ipv4, created_at
+INSERT OR REPLACE INTO leases (node_id, ipv4, ipv6, created_at) VALUES (?, ?, ?, ?)
+RETURNING node_id, ipv4, ipv6, created_at
 `
 
 type InsertNodeLeaseParams struct {
-	NodeID    string    `json:"node_id"`
-	Ipv4      string    `json:"ipv4"`
-	CreatedAt time.Time `json:"created_at"`
+	NodeID    string         `json:"node_id"`
+	Ipv4      sql.NullString `json:"ipv4"`
+	Ipv6      sql.NullString `json:"ipv6"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 func (q *Queries) InsertNodeLease(ctx context.Context, arg InsertNodeLeaseParams) (Lease, error) {
-	row := q.db.QueryRowContext(ctx, InsertNodeLease, arg.NodeID, arg.Ipv4, arg.CreatedAt)
+	row := q.db.QueryRowContext(ctx, InsertNodeLease,
+		arg.NodeID,
+		arg.Ipv4,
+		arg.Ipv6,
+		arg.CreatedAt,
+	)
 	var i Lease
-	err := row.Scan(&i.NodeID, &i.Ipv4, &i.CreatedAt)
+	err := row.Scan(
+		&i.NodeID,
+		&i.Ipv4,
+		&i.Ipv6,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
@@ -32,19 +44,46 @@ const ListAllocatedIPv4 = `-- name: ListAllocatedIPv4 :many
 SELECT ipv4 FROM leases WHERE ipv4 IS NOT NULL
 `
 
-func (q *Queries) ListAllocatedIPv4(ctx context.Context) ([]string, error) {
+func (q *Queries) ListAllocatedIPv4(ctx context.Context) ([]sql.NullString, error) {
 	rows, err := q.db.QueryContext(ctx, ListAllocatedIPv4)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []string
+	var items []sql.NullString
 	for rows.Next() {
-		var ipv4 string
+		var ipv4 sql.NullString
 		if err := rows.Scan(&ipv4); err != nil {
 			return nil, err
 		}
 		items = append(items, ipv4)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const ListAllocatedIPv6 = `-- name: ListAllocatedIPv6 :many
+SELECT ipv6 FROM leases WHERE ipv6 IS NOT NULL
+`
+
+func (q *Queries) ListAllocatedIPv6(ctx context.Context) ([]sql.NullString, error) {
+	rows, err := q.db.QueryContext(ctx, ListAllocatedIPv6)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []sql.NullString
+	for rows.Next() {
+		var ipv6 sql.NullString
+		if err := rows.Scan(&ipv6); err != nil {
+			return nil, err
+		}
+		items = append(items, ipv6)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

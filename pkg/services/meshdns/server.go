@@ -280,10 +280,10 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 					A:   peer.PrivateIPv4.Addr().AsSlice(),
 				})
 			}
-			if peer.NetworkIPv6.IsValid() {
+			if peer.PrivateIPv6.IsValid() {
 				m.Extra = append(m.Extra, &dns.AAAA{
 					Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
-					AAAA: peer.NetworkIPv6.Addr().AsSlice(),
+					AAAA: peer.PrivateIPv6.Addr().AsSlice(),
 				})
 			}
 		case dns.TypeA:
@@ -306,10 +306,10 @@ func (s *Server) handle(w dns.ResponseWriter, r *dns.Msg) {
 			}
 		case dns.TypeAAAA:
 			s.log.Debug("handling AAAA question")
-			if peer.NetworkIPv6.IsValid() {
+			if peer.PrivateIPv6.IsValid() {
 				m.Answer = append(m.Answer, &dns.AAAA{
 					Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
-					AAAA: peer.NetworkIPv6.Addr().AsSlice(),
+					AAAA: peer.PrivateIPv6.Addr().AsSlice(),
 				})
 				m.Extra = append(m.Extra, s.newPeerTXTRecord(fqdn, &peer))
 			} else {

@@ -64,12 +64,6 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 		CreatedAt: node.CreatedAt,
 		UpdatedAt: node.UpdatedAt,
 	}
-	if node.NetworkIPv6.IsValid() {
-		params.NetworkIpv6 = sql.NullString{
-			String: node.NetworkIPv6.String(),
-			Valid:  true,
-		}
-	}
 	if node.PrimaryEndpoint != "" {
 		params.PrimaryEndpoint = sql.NullString{
 			String: node.PrimaryEndpoint,
@@ -136,8 +130,8 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 		// truncate it to 32 bits here.
 		node.PrivateIPv4 = netip.PrefixFrom(node.PrivateIPv4.Addr(), 32)
 	}
-	if dbnode.NetworkIpv6.Valid {
-		node.NetworkIPv6, err = netip.ParsePrefix(dbnode.NetworkIpv6.String)
+	if dbnode.PrivateAddressV6 != "" {
+		node.PrivateIPv6, err = netip.ParsePrefix(dbnode.PrivateAddressV6)
 		if err != nil {
 			err = fmt.Errorf("parse node private IPv6: %w", err)
 			return
