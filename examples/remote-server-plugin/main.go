@@ -19,6 +19,7 @@ func main() {
 
 type Plugin struct {
 	v1.UnimplementedPluginServer
+	v1.UnimplementedWatchPluginServer
 }
 
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {

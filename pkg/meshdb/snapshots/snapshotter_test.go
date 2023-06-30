@@ -31,6 +31,7 @@ func TestSnapshotter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db.Close()
 
 	// Create a test table and populate it with some data.
 	if _, err := db.Exec(`

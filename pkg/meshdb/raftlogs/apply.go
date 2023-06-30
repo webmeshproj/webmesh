@@ -64,7 +64,7 @@ func Apply(ctx context.Context, db *sql.DB, logEntry *v1.RaftLogEntry) *v1.RaftA
 		return res
 	default:
 		return &v1.RaftApplyResponse{
-			Error: fmt.Sprintf("unknown command type: %s", logEntry.GetType()),
+			Error: fmt.Sprintf("unknown command type: %v", logEntry.GetType()),
 		}
 	}
 }
@@ -146,7 +146,7 @@ func queryWithQuerier(ctx context.Context, q models.DBTX, query *v1.SQLQuery) (*
 	}
 	rows, err := q.QueryContext(ctx, query.GetStatement().GetSql(), params...)
 	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
+		return nil, err
 	}
 	defer rows.Close()
 	columns, err := rows.Columns()
@@ -196,7 +196,7 @@ func execWithQuerier(ctx context.Context, q models.DBTX, exec *v1.SQLExec) (*v1.
 	}
 	result, err := q.ExecContext(ctx, exec.GetStatement().GetSql(), params...)
 	if err != nil {
-		return nil, fmt.Errorf("execute: %w", err)
+		return nil, err
 	}
 	if result == nil {
 		return &v1.SQLExecResult{}, nil
