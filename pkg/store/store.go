@@ -91,7 +91,7 @@ type Store interface {
 	LeaderRPCAddr(ctx context.Context) (string, error)
 	// Stepdown forces this node to relinquish leadership to another node in
 	// the cluster. If wait is true then this method will block until the
-	// leadership transfer is complete and return any error that ocurred.
+	// leadership transfer is complete and return any error that occurred.
 	Stepdown(wait bool) error
 	// AddNonVoter adds a non-voting node to the cluster with timeout enforced by the context.
 	AddNonVoter(ctx context.Context, id string, addr string) error
@@ -359,7 +359,7 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 
 // Stepdown forces this node to relinquish leadership to another node in
 // the cluster. If wait is true then this method will block until the
-// leadership transfer is complete and return any error that ocurred.
+// leadership transfer is complete and return any error that occurred.
 func (s *store) Stepdown(wait bool) error {
 	if !s.open.Load() {
 		return ErrNotOpen
