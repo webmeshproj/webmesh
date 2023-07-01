@@ -218,6 +218,13 @@ func (s *store) Open() error {
 	if err != nil {
 		return handleErr(fmt.Errorf("new raft: %w", err))
 	}
+	// Register observers.
+	s.observerChan = make(chan raft.Observation, s.opts.Raft.ObserverChanBuffer)
+	s.observer = raft.NewObserver(s.observerChan, false, func(o *raft.Observation) bool {
+		return true
+	})
+	s.raft.RegisterObserver(s.observer)
+	s.observerClose, s.observerDone = s.observe()
 	// Bootstrap the cluster if needed.
 	if s.opts.Bootstrap.Enabled {
 		// Database gets migrated during bootstrap.
@@ -252,13 +259,6 @@ func (s *store) Open() error {
 			return fmt.Errorf("recover wireguard: %w", err)
 		}
 	}
-	// Register observers.
-	s.observerChan = make(chan raft.Observation, s.opts.Raft.ObserverChanBuffer)
-	s.observer = raft.NewObserver(s.observerChan, false, func(o *raft.Observation) bool {
-		return true
-	})
-	s.raft.RegisterObserver(s.observer)
-	s.observerClose, s.observerDone = s.observe()
 	s.open.Store(true)
 	return nil
 }

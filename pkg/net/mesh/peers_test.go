@@ -206,6 +206,7 @@ func TestWireGuardPeers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("create test db: %v", err)
 			}
+			defer teardown()
 			peerdb := peers.New(db)
 			nw := networking.New(db)
 			// Create an allow-all traffic policy.
@@ -268,7 +269,6 @@ func TestWireGuardPeers(t *testing.T) {
 					t.Errorf("got %v, want %v", got, want)
 				}
 			}
-			teardown()
 		})
 	}
 }

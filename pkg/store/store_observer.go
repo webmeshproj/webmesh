@@ -54,6 +54,34 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					if err := s.nw.RefreshPeers(ctx); err != nil {
 						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
 					}
+					p := peers.New(s.DB())
+					node, err := p.Get(ctx, string(data.Peer.ID))
+					if err != nil {
+						s.log.Error("failed to get peer", slog.String("error", err.Error()))
+						continue
+					}
+					err = s.plugins.Emit(ctx, &v1.Event{
+						Type: func() v1.WatchEvent {
+							if data.Removed {
+								return v1.WatchEvent_WATCH_EVENT_NODE_LEAVE
+							}
+							return v1.WatchEvent_WATCH_EVENT_NODE_JOIN
+						}(),
+						Event: &v1.Event_Node{
+							Node: node.Proto(func() v1.ClusterStatus {
+								if data.Removed {
+									return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
+								}
+								if data.Peer.Suffrage == raft.Nonvoter {
+									return v1.ClusterStatus_CLUSTER_NON_VOTER
+								}
+								return v1.ClusterStatus_CLUSTER_VOTER
+							}()),
+						},
+					})
+					if err != nil {
+						s.log.Error("emit node join/leave event", slog.String("error", err.Error()))
+					}
 				case raft.LeaderObservation:
 					s.log.Debug("LeaderObservation", slog.Any("data", data))
 					p := peers.New(s.DB())
