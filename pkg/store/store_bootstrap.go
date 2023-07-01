@@ -49,7 +49,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 	if version != 0 {
 		// We have a version, so the cluster is already bootstrapped.
 		s.log.Info("cluster already bootstrapped, migrating schema to latest version")
-		if err = models.MigrateRaftDB(s.weakData); err != nil {
+		if err = models.MigrateDB(s.weakData); err != nil {
 			return fmt.Errorf("db migrate: %w", err)
 		}
 		// We rejoin as a voter no matter what
@@ -75,7 +75,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 			return fmt.Errorf("restore snapshot: %w", err)
 		}
 		s.log.Info("migrating schema to latest version")
-		if err = models.MigrateRaftDB(s.weakData); err != nil {
+		if err = models.MigrateDB(s.weakData); err != nil {
 			return fmt.Errorf("db migrate: %w", err)
 		}
 		// We're done here, but restore procedure needs to be documented
@@ -83,7 +83,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 	}
 	s.firstBootstrap.Store(true)
 	s.log.Info("migrating schema to latest version")
-	if err = models.MigrateRaftDB(s.weakData); err != nil {
+	if err = models.MigrateDB(s.weakData); err != nil {
 		return fmt.Errorf("db migrate: %w", err)
 	}
 	if s.opts.Bootstrap.AdvertiseAddress == "" && s.opts.Bootstrap.Servers == "" {

@@ -27,7 +27,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"
@@ -135,6 +135,26 @@ func (s *store) Open() error {
 	}
 	s.snapshotter = snapshots.New(s.weakData)
 
+	// Register an update hook to watch for node changes.
+	c, err := s.weakData.Conn(ctx)
+	if err != nil {
+		return handleErr(fmt.Errorf("get conn: %w", err))
+	}
+	err = c.Raw(func(driverConn interface{}) error {
+		c, ok := driverConn.(*sqlite3.SQLiteConn)
+		if !ok {
+			return fmt.Errorf("expected *sqlite3.SQLiteConn, got %T", driverConn)
+		}
+		c.RegisterUpdateHook(s.onDBUpdate)
+		return nil
+	})
+	if err != nil {
+		return handleErr(fmt.Errorf("register update hook: %w", err))
+	}
+	if err = c.Close(); err != nil {
+		return handleErr(fmt.Errorf("close conn: %w", err))
+	}
+
 	// Check if we have a snapshot to restore from.
 	log.Debug("checking for snapshot")
 	snapshots, err := s.raftSnapshots.List()
@@ -190,7 +210,7 @@ func (s *store) Open() error {
 		}
 	} else if s.opts.Mesh.JoinAddress != "" || len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
 		log.Debug("migrating raft database")
-		if err = models.MigrateRaftDB(s.weakData); err != nil {
+		if err = models.MigrateDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
 		ctx, cancel := context.WithTimeout(ctx, s.opts.Mesh.JoinTimeout)
@@ -208,7 +228,7 @@ func (s *store) Open() error {
 		// This means we are possibly a single node cluster.
 		// Recover our previous wireguard configuration and start up.
 		log.Debug("migrating raft database")
-		if err = models.MigrateRaftDB(s.weakData); err != nil {
+		if err = models.MigrateDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
 		if err := s.recoverWireguard(ctx); err != nil {

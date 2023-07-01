@@ -125,7 +125,7 @@ func (s *store) configureWireguard(ctx context.Context, opts *ConfigureWireGuard
 		if err != nil {
 			return fmt.Errorf("failed to add masquerade rule: %w", err)
 		}
-		s.masquerading = true
+		s.masquerading.Store(true)
 	}
 	return nil
 }

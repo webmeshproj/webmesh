@@ -73,7 +73,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	err = models.MigrateRaftDB(p.data)
+	err = models.MigrateDB(p.data)
 	if err != nil {
 		return nil, fmt.Errorf("migrate db schema: %w", err)
 	}

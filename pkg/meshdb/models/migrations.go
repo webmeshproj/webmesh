@@ -26,19 +26,33 @@ import (
 
 //go:generate bash -xc "go run github.com/kyleconroy/sqlc/cmd/sqlc@latest -f sql/sqlc.yaml generate"
 
-// migrationFS is the filesystem containing the goose migrations.
-//
 //go:embed sql/**/*
 var migrationFS embed.FS
 
-// raftMigrationsPath is the path to the raft db migrations.
-var raftMigrationsPath = "sql/migrations"
+// Table names
+const (
+	TableMeshState     = "mesh_state"
+	TableNodes         = "nodes"
+	TableNodeEdges     = "node_edges"
+	TableLeases        = "leases"
+	TableUsers         = "users"
+	TableGroups        = "groups"
+	TableRoles         = "roles"
+	TableRoleBindings  = "role_bindings"
+	TableNetworkACLs   = "network_acls"
+	TableNetworkRoutes = "network_routes"
+)
 
-// schemaVersionTable is the name of the goose schema version table.
-var schemaVersionTable = "schema_version"
+const (
+	// raftMigrationsPath is the path to the raft db migrations.
+	raftMigrationsPath = "sql/migrations"
 
-// gooseDialect is the goose dialect.
-var gooseDialect = "sqlite"
+	// schemaVersionTable is the name of the goose schema version table.
+	schemaVersionTable = "schema_version"
+
+	// gooseDialect is the goose dialect.
+	gooseDialect = "sqlite"
+)
 
 func init() {
 	goose.SetLogger(goose.NopLogger())
@@ -50,8 +64,8 @@ func init() {
 	}
 }
 
-// MigrateRaftDB migrates the raft database to the latest version.
-func MigrateRaftDB(db *sql.DB) error {
+// MigrateDB migrates the database to the latest version.
+func MigrateDB(db *sql.DB) error {
 	return goose.Up(db, raftMigrationsPath)
 }
 

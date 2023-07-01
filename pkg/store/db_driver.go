@@ -19,7 +19,6 @@ package store
 import (
 	"context"
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -28,7 +27,6 @@ import (
 	"github.com/golang/snappy"
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -185,22 +183,12 @@ func (s *raftDBStatement) ExecContext(ctx context.Context, args []driver.NamedVa
 			},
 		},
 	}
-	var data []byte
-	switch s.raftLogFormat {
-	case RaftLogFormatJSON:
-		data, err = json.Marshal(logEntry)
-	case RaftLogFormatProtobuf:
-		data, err = proto.Marshal(logEntry)
-	case RaftLogFormatProtobufSnappy:
-		data, err = proto.Marshal(logEntry)
-		if err == nil {
-			data = snappy.Encode(nil, data)
-		}
-	default:
-		err = fmt.Errorf("unknown raft log format: %s", s.raftLogFormat)
+	data, err := proto.Marshal(logEntry)
+	if err == nil {
+		data = snappy.Encode(nil, data)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("marshal log entry: %w", err)
+		return nil, fmt.Errorf("encode log entry: %w", err)
 	}
 	f := s.raft.Apply(data, timeout)
 	if err := f.Error(); err != nil {
@@ -242,22 +230,12 @@ func (s *raftDBStatement) QueryContext(ctx context.Context, args []driver.NamedV
 			},
 		},
 	}
-	var data []byte
-	switch s.raftLogFormat {
-	case RaftLogFormatJSON:
-		data, err = protojson.Marshal(logEntry)
-	case RaftLogFormatProtobuf:
-		data, err = proto.Marshal(logEntry)
-	case RaftLogFormatProtobufSnappy:
-		data, err = proto.Marshal(logEntry)
-		if err == nil {
-			data = snappy.Encode(nil, data)
-		}
-	default:
-		err = fmt.Errorf("unknown raft log format: %s", s.raftLogFormat)
+	data, err := proto.Marshal(logEntry)
+	if err == nil {
+		data = snappy.Encode(nil, data)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("marshal log entry: %w", err)
+		return nil, fmt.Errorf("encode log entry: %w", err)
 	}
 	f := s.raft.Apply(data, timeout)
 	if err := f.Error(); err != nil {

@@ -76,7 +76,7 @@ func NewTestDB() (DB, func(), error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("open database: %w", err)
 	}
-	err = models.MigrateRaftDB(db)
+	err = models.MigrateDB(db)
 	if err != nil {
 		defer db.Close()
 		return nil, nil, fmt.Errorf("migrate database: %w", err)

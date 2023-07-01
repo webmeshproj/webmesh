@@ -45,7 +45,6 @@ const (
 	SnapshotThresholdEnvVar   = "RAFT_SNAPSHOT_THRESHOLD"
 	SnapshotRetentionEnvVar   = "RAFT_SNAPSHOT_RETENTION"
 	ObserverChanBufferEnvVar  = "RAFT_OBSERVER_CHAN_BUFFER"
-	RaftLogFormatEnvVar       = "RAFT_LOG_FORMAT"
 	RaftLogLevelEnvVar        = "RAFT_LOG_LEVEL"
 	RaftPreferIPv6EnvVar      = "RAFT_PREFER_IPV6"
 	LeaveOnShutdownEnvVar     = "RAFT_LEAVE_ON_SHUTDOWN"
@@ -57,28 +56,6 @@ const (
 	// StableStoreFile is the raft stable store file.
 	StableStoreFile = "raft-stable-dat"
 )
-
-// RaftLogFormat is the raft log format.
-type RaftLogFormat string
-
-const (
-	// RaftLogFormatJSON is the JSON raft log format.
-	RaftLogFormatJSON RaftLogFormat = "json"
-	// RaftLogFormatProtobuf is the protobuf raft log format.
-	RaftLogFormatProtobuf RaftLogFormat = "protobuf"
-	// RaftLogFormatProtobufSnappy is the protobuf snappy raft log format.
-	RaftLogFormatProtobufSnappy RaftLogFormat = "protobuf+snappy"
-)
-
-// IsValid returns if the raft log format is valid.
-func (r RaftLogFormat) IsValid() bool {
-	switch r {
-	case RaftLogFormatJSON, RaftLogFormatProtobuf, RaftLogFormatProtobufSnappy:
-		return true
-	default:
-		return false
-	}
-}
 
 // RaftOptions are the raft options.
 type RaftOptions struct {
@@ -118,8 +95,6 @@ type RaftOptions struct {
 	PreferIPv6 bool `json:"prefer-ipv6,omitempty" yaml:"prefer-ipv6,omitempty" toml:"prefer-ipv6,omitempty"`
 	// LeaveOnShutdown is the leave on shutdown flag.
 	LeaveOnShutdown bool `json:"leave-on-shutdown,omitempty" yaml:"leave-on-shutdown,omitempty" toml:"leave-on-shutdown,omitempty"`
-	// LogFormat is the log format for the raft backend.
-	LogFormat string `json:"raft-log-format,omitempty" yaml:"raft-log-format,omitempty" toml:"raft-log-format,omitempty"`
 	// StartupTimeout is the timeout for starting up.
 	StartupTimeout time.Duration `json:"startup-timeout,omitempty" yaml:"startup-timeout,omitempty" toml:"startup-timeout,omitempty"`
 	// ShutdownTimeout is the timeout for shutting down.
@@ -142,7 +117,6 @@ func NewRaftOptions() *RaftOptions {
 		MaxAppendEntries:   15,
 		SnapshotRetention:  3,
 		ObserverChanBuffer: 100,
-		LogFormat:          string(RaftLogFormatProtobufSnappy),
 		LogLevel:           "info",
 		StartupTimeout:     time.Minute,
 		ShutdownTimeout:    time.Minute,
@@ -191,9 +165,6 @@ func (o *RaftOptions) BindFlags(fl *flag.FlagSet) {
 		"Timeout for startup.")
 	fl.DurationVar(&o.ShutdownTimeout, "raft.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
 		"Timeout for graceful shutdown.")
-	fl.StringVar(&o.LogFormat, "raft.log-format", util.GetEnvDefault(RaftLogFormatEnvVar, string(RaftLogFormatProtobufSnappy)),
-		`Raft log format. Valid options are 'json', 'protobuf', and 'protobuf+snappy'.
-All nodes must use the same log format for the lifetime of the cluster.`)
 }
 
 // Validate validates the raft options.
@@ -227,9 +198,6 @@ func (o *RaftOptions) Validate() error {
 	}
 	if o.SnapshotInterval <= 0 {
 		return errors.New("snapshot interval must be > 0")
-	}
-	if !RaftLogFormat(o.LogFormat).IsValid() {
-		return errors.New("invalid raft log format")
 	}
 	return nil
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
@@ -168,14 +169,16 @@ func New(opts *Options) (Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	var taskGroup errgroup.Group
+	taskGroup.SetLimit(1)
 	return &store{
-		sl:            sl,
-		opts:          opts,
-		tlsConfig:     tlsConfig,
-		nodeID:        raft.ServerID(nodeID),
-		raftLogFormat: RaftLogFormat(opts.Raft.LogFormat),
-		readyErr:      make(chan error, 2),
-		log:           log.With(slog.String("node-id", string(nodeID))),
+		sl:          sl,
+		opts:        opts,
+		tlsConfig:   tlsConfig,
+		nodeID:      raft.ServerID(nodeID),
+		readyErr:    make(chan error, 2),
+		nwTaskGroup: &taskGroup,
+		log:         log.With(slog.String("node-id", string(nodeID))),
 	}, nil
 }
 
@@ -198,7 +201,6 @@ type store struct {
 	raftSnapshots    raft.SnapshotStore
 	logDB            LogStoreCloser
 	stableDB         StableStoreCloser
-	raftLogFormat    RaftLogFormat
 	snapshotter      snapshots.Snapshotter
 
 	observerChan                chan raft.Observation
@@ -210,7 +212,8 @@ type store struct {
 
 	wg           wireguard.Interface
 	fw           firewall.Firewall
-	masquerading bool
+	nwTaskGroup  *errgroup.Group
+	masquerading atomic.Bool
 	wgmux        sync.Mutex
 
 	peerConns map[string]clientPeerConn

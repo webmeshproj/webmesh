@@ -90,7 +90,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		return nil, err
 	}
-	if err = models.MigrateRaftDB(p.data); err != nil {
+	if err = models.MigrateDB(p.data); err != nil {
 		return nil, fmt.Errorf("db migrate: %w", err)
 	}
 	p.termFile = filepath.Join(config.DataDir, ".current-term")

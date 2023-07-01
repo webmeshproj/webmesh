@@ -77,7 +77,6 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	storeOpts := store.NewOptions()
 	storeOpts.Raft.InMemory = true
 	storeOpts.Raft.ListenAddress = fmt.Sprintf(":%d", opts.RaftPort)
-	storeOpts.Raft.LogFormat = string(store.RaftLogFormatProtobufSnappy)
 	storeOpts.Raft.LeaveOnShutdown = true
 	storeOpts.Raft.ShutdownTimeout = time.Second * 10
 	if opts.TLSCertFile != "" && opts.TLSKeyFile != "" {
