@@ -256,7 +256,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	defer m.wgmux.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
-	peers, err := mesh.WireGuardPeersFor(ctx, m.store, m.store.ID())
+	peers, err := mesh.WireGuardPeersFor(ctx, m.store.DB(), m.store.ID())
 	if err != nil {
 		return fmt.Errorf("wireguard peers for: %w", err)
 	}
