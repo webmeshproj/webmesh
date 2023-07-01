@@ -39,26 +39,11 @@ func (s *store) Close() error {
 	// Stop the observers
 	close(s.observerClose)
 	<-s.observerDone
-	if s.fw != nil {
-		// Clear the firewall rules after wireguard is shutdown
+	if s.nw != nil {
 		defer func() {
-			s.wgmux.Lock()
-			defer s.wgmux.Unlock()
-			s.log.Debug("clearing firewall rules")
-			if err := s.fw.Clear(ctx); err != nil {
+			s.log.Debug("closing network manager")
+			if err := s.nw.Close(ctx); err != nil {
 				s.log.Error("error clearing firewall rules", slog.String("error", err.Error()))
-			}
-		}()
-	}
-	if s.wg != nil {
-		// Close the wireguard interface last, as it will cause
-		// raft operations to fail.
-		defer func() {
-			s.wgmux.Lock()
-			defer s.wgmux.Unlock()
-			s.log.Debug("closing wireguard interface")
-			if err := s.wg.Close(ctx); err != nil {
-				s.log.Error("error closing wireguard interface", slog.String("error", err.Error()))
 			}
 		}()
 	}

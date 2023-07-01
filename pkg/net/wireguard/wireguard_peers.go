@@ -67,9 +67,6 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 		}
 	}
-	if override, ok := w.opts.EndpointOverrides[peer.ID]; ok {
-		peer.Endpoint = override
-	}
 	var keepAlive *time.Duration
 	var allowedIPs []net.IPNet
 	if w.opts.PersistentKeepAlive != 0 {
@@ -137,8 +134,8 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		addr, _ := netip.AddrFromSlice(ip.IP)
 		ones, _ := ip.Mask.Size()
 		prefix := netip.PrefixFrom(addr, ones)
-		if prefix.Addr().Is6() && w.opts.NetworkV6.IsValid() {
-			if w.opts.NetworkV6.Contains(addr) {
+		if prefix.Addr().Is6() && w.opts.AddressV6.IsValid() {
+			if w.opts.AddressV6.Contains(addr) {
 				// Don't readd routes to our own network
 				continue
 			}
@@ -148,7 +145,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 				return fmt.Errorf("failed to add route: %w", err)
 			}
 		}
-		if prefix.Addr().Is4() && w.opts.NetworkV4.IsValid() {
+		if prefix.Addr().Is4() && w.opts.AddressV4.IsValid() {
 			w.log.Debug("adding ipv4 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {

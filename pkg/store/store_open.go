@@ -32,6 +32,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/node/pkg/net"
 	"github.com/webmeshproj/node/pkg/plugins"
 )
 
@@ -70,6 +71,22 @@ func (s *store) Open() error {
 	if err != nil {
 		return fmt.Errorf("failed to load plugins: %w", err)
 	}
+	// Create the network manager
+	s.nw = net.New(s, &net.Options{
+		InterfaceName:         s.opts.WireGuard.InterfaceName,
+		ForceReplace:          s.opts.WireGuard.ForceInterfaceName,
+		ListenPort:            s.opts.WireGuard.ListenPort,
+		PersistentKeepAlive:   s.opts.WireGuard.PersistentKeepAlive,
+		ForceTUN:              s.opts.WireGuard.ForceTUN,
+		Modprobe:              s.opts.WireGuard.Modprobe,
+		MTU:                   s.opts.WireGuard.MTU,
+		RecordMetrics:         s.opts.WireGuard.RecordMetrics,
+		RecordMetricsInterval: s.opts.WireGuard.RecordMetricsInterval,
+		RaftPort:              s.sl.ListenPort(),
+		GRPCPort:              s.opts.Mesh.GRPCPort,
+		ZoneAwarenessID:       s.opts.Mesh.ZoneAwarenessID,
+		DialOptions:           s.grpcCreds(ctx),
+	})
 	// If bootstrap and force are set, clear the data directory.
 	if s.opts.Bootstrap.Enabled && s.opts.Bootstrap.Force {
 		log.Warn("force bootstrap enabled, clearing data directory")

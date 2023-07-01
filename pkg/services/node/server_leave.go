@@ -17,16 +17,12 @@ limitations under the License.
 package node
 
 import (
-	"time"
-
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/services/leaderproxy"
 )
 
@@ -58,31 +54,5 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		peer, err := s.peers.Get(ctx, req.GetId())
-		if err != nil {
-			if err == peers.ErrNodeNotFound {
-				return
-			}
-			s.log.Error("failed to get node from db", slog.String("error", err.Error()))
-			return
-		}
-		// Notify watchers that the node is leaving
-		err = s.store.Plugins().Emit(ctx, &v1.Event{
-			Type:  v1.WatchEvent_WATCH_EVENT_NODE_JOIN,
-			Event: &v1.Event_Node{Node: peer.Proto(0)},
-		})
-		if err != nil {
-			s.log.Error("failed to emit event", slog.String("error", err.Error()))
-		}
-		// The most important thing is that we remove the server from raft. We should also remove the peer from
-		// the database and release leases, but we don't want this to negatively impact the caller.
-		err = s.peers.Delete(ctx, req.GetId())
-		if err != nil {
-			s.log.Error("failed to remove node from db", slog.String("error", err.Error()))
-		}
-	}()
 	return &emptypb.Empty{}, nil
 }

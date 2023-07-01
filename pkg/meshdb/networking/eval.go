@@ -18,14 +18,13 @@ limitations under the License.
 package networking
 
 import (
-	"context"
 	"database/sql"
 	"sort"
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 )
@@ -121,7 +120,7 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 					group, err := models.New(acl.rdb).GetGroup(ctx, groupName)
 					if err != nil {
 						if err != sql.ErrNoRows {
-							slog.Default().Error("failed to get group", "group", groupName, "error", err)
+							context.LoggerFrom(ctx).Error("failed to get group", "group", groupName, "error", err)
 							return false
 						}
 						// If the group doesn't exist, we'll just ignore it.
@@ -160,7 +159,7 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 					group, err := models.New(acl.rdb).GetGroup(ctx, groupName)
 					if err != nil {
 						if err != sql.ErrNoRows {
-							slog.Default().Error("failed to get group", "group", groupName, "error", err)
+							context.LoggerFrom(ctx).Error("failed to get group", "group", groupName, "error", err)
 							return false
 						}
 						// If the group doesn't exist, we'll just ignore it.

@@ -18,24 +18,21 @@ package store
 
 import (
 	"fmt"
-	"net"
 	"net/netip"
 	"strings"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/net/wireguard"
+	meshnet "github.com/webmeshproj/node/pkg/net"
 	"github.com/webmeshproj/node/pkg/plugins/basicauth"
 	"github.com/webmeshproj/node/pkg/plugins/ldap"
-	"github.com/webmeshproj/node/pkg/util"
 )
 
 func (s *store) joinWithPeerDiscovery(ctx context.Context) error {
@@ -183,146 +180,23 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 	log.Info("configuring wireguard",
 		slog.String("networkv4", addressv4.String()),
 		slog.String("networkv6", addressv6.String()))
-	opts := &ConfigureWireGuardOptions{
-		Key:           key,
-		AddressV4:     addressv4,
-		AddressV6:     addressv6,
-		MeshNetworkV4: networkv4,
-		MeshNetworkV6: networkv6,
+	opts := &meshnet.StartOptions{
+		Key:       key,
+		AddressV4: addressv4,
+		AddressV6: addressv6,
+		NetworkV4: networkv4,
+		NetworkV6: networkv6,
 	}
-	err = s.configureWireguard(ctx, opts)
+	err = s.nw.Start(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("configure wireguard: %w", err)
-	}
-	var localCIDRs util.PrefixList
-	if s.opts.Mesh.ZoneAwarenessID != "" {
-		log.Info("using zone awareness, collecting local CIDRs")
-		localCIDRs, err = util.DetectEndpoints(ctx, util.EndpointDetectOpts{
-			DetectPrivate:  true,
-			DetectIPv6:     !s.opts.Mesh.NoIPv6,
-			SkipInterfaces: []string{s.wg.Name()},
-		})
-		log.Debug("detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
-		if err != nil {
-			return fmt.Errorf("detect endpoints: %w", err)
-		}
+		return fmt.Errorf("start network manager: %w", err)
 	}
 	for _, peer := range resp.GetPeers() {
-		key, err := wgtypes.ParseKey(peer.GetPublicKey())
+		log.Info("adding peer", slog.Any("peer", peer))
+		err = s.nw.AddPeer(ctx, peer, resp.GetIceServers())
 		if err != nil {
-			return fmt.Errorf("parse peer key: %w", err)
+			return fmt.Errorf("add peer: %w", err)
 		}
-		var endpoint netip.AddrPort
-		var addr *net.UDPAddr
-		if peer.GetIce() {
-			// We are peered with this node via ICE.
-			if len(resp.GetIceServers()) == 0 {
-				return fmt.Errorf("no ICE servers provided")
-			}
-			// TODO: Try all ICE servers
-			addr, err = s.negotiateWireGuardICEConnection(ctx, resp.GetIceServers()[0], peer)
-		} else {
-			addr, err = net.ResolveUDPAddr("udp", peer.GetPrimaryEndpoint())
-		}
-		if err != nil {
-			log.Error("could not resolve peer primary endpoint", slog.String("error", err.Error()))
-		} else {
-			if addr.AddrPort().Addr().Is4In6() {
-				// This is an IPv4 address masquerading as an IPv6 address.
-				// We need to convert it to a real IPv4 address.
-				// This is a workaround for a bug in Go's net package.
-				addr = &net.UDPAddr{
-					IP:   addr.IP.To4(),
-					Port: addr.Port,
-					Zone: addr.Zone,
-				}
-			}
-			endpoint = addr.AddrPort()
-		}
-		if !peer.GetIce() && s.opts.Mesh.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() != "" {
-			if peer.GetZoneAwarenessId() == s.opts.Mesh.ZoneAwarenessID {
-				if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetWireguardEndpoints()) > 0 {
-					// We share zone awareness with the peer and their primary endpoint
-					// is not in one of our local CIDRs. We'll try to use one of their
-					// additional endpoints instead.
-					for _, additionalEndpoint := range peer.GetWireguardEndpoints() {
-						addr, err := net.ResolveUDPAddr("udp", additionalEndpoint)
-						if err != nil {
-							log.Error("could not resolve peer primary endpoint", slog.String("error", err.Error()))
-							continue
-						}
-						if addr.AddrPort().Addr().Is4In6() {
-							// Same as above, this is an IPv4 address masquerading as an IPv6 address.
-							addr = &net.UDPAddr{
-								IP:   addr.IP.To4(),
-								Port: addr.Port,
-								Zone: addr.Zone,
-							}
-						}
-						log.Debug("evalauting zone awareness endpoint",
-							slog.String("endpoint", addr.String()),
-							slog.String("zone", peer.GetZoneAwarenessId()))
-						ep := addr.AddrPort()
-						if localCIDRs.Contains(ep.Addr()) {
-							// We found an additional endpoint that is in one of our local
-							// CIDRs. We'll use this one instead.
-							log.Info("zone awareness shared with peer, using LAN endpoint", slog.String("endpoint", ep.String()))
-							endpoint = ep
-							break
-						}
-					}
-				}
-			}
-		}
-		allowedIPs := make([]netip.Prefix, len(peer.GetAllowedIps()))
-		for i, ip := range peer.GetAllowedIps() {
-			allowedIPs[i], err = netip.ParsePrefix(ip)
-			if err != nil {
-				return fmt.Errorf("parse peer allowed ip: %w", err)
-			}
-		}
-		allowedRoutes := make([]netip.Prefix, len(peer.GetAllowedRoutes()))
-		for i, ip := range peer.GetAllowedRoutes() {
-			allowedRoutes[i], err = netip.ParsePrefix(ip)
-			if err != nil {
-				return fmt.Errorf("parse peer allowed route: %w", err)
-			}
-		}
-		wgpeer := wireguard.Peer{
-			ID:         peer.GetId(),
-			PublicKey:  key,
-			Endpoint:   endpoint,
-			AllowedIPs: allowedIPs,
-		}
-		log.Info("adding wireguard peer", slog.Any("peer", &wgpeer))
-		err = s.wg.PutPeer(ctx, &wgpeer)
-		if err != nil {
-			return err
-		}
-		// Try to ping the peer to establish a connection
-		// TODO: Only do this if we are a private node
-		go func(peer *v1.WireGuardPeer) {
-			// TODO: make this configurable
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			var addr netip.Prefix
-			var err error
-			if peer.AddressIpv4 != "" {
-				addr, err = netip.ParsePrefix(peer.AddressIpv4)
-			} else {
-				addr, err = netip.ParsePrefix(peer.AddressIpv6)
-			}
-			if err != nil {
-				log.Warn("could not parse address", slog.String("error", err.Error()))
-				return
-			}
-			err = util.Ping(ctx, addr.Addr())
-			if err != nil {
-				log.Warn("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
-				return
-			}
-			log.Debug("successfully pinged descendant", slog.String("descendant", peer.Id))
-		}(peer)
 	}
 	return nil
 }

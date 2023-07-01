@@ -51,7 +51,7 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					if s.testStore {
 						continue
 					}
-					if err := s.refreshWireguardPeers(ctx); err != nil {
+					if err := s.nw.RefreshPeers(ctx); err != nil {
 						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
 					}
 				case raft.LeaderObservation:

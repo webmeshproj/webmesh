@@ -61,8 +61,6 @@ type Interface interface {
 	DeletePeer(ctx context.Context, id string) error
 	// Peers returns the list of peers in the wireguard configuration.
 	Peers() []string
-	// IsPublic returns true if this wireguard interface is publicly routable.
-	IsPublic() bool
 	// Metrics returns the metrics for the wireguard interface and the host.
 	Metrics() (*v1.InterfaceMetrics, error)
 	// Close closes the wireguard interface and all client connections.
@@ -89,16 +87,12 @@ type Options struct {
 	// accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
 	// packets are sent.
 	PersistentKeepAlive time.Duration
-	// EndpointOverrides is a map of peer IDs to endpoint overrides.
-	EndpointOverrides map[string]netip.AddrPort
 	// MTU is the MTU to use for the interface.
 	MTU int
-	// NetworkV4 is the private IPv4 network of this interface.
-	NetworkV4 netip.Prefix
-	// NetworkV6 is the private IPv6 network of this interface.
-	NetworkV6 netip.Prefix
-	// IsPublic is true if this interface is public.
-	IsPublic bool
+	// AddressV4 is the private IPv4 address of this interface.
+	AddressV4 netip.Prefix
+	// AddressV6 is the private IPv6 address of this interface.
+	AddressV6 netip.Prefix
 	// Metrics is true if prometheus metrics should be enabled.
 	Metrics bool
 	// MetricsInterval is the interval at which to update metrics.
@@ -143,8 +137,8 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	log.Info("creating wireguard interface", "name", opts.Name)
 	iface, err := system.New(ctx, &system.Options{
 		Name:      opts.Name,
-		NetworkV4: opts.NetworkV4,
-		NetworkV6: opts.NetworkV6,
+		NetworkV4: opts.AddressV4,
+		NetworkV6: opts.AddressV6,
 		ForceTUN:  opts.ForceTUN,
 		Modprobe:  opts.Modprobe,
 		MTU:       uint32(opts.MTU),
@@ -188,11 +182,6 @@ func (w *wginterface) ListenPort() (int, error) {
 		return 0, err
 	}
 	return iface.ListenPort, nil
-}
-
-// IsPublic returns true if the wireguard interface is publicly accessible.
-func (w *wginterface) IsPublic() bool {
-	return w.opts.IsPublic
 }
 
 // Peers returns the peers of the wireguard interface.

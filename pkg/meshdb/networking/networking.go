@@ -18,7 +18,6 @@ limitations under the License.
 package networking
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -28,8 +27,8 @@ import (
 
 	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
@@ -302,6 +301,8 @@ func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
 // allowed. Currently if a single route provided by a destination node is not allowed, the entire node
 // is filtered out.
 func (n *networking) FilterGraph(ctx context.Context, peerGraph peers.Graph, nodeName string) (AdjacencyMap, error) {
+	log := context.LoggerFrom(ctx)
+
 	acls, err := n.ListNetworkACLs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network acls: %w", err)
@@ -310,21 +311,23 @@ func (n *networking) FilterGraph(ctx context.Context, peerGraph peers.Graph, nod
 	if err != nil {
 		return nil, fmt.Errorf("build adjacency map: %w", err)
 	}
-	adjacents, ok := fullMap[nodeName]
-	if !ok {
-		return nil, fmt.Errorf("node %s not found in adjacency map", nodeName)
-	}
-	slog.Default().Debug("full adjacency map", "from", nodeName, "map", fullMap)
+
+	log.Debug("full adjacency map", "from", nodeName, "map", fullMap)
 	filtered := make(AdjacencyMap)
-	filtered[nodeName] = adjacents
+	filtered[nodeName] = fullMap[nodeName]
 
 Nodes:
-	for node := range adjacents {
+	for node := range fullMap {
+		if node == nodeName {
+			continue
+		}
 		// Check if the nodes can communicate directly.
-		if !acls.Accept(ctx, &v1.NetworkAction{
+		action := &v1.NetworkAction{
 			SrcNode: nodeName,
 			DstNode: node,
-		}) {
+		}
+		if !acls.Accept(ctx, action) {
+			log.Debug("filtering node", "node", node, "reason", "direct communication not allowed", "action", action)
 			continue Nodes
 		}
 		// If the destination node exposes additional routes, check if the nodes can communicate
@@ -335,11 +338,13 @@ Nodes:
 		}
 		for _, route := range routes {
 			for _, cidr := range route.GetDestinationCidrs() {
-				if !acls.Accept(ctx, &v1.NetworkAction{
+				action := &v1.NetworkAction{
 					SrcNode: nodeName,
 					DstNode: node,
 					DstCidr: cidr,
-				}) {
+				}
+				if !acls.Accept(ctx, action) {
+					log.Debug("filtering node", "node", node, "reason", "route not allowed", "action", action)
 					continue Nodes
 				}
 			}
@@ -347,19 +352,22 @@ Nodes:
 		filtered[node] = make(map[string]graph.Edge[string])
 	}
 	for node := range filtered {
-		if node == nodeName {
-			continue
-		}
 		edges, ok := fullMap[node]
 		if !ok {
 			continue
 		}
 	Peers:
 		for peer, edge := range edges {
-			if !acls.Accept(ctx, &v1.NetworkAction{
+			if peer == nodeName {
+				filtered[node][peer] = edge
+				continue
+			}
+			action := &v1.NetworkAction{
 				SrcNode: nodeName,
 				DstNode: peer,
-			}) {
+			}
+			if !acls.Accept(ctx, action) {
+				log.Debug("filtering peer", "peer", peer, "reason", "direct communication not allowed", "action", action)
 				continue Peers
 			}
 			// If the peer exposes additional routes, check if the nodes can communicate
@@ -370,11 +378,13 @@ Nodes:
 			}
 			for _, route := range routes {
 				for _, cidr := range route.GetDestinationCidrs() {
-					if !acls.Accept(ctx, &v1.NetworkAction{
+					action := &v1.NetworkAction{
 						SrcNode: nodeName,
 						DstNode: peer,
 						DstCidr: cidr,
-					}) {
+					}
+					if !acls.Accept(ctx, action) {
+						log.Debug("filtering peer", "peer", peer, "reason", "route not allowed", "action", action)
 						continue Peers
 					}
 				}
@@ -382,7 +392,7 @@ Nodes:
 			filtered[node][peer] = edge
 		}
 	}
-	slog.Debug("filtered adjacency map", "from", nodeName, "map", filtered)
+	log.Debug("filtered adjacency map", "from", nodeName, "map", filtered)
 	return filtered, nil
 }
 

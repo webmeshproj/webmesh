@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
@@ -59,6 +60,9 @@ func WireGuardPeersFor(ctx context.Context, store meshdb.Store, peerID string) (
 		node, err := graph.Vertex(adjacent)
 		if err != nil {
 			return nil, fmt.Errorf("get vertex: %w", err)
+		}
+		if node.PublicKey == (wgtypes.Key{}) {
+			continue
 		}
 		// Determine the preferred wireguard endpoint
 		var primaryEndpoint string
@@ -203,9 +207,13 @@ func recurseEdges(
 		if _, ok := visited[target]; ok {
 			continue
 		}
+		visited[target] = struct{}{}
 		targetNode, err := graph.Vertex(target)
 		if err != nil {
 			return nil, nil, fmt.Errorf("get vertex: %w", err)
+		}
+		if targetNode.PublicKey == (wgtypes.Key{}) {
+			continue
 		}
 		if targetNode.PrivateIPv4.IsValid() {
 			allowedIPs = append(allowedIPs, targetNode.PrivateIPv4)
@@ -239,7 +247,6 @@ func recurseEdges(
 				}
 			}
 		}
-		visited[target] = struct{}{}
 		ips, ipRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, &targetNode, visited)
 		if err != nil {
 			return nil, nil, fmt.Errorf("recurse allowed IPs: %w", err)

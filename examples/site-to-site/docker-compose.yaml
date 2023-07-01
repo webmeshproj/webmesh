@@ -132,6 +132,7 @@ services:
     hostname: site-2-leader
     entrypoint:
       - /node
+      - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
       - --global.primary-endpoint=10.250.0.2
@@ -209,6 +210,7 @@ services:
     hostname: site-3-leader
     entrypoint:
       - /node
+      - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
       - --global.primary-endpoint=10.250.0.3

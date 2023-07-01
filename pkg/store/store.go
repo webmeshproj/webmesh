@@ -24,7 +24,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -38,8 +37,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
-	"github.com/webmeshproj/node/pkg/net/datachannels"
-	"github.com/webmeshproj/node/pkg/net/firewall"
+	meshnet "github.com/webmeshproj/node/pkg/net"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
@@ -210,24 +208,13 @@ type store struct {
 	weakData, raftData *sql.DB
 	dataMux            sync.RWMutex
 
-	wg           wireguard.Interface
-	fw           firewall.Firewall
-	nwTaskGroup  *errgroup.Group
-	masquerading atomic.Bool
-	wgmux        sync.Mutex
-
-	peerConns map[string]clientPeerConn
-	pcmux     sync.Mutex
+	nw          meshnet.Manager
+	nwTaskGroup *errgroup.Group
 
 	open atomic.Bool
 
 	// a flag set on test stores to indicate skipping certain operations
 	testStore bool
-}
-
-type clientPeerConn struct {
-	peerConn  *datachannels.ClientPeerConnection
-	localAddr *net.UDPAddr
 }
 
 // ID returns the node ID.
@@ -271,7 +258,7 @@ func (s *store) Raft() *raft.Raft { return s.raft }
 
 // WireGuard returns the WireGuard interface. Note that the returned value
 // may be nil if the store is not open.
-func (s *store) WireGuard() wireguard.Interface { return s.wg }
+func (s *store) WireGuard() wireguard.Interface { return s.nw.WireGuard() }
 
 // Plugins returns the plugin manager.
 func (s *store) Plugins() plugins.Manager { return s.plugins }

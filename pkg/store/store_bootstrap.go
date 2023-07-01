@@ -31,12 +31,12 @@ import (
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/rbac"
+	meshnet "github.com/webmeshproj/node/pkg/net"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
@@ -420,15 +420,8 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		s.log.Info("creating node in database for bootstrap server",
 			slog.String("server-id", string(server.ID)),
 		)
-		// The server will generate and replace this when they join,
-		// but the database will reject a non-unique key.
-		key, err := wgtypes.GeneratePrivateKey()
-		if err != nil {
-			return fmt.Errorf("generate private key: %w", err)
-		}
 		_, err = p.Put(ctx, &peers.PutOptions{
-			ID:        string(server.ID),
-			PublicKey: key.PublicKey(),
+			ID: string(server.ID),
 		})
 		if err != nil {
 			return fmt.Errorf("create node: %w", err)
@@ -492,7 +485,6 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create lease: %w", err)
 	}
-
 	// Determine what our raft address will be
 	var raftAddr string
 	if !s.opts.Mesh.NoIPv4 && !s.opts.Raft.PreferIPv6 {
@@ -507,27 +499,28 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if s.testStore {
 		return nil
 	}
-	s.log.Info("configuring wireguard interface")
-	opts := &ConfigureWireGuardOptions{
+	// Start network resources
+	s.log.Info("starting network manager")
+	opts := &meshnet.StartOptions{
 		Key:       wireguardKey,
 		AddressV4: privatev4,
 		AddressV6: privatev6,
-		MeshNetworkV4: func() netip.Prefix {
+		NetworkV4: func() netip.Prefix {
 			if s.opts.Mesh.NoIPv4 {
 				return netip.Prefix{}
 			}
 			return meshnetworkv4
 		}(),
-		MeshNetworkV6: func() netip.Prefix {
+		NetworkV6: func() netip.Prefix {
 			if s.opts.Mesh.NoIPv6 {
 				return netip.Prefix{}
 			}
 			return meshnetworkv6
 		}(),
 	}
-	err = s.configureWireguard(ctx, opts)
+	err = s.nw.Start(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("configure wireguard: %w", err)
+		return fmt.Errorf("start net manager: %w", err)
 	}
 	// We need to readd ourselves server to the cluster as a voter with the acquired address.
 	s.log.Info("re-adding ourselves to the cluster with the acquired wireguard address")

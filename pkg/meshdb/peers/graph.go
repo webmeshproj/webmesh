@@ -54,15 +54,17 @@ func NewGraphStore(db meshdb.DB) graph.Store[string, Node] {
 // error should be returned.
 func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexProperties) error {
 	params := models.InsertNodeParams{
-		ID: node.ID,
-		PublicKey: sql.NullString{
-			String: node.PublicKey.String(),
-			Valid:  true,
-		},
+		ID:        node.ID,
 		GrpcPort:  int64(node.GRPCPort),
 		RaftPort:  int64(node.RaftPort),
 		CreatedAt: node.CreatedAt,
 		UpdatedAt: node.UpdatedAt,
+	}
+	if node.PublicKey != (wgtypes.Key{}) {
+		params.PublicKey = sql.NullString{
+			String: node.PublicKey.String(),
+			Valid:  true,
+		}
 	}
 	if node.PrimaryEndpoint != "" {
 		params.PrimaryEndpoint = sql.NullString{
@@ -126,9 +128,6 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 			err = fmt.Errorf("parse node private IPv4: %w", err)
 			return
 		}
-		// We are saving the full prefix length to the database so we need to
-		// truncate it to 32 bits here.
-		node.PrivateIPv4 = netip.PrefixFrom(node.PrivateIPv4.Addr(), 32)
 	}
 	if dbnode.PrivateAddressV6 != "" {
 		node.PrivateIPv6, err = netip.ParsePrefix(dbnode.PrivateAddressV6)

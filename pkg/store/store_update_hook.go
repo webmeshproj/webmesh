@@ -27,8 +27,8 @@ import (
 )
 
 func (s *store) onDBUpdate(op int, dbName, tableName string, rowID int64) {
-	s.log.Debug("db uppdate trigger", "op", op, "dbName", dbName, "tableName", tableName, "rowID", rowID)
-	if s.testStore || s.wg == nil {
+	s.log.Debug("db update trigger", "op", op, "dbName", dbName, "tableName", tableName, "rowID", rowID)
+	if s.testStore {
 		return
 	}
 	switch tableName {
@@ -43,10 +43,16 @@ func (s *store) onDBUpdate(op int, dbName, tableName string, rowID int64) {
 }
 
 func (s *store) queueRouteUpdate() {
-	// Allow a buffer to ensure we don't trigger this too often
-	time.Sleep(time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for s.lastAppliedIndex.Load() != s.raft.AppliedIndex() {
+		if ctx.Err() != nil {
+			s.log.Warn("timed out waiting for raft to catch up before applying route update")
+			return
+		}
+		time.Sleep(time.Second)
+	}
 	s.nwTaskGroup.TryGo(func() error {
-		ctx := context.Background()
 		nw := networking.New(s.DB())
 		routes, err := nw.GetRoutesByNode(ctx, s.ID())
 		if err != nil {
@@ -55,15 +61,9 @@ func (s *store) queueRouteUpdate() {
 		}
 		if len(routes) > 0 {
 			s.log.Debug("applied node route change, ensuring masquerade rules are in place")
-			if !s.masquerading.Load() {
-				s.wgmux.Lock()
-				defer s.wgmux.Unlock()
-				err = s.fw.AddMasquerade(ctx, s.wg.Name())
-				if err != nil {
-					s.log.Error("error adding masquerade rule", slog.String("error", err.Error()))
-				} else {
-					s.masquerading.Store(true)
-				}
+			err = s.nw.StartMasquerade(ctx)
+			if err != nil {
+				s.log.Error("error starting masquerade", slog.String("error", err.Error()))
 			}
 		}
 		return nil
@@ -71,11 +71,18 @@ func (s *store) queueRouteUpdate() {
 }
 
 func (s *store) queuePeersUpdate() {
-	// Allow a buffer to ensure we don't trigger this too often
-	time.Sleep(time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for s.lastAppliedIndex.Load() != s.raft.AppliedIndex() {
+		if ctx.Err() != nil {
+			s.log.Warn("timed out waiting for raft to catch up before applying peer update")
+			return
+		}
+		time.Sleep(time.Second)
+	}
 	s.nwTaskGroup.TryGo(func() error {
 		s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
-		if err := s.refreshWireguardPeers(context.Background()); err != nil {
+		if err := s.nw.RefreshPeers(context.Background()); err != nil {
 			s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
 		}
 		return nil

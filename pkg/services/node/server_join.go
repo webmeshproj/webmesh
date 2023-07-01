@@ -401,26 +401,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
-	// Notify any watchers that a new peer has joined
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		var status v1.ClusterStatus
-		if req.GetAsVoter() {
-			status = v1.ClusterStatus_CLUSTER_VOTER
-		} else {
-			status = v1.ClusterStatus_CLUSTER_NON_VOTER
-		}
-		node := peer.Proto(status)
-		err := s.store.Plugins().Emit(ctx, &v1.Event{
-			Type:  v1.WatchEvent_WATCH_EVENT_NODE_JOIN,
-			Event: &v1.Event_Node{Node: node},
-		})
-		if err != nil {
-			log.Error("failed to emit event", slog.String("error", err.Error()))
-		}
-	}()
-
 	log.Debug("sending join response", slog.Any("response", resp))
 	return resp, nil
 }
