@@ -43,6 +43,7 @@ func (s *store) onDBUpdate(op int, dbName, tableName string, rowID int64) {
 }
 
 func (s *store) queueRouteUpdate() {
+	// Allow a buffer to ensure we don't trigger this too often
 	time.Sleep(time.Second)
 	s.nwTaskGroup.TryGo(func() error {
 		ctx := context.Background()
@@ -70,6 +71,7 @@ func (s *store) queueRouteUpdate() {
 }
 
 func (s *store) queuePeersUpdate() {
+	// Allow a buffer to ensure we don't trigger this too often
 	time.Sleep(time.Second)
 	s.nwTaskGroup.TryGo(func() error {
 		s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
