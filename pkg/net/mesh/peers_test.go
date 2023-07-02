@@ -32,167 +32,327 @@ import (
 )
 
 func TestWireGuardPeers(t *testing.T) {
+	t.Parallel()
+
 	tt := []struct {
 		name    string
-		peers   map[string][]netip.Prefix            // peerID -> addressv4 + addressv6
-		edges   map[string][]string                  // peerID -> []peerID
-		wantIPs map[string]map[string][]netip.Prefix // peerID -> peerID -> []allowed ips
+		peers   map[string][]string            // peerID -> addressv4 + addressv6
+		edges   map[string][]string            // peerID -> []peerID
+		wantIPs map[string]map[string][]string // peerID -> peerID -> []allowed ips
 	}{
 		{
 			name: "simple 1-to-1",
-			peers: map[string][]netip.Prefix{
-				"peer1": {
-					netip.MustParsePrefix("172.16.0.1/32"),
-					netip.MustParsePrefix("2001:db8::1/128"),
-				},
-				"peer2": {
-					netip.MustParsePrefix("172.16.0.2/32"),
-					netip.MustParsePrefix("2001:db8::2/128"),
-				},
+			peers: map[string][]string{
+				"peer1": {"172.16.0.1/32", "2001:db8::1/128"},
+				"peer2": {"172.16.0.2/32", "2001:db8::2/128"},
 			},
 			edges: map[string][]string{
 				"peer1": {"peer2"},
 			},
-			wantIPs: map[string]map[string][]netip.Prefix{
+			wantIPs: map[string]map[string][]string{
 				"peer1": {
-					"peer2": {
-						netip.MustParsePrefix("172.16.0.2/32"),
-						netip.MustParsePrefix("2001:db8::2/128"),
-					},
+					"peer2": {"172.16.0.2/32", "2001:db8::2/128"},
 				},
 				"peer2": {
-					"peer1": {
-						netip.MustParsePrefix("172.16.0.1/32"),
-						netip.MustParsePrefix("2001:db8::1/128"),
-					},
+					"peer1": {"172.16.0.1/32", "2001:db8::1/128"},
 				},
 			},
 		},
 		{
 			name: "simple 1-to-1-to-1",
-			peers: map[string][]netip.Prefix{
-				"peer1": {
-					netip.MustParsePrefix("172.16.0.1/32"),
-					netip.MustParsePrefix("2001:db8::1/128"),
-				},
-				"peer2": {
-					netip.MustParsePrefix("172.16.0.2/32"),
-					netip.MustParsePrefix("2001:db8::2/128"),
-				},
-				"peer3": {
-					netip.MustParsePrefix("172.16.0.3/32"),
-					netip.MustParsePrefix("2001:db8::3/128"),
-				},
+			peers: map[string][]string{
+				"peer1": {"172.16.0.1/32", "2001:db8::1/128"},
+				"peer2": {"172.16.0.2/32", "2001:db8::2/128"},
+				"peer3": {"172.16.0.3/32", "2001:db8::3/128"},
 			},
 			edges: map[string][]string{
 				"peer1": {"peer2", "peer3"},
 				"peer2": {"peer1", "peer3"},
 				"peer3": {"peer1", "peer2"},
 			},
-			wantIPs: map[string]map[string][]netip.Prefix{
+			wantIPs: map[string]map[string][]string{
 				"peer1": {
-					"peer2": {
-						netip.MustParsePrefix("172.16.0.2/32"),
-						netip.MustParsePrefix("2001:db8::2/128"),
-					},
-					"peer3": {
-						netip.MustParsePrefix("172.16.0.3/32"),
-						netip.MustParsePrefix("2001:db8::3/128"),
-					},
+					"peer2": {"172.16.0.2/32", "2001:db8::2/128"},
+					"peer3": {"172.16.0.3/32", "2001:db8::3/128"},
 				},
 				"peer2": {
-					"peer1": {
-						netip.MustParsePrefix("172.16.0.1/32"),
-						netip.MustParsePrefix("2001:db8::1/128"),
-					},
-					"peer3": {
-						netip.MustParsePrefix("172.16.0.3/32"),
-						netip.MustParsePrefix("2001:db8::3/128"),
-					},
+					"peer1": {"172.16.0.1/32", "2001:db8::1/128"},
+					"peer3": {"172.16.0.3/32", "2001:db8::3/128"},
 				},
 				"peer3": {
-					"peer1": {
-						netip.MustParsePrefix("172.16.0.1/32"),
-						netip.MustParsePrefix("2001:db8::1/128"),
-					},
-					"peer2": {
-						netip.MustParsePrefix("172.16.0.2/32"),
-						netip.MustParsePrefix("2001:db8::2/128"),
-					},
+					"peer1": {"172.16.0.1/32", "2001:db8::1/128"},
+					"peer2": {"172.16.0.2/32", "2001:db8::2/128"},
 				},
 			},
 		},
 		{
 			name: "simple site-to-site",
-			peers: map[string][]netip.Prefix{
-				"site1-router": {
-					netip.MustParsePrefix("172.16.0.1/32"),
-					netip.MustParsePrefix("2001:db8::1/128"),
-				},
-				"site2-router": {
-					netip.MustParsePrefix("172.16.0.2/32"),
-					netip.MustParsePrefix("2001:db8::2/128"),
-				},
-				"site1-follower": {
-					netip.MustParsePrefix("172.16.0.3/32"),
-					netip.MustParsePrefix("2001:db8::3/128"),
-				},
-				"site2-follower": {
-					netip.MustParsePrefix("172.16.0.4/32"),
-					netip.MustParsePrefix("2001:db8::4/128"),
-				},
+			peers: map[string][]string{
+				"site1-router":   {"172.16.0.1/32", "2001:db8::1/128"},
+				"site2-router":   {"172.16.0.2/32", "2001:db8::2/128"},
+				"site1-follower": {"172.16.0.3/32", "2001:db8::3/128"},
+				"site2-follower": {"172.16.0.4/32", "2001:db8::4/128"},
 			},
 			edges: map[string][]string{
 				"site1-router": {"site2-router", "site1-follower"},
 				"site2-router": {"site1-router", "site2-follower"},
 			},
-			wantIPs: map[string]map[string][]netip.Prefix{
+			wantIPs: map[string]map[string][]string{
 				"site1-router": {
 					"site2-router": {
-						netip.MustParsePrefix("172.16.0.2/32"),
-						netip.MustParsePrefix("2001:db8::2/128"),
+						"172.16.0.2/32", "2001:db8::2/128",
 						// site2-follower is reachable via site2-router
-						netip.MustParsePrefix("172.16.0.4/32"),
-						netip.MustParsePrefix("2001:db8::4/128"),
+						"172.16.0.4/32", "2001:db8::4/128",
 					},
-					"site1-follower": {
-						netip.MustParsePrefix("172.16.0.3/32"),
-						netip.MustParsePrefix("2001:db8::3/128"),
-					},
+					"site1-follower": {"172.16.0.3/32", "2001:db8::3/128"},
 				},
 				"site2-router": {
 					"site1-router": {
-						netip.MustParsePrefix("172.16.0.1/32"),
-						netip.MustParsePrefix("2001:db8::1/128"),
+						"172.16.0.1/32", "2001:db8::1/128",
 						// site1-follower is reachable via site1-router
-						netip.MustParsePrefix("172.16.0.3/32"),
-						netip.MustParsePrefix("2001:db8::3/128"),
+						"172.16.0.3/32", "2001:db8::3/128",
 					},
-					"site2-follower": {
-						netip.MustParsePrefix("172.16.0.4/32"),
-						netip.MustParsePrefix("2001:db8::4/128"),
-					},
+					"site2-follower": {"172.16.0.4/32", "2001:db8::4/128"},
 				},
 				"site1-follower": {
 					"site1-router": {
 						// All IPs reachable via site1-router
-						netip.MustParsePrefix("172.16.0.1/32"),
-						netip.MustParsePrefix("2001:db8::1/128"),
-						netip.MustParsePrefix("172.16.0.2/32"),
-						netip.MustParsePrefix("2001:db8::2/128"),
-						netip.MustParsePrefix("172.16.0.4/32"),
-						netip.MustParsePrefix("2001:db8::4/128"),
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.4/32", "2001:db8::4/128",
 					},
 				},
 				"site2-follower": {
 					"site2-router": {
 						// All IPs reachable via site2-router
-						netip.MustParsePrefix("172.16.0.1/32"),
-						netip.MustParsePrefix("2001:db8::1/128"),
-						netip.MustParsePrefix("172.16.0.2/32"),
-						netip.MustParsePrefix("2001:db8::2/128"),
-						netip.MustParsePrefix("172.16.0.3/32"),
-						netip.MustParsePrefix("2001:db8::3/128"),
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+					},
+				},
+			},
+		},
+		{
+			name: "simple site-to-site-to-site",
+			peers: map[string][]string{
+				"site1-router":     {"172.16.0.1/32", "2001:db8::1/128"},
+				"site2-router":     {"172.16.0.2/32", "2001:db8::2/128"},
+				"site3-router":     {"172.16.0.3/32", "2001:db8::3/128"},
+				"site1-follower-1": {"172.16.0.4/32", "2001:db8::4/128"},
+				"site1-follower-2": {"172.16.0.5/32", "2001:db8::5/128"},
+				"site1-follower-3": {"172.16.0.6/32", "2001:db8::6/128"},
+				"site2-follower-1": {"172.16.0.7/32", "2001:db8::7/128"},
+				"site2-follower-2": {"172.16.0.8/32", "2001:db8::8/128"},
+				"site2-follower-3": {"172.16.0.9/32", "2001:db8::9/128"},
+				"site3-follower-1": {"172.16.0.10/32", "2001:db8::10/128"},
+				"site3-follower-2": {"172.16.0.11/32", "2001:db8::11/128"},
+				"site3-follower-3": {"172.16.0.12/32", "2001:db8::12/128"},
+			},
+			edges: map[string][]string{
+				"site1-router": {"site2-router", "site3-router", "site1-follower-1", "site1-follower-2", "site1-follower-3"},
+				"site2-router": {"site1-router", "site3-router", "site2-follower-1", "site2-follower-2", "site2-follower-3"},
+				"site3-router": {"site1-router", "site2-router", "site3-follower-1", "site3-follower-2", "site3-follower-3"},
+			},
+			wantIPs: map[string]map[string][]string{
+				"site1-router": {
+					"site2-router": {
+						// Site 2 is reachable via site 2 router
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+					},
+					"site3-router": {
+						// Site 3 is reachable via site 3 router
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+					"site1-follower-1": {"172.16.0.4/32", "2001:db8::4/128"},
+					"site1-follower-2": {"172.16.0.5/32", "2001:db8::5/128"},
+					"site1-follower-3": {"172.16.0.6/32", "2001:db8::6/128"},
+				},
+				"site2-router": {
+					"site1-router": {
+						// Site 1 is reachable via site 1 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+					},
+					"site3-router": {
+						// Site 3 is reachable via site 3 router
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+					"site2-follower-1": {"172.16.0.7/32", "2001:db8::7/128"},
+					"site2-follower-2": {"172.16.0.8/32", "2001:db8::8/128"},
+					"site2-follower-3": {"172.16.0.9/32", "2001:db8::9/128"},
+				},
+				"site3-router": {
+					"site1-router": {
+						// Site 1 is reachable via site 1 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+					},
+					"site2-router": {
+						// Site 2 is reachable via site 2 router
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+					},
+					"site3-follower-1": {"172.16.0.10/32", "2001:db8::10/128"},
+					"site3-follower-2": {"172.16.0.11/32", "2001:db8::11/128"},
+					"site3-follower-3": {"172.16.0.12/32", "2001:db8::12/128"},
+				},
+				"site1-follower-1": {
+					"site1-router": {
+						// Everyone is reachable via site 1 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+				},
+				"site1-follower-2": {
+					"site1-router": {
+						// Everyone is reachable via site 1 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+				},
+				"site1-follower-3": {
+					"site1-router": {
+						// Everyone is reachable via site 1 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+				},
+				"site2-follower-1": {
+					"site2-router": {
+						// Everyone is reachable via site 2 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+				},
+				"site2-follower-2": {
+					"site2-router": {
+						// Everyone is reachable via site 2 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+				},
+				"site2-follower-3": {
+					"site2-router": {
+						// Everyone is reachable via site 2 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+				},
+				"site3-follower-1": {
+					"site3-router": {
+						// Everyone is reachable via site 3 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+						"172.16.0.11/32", "2001:db8::11/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+				},
+				"site3-follower-2": {
+					"site3-router": {
+						// Everyone is reachable via site 3 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.12/32", "2001:db8::12/128",
+					},
+				},
+				"site3-follower-3": {
+					"site3-router": {
+						// Everyone is reachable via site 3 router
+						"172.16.0.1/32", "2001:db8::1/128",
+						"172.16.0.2/32", "2001:db8::2/128",
+						"172.16.0.3/32", "2001:db8::3/128",
+						"172.16.0.4/32", "2001:db8::4/128",
+						"172.16.0.5/32", "2001:db8::5/128",
+						"172.16.0.6/32", "2001:db8::6/128",
+						"172.16.0.7/32", "2001:db8::7/128",
+						"172.16.0.8/32", "2001:db8::8/128",
+						"172.16.0.9/32", "2001:db8::9/128",
+						"172.16.0.10/32", "2001:db8::10/128",
+						"172.16.0.11/32", "2001:db8::11/128",
 					},
 				},
 			},
@@ -231,8 +391,8 @@ func TestWireGuardPeers(t *testing.T) {
 				}
 				err = peerdb.PutLease(ctx, &peers.PutLeaseOptions{
 					ID:   peerID,
-					IPv4: addrs[0],
-					IPv6: addrs[1],
+					IPv4: netip.MustParsePrefix(addrs[0]),
+					IPv6: netip.MustParsePrefix(addrs[1]),
 				})
 				if err != nil {
 					t.Fatalf("put lease for peer %q: %v", peerID, err)
@@ -254,9 +414,10 @@ func TestWireGuardPeers(t *testing.T) {
 				if err != nil {
 					t.Fatalf("get peers for %q: %v", peer, err)
 				}
-				got := make(map[string][]netip.Prefix)
+				got := make(map[string][]string)
 				for node, ips := range want {
-					want[node] = sortPrefixes(ips)
+					sort.Strings(ips)
+					want[node] = ips
 				}
 				for _, p := range peers {
 					var ips []netip.Prefix
@@ -266,19 +427,19 @@ func TestWireGuardPeers(t *testing.T) {
 					got[p.Id] = sortPrefixes(ips)
 				}
 				if !reflect.DeepEqual(got, want) {
-					t.Errorf("got %v, want %v", got, want)
+					t.Errorf("peer: %s got %v, want %v", peer, got, want)
 				}
 			}
 		})
 	}
 }
 
-func sortPrefixes(in []netip.Prefix) []netip.Prefix {
-	out := make([]netip.Prefix, len(in))
-	copy(out, in)
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].String() < out[j].String()
-	})
+func sortPrefixes(in []netip.Prefix) []string {
+	out := make([]string, len(in))
+	for i, p := range in {
+		out[i] = p.String()
+	}
+	sort.Strings(out)
 	return out
 }
 
