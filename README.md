@@ -3,18 +3,14 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/webmeshproj/node)](https://goreportcard.com/report/github.com/webmeshproj/node)
 ![Build and Tests](https://github.com/webmeshproj/node/actions/workflows/ci.yaml/badge.svg)
 
-Webmesh is a project that aims to provide a simple, secure, and scalable way to connect devices and services across the internet.
-
+Webmesh is a project that aims to provide a zero-configuration, simple, secure, and scalable way to connect devices and services across the internet.
 It is inspired by several other projects that have emerged over the years such as TailScale, ZeroTier, and OpenZiti.
-The core difference, however, is that every node in the network is also, optionally, a controller server.
-Another core aim is to offload as much networking onto pre-existing protocols as possible and strive to maintain a simple codebase.
-This is one of the reasons the project is built on top of [WireGuard](https://www.wireguard.com/) and doesn't attempt to implement another Virtual Network Layer.
 
 Nodes connected to the network take on one of three roles. They can be a client, a server, or both.
 A client is a node that is connected to the network but does not provide any services, except to itself.
 A server is a node that is connected to the network and provides services to other nodes.
-When a server node is also the leader, it is referred to as a controller.
-Other server nodes will proxy requests to mutate the network to the controller.
+When a server node is also the leader, it is referred to as a controller and facilitates requests to join the mesh or mutate state.
+Other server nodes will proxy requests that require the leader appropriately.
 State is maintained on every connected node via Raft consensus.
 This allows for the network to be highly available and fault tolerant.
 
@@ -29,6 +25,9 @@ The current supported authentication methods are:
 
 Examples of different topologies and usages can be found in the [examples](examples/) directory.
 More examples and documentation will be added as the project matures.
+
+Administration of the network can be done via the gRPC API or the CLI utility included in this repository.
+For more information, see the [administration](docs/administration.md) docs.
 
 **This project is not yet ready for production use, but I hope to rapidly get there**
 
@@ -73,7 +72,7 @@ wmctl connect --insecure --no-ipv6 --join-server=<container_ip>:8443
 ```
 
 Configuration can be provided as CLI flags (as shown above) or via a configuration file and environment variables.
-Full details can be found in the [configuration](doc/configuration.md) docs.
+Full details can be found in the [configuration](docs/configuration.md) docs.
 
 ## Building
 
