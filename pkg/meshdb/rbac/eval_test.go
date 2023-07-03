@@ -23,6 +23,8 @@ import (
 )
 
 func TestRolesListEval(t *testing.T) {
+	t.Parallel()
+
 	tc := []struct {
 		name    string
 		roles   RolesList
