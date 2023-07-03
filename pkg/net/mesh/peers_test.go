@@ -484,17 +484,14 @@ func TestWireGuardPeers(t *testing.T) {
 				if err != nil {
 					t.Fatalf("get peers for %q: %v", peer, err)
 				}
-				got := make(map[string][]string)
-				for node, ips := range want {
+				// Make sure strings are sorted for comparison.
+				for _, ips := range want {
 					sort.Strings(ips)
-					want[node] = ips
 				}
+				got := make(map[string][]string)
 				for _, p := range peers {
-					var ips []netip.Prefix
-					for _, ip := range p.AllowedIps {
-						ips = append(ips, netip.MustParsePrefix(ip))
-					}
-					got[p.Id] = sortPrefixes(ips)
+					sort.Strings(p.AllowedIps)
+					got[p.Id] = p.AllowedIps
 				}
 				if !reflect.DeepEqual(got, want) {
 					t.Errorf("peer: %s got %v, want %v", peer, got, want)
@@ -502,15 +499,6 @@ func TestWireGuardPeers(t *testing.T) {
 			}
 		})
 	}
-}
-
-func sortPrefixes(in []netip.Prefix) []string {
-	out := make([]string, len(in))
-	for i, p := range in {
-		out[i] = p.String()
-	}
-	sort.Strings(out)
-	return out
 }
 
 func mustGenerateKey(t *testing.T) wgtypes.Key {
