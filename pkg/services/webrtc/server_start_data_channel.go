@@ -18,7 +18,6 @@ limitations under the License.
 package webrtc
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -114,25 +113,30 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 
 func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_StartDataChannelServer, r *v1.StartDataChannelRequest, remoteAddr string) error {
 	log.Info("handling negotiation locally")
-	var dstAddress string
-	if r.GetPort() == 0 && r.GetProto() == "udp" {
+	var conn datachannels.ServerChannel
+	var err error
+	if r.GetProto() == "udp" && r.GetPort() == 0 {
+		log.Info("negotiating WireGuard proxy connection")
 		// Lookup our WireGuard port.
 		port, err := s.store.WireGuard().ListenPort()
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get WireGuard listen port: %v", err)
 		}
-		dstAddress = fmt.Sprintf("127.0.0.1:%d", port)
+		conn, err = datachannels.NewWireGuardProxyServer(stream.Context(), s.stunServers, uint16(port))
+		if err != nil {
+			return err
+		}
 	} else {
-		dstAddress = net.JoinHostPort(r.GetDst(), strconv.Itoa(int(r.GetPort())))
-	}
-	conn, err := datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
-		Proto:       r.GetProto(),
-		SrcAddress:  remoteAddr,
-		DstAddress:  dstAddress,
-		STUNServers: s.stunServers,
-	})
-	if err != nil {
-		return err
+		log.Info("negotiating standard WebRTC connection")
+		conn, err = datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
+			Proto:       r.GetProto(),
+			SrcAddress:  remoteAddr,
+			DstAddress:  net.JoinHostPort(r.GetDst(), strconv.Itoa(int(r.GetPort()))),
+			STUNServers: s.stunServers,
+		})
+		if err != nil {
+			return err
+		}
 	}
 	go func() {
 		<-conn.Closed()

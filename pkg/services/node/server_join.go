@@ -322,6 +322,22 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if len(req.GetDirectPeers()) > 0 {
 		// Put an ICE edge between the caller and all direct peers
 		for _, peer := range req.GetDirectPeers() {
+			// Check if the peer exists
+			_, err := s.peers.Get(ctx, peer)
+			if err != nil {
+				if err != peers.ErrNodeNotFound {
+					return nil, status.Errorf(codes.Internal, "failed to get peer: %v", err)
+				}
+				// The peer doesn't exist, so create a placeholder for it
+				log.Debug("registering empty peer", slog.String("peer", peer))
+				_, err = s.peers.Put(ctx, &peers.PutOptions{
+					ID: peer,
+				})
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to register peer: %v", err)
+				}
+			}
+			log.Debug("adding ICE edge to peer", slog.String("peer", peer))
 			err = s.peers.PutEdge(ctx, peers.Edge{
 				From:   peer,
 				To:     req.GetId(),

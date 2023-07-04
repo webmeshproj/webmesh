@@ -78,17 +78,17 @@ func NewClientPeerConnection(ctx context.Context, opts *ClientOptions) (*ClientP
 	if err != nil {
 		return nil, fmt.Errorf("failed to start data channel negotiation: %w", err)
 	}
+	closeNeg := func() {
+		if err := neg.CloseSend(); err != nil {
+			fmt.Printf("failed to close negotiation stream: %v\n", err)
+		}
+	}
 	err = neg.Send(&v1.StartDataChannelRequest{
 		NodeId: opts.NodeID,
 		Proto:  opts.Protocol,
 		Dst:    opts.Destination,
 		Port:   opts.Port,
 	})
-	closeNeg := func() {
-		if err := neg.CloseSend(); err != nil {
-			fmt.Printf("failed to close negotiation stream: %v\n", err)
-		}
-	}
 	if err != nil {
 		defer closeNeg()
 		return nil, fmt.Errorf("failed to send request for offer: %w", err)

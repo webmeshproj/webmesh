@@ -496,10 +496,7 @@ func (p *peers) PutEdge(ctx context.Context, edge Edge) error {
 		return fmt.Errorf("get edge: %w", err)
 	}
 	err = p.graph.AddEdge(edge.From, edge.To, opts...)
-	if err == nil {
-		return nil
-	}
-	if !errors.Is(err, graph.ErrEdgeAlreadyExists) {
+	if err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {
 		return fmt.Errorf("add edge: %w", err)
 	}
 	return nil

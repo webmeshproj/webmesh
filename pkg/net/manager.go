@@ -124,7 +124,7 @@ type manager struct {
 }
 
 type clientPeerConn struct {
-	peerConn  *datachannels.ClientPeerConnection
+	peerConn  *datachannels.WireGuardProxyClient
 	localAddr *net.UDPAddr
 }
 
@@ -362,6 +362,9 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 	var endpoint netip.AddrPort
 	if peer.GetIce() {
 		// TODO: Try all ICE servers
+		if len(iceServers) == 0 {
+			return endpoint, fmt.Errorf("no ice servers available")
+		}
 		return m.negotiateICEConn(ctx, iceServers[0], peer)
 	}
 	if peer.GetPrimaryEndpoint() != "" {
@@ -438,55 +441,21 @@ func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, 
 		return endpoint, fmt.Errorf("dial webRTC server: %w", err)
 	}
 	defer conn.Close()
-	pc, err := datachannels.NewClientPeerConnection(ctx, &datachannels.ClientOptions{
-		Client:      v1.NewWebRTCClient(conn),
-		NodeID:      peer.GetId(),
-		Protocol:    "udp",
-		Destination: "127.0.0.1",
-		Port:        0,
-	})
+	pc, err := datachannels.NewWireGuardProxyClient(ctx, v1.NewWebRTCClient(conn), peer.GetId())
 	if err != nil {
 		return endpoint, fmt.Errorf("create peer connection: %w", err)
-	}
-	select {
-	case <-ctx.Done():
-		defer pc.Close()
-		return endpoint, ctx.Err()
-	case err := <-pc.Errors():
-		defer pc.Close()
-		return endpoint, fmt.Errorf("peer connection error: %w", err)
-	case <-pc.Closed():
-		return endpoint, fmt.Errorf("peer connection failed to become ready")
-	case <-pc.Ready():
-		log.Debug("wireguard ICE connection ready", slog.String("peer", peer.GetId()))
-	}
-	l, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IP{127, 0, 0, 1}, Port: 0})
-	if err != nil {
-		defer pc.Close()
-		return endpoint, fmt.Errorf("listen: %w", err)
-	}
-	localAddr := l.LocalAddr().(*net.UDPAddr)
-	if localAddr.AddrPort().Addr().Is4In6() {
-		// This is an IPv4 address masquerading as an IPv6 address.
-		// We need to convert it to a real IPv4 address.
-		// This is a workaround for a bug in Go's net package.
-		localAddr = &net.UDPAddr{
-			IP:   localAddr.IP.To4(),
-			Port: localAddr.Port,
-		}
 	}
 	go func() {
 		// TODO: reopen the connection if it closes and we are still
 		// peered with the node.
-		defer pc.Close()
-		pc.Handle(l)
+		<-pc.Closed()
 		m.pcmux.Lock()
 		defer m.pcmux.Unlock()
 		delete(m.iceConns, peer.GetId())
 	}()
 	m.iceConns[peer.GetId()] = clientPeerConn{
 		peerConn:  pc,
-		localAddr: localAddr,
+		localAddr: pc.LocalAddr(),
 	}
-	return localAddr.AddrPort(), nil
+	return pc.LocalAddr().AddrPort(), nil
 }

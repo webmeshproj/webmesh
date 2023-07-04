@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -55,26 +54,29 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 	log := s.log.With(slog.Any("request", req))
 	// TODO: We trust what the other node is sending for now, but we could save
 	// some errors by doing some extra validation first.
-	var dstAddress string
+	var conn datachannels.ServerChannel
 	if req.GetPort() == 0 && req.GetProto() == "udp" {
+		log.Info("creating WireGuard proxy connection")
 		// Lookup our WireGuard port.
 		port, err := s.store.WireGuard().ListenPort()
 		if err != nil {
-			return fmt.Errorf("lookup wireguard port: %w", err)
+			return status.Errorf(codes.Internal, "failed to get WireGuard listen port: %v", err)
 		}
-		dstAddress = fmt.Sprintf("127.0.0.1:%d", port)
+		conn, err = datachannels.NewWireGuardProxyServer(stream.Context(), req.GetStunServers(), uint16(port))
+		if err != nil {
+			return err
+		}
 	} else {
-		dstAddress = net.JoinHostPort(req.GetDst(), strconv.Itoa(int(req.GetPort())))
-	}
-	log.Info("creating new webrtc peer connection")
-	conn, err := datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
-		Proto:       req.GetProto(),
-		SrcAddress:  req.GetSrc(),
-		DstAddress:  dstAddress,
-		STUNServers: req.GetStunServers(),
-	})
-	if err != nil {
-		return err
+		log.Info("creating standard webrtc peer connection")
+		conn, err = datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
+			Proto:       req.GetProto(),
+			SrcAddress:  req.GetSrc(),
+			DstAddress:  net.JoinHostPort(req.GetDst(), strconv.Itoa(int(req.GetPort()))),
+			STUNServers: req.GetStunServers(),
+		})
+		if err != nil {
+			return err
+		}
 	}
 	go func() {
 		<-conn.Closed()

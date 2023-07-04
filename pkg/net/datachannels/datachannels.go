@@ -29,3 +29,19 @@ func init() {
 	s.DetachDataChannels()
 	WebRTC = webrtc.NewAPI(webrtc.WithSettingEngine(s))
 }
+
+// ServerChannel is a server-side data channel.
+type ServerChannel interface {
+	// Offer returns the offer for the data channel.
+	Offer() string
+	// AnswerOffer answers the offer from the peer.
+	AnswerOffer(offer string) error
+	// Candidates returns a channel for receiving ICE candidates.
+	Candidates() <-chan string
+	// AddCandidate adds an ICE candidate.
+	AddCandidate(candidate string) error
+	// Closed returns a channel for receiving a notification when the data channel is closed.
+	Closed() <-chan struct{}
+	// Close closes the data channel.
+	Close() error
+}
