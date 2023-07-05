@@ -95,11 +95,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 		}
 		if state == webrtc.ICEConnectionStateCompleted || state == webrtc.ICEConnectionStateFailed {
 			defer closeAll()
-			log.Info("ICE connection has closed, closing peer connection", "reason", state.String())
-			err := pc.Close()
-			if err != nil {
-				log.Error("Failed to close peer connection", slog.String("error", err.Error()))
-			}
+			log.Info("ICE connection has closed", "reason", state.String())
 		}
 	})
 	dc, err := pc.CreateDataChannel("wireguard-proxy", &webrtc.DataChannelInit{
@@ -112,7 +108,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
 	dc.OnOpen(func() {
-		log.Info("Data channel opened")
+		log.Info("Server side datachannel opened")
 		rw, err := dc.Detach()
 		if err != nil {
 			log.Error("Failed to detach data channel", slog.String("error", err.Error()))
@@ -148,7 +144,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 					if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
 						continue
 					}
-					log.Error("Failed to read from UDP", slog.String("error", err.Error()))
+					log.Error("Failed to read from interface", slog.String("error", err.Error()))
 					return
 				}
 				_, err = rw.Write(buf[:n])
@@ -159,7 +155,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			}
 		}()
 		defer log.Info("WireGuard proxy from datachannel to local stopped")
-		defer rw.Close()
+		defer pc.Close()
 		buf := make([]byte, wgBufferSize)
 		for {
 			select {
@@ -177,7 +173,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			}
 			_, err = wgiface.Write(buf[:n])
 			if err != nil {
-				log.Error("Failed to write to UDP", slog.String("error", err.Error()))
+				log.Error("Failed to write to interface", slog.String("error", err.Error()))
 				return
 			}
 		}
@@ -304,16 +300,22 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 		if s == webrtc.ICEConnectionStateConnected {
 			closeNeg()
 			close(pc.readyc)
+			candidatePair, err := pc.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
+			if err != nil {
+				log.Error("Failed to get selected candidate pair", slog.String("error", err.Error()))
+				return
+			}
+			log.Debug("ICE connection established", slog.Any("local", candidatePair.Local), slog.Any("remote", candidatePair.Remote))
 			return
 		}
 		if s == webrtc.ICEConnectionStateFailed || s == webrtc.ICEConnectionStateClosed || s == webrtc.ICEConnectionStateCompleted {
-			defer pc.Close()
 			select {
 			case <-pc.closec:
 				return
 			default:
 			}
 			close(pc.closec)
+			log.Info("ICE connection has closed", "reason", s.String())
 		}
 	})
 	dc, err := pc.CreateDataChannel("wireguard-proxy", &webrtc.DataChannelInit{
@@ -331,7 +333,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 	}
 	pc.localAddr = l.LocalAddr().(*net.UDPAddr)
 	dc.OnOpen(func() {
-		log.Debug("Data channel opened")
+		log.Debug("Client side datachannel opened")
 		var err error
 		rw, err := dc.Detach()
 		if err != nil {
@@ -357,7 +359,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 					if e, ok := err.(net.Error); ok && e.Timeout() {
 						continue
 					}
-					log.Error("Failed to read from UDP", slog.String("error", err.Error()))
+					log.Error("Failed to read from proxy listener", slog.String("error", err.Error()))
 					return
 				}
 				_, err = rw.Write(buf[:n])
@@ -367,7 +369,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 				}
 			}
 		}()
-		defer rw.Close()
+		defer pc.Close()
 		buf := make([]byte, wgBufferSize)
 		for {
 			select {
@@ -381,14 +383,14 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 					return
 				}
 				log.Error("Failed to read from data channel", slog.String("error", err.Error()))
-				continue
+				return
 			}
 			_, err = l.WriteTo(buf[:n], &net.UDPAddr{
 				IP:   net.IPv4zero,
 				Port: targetPort,
 			})
 			if err != nil {
-				log.Error("Failed to write to UDP", slog.String("error", err.Error()))
+				log.Error("Failed to write to interface", slog.String("error", err.Error()))
 				return
 			}
 		}
