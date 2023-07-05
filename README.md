@@ -5,6 +5,7 @@
 
 Webmesh is a project that aims to provide a zero-configuration, simple, secure, and scalable way to connect devices and services across the internet.
 It is inspired by several other projects that have emerged over the years such as TailScale, ZeroTier, and OpenZiti.
+Peers connect to eachother either via other peers, a central controller (or combination of controllers), or direct links negotiated via WebRTC.
 
 Nodes connected to the network take on one of three roles. They can be a client, a server, or both.
 A client is a node that is connected to the network but does not provide any services, except to itself.
@@ -28,6 +29,8 @@ More examples and documentation will be added as the project matures.
 
 Administration of the network can be done via the gRPC API or the CLI utility included in this repository.
 For more information, see the [administration](docs/administration.md) docs.
+
+Extended documentation will be added as the project matures.
 
 **This project is not yet ready for production use, but I hope to rapidly get there**
 
@@ -99,6 +102,8 @@ Please see the [contributing](CONTRIBUTING.md) docs for more information.
 ## Special Thanks
 
 The developers of [rqlite](https://github.com/rqlite/rqlite) for inspiration on managing a distributed to SQLite.
+
+The incredible work done by the [pion](https://github.com/pion/webrtc) team for WebRTC in Go.
 
 ## Legal
 

@@ -126,7 +126,7 @@ type manager struct {
 
 type clientPeerConn struct {
 	peerConn  *datachannels.WireGuardProxyClient
-	localAddr *net.UDPAddr
+	localAddr netip.AddrPort
 }
 
 func (m *manager) Firewall() firewall.Firewall { return m.fw }
@@ -279,6 +279,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 			for _, addr := range iceAddrs {
 				iceServers = append(iceServers, addr.String())
 			}
+			// TODO: cache these for a configurable amount of time
 		}
 		// Ensure the peer is configured
 		err := m.addPeer(ctx, peer, iceServers)
@@ -346,7 +347,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	// Try to ping the peer to establish a connection
 	go func() {
 		// TODO: make this configurable
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		var addr netip.Prefix
 		var err error
@@ -373,10 +374,10 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 	log := context.LoggerFrom(ctx)
 	var endpoint netip.AddrPort
 	if peer.GetIce() {
-		// TODO: Try all ICE servers
 		if len(iceServers) == 0 {
 			return endpoint, fmt.Errorf("no ice servers available")
 		}
+		// TODO: Try all ICE servers
 		return m.negotiateICEConn(ctx, iceServers[0], peer)
 	}
 	if peer.GetPrimaryEndpoint() != "" {
@@ -391,7 +392,6 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 			addr = &net.UDPAddr{
 				IP:   addr.IP.To4(),
 				Port: addr.Port,
-				Zone: addr.Zone,
 			}
 		}
 		endpoint = addr.AddrPort()
@@ -422,7 +422,6 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 					addr = &net.UDPAddr{
 						IP:   addr.IP.To4(),
 						Port: addr.Port,
-						Zone: addr.Zone,
 					}
 				}
 				log.Debug("evalauting zone awareness endpoint",
@@ -445,12 +444,17 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, peer *v1.WireGuardPeer) (netip.AddrPort, error) {
 	m.pcmux.Lock()
 	defer m.pcmux.Unlock()
+	log := context.LoggerFrom(ctx)
+	if conn, ok := m.iceConns[peer.GetId()]; ok {
+		// We already have an ICE connection for this peer
+		log.Debug("using existing wireguard ICE connection", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
+		return conn.localAddr, nil
+	}
 	wgPort, err := m.wg.ListenPort()
 	if err != nil {
 		return netip.AddrPort{}, fmt.Errorf("wireguard listen port: %w", err)
 	}
 	var endpoint netip.AddrPort
-	log := context.LoggerFrom(ctx)
 	log.Debug("negotiating wireguard ICE connection", slog.String("server", negotiateServer), slog.String("peer", peer.GetId()))
 	conn, err := grpc.DialContext(ctx, negotiateServer, m.opts.DialOptions...)
 	if err != nil {
@@ -462,16 +466,22 @@ func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, 
 		return endpoint, fmt.Errorf("create peer connection: %w", err)
 	}
 	go func() {
-		// TODO: reopen the connection if it closes and we are still
-		// peered with the node.
 		<-pc.Closed()
+		defer func() {
+			// This is a hacky way to attempt to reconnect to the peer if
+			// the ICE connection is closed and they are still in the store.
+			if err := m.RefreshPeers(ctx); err != nil {
+				log.Error("error refreshing peers after ICE connection closed", slog.String("error", err.Error()))
+			}
+		}()
 		m.pcmux.Lock()
-		defer m.pcmux.Unlock()
 		delete(m.iceConns, peer.GetId())
+		m.pcmux.Unlock()
 	}()
-	m.iceConns[peer.GetId()] = clientPeerConn{
+	peerconn := clientPeerConn{
 		peerConn:  pc,
-		localAddr: pc.LocalAddr(),
+		localAddr: pc.LocalAddr().AddrPort(),
 	}
-	return pc.LocalAddr().AddrPort(), nil
+	m.iceConns[peer.GetId()] = peerconn
+	return peerconn.localAddr, nil
 }
