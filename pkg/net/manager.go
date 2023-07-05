@@ -433,6 +433,10 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, peer *v1.WireGuardPeer) (netip.AddrPort, error) {
 	m.pcmux.Lock()
 	defer m.pcmux.Unlock()
+	wgPort, err := m.wg.ListenPort()
+	if err != nil {
+		return netip.AddrPort{}, fmt.Errorf("wireguard listen port: %w", err)
+	}
 	var endpoint netip.AddrPort
 	log := context.LoggerFrom(ctx)
 	log.Debug("negotiating wireguard ICE connection", slog.String("server", negotiateServer), slog.String("peer", peer.GetId()))
@@ -441,13 +445,14 @@ func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, 
 		return endpoint, fmt.Errorf("dial webRTC server: %w", err)
 	}
 	defer conn.Close()
-	pc, err := datachannels.NewWireGuardProxyClient(ctx, v1.NewWebRTCClient(conn), peer.GetId())
+	pc, err := datachannels.NewWireGuardProxyClient(ctx, v1.NewWebRTCClient(conn), peer.GetId(), wgPort)
 	if err != nil {
 		return endpoint, fmt.Errorf("create peer connection: %w", err)
 	}
 	go func() {
 		// TODO: reopen the connection if it closes and we are still
 		// peered with the node.
+		// Also close the connection if the peer is removed.
 		<-pc.Closed()
 		m.pcmux.Lock()
 		defer m.pcmux.Unlock()

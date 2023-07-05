@@ -31,6 +31,8 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
+const wgBufferSize = 1500
+
 type WireGuardProxyServer struct {
 	*webrtc.PeerConnection
 	candidatec chan string
@@ -116,9 +118,9 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			log.Error("Failed to detach data channel", slog.String("error", err.Error()))
 			return
 		}
-		wgiface, err := net.ListenUDP("udp", &net.UDPAddr{
+		wgiface, err := net.DialUDP("udp4", nil, &net.UDPAddr{
 			IP:   net.IPv4zero,
-			Port: 0,
+			Port: int(targetPort),
 		})
 		if err != nil {
 			defer rw.Close()
@@ -129,7 +131,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 		go func() {
 			defer log.Info("WireGuard proxy from local to datachannel stopped")
 			defer wgiface.Close()
-			buf := make([]byte, 65535)
+			buf := make([]byte, wgBufferSize)
 			for {
 				select {
 				case <-pc.closec:
@@ -141,7 +143,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 					log.Error("Failed to set read deadline", slog.String("error", err.Error()))
 					return
 				}
-				n, _, err := wgiface.ReadFromUDP(buf)
+				n, err := wgiface.Read(buf[0:])
 				if err != nil {
 					if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
 						continue
@@ -156,35 +158,31 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 				}
 			}
 		}()
-		go func() {
-			defer log.Info("WireGuard proxy from datachannel to local stopped")
-			defer rw.Close()
-			buf := make([]byte, 65535)
-			for {
-				select {
-				case <-pc.closec:
-					return
-				default:
-				}
-				n, err := rw.Read(buf)
-				if err != nil {
-					if err == io.EOF {
-						return
-					}
-					log.Error("Failed to read from data channel", slog.String("error", err.Error()))
-					return
-				}
-				_, err = wgiface.WriteToUDP(buf[:n], &net.UDPAddr{
-					IP:   net.IP{127, 0, 0, 1},
-					Port: int(targetPort),
-				})
-				if err != nil {
-					log.Error("Failed to write to UDP", slog.String("error", err.Error()))
-					return
-				}
+		defer log.Info("WireGuard proxy from datachannel to local stopped")
+		defer rw.Close()
+		buf := make([]byte, wgBufferSize)
+		for {
+			select {
+			case <-pc.closec:
+				return
+			default:
 			}
-		}()
+			n, err := rw.Read(buf[0:])
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				log.Error("Failed to read from data channel", slog.String("error", err.Error()))
+				return
+			}
+			_, err = wgiface.Write(buf[:n])
+			if err != nil {
+				log.Error("Failed to write to UDP", slog.String("error", err.Error()))
+				return
+			}
+		}
 	})
+
 	dc.OnClose(func() {
 		log.Info("Data channel closed")
 	})
@@ -245,7 +243,7 @@ type WireGuardProxyClient struct {
 }
 
 // NewWireGuardProxyClient creates a new WireGuard proxy client.
-func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNode string) (*WireGuardProxyClient, error) {
+func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNode string, targetPort int) (*WireGuardProxyClient, error) {
 	log := context.LoggerFrom(ctx)
 	neg, err := cli.StartDataChannel(ctx)
 	if err != nil {
@@ -327,7 +325,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 	if err != nil {
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
-	l, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	l, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
 		return nil, fmt.Errorf("listen: %w", err)
 	}
@@ -338,25 +336,23 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 		rw, err := dc.Detach()
 		if err != nil {
 			log.Error("Failed to detach data channel", slog.String("error", err.Error()))
-			errs <- err
 			return
 		}
-		defer rw.Close()
 		go func() {
 			defer l.Close()
-			buf := make([]byte, 65535)
+			buf := make([]byte, wgBufferSize)
 			for {
 				select {
 				case <-pc.closec:
 					return
-				case <-pc.readyc:
+				default:
 				}
 				err := l.SetReadDeadline(time.Now().Add(time.Second))
 				if err != nil {
 					log.Error("Failed to set read deadline", slog.String("error", err.Error()))
 					return
 				}
-				n, _, err := l.ReadFromUDP(buf)
+				n, err := l.Read(buf[0:])
 				if err != nil {
 					if e, ok := err.(net.Error); ok && e.Timeout() {
 						continue
@@ -371,14 +367,15 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 				}
 			}
 		}()
-		buf := make([]byte, 65535)
+		defer rw.Close()
+		buf := make([]byte, wgBufferSize)
 		for {
 			select {
 			case <-pc.closec:
 				return
 			default:
 			}
-			n, err := rw.Read(buf)
+			n, err := rw.Read(buf[0:])
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -386,7 +383,10 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 				log.Error("Failed to read from data channel", slog.String("error", err.Error()))
 				continue
 			}
-			_, err = l.WriteToUDP(buf[:n], pc.LocalAddr())
+			_, err = l.WriteTo(buf[:n], &net.UDPAddr{
+				IP:   net.IPv4zero,
+				Port: targetPort,
+			})
 			if err != nil {
 				log.Error("Failed to write to UDP", slog.String("error", err.Error()))
 				return
