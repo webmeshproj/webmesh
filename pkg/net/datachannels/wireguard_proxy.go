@@ -178,7 +178,6 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			}
 		}
 	})
-
 	dc.OnClose(func() {
 		log.Info("Data channel closed")
 	})
@@ -247,7 +246,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 	}
 	closeNeg := func() {
 		if err := neg.CloseSend(); err != nil {
-			fmt.Printf("failed to close negotiation stream: %v\n", err)
+			log.Error("failed to close negotiation stream", "error", err.Error())
 		}
 	}
 	err = neg.Send(&v1.StartDataChannelRequest{
