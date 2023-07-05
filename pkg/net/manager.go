@@ -17,6 +17,7 @@ limitations under the License.
 package net
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -264,6 +265,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	currentPeers := m.wg.Peers()
 	seenPeers := make(map[string]struct{})
 	var iceServers []string
+	errs := make([]error, 0)
 	for _, peer := range peers {
 		seenPeers[peer.GetId()] = struct{}{}
 		// Check if we need to gather ice servers
@@ -271,7 +273,8 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 			st := state.New(m.store.DB())
 			iceAddrs, err := st.ListPublicPeersWithFeature(ctx, m.opts.DialOptions, m.store.ID(), v1.Feature_ICE_NEGOTIATION)
 			if err != nil {
-				return fmt.Errorf("list public peers with feature: %w", err)
+				errs = append(errs, fmt.Errorf("list public peers with feature: %w", err))
+				continue
 			}
 			for _, addr := range iceAddrs {
 				iceServers = append(iceServers, addr.String())
@@ -280,7 +283,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 		// Ensure the peer is configured
 		err := m.addPeer(ctx, peer, iceServers)
 		if err != nil {
-			return fmt.Errorf("add peer: %w", err)
+			errs = append(errs, fmt.Errorf("add peer: %w", err))
 		}
 	}
 	// Remove any peers that are no longer in the store
@@ -294,9 +297,12 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 			}
 			m.pcmux.Unlock()
 			if err := m.wg.DeletePeer(ctx, peer); err != nil {
-				return fmt.Errorf("delete peer: %w", err)
+				errs = append(errs, fmt.Errorf("delete peer: %w", err))
 			}
 		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 	return nil
 }
