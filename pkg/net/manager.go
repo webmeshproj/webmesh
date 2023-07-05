@@ -287,6 +287,12 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	for _, peer := range currentPeers {
 		if _, ok := seenPeers[peer]; !ok {
 			log.Debug("removing peer", slog.String("peer_id", peer))
+			m.pcmux.Lock()
+			if conn, ok := m.iceConns[peer]; ok {
+				conn.peerConn.Close()
+				delete(m.iceConns, peer)
+			}
+			m.pcmux.Unlock()
 			if err := m.wg.DeletePeer(ctx, peer); err != nil {
 				return fmt.Errorf("delete peer: %w", err)
 			}
@@ -452,7 +458,6 @@ func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, 
 	go func() {
 		// TODO: reopen the connection if it closes and we are still
 		// peered with the node.
-		// Also close the connection if the peer is removed.
 		<-pc.Closed()
 		m.pcmux.Lock()
 		defer m.pcmux.Unlock()
