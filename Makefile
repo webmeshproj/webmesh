@@ -75,8 +75,7 @@ DOCKER ?= docker
 build-image: ## Build the node build image.
 	$(DOCKER) build -t $(BUILD_IMAGE) -f Dockerfile.build .
 
-dist-linux: generate ## Build binaries for all Linux platforms.
-	rm -rf $(DIST)
+dist-linux: generate ## Build distribution binaries for all Linux platforms.
 	mkdir -p $(DIST)
 	docker run --rm \
 		-u $(shell id -u):$(shell id -g) \
@@ -85,23 +84,32 @@ dist-linux: generate ## Build binaries for all Linux platforms.
 		-v "$(shell go env GOPATH):/go" \
 		-e GOPATH=/go \
 		-w /build \
-		$(BUILD_IMAGE) make -j $(shell nproc) dist-node dist-ctl
-	cd "$(DIST)" ; sha256sum * > sha256sums-linux.txt
+		$(BUILD_IMAGE) make -j $(shell nproc) dist-node-linux-all dist-ctl-linux-all
 
-dist-darwin: generate ## Build binaries for all Darwin platforms.
-	rm -rf $(DIST)
+dist-windows: generate ## Build distribution binaries for Windows.
+	mkdir -p $(DIST)
+	docker run --rm \
+		-u $(shell id -u):$(shell id -g) \
+		-v "$(CURDIR):/build" \
+		-v "$(shell go env GOCACHE):/.cache/go-build" \
+		-v "$(shell go env GOPATH):/go" \
+		-e GOPATH=/go \
+		-w /build \
+		$(BUILD_IMAGE) make -j $(shell nproc) dist-node-windows-amd64 dist-ctl-windows-amd64
+
+dist-darwin: generate ## Build distribution binaries for all Darwin platforms.
+	mkdir -p $(DIST)
 	$(MAKE) dist-node-darwin dist-ctl-darwin
 	upx --best --lzma $(DIST)/*
-	cd "$(DIST)" ; shasum -a 256 * > sha256sums-darwin.txt
 
-dist-node:
+dist-node-linux-all:
 	$(MAKE) \
 		dist-node-linux-amd64 \
 		dist-node-linux-arm64 \
 		dist-node-linux-arm
 	upx --best --lzma $(DIST)/$(NAME)_*
 
-dist-ctl:
+dist-ctl-linux-all:
 	$(MAKE) \
 		dist-ctl-linux-amd64 \
 		dist-ctl-linux-arm64 \
@@ -117,6 +125,11 @@ dist-node-linux-arm64:
 dist-node-linux-arm:
 	$(call dist-build,$(NAME),linux,arm,arm-linux-musleabihf-gcc)
 
+dist-node-windows-amd64:
+	$(call dist-build,$(NAME),windows,amd64,x86_64-w64-mingw32-gcc)
+	mv $(DIST)/$(NAME)_windows_amd64 $(DIST)/$(NAME)_windows_amd64.exe
+	upx --best --lzma $(DIST)/$(NAME)_windows_amd64.exe
+
 dist-ctl-linux-amd64:
 	$(call dist-build,$(CTL),linux,amd64,x86_64-linux-musl-gcc)
 
@@ -125,6 +138,11 @@ dist-ctl-linux-arm64:
 
 dist-ctl-linux-arm:
 	$(call dist-build,$(CTL),linux,arm,arm-linux-musleabihf-gcc)
+
+dist-ctl-windows-amd64:
+	$(call dist-build,$(CTL),windows,amd64,x86_64-w64-mingw32-gcc)
+	mv $(DIST)/$(CTL)_windows_amd64 $(DIST)/$(CTL)_windows_amd64.exe
+	upx --best --lzma $(DIST)/$(CTL)_windows_amd64.exe
 
 dist-node-darwin:
 	$(call dist-build,$(NAME),darwin,amd64,)

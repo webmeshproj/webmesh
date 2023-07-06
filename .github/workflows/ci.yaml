@@ -44,8 +44,8 @@ jobs:
         shell: bash
         run: make test
 
-  build-publish-linux:
-    name: Build and Publish Linux Artifacts
+  build-nix-windows:
+    name: Build Linux/Windows Artifacts
     runs-on: ubuntu-latest
     needs: [tests]
     permissions:
@@ -104,7 +104,7 @@ jobs:
         shell: bash
         env:
           BUILD_IMAGE: ghcr.io/webmeshproj/node-buildx:latest
-        run: make dist-linux
+        run: make dist-linux dist-windows
 
       - name: Login to GHCR
         uses: docker/login-action@v2
@@ -157,16 +157,14 @@ jobs:
           cosign sign --yes --recursive ${ALPINE_IMAGE_NAME}@${{ steps.alpine-build.outputs.digest }}
           cosign sign --yes --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.distroless-build.outputs.digest }}
 
-      - name: Upload CLI Artifacts
-        uses: softprops/action-gh-release@v1
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
         with:
-          name: "Release ${{ github.ref_name }}"
-          files: |
-            dist/*
+          name: artifacts-nix-windows
+          path: dist/*
 
-  build-publish-darwin:
-    name: Build and Publish macOS Artifacts
+  build-darwin:
+    name: Build macOS Artifacts
     runs-on: macos-12
     needs: [tests]
     permissions:
@@ -212,6 +210,37 @@ jobs:
         run: make dist-darwin -j 2
 
       - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts-darwin
+          path: dist/*
+
+  publish:
+    name: Publish Artifacts
+    runs-on: ubuntu-latest
+    needs: [tests, build-nix-windows, build-darwin]
+    permissions:
+      contents: "write"
+      id-token: "write"
+      packages: "write"
+    steps:
+      - name: Download Nix/Windows Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts-nix-windows
+
+      - name: Download macOS Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: artifacts-darwin
+
+      - name: Compute Checksums
+        shell: bash
+        run: |
+          ls -alh dist
+          cd dist ; sha256sum * > sha256sums.txt
+
+      - name: Publish Artifacts
         uses: softprops/action-gh-release@v1
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
