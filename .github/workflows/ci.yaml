@@ -219,6 +219,7 @@ jobs:
     name: Publish Artifacts
     runs-on: ubuntu-latest
     needs: [tests, build-nix-windows, build-darwin]
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
     permissions:
       contents: "write"
       id-token: "write"
@@ -244,7 +245,6 @@ jobs:
 
       - name: Publish Artifacts
         uses: softprops/action-gh-release@v1
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           name: "Release ${{ github.ref_name }}"
           files: |
