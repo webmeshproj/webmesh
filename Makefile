@@ -83,7 +83,7 @@ dist-windows: generate ## Build distribution binaries for Windows.
 	$(MAKE) build-in-docker DOCKER_BUILD_TARGETS="dist-windows-all"
 	upx --best --lzma $(DIST)/*_windows_*
 
-dist-linux-windows: ## An alias for dist-linux and dist-windows in a single docker execution.
+dist-linux-windows: generate ## An alias for dist-linux and dist-windows in a single docker execution.
 	$(MAKE) build-in-docker DOCKER_BUILD_TARGETS="dist-linux-windows-all"
 	upx --best --lzma $(DIST)/*_linux_* $(DIST)/*_windows_*
 
