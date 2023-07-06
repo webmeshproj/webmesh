@@ -43,7 +43,7 @@ func RemoveInterface(ctx context.Context, ifaceName string) error {
 
 // InterfaceNetwork returns the network for the given interface and address.
 func InterfaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Prefix, error) {
-	out, err := ExecOutput(context.Background(), "ifconfig", ifaceName)
+	out, err := util.ExecOutput(context.Background(), "ifconfig", ifaceName)
 	if err != nil {
 		return netip.Prefix{}, fmt.Errorf("ifconfig %s: %w: %s", ifaceName, err, out)
 	}
