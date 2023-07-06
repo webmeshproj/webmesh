@@ -72,7 +72,7 @@ lint: ## Run linters.
 
 DOCKER ?= docker
 
-build-image: ## Build the node build image.
+build-image: ## Build the cross-compiler container image.
 	$(DOCKER) build -t $(BUILD_IMAGE) -f Dockerfile.build .
 
 dist-linux: generate ## Build distribution binaries for all Linux platforms.
