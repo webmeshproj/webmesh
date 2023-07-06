@@ -3,14 +3,13 @@ FROM golang:1.20-alpine
 # Install build dependencies
 RUN apk add --update curl build-base musl musl-dev git make upx
 
-# Download toolchains
-RUN curl -JLO https://musl.cc/x86_64-linux-musl-cross.tgz \
-    && curl -JLO https://musl.cc/aarch64-linux-musl-cross.tgz \
-    && curl -JLO https://musl.cc/arm-linux-musleabihf-cross.tgz \
-    && curl -JLO https://musl.cc/x86_64-w64-mingw32-cross.tgz
-
-# Install toolchains
-RUN tar -xzf x86_64-linux-musl-cross.tgz \
+# Download and install cross toolchains
+RUN set -x ; curl -Z -JL --remote-name-all \
+    https://musl.cc/x86_64-linux-musl-cross.tgz \
+    https://musl.cc/aarch64-linux-musl-cross.tgz \
+    https://musl.cc/arm-linux-musleabihf-cross.tgz \
+    https://musl.cc/x86_64-w64-mingw32-cross.tgz \
+    && tar -xzf x86_64-linux-musl-cross.tgz \
     && tar -xzf aarch64-linux-musl-cross.tgz \
     && tar -xzf arm-linux-musleabihf-cross.tgz \
     && tar -xzf x86_64-w64-mingw32-cross.tgz \
