@@ -17,22 +17,22 @@ limitations under the License.
 package system
 
 import (
-	"bufio"
 	"context"
-	"encoding/binary"
-	"encoding/hex"
-	"errors"
 	"fmt"
-	"io/fs"
 	"net"
 	"net/netip"
-	"os"
-	"strings"
 
 	"github.com/jsimonetti/rtnetlink"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
+	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/device"
+	"golang.zx2c4.com/wireguard/ipc"
+	"golang.zx2c4.com/wireguard/tun"
 	"pault.ag/go/modprobe"
+
+	"github.com/webmeshproj/node/pkg/net/system/link"
+	"github.com/webmeshproj/node/pkg/net/system/routes"
 )
 
 func newInterface(ctx context.Context, opts *Options) (Interface, error) {
@@ -40,7 +40,7 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 		opts.MTU = DefaultMTU
 	}
 	if opts.ForceTUN {
-		return NewTUN(ctx, opts)
+		return newTUN(ctx, opts)
 	}
 	logger := slog.Default().With(
 		slog.String("component", "wireguard"),
@@ -51,11 +51,11 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 		if err != nil {
 			// Try to fallback to TUN
 			logger.Error("load wireguard kernel module, falling back to TUN", slog.String("error", err.Error()))
-			return NewTUN(ctx, opts)
+			return newTUN(ctx, opts)
 		}
 	}
 	if !opts.DefaultGateway.IsValid() {
-		defaultGateway, err := GetDefaultGateway(ctx)
+		defaultGateway, err := routes.GetDefaultGateway(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("detect current default gateway")
 		}
@@ -68,315 +68,221 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 	return iface, iface.create(ctx)
 }
 
-// EnableIPForwarding enables IP forwarding.
-func EnableIPForwarding() error {
-	on := []byte("1")
-	mode := fs.FileMode(0644)
-	err := os.WriteFile("/proc/sys/net/ipv4/conf/all/forwarding", on, mode)
-	if err != nil {
-		return fmt.Errorf("failed to enable IPv4 forwarding: %w", err)
-	}
-	// Write to the legacy configuration file
-	err = os.WriteFile("/proc/sys/net/ipv4/ip_forward", on, mode)
-	if err != nil {
-		return fmt.Errorf("failed to enable IPv4 forwarding: %w", err)
-	}
-	err = os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", on, mode)
-	if err != nil {
-		return fmt.Errorf("failed to enable IPv6 forwarding: %w", err)
-	}
-	return nil
+type linuxKernelInterface struct {
+	opts *Options
+	log  *slog.Logger
 }
 
-// RemoveInterface removes the given interface.
-func RemoveInterface(ifaceName string) error {
+// Name returns the real name of the interface.
+func (l *linuxKernelInterface) Name() string {
+	return l.opts.Name
+}
+
+// AddressV4 should return the current private address of this interface
+func (l *linuxKernelInterface) AddressV4() netip.Prefix {
+	return l.opts.NetworkV4
+}
+
+// AddressV6 should return the current private address of this interface
+func (l *linuxKernelInterface) AddressV6() netip.Prefix {
+	return l.opts.NetworkV6
+}
+
+// Up activates the interface
+func (l *linuxKernelInterface) Up(ctx context.Context) error {
+	return link.ActivateInterface(ctx, l.opts.Name)
+}
+
+// Down deactivates the interface
+func (l *linuxKernelInterface) Down(ctx context.Context) error {
+	return link.DeactivateInterface(ctx, l.opts.Name)
+}
+
+// Destroy destroys the interface
+func (l *linuxKernelInterface) Destroy(ctx context.Context) error {
+	return link.RemoveInterface(ctx, l.opts.Name)
+}
+
+// AddRoute adds a route for the given network.
+func (l *linuxKernelInterface) AddRoute(ctx context.Context, network netip.Prefix) error {
+	return routes.Add(ctx, l.opts.Name, network)
+}
+
+// RemoveRoute removes the route for the given network.
+func (l *linuxKernelInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
+	return routes.Remove(ctx, l.opts.Name, network)
+}
+
+func (l *linuxKernelInterface) create(ctx context.Context) error {
 	conn, err := rtnetlink.Dial(nil)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	iface, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		return fmt.Errorf("failed to get interface: %w", err)
-	}
-	return conn.Link.Delete(uint32(iface.Index))
-}
-
-// GetDefaultGateway returns the default gateway of the current system.
-func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
-	f, err := os.Open("/proc/net/route")
-	if err != nil {
-		return netip.Addr{}, fmt.Errorf("could not open /proc/net/route: %w", err)
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-		fields := strings.Fields(line)
-		if len(fields) < 8 {
-			continue
-		}
-		// Skip non-default routes.
-		// Second field is the destination and should be 00000000.
-		// Eighth field is the mask and should be 00000000.
-		if fields[1] != "00000000" || fields[7] != "00000000" {
-			continue
-		}
-		// The gateway IP is in the 3rd field of the route encoded as a hex string.
-		return decodeKernelHexIP(fields[2])
-	}
-	if err := scanner.Err(); err != nil {
-		return netip.Addr{}, fmt.Errorf("could not read /proc/net/route: %w", err)
-	}
-	return netip.Addr{}, errors.New("could not determine current default gateway")
-}
-
-// ActivateInterface activates the interface with the given name.
-func ActivateInterface(ctx context.Context, name string) error {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		return fmt.Errorf("get interface: %w", err)
-	}
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	// Request the details of the interface
-	msg, err := conn.Link.Get(uint32(iface.Index))
-	if err != nil {
-		return fmt.Errorf("get interface details: %w", err)
-	}
-	// Check if the interface is already up
-	state := msg.Attributes.OperationalState
-	if state == rtnetlink.OperStateUp || state == rtnetlink.OperStateUnknown {
-		return nil
-	}
+	name := l.opts.Name
 	req := &rtnetlink.LinkMessage{
 		Family: unix.AF_UNSPEC,
-		Type:   msg.Type,
-		Index:  uint32(iface.Index),
-		Flags:  unix.IFF_UP,
-		Change: unix.IFF_UP,
+		Type:   unix.RTM_NEWLINK,
+		Flags: unix.NLM_F_REQUEST |
+			unix.NLM_F_ACK |
+			unix.NLM_F_EXCL | // fail if already exists
+			unix.NLM_F_CREATE, // create if it does not exist
+		Attributes: &rtnetlink.LinkAttributes{
+			Name:  name,
+			Alias: &name,
+			Type:  unix.ARPHRD_NETROM,
+			MTU:   l.opts.MTU,
+			Info:  &rtnetlink.LinkInfo{Kind: "wireguard"},
+		},
 	}
-	slog.Default().Debug("set interface up",
+	slog.Default().Debug("creating wireguard interface",
 		slog.Any("request", req),
-		slog.String("interface", iface.Name))
-	err = conn.Link.Set(req)
+		slog.String("name", name))
+	err = conn.Link.New(req)
 	if err != nil {
-		return fmt.Errorf("set interface up: %w", err)
+		return fmt.Errorf("create wireguard interface: %w", err)
 	}
-	return nil
-}
-
-// DeactivateInterface deactivates the interface with the given name.
-func DeactivateInterface(ctx context.Context, name string) error {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		return fmt.Errorf("get interface: %w", err)
-	}
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	// Request the details of the interface
-	msg, err := conn.Link.Get(uint32(iface.Index))
-	if err != nil {
-		return fmt.Errorf("get interface details: %w", err)
-	}
-	// Check if the interface is already down
-	state := msg.Attributes.OperationalState
-	if state == rtnetlink.OperStateDown {
-		return nil
-	}
-	req := &rtnetlink.LinkMessage{
-		Family: 0x0,
-		Type:   msg.Type,
-		Index:  uint32(iface.Index),
-		Flags:  0x0,
-		Change: 0x1,
-	}
-	slog.Default().Debug("deactivate interface", slog.Any("request", req))
-	err = conn.Link.Set(req)
-	if err != nil {
-		return fmt.Errorf("set interface down: %w", err)
-	}
-	return nil
-}
-
-// DestroyInterface destroys the interface with the given name.
-func DestroyInterface(ctx context.Context, name string) error {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		return fmt.Errorf("get interface: %w", err)
-	}
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	slog.Default().Debug("destroying network interface", slog.String("name", name))
-	err = conn.Link.Delete(uint32(iface.Index))
-	if err != nil {
-		return fmt.Errorf("delete interface: %w", err)
-	}
-	return nil
-}
-
-// SetInterfaceAddress sets the address of the interface with the given name.
-func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		return fmt.Errorf("get interface by name: %w", err)
-	}
-
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Detect network family
-	family := unix.AF_INET6
-	if addr.Addr().Is4() {
-		family = unix.AF_INET
-	}
-
-	// Calculate the prefix length
-	ones := addr.Bits()
-
-	// Calculate the broadcast IP - only used when family is AF_INET
-	var brd net.IP
-	if addr.Addr().Is4() {
-		to4 := addr.Addr().AsSlice()
-		mask := net.CIDRMask(ones, 32)
-		brd = make(net.IP, len(to4))
-		binary.BigEndian.PutUint32(brd, binary.BigEndian.Uint32(to4)|^binary.BigEndian.Uint32(net.IP(mask).To4()))
-	}
-
-	req := &rtnetlink.AddressMessage{
-		Family:       uint8(family),
-		PrefixLength: uint8(ones),
-		Scope:        unix.RT_SCOPE_UNIVERSE,
-		Index:        uint32(iface.Index),
-		Attributes: &rtnetlink.AddressAttributes{
-			Address:   addr.Addr().AsSlice(),
-			Local:     addr.Addr().AsSlice(),
-			Broadcast: brd,
-		},
-	}
-	slog.Default().With("addr", "add").
-		Debug("adding address", slog.Any("request", req))
-	// Add the address to the interface
-	err = conn.Address.New(req)
-	if err != nil {
-		return fmt.Errorf("add address to interface: %w", err)
-	}
-	return nil
-}
-
-// AddRoute adds a route to the interface with the given name.
-func AddRoute(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	iface, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		return fmt.Errorf("get interface by name: %w", err)
-	}
-
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Detect network family
-	family := unix.AF_INET6
-	if addr.Addr().Is4() {
-		family = unix.AF_INET
-	}
-
-	// Calculate the prefix length
-	ones := addr.Bits()
-
-	// Add the route to the interface
-	req := &rtnetlink.RouteMessage{
-		Family:    uint8(family),
-		Table:     unix.RT_TABLE_MAIN,
-		Protocol:  unix.RTPROT_BOOT,
-		Scope:     unix.RT_SCOPE_LINK,
-		Type:      unix.RTN_UNICAST,
-		DstLength: uint8(ones),
-		Attributes: rtnetlink.RouteAttributes{
-			Dst:      addr.Masked().Addr().AsSlice(),
-			OutIface: uint32(iface.Index),
-		},
-	}
-	slog.Default().With("route", "add").
-		Debug("adding route", slog.Any("request", req))
-	err = conn.Route.Add(req)
-	if err != nil {
-		if strings.Contains(err.Error(), "file exists") {
-			return ErrRouteExists
+	for _, addr := range []netip.Prefix{l.opts.NetworkV4, l.opts.NetworkV6} {
+		if addr.IsValid() {
+			err = link.SetInterfaceAddress(ctx, l.opts.Name, addr)
+			if err != nil {
+				derr := link.RemoveInterface(ctx, l.opts.Name)
+				if derr != nil {
+					return fmt.Errorf("set address %q on wireguard interface: %w, destroy interface: %v", addr.String(), err, derr)
+				}
+				return fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
+			}
 		}
-		return fmt.Errorf("add route to interface: %w", err)
 	}
 	return nil
 }
 
-// RemoveRoute removes a route from the interface with the given name.
-func RemoveRoute(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	iface, err := net.InterfaceByName(ifaceName)
+type linuxTUNInterface struct {
+	opts *Options
+	log  *slog.Logger
+	dev  *device.Device
+	uapi net.Listener
+}
+
+// NewTUN creates a new wireguard interface using the userspace TUN implementation.
+func newTUN(ctx context.Context, opts *Options) (Interface, error) {
+	logger := slog.Default().With(
+		slog.String("component", "wireguard"),
+		slog.String("type", "tun"),
+		slog.String("facility", "device"))
+	if !opts.DefaultGateway.IsValid() {
+		defaultGateway, err := routes.GetDefaultGateway(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect current default gateway")
+		}
+		opts.DefaultGateway = defaultGateway
+	}
+
+	// Create the TUN device
+	tun, err := tun.CreateTUN(opts.Name, device.DefaultMTU)
 	if err != nil {
-		return fmt.Errorf("get interface by name: %w", err)
+		return nil, err
+	}
+	// Get the real name of the interface
+	realName, err := tun.Name()
+	if err == nil {
+		opts.Name = realName
 	}
 
-	conn, err := rtnetlink.Dial(nil)
+	// Open the UAPI socket
+	fileuapi, err := ipc.UAPIOpen(opts.Name)
 	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Detect network family
-	family := unix.AF_INET6
-	if addr.Addr().Is4() {
-		family = unix.AF_INET
+		tun.Close()
+		return nil, err
 	}
 
-	// Calculate the prefix length
-	ones := addr.Bits()
+	// Create the tunnel device
+	device := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(
+		func() int {
+			if logger.Handler().Enabled(context.Background(), slog.LevelDebug) {
+				return device.LogLevelVerbose
+			}
+			return device.LogLevelError
+		}(),
+		fmt.Sprintf("(%s) ", opts.Name),
+	))
 
-	// Delete the route from the interface
-	req := &rtnetlink.RouteMessage{
-		Family:    uint8(family),
-		Table:     unix.RT_TABLE_MAIN,
-		Protocol:  unix.RTPROT_BOOT,
-		Scope:     unix.RT_SCOPE_LINK,
-		Type:      unix.RTN_UNICAST,
-		DstLength: uint8(ones),
-		Attributes: rtnetlink.RouteAttributes{
-			Dst:      addr.Masked().Addr().AsSlice(),
-			OutIface: uint32(iface.Index),
-		},
-	}
-	slog.Default().With("route", "del").
-		Debug("removing route", slog.Any("request", req))
-	err = conn.Route.Delete(req)
+	// Listen for UAPI connections
+	uapi, err := ipc.UAPIListen(opts.Name, fileuapi)
 	if err != nil {
-		return fmt.Errorf("delete route from interface: %w", err)
+		device.Close()
+		return nil, err
 	}
+
+	// Handle UAPI connections
+	go func() {
+		for {
+			conn, err := uapi.Accept()
+			if err != nil {
+				return
+			}
+			go device.IpcHandle(conn)
+		}
+	}()
+
+	iface := &linuxTUNInterface{
+		opts: opts,
+		log:  logger,
+		dev:  device,
+		uapi: uapi,
+	}
+	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
+		if addr.IsValid() {
+			err = link.SetInterfaceAddress(ctx, opts.Name, addr)
+			if err != nil {
+				iface.uapi.Close()
+				iface.dev.Close()
+				return nil, fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
+			}
+		}
+	}
+	return iface, nil
+}
+
+// Name returns the real name of the interface.
+func (l *linuxTUNInterface) Name() string {
+	return l.opts.Name
+}
+
+// AddressV4 should return the current private address of this interface
+func (l *linuxTUNInterface) AddressV4() netip.Prefix {
+	return l.opts.NetworkV4
+}
+
+// AddressV6 should return the current private address of this interface
+func (l *linuxTUNInterface) AddressV6() netip.Prefix {
+	return l.opts.NetworkV6
+}
+
+// Up activates the interface
+func (l *linuxTUNInterface) Up(ctx context.Context) error {
+	return link.ActivateInterface(ctx, l.opts.Name)
+}
+
+// Down deactivates the interface
+func (l *linuxTUNInterface) Down(ctx context.Context) error {
+	return link.DeactivateInterface(ctx, l.opts.Name)
+}
+
+// Destroy destroys the interface
+func (l *linuxTUNInterface) Destroy(ctx context.Context) error {
+	l.uapi.Close()
+	l.dev.Close()
+	// The interface destroys itself when the TUN is closed
 	return nil
 }
 
-func decodeKernelHexIP(hexIP string) (netip.Addr, error) {
-	ip, err := hex.DecodeString(hexIP)
-	if err != nil {
-		return netip.Addr{}, fmt.Errorf("could not decode IP: %w", err)
-	}
-	// IPs in kernel files are returned in network byte order
-	// so we need to reverse it.
-	for i, j := 0, len(ip)-1; i < j; i, j = i+1, j-1 {
-		ip[i], ip[j] = ip[j], ip[i]
-	}
-	out, _ := netip.AddrFromSlice(ip)
-	return out, nil
+// AddRoute adds a route for the given network.
+func (l *linuxTUNInterface) AddRoute(ctx context.Context, network netip.Prefix) error {
+	return routes.Add(ctx, l.opts.Name, network)
+}
+
+// RemoveRoute removes the route for the given network.
+func (l *linuxTUNInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
+	return routes.Remove(ctx, l.opts.Name, network)
 }

@@ -36,7 +36,7 @@ import (
 	"github.com/webmeshproj/node/pkg/util"
 )
 
-//go:generate ../../../web/dashboard/embed.sh
+//go:generate bash ../../../web/dashboard/embed.sh
 //go:embed static/**
 var staticFiles embed.FS
 

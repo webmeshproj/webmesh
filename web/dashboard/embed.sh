@@ -4,13 +4,23 @@
 
 export SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+command-exists() {
+    command -v "$@" >/dev/null 2>&1
+}
+
 set -ex
 
 rm -rf static/dashboard
 
+export VERSION=$(git describe --tags --always --dirty)
 pushd $SCRIPT_DIR
-yarn
-VERSION=$(git describe --tags --always --dirty) yarn build
+if command-exists winpty ; then
+    yarn install </dev/tty
+    yarn build </dev/tty
+else
+    yarn install
+    yarn build
+fi
 popd
 
 cp -r $SCRIPT_DIR/dist/spa static/dashboard

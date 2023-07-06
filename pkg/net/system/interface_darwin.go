@@ -17,18 +17,19 @@ limitations under the License.
 package system
 
 import (
-	"errors"
 	"fmt"
+	"net"
 	"net/netip"
-	"strings"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/util"
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
+
+	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/net/system/link"
+	"github.com/webmeshproj/node/pkg/net/system/routes"
 )
 
 func newInterface(ctx context.Context, opts *Options) (Interface, error) {
@@ -37,7 +38,7 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 		slog.String("type", "tun"),
 		slog.String("facility", "device"))
 	if !opts.DefaultGateway.IsValid() {
-		defaultGateway, err := GetDefaultGateway(ctx)
+		defaultGateway, err := routes.GetDefaultGateway(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect current default gateway")
 		}
@@ -99,7 +100,7 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 	}
 	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
 		if addr.IsValid() {
-			err = SetInterfaceAddress(ctx, opts.Name, addr)
+			err = link.SetInterfaceAddress(ctx, opts.Name, addr)
 			if err != nil {
 				iface.uapi.Close()
 				iface.dev.Close()
@@ -110,67 +111,52 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 	return iface, nil
 }
 
-// EnableIPForwarding enables IP forwarding.
-func EnableIPForwarding() error {
-	return util.Exec(context.Background(), "sysctl", "-w", "net.inet.ip.forwarding=1")
+type darwinTUNInterface struct {
+	opts *Options
+	log  *slog.Logger
+	dev  *device.Device
+	uapi net.Listener
 }
 
-// RemoveInterface removes the given interface.
-func RemoveInterface(ifaceName string) error {
-	return util.Exec(context.Background(), "ifconfig", ifaceName, "destroy")
+// Name returns the real name of the interface.
+func (l *darwinTUNInterface) Name() string {
+	return l.opts.Name
 }
 
-// GetDefaultGateway returns the default gateway of the current system.
-func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
-	out, err := util.ExecOutput(ctx, "route", "-n", "get", "default")
-	if err != nil {
-		return netip.Addr{}, fmt.Errorf("failed to get default gateway: %w", err)
-	}
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "gateway:") {
-			return netip.ParseAddr(strings.TrimSpace(line[8:]))
-		}
-	}
-	return netip.Addr{}, errors.New("no default gateway found")
+// AddressV4 should return the current private address of this interface
+func (l *darwinTUNInterface) AddressV4() netip.Prefix {
+	return l.opts.NetworkV4
 }
 
-// ActivateInterface activates the interface with the given name.
-func ActivateInterface(ctx context.Context, name string) error {
-	return util.Exec(ctx, "ifconfig", name, "up")
+// AddressV6 should return the current private address of this interface
+func (l *darwinTUNInterface) AddressV6() netip.Prefix {
+	return l.opts.NetworkV6
 }
 
-// DeactivateInterface deactivates the interface with the given name.
-func DeactivateInterface(ctx context.Context, name string) error {
-	return util.Exec(ctx, "ifconfig", name, "down")
+// Up activates the interface
+func (l *darwinTUNInterface) Up(ctx context.Context) error {
+	return link.ActivateInterface(ctx, l.opts.Name)
 }
 
-// DestroyInterface destroys the interface with the given name.
-func DestroyInterface(ctx context.Context, name string) error {
-	return util.Exec(ctx, "ifconfig", name, "destroy")
+// Down deactivates the interface
+func (l *darwinTUNInterface) Down(ctx context.Context) error {
+	return link.DeactivateInterface(ctx, l.opts.Name)
 }
 
-// SetInterfaceAddress sets the address of the interface with the given name.
-func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
-	if addr.Addr().Is4() {
-		return util.Exec(ctx, "ifconfig", name, "inet", addr.String(), addr.Addr().String())
-	}
-	return util.Exec(ctx, "ifconfig", name, "inet6", addr.String(), "prefixlen", fmt.Sprintf("%d", addr.Bits()), "alias")
+// Destroy destroys the interface
+func (l *darwinTUNInterface) Destroy(ctx context.Context) error {
+	l.uapi.Close()
+	l.dev.Close()
+	// The interface destroys itself when the TUN is closed
+	return nil
 }
 
-// AddRoute adds a route to the interface with the given name.
-func AddRoute(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	return util.Exec(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
+// AddRoute adds a route for the given network.
+func (l *darwinTUNInterface) AddRoute(ctx context.Context, network netip.Prefix) error {
+	return routes.Add(ctx, l.opts.Name, network)
 }
 
-// RemoveRoute removes a route from the interface with the given name.
-func RemoveRoute(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	return util.Exec(ctx, "route", "-n", "delete", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
-}
-
-func getFamily(addr netip.Addr) string {
-	if addr.Is4() {
-		return "inet"
-	}
-	return "inet6"
+// RemoveRoute removes the route for the given network.
+func (l *darwinTUNInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
+	return routes.Remove(ctx, l.opts.Name, network)
 }

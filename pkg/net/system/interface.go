@@ -23,10 +23,9 @@ import (
 	"net"
 	"net/netip"
 	"strings"
-)
 
-// ErrRouteExists is returned when a route already exists.
-var ErrRouteExists = errors.New("route already exists")
+	"github.com/webmeshproj/node/pkg/net/system/routes"
+)
 
 // DefaultMTU is the default MTU for wireguard interfaces.
 const DefaultMTU = 1350
@@ -82,7 +81,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 
 // IsRouteExists returns true if the given error is a route exists error.
 func IsRouteExists(err error) bool {
-	return errors.Is(err, ErrRouteExists)
+	return errors.Is(err, routes.ErrRouteExists)
 }
 
 // IsInterfaceNotExists returns true if the given error is an interface not exists error.

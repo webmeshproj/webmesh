@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package endpoints
 
 import (
 	"context"
@@ -22,10 +22,13 @@ import (
 	"net"
 	"net/netip"
 	"time"
+
+	"github.com/webmeshproj/node/pkg/net/system/link"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
-// EndpointDetectOpts contains options for endpoint detection.
-type EndpointDetectOpts struct {
+// DetectOpts contains options for endpoint detection.
+type DetectOpts struct {
 	// DetectIPv6 enables IPv6 detection.
 	DetectIPv6 bool
 	// DetectPrivate enables private address detection.
@@ -79,8 +82,8 @@ func (a PrefixList) Less(i, j int) bool {
 	return a[i].Addr().Less(a[j].Addr())
 }
 
-// DetectEndpoints detects endpoints for this machine.
-func DetectEndpoints(ctx context.Context, opts EndpointDetectOpts) (PrefixList, error) {
+// Detect detects endpoints for this machine.
+func Detect(ctx context.Context, opts DetectOpts) (PrefixList, error) {
 	addrs, err := detectFromInterfaces(&opts)
 	if err != nil {
 		return nil, err
@@ -154,7 +157,7 @@ func DetectPublicAddresses(ctx context.Context) ([]netip.Addr, error) {
 	return out, nil
 }
 
-func detectFromInterfaces(opts *EndpointDetectOpts) (PrefixList, error) {
+func detectFromInterfaces(opts *DetectOpts) (PrefixList, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil, fmt.Errorf("list interfaces: %w", err)
@@ -170,7 +173,7 @@ func detectFromInterfaces(opts *EndpointDetectOpts) (PrefixList, error) {
 		if iface.Flags&net.FlagPointToPoint != 0 {
 			continue
 		}
-		if Contains(opts.SkipInterfaces, iface.Name) {
+		if util.Contains(opts.SkipInterfaces, iface.Name) {
 			continue
 		}
 		addrs, err := iface.Addrs()
@@ -190,14 +193,14 @@ func detectFromInterfaces(opts *EndpointDetectOpts) (PrefixList, error) {
 				continue
 			}
 			if addr.Is6() && opts.DetectIPv6 {
-				prefix, err := ifaceNetwork(iface.Name, addr, true)
+				prefix, err := link.InterfaceNetwork(iface.Name, addr, true)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get network for interface %s: %w", iface.Name, err)
 				}
 				ips = append(ips, prefix)
 			}
 			if addr.Is4() {
-				prefix, err := ifaceNetwork(iface.Name, addr, false)
+				prefix, err := link.InterfaceNetwork(iface.Name, addr, false)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get network for interface %s: %w", iface.Name, err)
 				}

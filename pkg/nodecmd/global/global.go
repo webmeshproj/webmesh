@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/webmeshproj/node/pkg/net/endpoints"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/services"
@@ -146,7 +147,7 @@ When detect-endpoints is true, this value will be the first address detected.`)
 // Overlay overlays the global options onto the given option sets.
 func (o *Options) Overlay(opts ...any) error {
 	var primaryEndpoint netip.Addr
-	var endpoints util.PrefixList
+	var detectedEndpoints endpoints.PrefixList
 	var err error
 	if o.PrimaryEndpoint != "" {
 		primaryEndpoint, err = netip.ParseAddr(o.PrimaryEndpoint)
@@ -155,7 +156,7 @@ func (o *Options) Overlay(opts ...any) error {
 		}
 	}
 	if o.DetectEndpoints || o.DetectPrivateEndpoints {
-		endpoints, err = util.DetectEndpoints(context.Background(), util.EndpointDetectOpts{
+		detectedEndpoints, err = endpoints.Detect(context.Background(), endpoints.DetectOpts{
 			DetectIPv6:           o.DetectIPv6,
 			DetectPrivate:        o.DetectPrivateEndpoints,
 			AllowRemoteDetection: o.AllowRemoteDetection,
@@ -163,14 +164,14 @@ func (o *Options) Overlay(opts ...any) error {
 		if err != nil {
 			return fmt.Errorf("failed to detect endpoints: %w", err)
 		}
-		sort.Sort(endpoints)
-		if len(endpoints) > 0 {
+		sort.Sort(detectedEndpoints)
+		if len(detectedEndpoints) > 0 {
 			if !primaryEndpoint.IsValid() {
-				primaryEndpoint = endpoints[0].Addr()
-				if len(endpoints) > 1 {
-					endpoints = endpoints[1:]
+				primaryEndpoint = detectedEndpoints[0].Addr()
+				if len(detectedEndpoints) > 1 {
+					detectedEndpoints = detectedEndpoints[1:]
 				} else {
-					endpoints = nil
+					detectedEndpoints = nil
 				}
 			}
 		}
@@ -260,7 +261,7 @@ func (o *Options) Overlay(opts ...any) error {
 					if primaryEndpoint.IsValid() {
 						eps = append(eps, netip.AddrPortFrom(primaryEndpoint, uint16(wireguardPort)).String())
 					}
-					for _, endpoint := range endpoints {
+					for _, endpoint := range detectedEndpoints {
 						ep := netip.AddrPortFrom(endpoint.Addr(), uint16(wireguardPort)).String()
 						if ep != v.Mesh.PrimaryEndpoint {
 							eps = append(eps, ep)

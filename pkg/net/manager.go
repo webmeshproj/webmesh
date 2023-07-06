@@ -33,6 +33,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net/datachannels"
+	"github.com/webmeshproj/node/pkg/net/endpoints"
 	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/mesh"
 	"github.com/webmeshproj/node/pkg/net/system"
@@ -399,7 +400,7 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 	// Check if we are using zone awareness and the peer is in the same zone
 	if m.opts.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() == m.opts.ZoneAwarenessID {
 		log.Debug("using zone awareness, collecting local CIDRs")
-		localCIDRs, err := util.DetectEndpoints(ctx, util.EndpointDetectOpts{
+		localCIDRs, err := endpoints.Detect(ctx, endpoints.DetectOpts{
 			DetectPrivate:  true,
 			DetectIPv6:     true,
 			SkipInterfaces: []string{m.wg.Name()},

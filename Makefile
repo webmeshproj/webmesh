@@ -14,8 +14,11 @@ BUILD_TAGS  ?= osusergo,netgo,sqlite_omit_load_extension,sqlite_vacuum_incr,sqli
 ARCH  ?= $(shell go env GOARCH)
 OS    ?= $(shell go env GOOS)
 
+ifeq ($(OS),Windows_NT)
+	OS := windows
+endif
+
 ifeq ($(OS),darwin)
-	# We can't do static builds on darwin
 	EXTLDFLAGS :=
 else
 	EXTLDFLAGS := -static
@@ -38,7 +41,13 @@ help: ## Display this help.
 
 ##@ Build
 
+ifeq ($(OS),windows)
+# Generate is buggy on windows depending on the setup, so comment out for local dev.
+# The windows binary is built via Linux in CI.
+build: fmt vet ## Build node binary for the local platform.
+else
 build: fmt vet generate ## Build node binary for the local platform.
+endif
 	go build \
 		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
@@ -153,7 +162,11 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
+ifeq ($(OS),windows)
+	echo "Skipping go fmt on windows"
+else
 	go fmt ./...
+endif
 
 .PHONY: vet
 vet: ## Run go vet against code.

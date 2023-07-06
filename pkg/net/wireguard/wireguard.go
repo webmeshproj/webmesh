@@ -33,6 +33,8 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/node/pkg/net/system"
+	"github.com/webmeshproj/node/pkg/net/system/link"
+	"github.com/webmeshproj/node/pkg/net/system/routes"
 )
 
 // DefaultInterfaceName is the default name to use for the WireGuard interface.
@@ -121,7 +123,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 				return nil, fmt.Errorf("failed to get interface: %w", err)
 			}
 		} else if iface != nil {
-			err = system.RemoveInterface(opts.Name)
+			err = link.RemoveInterface(ctx, opts.Name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to delete interface: %w", err)
 			}
@@ -129,7 +131,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	}
 	if os.Getuid() == 0 {
 		log.Debug("enabling ip forwarding")
-		err := system.EnableIPForwarding()
+		err := routes.EnableIPForwarding()
 		if err != nil {
 			log.Warn("failed to enable ip forwarding", "error", err)
 		}
