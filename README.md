@@ -86,7 +86,7 @@ You can run `make help` to see all the available targets.
 
 ## Roadmap
 
-- [ ] Add Windows Support.
+- [ ] GUI Application.
 - [ ] Potential SaaS offering for those who don't want to run their own controllers or have a simple off-site backup of the mesh state.
 - [ ] Ability to peer with other meshes. This would allow for a mesh to be split into multiple smaller meshes that can still communicate with each other.
 
