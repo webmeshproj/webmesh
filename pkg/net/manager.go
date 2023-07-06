@@ -34,9 +34,9 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net/datachannels"
 	"github.com/webmeshproj/node/pkg/net/endpoints"
-	"github.com/webmeshproj/node/pkg/net/firewall"
 	"github.com/webmeshproj/node/pkg/net/mesh"
 	"github.com/webmeshproj/node/pkg/net/system"
+	"github.com/webmeshproj/node/pkg/net/system/firewall"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/util"
 )
