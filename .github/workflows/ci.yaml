@@ -228,11 +228,13 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: artifacts-nix-windows
+          path: dist
 
       - name: Download macOS Artifacts
         uses: actions/download-artifact@v2
         with:
           name: artifacts-darwin
+          path: dist
 
       - name: Compute Checksums
         shell: bash
