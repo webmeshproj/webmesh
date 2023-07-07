@@ -18,7 +18,6 @@ limitations under the License.
 package system
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -28,6 +27,7 @@ import (
 
 	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/net/system/link"
 	"github.com/webmeshproj/node/pkg/net/system/routes"
 )
@@ -79,9 +79,8 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	if opts.MTU == 0 {
 		opts.MTU = DefaultMTU
 	}
-	log := slog.Default().With(
-		slog.String("component", "wireguard"),
-		slog.String("facility", "device"))
+	log := context.LoggerFrom(ctx).With(slog.String("component", "wireguard"))
+	ctx = context.WithLogger(ctx, log)
 	iface := &sysInterface{
 		opts: opts,
 	}
