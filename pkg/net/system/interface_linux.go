@@ -64,6 +64,9 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 		log:  logger,
 	}
 	err := link.New(ctx, opts.Name, opts.MTU)
+	if err != nil {
+		return nil, fmt.Errorf("new link: %w", err)
+	}
 	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
 		if addr.IsValid() {
 			err = link.SetInterfaceAddress(ctx, opts.Name, addr)
