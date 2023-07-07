@@ -37,70 +37,18 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 		slog.String("component", "wireguard"),
 		slog.String("type", "tun"),
 		slog.String("facility", "device"))
-	if !opts.DefaultGateway.IsValid() {
-		defaultGateway, err := routes.GetDefaultGateway(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect current default gateway")
-		}
-		opts.DefaultGateway = defaultGateway
-	}
-
-	// Create the TUN device
-	tun, err := tun.CreateTUN(opts.Name, device.DefaultMTU)
+	name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
 	if err != nil {
-		return nil, fmt.Errorf("create tun: %w", err)
+		return nil, fmt.Errorf("new tun: %w", err)
 	}
-	// Get the real name of the interface
-	realName, err := tun.Name()
-	if err == nil {
-		opts.Name = realName
-	}
-
-	// Open the UAPI socket
-	fileuapi, err := ipc.UAPIOpen(opts.Name)
-	if err != nil {
-		tun.Close()
-		return nil, fmt.Errorf("open uapi: %w", err)
-	}
-
-	// Create the tunnel device
-	device := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(
-		func() int {
-			if logger.Handler().Enabled(context.Background(), slog.LevelDebug) {
-				return device.LogLevelVerbose
-			}
-			return device.LogLevelError
-		}(),
-		fmt.Sprintf("(%s) ", opts.Name),
-	))
-
-	// Listen for UAPI connections
-	uapi, err := ipc.UAPIListen(opts.Name, fileuapi)
-	if err != nil {
-		device.Close()
-		return nil, fmt.Errorf("listen uapi: %w", err)
-	}
-
-	// Handle UAPI connections
-	go func() {
-		for {
-			conn, err := uapi.Accept()
-			if err != nil {
-				return
-			}
-			go device.IpcHandle(conn)
-		}
-	}()
-
+	opts.Name = name
 	iface := &darwinTUNInterface{
-		opts: opts,
-		log:  logger,
-		dev:  device,
-		uapi: uapi,
+		opts:  opts,
+		close: closer,
 	}
 	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
 		if addr.IsValid() {
-			err = link.SetInterfaceAddress(ctx, opts.Name, addr)
+			err := link.SetInterfaceAddress(ctx, opts.Name, addr)
 			if err != nil {
 				iface.uapi.Close()
 				iface.dev.Close()
@@ -112,10 +60,8 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 }
 
 type darwinTUNInterface struct {
-	opts *Options
-	log  *slog.Logger
-	dev  *device.Device
-	uapi net.Listener
+	opts  *Options
+	close func()
 }
 
 // Name returns the real name of the interface.
@@ -145,9 +91,7 @@ func (l *darwinTUNInterface) Down(ctx context.Context) error {
 
 // Destroy destroys the interface
 func (l *darwinTUNInterface) Destroy(ctx context.Context) error {
-	l.uapi.Close()
-	l.dev.Close()
-	// The interface destroys itself when the TUN is closed
+	l.close()
 	return nil
 }
 

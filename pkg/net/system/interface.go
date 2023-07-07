@@ -62,9 +62,6 @@ type Options struct {
 	NetworkV4 netip.Prefix
 	// NetworkV6 is the private IPv6 network of this interface.
 	NetworkV6 netip.Prefix
-	// DefaultGateway is the default gateway for the interface.
-	// If unset, it will be automatically detected from the host.
-	DefaultGateway netip.Addr
 	// ForceTUN forces the use of a TUN interface.
 	ForceTUN bool
 	// Modprobe attempts to load the wireguard kernel module.

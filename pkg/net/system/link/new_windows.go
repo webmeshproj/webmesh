@@ -19,9 +19,7 @@ package link
 import (
 	"fmt"
 
-	"github.com/jsimonetti/rtnetlink"
 	"golang.org/x/exp/slog"
-	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/ipc"
@@ -29,38 +27,6 @@ import (
 
 	"github.com/webmeshproj/node/pkg/context"
 )
-
-// New creates a new WireGuard interface on the host system with the given name.
-func New(ctx context.Context, name string, mtu uint32) error {
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	req := &rtnetlink.LinkMessage{
-		Family: unix.AF_UNSPEC,
-		Type:   unix.RTM_NEWLINK,
-		Flags: unix.NLM_F_REQUEST |
-			unix.NLM_F_ACK |
-			unix.NLM_F_EXCL | // fail if already exists
-			unix.NLM_F_CREATE, // create if it does not exist
-		Attributes: &rtnetlink.LinkAttributes{
-			Name:  name,
-			Alias: &name,
-			Type:  unix.ARPHRD_NETROM,
-			MTU:   mtu,
-			Info:  &rtnetlink.LinkInfo{Kind: "wireguard"},
-		},
-	}
-	context.LoggerFrom(ctx).Debug("creating wireguard interface",
-		slog.Any("request", req),
-		slog.String("name", name))
-	err = conn.Link.New(req)
-	if err != nil {
-		return fmt.Errorf("create wireguard interface: %w", err)
-	}
-	return nil
-}
 
 // NewTUN creates a new WireGuard interface using the userspace tun driver.
 func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, closer func(), err error) {
@@ -76,12 +42,6 @@ func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, clos
 		err = fmt.Errorf("get tun name: %w", err)
 		return
 	}
-	// Open the UAPI socket
-	fileuapi, err := ipc.UAPIOpen(name)
-	if err != nil {
-		tun.Close()
-		return
-	}
 	// Create the tunnel device
 	device := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(
 		func() int {
@@ -93,7 +53,7 @@ func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, clos
 		fmt.Sprintf("(%s) ", realName),
 	))
 	// Listen for UAPI connections
-	uapi, err := ipc.UAPIListen(realName, fileuapi)
+	uapi, err := ipc.UAPIListen(realName)
 	if err != nil {
 		device.Close()
 		err = fmt.Errorf("uapi listen: %w", err)

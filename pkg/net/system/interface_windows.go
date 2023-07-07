@@ -33,64 +33,27 @@ import (
 )
 
 func newInterface(ctx context.Context, opts *Options) (Interface, error) {
+	if opts.MTU == 0 {
+		opts.MTU = DefaultMTU
+	}
 	logger := slog.Default().With(
 		slog.String("component", "wireguard"),
 		slog.String("type", "wintun"),
 		slog.String("facility", "device"))
-	if !opts.DefaultGateway.IsValid() {
-		defaultGateway, err := routes.GetDefaultGateway(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect current default gateway")
-		}
-		opts.DefaultGateway = defaultGateway
-	}
-	// Create the TUN device
-	tun, err := tun.CreateTUN(opts.Name, device.DefaultMTU)
+	name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
 	if err != nil {
-		return nil, fmt.Errorf("create tun: %w", err)
+		return nil, fmt.Errorf("new tun: %w", err)
 	}
-	// Get the real name of the interface
-	realName, err := tun.Name()
-	if err == nil {
-		opts.Name = realName
-	}
-	// Create the wireguard device
-	device := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(
-		func() int {
-			if logger.Handler().Enabled(context.Background(), slog.LevelDebug) {
-				return device.LogLevelVerbose
-			}
-			return device.LogLevelError
-		}(),
-		fmt.Sprintf("(%s) ", opts.Name),
-	))
-	// Listen for UAPI connections
-	uapi, err := ipc.UAPIListen(opts.Name)
-	if err != nil {
-		device.Close()
-		return nil, fmt.Errorf("listen uapi: %w", err)
-	}
-	// Handle UAPI connections
-	go func() {
-		for {
-			conn, err := uapi.Accept()
-			if err != nil {
-				return
-			}
-			go device.IpcHandle(conn)
-		}
-	}()
+	opts.Name = name
 	iface := &winTUNInterface{
-		opts: opts,
-		dev:  device,
-		uapi: uapi,
+		opts:  opts,
+		close: closer,
 	}
 	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
 		if addr.IsValid() {
 			err = link.SetInterfaceAddress(ctx, opts.Name, addr)
 			if err != nil {
-				iface.uapi.Close()
-				iface.dev.Close()
+				iface.close()
 				return nil, fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
 			}
 		}
@@ -99,9 +62,8 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 }
 
 type winTUNInterface struct {
-	opts *Options
-	dev  *device.Device
-	uapi net.Listener
+	opts  *Options
+	close func()
 }
 
 // Name returns the real name of the interface.
@@ -131,9 +93,7 @@ func (l *winTUNInterface) Down(ctx context.Context) error {
 
 // Destroy destroys the interface
 func (l *winTUNInterface) Destroy(ctx context.Context) error {
-	l.uapi.Close()
-	l.dev.Close()
-	return nil
+	return l.close()
 }
 
 // AddRoute adds a route for the given network.
