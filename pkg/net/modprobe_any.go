@@ -18,6 +18,8 @@ limitations under the License.
 
 package net
 
+import "errors"
+
 func loadModule() error {
 	return errors.New("not implemented")
 }
