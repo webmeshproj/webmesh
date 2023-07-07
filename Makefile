@@ -24,7 +24,9 @@ else
 	EXTLDFLAGS := -static
 endif
 
-LDFLAGS ?= -s -w -extldflags=$(EXTLDFLAGS) \
+LDFLAGS ?= -s -w \
+			-linkmode=external \
+			-extldflags=$(EXTLDFLAGS) \
 			-X $(VERSION_PKG).Version=$(VERSION) \
 			-X $(VERSION_PKG).Commit=$(COMMIT) \
 			-X $(VERSION_PKG).BuildDate=$(DATE)
@@ -148,6 +150,24 @@ dist-ctl-linux-arm:
 dist-ctl-windows-amd64:
 	$(call dist-build,$(CTL),windows,amd64,x86_64-w64-mingw32-gcc)
 	mv $(DIST)/$(CTL)_windows_amd64 $(DIST)/$(CTL)_windows_amd64.exe
+
+dist-node-freebsd-amd64:
+	$(call dist-build,$(NAME),freebsd,amd64,)
+
+dist-node-freebsd-arm64:
+	$(call dist-build,$(NAME),freebsd,arm64,)
+
+dist-node-freebsd-arm:
+	$(call dist-build,$(NAME),freebsd,arm,)
+
+dist-ctl-freebsd-amd64:
+	$(call dist-build,$(CTL),freebsd,amd64,)
+
+dist-ctl-freebsd-arm64:
+	$(call dist-build,$(CTL),freebsd,arm64,)
+
+dist-ctl-freebsd-arm:
+	$(call dist-build,$(CTL),freebsd,arm,)
 
 dist-node-darwin-amd64:
 	$(call dist-build,$(NAME),darwin,amd64,)

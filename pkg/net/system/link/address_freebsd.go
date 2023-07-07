@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"strings"
 
 	"github.com/webmeshproj/node/pkg/util"
 )

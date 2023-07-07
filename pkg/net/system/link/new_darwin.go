@@ -36,25 +36,22 @@ func NewKernel(ctx context.Context, name string, mtu uint32) error {
 
 // NewTUN creates a new WireGuard interface using the userspace tun driver.
 func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, closer func(), err error) {
-	// Create the TUN device
 	tun, err := tun.CreateTUN(name, int(mtu))
 	if err != nil {
 		err = fmt.Errorf("create tun: %w", err)
 		return
 	}
-	// Get the real name of the interface
 	realName, err = tun.Name()
 	if err != nil {
 		err = fmt.Errorf("get tun name: %w", err)
 		return
 	}
-	// Open the UAPI socket
 	fileuapi, err := ipc.UAPIOpen(name)
 	if err != nil {
 		tun.Close()
+		err = fmt.Errorf("uapi open: %w", err)
 		return
 	}
-	// Create the tunnel device
 	device := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(
 		func() int {
 			if context.LoggerFrom(ctx).Handler().Enabled(context.Background(), slog.LevelDebug) {
@@ -64,14 +61,12 @@ func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, clos
 		}(),
 		fmt.Sprintf("(%s) ", realName),
 	))
-	// Listen for UAPI connections
 	uapi, err := ipc.UAPIListen(realName, fileuapi)
 	if err != nil {
 		device.Close()
 		err = fmt.Errorf("uapi listen: %w", err)
 		return
 	}
-	// Handle UAPI connections
 	go func() {
 		for {
 			conn, err := uapi.Accept()

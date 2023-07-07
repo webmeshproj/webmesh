@@ -20,7 +20,6 @@ package system
 import (
 	"errors"
 	"fmt"
-	"net"
 	"net/netip"
 	"runtime"
 	"strings"
@@ -72,6 +71,17 @@ type Options struct {
 	// MTU is the MTU of the interface. If unset, it will be automatically
 	// detected from the host.
 	MTU uint32
+}
+
+// IsRouteExists returns true if the given error is a route exists error.
+func IsRouteExists(err error) bool {
+	return errors.Is(err, routes.ErrRouteExists)
+}
+
+// IsInterfaceNotExists returns true if the given error is an interface not exists error.
+func IsInterfaceNotExists(err error) bool {
+	ok := errors.Is(err, link.ErrLinkNotExists)
+	return ok || strings.Contains(err.Error(), "no such network interface")
 }
 
 // New creates a new interface using the given options.
@@ -130,17 +140,6 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		}
 	}
 	return iface, nil
-}
-
-// IsRouteExists returns true if the given error is a route exists error.
-func IsRouteExists(err error) bool {
-	return errors.Is(err, routes.ErrRouteExists)
-}
-
-// IsInterfaceNotExists returns true if the given error is an interface not exists error.
-func IsInterfaceNotExists(err error) bool {
-	_, ok := err.(net.UnknownNetworkError)
-	return ok || strings.Contains(err.Error(), "no such network interface")
 }
 
 type sysInterface struct {

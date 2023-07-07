@@ -79,6 +79,7 @@ func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, clos
 	// Open the UAPI socket
 	fileuapi, err := ipc.UAPIOpen(name)
 	if err != nil {
+		err = fmt.Errorf("uapi open: %w", err)
 		tun.Close()
 		return
 	}

@@ -17,8 +17,8 @@ limitations under the License.
 package link
 
 import (
-	"errors"
 	"fmt"
+	"strconv"
 
 	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/conn"
@@ -27,11 +27,16 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 
 	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/util"
 )
 
 // NewKernel creates a new kernel WireGuard interface on the host system with the given name.
 func NewKernel(ctx context.Context, name string, mtu uint32) error {
-	return errors.New("kernel interfaces not supported on windows")
+	err := util.Exec(ctx, "ifconfig", name, "create", "name", name, "mtu", strconv.Itoa(int(mtu)))
+	if err != nil {
+		return fmt.Errorf("ifconfig create: %w", err)
+	}
+	return nil
 }
 
 // NewTUN creates a new WireGuard interface using the userspace tun driver.
@@ -46,6 +51,12 @@ func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, clos
 		err = fmt.Errorf("get tun name: %w", err)
 		return
 	}
+	fileuapi, err := ipc.UAPIOpen(name)
+	if err != nil {
+		err = fmt.Errorf("uapi open: %w", err)
+		tun.Close()
+		return
+	}
 	device := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(
 		func() int {
 			if context.LoggerFrom(ctx).Handler().Enabled(context.Background(), slog.LevelDebug) {
@@ -55,7 +66,7 @@ func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, clos
 		}(),
 		fmt.Sprintf("(%s) ", realName),
 	))
-	uapi, err := ipc.UAPIListen(realName)
+	uapi, err := ipc.UAPIListen(realName, fileuapi)
 	if err != nil {
 		device.Close()
 		err = fmt.Errorf("uapi listen: %w", err)
