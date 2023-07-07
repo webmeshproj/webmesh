@@ -28,6 +28,11 @@ import (
 	"github.com/webmeshproj/node/pkg/context"
 )
 
+// NewKernel creates a new kernel WireGuard interface on the host system with the given name.
+func NewKernel(ctx context.Context, name string, mtu uint32) error {
+	return errors.New("kernel interfaces not supported on windows")
+}
+
 // NewTUN creates a new WireGuard interface using the userspace tun driver.
 func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, closer func(), err error) {
 	// Create the TUN device

@@ -20,10 +20,16 @@ package system
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
+	"runtime"
 	"strings"
 
+	"golang.org/x/exp/slog"
+	"pault.ag/go/modprobe"
+
+	"github.com/webmeshproj/node/pkg/net/system/link"
 	"github.com/webmeshproj/node/pkg/net/system/routes"
 )
 
@@ -73,7 +79,66 @@ type Options struct {
 
 // New creates a new interface using the given options.
 func New(ctx context.Context, opts *Options) (Interface, error) {
-	return newInterface(ctx, opts)
+	if opts.MTU == 0 {
+		opts.MTU = DefaultMTU
+	}
+	logger := slog.Default().With(
+		slog.String("component", "wireguard"),
+		slog.String("facility", "device"))
+	if opts.Modprobe {
+		err := modprobe.Load("wireguard", "")
+		if err != nil {
+			// Will attempt a TUN device later on
+			logger.Error("load wireguard kernel module", slog.String("error", err.Error()))
+		}
+	}
+	iface := &sysInterface{
+		opts: opts,
+	}
+	useTUN := opts.ForceTUN || (runtime.GOOS != "linux" && runtime.GOOS != "freebsd")
+	if useTUN {
+		name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
+		if err != nil {
+			return nil, fmt.Errorf("new tun: %w", err)
+		}
+		iface.opts.Name = name
+		iface.close = func(context.Context) error {
+			closer()
+			return nil
+		}
+	} else {
+		err := link.NewKernel(ctx, opts.Name, opts.MTU)
+		if err != nil {
+			logger.Error("create wireguard kernel interface, attempting TUN interface", "error", err)
+			// Try the TUN device as a fallback
+			name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
+			if err != nil {
+				return nil, fmt.Errorf("new tun: %w", err)
+			}
+			iface.opts.Name = name
+			iface.close = func(context.Context) error {
+				closer()
+				return nil
+			}
+		} else {
+			iface.close = func(ctx context.Context) error {
+				return link.RemoveInterface(ctx, opts.Name)
+			}
+		}
+	}
+	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
+		if addr.IsValid() {
+			err := link.SetInterfaceAddress(ctx, opts.Name, addr)
+			if err != nil {
+				derr := iface.close(ctx)
+				if derr != nil {
+					return nil, fmt.Errorf("set address %q on wireguard interface: %w, destroy interface: %v", addr.String(), err, derr)
+				}
+				return nil, fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
+			}
+		}
+	}
+	return iface, nil
 }
 
 // IsRouteExists returns true if the given error is a route exists error.
@@ -85,4 +150,49 @@ func IsRouteExists(err error) bool {
 func IsInterfaceNotExists(err error) bool {
 	_, ok := err.(net.UnknownNetworkError)
 	return ok || strings.Contains(err.Error(), "no such network interface")
+}
+
+type sysInterface struct {
+	opts  *Options
+	close func(context.Context) error
+}
+
+// Name returns the real name of the interface.
+func (l *sysInterface) Name() string {
+	return l.opts.Name
+}
+
+// AddressV4 should return the current private address of this interface
+func (l *sysInterface) AddressV4() netip.Prefix {
+	return l.opts.NetworkV4
+}
+
+// AddressV6 should return the current private address of this interface
+func (l *sysInterface) AddressV6() netip.Prefix {
+	return l.opts.NetworkV6
+}
+
+// Up activates the interface
+func (l *sysInterface) Up(ctx context.Context) error {
+	return link.ActivateInterface(ctx, l.opts.Name)
+}
+
+// Down deactivates the interface
+func (l *sysInterface) Down(ctx context.Context) error {
+	return link.DeactivateInterface(ctx, l.opts.Name)
+}
+
+// Destroy destroys the interface
+func (l *sysInterface) Destroy(ctx context.Context) error {
+	return l.close(ctx)
+}
+
+// AddRoute adds a route for the given network.
+func (l *sysInterface) AddRoute(ctx context.Context, network netip.Prefix) error {
+	return routes.Add(ctx, l.opts.Name, network)
+}
+
+// RemoveRoute removes the route for the given network.
+func (l *sysInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
+	return routes.Remove(ctx, l.opts.Name, network)
 }

@@ -30,8 +30,8 @@ import (
 	"github.com/webmeshproj/node/pkg/context"
 )
 
-// New creates a new WireGuard interface on the host system with the given name.
-func New(ctx context.Context, name string, mtu uint32) error {
+// NewKernel creates a new kernel WireGuard interface on the host system with the given name.
+func NewKernel(ctx context.Context, name string, mtu uint32) error {
 	conn, err := rtnetlink.Dial(nil)
 	if err != nil {
 		return err
