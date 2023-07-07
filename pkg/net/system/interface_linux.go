@@ -22,9 +22,7 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/jsimonetti/rtnetlink"
 	"golang.org/x/exp/slog"
-	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/ipc"
@@ -65,7 +63,20 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 		opts: opts,
 		log:  logger,
 	}
-	return iface, iface.create(ctx)
+	err := link.New(ctx, opts.Name, opts.MTU)
+	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
+		if addr.IsValid() {
+			err = link.SetInterfaceAddress(ctx, opts.Name, addr)
+			if err != nil {
+				derr := link.RemoveInterface(ctx, opts.Name)
+				if derr != nil {
+					return nil, fmt.Errorf("set address %q on wireguard interface: %w, destroy interface: %v", addr.String(), err, derr)
+				}
+				return nil, fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
+			}
+		}
+	}
+	return iface, nil
 }
 
 type linuxKernelInterface struct {
@@ -111,50 +122,6 @@ func (l *linuxKernelInterface) AddRoute(ctx context.Context, network netip.Prefi
 // RemoveRoute removes the route for the given network.
 func (l *linuxKernelInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
 	return routes.Remove(ctx, l.opts.Name, network)
-}
-
-func (l *linuxKernelInterface) create(ctx context.Context) error {
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	name := l.opts.Name
-	req := &rtnetlink.LinkMessage{
-		Family: unix.AF_UNSPEC,
-		Type:   unix.RTM_NEWLINK,
-		Flags: unix.NLM_F_REQUEST |
-			unix.NLM_F_ACK |
-			unix.NLM_F_EXCL | // fail if already exists
-			unix.NLM_F_CREATE, // create if it does not exist
-		Attributes: &rtnetlink.LinkAttributes{
-			Name:  name,
-			Alias: &name,
-			Type:  unix.ARPHRD_NETROM,
-			MTU:   l.opts.MTU,
-			Info:  &rtnetlink.LinkInfo{Kind: "wireguard"},
-		},
-	}
-	slog.Default().Debug("creating wireguard interface",
-		slog.Any("request", req),
-		slog.String("name", name))
-	err = conn.Link.New(req)
-	if err != nil {
-		return fmt.Errorf("create wireguard interface: %w", err)
-	}
-	for _, addr := range []netip.Prefix{l.opts.NetworkV4, l.opts.NetworkV6} {
-		if addr.IsValid() {
-			err = link.SetInterfaceAddress(ctx, l.opts.Name, addr)
-			if err != nil {
-				derr := link.RemoveInterface(ctx, l.opts.Name)
-				if derr != nil {
-					return fmt.Errorf("set address %q on wireguard interface: %w, destroy interface: %v", addr.String(), err, derr)
-				}
-				return fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
-			}
-		}
-	}
-	return nil
 }
 
 type linuxTUNInterface struct {
