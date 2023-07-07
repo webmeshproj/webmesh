@@ -44,7 +44,6 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 	}
 	iface := &linuxInterface{
 		opts: opts,
-		log:  logger,
 	}
 	if opts.ForceTUN {
 		name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
@@ -93,7 +92,6 @@ func newInterface(ctx context.Context, opts *Options) (Interface, error) {
 
 type linuxInterface struct {
 	opts  *Options
-	log   *slog.Logger
 	close func() error
 }
 
