@@ -17,6 +17,7 @@ limitations under the License.
 package link
 
 import (
+	"errors"
 	"fmt"
 
 	"golang.org/x/exp/slog"
