@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"golang.org/x/exp/slog"
-	"pault.ag/go/modprobe"
 
 	"github.com/webmeshproj/node/pkg/net/system/link"
 	"github.com/webmeshproj/node/pkg/net/system/routes"
@@ -70,8 +69,6 @@ type Options struct {
 	NetworkV6 netip.Prefix
 	// ForceTUN forces the use of a TUN interface.
 	ForceTUN bool
-	// Modprobe attempts to load the wireguard kernel module.
-	Modprobe bool
 	// MTU is the MTU of the interface. If unset, it will be automatically
 	// detected from the host.
 	MTU uint32
@@ -82,21 +79,15 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	if opts.MTU == 0 {
 		opts.MTU = DefaultMTU
 	}
-	logger := slog.Default().With(
+	log := slog.Default().With(
 		slog.String("component", "wireguard"),
 		slog.String("facility", "device"))
-	if opts.Modprobe {
-		err := modprobe.Load("wireguard", "")
-		if err != nil {
-			// Will attempt a TUN device later on
-			logger.Error("load wireguard kernel module", slog.String("error", err.Error()))
-		}
-	}
 	iface := &sysInterface{
 		opts: opts,
 	}
-	useTUN := opts.ForceTUN || (runtime.GOOS != "linux" && runtime.GOOS != "freebsd")
-	if useTUN {
+	forceTUN := opts.ForceTUN || (runtime.GOOS != "linux" && runtime.GOOS != "freebsd")
+	if forceTUN {
+		log.Debug("creating wireguard tun interface")
 		name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
 		if err != nil {
 			return nil, fmt.Errorf("new tun: %w", err)
@@ -107,9 +98,10 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			return nil
 		}
 	} else {
+		log.Debug("creating wireguard kernel interface")
 		err := link.NewKernel(ctx, opts.Name, opts.MTU)
 		if err != nil {
-			logger.Error("create wireguard kernel interface, attempting TUN interface", "error", err)
+			log.Error("create wireguard kernel interface failed, falling back to TUN interface", "error", err)
 			// Try the TUN device as a fallback
 			name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
 			if err != nil {

@@ -82,8 +82,6 @@ type Options struct {
 	ForceName bool
 	// ForceTUN forces the use of a TUN interface.
 	ForceTUN bool
-	// Modprobe attempts to probe the wireguard module.
-	Modprobe bool
 	// PersistentKeepAlive is the interval at which to send keepalive packets
 	// to peers. If unset, keepalive packets will automatically be sent to publicly
 	// accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
@@ -142,7 +140,6 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		NetworkV4: opts.AddressV4,
 		NetworkV6: opts.AddressV6,
 		ForceTUN:  opts.ForceTUN,
-		Modprobe:  opts.Modprobe,
 		MTU:       uint32(opts.MTU),
 	})
 	if err != nil {

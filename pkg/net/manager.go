@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"runtime"
 	"sync"
 	"time"
 
@@ -150,13 +151,19 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	if err != nil {
 		return fmt.Errorf("new firewall: %w", err)
 	}
+	if m.opts.Modprobe && runtime.GOOS == "linux" {
+		err := loadModule()
+		if err != nil {
+			// Will attempt a TUN device later on
+			log.Error("load wireguard kernel module", slog.String("error", err.Error()))
+		}
+	}
 	wgopts := &wireguard.Options{
 		NodeID:              m.store.ID(),
 		ListenPort:          m.opts.ListenPort,
 		Name:                m.opts.InterfaceName,
 		ForceName:           m.opts.ForceReplace,
 		ForceTUN:            m.opts.ForceTUN,
-		Modprobe:            m.opts.Modprobe,
 		PersistentKeepAlive: m.opts.PersistentKeepAlive,
 		MTU:                 m.opts.MTU,
 		Metrics:             m.opts.RecordMetrics,
