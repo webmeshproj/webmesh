@@ -18,9 +18,11 @@ package link
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
+	"strings"
 
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/vishvananda/netlink"
@@ -32,6 +34,9 @@ import (
 func ActivateInterface(ctx context.Context, name string) error {
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
+		if isNoSuchInterfaceErr(err) {
+			return ErrLinkNotExists
+		}
 		return fmt.Errorf("get interface: %w", err)
 	}
 	conn, err := rtnetlink.Dial(nil)
@@ -70,6 +75,9 @@ func ActivateInterface(ctx context.Context, name string) error {
 func DeactivateInterface(ctx context.Context, name string) error {
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
+		if isNoSuchInterfaceErr(err) {
+			return ErrLinkNotExists
+		}
 		return fmt.Errorf("get interface: %w", err)
 	}
 	conn, err := rtnetlink.Dial(nil)
@@ -111,6 +119,9 @@ func RemoveInterface(ctx context.Context, ifaceName string) error {
 	defer conn.Close()
 	iface, err := net.InterfaceByName(ifaceName)
 	if err != nil {
+		if isNoSuchInterfaceErr(err) {
+			return ErrLinkNotExists
+		}
 		return fmt.Errorf("failed to get interface: %w", err)
 	}
 	return conn.Link.Delete(uint32(iface.Index))
@@ -124,6 +135,9 @@ func InterfaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Pr
 	}
 	link, err := netlink.LinkByName(ifaceName)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return netip.Prefix{}, ErrLinkNotExists
+		}
 		return netip.Prefix{}, err
 	}
 	addrs, err := netlink.AddrList(link, family)
@@ -143,4 +157,10 @@ func InterfaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Pr
 		}
 	}
 	return netip.Prefix{}, fmt.Errorf("no matching address found for interface %s", ifaceName)
+}
+
+func isNoSuchInterfaceErr(err error) bool {
+	opError := &net.OpError{}
+	ok := errors.As(err, &opError)
+	return ok && strings.Contains(opError.Unwrap().Error(), "no such network interface")
 }

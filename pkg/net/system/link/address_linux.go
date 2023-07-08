@@ -32,6 +32,9 @@ import (
 func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
+		if isNoSuchInterfaceErr(err) {
+			return ErrLinkNotExists
+		}
 		return fmt.Errorf("get interface by name: %w", err)
 	}
 
