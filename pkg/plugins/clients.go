@@ -252,7 +252,7 @@ func (p *externalProcessPlugin) start(ctx context.Context) error {
 		if err := p.checkProcess(ctx); err != nil {
 			return err
 		}
-		return invoker(ctx, method, req, reply, cc, opts...)
+		return invoker(ctx, method, req, reply, p.conn, opts...)
 	}
 	p.conn, err = grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithUnaryInterceptor(interceptor))
 	if err != nil {
