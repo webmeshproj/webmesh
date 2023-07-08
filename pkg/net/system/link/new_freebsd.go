@@ -51,7 +51,7 @@ func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, clos
 		err = fmt.Errorf("get tun name: %w", err)
 		return
 	}
-	fileuapi, err := ipc.UAPIOpen(name)
+	fileuapi, err := ipc.UAPIOpen(realName)
 	if err != nil {
 		err = fmt.Errorf("uapi open: %w", err)
 		tun.Close()
