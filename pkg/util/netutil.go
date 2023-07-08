@@ -146,11 +146,18 @@ func RandomLocalMAC() (net.HardwareAddr, error) {
 		}
 	}
 
-	if len(addrs) < 1 {
-		return nil, fmt.Errorf("no valid MAC addresses found")
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	if len(addrs) == 0 {
+		// Generate a random MAC
+		mac := make([]byte, 6)
+		_, err := r.Read(mac)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate random MAC address: %w", err)
+		}
+		return mac, nil
 	}
 
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ri := r.Intn(len(addrs))
 	return addrs[ri], nil
 }
