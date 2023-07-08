@@ -108,3 +108,7 @@ The incredible work done by the [pion](https://github.com/pion/webrtc) team for 
 ## Legal
 
 WireGuard is a registered trademark of Jason A. Donenfeld.
+
+## Support
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/webmeshproj)
