@@ -56,7 +56,7 @@ build: fmt vet ## Build node binary for the local platform.
 else
 build: fmt vet generate ## Build node binary for the local platform.
 endif
-	go build \
+	go build $(EXTBUILDFLAGS) \
 		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
 		-o "$(DIST)/$(NAME)_$(OS)_$(ARCH)" \
