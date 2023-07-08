@@ -102,6 +102,16 @@ func (c *Config) Marshal(w io.Writer) error {
 	return enc.Encode(c)
 }
 
+// WriteTo writes the configuration to a file.
+func (c *Config) WriteTo(filename string) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return c.Marshal(f)
+}
+
 // Config is the wmctl CLI tool configuration.
 type Config struct {
 	// APIVersion is the version of the API to use.
