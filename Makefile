@@ -18,6 +18,12 @@ ifeq ($(OS),Windows_NT)
 	OS := windows
 endif
 
+ifeq ($(OS),freebsd) 
+	EXTBUILDFLAGS :=
+else
+	EXTBUILDFLAGS := -race
+endif
+
 ifeq ($(OS),darwin)
 	EXTLDFLAGS :=
 else
@@ -183,7 +189,7 @@ dist-ctl-darwin-arm64:
 
 define dist-build
 	CGO_ENABLED=1 GOOS=$(2) GOARCH=$(3) CC=$(4) \
-		go build \
+		go build $(EXTBUILDFLAGS) \
 			-tags "$(BUILD_TAGS)" \
 			-ldflags "$(LDFLAGS)" \
 			-trimpath \
