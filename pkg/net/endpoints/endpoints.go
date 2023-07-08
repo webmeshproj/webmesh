@@ -98,7 +98,12 @@ func Detect(ctx context.Context, opts DetectOpts) (PrefixList, error) {
 				if addr.Is6() && !opts.DetectIPv6 {
 					continue
 				}
-				addrs = append(addrs, netip.PrefixFrom(addr, 32))
+				addrs = append(addrs, netip.PrefixFrom(addr, func() int {
+					if addr.Is4() {
+						return 32
+					}
+					return 128
+				}()))
 			}
 		}
 	}
