@@ -10,7 +10,9 @@ env:
   ALPINE_IMAGE_NAME: ghcr.io/webmeshproj/node
   DISTROLESS_IMAGE_NAME: ghcr.io/webmeshproj/node-distroless
   GO_VERSION: ^1.20
-  PLATFORMS: linux/amd64,linux/arm64,linux/arm
+  NODE_VERSION: 18
+  GOLANGCI_LINT_VERSION: v1.53.2
+  DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm
 
 jobs:
   tests:
@@ -40,7 +42,7 @@ jobs:
       - name: Run Linting
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.53.2
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout 10m
           skip-pkg-cache: true
 
@@ -65,7 +67,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v2
         with:
-          node-version: 18
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Cache Node Modules
         uses: actions/cache@v3
@@ -138,7 +140,7 @@ jobs:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.alpine-images }}
-          platforms: ${{ env.PLATFORMS }}
+          platforms: ${{ env.DOCKER_PLATFORMS }}
           cache-to: type=gha
           cache-from: type=gha
 
@@ -150,7 +152,7 @@ jobs:
           file: Dockerfile.distroless
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.distroless-images }}
-          platforms: ${{ env.PLATFORMS }}
+          platforms: ${{ env.DOCKER_PLATFORMS }}
 
       - name: Sign Images
         shell: bash
@@ -184,7 +186,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v2
         with:
-          node-version: 18
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Cache Node Modules
         uses: actions/cache@v3
