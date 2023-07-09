@@ -271,13 +271,10 @@ func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 
 // CurrentCluster returns the current cluster.
 func (c *Config) CurrentCluster() ClusterConfig {
-	for _, context := range c.Contexts {
-		if context.Name == c.CurrentContext {
-			for _, cluster := range c.Clusters {
-				if cluster.Name == context.Context.Cluster {
-					return cluster.Cluster
-				}
-			}
+	ctx := c.GetContext()
+	for _, cluster := range c.Clusters {
+		if cluster.Name == ctx.Cluster {
+			return cluster.Cluster
 		}
 	}
 	return ClusterConfig{}
@@ -285,16 +282,28 @@ func (c *Config) CurrentCluster() ClusterConfig {
 
 // CurrentUser returns the current user.
 func (c *Config) CurrentUser() UserConfig {
-	for _, context := range c.Contexts {
-		if context.Name == c.CurrentContext {
-			for _, user := range c.Users {
-				if user.Name == context.Context.User {
-					return user.User
-				}
-			}
+	ctx := c.GetContext()
+	for _, user := range c.Users {
+		if user.Name == ctx.User {
+			return user.User
 		}
 	}
 	return UserConfig{}
+}
+
+// GetContext returns the current context.
+func (c *Config) GetContext() ContextConfig {
+	for _, context := range c.Contexts {
+		if context.Name == c.CurrentContext {
+			return context.Context
+		}
+	}
+	return ContextConfig{}
+}
+
+// SetContext sets the current context.
+func (c *Config) SetContext(name string) {
+	c.CurrentContext = name
 }
 
 // TLSConfig returns the TLS configuration for the current context.
