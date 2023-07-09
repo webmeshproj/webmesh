@@ -85,9 +85,9 @@ func doConnect(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 	if connectOpts.JoinServer == "" {
-		connectOpts.JoinServer = cliConfig.CurrentCluster().Server
-		connectOpts.VerifyChainOnly = cliConfig.CurrentCluster().TLSVerifyChainOnly
-		connectOpts.Insecure = cliConfig.CurrentCluster().Insecure
+		connectOpts.JoinServer = cliConfig.GetCurrentCluster().Server
+		connectOpts.VerifyChainOnly = cliConfig.GetCurrentCluster().TLSVerifyChainOnly
+		connectOpts.Insecure = cliConfig.GetCurrentCluster().Insecure
 		if connectOpts.JoinServer == "" {
 			return fmt.Errorf("no join server specified")
 		}
@@ -96,7 +96,7 @@ func doConnect(cmd *cobra.Command, args []string) error {
 	// if not specified on the command line.
 	if !connectOpts.Insecure {
 		if connectOpts.TLSCertFile == "" {
-			certData := cliConfig.CurrentUser().ClientCertificateData
+			certData := cliConfig.GetCurrentUser().ClientCertificateData
 			if certData == "" {
 				return fmt.Errorf("no TLS certificate data found")
 			}
@@ -116,7 +116,7 @@ func doConnect(cmd *cobra.Command, args []string) error {
 			connectOpts.TLSCertFile = tmpCert.Name()
 		}
 		if connectOpts.TLSKeyFile == "" {
-			keyData := cliConfig.CurrentUser().ClientKeyData
+			keyData := cliConfig.GetCurrentUser().ClientKeyData
 			if keyData == "" {
 				return fmt.Errorf("no TLS key data found")
 			}
@@ -136,7 +136,7 @@ func doConnect(cmd *cobra.Command, args []string) error {
 			connectOpts.TLSKeyFile = tmpKey.Name()
 		}
 		if connectOpts.TLSCAFile == "" {
-			caData := cliConfig.CurrentCluster().CertificateAuthorityData
+			caData := cliConfig.GetCurrentCluster().CertificateAuthorityData
 			if caData != "" {
 				decoded, err := base64.StdEncoding.DecodeString(caData)
 				if err != nil {

@@ -235,8 +235,8 @@ func (c *Config) NewAdminClient() (v1.AdminClient, io.Closer, error) {
 // DialCurrent connects to the current context.
 func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 	var opts []grpc.DialOption
-	cluster := c.CurrentCluster()
-	user := c.CurrentUser()
+	cluster := c.GetCurrentCluster()
+	user := c.GetCurrentUser()
 	if cluster.Insecure {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
@@ -269,50 +269,65 @@ func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 	return grpc.DialContext(ctx, cluster.Server, opts...)
 }
 
-// CurrentCluster returns the current cluster.
-func (c *Config) CurrentCluster() ClusterConfig {
-	ctx := c.GetContext()
+// GetCluster gets a cluster by name.
+func (c *Config) GetCluster(name string) ClusterConfig {
 	for _, cluster := range c.Clusters {
-		if cluster.Name == ctx.Cluster {
+		if cluster.Name == name {
 			return cluster.Cluster
 		}
 	}
 	return ClusterConfig{}
 }
 
-// CurrentUser returns the current user.
-func (c *Config) CurrentUser() UserConfig {
-	ctx := c.GetContext()
+// GetUser gets a user by name.
+func (c *Config) GetUser(name string) UserConfig {
 	for _, user := range c.Users {
-		if user.Name == ctx.User {
+		if user.Name == name {
 			return user.User
 		}
 	}
 	return UserConfig{}
 }
 
-// GetContext returns the current context.
-func (c *Config) GetContext() ContextConfig {
+// GetContext gets a context by name.
+func (c *Config) GetContext(name string) ContextConfig {
 	for _, context := range c.Contexts {
-		if context.Name == c.CurrentContext {
+		if context.Name == name {
 			return context.Context
 		}
 	}
 	return ContextConfig{}
 }
 
-// SetContext sets the current context.
-func (c *Config) SetContext(name string) {
+// GetCurrentCluster returns the current cluster.
+func (c *Config) GetCurrentCluster() ClusterConfig {
+	ctx := c.GetCurrentContext()
+	return c.GetCluster(ctx.Cluster)
+}
+
+// GetCurrentUser returns the current user.
+func (c *Config) GetCurrentUser() UserConfig {
+	ctx := c.GetCurrentContext()
+	return c.GetUser(ctx.User)
+}
+
+// GetCurrentContext returns the current context.
+func (c *Config) GetCurrentContext() ContextConfig {
+	return c.GetContext(c.CurrentContext)
+}
+
+// SetCurrentContext sets the current context.
+func (c *Config) SetCurrentContext(name string) {
 	c.CurrentContext = name
 }
 
 // TLSConfig returns the TLS configuration for the current context.
 func (c *Config) TLSConfig() (*tls.Config, error) {
 	config := &tls.Config{}
-	cluster := c.CurrentCluster()
+	cluster := c.GetCurrentCluster()
 	certpool := x509.NewCertPool()
 	if cluster.CertificateAuthorityData != "" {
-		ca, err := base64.StdEncoding.DecodeString(c.CurrentCluster().CertificateAuthorityData)
+		ca, err := base64.StdEncoding.DecodeString(cluster.CertificateAuthorityData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode CA certificate: %w", err)
 		}
@@ -326,7 +341,7 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 		config.InsecureSkipVerify = true
 		config.VerifyPeerCertificate = util.VerifyChainOnly
 	}
-	currentUser := c.CurrentUser()
+	currentUser := c.GetCurrentUser()
 	var certs []tls.Certificate
 	if currentUser.ClientCertificateData != "" && currentUser.ClientKeyData != "" {
 		cert, err := base64.StdEncoding.DecodeString(currentUser.ClientCertificateData)
