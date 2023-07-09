@@ -31,8 +31,10 @@ const (
 
 // TLSOptions are options for TLS communication when joining a mesh.
 type TLSOptions struct {
-	// TLSCAFile is the path to a TLS CA file for verification. If empty, the system CA pool is used.
+	// CAFile is the path to a TLS CA file for verification. If this and CAData are empty, the system CA pool is used.
 	CAFile string `yaml:"tls-ca-file,omitempty" json:"tls-ca-file,omitempty" toml:"tls-ca-file,omitempty"`
+	// CAData is the base64 encoded TLS CA data for verification. If this and CAFile are empty, the system CA pool is used.
+	CAData string `yaml:"tls-ca-data,omitempty" json:"tls-ca-data,omitempty" toml:"tls-ca-data,omitempty"`
 	// VerifyChainOnly is true if only the certificate chain should be verified.
 	VerifyChainOnly bool `yaml:"verify-chain-only,omitempty" json:"verify-chain-only,omitempty" toml:"verify-chain-only,omitempty"`
 	// InsecureSkipVerify is true if the server TLS cert should not be verified.

@@ -42,10 +42,16 @@ type AuthOptions struct {
 
 // MTLSOptions are options for mutual TLS.
 type MTLSOptions struct {
-	// TLSCertFile is the path to a TLS certificate file to present when joining.
+	// CertFile is the path to a TLS certificate file to present when joining. Either this
+	// or CertData must be set.
 	CertFile string `yaml:"cert-file,omitempty" json:"cert-file,omitempty" toml:"cert-file,omitempty"`
-	// TLSKeyFile is the path to a TLS key file for the certificate.
+	// CertData is the base64 encoded TLS certificate data to present when joining. Either this
+	// or CertFile must be set.
+	CertData string `yaml:"cert-data,omitempty" json:"cert-data,omitempty" toml:"cert-data,omitempty"`
+	// KeyFile is the path to a TLS key file for the certificate. Either this or KeyData must be set.
 	KeyFile string `yaml:"key-file,omitempty" json:"key-file,omitempty" toml:"tls-file,omitempty"`
+	// KeyData is the base64 encoded TLS key data for the certificate. Either this or KeyFile must be set.
+	KeyData string `yaml:"key-data,omitempty" json:"key-data,omitempty" toml:"tls-data,omitempty"`
 }
 
 // BasicAuthOptions are options for basic authentication.
@@ -120,10 +126,10 @@ func (o *AuthOptions) Validate() error {
 		return nil
 	}
 	if o.MTLS != nil {
-		if o.MTLS.CertFile == "" {
+		if o.MTLS.CertFile == "" && o.MTLS.CertData == "" {
 			return errors.New("auth.mtls.cert-file is required")
 		}
-		if o.MTLS.KeyFile == "" {
+		if o.MTLS.KeyFile == "" && o.MTLS.KeyData == "" {
 			return errors.New("auth.mtls.key-file is required")
 		}
 	}

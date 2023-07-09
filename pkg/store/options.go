@@ -19,6 +19,7 @@ package store
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
@@ -113,12 +114,28 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 	}
 	var config tls.Config
 	if o.Auth != nil && o.Auth.MTLS != nil {
+		config.Certificates = []tls.Certificate{}
 		if o.Auth.MTLS.CertFile != "" && o.Auth.MTLS.KeyFile != "" {
 			cert, err := tls.LoadX509KeyPair(o.Auth.MTLS.CertFile, o.Auth.MTLS.KeyFile)
 			if err != nil {
 				return nil, fmt.Errorf("load x509 key pair: %w", err)
 			}
-			config.Certificates = []tls.Certificate{cert}
+			config.Certificates = append(config.Certificates, cert)
+		}
+		if o.Auth.MTLS.CertData != "" && o.Auth.MTLS.KeyData != "" {
+			cert, err := base64.StdEncoding.DecodeString(o.Auth.MTLS.CertData)
+			if err != nil {
+				return nil, fmt.Errorf("decode cert data: %w", err)
+			}
+			key, err := base64.StdEncoding.DecodeString(o.Auth.MTLS.KeyData)
+			if err != nil {
+				return nil, fmt.Errorf("decode key data: %w", err)
+			}
+			tlscert, err := tls.X509KeyPair(cert, key)
+			if err != nil {
+				return nil, fmt.Errorf("x509 key pair: %w", err)
+			}
+			config.Certificates = append(config.Certificates, tlscert)
 		}
 	}
 	pool, err := x509.SystemCertPool()
@@ -132,6 +149,15 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 			return nil, fmt.Errorf("read ca file: %w", err)
 		}
 		if ok := pool.AppendCertsFromPEM(ca); !ok {
+			return nil, fmt.Errorf("append certs from pem")
+		}
+	}
+	if o.TLS.CAData != "" {
+		data, err := base64.StdEncoding.DecodeString(o.TLS.CAData)
+		if err != nil {
+			return nil, fmt.Errorf("decode ca data: %w", err)
+		}
+		if ok := pool.AppendCertsFromPEM(data); !ok {
 			return nil, fmt.Errorf("append certs from pem")
 		}
 	}
