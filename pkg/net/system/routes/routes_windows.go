@@ -37,8 +37,11 @@ func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	if addr.Addr().Is6() {
 		family = "ipv6"
 	}
-	err := util.Exec(ctx, "netsh", "interface", family, "add", "route", addr.String(), ifaceName, "metric=0", "store=active")
+	out, err := util.ExecOutput(ctx, "netsh", "interface", family, "add", "route", addr.String(), ifaceName, "metric=0", "store=active")
 	if err != nil {
+		if strings.Contains(string(out), "already in table") || strings.Contains(string(out), "exists") {
+			return ErrRouteExists
+		}
 		return err
 	}
 	return nil
