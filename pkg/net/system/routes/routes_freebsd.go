@@ -43,7 +43,14 @@ func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
 
 // Add adds a route to the interface with the given name.
 func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	return util.Exec(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
+	out, err := util.ExecOutput(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
+	if err != nil {
+		if strings.Contains(string(out), "already in table") || strings.Contains(string(out), "exists") {
+			return ErrRouteExists
+		}
+		return err
+	}
+	return nil
 }
 
 // Remove removes a route from the interface with the given name.
