@@ -97,20 +97,25 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 		if builtIn, ok := BuiltIns[name]; ok {
 			plugin = builtIn
 		} else {
-			if cfg.Path == "" && cfg.Server == "" {
-				return nil, fmt.Errorf("plugin %q: path or server must be specified", name)
-			}
-			if cfg.Path != "" && cfg.Server != "" {
-				return nil, fmt.Errorf("plugin %q: path and server cannot both be specified", name)
-			}
-			var err error
-			if cfg.Path != "" {
-				plugin, err = newExternalProcess(ctx, cfg.Path)
+			// Special case of in-lined implementation
+			if cfg.Plugin != nil {
+				plugin = inProcessClient(cfg.Plugin)
 			} else {
-				plugin, err = newExternalServer(ctx, cfg)
-			}
-			if err != nil {
-				return nil, fmt.Errorf("plugin %q: %w", name, err)
+				if cfg.Path == "" && cfg.Server == "" {
+					return nil, fmt.Errorf("plugin %q: path or server must be specified", name)
+				}
+				if cfg.Path != "" && cfg.Server != "" {
+					return nil, fmt.Errorf("plugin %q: path and server cannot both be specified", name)
+				}
+				var err error
+				if cfg.Path != "" {
+					plugin, err = newExternalProcess(ctx, cfg.Path)
+				} else {
+					plugin, err = newExternalServer(ctx, cfg)
+				}
+				if err != nil {
+					return nil, fmt.Errorf("plugin %q: %w", name, err)
+				}
 			}
 		}
 		// Configure the plugin.
@@ -133,15 +138,17 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 				emitters = append(emitters, plugin)
 			}
 		}
-		pcfg, err := structpb.NewStruct(cfg.Config)
-		if err != nil {
-			return nil, fmt.Errorf("convert config: %w", err)
-		}
-		_, err = plugin.Configure(ctx, &v1.PluginConfiguration{
-			Config: pcfg,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("configure plugin %q: %w", name, err)
+		if len(cfg.Config) > 0 {
+			pcfg, err := structpb.NewStruct(cfg.Config)
+			if err != nil {
+				return nil, fmt.Errorf("convert config: %w", err)
+			}
+			_, err = plugin.Configure(ctx, &v1.PluginConfiguration{
+				Config: pcfg,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("configure plugin %q: %w", name, err)
+			}
 		}
 		registered[name] = plugin
 	}

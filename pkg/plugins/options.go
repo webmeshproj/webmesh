@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	v1 "github.com/webmeshproj/api/v1"
 )
 
 // Options are the options for loading plugins.
@@ -31,6 +33,8 @@ type Options struct {
 
 // Config is the configuration for a plugin.
 type Config struct {
+	// Plugin is an inline plugin implementation.
+	Plugin v1.PluginServer `yaml:"-" json:"-" toml:"-"`
 	// Path is the path to an executable for the plugin.
 	Path string `yaml:"path,omitempty" json:"path,omitempty" toml:"path,omitempty"`
 	// Server is the address of a server for the plugin.
