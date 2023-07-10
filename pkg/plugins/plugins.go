@@ -138,17 +138,18 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 				emitters = append(emitters, plugin)
 			}
 		}
-		if len(cfg.Config) > 0 {
-			pcfg, err := structpb.NewStruct(cfg.Config)
-			if err != nil {
-				return nil, fmt.Errorf("convert config: %w", err)
-			}
-			_, err = plugin.Configure(ctx, &v1.PluginConfiguration{
-				Config: pcfg,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("configure plugin %q: %w", name, err)
-			}
+		if cfg.Config == nil {
+			cfg.Config = make(map[string]interface{})
+		}
+		pcfg, err := structpb.NewStruct(cfg.Config)
+		if err != nil {
+			return nil, fmt.Errorf("convert config: %w", err)
+		}
+		_, err = plugin.Configure(ctx, &v1.PluginConfiguration{
+			Config: pcfg,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("configure plugin %q: %w", name, err)
 		}
 		registered[name] = plugin
 	}
