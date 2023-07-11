@@ -139,6 +139,19 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	m.wgmux.Lock()
 	defer m.wgmux.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
+	handleErr := func(err error) error {
+		if m.wg != nil {
+			if closeErr := m.wg.Close(ctx); closeErr != nil {
+				err = fmt.Errorf("%w: %v", err, closeErr)
+			}
+		}
+		if m.fw != nil {
+			if clearErr := m.fw.Clear(ctx); clearErr != nil {
+				err = fmt.Errorf("%w: %v", err, clearErr)
+			}
+		}
+		return err
+	}
 	fwopts := &firewall.Options{
 		DefaultPolicy: firewall.PolicyAccept,
 		WireguardPort: uint16(m.opts.ListenPort),
@@ -174,37 +187,37 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	log.Info("Configuring wireguard", slog.Any("opts", wgopts))
 	m.wg, err = wireguard.New(ctx, wgopts)
 	if err != nil {
-		return fmt.Errorf("new wireguard: %w", err)
+		return handleErr(fmt.Errorf("new wireguard: %w", err))
 	}
 	err = m.wg.Configure(ctx, opts.Key, m.opts.ListenPort)
 	if err != nil {
-		return fmt.Errorf("configure wireguard: %w", err)
+		return handleErr(fmt.Errorf("configure wireguard: %w", err))
 	}
 	if opts.NetworkV6.IsValid() {
 		log.Debug("Adding IPv6 network route", slog.String("network", opts.NetworkV6.String()))
 		err = m.wg.AddRoute(ctx, opts.NetworkV6)
 		if err != nil && !system.IsRouteExists(err) {
-			return fmt.Errorf("wireguard add mesh network route: %w", err)
+			return handleErr(fmt.Errorf("wireguard add mesh network route: %w", err))
 		}
 	}
 	if opts.AddressV6.IsValid() {
 		log.Debug("Adding IPv6 address route", slog.String("address", opts.AddressV6.String()))
 		err = m.wg.AddRoute(ctx, opts.AddressV6)
 		if err != nil && !system.IsRouteExists(err) {
-			return fmt.Errorf("wireguard add ipv6 route: %w", err)
+			return handleErr(fmt.Errorf("wireguard add ipv6 route: %w", err))
 		}
 	}
 	if opts.NetworkV4.IsValid() {
 		log.Debug("Adding IPv4 network route", slog.String("network", opts.NetworkV4.String()))
 		err = m.wg.AddRoute(ctx, opts.NetworkV4)
 		if err != nil && !system.IsRouteExists(err) {
-			return fmt.Errorf("wireguard add mesh network route: %w", err)
+			return handleErr(fmt.Errorf("wireguard add mesh network route: %w", err))
 		}
 	}
 	log.Debug("Configuring forwarding on wireguard interface", slog.String("interface", m.wg.Name()))
 	err = m.fw.AddWireguardForwarding(ctx, m.wg.Name())
 	if err != nil {
-		return fmt.Errorf("add wireguard forwarding rule: %w", err)
+		return handleErr(fmt.Errorf("add wireguard forwarding rule: %w", err))
 	}
 	return nil
 }
