@@ -20,7 +20,6 @@ import (
 	"flag"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/webmeshproj/node/pkg/util"
 )
@@ -53,8 +52,6 @@ type MeshOptions struct {
 	PeerDiscoveryAddresses []string `json:"peer-discovery-addresses,omitempty" yaml:"peer-discovery-addresses,omitempty" toml:"peer-discovery-addresses,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int `json:"max-join-retries,omitempty" yaml:"max-join-retries,omitempty" toml:"max-join-retries,omitempty"`
-	// JoinTimeout is the timeout for joining.
-	JoinTimeout time.Duration `json:"join-timeout,omitempty" yaml:"join-timeout,omitempty" toml:"join-timeout,omitempty"`
 	// Voter is true if the node should be a voter.
 	JoinAsVoter bool `json:"voter,omitempty" yaml:"voter,omitempty" toml:"voter,omitempty"`
 	// PrimaryEndpoint is the primary endpoint to advertise when joining.
@@ -96,7 +93,6 @@ func NewMeshOptions() *MeshOptions {
 		}(),
 		MaxJoinRetries: 10,
 		GRPCPort:       8443,
-		JoinTimeout:    time.Minute,
 	}
 }
 
@@ -120,8 +116,7 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
 	})
 	fl.IntVar(&o.MaxJoinRetries, "mesh.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
 		"Maximum number of join retries.")
-	fl.DurationVar(&o.JoinTimeout, "mesh.join-timeout", util.GetEnvDurationDefault(JoinTimeoutEnvVar, time.Minute),
-		"Join timeout.")
+
 	fl.BoolVar(&o.JoinAsVoter, "mesh.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
 		"Join the cluster as a voter. Default behavior is to join as an observer.")
 	fl.IntVar(&o.GRPCPort, "mesh.grpc-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),

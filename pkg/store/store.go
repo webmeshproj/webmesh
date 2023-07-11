@@ -64,7 +64,8 @@ type Store interface {
 	// Open opens the store. This must be called before the store can be used.
 	// The Ready functions should be used to determine when the store is ready
 	// to serve requests, after which the Wireguard interface will also be available.
-	Open() error
+	// The context is used to enforce timeouts on certain operations.
+	Open(context.Context) error
 	// IsOpen returns true if the store is open.
 	IsOpen() bool
 	// Close closes the store.

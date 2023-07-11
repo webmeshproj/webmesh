@@ -37,12 +37,10 @@ import (
 )
 
 // Open opens the store.
-func (s *store) Open() error {
+func (s *store) Open(ctx context.Context) error {
 	if s.open.Load() {
 		return ErrOpen
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), s.opts.Raft.StartupTimeout)
-	defer cancel()
 	log := s.log
 	handleErr := func(err error) error {
 		if s.raftTransport != nil {
@@ -237,8 +235,6 @@ func (s *store) Open() error {
 		if err = models.MigrateDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
 		}
-		ctx, cancel := context.WithTimeout(ctx, s.opts.Mesh.JoinTimeout)
-		defer cancel()
 		if len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
 			err = s.joinWithPeerDiscovery(ctx)
 		} else {

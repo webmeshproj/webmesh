@@ -137,25 +137,23 @@ func Execute() error {
 	if err != nil {
 		return fmt.Errorf("failed to create raft store: %w", err)
 	}
-	err = st.Open()
+
+	// Add flag for timeout
+	ctx := context.Background()
+	err = st.Open(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to open raft store: %w", err)
 	}
-
 	handleErr := func(cause error) error {
 		if err := st.Close(); err != nil {
 			log.Error("failed to shutdown raft store", slog.String("error", err.Error()))
 		}
 		return fmt.Errorf("failed to start raft node: %w", cause)
 	}
-
 	log.Info("waiting for raft store to become ready")
-	ctx, cancel := context.WithTimeout(context.Background(), opts.Mesh.Raft.StartupTimeout)
 	if err := <-st.ReadyError(ctx); err != nil {
-		cancel()
 		return handleErr(fmt.Errorf("failed to wait for raft store to become ready: %w", err))
 	}
-	cancel()
 	// Shutdown the store on exit
 	defer func() {
 		log.Info("shutting down raft store")

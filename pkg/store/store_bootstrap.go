@@ -174,14 +174,6 @@ func (s *store) bootstrap(ctx context.Context) error {
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
 	go func() {
-		deadline, ok := ctx.Deadline()
-		var cancel context.CancelFunc
-		if !ok {
-			ctx, cancel = context.WithTimeout(context.Background(), s.opts.Raft.StartupTimeout)
-		} else {
-			ctx, cancel = context.WithDeadline(context.Background(), deadline)
-		}
-		defer cancel()
 		defer close(s.readyErr)
 		s.log.Info("waiting for raft to become ready")
 		<-s.ReadyNotify(ctx)
@@ -565,7 +557,6 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 		grpcPort = int64(s.opts.Mesh.GRPCPort)
 	}
 	joinAddr := net.JoinHostPort(advertiseAddress.Addr().String(), strconv.Itoa(int(grpcPort)))
-	s.opts.Mesh.JoinTimeout = 30 * time.Second
 	s.opts.Mesh.JoinAsVoter = true
 	// TODO: Technically we want to wait for the first barrier to be reached before we
 	//       start the join process. This is because we want to make sure that the
@@ -578,7 +569,6 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 
 func (s *store) rejoinBootstrapServer(ctx context.Context) error {
 	servers := strings.Split(s.opts.Bootstrap.Servers, ",")
-	s.opts.Mesh.JoinTimeout = 30 * time.Second
 	s.opts.Mesh.JoinAsVoter = true
 	for _, server := range servers {
 		parts := strings.Split(server, "=")

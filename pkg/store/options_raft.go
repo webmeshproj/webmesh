@@ -95,8 +95,6 @@ type RaftOptions struct {
 	PreferIPv6 bool `json:"prefer-ipv6,omitempty" yaml:"prefer-ipv6,omitempty" toml:"prefer-ipv6,omitempty"`
 	// LeaveOnShutdown is the leave on shutdown flag.
 	LeaveOnShutdown bool `json:"leave-on-shutdown,omitempty" yaml:"leave-on-shutdown,omitempty" toml:"leave-on-shutdown,omitempty"`
-	// StartupTimeout is the timeout for starting up.
-	StartupTimeout time.Duration `json:"startup-timeout,omitempty" yaml:"startup-timeout,omitempty" toml:"startup-timeout,omitempty"`
 	// ShutdownTimeout is the timeout for shutting down.
 	ShutdownTimeout time.Duration `json:"shutdown-timeout,omitempty" yaml:"shutdown-timeout,omitempty" toml:"shutdown-timeout,omitempty"`
 }
@@ -118,7 +116,6 @@ func NewRaftOptions() *RaftOptions {
 		SnapshotRetention:  3,
 		ObserverChanBuffer: 100,
 		LogLevel:           "info",
-		StartupTimeout:     time.Minute,
 		ShutdownTimeout:    time.Minute,
 	}
 }
@@ -161,8 +158,6 @@ func (o *RaftOptions) BindFlags(fl *flag.FlagSet) {
 		"Raft observer channel buffer size.")
 	fl.BoolVar(&o.LeaveOnShutdown, "raft.leave-on-shutdown", util.GetEnvDefault(LeaveOnShutdownEnvVar, "false") == "true",
 		"Leave the cluster when the server shuts down.")
-	fl.DurationVar(&o.StartupTimeout, "raft.startup-timeout", util.GetEnvDurationDefault(StartupTimeoutEnvVar, time.Minute*3),
-		"Timeout for startup.")
 	fl.DurationVar(&o.ShutdownTimeout, "raft.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
 		"Timeout for graceful shutdown.")
 }

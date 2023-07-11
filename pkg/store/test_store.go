@@ -36,7 +36,7 @@ func NewTestStore(ctx context.Context) (Store, error) {
 	}
 	stor := st.(*store)
 	stor.testStore = true
-	if err := stor.Open(); err != nil {
+	if err := stor.Open(ctx); err != nil {
 		return nil, err
 	}
 	err = <-stor.ReadyError(ctx)
@@ -87,7 +87,7 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Store, 
 	for i := 0; i < numNodes; i++ {
 		i := i
 		g.Go(func() error {
-			if err := stores[i].Open(); err != nil {
+			if err := stores[i].Open(ctx); err != nil {
 				return err
 			}
 			return <-stores[i].ReadyError(ctx)
@@ -110,9 +110,5 @@ func newTestOptions(ctx context.Context) *Options {
 	opts.TLS.Insecure = true
 	opts.Bootstrap.Enabled = true
 	opts.Mesh.NodeID = uuid.NewString()
-	deadline, ok := ctx.Deadline()
-	if ok {
-		opts.Raft.StartupTimeout = time.Until(deadline)
-	}
 	return opts
 }
