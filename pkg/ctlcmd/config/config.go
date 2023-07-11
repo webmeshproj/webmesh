@@ -270,49 +270,49 @@ func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 }
 
 // GetCluster gets a cluster by name.
-func (c *Config) GetCluster(name string) ClusterConfig {
+func (c *Config) GetCluster(name string) *ClusterConfig {
 	for _, cluster := range c.Clusters {
 		if cluster.Name == name {
-			return cluster.Cluster
+			return &cluster.Cluster
 		}
 	}
-	return ClusterConfig{}
+	return &ClusterConfig{}
 }
 
 // GetUser gets a user by name.
-func (c *Config) GetUser(name string) UserConfig {
+func (c *Config) GetUser(name string) *UserConfig {
 	for _, user := range c.Users {
 		if user.Name == name {
-			return user.User
+			return &user.User
 		}
 	}
-	return UserConfig{}
+	return &UserConfig{}
 }
 
 // GetContext gets a context by name.
-func (c *Config) GetContext(name string) ContextConfig {
+func (c *Config) GetContext(name string) *ContextConfig {
 	for _, context := range c.Contexts {
 		if context.Name == name {
-			return context.Context
+			return &context.Context
 		}
 	}
-	return ContextConfig{}
+	return &ContextConfig{}
 }
 
 // GetCurrentCluster returns the current cluster.
-func (c *Config) GetCurrentCluster() ClusterConfig {
+func (c *Config) GetCurrentCluster() *ClusterConfig {
 	ctx := c.GetCurrentContext()
 	return c.GetCluster(ctx.Cluster)
 }
 
 // GetCurrentUser returns the current user.
-func (c *Config) GetCurrentUser() UserConfig {
+func (c *Config) GetCurrentUser() *UserConfig {
 	ctx := c.GetCurrentContext()
 	return c.GetUser(ctx.User)
 }
 
 // GetCurrentContext returns the current context.
-func (c *Config) GetCurrentContext() ContextConfig {
+func (c *Config) GetCurrentContext() *ContextConfig {
 	return c.GetContext(c.CurrentContext)
 }
 
