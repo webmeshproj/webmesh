@@ -131,36 +131,7 @@ func New(opts *Options) (Store, error) {
 	}
 	log := slog.Default().With(slog.String("component", "store"))
 	if nodeID == "" || nodeID == hostnameFlagDefault {
-		// First check if we are using mTLS.
-		if tlsConfig != nil {
-			if len(tlsConfig.Certificates) == 0 {
-				log.Warn("no client certificates provided, generating random UUID for node ID")
-				nodeID = uuid.NewString()
-			} else {
-				clientCert := tlsConfig.Certificates[0]
-				leaf, err := x509.ParseCertificate(clientCert.Certificate[0])
-				if err != nil {
-					log.Warn("unable to parse client certificate, generating random UUID for node ID",
-						slog.String("error", err.Error()))
-					nodeID = uuid.NewString()
-				} else {
-					nodeID = leaf.Subject.CommonName
-					log.Info("using CN as node ID", slog.String("node-id", nodeID))
-				}
-			}
-		} else {
-			// Try to retrieve the system hostname
-			hostname, err := os.Hostname()
-			if err != nil {
-				log.Warn("unable to retrieve system hostname, generating random UUID for node ID",
-					slog.String("error", err.Error()))
-				nodeID = uuid.NewString()
-			} else {
-				nodeID = hostname
-				log.Info("using system hostname as node ID",
-					slog.String("node-id", string(nodeID)))
-			}
-		}
+		nodeID = determineNodeID(log, tlsConfig, opts)
 	}
 	sl, err := streamlayer.New(&streamlayer.Options{
 		ListenAddress: opts.Raft.ListenAddress,
@@ -179,6 +150,46 @@ func New(opts *Options) (Store, error) {
 		nwTaskGroup: &taskGroup,
 		log:         log.With(slog.String("node-id", string(nodeID))),
 	}, nil
+}
+
+func determineNodeID(log *slog.Logger, tlsConfig *tls.Config, opts *Options) string {
+	// Check if we are using mTLS.
+	if tlsConfig != nil {
+		if len(tlsConfig.Certificates) > 0 {
+			clientCert := tlsConfig.Certificates[0]
+			leaf, err := x509.ParseCertificate(clientCert.Certificate[0])
+			if err != nil {
+				log.Warn("unable to parse client certificate to determine node ID", slog.String("error", err.Error()))
+			} else {
+				nodeID := leaf.Subject.CommonName
+				log.Info("using CN as node ID", slog.String("node-id", nodeID))
+				return nodeID
+			}
+		}
+	}
+	// Check if we are using auth
+	if opts.Auth != nil {
+		if opts.Auth.Basic != nil && opts.Auth.Basic.Username != "" {
+			log.Info("using basic auth username as node ID",
+				slog.String("node-id", opts.Auth.Basic.Username))
+			return opts.Auth.Basic.Username
+		}
+		if opts.Auth.LDAP != nil && opts.Auth.LDAP.Username != "" {
+			log.Info("using LDAP username as node ID",
+				slog.String("node-id", opts.Auth.LDAP.Username))
+			return opts.Auth.LDAP.Username
+		}
+	}
+	// Try to retrieve the system hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Warn("unable to retrieve system hostname, generating random UUID for node ID",
+			slog.String("error", err.Error()))
+		return uuid.NewString()
+	}
+	log.Info("using system hostname as node ID",
+		slog.String("node-id", string(hostname)))
+	return hostname
 }
 
 type store struct {
