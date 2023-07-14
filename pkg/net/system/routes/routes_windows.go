@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"net/netip"
 	"strings"
 
@@ -29,6 +30,16 @@ import (
 // GetDefaultGateway returns the default gateway of the current system.
 func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
 	return defaultGatewayIPConfig(ctx)
+}
+
+// SetDefaultIPv4Gateway sets the default IPv4 gateway for the current system.
+func SetDefaultIPv4Gateway(ctx context.Context, gateway netip.Addr) error {
+	return errors.New("not implemented")
+}
+
+// SetDefaultIPv6Gateway sets the default IPv6 gateway for the current system.
+func SetDefaultIPv6Gateway(ctx context.Context, gateway netip.Addr) error {
+	return errors.New("not implemented")
 }
 
 // Add adds a route to the interface with the given name.

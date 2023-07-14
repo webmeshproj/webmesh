@@ -18,7 +18,6 @@ limitations under the License.
 package wireguard
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/netip"
@@ -32,6 +31,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/net/system"
 	"github.com/webmeshproj/node/pkg/net/system/link"
 	"github.com/webmeshproj/node/pkg/net/system/routes"
@@ -102,6 +102,7 @@ type Options struct {
 
 type wginterface struct {
 	system.Interface
+	defaultGateway netip.Addr
 	opts           *Options
 	cli            *wgctrl.Client
 	log            *slog.Logger
@@ -112,7 +113,7 @@ type wginterface struct {
 
 // New creates a new wireguard interface.
 func New(ctx context.Context, opts *Options) (Interface, error) {
-	log := slog.Default().With("component", "wireguard")
+	log := context.LoggerFrom(ctx).With("component", "wireguard")
 	if opts.ForceName {
 		log.Info("forcing wireguard interface name", "name", opts.Name)
 		iface, err := net.InterfaceByName(opts.Name)
@@ -133,6 +134,13 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		if err != nil {
 			log.Warn("failed to enable ip forwarding", "error", err)
 		}
+	}
+	// Get the default gateway in case we change it later.
+	var gw netip.Addr
+	var err error
+	gw, err = routes.GetDefaultGateway(ctx)
+	if err != nil {
+		log.Warn("failed to get default gateway", "error", err.Error())
 	}
 	log.Info("creating wireguard interface", "name", opts.Name)
 	iface, err := system.New(ctx, &system.Options{
@@ -156,11 +164,12 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		return nil, handleErr(fmt.Errorf("failed to create wireguard control client: %w", err))
 	}
 	wg := &wginterface{
-		Interface: iface,
-		opts:      opts,
-		cli:       cli,
-		peers:     make(map[string]wgtypes.Key),
-		log:       log,
+		Interface:      iface,
+		defaultGateway: gw,
+		opts:           opts,
+		cli:            cli,
+		peers:          make(map[string]wgtypes.Key),
+		log:            log,
 	}
 	if opts.Metrics {
 		recorder := NewMetricsRecorder(wg)

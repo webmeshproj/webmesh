@@ -18,7 +18,6 @@ package routes
 
 import (
 	"bufio"
-	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -30,6 +29,8 @@ import (
 	"github.com/jsimonetti/rtnetlink"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
+
+	"github.com/webmeshproj/node/pkg/context"
 )
 
 // GetDefaultGateway returns the default gateway of the current system.
@@ -59,6 +60,16 @@ func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
 		return netip.Addr{}, fmt.Errorf("could not read /proc/net/route: %w", err)
 	}
 	return netip.Addr{}, errors.New("could not determine current default gateway")
+}
+
+// SetDefaultIPv4Gateway sets the default IPv4 gateway for the current system.
+func SetDefaultIPv4Gateway(ctx context.Context, gateway netip.Addr) error {
+	return errors.New("not implemented")
+}
+
+// SetDefaultIPv6Gateway sets the default IPv6 gateway for the current system.
+func SetDefaultIPv6Gateway(ctx context.Context, gateway netip.Addr) error {
+	return errors.New("not implemented")
 }
 
 // Add adds a route to the interface with the given name.
@@ -96,8 +107,7 @@ func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 			OutIface: uint32(iface.Index),
 		},
 	}
-	slog.Default().With("route", "add").
-		Debug("adding route", slog.Any("request", req))
+	context.LoggerFrom(ctx).With("route", "add").Debug("adding route", slog.Any("request", req))
 	err = conn.Route.Add(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "file exists") {
@@ -143,8 +153,7 @@ func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 			OutIface: uint32(iface.Index),
 		},
 	}
-	slog.Default().With("route", "del").
-		Debug("removing route", slog.Any("request", req))
+	context.LoggerFrom(ctx).With("route", "del").Debug("removing route", slog.Any("request", req))
 	err = conn.Route.Delete(req)
 	if err != nil {
 		return fmt.Errorf("delete route from interface: %w", err)
