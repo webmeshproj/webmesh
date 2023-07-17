@@ -1,43 +1,15 @@
-# What is Webmesh?
+# Webmesh Node
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/webmeshproj/node)](https://goreportcard.com/report/github.com/webmeshproj/node)
 ![Build and Tests](https://github.com/webmeshproj/node/actions/workflows/ci.yaml/badge.svg)
 
-Webmesh is a project that aims to provide a zero-configuration, simple, secure, and scalable way to connect devices and services across the internet.
-It is inspired by several other projects that have emerged over the years such as TailScale, ZeroTier, and OpenZiti.
-Peers connect to eachother either via other peers, a central controller (or combination of controllers), or direct links negotiated via WebRTC.
-
-Nodes connected to the network take on one of three roles. They can be a client, a server, or both.
-A client is a node that is connected to the network but does not provide any services, except to itself.
-A server is a node that is connected to the network and provides services to other nodes.
-When a server node is also the leader, it is referred to as a controller and facilitates requests to join the mesh or mutate state.
-Other server nodes will proxy requests that require the leader appropriately.
-State is maintained on every connected node via Raft consensus.
-This allows for the network to be highly available and fault tolerant.
-
-The network supports role-based access control and can be configured to allow or deny access to specific services and operations to specific nodes.
-The same goes for network access controls.
-This is the recommended way to run the network, but insecure options are provided for testing and development purposes.
-The current supported authentication methods are:
-
-- mTLS
-- LDAP
-- Basic Auth
-
-Examples of different topologies and usages can be found in the [examples](examples/) directory.
-More examples and documentation will be added as the project matures.
-
-Administration of the network can be done via the gRPC API or the CLI utility included in this repository.
-For more information, see the [administration](docs/administration.md) docs.
-
-Extended documentation will be added as the project matures.
-
-**This project is not yet ready for production use, but I hope to rapidly get there**
-
-# Webmesh Node
+For an introduction on what is Webmesh, please see the [project website](https://webmeshproj.github.io).
+Extended documentation will be added to this site as the project matures.
 
 This repository contains the core functionality of the Webmesh Project.
-It implements the [API](https://github.com/webmeshproj/api) in Go.
+It implements the [Webmesh API](https://github.com/webmeshproj/api) in Go.
+
+**This project is not yet ready for production use, but I hope to rapidly get there**
 
 ## Getting Started
 
