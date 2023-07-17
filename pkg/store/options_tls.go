@@ -51,11 +51,11 @@ func NewTLSOptions() *TLSOptions {
 // BindFlags binds the TLS options to the flag set.
 func (o *TLSOptions) BindFlags(fl *flag.FlagSet) {
 	fl.StringVar(&o.CAFile, "tls.ca-file", util.GetEnvDefault(CAFileEnvVar, ""),
-		"Stream layer TLS CA file.")
+		"Path to a TLS CA certificate for verifying peer certificates.")
 	fl.BoolVar(&o.VerifyChainOnly, "tls.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
-		"Only verify the certificate chain for the stream layer.")
+		"Only verify the certificate chain of peer certificates.")
 	fl.BoolVar(&o.InsecureSkipVerify, "tls.insecure-skip-verify", util.GetEnvDefault(InsecureSkipVerifyEnvVar, "false") == "true",
-		"Skip verification of the stream layer certificate.")
+		"Skip verification of peer certificates.")
 	fl.BoolVar(&o.Insecure, "tls.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
-		"Don't use TLS for the stream layer.")
+		"Don't use TLS for peer communication.")
 }
