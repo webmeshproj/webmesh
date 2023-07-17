@@ -48,6 +48,7 @@ wmctl connect --insecure --no-ipv6 --join-server=<container_ip>:8443
 
 Configuration can be provided as CLI flags (as shown above) or via a configuration file and environment variables.
 Full details can be found on the [configuration section](https://webmeshproj.github.io/usage/configuration/) of the project website.
+Administration of the network can be done via the [API](https://webmeshproj.github.io/usage/administration/) using the CLI or custom tooling.
 
 ## Building
 
