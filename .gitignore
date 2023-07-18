@@ -3,4 +3,5 @@ bin/
 *.sqlite
 .vscode
 coverage.out
-pki/
+*.crt
+*.key
