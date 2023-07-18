@@ -60,6 +60,7 @@ You can run `make help` to see all the available targets.
 ## Roadmap
 
 - [ ] GUI Application. In the works over [here](https://github.com/webmeshproj/app).
+- [ ] Ability for plugins to call back into the node. This would allow for things like a plugin that can automatically configure NAT64 and DNS64. Technically already possible via storage plugins, but could be made easier.
 - [ ] Potential SaaS offering for those who don't want to run their own controllers or have a simple off-site backup of the mesh state.
 - [ ] Ability to peer with other meshes. This would allow for a mesh to be split into multiple smaller meshes that can still communicate with each other.
 
