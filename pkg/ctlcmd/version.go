@@ -27,10 +27,9 @@ func init() {
 }
 
 var versionCmd = &cobra.Command{
-	Use:               "version",
-	Short:             "Print the version number of the CLI",
-	Args:              cobra.NoArgs,
-	ValidArgsFunction: completeNodes(1),
+	Use:   "version",
+	Short: "Print the version number of the CLI",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Println("Version:", version.Version)
 		cmd.Println("Git Commit:", version.Commit)
