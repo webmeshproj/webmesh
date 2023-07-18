@@ -50,7 +50,11 @@ func init() {
 // Execute runs the root command.
 func Execute() error {
 	return rootCmd.Execute()
+}
 
+// Root returns the root command.
+func Root() *cobra.Command {
+	return rootCmd
 }
 
 var rootCmd = &cobra.Command{
