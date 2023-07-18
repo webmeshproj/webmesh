@@ -47,12 +47,14 @@ const (
 	DefaultCAExpiry = 365 * 24 * time.Hour // 1 year
 	// DefaultNodeExpiry is the default node expiry.
 	DefaultNodeExpiry = 90 * 24 * time.Hour // 90 days
+	// CADirectory is the name of the relative directory containing the CA.
+	CADirectory = "ca"
+	// NodesDirectory is the name of the relative directory containing the nodes.
+	NodesDirectory = "nodes"
 
-	caDirectory    = "ca"
-	nodesDirectory = "nodes"
-	keyFileName    = "tls.key"
-	certFileName   = "tls.crt"
-	caFileName     = "ca.crt"
+	keyFileName  = "tls.key"
+	certFileName = "tls.crt"
+	caFileName   = "ca.crt"
 )
 
 // PKI is an interface for managing the PKI for a cluster using mTLS.
@@ -253,11 +255,11 @@ func (p *pki) Generate(opts *GenerateOptions) error {
 		return err
 	}
 	// Write the CA and admin keys and certs to disk.
-	err = writeCertChain(filepath.Join(p.dataDir, caDirectory), caBytes, caBytes, caPrivKey)
+	err = writeCertChain(filepath.Join(p.dataDir, CADirectory), caBytes, caBytes, caPrivKey)
 	if err != nil {
 		return err
 	}
-	err = writeCertChain(filepath.Join(p.dataDir, nodesDirectory, opts.AdminName), caBytes, adminBytes, adminPrivKey)
+	err = writeCertChain(filepath.Join(p.dataDir, NodesDirectory, opts.AdminName), caBytes, adminBytes, adminPrivKey)
 	if err != nil {
 		return err
 	}
@@ -273,13 +275,13 @@ func (p *pki) Issue(opts *IssueOptions) error {
 	if _, err := os.Stat(p.dataDir); err != nil {
 		return fmt.Errorf("pki directory %s does not exist", p.dataDir)
 	}
-	if _, err := os.Stat(filepath.Join(p.dataDir, nodesDirectory, opts.Name)); err == nil {
+	if _, err := os.Stat(filepath.Join(p.dataDir, NodesDirectory, opts.Name)); err == nil {
 		return fmt.Errorf("user %s already exists", opts.Name)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
 	// Load the CA.
-	caPath := filepath.Join(p.dataDir, caDirectory)
+	caPath := filepath.Join(p.dataDir, CADirectory)
 	caCert, err := loadCert(filepath.Join(caPath, caFileName))
 	if err != nil {
 		return err
@@ -326,7 +328,7 @@ func (p *pki) Issue(opts *IssueOptions) error {
 		return err
 	}
 	// Write the key and cert to disk.
-	err = writeCertChain(filepath.Join(p.dataDir, nodesDirectory, opts.Name), caCert.Raw, certBytes, privKey)
+	err = writeCertChain(filepath.Join(p.dataDir, NodesDirectory, opts.Name), caCert.Raw, certBytes, privKey)
 	if err != nil {
 		return err
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package ctlcmd
 
 import (
+	"path/filepath"
+
 	"github.com/spf13/cobra"
 
 	"github.com/webmeshproj/node/pkg/ctlcmd/pki"
@@ -64,7 +66,12 @@ var initPkiCmd = &cobra.Command{
 	Short: "Initializes the PKI for a cluster using mTLS",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return pki.New(pkiDirectory).Generate(genOpts)
+		err := pki.New(pkiDirectory).Generate(genOpts)
+		if err != nil {
+			return err
+		}
+		cmd.Println("PKI initialized at", pkiDirectory)
+		return nil
 	},
 }
 
@@ -73,7 +80,12 @@ var issueCmd = &cobra.Command{
 	Short: "Issues a certificate for a node",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return pki.New(pkiDirectory).Issue(issueOpts)
+		err := pki.New(pkiDirectory).Issue(issueOpts)
+		if err != nil {
+			return err
+		}
+		cmd.Println("Certificate issued at", filepath.Join(pkiDirectory, pki.NodesDirectory, issueOpts.Name))
+		return nil
 	},
 }
 
