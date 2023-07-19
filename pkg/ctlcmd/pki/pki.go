@@ -25,6 +25,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -32,6 +33,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/webmeshproj/node/pkg/ctlcmd/config"
 )
 
 const (
@@ -63,6 +66,8 @@ type PKI interface {
 	Generate(*GenerateOptions) error
 	// Issue issues a new certificate.
 	Issue(*IssueOptions) error
+	// GenerateConfig generates a new config.
+	GenerateConfig(*GenerateConfigOptions) error
 }
 
 // GenerateOptions are options for generating a new PKI.
@@ -165,6 +170,47 @@ func (o *IssueOptions) validate() error {
 		if o.KeySize%8 != 0 {
 			return fmt.Errorf("key size must be a multiple of 8 for rsa")
 		}
+	}
+	return nil
+}
+
+// GenerateConfigOptions are options for generating a new config.
+type GenerateConfigOptions struct {
+	// Name is the name of the certificate.
+	Name string
+	// Server is the server address.
+	Server string
+	// Output is the output file.
+	Output string
+	// ContextName sets the name of the context. Defaults to "default".
+	ContextName string
+	// ClusterName sets the name of the cluster. Defaults to "default".
+	ClusterName string
+	// UserName sets the name of the user. Defaults to "default".
+	UserName string
+}
+
+func (o *GenerateConfigOptions) applyDefaults() {
+	if o.Name == "" {
+		o.Name = DefaultAdminName
+	}
+	if o.ContextName == "" {
+		o.ContextName = "default"
+	}
+	if o.ClusterName == "" {
+		o.ClusterName = "default"
+	}
+	if o.UserName == "" {
+		o.UserName = "default"
+	}
+}
+
+func (o *GenerateConfigOptions) validate() error {
+	if o.Name == "" {
+		return fmt.Errorf("name must be specified")
+	}
+	if o.Server == "" {
+		return fmt.Errorf("server must be specified")
 	}
 	return nil
 }
@@ -331,6 +377,54 @@ func (p *pki) Issue(opts *IssueOptions) error {
 	err = writeCertChain(filepath.Join(p.dataDir, NodesDirectory, opts.Name), caCert.Raw, certBytes, privKey)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (p *pki) GenerateConfig(opts *GenerateConfigOptions) error {
+	opts.applyDefaults()
+	if err := opts.validate(); err != nil {
+		return err
+	}
+	caData, err := os.ReadFile(filepath.Join(p.dataDir, CADirectory, caFileName))
+	if err != nil {
+		return fmt.Errorf("error reading CA certificate: %w", err)
+	}
+	certData, err := os.ReadFile(filepath.Join(p.dataDir, NodesDirectory, opts.Name, certFileName))
+	if err != nil {
+		return fmt.Errorf("error reading certificate: %w", err)
+	}
+	keyData, err := os.ReadFile(filepath.Join(p.dataDir, NodesDirectory, opts.Name, keyFileName))
+	if err != nil {
+		return fmt.Errorf("error reading key: %w", err)
+	}
+	conf := config.New()
+	conf.Clusters = append(conf.Clusters, config.Cluster{
+		Name: opts.ClusterName,
+		Cluster: config.ClusterConfig{
+			Server:                   opts.Server,
+			CertificateAuthorityData: base64.StdEncoding.EncodeToString(caData),
+			TLSVerifyChainOnly:       true,
+		},
+	})
+	conf.Users = append(conf.Users, config.User{
+		Name: opts.UserName,
+		User: config.UserConfig{
+			ClientCertificateData: base64.StdEncoding.EncodeToString(certData),
+			ClientKeyData:         base64.StdEncoding.EncodeToString(keyData),
+		},
+	})
+	conf.Contexts = append(conf.Contexts, config.Context{
+		Name: opts.ContextName,
+		Context: config.ContextConfig{
+			Cluster: opts.ClusterName,
+			User:    opts.UserName,
+		},
+	})
+	conf.CurrentContext = opts.ContextName
+	err = conf.WriteTo(opts.Output)
+	if err != nil {
+		return fmt.Errorf("error writing config: %w", err)
 	}
 	return nil
 }
