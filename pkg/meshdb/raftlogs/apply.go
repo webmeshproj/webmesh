@@ -25,7 +25,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/models"
@@ -41,7 +40,7 @@ func Apply(ctx context.Context, db *sql.DB, logEntry *v1.RaftLogEntry) *v1.RaftA
 			slog.String("query", logEntry.GetSqlQuery().GetStatement().GetSql()),
 			slog.Any("params", logEntry.GetSqlExec().GetStatement().GetParameters()),
 		)
-		res, err := applyQuery(ctx, db, logEntry.GetSqlQuery())
+		res, err := ApplyQuery(ctx, db, logEntry.GetSqlQuery())
 		if err != nil {
 			res = &v1.RaftApplyResponse{
 				Error: err.Error(),
@@ -54,7 +53,7 @@ func Apply(ctx context.Context, db *sql.DB, logEntry *v1.RaftLogEntry) *v1.RaftA
 			slog.String("execute", logEntry.GetSqlExec().GetStatement().GetSql()),
 			slog.Any("params", logEntry.GetSqlExec().GetStatement().GetParameters()),
 		)
-		res, err := applyExecute(ctx, db, logEntry.GetSqlExec())
+		res, err := ApplyExecute(ctx, db, logEntry.GetSqlExec())
 		if err != nil {
 			res = &v1.RaftApplyResponse{
 				Error: err.Error(),
@@ -69,7 +68,8 @@ func Apply(ctx context.Context, db *sql.DB, logEntry *v1.RaftLogEntry) *v1.RaftA
 	}
 }
 
-func applyQuery(ctx context.Context, db *sql.DB, query *v1.SQLQuery) (*v1.RaftApplyResponse, error) {
+// ApplyQuery applies a query to the database.
+func ApplyQuery(ctx context.Context, db *sql.DB, query *v1.SQLQuery) (*v1.RaftApplyResponse, error) {
 	c, err := db.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("acquire connection: %w", err)
@@ -104,7 +104,8 @@ func applyQuery(ctx context.Context, db *sql.DB, query *v1.SQLQuery) (*v1.RaftAp
 	}, nil
 }
 
-func applyExecute(ctx context.Context, db *sql.DB, exec *v1.SQLExec) (*v1.RaftApplyResponse, error) {
+// ApplyExecute applies an execute to the database.
+func ApplyExecute(ctx context.Context, db *sql.DB, exec *v1.SQLExec) (*v1.RaftApplyResponse, error) {
 	c, err := db.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("acquire connection: %w", err)
@@ -140,7 +141,7 @@ func applyExecute(ctx context.Context, db *sql.DB, exec *v1.SQLExec) (*v1.RaftAp
 }
 
 func queryWithQuerier(ctx context.Context, q models.DBTX, query *v1.SQLQuery) (*v1.SQLQueryResult, error) {
-	params, err := parametersToValues(query.GetStatement().GetParameters())
+	params, err := SQLParametersToNamedArgs(query.GetStatement().GetParameters())
 	if err != nil {
 		return nil, fmt.Errorf("convert parameters: %w", err)
 	}
@@ -171,7 +172,7 @@ func queryWithQuerier(ctx context.Context, q models.DBTX, query *v1.SQLQuery) (*
 		if err := rows.Scan(ptrs...); err != nil {
 			return nil, fmt.Errorf("scan row: %w", err)
 		}
-		params, err := normalizeRowValues(dest, dbTypes)
+		params, err := NormalizeRowValues(dest, dbTypes)
 		if err != nil {
 			return nil, fmt.Errorf("normalize row values: %w", err)
 		}
@@ -190,7 +191,7 @@ func queryWithQuerier(ctx context.Context, q models.DBTX, query *v1.SQLQuery) (*
 }
 
 func execWithQuerier(ctx context.Context, q models.DBTX, exec *v1.SQLExec) (*v1.SQLExecResult, error) {
-	params, err := parametersToValues(exec.GetStatement().GetParameters())
+	params, err := SQLParametersToNamedArgs(exec.GetStatement().GetParameters())
 	if err != nil {
 		return nil, fmt.Errorf("convert parameters: %w", err)
 	}
@@ -213,91 +214,4 @@ func execWithQuerier(ctx context.Context, q models.DBTX, exec *v1.SQLExec) (*v1.
 		LastInsertId: lastInsertID,
 		RowsAffected: rowsAffected,
 	}, nil
-}
-
-func parametersToValues(parameters []*v1.SQLParameter) ([]interface{}, error) {
-	if parameters == nil {
-		return nil, nil
-	}
-	values := make([]interface{}, len(parameters))
-	for idx, param := range parameters {
-		i := idx
-		switch param.GetType() {
-		case v1.SQLParameterType_SQL_PARAM_INT64:
-			values[i] = sql.Named(param.GetName(), param.Int64)
-		case v1.SQLParameterType_SQL_PARAM_DOUBLE:
-			values[i] = sql.Named(param.GetName(), param.Double)
-		case v1.SQLParameterType_SQL_PARAM_BOOL:
-			values[i] = sql.Named(param.GetName(), param.Bool)
-		case v1.SQLParameterType_SQL_PARAM_BYTES:
-			values[i] = sql.Named(param.GetName(), param.Bytes)
-		case v1.SQLParameterType_SQL_PARAM_STRING:
-			values[i] = sql.Named(param.GetName(), param.Str)
-		case v1.SQLParameterType_SQL_PARAM_TIME:
-			values[i] = sql.Named(param.GetName(), param.Time.AsTime())
-		case v1.SQLParameterType_SQL_PARAM_NULL:
-			values[i] = sql.Named(param.GetName(), nil)
-		default:
-			return nil, fmt.Errorf("unsupported type: %T", param.GetType())
-		}
-	}
-	return values, nil
-}
-
-func normalizeRowValues(data []interface{}, types []string) ([]*v1.SQLParameter, error) {
-	values := make([]*v1.SQLParameter, len(types))
-	for idx, v := range data {
-		i := idx
-		switch val := v.(type) {
-		case int:
-			values[i] = &v1.SQLParameter{
-				Type:  v1.SQLParameterType_SQL_PARAM_INT64,
-				Int64: int64(val),
-			}
-		case int64:
-			values[i] = &v1.SQLParameter{
-				Type:  v1.SQLParameterType_SQL_PARAM_INT64,
-				Int64: val,
-			}
-		case float64:
-			values[i] = &v1.SQLParameter{
-				Type:   v1.SQLParameterType_SQL_PARAM_DOUBLE,
-				Double: val,
-			}
-		case bool:
-			values[i] = &v1.SQLParameter{
-				Type: v1.SQLParameterType_SQL_PARAM_BOOL,
-				Bool: val,
-			}
-		case string:
-			values[i] = &v1.SQLParameter{
-				Type: v1.SQLParameterType_SQL_PARAM_STRING,
-				Str:  val,
-			}
-		case []byte:
-			if types[i] == "TEXT" {
-				values[i] = &v1.SQLParameter{
-					Type: v1.SQLParameterType_SQL_PARAM_STRING,
-					Str:  string(val),
-				}
-			} else {
-				values[i] = &v1.SQLParameter{
-					Type:  v1.SQLParameterType_SQL_PARAM_BYTES,
-					Bytes: val,
-				}
-			}
-		case time.Time:
-			values[i] = &v1.SQLParameter{
-				Type: v1.SQLParameterType_SQL_PARAM_TIME,
-				Time: timestamppb.New(val),
-			}
-		case nil:
-			values[i] = &v1.SQLParameter{
-				Type: v1.SQLParameterType_SQL_PARAM_NULL,
-			}
-		default:
-			return nil, fmt.Errorf("unhandled column type: %T %v", val, val)
-		}
-	}
-	return values, nil
 }

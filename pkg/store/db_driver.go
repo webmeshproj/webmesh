@@ -21,14 +21,14 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/golang/snappy"
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
 )
 
 // raftDBDriver is a driver that is backed by the Raft log.
@@ -149,12 +149,12 @@ func (s *raftDBStatement) Rollback() error {
 
 // Exec applies the query to the Raft log.
 func (s *raftDBStatement) Exec(args []driver.Value) (driver.Result, error) {
-	return s.ExecContext(context.Background(), toNamedValues(args))
+	return s.ExecContext(context.Background(), raftlogs.ValuesToNamedValues(args))
 }
 
 // Query applies the query to the Raft log.
 func (s *raftDBStatement) Query(args []driver.Value) (driver.Rows, error) {
-	return s.QueryContext(context.Background(), toNamedValues(args))
+	return s.QueryContext(context.Background(), raftlogs.ValuesToNamedValues(args))
 }
 
 // ExecContext applies the query to the Raft log.
@@ -169,9 +169,9 @@ func (s *raftDBStatement) ExecContext(ctx context.Context, args []driver.NamedVa
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	params, err := toSQLParameters(args)
+	params, err := raftlogs.NamedValuesToSQLParameters(args)
 	if err != nil {
-		return nil, fmt.Errorf("to sql parameters: %w", err)
+		return nil, fmt.Errorf("named values to sql parameters: %w", err)
 	}
 	logEntry := &v1.RaftLogEntry{
 		Type: v1.RaftCommandType_EXECUTE,
@@ -201,7 +201,7 @@ func (s *raftDBStatement) ExecContext(ctx context.Context, args []driver.NamedVa
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("apply log entry data: %s", resp.GetError())
 	}
-	return &execResult{resp}, nil
+	return raftlogs.NewResult(resp.GetExecResult()), nil
 }
 
 // QueryContext applies the query to the Raft log.
@@ -216,9 +216,9 @@ func (s *raftDBStatement) QueryContext(ctx context.Context, args []driver.NamedV
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	params, err := toSQLParameters(args)
+	params, err := raftlogs.NamedValuesToSQLParameters(args)
 	if err != nil {
-		return nil, fmt.Errorf("to sql parameters: %w", err)
+		return nil, fmt.Errorf("named values to sql parameters: %w", err)
 	}
 	logEntry := &v1.RaftLogEntry{
 		Type: v1.RaftCommandType_QUERY,
@@ -248,124 +248,5 @@ func (s *raftDBStatement) QueryContext(ctx context.Context, args []driver.NamedV
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("apply log entry data: %s", resp.GetError())
 	}
-	return &queryResult{resp, 0}, nil
-}
-
-func toNamedValues(args []driver.Value) []driver.NamedValue {
-	named := make([]driver.NamedValue, len(args))
-	for i, arg := range args {
-		named[i] = driver.NamedValue{
-			Ordinal: i + 1,
-			Value:   arg,
-		}
-	}
-	return named
-}
-
-func toSQLParameters(args []driver.NamedValue) ([]*v1.SQLParameter, error) {
-	params := make([]*v1.SQLParameter, len(args))
-	for i, argz := range args {
-		arg := argz
-		sqlParam := &v1.SQLParameter{Name: arg.Name}
-		switch v := arg.Value.(type) {
-		case nil:
-			sqlParam.Type = v1.SQLParameterType_SQL_PARAM_NULL
-		case bool:
-			sqlParam.Type = v1.SQLParameterType_SQL_PARAM_BOOL
-			sqlParam.Bool = v
-		case int:
-			sqlParam.Type = v1.SQLParameterType_SQL_PARAM_INT64
-			sqlParam.Int64 = int64(v)
-		case int64:
-			sqlParam.Type = v1.SQLParameterType_SQL_PARAM_INT64
-			sqlParam.Int64 = v
-		case float64:
-			sqlParam.Type = v1.SQLParameterType_SQL_PARAM_DOUBLE
-			sqlParam.Double = v
-		case string:
-			sqlParam.Type = v1.SQLParameterType_SQL_PARAM_STRING
-			sqlParam.Str = v
-		case []byte:
-			sqlParam.Type = v1.SQLParameterType_SQL_PARAM_BYTES
-			sqlParam.Bytes = v
-		case time.Time:
-			sqlParam.Type = v1.SQLParameterType_SQL_PARAM_TIME
-			sqlParam.Time = timestamppb.New(v)
-		default:
-			return nil, fmt.Errorf("unsupported parameter type: %T", v)
-		}
-		params[i] = sqlParam
-	}
-	return params, nil
-}
-
-type execResult struct {
-	resp *v1.RaftApplyResponse
-}
-
-// LastInsertId returns the database's auto-generated ID
-// after, for example, an INSERT into a table with primary
-// key.
-func (r *execResult) LastInsertId() (int64, error) {
-	return r.resp.GetExecResult().GetLastInsertId(), nil
-}
-
-// RowsAffected returns the number of rows affected by the
-// query.
-func (r *execResult) RowsAffected() (int64, error) {
-	return r.resp.GetExecResult().GetRowsAffected(), nil
-}
-
-type queryResult struct {
-	resp  *v1.RaftApplyResponse
-	index int64
-}
-
-// Columns returns the names of the columns.
-func (q *queryResult) Columns() []string {
-	return q.resp.GetQueryResult().GetColumns()
-}
-
-// Next is called to populate the next row of data into
-// the provided slice.
-func (q *queryResult) Next(dest []driver.Value) error {
-	if q.index >= int64(len(q.resp.GetQueryResult().GetValues())) {
-		return io.EOF
-	}
-	for i, v := range q.resp.GetQueryResult().GetValues()[q.index].Values {
-		if v == nil {
-			dest[i] = nil
-			continue
-		}
-		switch v.Type {
-		case v1.SQLParameterType_SQL_PARAM_INT64:
-			dest[i] = v.GetInt64()
-		case v1.SQLParameterType_SQL_PARAM_DOUBLE:
-			dest[i] = v.GetDouble()
-		case v1.SQLParameterType_SQL_PARAM_BOOL:
-			dest[i] = v.GetBool()
-		case v1.SQLParameterType_SQL_PARAM_BYTES:
-			dest[i] = v.GetBytes()
-		case v1.SQLParameterType_SQL_PARAM_STRING:
-			dest[i] = v.GetStr()
-		case v1.SQLParameterType_SQL_PARAM_TIME:
-			dest[i] = v.GetTime().AsTime()
-		case v1.SQLParameterType_SQL_PARAM_NULL:
-			dest[i] = nil
-		default:
-			return fmt.Errorf("unsupported type: %T", v.GetType())
-		}
-	}
-	q.index++
-	return nil
-}
-
-// ColumnTypeDatabaseTypeName returns the database system type.
-func (q *queryResult) ColumnTypeDatabaseTypeName(index int) string {
-	return q.resp.GetQueryResult().GetTypes()[index]
-}
-
-// Close closes the rows iterator.
-func (q *queryResult) Close() error {
-	return nil
+	return raftlogs.NewRows(resp.GetQueryResult()), nil
 }
