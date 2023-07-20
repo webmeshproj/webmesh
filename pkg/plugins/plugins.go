@@ -39,16 +39,17 @@ import (
 	"github.com/webmeshproj/node/pkg/plugins/ldap"
 	"github.com/webmeshproj/node/pkg/plugins/localstore"
 	"github.com/webmeshproj/node/pkg/plugins/mtls"
+	"github.com/webmeshproj/node/pkg/plugins/zclients"
 )
 
 var (
 	// BuiltIns are the built-in plugins.
-	BuiltIns = map[string]PluginClient{
-		"ipam":       inProcessClient(&ipam.Plugin{}),
-		"mtls":       inProcessClient(&mtls.Plugin{}),
-		"basic-auth": inProcessClient(&basicauth.Plugin{}),
-		"ldap":       inProcessClient(&ldap.Plugin{}),
-		"localstore": inProcessClient(&localstore.Plugin{}),
+	BuiltIns = map[string]zclients.PluginClient{
+		"ipam":       zclients.NewInProcessClient(&ipam.Plugin{}),
+		"mtls":       zclients.NewInProcessClient(&mtls.Plugin{}),
+		"basic-auth": zclients.NewInProcessClient(&basicauth.Plugin{}),
+		"ldap":       zclients.NewInProcessClient(&ldap.Plugin{}),
+		"localstore": zclients.NewInProcessClient(&localstore.Plugin{}),
 	}
 
 	// ErrUnsupported is returned when a plugin capability is not supported
@@ -84,22 +85,22 @@ type Manager interface {
 
 // New creates a new plugin manager.
 func New(ctx context.Context, opts *Options) (Manager, error) {
-	var auth, ipamv4, ipamv6 PluginClient
-	registered := make(map[string]PluginClient)
-	stores := make([]PluginClient, 0)
-	emitters := make([]PluginClient, 0)
+	var auth, ipamv4, ipamv6 zclients.PluginClient
+	registered := make(map[string]zclients.PluginClient)
+	stores := make([]zclients.PluginClient, 0)
+	emitters := make([]zclients.PluginClient, 0)
 	log := slog.Default()
 	for name, cfg := range opts.Plugins {
 		log.Info("loading plugin", "name", name)
 		log.Debug("plugin configuration", "config", cfg)
 		// Load the plugin.
-		var plugin PluginClient
+		var plugin zclients.PluginClient
 		if builtIn, ok := BuiltIns[name]; ok {
 			plugin = builtIn
 		} else {
 			// Special case of in-lined implementation
 			if cfg.Plugin != nil {
-				plugin = inProcessClient(cfg.Plugin)
+				plugin = zclients.NewInProcessClient(cfg.Plugin)
 			} else {
 				if cfg.Path == "" && cfg.Server == "" {
 					return nil, fmt.Errorf("plugin %q: path or server must be specified", name)
@@ -109,9 +110,16 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 				}
 				var err error
 				if cfg.Path != "" {
-					plugin, err = newExternalProcess(ctx, cfg.Path)
+					plugin, err = zclients.NewExternalProcessClient(ctx, cfg.Path)
 				} else {
-					plugin, err = newExternalServer(ctx, cfg)
+					plugin, err = zclients.NewExternalServerClient(ctx, &zclients.ExternalServerConfig{
+						Server:        cfg.Server,
+						Insecure:      cfg.Insecure,
+						TLSCAFile:     cfg.TLSCAFile,
+						TLSCertFile:   cfg.TLSCertFile,
+						TLSKeyFile:    cfg.TLSKeyFile,
+						TLSSkipVerify: cfg.TLSSkipVerify,
+					})
 				}
 				if err != nil {
 					return nil, fmt.Errorf("plugin %q: %w", name, err)
@@ -175,12 +183,12 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 }
 
 type manager struct {
-	auth     PluginClient
-	ipamv4   PluginClient
-	ipamv6   PluginClient
-	stores   []PluginClient
-	emitters []PluginClient
-	plugins  map[string]PluginClient
+	auth     zclients.PluginClient
+	ipamv4   zclients.PluginClient
+	ipamv6   zclients.PluginClient
+	stores   []zclients.PluginClient
+	emitters []zclients.PluginClient
+	plugins  map[string]zclients.PluginClient
 	log      *slog.Logger
 }
 
