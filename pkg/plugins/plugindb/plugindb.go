@@ -27,8 +27,10 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/mattn/go-sqlite3"
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
 )
 
@@ -38,12 +40,21 @@ func Open(srv v1.Plugin_QueryServer) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("generate uuid: %w", err)
 	}
-	sql.Register(drvId.String(), &pluginDB{srv: srv})
+	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=memory", drvId))
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite3: %w", err)
+	}
+	if err := models.MigrateDB(db); err != nil {
+		defer db.Close()
+		return nil, fmt.Errorf("migrate db: %w", err)
+	}
+	sql.Register(drvId.String(), &pluginDB{srv: srv, models: db})
 	return sql.Open(drvId.String(), "")
 }
 
 type pluginDB struct {
-	srv v1.Plugin_QueryServer
+	srv    v1.Plugin_QueryServer
+	models *sql.DB
 	// TODO: Add a multiplexer to allow multiple queries at once?
 	mu sync.Mutex
 }
@@ -86,22 +97,51 @@ func (db *pluginDB) Rollback() error {
 
 // Close closes the connection.
 func (db *pluginDB) Close() error {
-	return nil
+	return db.models.Close()
 }
 
 // Prepare returns a prepared statement.
 func (db *pluginDB) Prepare(query string) (driver.Stmt, error) {
-	return &pluginStatement{db, query}, nil
+	return db.PrepareContext(context.Background(), query)
+}
+
+// PrepareContext returns a new statement that is backed by the Raft log.
+func (db *pluginDB) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+	c, err := db.models.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get conn: %w", err)
+	}
+	defer c.Close()
+	var numInput int
+	err = c.Raw(func(driverConn interface{}) error {
+		conn, ok := driverConn.(*sqlite3.SQLiteConn)
+		if !ok {
+			return fmt.Errorf("raw conn is not sqlite3")
+		}
+		stmt, err := conn.PrepareContext(ctx, query)
+		if err != nil {
+			return fmt.Errorf("prepare: %w", err)
+		}
+		defer stmt.Close()
+		sqlstmt, ok := stmt.(*sqlite3.SQLiteStmt)
+		if !ok {
+			return fmt.Errorf("stmt is not sqlite3")
+		}
+		numInput = sqlstmt.NumInput()
+		return nil
+	})
+	return &pluginStatement{db, query, numInput}, err
 }
 
 type pluginStatement struct {
-	db  *pluginDB
-	sql string
+	db       *pluginDB
+	sql      string
+	numInput int
 }
 
 // NumInput is a noop. It is handled during parsing.
 func (s *pluginStatement) NumInput() int {
-	return -1
+	return s.numInput
 }
 
 // Exec executes the statement with the given arguments.

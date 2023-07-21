@@ -17,13 +17,11 @@ limitations under the License.
 package clients
 
 import (
-	"errors"
 	"io"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -32,11 +30,12 @@ import (
 
 // NewInProcessClient creates a plugin client from a built-in plugin server.
 func NewInProcessClient(plugin v1.PluginServer) *inProcessPlugin {
-	return &inProcessPlugin{plugin}
+	return &inProcessPlugin{server: plugin}
 }
 
 type inProcessPlugin struct {
-	server v1.PluginServer
+	server      v1.PluginServer
+	queryStream v1.Plugin_QueryClient
 }
 
 func (p *inProcessPlugin) GetInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*v1.PluginInfo, error) {
@@ -56,122 +55,24 @@ func (p *inProcessPlugin) Query(ctx context.Context, opts ...grpc.CallOption) (v
 	go func() {
 		defer cancel()
 		err := p.server.Query(srv)
-		if err != nil && err != io.EOF && status.Code(err) != codes.Unimplemented {
-			context.LoggerFrom(ctx).Error("error in plugin query", "err", err)
+		if err != nil {
+			if err != io.EOF && status.Code(err) != codes.Unimplemented {
+				context.LoggerFrom(ctx).Error("error in plugin query", "error", err)
+			}
 		}
 	}()
+	p.queryStream = cli
 	return cli, nil
 }
 
-type inProcessQueryClient struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	schan  chan *v1.PluginSQLQuery
-	rchan  chan *v1.PluginSQLQueryResult
-}
-
-func (p *inProcessQueryClient) Context() context.Context {
-	return p.ctx
-}
-
-func (p *inProcessQueryClient) Header() (metadata.MD, error) {
-	return nil, nil
-}
-
-func (p *inProcessQueryClient) Trailer() metadata.MD {
-	return nil
-}
-
-func (p *inProcessQueryClient) CloseSend() error {
-	p.cancel()
-	close(p.rchan)
-	close(p.schan)
-	return nil
-}
-
-func (p *inProcessQueryClient) Recv() (*v1.PluginSQLQuery, error) {
-	select {
-	case <-p.ctx.Done():
-		return nil, io.EOF
-	case res := <-p.schan:
-		return res, nil
-	}
-}
-
-func (p *inProcessQueryClient) RecvMsg(m interface{}) error {
-	return errors.New("not implemented")
-}
-
-func (p *inProcessQueryClient) Send(in *v1.PluginSQLQueryResult) error {
-	select {
-	case <-p.ctx.Done():
-		return p.ctx.Err()
-	default:
-	}
-	select {
-	case p.rchan <- in:
-	default:
-	}
-	return nil
-}
-
-func (p *inProcessQueryClient) SendMsg(m interface{}) error {
-	return p.Send(m.(*v1.PluginSQLQueryResult))
-}
-
-type inProcessQueryServer struct {
-	ctx   context.Context
-	schan chan *v1.PluginSQLQuery
-	rchan chan *v1.PluginSQLQueryResult
-}
-
-func (p *inProcessQueryServer) Context() context.Context {
-	return p.ctx
-}
-
-func (p *inProcessQueryServer) SetHeader(metadata.MD) error {
-	return nil
-}
-
-func (p *inProcessQueryServer) SendHeader(m metadata.MD) error {
-	return nil
-}
-
-func (p *inProcessQueryServer) SetTrailer(metadata.MD) {
-}
-
-func (p *inProcessQueryServer) Send(in *v1.PluginSQLQuery) error {
-	select {
-	case <-p.ctx.Done():
-		return p.ctx.Err()
-	default:
-	}
-	select {
-	case p.schan <- in:
-	default:
-	}
-	return nil
-}
-
-func (p *inProcessQueryServer) SendMsg(m interface{}) error {
-	return p.Send(m.(*v1.PluginSQLQuery))
-}
-
-func (p *inProcessQueryServer) Recv() (*v1.PluginSQLQueryResult, error) {
-	select {
-	case <-p.ctx.Done():
-		return nil, io.EOF
-	case res := <-p.rchan:
-		return res, nil
-	}
-}
-
-func (p *inProcessQueryServer) RecvMsg(m interface{}) error {
-	return errors.New("not implemented")
-}
-
 func (p *inProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	return p.server.Close(context.Background(), &emptypb.Empty{})
+	if p.queryStream != nil {
+		err := p.queryStream.CloseSend()
+		if err != nil {
+			context.LoggerFrom(ctx).Error("error closing query stream", "error", err)
+		}
+	}
+	return p.server.Close(ctx, &emptypb.Empty{})
 }
 
 func (p *inProcessPlugin) Storage() v1.StoragePluginClient {

@@ -20,13 +20,10 @@ limitations under the License.
 package ipam
 
 import (
-	"bytes"
 	"database/sql"
 	"fmt"
-	"io"
 	"net/netip"
 	"sync"
-	"sync/atomic"
 
 	_ "github.com/mattn/go-sqlite3"
 	v1 "github.com/webmeshproj/api/v1"
@@ -34,8 +31,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/models"
-	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
-	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/node/pkg/plugins/plugindb"
 	"github.com/webmeshproj/node/pkg/util"
 	"github.com/webmeshproj/node/pkg/version"
 )
@@ -43,12 +39,10 @@ import (
 // Plugin is the ipam plugin.
 type Plugin struct {
 	v1.UnimplementedPluginServer
-	v1.UnimplementedStoragePluginServer
 	v1.UnimplementedIPAMPluginServer
 
-	data                          *sql.DB
-	currentTerm, lastAppliedIndex atomic.Uint64
-	datamux                       sync.Mutex
+	data    *sql.DB
+	datamux sync.Mutex
 }
 
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {
@@ -57,7 +51,6 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Version:     version.Version,
 		Description: "Simple IPAM plugin",
 		Capabilities: []v1.PluginCapability{
-			v1.PluginCapability_PLUGIN_CAPABILITY_STORE,
 			v1.PluginCapability_PLUGIN_CAPABILITY_IPAMV4,
 			v1.PluginCapability_PLUGIN_CAPABILITY_IPAMV6,
 		},
@@ -65,52 +58,34 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 }
 
 func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*emptypb.Empty, error) {
-	p.datamux.Lock()
-	defer p.datamux.Unlock()
-	var err error
-	dataPath := "file:simple-ipam?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full"
-	p.data, err = sql.Open("sqlite3", dataPath)
-	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
-	}
-	err = models.MigrateDB(p.data)
-	if err != nil {
-		return nil, fmt.Errorf("migrate db schema: %w", err)
-	}
 	return &emptypb.Empty{}, nil
 }
 
-// func (p *Plugin) Query(srv v1.Plugin_QueryServer) error {
-// 	<-srv.Context().Done()
-// 	return nil
-// }
+func (p *Plugin) Query(srv v1.Plugin_QueryServer) error {
+	p.datamux.Lock()
+	var err error
+	p.data, err = plugindb.Open(srv)
+	if err != nil {
+		p.datamux.Unlock()
+		return fmt.Errorf("open database: %w", err)
+	}
+	p.datamux.Unlock()
+	<-srv.Context().Done()
+	return nil
+}
 
 func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, p.data.Close()
 }
 
-func (p *Plugin) Store(ctx context.Context, log *v1.StoreLogRequest) (*v1.RaftApplyResponse, error) {
-	p.datamux.Lock()
-	defer p.datamux.Unlock()
-	defer p.currentTerm.Store(log.GetTerm())
-	defer p.lastAppliedIndex.Store(log.GetIndex())
-	context.LoggerFrom(ctx).Debug("storing log", "index", log.GetIndex(), "term", log.GetTerm())
-	return raftlogs.Apply(ctx, p.data, log.GetLog()), nil
-}
-
-func (p *Plugin) RestoreSnapshot(ctx context.Context, snapshot *v1.DataSnapshot) (*emptypb.Empty, error) {
-	p.datamux.Lock()
-	defer p.datamux.Unlock()
-	defer p.currentTerm.Store(snapshot.GetTerm())
-	defer p.lastAppliedIndex.Store(snapshot.GetIndex())
-	context.LoggerFrom(ctx).Info("restoring snapshot", "index", snapshot.GetIndex(), "term", snapshot.GetTerm())
-	snapshotter := snapshots.New(p.data)
-	return &emptypb.Empty{}, snapshotter.Restore(ctx, io.NopCloser(bytes.NewReader(snapshot.GetData())))
-}
-
 func (p *Plugin) Allocate(ctx context.Context, r *v1.AllocateIPRequest) (*v1.AllocatedIP, error) {
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
+	if p.data == nil {
+		// Safeguard to make sure we don't get called before the query stream
+		// is opened.
+		return nil, fmt.Errorf("plugin not configured")
+	}
 	switch r.GetVersion() {
 	case v1.AllocateIPRequest_IP_VERSION_4:
 		return p.allocateV4(ctx, r)

@@ -111,7 +111,8 @@ func NewManager(ctx context.Context, db models.DBTX, opts *Options) (Manager, er
 		}
 		ipamv4 = ipam
 		ipamv6 = ipam
-		stores = append(stores, ipam)
+		allPlugins["ipam"] = ipam
+		// stores = append(stores, ipam)
 	}
 	m := &manager{
 		db:       db,

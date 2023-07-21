@@ -55,7 +55,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if !s.store.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
-	// Check if we haven't loaded out prefixes into memory yet
+	s.joinmu.Lock()
+	defer s.joinmu.Unlock()
+	// Check if we haven't loaded our prefixes into memory yet
 	var err error
 	if !s.ipv6Prefix.IsValid() {
 		s.ipv6Prefix, err = s.meshstate.GetIPv6Prefix(ctx)
@@ -87,6 +89,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				return nil, status.Errorf(codes.InvalidArgument, "invalid route %q: %v", route, err)
 			}
 		}
+	}
+	publicKey, err := wgtypes.ParseKey(req.GetPublicKey())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
 
 	// Check that the node is indeed who they say they are
@@ -131,11 +137,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				return nil, status.Error(codes.PermissionDenied, "not allowed")
 			}
 		}
-	}
-
-	publicKey, err := wgtypes.ParseKey(req.GetPublicKey())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
 
 	log := s.log.With("id", req.GetId())

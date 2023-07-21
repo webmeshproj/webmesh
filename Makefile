@@ -64,7 +64,8 @@ build-ctl: fmt vet ## Build wmctl binary for the local platform.
 		cmd/$(CTL)/main.go
 
 COVERAGE_FILE ?= coverage.out
-TEST_ARGS     ?= -v -cover -tags "$(BUILD_TAGS)" -coverprofile=$(COVERAGE_FILE) -covermode=atomic
+TEST_PARALLEL ?= 1
+TEST_ARGS     ?= -v -cover -tags "$(BUILD_TAGS)" -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 test: fmt vet
 	go test $(TEST_ARGS) ./...
 	go tool cover -func=$(COVERAGE_FILE)

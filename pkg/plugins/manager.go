@@ -266,16 +266,14 @@ func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, 
 		result.Id = query.GetId()
 		res, err := raftlogs.QueryWithQuerier(queries.Context(), m.db, query.GetQuery())
 		if err != nil {
-			m.log.Error("query", "plugin", plugin, "error", err)
+			m.log.Error("plugin query error", "plugin", plugin, "error", err)
 			result.Error = err.Error()
 		} else {
 			result.Result = res
 		}
 		err = queries.Send(&result)
 		if err != nil {
-			// TODO: restart the stream?
 			m.log.Error("send query result", "plugin", plugin, "error", err)
-			return
 		}
 	}
 }

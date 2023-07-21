@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"sync"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -57,12 +58,13 @@ type Server struct {
 	proxyCreds []grpc.DialOption
 	// insecure flags that no authentication plugins are enabled.
 	insecure bool
+	// lock taken during the join process to prevent concurrent joins.
+	joinmu sync.Mutex
 }
 
-// NewServer returns a new Server. The TLS config is optional and is used
-// for RPCs to other nodes in the cluster. Features are used for returning
-// what features are enabled. It is the callers responsibility to ensure
-// those servers are registered on the node.
+// NewServer returns a new Server. Features are used for returning what features are enabled.
+// It is the callers responsibility to ensure those servers are registered on the node.
+// Insecure is used to disable authorization.
 func NewServer(store store.Store, proxyCreds []grpc.DialOption, features []v1.Feature, insecure bool) *Server {
 	var rbaceval rbac.Evaluator
 	if insecure {
