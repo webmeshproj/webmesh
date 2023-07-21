@@ -80,10 +80,23 @@ func Serve(ctx context.Context, plugin v1.PluginServer) error {
 	select {
 	case <-ctx.Done():
 		log.Info("shutting down plugin")
+		_, err := plugin.Close(context.Background(), nil)
+		if err != nil {
+			log.Error("error closing plugin", "error", err.Error())
+		}
 		s.GracefulStop()
 		return nil
 	case <-sig:
 		log.Info("shutting down plugin")
+		_, err := plugin.Close(context.Background(), nil)
+		if err != nil {
+			log.Error("error closing plugin", "error", err.Error())
+		}
+		go func() {
+			log.Info("waiting for plugin to shut down, press ctrl-c again to force")
+			<-sig
+			os.Exit(1)
+		}()
 		s.GracefulStop()
 		return nil
 	case err := <-errs:

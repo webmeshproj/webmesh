@@ -2,6 +2,7 @@
 
 This example is just like the [simple](../simple/) example, but it registers an external server as a plugin.
 The example plugin implements the Watch RPC, which allows the plugin to be notified of changes to the mesh state.
+The plugin also injects a querier that can be used to query the mesh state.
 
 ## Running
 

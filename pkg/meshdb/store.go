@@ -68,6 +68,12 @@ type DBTX interface {
 	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
 }
 
+// New creates a new mesh database with the given *sql.DB. It is intended
+// for use by plugins.
+func New(db *sql.DB) DB {
+	return &simpleDB{db: db}
+}
+
 // NewTestDB returns a new in-memory database for testing. Read and Write
 // operations are performed on the same database.
 func NewTestDB() (DB, func(), error) {
@@ -81,17 +87,17 @@ func NewTestDB() (DB, func(), error) {
 		defer db.Close()
 		return nil, nil, fmt.Errorf("migrate database: %w", err)
 	}
-	return &testDB{db: db}, func() { db.Close() }, nil
+	return &simpleDB{db: db}, func() { db.Close() }, nil
 }
 
-type testDB struct {
+type simpleDB struct {
 	db *sql.DB
 }
 
-func (t *testDB) Read() DBTX {
+func (t *simpleDB) Read() DBTX {
 	return t.db
 }
 
-func (t *testDB) Write() DBTX {
+func (t *simpleDB) Write() DBTX {
 	return t.db
 }
