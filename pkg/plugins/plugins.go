@@ -55,7 +55,7 @@ var (
 // NewManager creates a new plugin manager.
 func NewManager(ctx context.Context, db models.DBTX, opts *Options) (Manager, error) {
 	var auth, ipamv4, ipamv6 clients.PluginClient
-	registered := make(map[string]clients.PluginClient)
+	allPlugins := make(map[string]clients.PluginClient)
 	stores := make([]clients.PluginClient, 0)
 	emitters := make([]clients.PluginClient, 0)
 	log := context.LoggerFrom(ctx)
@@ -101,7 +101,7 @@ func NewManager(ctx context.Context, db models.DBTX, opts *Options) (Manager, er
 		if err != nil {
 			return nil, fmt.Errorf("configure plugin %q: %w", name, err)
 		}
-		registered[name] = plugin
+		allPlugins[name] = plugin
 	}
 	// If both IPAM plugins are unconfigured, use the in-process IPAM plugin.
 	if ipamv4 == nil && ipamv6 == nil {
@@ -120,7 +120,7 @@ func NewManager(ctx context.Context, db models.DBTX, opts *Options) (Manager, er
 		ipamv6:   ipamv6,
 		stores:   stores,
 		emitters: emitters,
-		plugins:  registered,
+		plugins:  allPlugins,
 		log:      slog.Default().With("component", "plugin-manager"),
 	}
 	go m.handleQueries()

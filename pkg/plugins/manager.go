@@ -17,6 +17,7 @@ import (
 
 	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/models"
+	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
 	"github.com/webmeshproj/node/pkg/plugins/clients"
 )
 
@@ -226,7 +227,56 @@ func (m *manager) Close() error {
 }
 
 // handleQueries handles SQL queries from plugins.
-func (m *manager) handleQueries() {}
+func (m *manager) handleQueries() {
+	for plugin, client := range m.plugins {
+		ctx := context.Background()
+		q, err := client.Query(ctx)
+		if err != nil {
+			if status.Code(err) == codes.Unimplemented {
+				m.log.Debug("plugin does not implement queries", "plugin", plugin)
+				continue
+			}
+			m.log.Error("start query stream", "plugin", plugin, "error", err)
+			continue
+		}
+		go m.handleQueryClient(plugin, client, q)
+	}
+}
+
+// handleQueryClient handles a query client.
+func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, queries v1.Plugin_QueryClient) {
+	defer func() {
+		if err := queries.CloseSend(); err != nil {
+			m.log.Error("close query stream", "plugin", plugin, "error", err)
+		}
+	}()
+	for {
+		query, err := queries.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+			// TODO: restart the stream?
+			m.log.Error("receive query", "plugin", plugin, "error", err)
+			return
+		}
+		var result v1.PluginSQLQueryResult
+		result.Id = query.GetId()
+		res, err := raftlogs.QueryWithQuerier(queries.Context(), m.db, query.GetQuery())
+		if err != nil {
+			m.log.Error("query", "plugin", plugin, "error", err)
+			result.Error = err.Error()
+		} else {
+			result.Result = res
+		}
+		err = queries.Send(&result)
+		if err != nil {
+			// TODO: restart the stream?
+			m.log.Error("send query result", "plugin", plugin, "error", err)
+			return
+		}
+	}
+}
 
 func (m *manager) newAuthRequest(ctx context.Context) *v1.AuthenticationRequest {
 	var req v1.AuthenticationRequest
