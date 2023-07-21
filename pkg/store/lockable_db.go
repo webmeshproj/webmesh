@@ -17,26 +17,26 @@ limitations under the License.
 package store
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"sync"
 
 	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
 )
 
 var ErrStatementNotReadOnly = fmt.Errorf("statement is not read-only")
 
 type roLockableDB struct {
-	db  *sql.DB
-	mux sync.Locker
+	db *sql.DB
+	mu sync.Locker
 }
 
 func (d *roLockableDB) ExecContext(ctx context.Context, stmt string, args ...any) (sql.Result, error) {
-	d.mux.Lock()
-	defer d.mux.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	readonly, err := raftlogs.IsReadOnlyStatement(ctx, d.db, stmt)
 	if err != nil {
 		return nil, fmt.Errorf("exec, check readonly: %w", err)
@@ -48,11 +48,11 @@ func (d *roLockableDB) ExecContext(ctx context.Context, stmt string, args ...any
 }
 
 func (d *roLockableDB) PrepareContext(ctx context.Context, stmt string) (*sql.Stmt, error) {
-	d.mux.Lock()
-	defer d.mux.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	readonly, err := raftlogs.IsReadOnlyStatement(ctx, d.db, stmt)
 	if err != nil {
-		return nil, fmt.Errorf("query, check readonly: %w", err)
+		return nil, fmt.Errorf("prepare, check readonly: %w", err)
 	}
 	if !readonly {
 		return nil, ErrStatementNotReadOnly
@@ -61,8 +61,8 @@ func (d *roLockableDB) PrepareContext(ctx context.Context, stmt string) (*sql.St
 }
 
 func (d *roLockableDB) QueryContext(ctx context.Context, stmt string, args ...any) (*sql.Rows, error) {
-	d.mux.Lock()
-	defer d.mux.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	readonly, err := raftlogs.IsReadOnlyStatement(ctx, d.db, stmt)
 	if err != nil {
 		return nil, fmt.Errorf("query, check readonly: %w", err)
@@ -74,16 +74,16 @@ func (d *roLockableDB) QueryContext(ctx context.Context, stmt string, args ...an
 }
 
 func (d *roLockableDB) QueryRowContext(ctx context.Context, stmt string, args ...any) *sql.Row {
-	d.mux.Lock()
-	defer d.mux.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	readonly, err := raftlogs.IsReadOnlyStatement(ctx, d.db, stmt)
 	if err != nil {
 		// send a bad query
-		slog.Default().Error("query, check readonly", slog.String("error", err.Error()))
+		context.LoggerFrom(ctx).Error("query row, check readonly", slog.String("error", err.Error()))
 		return d.db.QueryRowContext(ctx, "SELECT 1 WHERE 0")
 	} else if !readonly {
 		// send a bad query
-		slog.Default().Error("query, check readonly", slog.String("error", ErrStatementNotReadOnly.Error()))
+		context.LoggerFrom(ctx).Error("query row, check readonly", slog.String("error", ErrStatementNotReadOnly.Error()))
 		return d.db.QueryRowContext(ctx, "SELECT 1 WHERE 0")
 	}
 	return d.db.QueryRowContext(ctx, stmt, args...)
