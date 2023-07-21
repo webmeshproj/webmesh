@@ -55,8 +55,8 @@ func (p *externalProcessPlugin) Configure(ctx context.Context, in *v1.PluginConf
 	return p.cli.Configure(ctx, in)
 }
 
-func (p *externalProcessPlugin) Query(ctx context.Context, opts ...grpc.CallOption) (v1.Plugin_QueryClient, error) {
-	return p.cli.Query(ctx, opts...)
+func (p *externalProcessPlugin) InjectQuerier(ctx context.Context, opts ...grpc.CallOption) (v1.Plugin_InjectQuerierClient, error) {
+	return p.cli.InjectQuerier(ctx, opts...)
 }
 
 func (p *externalProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {

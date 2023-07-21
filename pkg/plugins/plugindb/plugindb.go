@@ -35,7 +35,7 @@ import (
 )
 
 // Open opens a new database connection to a plugin query stream.
-func Open(srv v1.Plugin_QueryServer) (*sql.DB, error) {
+func Open(srv v1.Plugin_InjectQuerierServer) (*sql.DB, error) {
 	drvId, err := uuid.NewRandom()
 	if err != nil {
 		return nil, fmt.Errorf("generate uuid: %w", err)
@@ -53,7 +53,7 @@ func Open(srv v1.Plugin_QueryServer) (*sql.DB, error) {
 }
 
 type pluginDB struct {
-	srv    v1.Plugin_QueryServer
+	srv    v1.Plugin_InjectQuerierServer
 	models *sql.DB
 	// TODO: Add a multiplexer to allow multiple queries at once?
 	mu sync.Mutex

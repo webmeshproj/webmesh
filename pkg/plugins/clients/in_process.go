@@ -35,7 +35,7 @@ func NewInProcessClient(plugin v1.PluginServer) *inProcessPlugin {
 
 type inProcessPlugin struct {
 	server      v1.PluginServer
-	queryStream v1.Plugin_QueryClient
+	queryStream v1.Plugin_InjectQuerierClient
 }
 
 func (p *inProcessPlugin) GetInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*v1.PluginInfo, error) {
@@ -46,7 +46,7 @@ func (p *inProcessPlugin) Configure(ctx context.Context, in *v1.PluginConfigurat
 	return p.server.Configure(ctx, in)
 }
 
-func (p *inProcessPlugin) Query(ctx context.Context, opts ...grpc.CallOption) (v1.Plugin_QueryClient, error) {
+func (p *inProcessPlugin) InjectQuerier(ctx context.Context, opts ...grpc.CallOption) (v1.Plugin_InjectQuerierClient, error) {
 	schan := make(chan *v1.PluginSQLQuery)
 	rchan := make(chan *v1.PluginSQLQueryResult)
 	ctx, cancel := context.WithCancel(ctx)
@@ -54,7 +54,7 @@ func (p *inProcessPlugin) Query(ctx context.Context, opts ...grpc.CallOption) (v
 	cli := &inProcessQueryClient{ctx, cancel, schan, rchan}
 	go func() {
 		defer cancel()
-		err := p.server.Query(srv)
+		err := p.server.InjectQuerier(srv)
 		if err != nil {
 			if err != io.EOF && status.Code(err) != codes.Unimplemented {
 				context.LoggerFrom(ctx).Error("error in plugin query", "error", err)

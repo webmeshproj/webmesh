@@ -230,7 +230,7 @@ func (m *manager) Close() error {
 func (m *manager) handleQueries() {
 	for plugin, client := range m.plugins {
 		ctx := context.Background()
-		q, err := client.Query(ctx)
+		q, err := client.InjectQuerier(ctx)
 		if err != nil {
 			if status.Code(err) == codes.Unimplemented {
 				m.log.Debug("plugin does not implement queries", "plugin", plugin)
@@ -244,7 +244,7 @@ func (m *manager) handleQueries() {
 }
 
 // handleQueryClient handles a query client.
-func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, queries v1.Plugin_QueryClient) {
+func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, queries v1.Plugin_InjectQuerierClient) {
 	defer func() {
 		if err := queries.CloseSend(); err != nil {
 			m.log.Error("close query stream", "plugin", plugin, "error", err)

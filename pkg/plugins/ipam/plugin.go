@@ -61,7 +61,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	return &emptypb.Empty{}, nil
 }
 
-func (p *Plugin) Query(srv v1.Plugin_QueryServer) error {
+func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
 	p.datamux.Lock()
 	var err error
 	p.data, err = plugindb.Open(srv)
