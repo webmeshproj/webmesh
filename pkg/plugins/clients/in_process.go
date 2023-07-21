@@ -22,7 +22,9 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
@@ -49,10 +51,16 @@ func (p *inProcessPlugin) Query(ctx context.Context, opts ...grpc.CallOption) (v
 	schan := make(chan *v1.PluginSQLQuery)
 	rchan := make(chan *v1.PluginSQLQueryResult)
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	srv := &inProcessQueryServer{ctx, schan, rchan}
 	cli := &inProcessQueryClient{ctx, cancel, schan, rchan}
-	return cli, p.server.Query(srv)
+	go func() {
+		defer cancel()
+		err := p.server.Query(srv)
+		if err != nil && err != io.EOF && status.Code(err) != codes.Unimplemented {
+			context.LoggerFrom(ctx).Error("error in plugin query", "err", err)
+		}
+	}()
+	return cli, nil
 }
 
 type inProcessQueryClient struct {

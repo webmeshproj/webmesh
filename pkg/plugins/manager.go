@@ -254,12 +254,14 @@ func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, 
 		query, err := queries.Recv()
 		if err != nil {
 			if err == io.EOF {
+				m.log.Debug("query stream closed cleanly", "plugin", plugin)
 				return
 			}
 			// TODO: restart the stream?
 			m.log.Error("receive query", "plugin", plugin, "error", err)
 			return
 		}
+		m.log.Debug("handling plugin query", "plugin", plugin, "query", query.GetQuery())
 		var result v1.PluginSQLQueryResult
 		result.Id = query.GetId()
 		res, err := raftlogs.QueryWithQuerier(queries.Context(), m.db, query.GetQuery())
