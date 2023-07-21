@@ -262,7 +262,7 @@ func (s *store) WriteDB() meshdb.DBTX {
 
 // ReadDB returns a DB interface for use by the application.
 func (s *store) ReadDB() meshdb.DBTX {
-	return &roLockableDB{DB: s.weakData, mux: s.dataMux.RLocker()}
+	return &roLockableDB{db: s.weakData, mux: s.dataMux.RLocker()}
 }
 
 // Raft returns the Raft interface.
