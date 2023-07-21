@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 // Package raftlogs provides facilities for applying raft logs to a database.
+// It also contains helpers for executing queries and statements provided as
+// protobuf messages.
 package raftlogs
 
 import (
@@ -90,7 +92,7 @@ func ApplyQuery(ctx context.Context, db *sql.DB, query *v1.SQLQuery) (*v1.RaftAp
 		}()
 		querier = tx
 	}
-	result, err := queryWithQuerier(ctx, querier, query)
+	result, err := QueryWithQuerier(ctx, querier, query)
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
@@ -126,7 +128,7 @@ func ApplyExecute(ctx context.Context, db *sql.DB, exec *v1.SQLExec) (*v1.RaftAp
 		}()
 		querier = tx
 	}
-	result, err := execWithQuerier(ctx, querier, exec)
+	result, err := ExecWithQuerier(ctx, querier, exec)
 	if err != nil {
 		return nil, fmt.Errorf("execute: %w", err)
 	}
@@ -140,7 +142,8 @@ func ApplyExecute(ctx context.Context, db *sql.DB, exec *v1.SQLExec) (*v1.RaftAp
 	}, nil
 }
 
-func queryWithQuerier(ctx context.Context, q models.DBTX, query *v1.SQLQuery) (*v1.SQLQueryResult, error) {
+// QueryWithQuerier queries with the given querier.
+func QueryWithQuerier(ctx context.Context, q models.DBTX, query *v1.SQLQuery) (*v1.SQLQueryResult, error) {
 	params, err := SQLParametersToNamedArgs(query.GetStatement().GetParameters())
 	if err != nil {
 		return nil, fmt.Errorf("convert parameters: %w", err)
@@ -190,7 +193,8 @@ func queryWithQuerier(ctx context.Context, q models.DBTX, query *v1.SQLQuery) (*
 	}, nil
 }
 
-func execWithQuerier(ctx context.Context, q models.DBTX, exec *v1.SQLExec) (*v1.SQLExecResult, error) {
+// ExecWithQuerier executes a statement with the given querier.
+func ExecWithQuerier(ctx context.Context, q models.DBTX, exec *v1.SQLExec) (*v1.SQLExecResult, error) {
 	params, err := SQLParametersToNamedArgs(exec.GetStatement().GetParameters())
 	if err != nil {
 		return nil, fmt.Errorf("convert parameters: %w", err)
