@@ -37,6 +37,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
+	"github.com/webmeshproj/node/pkg/net"
 	meshnet "github.com/webmeshproj/node/pkg/net"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
@@ -110,7 +111,8 @@ type Store interface {
 	// WireGuard returns the WireGuard interface. Note that the returned value
 	// may be nil if the store is not open.
 	WireGuard() wireguard.Interface
-	// Plugins returns the plugin manager.
+	// Plugins returns the plugin manager. Note that the returned value
+	// may be nil if the store is not open.
 	Plugins() plugins.Manager
 }
 
@@ -141,7 +143,7 @@ func New(opts *Options) (Store, error) {
 	}
 	var taskGroup errgroup.Group
 	taskGroup.SetLimit(1)
-	return &store{
+	st := &store{
 		sl:          sl,
 		opts:        opts,
 		tlsConfig:   tlsConfig,
@@ -149,7 +151,23 @@ func New(opts *Options) (Store, error) {
 		readyErr:    make(chan error, 2),
 		nwTaskGroup: &taskGroup,
 		log:         log.With(slog.String("node-id", string(nodeID))),
-	}, nil
+	}
+	st.nw = net.New(st, &net.Options{
+		InterfaceName:         opts.WireGuard.InterfaceName,
+		ForceReplace:          opts.WireGuard.ForceInterfaceName,
+		ListenPort:            opts.WireGuard.ListenPort,
+		PersistentKeepAlive:   opts.WireGuard.PersistentKeepAlive,
+		ForceTUN:              opts.WireGuard.ForceTUN,
+		Modprobe:              opts.WireGuard.Modprobe,
+		MTU:                   opts.WireGuard.MTU,
+		RecordMetrics:         opts.WireGuard.RecordMetrics,
+		RecordMetricsInterval: opts.WireGuard.RecordMetricsInterval,
+		RaftPort:              sl.ListenPort(),
+		GRPCPort:              opts.Mesh.GRPCPort,
+		ZoneAwarenessID:       opts.Mesh.ZoneAwarenessID,
+		DialOptions:           st.grpcCreds(context.Background()),
+	})
+	return st, nil
 }
 
 func determineNodeID(log *slog.Logger, tlsConfig *tls.Config, opts *Options) string {
@@ -272,7 +290,8 @@ func (s *store) Raft() *raft.Raft { return s.raft }
 // may be nil if the store is not open.
 func (s *store) WireGuard() wireguard.Interface { return s.nw.WireGuard() }
 
-// Plugins returns the plugin manager.
+// Plugins returns the plugin manager. Note that the returned value
+// may be nil if the store is not open.
 func (s *store) Plugins() plugins.Manager { return s.plugins }
 
 // State returns the current Raft state.

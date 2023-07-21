@@ -34,6 +34,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/plugins/basicauth"
 	"github.com/webmeshproj/node/pkg/plugins/ipam"
 	"github.com/webmeshproj/node/pkg/plugins/ldap"
@@ -83,8 +84,8 @@ type Manager interface {
 	Close() error
 }
 
-// New creates a new plugin manager.
-func New(ctx context.Context, opts *Options) (Manager, error) {
+// NewManager creates a new plugin manager.
+func NewManager(ctx context.Context, db models.DBTX, opts *Options) (Manager, error) {
 	var auth, ipamv4, ipamv6 zclients.PluginClient
 	registered := make(map[string]zclients.PluginClient)
 	stores := make([]zclients.PluginClient, 0)
@@ -172,6 +173,7 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 		stores = append(stores, ipam)
 	}
 	return &manager{
+		db:       db,
 		auth:     auth,
 		ipamv4:   ipamv4,
 		ipamv6:   ipamv6,
@@ -183,6 +185,7 @@ func New(ctx context.Context, opts *Options) (Manager, error) {
 }
 
 type manager struct {
+	db       models.DBTX
 	auth     zclients.PluginClient
 	ipamv4   zclients.PluginClient
 	ipamv6   zclients.PluginClient

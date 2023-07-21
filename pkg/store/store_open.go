@@ -32,12 +32,11 @@ import (
 
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
-	"github.com/webmeshproj/node/pkg/net"
 	"github.com/webmeshproj/node/pkg/plugins"
 )
 
 // Open opens the store.
-func (s *store) Open(ctx context.Context) error {
+func (s *store) Open(ctx context.Context) (err error) {
 	if s.open.Load() {
 		return ErrOpen
 	}
@@ -63,28 +62,6 @@ func (s *store) Open(ctx context.Context) error {
 		}
 		return err
 	}
-	var err error
-	// Create the plugin manager
-	s.plugins, err = plugins.New(ctx, s.opts.Plugins)
-	if err != nil {
-		return fmt.Errorf("failed to load plugins: %w", err)
-	}
-	// Create the network manager
-	s.nw = net.New(s, &net.Options{
-		InterfaceName:         s.opts.WireGuard.InterfaceName,
-		ForceReplace:          s.opts.WireGuard.ForceInterfaceName,
-		ListenPort:            s.opts.WireGuard.ListenPort,
-		PersistentKeepAlive:   s.opts.WireGuard.PersistentKeepAlive,
-		ForceTUN:              s.opts.WireGuard.ForceTUN,
-		Modprobe:              s.opts.WireGuard.Modprobe,
-		MTU:                   s.opts.WireGuard.MTU,
-		RecordMetrics:         s.opts.WireGuard.RecordMetrics,
-		RecordMetricsInterval: s.opts.WireGuard.RecordMetricsInterval,
-		RaftPort:              s.sl.ListenPort(),
-		GRPCPort:              s.opts.Mesh.GRPCPort,
-		ZoneAwarenessID:       s.opts.Mesh.ZoneAwarenessID,
-		DialOptions:           s.grpcCreds(ctx),
-	})
 	// If bootstrap and force are set, clear the data directory.
 	if s.opts.Bootstrap.Enabled && s.opts.Bootstrap.Force {
 		log.Warn("force bootstrap enabled, clearing data directory")
@@ -149,7 +126,6 @@ func (s *store) Open(ctx context.Context) error {
 		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
 	}
 	s.snapshotter = snapshots.New(s.weakData)
-
 	// Register an update hook to watch for node changes.
 	c, err := s.weakData.Conn(ctx)
 	if err != nil {
@@ -169,7 +145,11 @@ func (s *store) Open(ctx context.Context) error {
 	if err = c.Close(); err != nil {
 		return handleErr(fmt.Errorf("close conn: %w", err))
 	}
-
+	// Create the plugin manager
+	s.plugins, err = plugins.NewManager(ctx, s.DB().Read(), s.opts.Plugins)
+	if err != nil {
+		return fmt.Errorf("failed to load plugins: %w", err)
+	}
 	// Check if we have a snapshot to restore from.
 	log.Debug("checking for snapshot")
 	snapshots, err := s.raftSnapshots.List()
@@ -201,7 +181,6 @@ func (s *store) Open(ctx context.Context) error {
 		s.currentTerm.Store(latest.Term)
 		s.lastAppliedIndex.Store(latest.Index)
 	}
-
 	// Create the raft instance.
 	log.Info("starting raft instance",
 		slog.String("listen-addr", string(s.raftTransport.LocalAddr())),
@@ -223,14 +202,15 @@ func (s *store) Open(ctx context.Context) error {
 	})
 	s.raft.RegisterObserver(s.observer)
 	s.observerClose, s.observerDone = s.observe()
-	// Bootstrap the cluster if needed.
 	if s.opts.Bootstrap.Enabled {
+		// Attempt bootstrap.
 		// Database gets migrated during bootstrap.
 		log.Info("bootstrapping cluster")
 		if err = s.bootstrap(ctx); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if s.opts.Mesh.JoinAddress != "" || len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
+		// Attempt to join the cluster.
 		log.Debug("migrating raft database")
 		if err = models.MigrateDB(s.weakData); err != nil {
 			return fmt.Errorf("raft db migrate: %w", err)
