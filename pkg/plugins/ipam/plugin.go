@@ -80,9 +80,10 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	return &emptypb.Empty{}, nil
 }
 
-func (p *Plugin) Query(srv v1.Plugin_QueryServer) error {
-	return nil
-}
+// func (p *Plugin) Query(srv v1.Plugin_QueryServer) error {
+// 	<-srv.Context().Done()
+// 	return nil
+// }
 
 func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, p.data.Close()
