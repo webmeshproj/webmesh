@@ -92,7 +92,7 @@ dist-linux-windows: generate ## An alias for dist-linux and dist-windows in a si
 
 dist-darwin: generate ## Build distribution binaries for Darwin.
 	$(MAKE) dist-darwin-all
-	upx --best --lzma $(DIST)/*_darwin_*
+	# upx --best --lzma $(DIST)/*_darwin_*
 
 DOCKER_BUILD_TARGETS ?=
 build-in-docker:
