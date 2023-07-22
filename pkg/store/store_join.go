@@ -152,6 +152,7 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 		return fmt.Errorf("join request: %w", err)
 	}
 	log.Debug("received join response", slog.Any("resp", resp))
+	s.meshDomain = resp.GetMeshDomain()
 	var addressv4, addressv6, networkv4, networkv6 netip.Prefix
 	if !s.opts.Mesh.NoIPv4 {
 		if resp.AddressIpv4 != "" {

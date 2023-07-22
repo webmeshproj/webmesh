@@ -99,7 +99,7 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 			TSIGKey:        o.MeshDNS.TSIGKey,
 			ReusePort:      o.MeshDNS.ReusePort,
 			Compression:    o.MeshDNS.EnableCompression,
-			Domain:         o.MeshDNS.Domain,
+			Domain:         store.Domain(),
 			RequestTimeout: o.MeshDNS.RequestTimeout,
 		})
 	}

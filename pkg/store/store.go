@@ -62,6 +62,8 @@ var (
 type Store interface {
 	// ID returns the node ID.
 	ID() string
+	// Domain returns the domain of the mesh network.
+	Domain() string
 	// Open opens the store. This must be called before the store can be used.
 	// The Ready functions should be used to determine when the store is ready
 	// to serve requests, after which the Wireguard interface will also be available.
@@ -240,6 +242,7 @@ type store struct {
 
 	nw          meshnet.Manager
 	nwTaskGroup *errgroup.Group
+	meshDomain  string
 
 	open atomic.Bool
 
@@ -250,6 +253,11 @@ type store struct {
 // ID returns the node ID.
 func (s *store) ID() string {
 	return string(s.nodeID)
+}
+
+// Domain returns the domain of the mesh network.
+func (s *store) Domain() string {
+	return s.meshDomain
 }
 
 // IsOpen returns true if the store is open.

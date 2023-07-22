@@ -31,7 +31,6 @@ const (
 	MeshDNSTSIGKeyEnvVar        = "SERVICES_MESH_DNS_TSIG_KEY"
 	MeshDNSReusePortEnvVar      = "SERVICES_MESH_DNS_REUSE_PORT"
 	MeshDNSCompressionEnvVar    = "SERVICES_MESH_DNS_COMPRESSION"
-	MeshDNSDomainEnvVar         = "SERVICES_MESH_DNS_DOMAIN"
 	MeshDNSRequestTimeoutEnvVar = "SERVICES_MESH_DNS_REQUEST_TIMEOUT"
 )
 
@@ -50,8 +49,6 @@ type MeshDNSOptions struct {
 	ReusePort int `json:"reuse-port,omitempty" yaml:"reuse-port,omitempty" toml:"reuse-port,omitempty"`
 	// EnableCompression is true if DNS compression should be enabled.
 	EnableCompression bool `json:"compression,omitempty" yaml:"compression,omitempty" toml:"compression,omitempty"`
-	// Domain is the domain to use for the mesh DNS server.
-	Domain string `json:"domain,omitempty" yaml:"domain,omitempty" toml:"domain,omitempty"`
 	// RequestTimeout is the timeout for DNS requests.
 	RequestTimeout time.Duration `json:"request-timeout,omitempty" yaml:"request-timeout,omitempty" toml:"request-timeout,omitempty"`
 }
@@ -62,7 +59,6 @@ func NewMeshDNSOptions() *MeshDNSOptions {
 		Enabled:           false,
 		ListenUDP:         ":5353",
 		ListenTCP:         ":5353",
-		Domain:            "webmesh.internal.",
 		EnableCompression: true,
 		RequestTimeout:    time.Second * 5,
 	}
@@ -76,8 +72,6 @@ func (o *MeshDNSOptions) BindFlags(fs *flag.FlagSet) {
 		"UDP address to listen on for DNS requests.")
 	fs.StringVar(&o.ListenTCP, "services.mesh-dns.listen-tcp", util.GetEnvDefault(MeshDNSListenTCPEnvVar, ":5353"),
 		"TCP address to listen on for DNS requests.")
-	fs.StringVar(&o.Domain, "services.mesh-dns.domain", util.GetEnvDefault(MeshDNSDomainEnvVar, "webmesh.internal"),
-		"Domain to use for mesh DNS.")
 	fs.StringVar(&o.TSIGKey, "services.mesh-dns.tsig-key", util.GetEnvDefault(MeshDNSTSIGKeyEnvVar, ""),
 		"TSIG key to use for mesh DNS.")
 	fs.IntVar(&o.ReusePort, "services.mesh-dns.reuse-port", util.GetEnvIntDefault(MeshDNSReusePortEnvVar, 0),
@@ -93,9 +87,6 @@ func (o *MeshDNSOptions) Validate() error {
 	if o.Enabled {
 		if o.ListenTCP == "" && o.ListenUDP == "" {
 			return errors.New("must specify a TCP or UDP address for mesh DNS")
-		}
-		if o.Domain == "" {
-			return errors.New("must specify a domain for mesh DNS")
 		}
 	}
 	return nil
