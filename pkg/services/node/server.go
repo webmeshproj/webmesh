@@ -52,6 +52,7 @@ type Server struct {
 
 	ipv4Prefix netip.Prefix
 	ipv6Prefix netip.Prefix
+	meshDomain string
 	features   []v1.Feature
 	startedAt  time.Time
 	log        *slog.Logger

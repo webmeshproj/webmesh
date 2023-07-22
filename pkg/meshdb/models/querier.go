@@ -22,6 +22,7 @@ type Querier interface {
 	GetGroup(ctx context.Context, name string) (Group, error)
 	GetIPv4Prefix(ctx context.Context) (string, error)
 	GetIPv6Prefix(ctx context.Context) (string, error)
+	GetMeshDomain(ctx context.Context) (string, error)
 	GetNetworkACL(ctx context.Context, name string) (NetworkAcl, error)
 	GetNetworkRoute(ctx context.Context, name string) (NetworkRoute, error)
 	GetNode(ctx context.Context, id string) (GetNodeRow, error)
@@ -59,6 +60,7 @@ type Querier interface {
 	ReleaseNodeLease(ctx context.Context, nodeID string) error
 	SetIPv4Prefix(ctx context.Context, value string) error
 	SetIPv6Prefix(ctx context.Context, value string) error
+	SetMeshDomain(ctx context.Context, value string) error
 	UpdateNodeEdge(ctx context.Context, arg UpdateNodeEdgeParams) error
 }
 

@@ -38,6 +38,8 @@ type State interface {
 	GetIPv6Prefix(ctx context.Context) (netip.Prefix, error)
 	// GetIPv4Prefix returns the IPv4 prefix.
 	GetIPv4Prefix(ctx context.Context) (netip.Prefix, error)
+	// GetMeshDomain returns the mesh domain.
+	GetMeshDomain(ctx context.Context) (string, error)
 	// GetNodePrivateRPCAddress returns the private gRPC address for a node.
 	GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (netip.AddrPort, error)
 	// ListPublicRPCAddresses returns all public gRPC addresses in the mesh.
@@ -83,6 +85,11 @@ func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
 		return netip.Prefix{}, err
 	}
 	return netip.ParsePrefix(prefix)
+}
+
+func (s *state) GetMeshDomain(ctx context.Context) (string, error) {
+	q := models.New(s.Read())
+	return q.GetMeshDomain(ctx)
 }
 
 func (s *state) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (netip.AddrPort, error) {

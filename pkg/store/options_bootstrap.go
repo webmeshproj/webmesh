@@ -32,6 +32,7 @@ const (
 	BootstrapServersEnvVar              = "BOOTSTRAP_SERVERS"
 	BootstrapServersGRPCPortsEnvVar     = "BOOTSTRAP_SERVERS_GRPC_PORTS"
 	BootstrapIPv4NetworkEnvVar          = "BOOTSTRAP_IPV4_NETWORK"
+	BootstrapMeshDomainEnvVar           = "BOOTSTRAP_MESH_DOMAIN"
 	BootstrapAdminEnvVar                = "BOOTSTRAP_ADMIN"
 	BootstrapVotersEnvVar               = "BOOTSTRAP_VOTERS"
 	BootstrapDefaultNetworkPolicyEnvVar = "BOOTSTRAP_DEFAULT_NETWORK_POLICY"
@@ -57,6 +58,8 @@ type BootstrapOptions struct {
 	ServersGRPCPorts string `json:"servers-grpc-ports,omitempty" yaml:"servers-grpc-ports,omitempty" toml:"servers-grpc-ports,omitempty"`
 	// IPv4Network is the IPv4 network of the mesh to write to the database when bootstraping a new cluster.
 	IPv4Network string `json:"ipv4-network,omitempty" yaml:"ipv4-network,omitempty" toml:"ipv4-network,omitempty"`
+	// MeshDomain is the domain of the mesh to write to the database when bootstraping a new cluster.
+	MeshDomain string `json:"mesh-domain,omitempty" yaml:"mesh-domain,omitempty" toml:"mesh-domain,omitempty"`
 	// Admin is the user and/or node name to assign administrator privileges to when bootstraping a new cluster.
 	Admin string `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty"`
 	// Voters is a comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster.
@@ -90,13 +93,21 @@ func (n NetworkPolicy) IsValid() bool {
 	}
 }
 
+const (
+	DefaultIPv4Network   = "172.16.0.0/12"
+	DefaultMeshDomain    = "webmesh.internal."
+	DefaultAdminUser     = "admin"
+	DefaultNetworkPolicy = NetworkPolicyDeny
+)
+
 // NewBootstrapOptions creates a new BootstrapOptions.
 func NewBootstrapOptions() *BootstrapOptions {
 	return &BootstrapOptions{
 		Enabled:              false,
-		IPv4Network:          "172.16.0.0/12",
-		Admin:                "admin",
-		DefaultNetworkPolicy: "deny",
+		IPv4Network:          DefaultIPv4Network,
+		MeshDomain:           DefaultMeshDomain,
+		Admin:                DefaultAdminUser,
+		DefaultNetworkPolicy: string(DefaultNetworkPolicy),
 	}
 }
 
@@ -120,6 +131,12 @@ func (o *BootstrapOptions) Validate() error {
 		return errors.New("bootstrap IPv4 network is required for bootstrapping")
 	} else if _, err := netip.ParsePrefix(o.IPv4Network); err != nil {
 		return fmt.Errorf("invalid bootstrap IPv4 network: %s", err)
+	}
+	if o.MeshDomain == "" {
+		return errors.New("bootstrap mesh domain is required for bootstrapping")
+	} else if !strings.HasSuffix(o.MeshDomain, ".") {
+		// Append the period to the domain if it's not there.
+		o.MeshDomain = o.MeshDomain + "."
 	}
 	return nil
 }
@@ -149,6 +166,9 @@ Ports should be in the form of <node-id>=<port>.`)
 
 	fl.StringVar(&o.IPv4Network, "bootstrap.ipv4-network", util.GetEnvDefault(BootstrapIPv4NetworkEnvVar, "172.16.0.0/12"),
 		"IPv4 network of the mesh to write to the database when bootstraping a new cluster.")
+
+	fl.StringVar(&o.MeshDomain, "bootstrap.mesh-domain", util.GetEnvDefault(BootstrapMeshDomainEnvVar, "webmesh.internal"),
+		"Domain of the mesh to write to the database when bootstraping a new cluster.")
 
 	fl.StringVar(&o.Admin, "bootstrap.admin", util.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
 		"Admin username to bootstrap the cluster with.")

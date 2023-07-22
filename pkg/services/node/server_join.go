@@ -57,7 +57,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	s.joinmu.Lock()
 	defer s.joinmu.Unlock()
-	// Check if we haven't loaded our prefixes into memory yet
+	// Check if we haven't loaded the mesh domain and prefixes into memory yet
 	var err error
 	if !s.ipv6Prefix.IsValid() {
 		s.ipv6Prefix, err = s.meshstate.GetIPv6Prefix(ctx)
@@ -71,6 +71,13 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if err != nil {
 			// DB error, bail
 			return nil, status.Errorf(codes.Internal, "failed to get IPv4 prefix: %v", err)
+		}
+	}
+	if s.meshDomain == "" {
+		s.meshDomain, err = s.meshstate.GetMeshDomain(ctx)
+		if err != nil {
+			// DB error, bail
+			return nil, status.Errorf(codes.Internal, "failed to get mesh domain: %v", err)
 		}
 	}
 
@@ -380,6 +387,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Start building the response
 	resp := &v1.JoinResponse{
+		MeshDomain:  s.meshDomain,
 		NetworkIpv4: s.ipv4Prefix.String(),
 		NetworkIpv6: s.ipv6Prefix.String(),
 		AddressIpv6: leasev6.String(),

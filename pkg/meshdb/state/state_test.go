@@ -29,6 +29,7 @@ import (
 var (
 	ipv6Prefix = "fd00:dead::/48"
 	ipv4Prefix = "172.16.0.0/12"
+	domain     = "webmesh.internal"
 
 	publicNode  = "public"
 	privateNode = "private"
@@ -66,6 +67,20 @@ func TestGetIPv4Prefix(t *testing.T) {
 	}
 	if prefix.String() != ipv4Prefix {
 		t.Fatalf("expected %s, got %s", ipv4Prefix, prefix)
+	}
+}
+
+func TestGetMeshDomain(t *testing.T) {
+	t.Parallel()
+
+	state, teardown := setupTest(t)
+	defer teardown()
+	got, err := state.GetMeshDomain(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if domain != got {
+		t.Fatalf("expected %q, got %s", domain, got)
 	}
 }
 
@@ -196,6 +211,10 @@ func setupTest(t *testing.T) (*state, func()) {
 		t.Fatal(err)
 	}
 	err = q.SetIPv4Prefix(ctx, ipv4Prefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = q.SetMeshDomain(ctx, domain)
 	if err != nil {
 		t.Fatal(err)
 	}

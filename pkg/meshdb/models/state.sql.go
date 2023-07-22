@@ -31,6 +31,17 @@ func (q *Queries) GetIPv6Prefix(ctx context.Context) (string, error) {
 	return value, err
 }
 
+const GetMeshDomain = `-- name: GetMeshDomain :one
+SELECT value FROM mesh_state WHERE key = 'MeshDomain'
+`
+
+func (q *Queries) GetMeshDomain(ctx context.Context) (string, error) {
+	row := q.db.QueryRowContext(ctx, GetMeshDomain)
+	var value string
+	err := row.Scan(&value)
+	return value, err
+}
+
 const SetIPv4Prefix = `-- name: SetIPv4Prefix :exec
 INSERT into mesh_state (key, value) VALUES ('IPv4Prefix', ?)
 ON CONFLICT (key) DO UPDATE SET value = excluded.value
@@ -48,5 +59,15 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value
 
 func (q *Queries) SetIPv6Prefix(ctx context.Context, value string) error {
 	_, err := q.db.ExecContext(ctx, SetIPv6Prefix, value)
+	return err
+}
+
+const SetMeshDomain = `-- name: SetMeshDomain :exec
+INSERT into mesh_state (key, value) VALUES ('MeshDomain', ?)
+ON CONFLICT (key) DO UPDATE SET value = excluded.value
+`
+
+func (q *Queries) SetMeshDomain(ctx context.Context, value string) error {
+	_, err := q.db.ExecContext(ctx, SetMeshDomain, value)
 	return err
 }

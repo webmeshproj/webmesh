@@ -240,6 +240,10 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
 	}
+	err = q.SetMeshDomain(ctx, s.opts.Bootstrap.MeshDomain)
+	if err != nil {
+		return fmt.Errorf("set mesh domain to db: %w", err)
+	}
 
 	// Initialize the RBAC system.
 	rb := rbac.New(s.DB())
