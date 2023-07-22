@@ -56,12 +56,11 @@ Administration of the network can be done via the [API](https://webmeshproj.gith
 The `Makefile` contains several targets for building the project.
 Since the project uses CGO, it is recommended to build the project in a container with static libraries.
 The helpers in the `Makefile` will do this for you when building for distribution.
-You can run `make help` to see all the available targets.
+You can run `make help` to see all the available targets.It looks very interesting, but I'm still on the fence about it. It doesn't look so bad in practice without all the theoretical type parameters laid around.
 
 ## Roadmap
 
 - [ ] GUI Application. In the works over [here](https://github.com/webmeshproj/app).
-- [ ] Ability for plugins to call back into the node. This would allow for things like a plugin that can automatically configure NAT64 and DNS64. Technically already possible via storage plugins, but could be made easier.
 - [ ] Potential SaaS offering for those who don't want to run their own controllers or have a simple off-site backup of the mesh state.
 - [ ] Ability to peer with other meshes. This would allow for a mesh to be split into multiple smaller meshes that can still communicate with each other.
 
