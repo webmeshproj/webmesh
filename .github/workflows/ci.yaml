@@ -122,6 +122,12 @@ jobs:
         shell: bash
         run: make -j2 dist-linux dist-windows dist-darwin DIST_PARALLEL=2
 
+      - name: Compute Binary Checksums
+        shell: bash
+        run: |
+          ls -alh dist
+          cd dist ; sha256sum * > sha256sums.txt
+
       - name: Login to GHCR
         uses: docker/login-action@v2
         if: ${{ github.event_name != 'pull_request' }}
@@ -194,12 +200,6 @@ jobs:
         with:
           name: artifacts
           path: dist
-
-      - name: Compute Checksums
-        shell: bash
-        run: |
-          ls -alh dist
-          cd dist ; sha256sum * > sha256sums.txt
 
       - name: Publish Artifacts
         uses: softprops/action-gh-release@v1
