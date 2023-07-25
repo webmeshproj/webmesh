@@ -15,7 +15,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.5
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/raft v1.5.0
-	github.com/hashicorp/raft-boltdb v0.0.0-20230125174641-2a8082862702
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/jsimonetti/rtnetlink v1.3.3
 	github.com/mattn/go-sqlite3 v1.14.17
@@ -33,8 +32,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.0.0
 	github.com/webmeshproj/api v0.2.0
+	github.com/webmeshproj/raft-badger v0.0.0-20230725234709-eaa5e151214f
 	golang.org/x/crypto v0.11.0
-	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
+	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.10.0
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b
@@ -49,7 +49,6 @@ require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
@@ -70,7 +69,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
-	github.com/kr/pretty v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.18 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
@@ -98,7 +96,7 @@ require (
 	github.com/stretchr/testify v1.8.3 // indirect
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
 	go.opencensus.io v0.22.5 // indirect
-	golang.org/x/mod v0.10.0 // indirect
+	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect

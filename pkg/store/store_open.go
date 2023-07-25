@@ -22,10 +22,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/hashicorp/raft"
-	boltdb "github.com/hashicorp/raft-boltdb"
+	raftbadger "github.com/webmeshproj/raft-badger"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
@@ -99,14 +98,16 @@ func (s *store) Open(ctx context.Context) (err error) {
 			return handleErr(fmt.Errorf("new inmem storage: %w", err))
 		}
 	} else {
-		logFilePath := filepath.Join(s.opts.Raft.LogPath(), "log.db")
-		stableStorePath := filepath.Join(s.opts.Raft.StableStorePath(), "stable.db")
-		logDB, err := boltdb.NewBoltStore(logFilePath)
+		// logFilePath := filepath.Join(s.opts.Raft.LogPath(), "log.db")
+		// stableStorePath := filepath.Join(s.opts.Raft.StableStorePath(), "stable.db")
+		logFilePath := s.opts.Raft.LogPath()
+		stableStorePath := s.opts.Raft.StableStorePath()
+		logDB, err := raftbadger.New(log, logFilePath)
 		if err != nil {
 			return handleErr(fmt.Errorf("new bolt store %q: %w", logFilePath, err))
 		}
 		s.logDB = logDB
-		stableDB, err := boltdb.NewBoltStore(stableStorePath)
+		stableDB, err := raftbadger.New(log, logFilePath)
 		if err != nil {
 			return handleErr(fmt.Errorf("new bolt store %q: %w", stableStorePath, err))
 		}
@@ -212,25 +213,5 @@ func (s *store) Open(ctx context.Context) (err error) {
 		}
 	}
 	s.open.Store(true)
-	return nil
-}
-
-type monotonicLogStore struct{ raft.LogStore }
-
-var _ = raft.MonotonicLogStore(&monotonicLogStore{})
-
-func (m *monotonicLogStore) IsMonotonic() bool {
-	return true
-}
-
-func newInmemStore() *inMemoryCloser {
-	return &inMemoryCloser{raft.NewInmemStore()}
-}
-
-type inMemoryCloser struct {
-	*raft.InmemStore
-}
-
-func (i *inMemoryCloser) Close() error {
 	return nil
 }
