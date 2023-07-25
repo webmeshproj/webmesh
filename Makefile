@@ -56,6 +56,7 @@ build-ctl: fmt vet ## Build wmctl binary for the local platform.
 		cmd/$(CTL)/main.go
 
 DIST_TEMPLATE := {{.Dir}}_{{.OS}}_{{.Arch}}
+DIST_PARALLEL ?= -1
 
 LINUX_ARCHS := amd64 arm64 arm 386 s390x ppc64le # mips64 mips64le
 dist-linux: generate ## Build distribution binaries for all Linux platforms.
@@ -64,6 +65,7 @@ dist-linux: generate ## Build distribution binaries for all Linux platforms.
 		-arch="$(LINUX_ARCHS)" \
 		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
+		-parallel="$(DIST_PARALLEL)" \
 		-output="$(DIST)/$(DIST_TEMPLATE)" \
 		./cmd/$(NAME) ./cmd/$(CTL)
 	# We can only compress the amd/arm/386 binaries due to upx limitations.
@@ -76,6 +78,7 @@ dist-windows: generate ## Build distribution binaries for Windows.
 		-arch="$(WINDOWS_ARCHS)" \
 		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
+		-parallel="$(DIST_PARALLEL)" \
 		-output="$(DIST)/$(DIST_TEMPLATE)" \
 		./cmd/$(NAME) ./cmd/$(CTL)
 	upx --best --lzma $(DIST)/*_windows_*
@@ -87,6 +90,7 @@ dist-darwin: generate ## Build distribution binaries for Darwin.
 		-arch="$(DARWIN_ARCHS)" \
 		-tags "$(BUILD_TAGS)" \
 		-ldflags "$(LDFLAGS)" \
+		-parallel="$(DIST_PARALLEL)" \
 		-output="$(DIST)/$(DIST_TEMPLATE)" \
 		./cmd/$(NAME) ./cmd/$(CTL)
 	# Only compress the amd64 binaries. M1/M2 platforms are tricky.
