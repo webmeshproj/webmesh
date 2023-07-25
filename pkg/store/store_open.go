@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
@@ -39,6 +40,7 @@ func (s *store) Open(ctx context.Context) (err error) {
 	}
 	log := s.log
 	handleErr := func(err error) error {
+		log.Error("failed to open store", slog.String("error", err.Error()))
 		if s.raftTransport != nil {
 			defer s.raftTransport.Close()
 		}
@@ -97,14 +99,18 @@ func (s *store) Open(ctx context.Context) (err error) {
 			return handleErr(fmt.Errorf("new inmem storage: %w", err))
 		}
 	} else {
-		s.logDB, err = boltdb.NewBoltStore(s.opts.Raft.LogPath())
+		logFilePath := filepath.Join(s.opts.Raft.LogPath(), "log.db")
+		stableStorePath := filepath.Join(s.opts.Raft.StableStorePath(), "stable.db")
+		logDB, err := boltdb.NewBoltStore(logFilePath)
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.LogPath(), err))
+			return handleErr(fmt.Errorf("new bolt store %q: %w", logFilePath, err))
 		}
-		s.stableDB, err = boltdb.NewBoltStore(s.opts.Raft.StableStorePath())
+		s.logDB = logDB
+		stableDB, err := boltdb.NewBoltStore(stableStorePath)
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.StableStorePath(), err))
+			return handleErr(fmt.Errorf("new bolt store %q: %w", stableStorePath, err))
 		}
+		s.stableDB = stableDB
 		s.raftSnapshots, err = raft.NewFileSnapshotStoreWithLogger(
 			s.opts.Raft.DataDir,
 			int(s.opts.Raft.SnapshotRetention),

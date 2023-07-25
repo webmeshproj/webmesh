@@ -52,7 +52,7 @@ const (
 	ShutdownTimeoutEnvVar     = "RAFT_SHUTDOWN_TIMEOUT"
 
 	// LogPath is the raft log file.
-	LogPath = "raft-log"
+	LogPath = "raft-logs"
 	// StableStorePath is the raft stable store file.
 	StableStorePath = "raft-stable-dat"
 	// DataStoragePath is the raft data storage directory.

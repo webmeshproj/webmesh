@@ -32,10 +32,6 @@ var (
 func init() {
 	fl := snapshotCmd.Flags()
 	fl.StringVar(&snapshotOutput, "output", "", "Output file (default: stdout)")
-	cobra.CheckErr(snapshotCmd.RegisterFlagCompletionFunc("format", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"raw", "sqlite"}, cobra.ShellCompDirectiveNoFileComp
-	}))
-
 	rootCmd.AddCommand(snapshotCmd)
 }
 
