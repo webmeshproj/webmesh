@@ -189,7 +189,7 @@ jobs:
       id-token: "write"
       packages: "write"
     steps:
-      - name: Download Nix/Windows Artifacts
+      - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
           name: artifacts
