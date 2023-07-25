@@ -47,8 +47,8 @@ func (p *inProcessPlugin) Configure(ctx context.Context, in *v1.PluginConfigurat
 }
 
 func (p *inProcessPlugin) InjectQuerier(ctx context.Context, opts ...grpc.CallOption) (v1.Plugin_InjectQuerierClient, error) {
-	schan := make(chan *v1.PluginSQLQuery)
-	rchan := make(chan *v1.PluginSQLQueryResult)
+	schan := make(chan *v1.PluginQuery, 1)
+	rchan := make(chan *v1.PluginQueryResult, 1)
 	ctx, cancel := context.WithCancel(ctx)
 	srv := &inProcessQueryServer{ctx, schan, rchan}
 	cli := &inProcessQueryClient{ctx, cancel, schan, rchan}

@@ -26,16 +26,16 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
 // Peers are filtered by network ACLs.
-func WireGuardPeersFor(ctx context.Context, db meshdb.DB, peerID string) ([]*v1.WireGuardPeer, error) {
-	graph := peers.New(db).Graph()
-	nw := networking.New(db)
+func WireGuardPeersFor(ctx context.Context, st storage.Storage, peerID string) ([]*v1.WireGuardPeer, error) {
+	graph := peers.New(st).Graph()
+	nw := networking.New(st)
 	adjacencyMap, err := nw.FilterGraph(ctx, graph, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)

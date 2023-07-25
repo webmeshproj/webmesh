@@ -18,25 +18,26 @@ limitations under the License.
 package networking
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 const (
 	// BootstrapNodesNetworkACLName is the name of the bootstrap nodes NetworkACL.
 	BootstrapNodesNetworkACLName = "bootstrap-nodes"
+	// NetworkACLsPrefix is where NetworkACLs are stored in the database.
+	NetworkACLsPrefix = "/registry/network-acls"
+	// RoutesPrefix is where Routes are stored in the database.
+	RoutesPrefix = "/registry/routes"
 )
 
 // IsSystemNetworkACL returns true if the NetworkACL is a system NetworkACL.
@@ -84,12 +85,12 @@ type Networking interface {
 type AdjacencyMap map[string]map[string]graph.Edge[string]
 
 // New returns a new Networking interface.
-func New(db meshdb.DB) Networking {
-	return &networking{db}
+func New(st storage.Storage) Networking {
+	return &networking{st}
 }
 
 type networking struct {
-	meshdb.DB
+	storage.Storage
 }
 
 // PutNetworkACL creates or updates a NetworkACL.
@@ -104,61 +105,12 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 			return fmt.Errorf("cannot update system network acl %s", acl.GetName())
 		}
 	}
-	q := models.New(n.Write())
-	params := models.PutNetworkACLParams{
-		Name:       acl.GetName(),
-		Priority:   int64(acl.GetPriority()),
-		Action:     int64(acl.GetAction()),
-		SrcNodeIds: sql.NullString{},
-		DstNodeIds: sql.NullString{},
-		SrcCidrs:   sql.NullString{},
-		DstCidrs:   sql.NullString{},
-		Protocols:  sql.NullString{},
-		Ports:      sql.NullString{},
-		CreatedAt:  time.Now().UTC(),
-		UpdatedAt:  time.Now().UTC(),
+	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, acl.GetName())
+	data, err := protojson.Marshal(acl)
+	if err != nil {
+		return fmt.Errorf("marshal network acl: %w", err)
 	}
-	if len(acl.GetSourceNodes()) > 0 {
-		params.SrcNodeIds = sql.NullString{
-			String: strings.Join(acl.GetSourceNodes(), ","),
-			Valid:  true,
-		}
-	}
-	if len(acl.GetDestinationNodes()) > 0 {
-		params.DstNodeIds = sql.NullString{
-			String: strings.Join(acl.GetDestinationNodes(), ","),
-			Valid:  true,
-		}
-	}
-	if len(acl.GetSourceCidrs()) > 0 {
-		params.SrcCidrs = sql.NullString{
-			String: strings.Join(acl.GetSourceCidrs(), ","),
-			Valid:  true,
-		}
-	}
-	if len(acl.GetDestinationCidrs()) > 0 {
-		params.DstCidrs = sql.NullString{
-			String: strings.Join(acl.GetDestinationCidrs(), ","),
-			Valid:  true,
-		}
-	}
-	if len(acl.GetProtocols()) > 0 {
-		params.Protocols = sql.NullString{
-			String: strings.Join(acl.GetProtocols(), ","),
-			Valid:  true,
-		}
-	}
-	if len(acl.GetPorts()) > 0 {
-		protocols := make([]string, len(acl.GetPorts()))
-		for i, port := range acl.GetPorts() {
-			protocols[i] = strconv.Itoa(int(port))
-		}
-		params.Ports = sql.NullString{
-			String: strings.Join(protocols, ","),
-			Valid:  true,
-		}
-	}
-	err := q.PutNetworkACL(ctx, params)
+	err = n.Put(ctx, key, string(data))
 	if err != nil {
 		return fmt.Errorf("put network acl: %w", err)
 	}
@@ -167,15 +119,23 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 
 // GetNetworkACL returns a NetworkACL by name.
 func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, error) {
-	q := models.New(n.Read())
-	acl, err := q.GetNetworkACL(ctx, name)
+	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, name)
+	data, err := n.Get(ctx, key)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, storage.ErrKeyNotFound) {
 			return nil, ErrACLNotFound
 		}
 		return nil, fmt.Errorf("get network acl: %w", err)
 	}
-	return dbACLToAPIACL(n.Read(), &acl), nil
+	acl := &v1.NetworkACL{}
+	err = protojson.Unmarshal([]byte(data), acl)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal network acl: %w", err)
+	}
+	return &ACL{
+		NetworkACL: acl,
+		storage:    n.Storage,
+	}, nil
 }
 
 // DeleteNetworkACL deletes a NetworkACL by name.
@@ -183,8 +143,8 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 	if IsSystemNetworkACL(name) {
 		return fmt.Errorf("cannot delete system network acl %s", name)
 	}
-	q := models.New(n.Write())
-	err := q.DeleteNetworkACL(ctx, name)
+	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, name)
+	err := n.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("delete network acl: %w", err)
 	}
@@ -193,36 +153,30 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 
 // ListNetworkACLs returns a list of NetworkACLs.
 func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
-	q := models.New(n.Read())
-	acls, err := q.ListNetworkACLs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list network acls: %w", err)
-	}
-	out := make(ACLs, len(acls))
-	for i, acl := range acls {
-		out[i] = dbACLToAPIACL(n.Read(), &acl)
-	}
-	out.Sort(SortDescending)
-	return out, nil
+	out := make(ACLs, 0)
+	err := n.IterPrefix(ctx, NetworkACLsPrefix, func(key, value string) error {
+		acl := &v1.NetworkACL{}
+		err := protojson.Unmarshal([]byte(value), acl)
+		if err != nil {
+			return fmt.Errorf("unmarshal network acl: %w", err)
+		}
+		out = append(out, &ACL{
+			NetworkACL: acl,
+			storage:    n.Storage,
+		})
+		return nil
+	})
+	return out, err
 }
 
 // PutRoute creates or updates a Route.
 func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
-	q := models.New(n.Write())
-	params := models.PutNetworkRouteParams{
-		Name:      route.GetName(),
-		Node:      route.GetNode(),
-		DstCidrs:  strings.Join(route.GetDestinationCidrs(), ","),
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+	key := fmt.Sprintf("%s/%s", RoutesPrefix, route.GetName())
+	data, err := protojson.Marshal(route)
+	if err != nil {
+		return fmt.Errorf("marshal route: %w", err)
 	}
-	if route.GetNextHopNode() != "" {
-		params.NextHop = sql.NullString{
-			String: route.GetNextHopNode(),
-			Valid:  true,
-		}
-	}
-	err := q.PutNetworkRoute(ctx, params)
+	err = n.Put(ctx, key, string(data))
 	if err != nil {
 		return fmt.Errorf("put network route: %w", err)
 	}
@@ -231,49 +185,62 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 
 // GetRoute returns a Route by name.
 func (n *networking) GetRoute(ctx context.Context, name string) (*v1.Route, error) {
-	q := models.New(n.Read())
-	route, err := q.GetNetworkRoute(ctx, name)
+	key := fmt.Sprintf("%s/%s", RoutesPrefix, name)
+	data, err := n.Get(ctx, key)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, storage.ErrKeyNotFound) {
 			return nil, ErrRouteNotFound
 		}
 		return nil, fmt.Errorf("get network route: %w", err)
 	}
-	return dbRouteToAPIRoute(&route), nil
+	route := &v1.Route{}
+	err = protojson.Unmarshal([]byte(data), route)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal network route: %w", err)
+	}
+	return route, nil
 }
 
 // GetRoutesByNode returns a list of Routes for a given Node.
 func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) ([]*v1.Route, error) {
-	q := models.New(n.Read())
-	routes, err := q.ListNetworkRoutesByNode(ctx, nodeName)
+	routes, err := n.ListRoutes(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list network routes by node: %w", err)
+		return nil, fmt.Errorf("list network routes: %w", err)
 	}
-	out := make([]*v1.Route, len(routes))
-	for i, route := range routes {
-		out[i] = dbRouteToAPIRoute(&route)
+	out := make([]*v1.Route, 0)
+	for _, route := range routes {
+		r := route
+		if r.GetNode() != nodeName {
+			continue
+		}
+		out = append(out, r)
 	}
 	return out, nil
 }
 
 // GetRoutesByCIDR returns a list of Routes for a given CIDR.
 func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr string) ([]*v1.Route, error) {
-	q := models.New(n.Read())
-	routes, err := q.ListNetworkRoutesByDstCidr(ctx, cidr)
+	routes, err := n.ListRoutes(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list network routes by cidr: %w", err)
+		return nil, fmt.Errorf("list network routes: %w", err)
 	}
-	out := make([]*v1.Route, len(routes))
-	for i, route := range routes {
-		out[i] = dbRouteToAPIRoute(&route)
+	out := make([]*v1.Route, 0)
+	for _, route := range routes {
+		r := route
+		for _, destination := range r.GetDestinationCidrs() {
+			if strings.HasPrefix(destination, cidr) {
+				out = append(out, r)
+				break
+			}
+		}
 	}
 	return out, nil
 }
 
 // DeleteRoute deletes a Route by name.
 func (n *networking) DeleteRoute(ctx context.Context, name string) error {
-	q := models.New(n.Write())
-	err := q.DeleteNetworkRoute(ctx, name)
+	key := fmt.Sprintf("%s/%s", RoutesPrefix, name)
+	err := n.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("delete network route: %w", err)
 	}
@@ -282,16 +249,17 @@ func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 
 // ListRoutes returns a list of Routes.
 func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
-	q := models.New(n.Read())
-	routes, err := q.ListNetworkRoutes(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list network routes: %w", err)
-	}
-	out := make([]*v1.Route, len(routes))
-	for i, route := range routes {
-		out[i] = dbRouteToAPIRoute(&route)
-	}
-	return out, nil
+	out := make([]*v1.Route, 0)
+	err := n.IterPrefix(ctx, RoutesPrefix, func(key, value string) error {
+		route := &v1.Route{}
+		err := protojson.Unmarshal([]byte(value), route)
+		if err != nil {
+			return fmt.Errorf("unmarshal network route: %w", err)
+		}
+		out = append(out, route)
+		return nil
+	})
+	return out, err
 }
 
 // FilterGraph filters the adjacency map in the given graph for the given node name according
@@ -394,69 +362,4 @@ Nodes:
 	}
 	log.Debug("filtered adjacency map", "from", nodeName, "map", filtered)
 	return filtered, nil
-}
-
-func dbACLToAPIACL(rdb meshdb.DBTX, dbACL *models.NetworkAcl) *ACL {
-	return &ACL{
-		rdb: rdb,
-		NetworkACL: v1.NetworkACL{
-			Name:     dbACL.Name,
-			Priority: int32(dbACL.Priority),
-			Action:   v1.ACLAction(dbACL.Action),
-			SourceNodes: func() []string {
-				if dbACL.SrcNodeIds.Valid {
-					return strings.Split(dbACL.SrcNodeIds.String, ",")
-				}
-				return nil
-			}(),
-			DestinationNodes: func() []string {
-				if dbACL.DstNodeIds.Valid {
-					return strings.Split(dbACL.DstNodeIds.String, ",")
-				}
-				return nil
-			}(),
-			SourceCidrs: func() []string {
-				if dbACL.SrcCidrs.Valid {
-					return strings.Split(dbACL.SrcCidrs.String, ",")
-				}
-				return nil
-			}(),
-			DestinationCidrs: func() []string {
-				if dbACL.DstCidrs.Valid {
-					return strings.Split(dbACL.DstCidrs.String, ",")
-				}
-				return nil
-			}(),
-			Protocols: func() []string {
-				if dbACL.Protocols.Valid {
-					return strings.Split(dbACL.Protocols.String, ",")
-				}
-				return nil
-			}(),
-			Ports: func() []uint32 {
-				if dbACL.Ports.Valid {
-					out := make([]uint32, 0)
-					for _, port := range strings.Split(dbACL.Ports.String, ",") {
-						p, err := strconv.ParseUint(port, 10, 32)
-						if err != nil {
-							// A bad port got into the databse somehow, just skip it
-							continue
-						}
-						out = append(out, uint32(p))
-					}
-					return out
-				}
-				return nil
-			}(),
-		},
-	}
-}
-
-func dbRouteToAPIRoute(dbRoute *models.NetworkRoute) *v1.Route {
-	return &v1.Route{
-		Name:             dbRoute.Name,
-		Node:             dbRoute.Node,
-		DestinationCidrs: strings.Split(dbRoute.DstCidrs, ","),
-		NextHopNode:      dbRoute.NextHop.String,
-	}
 }

@@ -26,9 +26,9 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 func TestWireGuardPeers(t *testing.T) {
@@ -432,11 +432,11 @@ func TestWireGuardPeers(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			db, teardown, err := meshdb.NewTestDB()
+			db, err := storage.NewTestStorage()
 			if err != nil {
 				t.Fatalf("create test db: %v", err)
 			}
-			defer teardown()
+			defer db.Close()
 			peerdb := peers.New(db)
 			nw := networking.New(db)
 			// Create an allow-all traffic policy.

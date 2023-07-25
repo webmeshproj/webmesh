@@ -19,6 +19,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"errors"
 	"io"
 )
@@ -26,25 +27,34 @@ import (
 // Storage is the interface for storing and retrieving data about the state of the mesh.
 type Storage interface {
 	// Get returns the value of a key.
-	Get(key string) (string, error)
+	Get(ctx context.Context, key string) (string, error)
 	// Put sets the value of a key.
-	Put(key, value string) error
+	Put(ctx context.Context, key, value string) error
 	// Delete removes a key.
-	Delete(key string) error
+	Delete(ctx context.Context, key string) error
 	// List returns all keys with a given prefix.
-	List(prefix string) ([]string, error)
+	List(ctx context.Context, prefix string) ([]string, error)
+	// IterPrefix iterates over all keys with a given prefix.
+	IterPrefix(ctx context.Context, prefix string, fn PrefixIterator) error
 	// Snapshot returns a snapshot of the storage.
-	Snapshot() (io.ReadCloser, error)
+	Snapshot(ctx context.Context) (io.Reader, error)
 	// Restore restores a snapshot of the storage.
-	Restore(r io.Reader) error
-	// ReadOnly returns a read-only view of the storage.
-	ReadOnly() Storage
+	Restore(ctx context.Context, r io.Reader) error
+	// Subscribe will call the given function whenever a key with the given prefix is changed.
+	// The returned function can be called to unsubscribe.
+	Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (func(), error)
 	// Close closes the storage.
 	Close() error
 }
 
-// ErrReadOnly is the error returned when attempting to write to a read-only storage.
-var ErrReadOnly = errors.New("read-only storage")
+// SubscribeFunc is the function signature for subscribing to changes to a key.
+type SubscribeFunc func(key, value string)
+
+// PrefixIterator is the function signature for iterating over all keys with a given prefix.
+type PrefixIterator func(key, value string) error
+
+// ErrKeyNotFound is the error returned when a key is not found.
+var ErrKeyNotFound = errors.New("key not found")
 
 // Options are the options for creating a new Storage.
 type Options struct {
@@ -52,9 +62,17 @@ type Options struct {
 	InMemory bool
 	// DiskPath is the path to the disk storage.
 	DiskPath string
+	// Silent specifies whether to suppress log output.
+	Silent bool
 }
 
 // New returns a new Storage.
 func New(opts *Options) (Storage, error) {
 	return newBadgerStorage(opts)
+}
+
+// NewTestStorage is a helper for creating an in-memory storage suitable
+// for testing.
+func NewTestStorage() (Storage, error) {
+	return New(&Options{InMemory: true, Silent: true})
 }

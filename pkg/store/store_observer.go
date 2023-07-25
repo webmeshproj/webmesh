@@ -54,7 +54,7 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					if err := s.nw.RefreshPeers(ctx); err != nil {
 						s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
 					}
-					p := peers.New(s.DB())
+					p := peers.New(s.Storage())
 					node, err := p.Get(ctx, string(data.Peer.ID))
 					if err != nil {
 						s.log.Error("failed to get peer", slog.String("error", err.Error()))
@@ -84,7 +84,7 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 					}
 				case raft.LeaderObservation:
 					s.log.Debug("LeaderObservation", slog.Any("data", data))
-					p := peers.New(s.DB())
+					p := peers.New(s.Storage())
 					node, err := p.Get(ctx, string(data.LeaderID))
 					if err != nil {
 						s.log.Error("failed to get leader", slog.String("error", err.Error()))
@@ -117,7 +117,7 @@ func (s *store) observe() (closeCh, doneCh chan struct{}) {
 									if err := s.RemoveServer(ctx, string(data.PeerID), false); err != nil {
 										s.log.Error("remove non-voting peer", slog.String("error", err.Error()))
 									}
-									p := peers.New(s.DB())
+									p := peers.New(s.Storage())
 									if err := p.Delete(ctx, string(data.PeerID)); err != nil {
 										s.log.Error("remove node", slog.String("error", err.Error()))
 									}

@@ -398,7 +398,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return ""
 		}(),
 	}
-	peers, err := mesh.WireGuardPeersFor(ctx, s.store.DB(), req.GetId())
+	peers, err := mesh.WireGuardPeersFor(ctx, s.store.Storage(), req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err)
 	}

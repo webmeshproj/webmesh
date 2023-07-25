@@ -18,28 +18,37 @@ package store
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 )
 
-func (s *store) onDBUpdate(op int, dbName, tableName string, rowID int64) {
-	s.log.Debug("db update trigger", "op", op, "dbName", dbName, "tableName", tableName, "rowID", rowID)
+func (s *store) onDBUpdate(key, value string) {
+	s.log.Debug("db update trigger", "key", key)
 	if s.testStore {
 		return
 	}
-	switch tableName {
-	case models.TableNodes, models.TableNodeEdges, models.TableLeases:
+	if isNodeChangeKey(key) {
 		// Potentially need to update wireguard peers
 		go s.queuePeersUpdate()
-	case models.TableNetworkRoutes:
+	} else if isRouteChangeKey(key) {
 		// Potentially need to update wireguard routes and peers
 		go s.queuePeersUpdate()
 		go s.queueRouteUpdate()
 	}
+}
+
+func isNodeChangeKey(key string) bool {
+	return strings.HasPrefix(key, peers.NodesPrefix) ||
+		strings.HasPrefix(key, peers.EdgesPrefix)
+}
+
+func isRouteChangeKey(key string) bool {
+	return strings.HasPrefix(key, networking.RoutesPrefix)
 }
 
 func (s *store) queueRouteUpdate() {
@@ -53,7 +62,7 @@ func (s *store) queueRouteUpdate() {
 		time.Sleep(time.Second)
 	}
 	s.nwTaskGroup.TryGo(func() error {
-		nw := networking.New(s.DB())
+		nw := networking.New(s.Storage())
 		routes, err := nw.GetRoutesByNode(ctx, s.ID())
 		if err != nil {
 			s.log.Error("error getting routes by node", slog.String("error", err.Error()))

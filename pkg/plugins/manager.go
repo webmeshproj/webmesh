@@ -16,9 +16,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
-	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
 	"github.com/webmeshproj/node/pkg/plugins/clients"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // Manager is the interface for managing plugins.
@@ -48,7 +47,7 @@ type Manager interface {
 }
 
 type manager struct {
-	db       models.DBTX
+	db       storage.Storage
 	auth     clients.PluginClient
 	ipamv4   clients.PluginClient
 	ipamv6   clients.PluginClient
@@ -250,6 +249,7 @@ func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, 
 			m.log.Error("close query stream", "plugin", plugin, "error", err)
 		}
 	}()
+	// TODO: This does not support multiplexed queries yet.
 	for {
 		query, err := queries.Recv()
 		if err != nil {
@@ -261,19 +261,62 @@ func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, 
 			m.log.Error("receive query", "plugin", plugin, "error", err)
 			return
 		}
-		m.log.Debug("handling plugin query", "plugin", plugin, "query", query.GetQuery())
-		var result v1.PluginSQLQueryResult
-		result.Id = query.GetId()
-		res, err := raftlogs.QueryWithQuerier(queries.Context(), m.db, query.GetQuery())
-		if err != nil {
-			m.log.Error("plugin query error", "plugin", plugin, "error", err)
-			result.Error = err.Error()
-		} else {
-			result.Result = res
-		}
-		err = queries.Send(&result)
-		if err != nil {
-			m.log.Error("send query result", "plugin", plugin, "error", err)
+		m.log.Debug("handling plugin query", "plugin", plugin, "query", query.GetQuery(), "cmd", query.GetCommand().String())
+		switch query.GetCommand() {
+		case v1.PluginQuery_GET:
+			var result v1.PluginQueryResult
+			result.Id = query.GetId()
+			result.Key = query.GetQuery()
+			val, err := m.db.Get(queries.Context(), query.GetQuery())
+			if err != nil {
+				result.Error = err.Error()
+			} else {
+				result.Value = []string{val}
+			}
+			err = queries.Send(&result)
+			if err != nil {
+				m.log.Error("send query result", "plugin", plugin, "error", err)
+			}
+		case v1.PluginQuery_LIST:
+			var result v1.PluginQueryResult
+			result.Id = query.GetId()
+			result.Key = query.GetQuery()
+			keys, err := m.db.List(queries.Context(), query.GetQuery())
+			if err != nil {
+				result.Error = err.Error()
+			} else {
+				result.Value = keys
+			}
+			err = queries.Send(&result)
+			if err != nil {
+				m.log.Error("send query result", "plugin", plugin, "error", err)
+			}
+		case v1.PluginQuery_ITER:
+			var result v1.PluginQueryResult
+			result.Id = query.GetId()
+			err := m.db.IterPrefix(queries.Context(), query.GetQuery(), func(key, val string) error {
+				result.Key = key
+				result.Value = []string{val}
+				err := queries.Send(&result)
+				return err
+			})
+			if err != nil {
+				m.log.Error("stream query results", "plugin", plugin, "error", err)
+				continue
+			}
+			result.Error = "EOF"
+			err = queries.Send(&result)
+			if err != nil {
+				m.log.Error("send query results EOF", "plugin", plugin, "error", err)
+			}
+		default:
+			var result v1.PluginQueryResult
+			result.Id = query.GetId()
+			result.Error = fmt.Sprintf("unsupported command: %v", query.GetCommand())
+			err = queries.Send(&result)
+			if err != nil {
+				m.log.Error("send query result", "plugin", plugin, "error", err)
+			}
 		}
 	}
 }

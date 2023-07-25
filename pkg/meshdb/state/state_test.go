@@ -18,12 +18,13 @@ package state
 
 import (
 	"context"
-	"database/sql"
+	"net/netip"
 	"testing"
-	"time"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 var (
@@ -36,8 +37,8 @@ var (
 
 	publicNodePublicAddr = "1.1.1.1"
 
-	publicNodePrivateAddr  = "172.16.0.1"
-	privateNodePrivateAddr = "172.16.0.2"
+	publicNodePrivateAddr  = "172.16.0.1/32"
+	privateNodePrivateAddr = "172.16.0.2/32"
 
 	rpcPort = 1
 )
@@ -200,82 +201,75 @@ func TestListPeerPrivateRPCAddresses(t *testing.T) {
 
 func setupTest(t *testing.T) (*state, func()) {
 	t.Helper()
-	db, close, err := meshdb.NewTestDB()
+	db, err := storage.NewTestStorage()
 	if err != nil {
 		t.Fatal(err)
+	}
+	close := func() {
+		err := db.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	ctx := context.Background()
-	q := models.New(db.Write())
-	err = q.SetIPv6Prefix(ctx, ipv6Prefix)
+	err = db.Put(ctx, IPv6PrefixKey, ipv6Prefix)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = q.SetIPv4Prefix(ctx, ipv4Prefix)
+	err = db.Put(ctx, IPv4PrefixKey, ipv4Prefix)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = q.SetMeshDomain(ctx, domain)
+	err = db.Put(ctx, MeshDomainKey, domain)
 	if err != nil {
 		t.Fatal(err)
 	}
+	p := peers.New(db)
 	// Node with public address
-	_, err = q.InsertNode(ctx, models.InsertNodeParams{
-		ID: publicNode,
-		PublicKey: sql.NullString{
-			String: "public",
-			Valid:  true,
-		},
-		PrimaryEndpoint: sql.NullString{
-			String: publicNodePublicAddr,
-			Valid:  true,
-		},
-		GrpcPort:  int64(rpcPort),
-		RaftPort:  2,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+	_, err = p.Put(ctx, &peers.PutOptions{
+		ID:              publicNode,
+		PublicKey:       mustGenerateKey(t),
+		PrimaryEndpoint: publicNodePublicAddr,
+		GRPCPort:        rpcPort,
+		RaftPort:        2,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Node with private address
-	_, err = q.InsertNode(ctx, models.InsertNodeParams{
-		ID: privateNode,
-		PublicKey: sql.NullString{
-			String: "private",
-			Valid:  true,
-		},
-		GrpcPort:  int64(rpcPort),
+	_, err = p.Put(ctx, &peers.PutOptions{
+		ID:        privateNode,
+		PublicKey: mustGenerateKey(t),
+		GRPCPort:  rpcPort,
 		RaftPort:  2,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Leases for each
-	_, err = q.InsertNodeLease(ctx, models.InsertNodeLeaseParams{
-		NodeID: publicNode,
-		Ipv4: sql.NullString{
-			String: publicNodePrivateAddr,
-			Valid:  true,
-		},
-		CreatedAt: time.Now(),
+	err = p.PutLease(ctx, &peers.PutLeaseOptions{
+		ID:   publicNode,
+		IPv4: netip.MustParsePrefix(publicNodePrivateAddr),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Leases for each
-	_, err = q.InsertNodeLease(ctx, models.InsertNodeLeaseParams{
-		NodeID: privateNode,
-		Ipv4: sql.NullString{
-			String: privateNodePrivateAddr,
-			Valid:  true,
-		},
-		CreatedAt: time.Now(),
+	err = p.PutLease(ctx, &peers.PutLeaseOptions{
+		ID:   privateNode,
+		IPv4: netip.MustParsePrefix(privateNodePrivateAddr),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := New(db)
 	return s.(*state), close
+}
+
+func mustGenerateKey(t *testing.T) wgtypes.Key {
+	t.Helper()
+	key, err := wgtypes.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
 }

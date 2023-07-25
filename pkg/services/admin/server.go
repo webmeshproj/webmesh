@@ -46,9 +46,9 @@ func New(store meshdb.Store, insecure bool) *Server {
 	}
 	return &Server{
 		store:      store,
-		peers:      peers.New(store.DB()),
-		rbac:       rbacdb.New(store.DB()),
+		peers:      peers.New(store.Storage()),
+		rbac:       rbacdb.New(store.Storage()),
 		rbacEval:   rbacEval,
-		networking: networking.New(store.DB()),
+		networking: networking.New(store.Storage()),
 	}
 }

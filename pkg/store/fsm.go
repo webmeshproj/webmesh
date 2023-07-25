@@ -144,5 +144,5 @@ func (s *store) applyLog(l *raft.Log) (res any) {
 		}
 	}()
 
-	return raftlogs.Apply(ctx, s.weakData, &cmd)
+	return raftlogs.Apply(ctx, s.kvData, &cmd)
 }

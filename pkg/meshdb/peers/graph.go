@@ -18,79 +18,52 @@ package peers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/netip"
 	"strings"
 
 	"github.com/dominikbraun/graph"
-	"github.com/mattn/go-sqlite3"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // GraphStore implements graph.Store[string, Node] where
 // string is the node ID and Node is the node itself.
 type GraphStore struct {
-	meshdb.DB
+	storage.Storage
 }
 
+// NodesPrefix is where nodes are stored in the database.
+// nodes are indexed by their ID in the format /registry/nodes/<id>.
+const NodesPrefix = "/registry/nodes"
+
+// EdgesPrefix is where edges are stored in the database.
+// edges are indexed by their source and target node IDs
+// in the format /registry/edges/<source>/<target>.
+const EdgesPrefix = "/registry/edges"
+
 // NewGraph creates a new Graph instance.
-func NewGraph(db meshdb.DB) Graph {
-	return graph.NewWithStore(graphHasher, NewGraphStore(db))
+func NewGraph(st storage.Storage) Graph {
+	return graph.NewWithStore(graphHasher, NewGraphStore(st))
 }
 
 // NewGraphStore creates a new GraphStore instance.
-func NewGraphStore(db meshdb.DB) graph.Store[string, Node] {
-	return graph.Store[string, Node](&GraphStore{db})
+func NewGraphStore(st storage.Storage) graph.Store[string, Node] {
+	return graph.Store[string, Node](&GraphStore{st})
 }
 
 // AddVertex should add the given vertex with the given hash value and vertex properties to the
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no
 // error should be returned.
 func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexProperties) error {
-	params := models.InsertNodeParams{
-		ID:        node.ID,
-		GrpcPort:  int64(node.GRPCPort),
-		RaftPort:  int64(node.RaftPort),
-		CreatedAt: node.CreatedAt,
-		UpdatedAt: node.UpdatedAt,
-	}
-	if node.PublicKey != (wgtypes.Key{}) {
-		params.PublicKey = sql.NullString{
-			String: node.PublicKey.String(),
-			Valid:  true,
-		}
-	}
-	if node.PrimaryEndpoint != "" {
-		params.PrimaryEndpoint = sql.NullString{
-			String: node.PrimaryEndpoint,
-			Valid:  true,
-		}
-	}
-	if len(node.WireGuardEndpoints) > 0 {
-		params.WireguardEndpoints = sql.NullString{
-			String: strings.Join(node.WireGuardEndpoints, ","),
-			Valid:  true,
-		}
-	}
-	if node.ZoneAwarenessID != "" {
-		params.ZoneAwarenessID = sql.NullString{
-			String: node.ZoneAwarenessID,
-			Valid:  true,
-		}
-	}
-	_, err := models.New(g.Write()).InsertNode(context.Background(), params)
+	data, err := json.Marshal(node)
 	if err != nil {
-		var sqliteErr *sqlite3.Error
-		if errors.As(err, &sqliteErr) && sqliteErr.Code == sqlite3.ErrConstraint {
-			return graph.ErrVertexAlreadyExists
-		}
-		return fmt.Errorf("create node: %w", err)
+		return fmt.Errorf("marshal node: %w", err)
+	}
+	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
+	if err := g.Put(context.Background(), key, string(data)); err != nil {
+		return fmt.Errorf("put node: %w", err)
 	}
 	return nil
 }
@@ -98,43 +71,17 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 // Vertex should return the vertex and vertex properties with the given hash value. If the
 // vertex doesn't exist, ErrVertexNotFound should be returned.
 func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexProperties, err error) {
-	dbnode, err := models.New(g.Read()).GetNode(context.Background(), nodeID)
+	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
+	data, err := g.Get(context.Background(), key)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, storage.ErrKeyNotFound) {
 			err = graph.ErrVertexNotFound
 		}
 		return
 	}
-	node.ID = dbnode.ID
-	node.PrimaryEndpoint = dbnode.PrimaryEndpoint.String
-	node.ZoneAwarenessID = dbnode.ZoneAwarenessID.String
-	node.GRPCPort = int(dbnode.GrpcPort)
-	node.RaftPort = int(dbnode.RaftPort)
-	node.CreatedAt = dbnode.CreatedAt
-	node.UpdatedAt = dbnode.UpdatedAt
-	if dbnode.PublicKey.Valid {
-		node.PublicKey, err = wgtypes.ParseKey(dbnode.PublicKey.String)
-		if err != nil {
-			err = fmt.Errorf("parse node public key: %w", err)
-			return
-		}
-	}
-	if dbnode.WireguardEndpoints.Valid {
-		node.WireGuardEndpoints = strings.Split(dbnode.WireguardEndpoints.String, ",")
-	}
-	if dbnode.PrivateAddressV4 != "" {
-		node.PrivateIPv4, err = netip.ParsePrefix(dbnode.PrivateAddressV4)
-		if err != nil {
-			err = fmt.Errorf("parse node private IPv4: %w", err)
-			return
-		}
-	}
-	if dbnode.PrivateAddressV6 != "" {
-		node.PrivateIPv6, err = netip.ParsePrefix(dbnode.PrivateAddressV6)
-		if err != nil {
-			err = fmt.Errorf("parse node private IPv6: %w", err)
-			return
-		}
+	err = json.Unmarshal([]byte(data), &node)
+	if err != nil {
+		err = fmt.Errorf("unmarshal node: %w", err)
 	}
 	return
 }
@@ -143,23 +90,31 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 // exist, ErrVertexNotFound should be returned. If the vertex has edges to other vertices,
 // ErrVertexHasEdges should be returned.
 func (g *GraphStore) RemoveVertex(nodeID string) error {
-	_, err := models.New(g.Read()).GetNode(context.Background(), nodeID)
+	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
+	_, err := g.Get(context.Background(), key)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, storage.ErrKeyNotFound) {
 			err = graph.ErrVertexNotFound
 		}
 		return err
 	}
-	_, err = models.New(g.Read()).NodeHasEdges(context.Background(), models.NodeHasEdgesParams{
-		SrcNodeID: nodeID,
-		DstNodeID: nodeID,
-	})
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("check node edges: %w", err)
-	} else if err == nil {
-		return graph.ErrVertexHasEdges
+	// Check if the node has edges.
+	keys, err := g.List(context.Background(), EdgesPrefix)
+	if err != nil {
+		return fmt.Errorf("list edges: %w", err)
 	}
-	if err := models.New(g.Write()).DeleteNode(context.Background(), nodeID); err != nil {
+	for _, key := range keys {
+		key = strings.TrimPrefix(key, EdgesPrefix+"/")
+		parts := strings.Split(key, "/")
+		if len(parts) != 2 {
+			// Should never happen.
+			continue
+		}
+		if parts[0] == nodeID || parts[1] == nodeID {
+			return graph.ErrVertexHasEdges
+		}
+	}
+	if err := g.Delete(context.Background(), key); err != nil {
 		return fmt.Errorf("delete node: %w", err)
 	}
 	return nil
@@ -167,24 +122,25 @@ func (g *GraphStore) RemoveVertex(nodeID string) error {
 
 // ListVertices should return all vertices in the graph in a slice.
 func (g *GraphStore) ListVertices() ([]string, error) {
-	ids, err := models.New(g.Read()).ListNodeIDs(context.Background())
+	keys, err := g.List(context.Background(), NodesPrefix)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return []string{}, nil
-		}
-		return nil, fmt.Errorf("list node IDs: %w", err)
+		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	return ids, nil
+	out := make([]string, len(keys))
+	for i, key := range keys {
+		out[i] = strings.TrimPrefix(key, NodesPrefix+"/")
+	}
+	return out, nil
 }
 
 // VertexCount should return the number of vertices in the graph. This should be equal to the
 // length of the slice returned by ListVertices.
 func (g *GraphStore) VertexCount() (int, error) {
-	count, err := models.New(g.Read()).GetNodeCount(context.Background())
+	ids, err := g.ListVertices()
 	if err != nil {
-		return 0, fmt.Errorf("get node count: %w", err)
+		return 0, fmt.Errorf("list vertices: %w", err)
 	}
-	return int(count), nil
+	return len(ids), nil
 }
 
 // AddEdge should add an edge between the vertices with the given source and target hashes.
@@ -195,38 +151,54 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 	// We diverge from the suggested implementation and only check that one of the nodes
 	// exists. This is so joiners can add edges to nodes that are not yet in the graph.
 	// If this ends up causing problems, we can change it.
-	_, err := models.New(g.Read()).EitherNodeExists(context.Background(), models.EitherNodeExistsParams{
-		ID:   sourceNode,
-		ID_2: targetNode,
+	nodeKeys, err := g.List(context.Background(), NodesPrefix)
+	if err != nil {
+		return fmt.Errorf("list nodes: %w", err)
+	}
+	edgeKeys, err := g.List(context.Background(), EdgesPrefix)
+	if err != nil {
+		return fmt.Errorf("list edges: %w", err)
+	}
+	var vertexExists bool
+	for _, key := range nodeKeys {
+		key = strings.TrimPrefix(key, NodesPrefix+"/")
+		if key == sourceNode || key == targetNode {
+			vertexExists = true
+			break
+		}
+	}
+	if !vertexExists {
+		return graph.ErrVertexNotFound
+	}
+	var edgeExists bool
+	for _, key := range edgeKeys {
+		key = strings.TrimPrefix(key, EdgesPrefix+"/")
+		parts := strings.Split(key, "/")
+		if len(parts) != 2 {
+			// Should never happen.
+			continue
+		}
+		if parts[0] == sourceNode && parts[1] == targetNode {
+			edgeExists = true
+			break
+		}
+	}
+	if edgeExists {
+		return graph.ErrEdgeAlreadyExists
+	}
+	edgeKey := fmt.Sprintf("%s/%s/%s", EdgesPrefix, sourceNode, targetNode)
+	edgeData, err := json.Marshal(Edge{
+		From:   sourceNode,
+		To:     targetNode,
+		Weight: int(edge.Properties.Weight),
+		Attrs:  edge.Properties.Attributes,
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = graph.ErrVertexNotFound
-		}
-		return err
+		return fmt.Errorf("marshal edge: %w", err)
 	}
-	params := models.InsertNodeEdgeParams{
-		SrcNodeID: sourceNode,
-		DstNodeID: targetNode,
-		Weight:    int64(edge.Properties.Weight),
-	}
-	if edge.Properties.Attributes != nil {
-		attrs, err := json.Marshal(edge.Properties.Attributes)
-		if err != nil {
-			return fmt.Errorf("marshal edge attributes: %w", err)
-		}
-		params.Attrs = sql.NullString{
-			String: string(attrs),
-			Valid:  true,
-		}
-	}
-	err = models.New(g.Write()).InsertNodeEdge(context.Background(), params)
+	err = g.Put(context.Background(), edgeKey, string(edgeData))
 	if err != nil {
-		var sqlerr *sqlite3.Error
-		if errors.As(err, &sqlerr) && sqlerr.Code == sqlite3.ErrConstraint {
-			return graph.ErrEdgeAlreadyExists
-		}
-		return fmt.Errorf("insert node edge: %w", err)
+		return fmt.Errorf("put node edge: %w", err)
 	}
 	return nil
 }
@@ -234,34 +206,26 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 // UpdateEdge should update the edge between the given vertices with the data of the given
 // Edge instance. If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
-	_, err := models.New(g.Read()).NodeEdgeExists(context.Background(), models.NodeEdgeExistsParams{
-		SrcNodeID: sourceNode,
-		DstNodeID: targetNode,
-	})
+	key := fmt.Sprintf("%s/%s/%s", EdgesPrefix, sourceNode, targetNode)
+	_, err := g.Get(context.Background(), key)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, storage.ErrKeyNotFound) {
 			return graph.ErrEdgeNotFound
 		}
 		return fmt.Errorf("get node edge: %w", err)
 	}
-	params := models.UpdateNodeEdgeParams{
-		SrcNodeID: sourceNode,
-		DstNodeID: targetNode,
-		Weight:    int64(edge.Properties.Weight),
-	}
-	if edge.Properties.Attributes != nil {
-		attrs, err := json.Marshal(edge.Properties.Attributes)
-		if err != nil {
-			return fmt.Errorf("marshal edge attributes: %w", err)
-		}
-		params.Attrs = sql.NullString{
-			String: string(attrs),
-			Valid:  true,
-		}
-	}
-	err = models.New(g.Write()).UpdateNodeEdge(context.Background(), params)
+	edgeData, err := json.Marshal(Edge{
+		From:   sourceNode,
+		To:     targetNode,
+		Weight: int(edge.Properties.Weight),
+		Attrs:  edge.Properties.Attributes,
+	})
 	if err != nil {
-		return fmt.Errorf("update node edge: %w", err)
+		return fmt.Errorf("marshal edge: %w", err)
+	}
+	err = g.Put(context.Background(), key, string(edgeData))
+	if err != nil {
+		return fmt.Errorf("put node edge: %w", err)
 	}
 	return nil
 }
@@ -273,10 +237,16 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[s
 // be returned. If the edge doesn't exist, it is up to you whether ErrEdgeNotFound or no error
 // should be returned.
 func (g *GraphStore) RemoveEdge(sourceNode, targetNode string) error {
-	return models.New(g.Write()).DeleteNodeEdge(context.Background(), models.DeleteNodeEdgeParams{
-		SrcNodeID: sourceNode,
-		DstNodeID: targetNode,
-	})
+	key := fmt.Sprintf("%s/%s/%s", EdgesPrefix, sourceNode, targetNode)
+	err := g.Delete(context.Background(), key)
+	if err != nil {
+		// Don't return an error if the edge doesn't exist.
+		if errors.Is(err, storage.ErrKeyNotFound) {
+			return nil
+		}
+		return fmt.Errorf("delete node edge: %w", err)
+	}
+	return nil
 }
 
 // Edge should return the edge joining the vertices with the given hash values. It should
@@ -288,28 +258,24 @@ func (g *GraphStore) RemoveEdge(sourceNode, targetNode string) error {
 //
 // If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) Edge(sourceNode, targetNode string) (graph.Edge[string], error) {
-	edge, err := models.New(g.Read()).GetNodeEdge(context.Background(), models.GetNodeEdgeParams{
-		SrcNodeID: sourceNode,
-		DstNodeID: targetNode,
-	})
+	key := fmt.Sprintf("%s/%s/%s", EdgesPrefix, sourceNode, targetNode)
+	data, err := g.Get(context.Background(), key)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, storage.ErrKeyNotFound) {
 			return graph.Edge[string]{}, graph.ErrEdgeNotFound
 		}
 		return graph.Edge[string]{}, fmt.Errorf("get node edge: %w", err)
 	}
-	var attrs map[string]string
-	if edge.Attrs.Valid {
-		err = json.Unmarshal([]byte(edge.Attrs.String), &attrs)
-		if err != nil {
-			return graph.Edge[string]{}, fmt.Errorf("unmarshal edge attributes: %w", err)
-		}
+	var edge Edge
+	err = json.Unmarshal([]byte(data), &edge)
+	if err != nil {
+		return graph.Edge[string]{}, fmt.Errorf("unmarshal edge: %w", err)
 	}
 	return graph.Edge[string]{
 		Source: sourceNode,
 		Target: targetNode,
 		Properties: graph.EdgeProperties{
-			Attributes: attrs,
+			Attributes: edge.Attrs,
 			Weight:     int(edge.Weight),
 		},
 	}, nil
@@ -317,30 +283,22 @@ func (g *GraphStore) Edge(sourceNode, targetNode string) (graph.Edge[string], er
 
 // ListEdges should return all edges in the graph in a slice.
 func (g *GraphStore) ListEdges() ([]graph.Edge[string], error) {
-	edges, err := models.New(g.Read()).ListNodeEdges(context.Background())
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []graph.Edge[string]{}, nil
+	edges := make([]graph.Edge[string], 0)
+	err := g.IterPrefix(context.Background(), EdgesPrefix, func(key, value string) error {
+		var edge Edge
+		err := json.Unmarshal([]byte(value), &edge)
+		if err != nil {
+			return fmt.Errorf("unmarshal edge: %w", err)
 		}
-		return nil, fmt.Errorf("list node edges: %w", err)
-	}
-	out := make([]graph.Edge[string], len(edges))
-	for i, edge := range edges {
-		var attrs map[string]string
-		if edge.Attrs.Valid {
-			err = json.Unmarshal([]byte(edge.Attrs.String), &attrs)
-			if err != nil {
-				return nil, fmt.Errorf("unmarshal edge attributes: %w", err)
-			}
-		}
-		out[i] = graph.Edge[string]{
-			Source: edge.SrcNodeID,
-			Target: edge.DstNodeID,
+		edges = append(edges, graph.Edge[string]{
+			Source: edge.From,
+			Target: edge.To,
 			Properties: graph.EdgeProperties{
-				Attributes: attrs,
+				Attributes: edge.Attrs,
 				Weight:     int(edge.Weight),
 			},
-		}
-	}
-	return out, nil
+		})
+		return nil
+	})
+	return edges, err
 }

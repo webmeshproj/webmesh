@@ -18,15 +18,14 @@ limitations under the License.
 package networking
 
 import (
-	"database/sql"
 	"sort"
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
+	"github.com/webmeshproj/node/pkg/meshdb/rbac"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // ACLs is a list of Network ACLs. It contains methods for evaluating actions against
@@ -47,13 +46,13 @@ func (a ACLs) Proto() []*v1.NetworkACL {
 
 // ACL is a Network ACL. It contains a reference to the database for evaluating group membership.
 type ACL struct {
-	v1.NetworkACL
-	rdb meshdb.DBTX
+	*v1.NetworkACL
+	storage storage.Storage
 }
 
 // Proto returns the protobuf representation of the ACL.
 func (a *ACL) Proto() *v1.NetworkACL {
-	return &a.NetworkACL
+	return a.NetworkACL
 }
 
 // SortDirection is the direction to sort ACLs.
@@ -117,17 +116,19 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 						continue
 					}
 					groupName := strings.TrimPrefix(node, "group:")
-					group, err := models.New(acl.rdb).GetGroup(ctx, groupName)
+					group, err := rbac.New(acl.storage).GetGroup(ctx, groupName)
 					if err != nil {
-						if err != sql.ErrNoRows {
+						if err != rbac.ErrGroupNotFound {
 							context.LoggerFrom(ctx).Error("failed to get group", "group", groupName, "error", err)
 							return false
 						}
 						// If the group doesn't exist, we'll just ignore it.
 						continue
 					}
-					if group.Nodes.Valid {
-						groups[groupName] = strings.Split(group.Nodes.String, ",")
+					for _, subject := range group.GetSubjects() {
+						if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_NODE {
+							groups[groupName] = append(groups[groupName], subject.GetName())
+						}
 					}
 				}
 			}
@@ -156,17 +157,19 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 						continue
 					}
 					groupName := strings.TrimPrefix(node, "group:")
-					group, err := models.New(acl.rdb).GetGroup(ctx, groupName)
+					group, err := rbac.New(acl.storage).GetGroup(ctx, groupName)
 					if err != nil {
-						if err != sql.ErrNoRows {
+						if err != rbac.ErrGroupNotFound {
 							context.LoggerFrom(ctx).Error("failed to get group", "group", groupName, "error", err)
 							return false
 						}
 						// If the group doesn't exist, we'll just ignore it.
 						continue
 					}
-					if group.Nodes.Valid {
-						groups[groupName] = strings.Split(group.Nodes.String, ",")
+					for _, subject := range group.GetSubjects() {
+						if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_NODE {
+							groups[groupName] = append(groups[groupName], subject.GetName())
+						}
 					}
 				}
 			}

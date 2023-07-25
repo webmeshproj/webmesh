@@ -78,14 +78,6 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		}
 		return nil
 	})
-	fs.Func("plugins.localstore.data-dir", "Enables the localstore plugin with the path to a data directory", func(s string) error {
-		o.Plugins["localstore"] = &Config{
-			Config: map[string]any{
-				"data-dir": s,
-			},
-		}
-		return nil
-	})
 	fs.Func("plugins.ldap.server", "Enables the ldap plugin with the server address", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{

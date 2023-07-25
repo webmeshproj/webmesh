@@ -18,15 +18,19 @@ package storage
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/badger/v4/pb"
+	"golang.org/x/exp/slog"
+
+	"github.com/webmeshproj/node/pkg/context"
 )
 
 type badgerStorage struct {
-	db       *badger.DB
-	readonly bool
+	db *badger.DB
 }
 
 func newBadgerStorage(opts *Options) (Storage, error) {
@@ -36,6 +40,10 @@ func newBadgerStorage(opts *Options) (Storage, error) {
 	} else {
 		badgeropts = badger.DefaultOptions(opts.DiskPath)
 	}
+	badgeropts.Logger = nil
+	if !opts.Silent {
+		badgeropts.Logger = &logger{slog.Default().With("component", "badger")}
+	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {
 		return nil, fmt.Errorf("badger open: %w", err)
@@ -44,11 +52,14 @@ func newBadgerStorage(opts *Options) (Storage, error) {
 }
 
 // Get returns the value of a key.
-func (b *badgerStorage) Get(key string) (string, error) {
+func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
 	var value string
 	err := b.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
 		if err != nil {
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return ErrKeyNotFound
+			}
 			return fmt.Errorf("badger get: %w", err)
 		}
 		err = item.Value(func(val []byte) error {
@@ -64,10 +75,7 @@ func (b *badgerStorage) Get(key string) (string, error) {
 }
 
 // Put sets the value of a key.
-func (b *badgerStorage) Put(key, value string) error {
-	if b.readonly {
-		return ErrReadOnly
-	}
+func (b *badgerStorage) Put(ctx context.Context, key, value string) error {
 	err := b.db.Update(func(txn *badger.Txn) error {
 		err := txn.Set([]byte(key), []byte(value))
 		if err != nil {
@@ -79,13 +87,13 @@ func (b *badgerStorage) Put(key, value string) error {
 }
 
 // Delete removes a key.
-func (b *badgerStorage) Delete(key string) error {
-	if b.readonly {
-		return ErrReadOnly
-	}
+func (b *badgerStorage) Delete(ctx context.Context, key string) error {
 	err := b.db.Update(func(txn *badger.Txn) error {
 		err := txn.Delete([]byte(key))
 		if err != nil {
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return ErrKeyNotFound
+			}
 			return fmt.Errorf("badger delete: %w", err)
 		}
 		return nil
@@ -94,7 +102,7 @@ func (b *badgerStorage) Delete(key string) error {
 }
 
 // List returns all keys with a given prefix.
-func (b *badgerStorage) List(prefix string) ([]string, error) {
+func (b *badgerStorage) List(ctx context.Context, prefix string) ([]string, error) {
 	var keys []string
 	err := b.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -109,25 +117,44 @@ func (b *badgerStorage) List(prefix string) ([]string, error) {
 	return keys, err
 }
 
+// IterPrefix iterates over all keys with a given prefix.
+func (b *badgerStorage) IterPrefix(ctx context.Context, prefix string, fn PrefixIterator) error {
+	err := b.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek([]byte(prefix)); it.ValidForPrefix([]byte(prefix)); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				return fn(string(k), string(v))
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
+}
+
 // Snapshot returns a snapshot of the storage.
-func (b *badgerStorage) Snapshot() (io.ReadCloser, error) {
-	err := b.db.RunValueLogGC(0.5)
-	if err != nil {
-		return nil, fmt.Errorf("badger snapshot: %w", err)
+func (b *badgerStorage) Snapshot(ctx context.Context) (io.Reader, error) {
+	if !b.db.Opts().InMemory {
+		err := b.db.RunValueLogGC(0.5)
+		if err != nil {
+			return nil, fmt.Errorf("badger run log gc: %w", err)
+		}
 	}
 	var buf bytes.Buffer
-	_, err = b.db.Backup(&buf, 0)
+	_, err := b.db.Backup(&buf, 0)
 	if err != nil {
 		return nil, fmt.Errorf("badger snapshot: %w", err)
 	}
-	return io.NopCloser(&buf), nil
+	return &buf, nil
 }
 
 // Restore restores a snapshot of the storage.
-func (b *badgerStorage) Restore(r io.Reader) error {
-	if b.readonly {
-		return ErrReadOnly
-	}
+func (b *badgerStorage) Restore(ctx context.Context, r io.Reader) error {
 	err := b.db.DropAll()
 	if err != nil {
 		return fmt.Errorf("badger restore: %w", err)
@@ -139,18 +166,47 @@ func (b *badgerStorage) Restore(r io.Reader) error {
 	return nil
 }
 
-func (b *badgerStorage) ReadOnly() Storage {
-	if b.readonly {
-		return b
-	}
-	return &badgerStorage{db: b.db, readonly: true}
+// Subscribe will call the given function whenever a key with the given prefix is changed.
+// The returned function can be called to unsubscribe. If the given context is cancelled,
+// the subscription will be automatically unsubscribed.
+func (b *badgerStorage) Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (func(), error) {
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		sub := func(kv *badger.KVList) error {
+			for _, keyval := range kv.GetKv() {
+				fn(string(keyval.Key), string(keyval.Value))
+			}
+			return nil
+		}
+		err := b.db.Subscribe(ctx, sub, []pb.Match{{Prefix: []byte(prefix)}})
+		if err != nil && err != context.Canceled {
+			context.LoggerFrom(ctx).Error(fmt.Sprintf("badger subscribe: %v", err))
+		}
+	}()
+	return cancel, nil
 }
 
 // Close closes the storage.
 func (b *badgerStorage) Close() error {
-	// Don't close the database if it's a read-only view.
-	if b.readonly {
-		return nil
-	}
 	return b.db.Close()
+}
+
+// logger wraps the default slog.Logger to satisfy the badger.Logger interface.
+type logger struct {
+	*slog.Logger
+}
+
+func (l *logger) Errorf(msg string, args ...interface{}) {
+	l.Logger.Error(fmt.Sprintf(msg, args...))
+}
+func (l *logger) Warningf(msg string, args ...interface{}) {
+	l.Logger.Warn(fmt.Sprintf(msg, args...))
+}
+
+func (l *logger) Infof(msg string, args ...interface{}) {
+	l.Logger.Info(fmt.Sprintf(msg, args...))
+}
+
+func (l *logger) Debugf(msg string, args ...interface{}) {
+	l.Logger.Debug(fmt.Sprintf(msg, args...))
 }

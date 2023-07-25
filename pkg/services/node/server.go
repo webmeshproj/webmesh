@@ -75,11 +75,11 @@ func NewServer(store store.Store, proxyCreds []grpc.DialOption, features []v1.Fe
 	}
 	return &Server{
 		store:      store,
-		peers:      peers.New(store.DB()),
-		meshstate:  state.New(store.DB()),
-		rbac:       rbacdb.New(store.DB()),
+		peers:      peers.New(store.Storage()),
+		meshstate:  state.New(store.Storage()),
+		rbac:       rbacdb.New(store.Storage()),
 		rbacEval:   rbaceval,
-		networking: networking.New(store.DB()),
+		networking: networking.New(store.Storage()),
 		features:   features,
 		startedAt:  time.Now(),
 		proxyCreds: proxyCreds,

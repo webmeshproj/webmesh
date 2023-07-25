@@ -27,13 +27,12 @@ require (
 	github.com/pion/stun v0.6.0
 	github.com/pion/turn/v2 v2.1.0
 	github.com/pion/webrtc/v3 v3.2.8
-	github.com/pressly/goose/v3 v3.11.2
 	github.com/prometheus/client_golang v1.14.0
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.0.0
-	github.com/webmeshproj/api v0.1.5-0.20230722191228-cb651f9fad86
+	github.com/webmeshproj/api v0.1.5-0.20230725204327-19bf78499aeb
 	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sync v0.1.0

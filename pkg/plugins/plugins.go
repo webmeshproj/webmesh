@@ -28,13 +28,12 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/plugins/basicauth"
 	"github.com/webmeshproj/node/pkg/plugins/clients"
 	"github.com/webmeshproj/node/pkg/plugins/ipam"
 	"github.com/webmeshproj/node/pkg/plugins/ldap"
-	"github.com/webmeshproj/node/pkg/plugins/localstore"
 	"github.com/webmeshproj/node/pkg/plugins/mtls"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 var (
@@ -44,7 +43,6 @@ var (
 		"mtls":       clients.NewInProcessClient(&mtls.Plugin{}),
 		"basic-auth": clients.NewInProcessClient(&basicauth.Plugin{}),
 		"ldap":       clients.NewInProcessClient(&ldap.Plugin{}),
-		"localstore": clients.NewInProcessClient(&localstore.Plugin{}),
 	}
 
 	// ErrUnsupported is returned when a plugin capability is not supported
@@ -53,7 +51,7 @@ var (
 )
 
 // NewManager creates a new plugin manager.
-func NewManager(ctx context.Context, db models.DBTX, opts *Options) (Manager, error) {
+func NewManager(ctx context.Context, db storage.Storage, opts *Options) (Manager, error) {
 	var auth, ipamv4, ipamv6 clients.PluginClient
 	allPlugins := make(map[string]clients.PluginClient)
 	stores := make([]clients.PluginClient, 0)

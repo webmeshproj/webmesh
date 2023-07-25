@@ -17,28 +17,21 @@ limitations under the License.
 package ctlcmd
 
 import (
-	"bytes"
-	"database/sql"
-	"fmt"
 	"io"
 	"os"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 	v1 "github.com/webmeshproj/api/v1"
-
-	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 )
 
 var (
 	snapshotOutput string
-	snapshotFormat string
 )
 
 func init() {
 	fl := snapshotCmd.Flags()
 	fl.StringVar(&snapshotOutput, "output", "", "Output file (default: stdout)")
-	fl.StringVar(&snapshotFormat, "format", "raw", "Output format (raw|sqlite)")
 	cobra.CheckErr(snapshotCmd.RegisterFlagCompletionFunc("format", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"raw", "sqlite"}, cobra.ShellCompDirectiveNoFileComp
 	}))
@@ -51,12 +44,9 @@ var snapshotCmd = &cobra.Command{
 	Short: "Take a snapshot of the current state of the mesh",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var out io.Writer
-		if snapshotFormat == "sqlite" && snapshotOutput == "" {
-			return fmt.Errorf("sqlite snapshot format requires --output")
-		}
 		if snapshotOutput == "" || snapshotOutput == "-" {
 			out = cmd.OutOrStdout()
-		} else if snapshotFormat == "raw" {
+		} else {
 			f, err := os.Create(snapshotOutput)
 			if err != nil {
 				return err
@@ -64,7 +54,6 @@ var snapshotCmd = &cobra.Command{
 			defer f.Close()
 			out = f
 		}
-
 		client, closer, err := cliConfig.NewNodeClient()
 		if err != nil {
 			return err
@@ -75,22 +64,7 @@ var snapshotCmd = &cobra.Command{
 			return err
 		}
 		rawSnapshot := resp.GetSnapshot()
-
-		switch snapshotFormat {
-		case "raw":
-			_, err = out.Write(rawSnapshot)
-			return err
-		case "sqlite":
-			db, err := sql.Open("sqlite3", snapshotOutput)
-			if err != nil {
-				return err
-			}
-			defer db.Close()
-			snapshotter := snapshots.New(db)
-			err = snapshotter.Restore(cmd.Context(), io.NopCloser(bytes.NewReader(rawSnapshot)))
-			return err
-		default:
-			return fmt.Errorf("unknown snapshot format %q", snapshotFormat)
-		}
+		_, err = out.Write(rawSnapshot)
+		return err
 	},
 }

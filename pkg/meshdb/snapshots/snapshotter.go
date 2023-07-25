@@ -21,14 +21,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/mattn/go-sqlite3"
 	"golang.org/x/exp/slog"
+
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // Snapshotter is an interface for taking and restoring snapshots.
@@ -40,45 +40,32 @@ type Snapshotter interface {
 }
 
 type snapshotter struct {
-	db  *sql.DB
+	st  storage.Storage
 	log *slog.Logger
 }
 
 // New returns a new Snapshotter.
-func New(db *sql.DB) Snapshotter {
+func New(st storage.Storage) Snapshotter {
 	return &snapshotter{
-		db:  db,
+		st:  st,
 		log: slog.Default().With("component", "snapshots"),
 	}
 }
 
-const schema = "main"
-
 func (s *snapshotter) Snapshot(ctx context.Context) (raft.FSMSnapshot, error) {
 	s.log.Info("creating new db snapshot")
 	start := time.Now()
-	conn, err := s.db.Conn(ctx)
+	data, err := s.st.Snapshot(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get db connection: %w", err)
+		return nil, fmt.Errorf("get snapshot: %w", err)
 	}
 	var buf bytes.Buffer
 	gzw := gzip.NewWriter(&buf)
-	err = conn.Raw(func(driverConn interface{}) error {
-		sqliteConn, ok := driverConn.(*sqlite3.SQLiteConn)
-		if !ok {
-			return fmt.Errorf("expected sqlite3 connection, got %T", conn)
-		}
-		out, err := sqliteConn.Serialize(schema)
-		if err != nil {
-			return fmt.Errorf("serialize db: %w", err)
-		}
-		if _, err := gzw.Write(out); err != nil {
-			return fmt.Errorf("write db: %w", err)
-		}
-		return gzw.Close()
-	})
-	if err != nil {
-		return nil, fmt.Errorf("snapshot db: %w", err)
+	if _, err := io.Copy(gzw, data); err != nil {
+		return nil, fmt.Errorf("compress snapshot data: %w", err)
+	}
+	if err := gzw.Close(); err != nil {
+		return nil, fmt.Errorf("close gzip writer: %w", err)
 	}
 	snapshot := &snapshot{&buf}
 	s.log.Info("db snapshot complete",
@@ -101,61 +88,8 @@ func (s *snapshotter) Restore(ctx context.Context, r io.ReadCloser) error {
 	if err != nil {
 		return fmt.Errorf("read snapshot: %w", err)
 	}
-	// Create an in-memory database to deserialize the backup into.
-	restore, err := sql.Open("sqlite3", "file::restoredb:?mode=memory&cache=shared")
-	if err != nil {
-		return fmt.Errorf("open in-memory db: %w", err)
-	}
-	defer restore.Close()
-	// Execute the snapshot.
-	restoreConn, err := restore.Conn(ctx)
-	if err != nil {
-		return fmt.Errorf("get db connection: %w", err)
-	}
-	var rawConn *sqlite3.SQLiteConn
-	err = restoreConn.Raw(func(driverConn interface{}) error {
-		rawConn = driverConn.(*sqlite3.SQLiteConn)
-		return rawConn.Deserialize(data, schema)
-	})
-	if err != nil {
-		return fmt.Errorf("deserialize db: %w", err)
-	}
-	// Drop all tables.
-	writeConn, err := s.db.Conn(ctx)
-	if err != nil {
-		return fmt.Errorf("get db connection: %w", err)
-	}
-	_, err = writeConn.ExecContext(ctx, `PRAGMA writable_schema = 1; 
-	DELETE FROM sqlite_master WHERE type IN ('table', 'index', 'trigger', 'view'); 
-	PRAGMA writable_schema = 0;`)
-	if err != nil {
-		return fmt.Errorf("drop tables: %w", err)
-	}
-	// Vacuum and integrity check.
-	_, err = writeConn.ExecContext(ctx, "VACUUM; PRAGMA INTEGRITY_CHECK;")
-	if err != nil {
-		return fmt.Errorf("vacuum and integrity check: %w", err)
-	}
-	// Restore the deserialized database.
-	err = writeConn.Raw(func(driverConn interface{}) error {
-		c := driverConn.(*sqlite3.SQLiteConn)
-		backup, err := c.Backup(schema, rawConn, schema)
-		if err != nil {
-			return fmt.Errorf("restore deserialized db: %w", err)
-		}
-		for {
-			done, err := backup.Step(-1)
-			if err != nil {
-				return fmt.Errorf("restore step: %w", err)
-			}
-			if done {
-				break
-			}
-		}
-		return backup.Finish()
-	})
-	if err != nil {
-		return fmt.Errorf("restore db: %w", err)
+	if err := s.st.Restore(ctx, bytes.NewReader(data)); err != nil {
+		return fmt.Errorf("restore snapshot: %w", err)
 	}
 	s.log.Info("db snapshot restore complete", slog.String("duration", time.Since(start).String()))
 	return nil
