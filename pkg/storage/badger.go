@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -43,31 +44,88 @@ func newBadgerStorage(opts *Options) (Storage, error) {
 
 // Get returns the value of a key.
 func (b *badgerStorage) Get(key string) (string, error) {
-	return "", nil
+	var value string
+	err := b.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte(key))
+		if err != nil {
+			return fmt.Errorf("badger get: %w", err)
+		}
+		err = item.Value(func(val []byte) error {
+			value = string(val)
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("badger get: %w", err)
+		}
+		return nil
+	})
+	return value, err
 }
 
 // Put sets the value of a key.
 func (b *badgerStorage) Put(key, value string) error {
-	return nil
+	err := b.db.Update(func(txn *badger.Txn) error {
+		err := txn.Set([]byte(key), []byte(value))
+		if err != nil {
+			return fmt.Errorf("badger put: %w", err)
+		}
+		return nil
+	})
+	return err
 }
 
 // Delete removes a key.
 func (b *badgerStorage) Delete(key string) error {
-	return nil
+	err := b.db.Update(func(txn *badger.Txn) error {
+		err := txn.Delete([]byte(key))
+		if err != nil {
+			return fmt.Errorf("badger delete: %w", err)
+		}
+		return nil
+	})
+	return err
 }
 
 // List returns all keys with a given prefix.
 func (b *badgerStorage) List(prefix string) ([]string, error) {
-	return nil, nil
+	var keys []string
+	err := b.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek([]byte(prefix)); it.ValidForPrefix([]byte(prefix)); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			keys = append(keys, string(k))
+		}
+		return nil
+	})
+	return keys, err
 }
 
 // Snapshot returns a snapshot of the storage.
 func (b *badgerStorage) Snapshot() (io.ReadCloser, error) {
-	return nil, nil
+	err := b.db.RunValueLogGC(0.5)
+	if err != nil {
+		return nil, fmt.Errorf("badger snapshot: %w", err)
+	}
+	var buf bytes.Buffer
+	_, err = b.db.Backup(&buf, 0)
+	if err != nil {
+		return nil, fmt.Errorf("badger snapshot: %w", err)
+	}
+	return io.NopCloser(&buf), nil
 }
 
 // Restore restores a snapshot of the storage.
 func (b *badgerStorage) Restore(r io.Reader) error {
+	err := b.db.DropAll()
+	if err != nil {
+		return fmt.Errorf("badger restore: %w", err)
+	}
+	err = b.db.Load(r, 16)
+	if err != nil {
+		return fmt.Errorf("badger restore: %w", err)
+	}
 	return nil
 }
 
