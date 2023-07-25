@@ -17,7 +17,7 @@ It implements the [Webmesh API](https://github.com/webmeshproj/api) in Go.
 If you'd like to play with the project on Kubernetes, there is a work-in-progress Operator in the [operator](https://github.com/webmeshproj/operator/) repository.
 It works fine on most clusters, including ephemeral docker-based ones, but is not yet ready for production use.
 
-Detailed instructions can be found in the [Getting Started](https://webmeshproj.github.io/usage/getting-started/) guide on the project website.
+Detailed instructions can be found in the [Getting Started](https://webmeshproj.github.io/documentation/getting-started/) guide on the project website.
 
 ```bash
 # You can remove the --global.no-ipv6 flag if you have IPv6 connectivity on your docker network.
@@ -48,8 +48,8 @@ wmctl connect --insecure --no-ipv6 --join-server=<container_ip>:8443
 ```
 
 Configuration can be provided as CLI flags (as shown above) or via a configuration file and environment variables.
-Full details can be found on the [configuration section](https://webmeshproj.github.io/usage/configuration/) of the project website.
-Administration of the network can be done via the [API](https://webmeshproj.github.io/usage/administration/) using the CLI or custom tooling.
+Full details can be found on the [configuration section](https://webmeshproj.github.io/documentation/configuration/) of the project website.
+Administration of the network can be done via the [API](https://webmeshproj.github.io/documentation/administration/) using the CLI or custom tooling.
 
 ## Building
 
