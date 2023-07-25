@@ -41,6 +41,7 @@ import (
 	meshnet "github.com/webmeshproj/node/pkg/net"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
+	"github.com/webmeshproj/node/pkg/storage"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
 )
 
@@ -107,6 +108,8 @@ type Store interface {
 	RemoveServer(ctx context.Context, id string, wait bool) error
 	// DB returns a DB interface for use by the application.
 	DB() meshdb.DB
+	// Storage returns a storage interface for use by the application.
+	Storage() storage.Storage
 	// Raft returns the Raft interface. Note that the returned value
 	// may be nil if the store is not open.
 	Raft() *raft.Raft
@@ -238,6 +241,7 @@ type store struct {
 	observerClose, observerDone chan struct{}
 
 	weakData, raftData *sql.DB
+	kvData             storage.Storage
 	dataMux            sync.RWMutex
 
 	nw          meshnet.Manager
@@ -268,6 +272,11 @@ func (s *store) IsOpen() bool {
 // DB returns a DB interface for use by the application.
 func (s *store) DB() meshdb.DB {
 	return &storeDB{s}
+}
+
+// Storage returns a storage interface for use by the application.
+func (s *store) Storage() storage.Storage {
+	return s.kvData
 }
 
 type storeDB struct {

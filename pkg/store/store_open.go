@@ -33,6 +33,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/plugins"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // Open opens the store.
@@ -72,9 +73,11 @@ func (s *store) Open(ctx context.Context) (err error) {
 	}
 	// Ensure the data and snapshots directory exists.
 	if !s.opts.Raft.InMemory {
-		err = os.MkdirAll(s.opts.Raft.DataDir, 0755)
-		if err != nil {
-			return fmt.Errorf("mkdir %q: %w", s.opts.Raft.DataDir, err)
+		for _, dir := range []string{s.opts.Raft.LogPath(), s.opts.Raft.StableStorePath(), s.opts.Raft.DataStoragePath()} {
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				return fmt.Errorf("mkdir %q: %w", dir, err)
+			}
 		}
 		log = log.With(slog.String("data-dir", s.opts.Raft.DataDir))
 	} else {
@@ -93,14 +96,18 @@ func (s *store) Open(ctx context.Context) (err error) {
 		s.logDB = newInmemStore()
 		s.stableDB = newInmemStore()
 		s.raftSnapshots = raft.NewInmemSnapshotStore()
-	} else {
-		s.logDB, err = boltdb.NewBoltStore(s.opts.Raft.LogFilePath())
+		s.kvData, err = storage.New(&storage.Options{InMemory: true})
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.LogFilePath(), err))
+			return handleErr(fmt.Errorf("new inmem storage: %w", err))
 		}
-		s.stableDB, err = boltdb.NewBoltStore(s.opts.Raft.StableStoreFilePath())
+	} else {
+		s.logDB, err = boltdb.NewBoltStore(s.opts.Raft.LogPath())
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.StableStoreFilePath(), err))
+			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.LogPath(), err))
+		}
+		s.stableDB, err = boltdb.NewBoltStore(s.opts.Raft.StableStorePath())
+		if err != nil {
+			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.StableStorePath(), err))
 		}
 		s.raftSnapshots, err = raft.NewFileSnapshotStoreWithLogger(
 			s.opts.Raft.DataDir,
@@ -109,6 +116,10 @@ func (s *store) Open(ctx context.Context) (err error) {
 		)
 		if err != nil {
 			return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.Raft.DataDir, err))
+		}
+		s.kvData, err = storage.New(&storage.Options{DiskPath: s.opts.Raft.DataStoragePath()})
+		if err != nil {
+			return handleErr(fmt.Errorf("new disk storage: %w", err))
 		}
 	}
 	// Create the data stores.

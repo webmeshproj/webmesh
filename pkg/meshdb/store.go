@@ -30,6 +30,7 @@ import (
 	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // Store is the interface for interacting with the mesh database. It is a reduced
@@ -39,6 +40,8 @@ type Store interface {
 	ID() string
 	// DB returns a DB interface for use by the application.
 	DB() DB
+	// Storage returns a storage interface for use by the application.
+	Storage() storage.Storage
 	// Raft returns the underlying Raft database.
 	Raft() *raft.Raft
 	// Leader returns the current Raft leader.
