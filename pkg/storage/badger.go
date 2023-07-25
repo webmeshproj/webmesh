@@ -25,7 +25,8 @@ import (
 )
 
 type badgerStorage struct {
-	db *badger.DB
+	db       *badger.DB
+	readonly bool
 }
 
 func newBadgerStorage(opts *Options) (Storage, error) {
@@ -39,7 +40,7 @@ func newBadgerStorage(opts *Options) (Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("badger open: %w", err)
 	}
-	return &badgerStorage{db}, nil
+	return &badgerStorage{db: db}, nil
 }
 
 // Get returns the value of a key.
@@ -64,6 +65,9 @@ func (b *badgerStorage) Get(key string) (string, error) {
 
 // Put sets the value of a key.
 func (b *badgerStorage) Put(key, value string) error {
+	if b.readonly {
+		return ErrReadOnly
+	}
 	err := b.db.Update(func(txn *badger.Txn) error {
 		err := txn.Set([]byte(key), []byte(value))
 		if err != nil {
@@ -76,6 +80,9 @@ func (b *badgerStorage) Put(key, value string) error {
 
 // Delete removes a key.
 func (b *badgerStorage) Delete(key string) error {
+	if b.readonly {
+		return ErrReadOnly
+	}
 	err := b.db.Update(func(txn *badger.Txn) error {
 		err := txn.Delete([]byte(key))
 		if err != nil {
@@ -118,6 +125,9 @@ func (b *badgerStorage) Snapshot() (io.ReadCloser, error) {
 
 // Restore restores a snapshot of the storage.
 func (b *badgerStorage) Restore(r io.Reader) error {
+	if b.readonly {
+		return ErrReadOnly
+	}
 	err := b.db.DropAll()
 	if err != nil {
 		return fmt.Errorf("badger restore: %w", err)
@@ -129,7 +139,18 @@ func (b *badgerStorage) Restore(r io.Reader) error {
 	return nil
 }
 
+func (b *badgerStorage) ReadOnly() Storage {
+	if b.readonly {
+		return b
+	}
+	return &badgerStorage{db: b.db, readonly: true}
+}
+
 // Close closes the storage.
 func (b *badgerStorage) Close() error {
+	// Don't close the database if it's a read-only view.
+	if b.readonly {
+		return nil
+	}
 	return b.db.Close()
 }

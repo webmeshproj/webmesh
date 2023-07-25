@@ -18,7 +18,10 @@ limitations under the License.
 // about the state of the mesh.
 package storage
 
-import "io"
+import (
+	"errors"
+	"io"
+)
 
 // Storage is the interface for storing and retrieving data about the state of the mesh.
 type Storage interface {
@@ -34,9 +37,14 @@ type Storage interface {
 	Snapshot() (io.ReadCloser, error)
 	// Restore restores a snapshot of the storage.
 	Restore(r io.Reader) error
+	// ReadOnly returns a read-only view of the storage.
+	ReadOnly() Storage
 	// Close closes the storage.
 	Close() error
 }
+
+// ErrReadOnly is the error returned when attempting to write to a read-only storage.
+var ErrReadOnly = errors.New("read-only storage")
 
 // Options are the options for creating a new Storage.
 type Options struct {
