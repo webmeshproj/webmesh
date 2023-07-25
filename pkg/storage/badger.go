@@ -16,47 +16,62 @@ limitations under the License.
 
 package storage
 
-import "io"
+import (
+	"fmt"
+	"io"
 
-// diskStorage uses a Badger database on disk.
-type diskStorage struct{}
+	"github.com/dgraph-io/badger/v4"
+)
 
-// newDiskStorage returns a new disk storage.
-func newDiskStorage(opts *Options) Storage {
-	return &diskStorage{}
+type badgerStorage struct {
+	db *badger.DB
+}
+
+func newBadgerStorage(opts *Options) (Storage, error) {
+	var badgeropts badger.Options
+	if opts.InMemory {
+		badgeropts = badger.DefaultOptions("").WithInMemory(true)
+	} else {
+		badgeropts = badger.DefaultOptions(opts.DiskPath)
+	}
+	db, err := badger.Open(badgeropts)
+	if err != nil {
+		return nil, fmt.Errorf("badger open: %w", err)
+	}
+	return &badgerStorage{db}, nil
 }
 
 // Get returns the value of a key.
-func (dsk *diskStorage) Get(key string) (string, error) {
+func (b *badgerStorage) Get(key string) (string, error) {
 	return "", nil
 }
 
 // Put sets the value of a key.
-func (dsk *diskStorage) Put(key, value string) error {
+func (b *badgerStorage) Put(key, value string) error {
 	return nil
 }
 
 // Delete removes a key.
-func (dsk *diskStorage) Delete(key string) error {
+func (b *badgerStorage) Delete(key string) error {
 	return nil
 }
 
 // List returns all keys with a given prefix.
-func (dsk *diskStorage) List(prefix string) ([]string, error) {
+func (b *badgerStorage) List(prefix string) ([]string, error) {
 	return nil, nil
 }
 
 // Snapshot returns a snapshot of the storage.
-func (dsk *diskStorage) Snapshot() (io.ReadCloser, error) {
+func (b *badgerStorage) Snapshot() (io.ReadCloser, error) {
 	return nil, nil
 }
 
 // Restore restores a snapshot of the storage.
-func (dsk *diskStorage) Restore(r io.Reader) error {
+func (b *badgerStorage) Restore(r io.Reader) error {
 	return nil
 }
 
 // Close closes the storage.
-func (dsk *diskStorage) Close() error {
-	return nil
+func (b *badgerStorage) Close() error {
+	return b.db.Close()
 }

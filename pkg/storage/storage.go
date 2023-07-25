@@ -47,9 +47,6 @@ type Options struct {
 }
 
 // New returns a new Storage.
-func New(opts *Options) Storage {
-	if opts.InMemory {
-		return newInMemoryStorage(opts)
-	}
-	return newDiskStorage(opts)
+func New(opts *Options) (Storage, error) {
+	return newBadgerStorage(opts)
 }
