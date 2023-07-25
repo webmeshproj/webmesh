@@ -75,7 +75,7 @@ Please see the [contributing](CONTRIBUTING.md) docs for more information.
 
 ## Special Thanks
 
-The developers of [rqlite](https://github.com/rqlite/rqlite) for inspiration on managing a distributed to SQLite.
+The developers of [rqlite](https://github.com/rqlite/rqlite) for inspiration on managing a distributed database.
 
 The incredible work done by the [pion](https://github.com/pion/webrtc) team for WebRTC in Go.
 
