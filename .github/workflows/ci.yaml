@@ -176,7 +176,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: artifacts-nix-windows
+          name: artifacts
           path: dist/*
 
   publish:
@@ -192,13 +192,7 @@ jobs:
       - name: Download Nix/Windows Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: artifacts-nix-windows
-          path: dist
-
-      - name: Download macOS Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts-darwin
+          name: artifacts
           path: dist
 
       - name: Compute Checksums
