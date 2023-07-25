@@ -10,7 +10,7 @@ For a more detailed introduction and extended documentation, please see the [pro
 This repository contains the core functionality of the Webmesh Project.
 It implements the [Webmesh API](https://github.com/webmeshproj/api) in Go.
 
-**This project is not yet ready for production use, but I hope to rapidly get there**
+**This project is not yet ready for production use, but I hope to rapidly get there. For now, expect backwards-incompatible changes.**
 
 ## Getting Started
 
