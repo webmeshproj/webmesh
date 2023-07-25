@@ -19,20 +19,18 @@ package store
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
-	"github.com/mattn/go-sqlite3"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/plugins"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // Open opens the store.
@@ -42,6 +40,7 @@ func (s *store) Open(ctx context.Context) (err error) {
 	}
 	log := s.log
 	handleErr := func(err error) error {
+		log.Error("failed to open store", slog.String("error", err.Error()))
 		if s.raftTransport != nil {
 			defer s.raftTransport.Close()
 		}
@@ -72,9 +71,11 @@ func (s *store) Open(ctx context.Context) (err error) {
 	}
 	// Ensure the data and snapshots directory exists.
 	if !s.opts.Raft.InMemory {
-		err = os.MkdirAll(s.opts.Raft.DataDir, 0755)
-		if err != nil {
-			return fmt.Errorf("mkdir %q: %w", s.opts.Raft.DataDir, err)
+		for _, dir := range []string{s.opts.Raft.LogPath(), s.opts.Raft.StableStorePath(), s.opts.Raft.DataStoragePath()} {
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				return fmt.Errorf("mkdir %q: %w", dir, err)
+			}
 		}
 		log = log.With(slog.String("data-dir", s.opts.Raft.DataDir))
 	} else {
@@ -88,20 +89,28 @@ func (s *store) Open(ctx context.Context) (err error) {
 		&logWriter{log: s.log},
 	)
 	// Create the raft stores.
-	log.Debug("creating boltdb stores")
+	log.Debug("creating data stores")
 	if s.opts.Raft.InMemory {
 		s.logDB = newInmemStore()
 		s.stableDB = newInmemStore()
 		s.raftSnapshots = raft.NewInmemSnapshotStore()
+		s.kvData, err = storage.New(&storage.Options{InMemory: true})
+		if err != nil {
+			return handleErr(fmt.Errorf("new inmem storage: %w", err))
+		}
 	} else {
-		s.logDB, err = boltdb.NewBoltStore(s.opts.Raft.LogFilePath())
+		logFilePath := filepath.Join(s.opts.Raft.LogPath(), "log.db")
+		stableStorePath := filepath.Join(s.opts.Raft.StableStorePath(), "stable.db")
+		logDB, err := boltdb.NewBoltStore(logFilePath)
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.LogFilePath(), err))
+			return handleErr(fmt.Errorf("new bolt store %q: %w", logFilePath, err))
 		}
-		s.stableDB, err = boltdb.NewBoltStore(s.opts.Raft.StableStoreFilePath())
+		s.logDB = logDB
+		stableDB, err := boltdb.NewBoltStore(stableStorePath)
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", s.opts.Raft.StableStoreFilePath(), err))
+			return handleErr(fmt.Errorf("new bolt store %q: %w", stableStorePath, err))
 		}
+		s.stableDB = stableDB
 		s.raftSnapshots, err = raft.NewFileSnapshotStoreWithLogger(
 			s.opts.Raft.DataDir,
 			int(s.opts.Raft.SnapshotRetention),
@@ -110,43 +119,19 @@ func (s *store) Open(ctx context.Context) (err error) {
 		if err != nil {
 			return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.Raft.DataDir, err))
 		}
-	}
-	// Create the data stores.
-	log.Debug("creating data store")
-	raftDriverName := uuid.NewString()
-	sql.Register(raftDriverName, &raftDBDriver{s})
-	// Giving the db a unique name is useful for testing.
-	dataPath := fmt.Sprintf("file:%s?mode=memory&cache=shared&_foreign_keys=on&_case_sensitive_like=on&synchronous=full", raftDriverName)
-	s.weakData, err = sql.Open("sqlite3", dataPath)
-	if err != nil {
-		return handleErr(fmt.Errorf("open data sqlite: %w", err))
-	}
-	s.raftData, err = sql.Open(raftDriverName, "")
-	if err != nil {
-		return handleErr(fmt.Errorf("open raft sqlite: %w", err))
-	}
-	s.snapshotter = snapshots.New(s.weakData)
-	// Register an update hook to watch for node changes.
-	c, err := s.weakData.Conn(ctx)
-	if err != nil {
-		return handleErr(fmt.Errorf("get conn: %w", err))
-	}
-	err = c.Raw(func(driverConn interface{}) error {
-		c, ok := driverConn.(*sqlite3.SQLiteConn)
-		if !ok {
-			return fmt.Errorf("expected *sqlite3.SQLiteConn, got %T", driverConn)
+		s.kvData, err = storage.New(&storage.Options{DiskPath: s.opts.Raft.DataStoragePath()})
+		if err != nil {
+			return handleErr(fmt.Errorf("new disk storage: %w", err))
 		}
-		c.RegisterUpdateHook(s.onDBUpdate)
-		return nil
-	})
-	if err != nil {
-		return handleErr(fmt.Errorf("register update hook: %w", err))
 	}
-	if err = c.Close(); err != nil {
-		return handleErr(fmt.Errorf("close conn: %w", err))
+	s.snapshotter = snapshots.New(s.kvData)
+	// Register an update hook to watch for node changes.
+	s.kvSubCancel, err = s.kvData.Subscribe(context.Background(), "", s.onDBUpdate)
+	if err != nil {
+		return handleErr(fmt.Errorf("subscribe: %w", err))
 	}
 	// Create the plugin manager
-	s.plugins, err = plugins.NewManager(ctx, s.DB().Read(), s.opts.Plugins)
+	s.plugins, err = plugins.NewManager(ctx, s.Storage(), s.opts.Plugins)
 	if err != nil {
 		return fmt.Errorf("failed to load plugins: %w", err)
 	}
@@ -204,17 +189,12 @@ func (s *store) Open(ctx context.Context) (err error) {
 	s.observerClose, s.observerDone = s.observe()
 	if s.opts.Bootstrap.Enabled {
 		// Attempt bootstrap.
-		// Database gets migrated during bootstrap.
 		log.Info("bootstrapping cluster")
 		if err = s.bootstrap(ctx); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if s.opts.Mesh.JoinAddress != "" || len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
 		// Attempt to join the cluster.
-		log.Debug("migrating raft database")
-		if err = models.MigrateDB(s.weakData); err != nil {
-			return fmt.Errorf("raft db migrate: %w", err)
-		}
 		if len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
 			err = s.joinWithPeerDiscovery(ctx)
 		} else {
@@ -227,10 +207,6 @@ func (s *store) Open(ctx context.Context) (err error) {
 		// We neither had the bootstrap flag nor the join flag set.
 		// This means we are possibly a single node cluster.
 		// Recover our previous wireguard configuration and start up.
-		log.Debug("migrating raft database")
-		if err = models.MigrateDB(s.weakData); err != nil {
-			return fmt.Errorf("raft db migrate: %w", err)
-		}
 		if err := s.recoverWireguard(ctx); err != nil {
 			return fmt.Errorf("recover wireguard: %w", err)
 		}

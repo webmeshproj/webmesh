@@ -20,7 +20,7 @@ limitations under the License.
 package ipam
 
 import (
-	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/netip"
 	"sync"
@@ -30,8 +30,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
+	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/plugins/plugindb"
+	"github.com/webmeshproj/node/pkg/storage"
 	"github.com/webmeshproj/node/pkg/util"
 	"github.com/webmeshproj/node/pkg/version"
 )
@@ -41,7 +42,7 @@ type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedIPAMPluginServer
 
-	data    *sql.DB
+	data    storage.Storage
 	datamux sync.Mutex
 }
 
@@ -63,12 +64,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 
 func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
 	p.datamux.Lock()
-	var err error
-	p.data, err = plugindb.Open(srv)
-	if err != nil {
-		p.datamux.Unlock()
-		return fmt.Errorf("open database: %w", err)
-	}
+	p.data = plugindb.Open(srv)
 	p.datamux.Unlock()
 	<-srv.Context().Done()
 	return nil
@@ -101,9 +97,19 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	if err != nil {
 		return nil, fmt.Errorf("parse subnet: %w", err)
 	}
-	allocated, err := models.New(p.data).ListAllocatedIPv4(ctx)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("list allocated IPv4s: %w", err)
+	var allocated []netip.Prefix
+	err = p.data.IterPrefix(ctx, peers.NodesPrefix, func(key string, value string) error {
+		var node peers.Node
+		if err := json.Unmarshal([]byte(value), &node); err != nil {
+			return fmt.Errorf("unmarshal node: %w", err)
+		}
+		if node.PrivateIPv4.IsValid() {
+			allocated = append(allocated, node.PrivateIPv4)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("iterate nodes: %w", err)
 	}
 	allocatedSet, err := toPrefixSet(allocated)
 	if err != nil {
@@ -149,16 +155,10 @@ func next32(cidr netip.Prefix, set map[netip.Prefix]struct{}) (netip.Prefix, err
 	return netip.Prefix{}, fmt.Errorf("no more addresses in %s", cidr)
 }
 
-func toPrefixSet(addrs []sql.NullString) (map[netip.Prefix]struct{}, error) {
+func toPrefixSet(addrs []netip.Prefix) (map[netip.Prefix]struct{}, error) {
 	set := make(map[netip.Prefix]struct{})
 	for _, addr := range addrs {
-		if !addr.Valid {
-			continue
-		}
-		ip, err := netip.ParsePrefix(addr.String)
-		if err != nil {
-			return nil, err
-		}
+		ip := addr
 		set[ip] = struct{}{}
 	}
 	return set, nil

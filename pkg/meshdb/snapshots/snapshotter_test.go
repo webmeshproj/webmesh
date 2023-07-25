@@ -19,38 +19,32 @@ package snapshots
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"io"
 	"testing"
+
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 func TestSnapshotter(t *testing.T) {
 	t.Parallel()
 
-	db, err := sql.Open("sqlite3", "file:snapshotter-test?mode=memory&cache=shared")
+	db, err := storage.NewTestStorage()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 
 	// Create a test table and populate it with some data.
-	if _, err := db.Exec(`
-		CREATE TABLE test (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL
-		);
-	`); err != nil {
-		t.Fatal(err)
+	testValues := map[string]string{
+		"/registry/foo": "bar",
+		"/registry/baz": "qux",
+		"/registry/abc": "def",
 	}
-	if _, err := db.Exec(`
-		INSERT INTO test (name) VALUES
-			("foo"),
-			("bar"),
-			("baz");
-	`); err != nil {
-		t.Fatal(err)
+	for key, val := range testValues {
+		if err := db.Put(context.Background(), key, val); err != nil {
+			t.Fatal(err)
+		}
 	}
-
 	snaps := New(db)
 
 	// Take a snapshot.
@@ -59,14 +53,11 @@ func TestSnapshotter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Drop the table.
-	if _, err := db.Exec(`DROP TABLE test;`); err != nil {
-		t.Fatal(err)
-	}
-
-	// Ensure the table is dropped
-	if _, err := db.Exec(`SELECT * FROM test;`); err == nil {
-		t.Fatal("expected error")
+	// Drop the keys
+	for key := range testValues {
+		if err := db.Delete(context.Background(), key); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Persist the snapshot to a buffer.
@@ -83,19 +74,15 @@ func TestSnapshotter(t *testing.T) {
 
 	snap.Release()
 
-	// Ensure the table is restored.
-	rows, err := db.Query(`SELECT * FROM test;`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-
-	var count int
-	for rows.Next() {
-		count++
-	}
-	if count != 3 {
-		t.Fatalf("expected 3 rows, got %d", count)
+	// Ensure the keys were restored.
+	for key, val := range testValues {
+		got, err := db.Get(context.Background(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != val {
+			t.Errorf("got %q, want %q", got, val)
+		}
 	}
 }
 

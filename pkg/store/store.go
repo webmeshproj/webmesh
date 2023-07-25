@@ -21,7 +21,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -34,13 +33,13 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/node/pkg/meshdb/state"
 	"github.com/webmeshproj/node/pkg/net"
 	meshnet "github.com/webmeshproj/node/pkg/net"
 	"github.com/webmeshproj/node/pkg/net/wireguard"
 	"github.com/webmeshproj/node/pkg/plugins"
+	"github.com/webmeshproj/node/pkg/storage"
 	"github.com/webmeshproj/node/pkg/store/streamlayer"
 )
 
@@ -105,8 +104,8 @@ type Store interface {
 	DemoteVoter(ctx context.Context, id string) error
 	// RemoveServer removes a peer from the cluster with timeout enforced by the context.
 	RemoveServer(ctx context.Context, id string, wait bool) error
-	// DB returns a DB interface for use by the application.
-	DB() meshdb.DB
+	// Storage returns a storage interface for use by the application.
+	Storage() storage.Storage
 	// Raft returns the Raft interface. Note that the returned value
 	// may be nil if the store is not open.
 	Raft() *raft.Raft
@@ -237,8 +236,9 @@ type store struct {
 	observer                    *raft.Observer
 	observerClose, observerDone chan struct{}
 
-	weakData, raftData *sql.DB
-	dataMux            sync.RWMutex
+	kvData      storage.Storage
+	kvSubCancel context.CancelFunc
+	dataMux     sync.RWMutex
 
 	nw          meshnet.Manager
 	nwTaskGroup *errgroup.Group
@@ -265,30 +265,9 @@ func (s *store) IsOpen() bool {
 	return s.open.Load()
 }
 
-// DB returns a DB interface for use by the application.
-func (s *store) DB() meshdb.DB {
-	return &storeDB{s}
-}
-
-type storeDB struct {
-	s *store
-}
-
-// Read returns a DB interface for use by the application.
-func (s *storeDB) Read() meshdb.DBTX { return s.s.ReadDB() }
-
-// Write returns a DB interface for use by the application.
-func (s *storeDB) Write() meshdb.DBTX { return s.s.WriteDB() }
-
-// WriteDB returns a DB interface for use by the application.
-func (s *store) WriteDB() meshdb.DBTX {
-	// Locks are taken during the application of log entries
-	return s.raftData
-}
-
-// ReadDB returns a DB interface for use by the application.
-func (s *store) ReadDB() meshdb.DBTX {
-	return &roLockableDB{db: s.weakData, mu: &s.dataMux}
+// Storage returns a storage interface for use by the application.
+func (s *store) Storage() storage.Storage {
+	return &raftStorage{Storage: s.kvData, store: s}
 }
 
 // Raft returns the Raft interface.
@@ -388,7 +367,7 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 		return "", err
 	}
 	s.log.Debug("looking up rpc address for leader", slog.String("leader", string(leader)))
-	state := state.New(s.DB())
+	state := state.New(s.Storage())
 	addr, err := state.GetNodePrivateRPCAddress(ctx, string(leader))
 	if err != nil {
 		return "", err

@@ -93,7 +93,7 @@ func Execute() error {
 	if !opts.Mesh.Bootstrap.Enabled && opts.Mesh.Mesh.JoinAddress == "" {
 		if _, err := os.Stat(opts.Mesh.Raft.DataDir); os.IsNotExist(err) {
 			if !opts.Mesh.Raft.InMemory {
-				flag.Usage()
+				fs.Usage()
 				return fmt.Errorf("Must specify either --bootstrap.enabled or --mesh.join-address when --raft.data-dir does not exist")
 			}
 		}

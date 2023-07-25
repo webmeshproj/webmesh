@@ -29,8 +29,8 @@ import (
 type inProcessQueryClient struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	schan  chan *v1.PluginSQLQuery
-	rchan  chan *v1.PluginSQLQueryResult
+	schan  chan *v1.PluginQuery
+	rchan  chan *v1.PluginQueryResult
 }
 
 func (p *inProcessQueryClient) Context() context.Context {
@@ -50,7 +50,7 @@ func (p *inProcessQueryClient) CloseSend() error {
 	return nil
 }
 
-func (p *inProcessQueryClient) Recv() (*v1.PluginSQLQuery, error) {
+func (p *inProcessQueryClient) Recv() (*v1.PluginQuery, error) {
 	select {
 	case <-p.ctx.Done():
 		return nil, io.EOF
@@ -63,7 +63,7 @@ func (p *inProcessQueryClient) RecvMsg(m interface{}) error {
 	return errors.New("not implemented")
 }
 
-func (p *inProcessQueryClient) Send(in *v1.PluginSQLQueryResult) error {
+func (p *inProcessQueryClient) Send(in *v1.PluginQueryResult) error {
 	select {
 	case <-p.ctx.Done():
 		return p.ctx.Err()
@@ -77,13 +77,13 @@ func (p *inProcessQueryClient) Send(in *v1.PluginSQLQueryResult) error {
 }
 
 func (p *inProcessQueryClient) SendMsg(m interface{}) error {
-	return p.Send(m.(*v1.PluginSQLQueryResult))
+	return p.Send(m.(*v1.PluginQueryResult))
 }
 
 type inProcessQueryServer struct {
 	ctx   context.Context
-	schan chan *v1.PluginSQLQuery
-	rchan chan *v1.PluginSQLQueryResult
+	schan chan *v1.PluginQuery
+	rchan chan *v1.PluginQueryResult
 }
 
 func (p *inProcessQueryServer) Context() context.Context {
@@ -101,7 +101,7 @@ func (p *inProcessQueryServer) SendHeader(m metadata.MD) error {
 func (p *inProcessQueryServer) SetTrailer(metadata.MD) {
 }
 
-func (p *inProcessQueryServer) Send(in *v1.PluginSQLQuery) error {
+func (p *inProcessQueryServer) Send(in *v1.PluginQuery) error {
 	select {
 	case <-p.ctx.Done():
 		return p.ctx.Err()
@@ -115,10 +115,10 @@ func (p *inProcessQueryServer) Send(in *v1.PluginSQLQuery) error {
 }
 
 func (p *inProcessQueryServer) SendMsg(m interface{}) error {
-	return p.Send(m.(*v1.PluginSQLQuery))
+	return p.Send(m.(*v1.PluginQuery))
 }
 
-func (p *inProcessQueryServer) Recv() (*v1.PluginSQLQueryResult, error) {
+func (p *inProcessQueryServer) Recv() (*v1.PluginQueryResult, error) {
 	select {
 	case <-p.ctx.Done():
 		return nil, io.EOF

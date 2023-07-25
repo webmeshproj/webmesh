@@ -36,6 +36,10 @@ type Context = context.Context
 // confusion with the context package.
 type CancelFunc = context.CancelFunc
 
+// Canceled is an alias to context.Canceled for convenience and to avoid
+// confusion with the context package.
+var Canceled = context.Canceled
+
 // Background returns a background context.
 func Background() Context {
 	return context.Background()

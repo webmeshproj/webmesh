@@ -38,18 +38,18 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	var meshnetworkv4, meshnetworkv6 netip.Prefix
 	var err error
 	if !s.opts.Mesh.NoIPv6 {
-		meshnetworkv6, err = state.New(s.DB()).GetIPv6Prefix(ctx)
+		meshnetworkv6, err = state.New(s.Storage()).GetIPv6Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ula prefix: %w", err)
 		}
 	}
 	if !s.opts.Mesh.NoIPv4 {
-		meshnetworkv4, err = state.New(s.DB()).GetIPv4Prefix(ctx)
+		meshnetworkv4, err = state.New(s.Storage()).GetIPv4Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ipv4 prefix: %w", err)
 		}
 	}
-	p := peers.New(s.DB())
+	p := peers.New(s.Storage())
 	self, err := p.Get(ctx, s.ID())
 	if err != nil {
 		return fmt.Errorf("get self peer: %w", err)

@@ -9,10 +9,10 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/plugins"
 	"github.com/webmeshproj/node/pkg/plugins/plugindb"
+	"github.com/webmeshproj/node/pkg/storage"
 	"github.com/webmeshproj/node/pkg/version"
 )
 
@@ -30,7 +30,7 @@ type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedWatchPluginServer
 	// data is the meshdb database.
-	data   meshdb.DB
+	data   storage.Storage
 	closec chan struct{}
 }
 
@@ -57,11 +57,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 // It is called after Configure and before any other methods are called. The stream
 // can be used with the plugindb package to open a database connection.
 func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
-	db, err := plugindb.Open(srv)
-	if err != nil {
-		return fmt.Errorf("open database: %w", err)
-	}
-	p.data = meshdb.New(db)
+	p.data = plugindb.Open(srv)
 	select {
 	case <-p.closec:
 	case <-srv.Context().Done():

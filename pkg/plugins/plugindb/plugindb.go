@@ -20,179 +20,137 @@ package plugindb
 
 import (
 	"context"
-	"database/sql"
-	"database/sql/driver"
 	"errors"
-	"fmt"
+	"io"
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/mattn/go-sqlite3"
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/node/pkg/meshdb/models"
-	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // Open opens a new database connection to a plugin query stream.
-func Open(srv v1.Plugin_InjectQuerierServer) (*sql.DB, error) {
-	drvId, err := uuid.NewRandom()
-	if err != nil {
-		return nil, fmt.Errorf("generate uuid: %w", err)
-	}
-	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=memory", drvId))
-	if err != nil {
-		return nil, fmt.Errorf("open sqlite3: %w", err)
-	}
-	if err := models.MigrateDB(db); err != nil {
-		defer db.Close()
-		return nil, fmt.Errorf("migrate db: %w", err)
-	}
-	sql.Register(drvId.String(), &pluginDB{srv: srv, models: db})
-	return sql.Open(drvId.String(), "")
+func Open(srv v1.Plugin_InjectQuerierServer) storage.Storage {
+	return &pluginDB{srv: srv}
 }
 
 type pluginDB struct {
-	srv    v1.Plugin_InjectQuerierServer
-	models *sql.DB
+	srv v1.Plugin_InjectQuerierServer
 	// TODO: Add a multiplexer to allow multiple queries at once?
 	mu sync.Mutex
 }
 
-func (db *pluginDB) Open(_ string) (driver.Conn, error) {
-	return db, nil
-}
-
-// OpenConnector returns a new connector that is backed by the Raft log.
-func (db *pluginDB) OpenConnector(_ string) (driver.Connector, error) {
-	return db, nil
-}
-
-// Connect returns a new connection that is backed by the Raft log.
-func (db *pluginDB) Connect(ctx context.Context) (driver.Conn, error) {
-	return db, nil
-}
-
-// Driver returns the driver.
-func (db *pluginDB) Driver() driver.Driver {
-	return db
-}
-
-// Transactions are not supported.
-
-// Begin starts a new transaction.
-func (db *pluginDB) Begin() (driver.Tx, error) {
-	return db, nil
-}
-
-// Commit commits the transaction.
-func (db *pluginDB) Commit() error {
-	return nil
-}
-
-// Rollback rolls back the transaction.
-func (db *pluginDB) Rollback() error {
-	return nil
-}
-
-// Close closes the connection.
-func (db *pluginDB) Close() error {
-	return db.models.Close()
-}
-
-// Prepare returns a prepared statement.
-func (db *pluginDB) Prepare(query string) (driver.Stmt, error) {
-	return db.PrepareContext(context.Background(), query)
-}
-
-// PrepareContext returns a new statement that is backed by the Raft log.
-func (db *pluginDB) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	c, err := db.models.Conn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get conn: %w", err)
-	}
-	defer c.Close()
-	var numInput int
-	err = c.Raw(func(driverConn interface{}) error {
-		conn, ok := driverConn.(*sqlite3.SQLiteConn)
-		if !ok {
-			return fmt.Errorf("raw conn is not sqlite3")
-		}
-		stmt, err := conn.PrepareContext(ctx, query)
-		if err != nil {
-			return fmt.Errorf("prepare: %w", err)
-		}
-		defer stmt.Close()
-		sqlstmt, ok := stmt.(*sqlite3.SQLiteStmt)
-		if !ok {
-			return fmt.Errorf("stmt is not sqlite3")
-		}
-		numInput = sqlstmt.NumInput()
-		return nil
-	})
-	return &pluginStatement{db, query, numInput}, err
-}
-
-type pluginStatement struct {
-	db       *pluginDB
-	sql      string
-	numInput int
-}
-
-// NumInput is a noop. It is handled during parsing.
-func (s *pluginStatement) NumInput() int {
-	return s.numInput
-}
-
-// Exec executes the statement with the given arguments.
-func (s *pluginStatement) Exec(args []driver.Value) (driver.Result, error) {
-	return s.ExecContext(context.Background(), raftlogs.ValuesToNamedValues(args))
-}
-
-// Query executes the statement with the given arguments.
-func (s *pluginStatement) Query(args []driver.Value) (driver.Rows, error) {
-	return s.QueryContext(context.Background(), raftlogs.ValuesToNamedValues(args))
-}
-
-func (s *pluginStatement) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *pluginStatement) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	s.db.mu.Lock()
-	defer s.db.mu.Unlock()
+func (p *pluginDB) Get(ctx context.Context, key string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	id, err := uuid.NewRandom()
 	if err != nil {
-		return nil, fmt.Errorf("generate uuid: %w", err)
+		return "", err
 	}
-	params, err := raftlogs.NamedValuesToSQLParameters(args)
+	req := &v1.PluginQuery{
+		Id:      id.String(),
+		Command: v1.PluginQuery_GET,
+		Query:   key,
+	}
+	if err := p.srv.Send(req); err != nil {
+		return "", err
+	}
+	resp, err := p.srv.Recv()
 	if err != nil {
-		return nil, fmt.Errorf("named values to sql parameters: %w", err)
+		return "", err
 	}
-	req := &v1.PluginSQLQuery{
-		Id: id.String(),
-		Query: &v1.SQLQuery{
-			Statement: &v1.SQLStatement{
-				Sql:        s.sql,
-				Parameters: params,
-			},
-		},
+	if len(resp.GetValue()) == 0 {
+		// This should never happen, but just in case.
+		return "", storage.ErrKeyNotFound
 	}
-	err = s.db.srv.Send(req)
-	if err != nil {
-		return nil, fmt.Errorf("send query: %w", err)
-	}
-	res, err := s.db.srv.Recv()
-	if err != nil {
-		return nil, fmt.Errorf("receive query result: %w", err)
-	}
-	if res.GetError() != "" {
-		return nil, errors.New(res.GetError())
-	}
-	return raftlogs.NewRows(res.GetResult()), nil
+	return resp.GetValue()[0], nil
 }
 
-// Close closes the statement.
-func (s *pluginStatement) Close() error {
+// Put sets the value of a key.
+func (p *pluginDB) Put(ctx context.Context, key, value string) error {
+	return errors.New("put not implemented")
+}
+
+// Delete removes a key.
+func (p *pluginDB) Delete(ctx context.Context, key string) error {
+	return errors.New("delete not implemented")
+}
+
+// List returns all keys with a given prefix.
+func (p *pluginDB) List(ctx context.Context, prefix string) ([]string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err
+	}
+	req := &v1.PluginQuery{
+		Id:      id.String(),
+		Command: v1.PluginQuery_LIST,
+		Query:   prefix,
+	}
+	if err := p.srv.Send(req); err != nil {
+		return nil, err
+	}
+	resp, err := p.srv.Recv()
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetValue(), nil
+}
+
+// IterPrefix iterates over all keys with a given prefix.
+func (p *pluginDB) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return err
+	}
+	req := &v1.PluginQuery{
+		Id:      id.String(),
+		Command: v1.PluginQuery_ITER,
+		Query:   prefix,
+	}
+	if err := p.srv.Send(req); err != nil {
+		return err
+	}
+	for {
+		resp, err := p.srv.Recv()
+		if err != nil {
+			return err
+		}
+		if resp.GetError() == "EOF" {
+			return nil
+		}
+		if len(resp.GetValue()) == 0 {
+			// Should never happen, silently continue.
+			continue
+		}
+		if err := fn(resp.GetKey(), resp.GetValue()[0]); err != nil {
+			return err
+		}
+	}
+}
+
+// Snapshot returns a snapshot of the storage.
+func (p *pluginDB) Snapshot(ctx context.Context) (io.Reader, error) {
+	return nil, errors.New("snapshot not implemented")
+}
+
+// Restore restores a snapshot of the storage.
+func (p *pluginDB) Restore(ctx context.Context, r io.Reader) error {
+	return errors.New("restore not implemented")
+}
+
+// Subscribe will call the given function whenever a key with the given prefix is changed.
+// The returned function can be called to unsubscribe.
+func (p *pluginDB) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (func(), error) {
+	return nil, errors.New("subscribe not implemented")
+}
+
+// Close closes the storage.
+func (p *pluginDB) Close() error {
 	return nil
 }

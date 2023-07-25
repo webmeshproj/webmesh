@@ -19,7 +19,7 @@ package peers
 
 import (
 	"context"
-	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,8 +34,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 // ErrNodeNotFound is returned when a node is not found.
@@ -98,31 +97,95 @@ type Peers interface {
 // A fully populated node is returned by Get and List.
 type Node struct {
 	// ID is the node's ID.
-	ID string
+	ID string `json:"id"`
 	// PublicKey is the node's public key.
-	PublicKey wgtypes.Key
+	PublicKey wgtypes.Key `json:"publicKey"`
 	// PrimaryEndpoint is the primary public endpoint of the node.
-	PrimaryEndpoint string
+	PrimaryEndpoint string `json:"primaryEndpoint"`
 	// WireGuardEndpoints are the available wireguard endpoints of the node.
-	WireGuardEndpoints []string
+	WireGuardEndpoints []string `json:"wireGuardEndpoints"`
 	// ZoneAwarenessID is the node's zone awareness ID.
-	ZoneAwarenessID string
+	ZoneAwarenessID string `json:"zoneAwarenessId"`
 	// PrivateIPv4 is the node's private IPv4 address.
-	PrivateIPv4 netip.Prefix
+	PrivateIPv4 netip.Prefix `json:"privateIpv4"`
 	// PrivateIPv6 is the node's IPv6 network.
-	PrivateIPv6 netip.Prefix
+	PrivateIPv6 netip.Prefix `json:"privateIpv6"`
 	// GRPCPort is the node's GRPC port.
-	GRPCPort int
+	GRPCPort int `json:"grpcPort"`
 	// RaftPort is the node's Raft port.
-	RaftPort int
+	RaftPort int `json:"raftPort"`
 	// CreatedAt is the time the node was created.
-	CreatedAt time.Time
+	CreatedAt time.Time `json:"createdAt"`
 	// UpdatedAt is the time the node was last updated.
-	UpdatedAt time.Time
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// MarshalJSON marshals a Node to JSON.
+func (n Node) MarshalJSON() ([]byte, error) {
+	type Alias Node
+	return json.Marshal(&struct {
+		PublicKey   string `json:"publicKey"`
+		PrivateIPv4 string `json:"privateIpv4"`
+		PrivateIPv6 string `json:"privateIpv6"`
+		Alias
+	}{
+		PublicKey: n.PublicKey.String(),
+		PrivateIPv4: func() string {
+			if n.PrivateIPv4.IsValid() {
+				return n.PrivateIPv4.String()
+			}
+			return ""
+		}(),
+		PrivateIPv6: func() string {
+			if n.PrivateIPv6.IsValid() {
+				return n.PrivateIPv6.String()
+			}
+			return ""
+		}(),
+		Alias: (Alias)(n),
+	})
+}
+
+// UnmarshalJSON unmarshals a Node from JSON.
+func (n *Node) UnmarshalJSON(b []byte) error {
+	type Alias Node
+	aux := &struct {
+		PublicKey   string `json:"publicKey"`
+		PrivateIPv4 string `json:"privateIpv4"`
+		PrivateIPv6 string `json:"privateIpv6"`
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	if aux.PublicKey != "" {
+		key, err := wgtypes.ParseKey(aux.PublicKey)
+		if err != nil {
+			return fmt.Errorf("parse node public key: %w", err)
+		}
+		n.PublicKey = key
+	}
+	if aux.PrivateIPv4 != "" {
+		network, err := netip.ParsePrefix(aux.PrivateIPv4)
+		if err != nil {
+			return fmt.Errorf("parse node private IPv4: %w", err)
+		}
+		n.PrivateIPv4 = network
+	}
+	if aux.PrivateIPv6 != "" {
+		network, err := netip.ParsePrefix(aux.PrivateIPv6)
+		if err != nil {
+			return fmt.Errorf("parse node private IPv6: %w", err)
+		}
+		n.PrivateIPv6 = network
+	}
+	return nil
 }
 
 // Proto converts a Node to the protobuf representation.
-func (n Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
+func (n *Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
 	return &v1.MeshNode{
 		Id:                 n.ID,
 		PrimaryEndpoint:    n.PrimaryEndpoint,
@@ -157,13 +220,13 @@ func (n Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
 // Edge represents an edge between two nodes.
 type Edge struct {
 	// From is the ID of the source node.
-	From string
+	From string `json:"from"`
 	// To is the ID of the target node.
-	To string
+	To string `json:"to"`
 	// Weight is the weight of the edge.
-	Weight int
+	Weight int `json:"weight"`
 	// Attrs are the edge's attributes.
-	Attrs map[string]string
+	Attrs map[string]string `json:"attrs"`
 }
 
 // PutOptions are options for creating or updating a node.
@@ -195,7 +258,7 @@ type PutLeaseOptions struct {
 }
 
 // New returns a new Peers interface.
-func New(db meshdb.DB) Peers {
+func New(db storage.Storage) Peers {
 	return &peers{
 		db:    db,
 		graph: NewGraph(db),
@@ -203,7 +266,7 @@ func New(db meshdb.DB) Peers {
 }
 
 type peers struct {
-	db    meshdb.DB
+	db    storage.Storage
 	graph Graph
 }
 
@@ -220,20 +283,29 @@ func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
 		seen[endpoint] = struct{}{}
 		wgendpoints = append(wgendpoints, endpoint)
 	}
-	err := p.graph.AddVertex(Node{
-		ID:                 opts.ID,
-		PublicKey:          opts.PublicKey,
-		PrimaryEndpoint:    opts.PrimaryEndpoint,
-		WireGuardEndpoints: wgendpoints,
-		ZoneAwarenessID:    opts.ZoneAwarenessID,
-		GRPCPort:           opts.GRPCPort,
-		RaftPort:           opts.RaftPort,
-		CreatedAt:          time.Now().UTC(),
-		UpdatedAt:          time.Now().UTC(),
-	})
+	// Get any existing node.
+	node, err := p.graph.Vertex(opts.ID)
+	if err != nil && !errors.Is(err, graph.ErrVertexNotFound) {
+		return Node{}, fmt.Errorf("get node: %w", err)
+	}
+	// Fill in the missing fields.
+	node.ID = opts.ID
+	node.PublicKey = opts.PublicKey
+	node.PrimaryEndpoint = opts.PrimaryEndpoint
+	node.WireGuardEndpoints = wgendpoints
+	node.ZoneAwarenessID = opts.ZoneAwarenessID
+	node.GRPCPort = opts.GRPCPort
+	node.RaftPort = opts.RaftPort
+	node.UpdatedAt = time.Now().UTC()
+	// If the node doesn't exist, set the creation timestamp.
+	if errors.Is(err, graph.ErrVertexNotFound) {
+		node.CreatedAt = node.UpdatedAt
+	}
+	err = p.graph.AddVertex(node)
 	if err != nil {
 		return Node{}, fmt.Errorf("add vertex: %w", err)
 	}
+	// Return the full node.
 	out, err := p.graph.Vertex(opts.ID)
 	if err != nil {
 		return Node{}, fmt.Errorf("get vertex: %w", err)
@@ -242,20 +314,22 @@ func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
 }
 
 func (p *peers) PutLease(ctx context.Context, opts *PutLeaseOptions) error {
-	q := models.New(p.db.Write())
-	params := models.InsertNodeLeaseParams{
-		NodeID:    opts.ID,
-		CreatedAt: time.Now().UTC(),
+	if !opts.IPv4.IsValid() && !opts.IPv6.IsValid() {
+		return errors.New("at least one of IPv4 or IPv6 must be set")
+	}
+	node, err := p.graph.Vertex(opts.ID)
+	if err != nil {
+		return fmt.Errorf("get node: %w", err)
 	}
 	if opts.IPv4.IsValid() {
-		params.Ipv4 = sql.NullString{String: opts.IPv4.String(), Valid: true}
+		node.PrivateIPv4 = opts.IPv4
 	}
 	if opts.IPv6.IsValid() {
-		params.Ipv6 = sql.NullString{String: opts.IPv6.String(), Valid: true}
+		node.PrivateIPv6 = opts.IPv6
 	}
-	_, err := q.InsertNodeLease(ctx, params)
+	err = p.graph.AddVertex(node)
 	if err != nil {
-		return fmt.Errorf("insert node lease: %w", err)
+		return fmt.Errorf("add vertex: %w", err)
 	}
 	return nil
 }
@@ -276,14 +350,12 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("get edges: %w", err)
 	}
-	if len(edges) > 0 {
-		q := models.New(p.db.Write())
-		err = q.DeleteNodeEdges(ctx, models.DeleteNodeEdgesParams{
-			SrcNodeID: id,
-			DstNodeID: id,
-		})
-		if err != nil {
-			return fmt.Errorf("delete node edges: %w", err)
+	for _, edge := range edges {
+		if edge.Source == id || edge.Target == id {
+			err = p.graph.RemoveEdge(edge.Source, edge.Target)
+			if err != nil {
+				return fmt.Errorf("remove edge: %w", err)
+			}
 		}
 	}
 	err = p.graph.RemoveVertex(id)
@@ -299,105 +371,29 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 }
 
 func (p *peers) List(ctx context.Context) ([]Node, error) {
-	q := models.New(p.db.Read())
-	nodes, err := q.ListNodes(ctx)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []Node{}, nil
+	out := make([]Node, 0)
+	err := p.db.IterPrefix(ctx, NodesPrefix, func(key, value string) error {
+		var node Node
+		err := json.Unmarshal([]byte(value), &node)
+		if err != nil {
+			return fmt.Errorf("unmarshal node: %w", err)
 		}
-		return nil, err
-	}
-	out := make([]Node, len(nodes))
-	for i, node := range nodes {
-		var key wgtypes.Key
-		if node.PublicKey.Valid {
-			key, err = wgtypes.ParseKey(node.PublicKey.String)
-			if err != nil {
-				return nil, fmt.Errorf("parse node public key: %w", err)
-			}
-		}
-		var wireguardEndpoints []string
-		if node.WireguardEndpoints.Valid {
-			wireguardEndpoints = strings.Split(node.WireguardEndpoints.String, ",")
-		}
-		var networkv4, networkv6 netip.Prefix
-		if node.PrivateAddressV4 != "" {
-			networkv4, err = netip.ParsePrefix(node.PrivateAddressV4)
-			if err != nil {
-				return nil, fmt.Errorf("parse node network IPv4: %w", err)
-			}
-		}
-		if node.PrivateAddressV6 != "" {
-			networkv6, err = netip.ParsePrefix(node.PrivateAddressV6)
-			if err != nil {
-				return nil, fmt.Errorf("parse node network IPv6: %w", err)
-			}
-		}
-		out[i] = Node{
-			ID:                 node.ID,
-			PublicKey:          key,
-			PrimaryEndpoint:    node.PrimaryEndpoint.String,
-			WireGuardEndpoints: wireguardEndpoints,
-			ZoneAwarenessID:    node.ZoneAwarenessID.String,
-			PrivateIPv4:        networkv4,
-			PrivateIPv6:        networkv6,
-			GRPCPort:           int(node.GrpcPort),
-			RaftPort:           int(node.RaftPort),
-			UpdatedAt:          node.UpdatedAt,
-			CreatedAt:          node.CreatedAt,
-		}
-	}
-	return out, nil
+		out = append(out, node)
+		return nil
+	})
+	return out, err
 }
 
 // ListPublicNodes lists all public nodes.
 func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
-	q := models.New(p.db.Read())
-	nodes, err := q.ListPublicNodes(ctx)
+	nodes, err := p.List(ctx)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []Node{}, nil
-		}
-		return nil, err
+		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]Node, len(nodes))
-	for i, node := range nodes {
-		var key wgtypes.Key
-		if node.PublicKey.Valid {
-			key, err = wgtypes.ParseKey(node.PublicKey.String)
-			if err != nil {
-				return nil, fmt.Errorf("parse node public key: %w", err)
-			}
-		}
-		var wireguardEndpoints []string
-		if node.WireguardEndpoints.Valid {
-			wireguardEndpoints = strings.Split(node.WireguardEndpoints.String, ",")
-		}
-		var networkv4, networkv6 netip.Prefix
-		if node.PrivateAddressV4 != "" {
-			networkv4, err = netip.ParsePrefix(node.PrivateAddressV4)
-			if err != nil {
-				return nil, fmt.Errorf("parse node network IPv4: %w", err)
-			}
-		}
-		if node.PrivateAddressV6 != "" {
-			networkv6, err = netip.ParsePrefix(node.PrivateAddressV6)
-			if err != nil {
-				return nil, fmt.Errorf("parse node network IPv6: %w", err)
-			}
-		}
-		out[i] = Node{
-			ID:                 node.ID,
-			PublicKey:          key,
-			PrimaryEndpoint:    node.PrimaryEndpoint.String,
-			WireGuardEndpoints: wireguardEndpoints,
-			ZoneAwarenessID:    node.ZoneAwarenessID.String,
-			PrivateIPv4:        networkv4,
-			PrivateIPv6:        networkv6,
-			GRPCPort:           int(node.GrpcPort),
-			RaftPort:           int(node.RaftPort),
-			UpdatedAt:          node.UpdatedAt,
-			CreatedAt:          node.CreatedAt,
+	out := make([]Node, 0)
+	for _, node := range nodes {
+		if node.PrimaryEndpoint != "" {
+			out = append(out, node)
 		}
 	}
 	return out, nil
@@ -405,52 +401,14 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 
 // ListByZoneID lists all nodes in a zone.
 func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error) {
-	q := models.New(p.db.Read())
-	nodes, err := q.ListNodesByZone(ctx, sql.NullString{String: zoneID, Valid: true})
+	nodes, err := p.List(ctx)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []Node{}, nil
-		}
-		return nil, err
+		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]Node, len(nodes))
-	for i, node := range nodes {
-		var key wgtypes.Key
-		if node.PublicKey.Valid {
-			key, err = wgtypes.ParseKey(node.PublicKey.String)
-			if err != nil {
-				return nil, fmt.Errorf("parse node public key: %w", err)
-			}
-		}
-		var wireguardEndpoints []string
-		if node.WireguardEndpoints.Valid {
-			wireguardEndpoints = strings.Split(node.WireguardEndpoints.String, ",")
-		}
-		var networkv4, networkv6 netip.Prefix
-		if node.PrivateAddressV4 != "" {
-			networkv4, err = netip.ParsePrefix(node.PrivateAddressV4)
-			if err != nil {
-				return nil, fmt.Errorf("parse node network IPv4: %w", err)
-			}
-		}
-		if node.PrivateAddressV6 != "" {
-			networkv6, err = netip.ParsePrefix(node.PrivateAddressV6)
-			if err != nil {
-				return nil, fmt.Errorf("parse node network IPv6: %w", err)
-			}
-		}
-		out[i] = Node{
-			ID:                 node.ID,
-			PublicKey:          key,
-			PrimaryEndpoint:    node.PrimaryEndpoint.String,
-			WireGuardEndpoints: wireguardEndpoints,
-			ZoneAwarenessID:    node.ZoneAwarenessID.String,
-			PrivateIPv4:        networkv4,
-			PrivateIPv6:        networkv6,
-			GRPCPort:           int(node.GrpcPort),
-			RaftPort:           int(node.RaftPort),
-			UpdatedAt:          node.UpdatedAt,
-			CreatedAt:          node.CreatedAt,
+	out := make([]Node, 0)
+	for _, node := range nodes {
+		if node.ZoneAwarenessID == zoneID {
+			out = append(out, node)
 		}
 	}
 	return out, nil
@@ -458,12 +416,13 @@ func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
 
 // ListIDs returns a list of node IDs.
 func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
-	ids, err := models.New(p.db.Read()).ListNodeIDs(ctx)
+	keys, err := p.db.List(ctx, NodesPrefix)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []string{}, nil
-		}
-		return nil, fmt.Errorf("list node IDs: %w", err)
+		return nil, fmt.Errorf("list keys: %w", err)
+	}
+	ids := make([]string, 0)
+	for _, key := range keys {
+		ids = append(ids, strings.TrimPrefix(key, NodesPrefix+"/"))
 	}
 	return ids, nil
 }

@@ -24,7 +24,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 const admin = "admin"
@@ -92,11 +92,16 @@ var groupSeeds = []*v1.Group{
 func setupTest(t *testing.T) (*rbac, func()) {
 	t.Helper()
 	ctx := context.Background()
-	db, close, err := meshdb.NewTestDB()
+	st, err := storage.NewTestStorage()
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := New(db)
+	close := func() {
+		if err := st.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := New(st)
 	for _, role := range roleSeeds {
 		err = r.PutRole(ctx, role)
 		if err != nil {
@@ -693,14 +698,17 @@ func TestListNodeRoles(t *testing.T) {
 	rbac, close := setupTest(t)
 	defer close()
 
-	// Should return all roles for the admin user
+	// Should only return the admin role for the admin user
 
-	roles, err := rbac.ListNodeRoles(context.Background(), admin)
+	roles, err := rbac.ListUserRoles(context.Background(), admin)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(roles) != len(roleSeeds) {
-		t.Fatalf("expected %d roles, got %d", len(roleSeeds), len(roles))
+	if len(roles) != 1 {
+		t.Fatalf("expected 1 role, got %d", len(roles))
+	}
+	if roles[0].Name != MeshAdminRole {
+		t.Fatalf("expected %s role, got %s", MeshAdminRole, roles[0].Name)
 	}
 }
 

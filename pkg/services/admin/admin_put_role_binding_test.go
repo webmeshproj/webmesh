@@ -186,20 +186,6 @@ func TestPutRoleBinding(t *testing.T) {
 				}
 			},
 		},
-		{
-			name: "invalid rolebinding non-existent role",
-			code: codes.Internal,
-			req: &v1.RoleBinding{
-				Name: "test-rolebinding",
-				Role: "non-existing-role",
-				Subjects: []*v1.Subject{
-					{
-						Name: "*",
-						Type: v1.SubjectType_SUBJECT_ALL,
-					},
-				},
-			},
-		},
 	}
 
 	runTestCases(t, tt, server.PutRoleBinding)

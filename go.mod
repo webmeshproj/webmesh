@@ -3,6 +3,7 @@ module github.com/webmeshproj/node
 go 1.20
 
 require (
+	github.com/dgraph-io/badger/v4 v4.1.0
 	github.com/dominikbraun/graph v0.22.0
 	github.com/go-ldap/ldap/v3 v3.4.5
 	github.com/go-ping/ping v1.1.0
@@ -26,21 +27,20 @@ require (
 	github.com/pion/stun v0.6.0
 	github.com/pion/turn/v2 v2.1.0
 	github.com/pion/webrtc/v3 v3.2.8
-	github.com/pressly/goose/v3 v3.11.2
 	github.com/prometheus/client_golang v1.14.0
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.0.0
-	github.com/webmeshproj/api v0.1.5-0.20230722191228-cb651f9fad86
-	golang.org/x/crypto v0.9.0
+	github.com/webmeshproj/api v0.2.0
+	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.8.0
+	golang.org/x/sys v0.10.0
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/grpc v1.55.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v3 v3.0.1
 	pault.ag/go/modprobe v0.1.2
 )
@@ -55,15 +55,22 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
+	github.com/dgraph-io/ristretto v0.1.1 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.4 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/glog v1.1.1 // indirect
+	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/flatbuffers v1.12.1 // indirect
 	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
+	github.com/kr/pretty v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.18 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
@@ -81,6 +88,7 @@ require (
 	github.com/pion/sdp/v3 v3.0.6 // indirect
 	github.com/pion/srtp/v2 v2.0.15 // indirect
 	github.com/pion/transport/v2 v2.2.1 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
@@ -89,9 +97,10 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/stretchr/testify v1.8.3 // indirect
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
+	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/net v0.12.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.8.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect

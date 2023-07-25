@@ -34,7 +34,7 @@ func TestPutEdge(t *testing.T) {
 	defer closer()
 
 	// Pre register the nodes
-	p := peers.New(server.store.DB())
+	p := peers.New(server.store.Storage())
 	for _, peer := range []string{"foo", "baz"} {
 		key, err := wgtypes.GenerateKey()
 		if err != nil {

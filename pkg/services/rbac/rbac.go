@@ -67,7 +67,7 @@ func (a *Action) action() *v1.RBACAction {
 // NewStoreEvaluator returns a ActionEvaluator that evaluates actions
 // against the roles in the given store.
 func NewStoreEvaluator(store meshdb.Store) Evaluator {
-	return &storeEvaluator{rbac: rbacdb.New(store.DB())}
+	return &storeEvaluator{rbac: rbacdb.New(store.Storage())}
 }
 
 type storeEvaluator struct {

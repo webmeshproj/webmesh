@@ -278,7 +278,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	defer m.wgmux.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
-	peers, err := mesh.WireGuardPeersFor(ctx, m.store.DB(), m.store.ID())
+	peers, err := mesh.WireGuardPeersFor(ctx, m.store.Storage(), m.store.ID())
 	if err != nil {
 		return fmt.Errorf("wireguard peers for: %w", err)
 	}
@@ -291,7 +291,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 		seenPeers[peer.GetId()] = struct{}{}
 		// Check if we need to gather ice servers
 		if peer.GetIce() && len(iceServers) == 0 {
-			st := state.New(m.store.DB())
+			st := state.New(m.store.Storage())
 			iceAddrs, err := st.ListPublicPeersWithFeature(ctx, m.opts.DialOptions, m.store.ID(), v1.Feature_ICE_NEGOTIATION)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("list public peers with feature: %w", err))

@@ -51,10 +51,12 @@ const (
 	StartupTimeoutEnvVar      = "RAFT_STARTUP_TIMEOUT"
 	ShutdownTimeoutEnvVar     = "RAFT_SHUTDOWN_TIMEOUT"
 
-	// LogFile is the raft log file.
-	LogFile = "raft.log"
-	// StableStoreFile is the raft stable store file.
-	StableStoreFile = "raft-stable-dat"
+	// LogPath is the raft log file.
+	LogPath = "raft-logs"
+	// StableStorePath is the raft stable store file.
+	StableStorePath = "raft-stable-dat"
+	// DataStoragePath is the raft data storage directory.
+	DataStoragePath = "raft-data"
 )
 
 // RaftOptions are the raft options.
@@ -235,12 +237,17 @@ func (o *RaftOptions) Logger(name string) hclog.Logger {
 	}
 }
 
-// LogFilePath returns the log file path.
-func (o *RaftOptions) LogFilePath() string {
-	return filepath.Join(o.DataDir, LogFile)
+// LogFilePath returns the log path.
+func (o *RaftOptions) LogPath() string {
+	return filepath.Join(o.DataDir, LogPath)
 }
 
-// StableStoreFilePath returns the stable store file path.
-func (o *RaftOptions) StableStoreFilePath() string {
-	return filepath.Join(o.DataDir, StableStoreFile)
+// StableStorePath returns the stable store path.
+func (o *RaftOptions) StableStorePath() string {
+	return filepath.Join(o.DataDir, StableStorePath)
+}
+
+// DataStoragePath returns the data directory.
+func (o *RaftOptions) DataStoragePath() string {
+	return filepath.Join(o.DataDir, DataStoragePath)
 }

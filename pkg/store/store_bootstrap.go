@@ -32,26 +32,28 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/meshdb/models"
 	"github.com/webmeshproj/node/pkg/meshdb/networking"
 	"github.com/webmeshproj/node/pkg/meshdb/peers"
 	"github.com/webmeshproj/node/pkg/meshdb/rbac"
+	"github.com/webmeshproj/node/pkg/meshdb/state"
 	meshnet "github.com/webmeshproj/node/pkg/net"
+	"github.com/webmeshproj/node/pkg/storage"
 	"github.com/webmeshproj/node/pkg/util"
 )
 
 func (s *store) bootstrap(ctx context.Context) error {
-	version, err := models.GetDBVersion(s.weakData)
+	// Check if the mesh network is defined
+	_, err := s.Storage().Get(ctx, state.IPv6PrefixKey)
+	var firstBootstrap bool
 	if err != nil {
-		return fmt.Errorf("get db schema version: %w", err)
-	}
-	s.log.Info("current db schema version", slog.Int("version", int(version)))
-	if version != 0 {
-		// We have a version, so the cluster is already bootstrapped.
-		s.log.Info("cluster already bootstrapped, migrating schema to latest version")
-		if err = models.MigrateDB(s.weakData); err != nil {
-			return fmt.Errorf("db migrate: %w", err)
+		if !errors.Is(err, storage.ErrKeyNotFound) {
+			return fmt.Errorf("get mesh network: %w", err)
 		}
+		firstBootstrap = true
+	}
+	if !firstBootstrap {
+		// We have a version, so the cluster is already bootstrapped.
+		s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 		// We rejoin as a voter no matter what
 		s.opts.Mesh.JoinAsVoter = true
 		if s.opts.Bootstrap.Servers == "" {
@@ -74,18 +76,10 @@ func (s *store) bootstrap(ctx context.Context) error {
 		if err := s.snapshotter.Restore(ctx, f); err != nil {
 			return fmt.Errorf("restore snapshot: %w", err)
 		}
-		s.log.Info("migrating schema to latest version")
-		if err = models.MigrateDB(s.weakData); err != nil {
-			return fmt.Errorf("db migrate: %w", err)
-		}
 		// We're done here, but restore procedure needs to be documented
 		return nil
 	}
 	s.firstBootstrap.Store(true)
-	s.log.Info("migrating schema to latest version")
-	if err = models.MigrateDB(s.weakData); err != nil {
-		return fmt.Errorf("db migrate: %w", err)
-	}
 	if s.opts.Bootstrap.AdvertiseAddress == "" && s.opts.Bootstrap.Servers == "" {
 		s.opts.Bootstrap.AdvertiseAddress = fmt.Sprintf("localhost:%d", s.sl.ListenPort())
 	} else if s.opts.Bootstrap.AdvertiseAddress == "" {
@@ -217,7 +211,6 @@ func (s *store) bootstrap(ctx context.Context) error {
 }
 
 func (s *store) initialBootstrapLeader(ctx context.Context) error {
-	q := models.New(s.WriteDB())
 	cfg := s.raft.GetConfiguration().Configuration()
 
 	// Set initial cluster configurations to the raft log
@@ -232,22 +225,22 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		return fmt.Errorf("generate ULA: %w", err)
 	}
 	s.log.Info("generated IPv6 Mesh Network", slog.String("ula", meshnetworkv6.String()))
-	err = q.SetIPv6Prefix(ctx, meshnetworkv6.String())
+	err = s.Storage().Put(ctx, state.IPv6PrefixKey, meshnetworkv6.String())
 	if err != nil {
 		return fmt.Errorf("set ULA prefix to db: %w", err)
 	}
-	err = q.SetIPv4Prefix(ctx, s.opts.Bootstrap.IPv4Network)
+	err = s.Storage().Put(ctx, state.IPv4PrefixKey, meshnetworkv4.String())
 	if err != nil {
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
 	}
 	s.meshDomain = s.opts.Bootstrap.MeshDomain
-	err = q.SetMeshDomain(ctx, s.opts.Bootstrap.MeshDomain)
+	err = s.Storage().Put(ctx, state.MeshDomainKey, s.meshDomain)
 	if err != nil {
 		return fmt.Errorf("set mesh domain to db: %w", err)
 	}
 
 	// Initialize the RBAC system.
-	rb := rbac.New(s.DB())
+	rb := rbac.New(s.Storage())
 
 	// Create an admin role and add the admin user/node to it.
 	err = rb.PutRole(ctx, &v1.Role{
@@ -338,7 +331,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	}
 
 	// Initialize the Networking system.
-	nw := networking.New(s.DB())
+	nw := networking.New(s.Storage())
 
 	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
@@ -388,7 +381,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 
-	p := peers.New(s.DB())
+	p := peers.New(s.Storage())
 	params := &peers.PutOptions{
 		ID:                 s.ID(),
 		GRPCPort:           s.opts.Mesh.GRPCPort,

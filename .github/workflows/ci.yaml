@@ -71,8 +71,8 @@ jobs:
         shell: bash
         run: make test
 
-  build-nix-windows:
-    name: Build Linux/Windows Artifacts
+  build:
+    name: Build Artifacts
     runs-on: ubuntu-latest
     needs: [tests]
     permissions:
@@ -118,20 +118,15 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Cross Compiler Image
-        uses: docker/build-push-action@v3
-        with:
-          file: Dockerfile.build
-          tags: ghcr.io/webmeshproj/node-buildx:latest
-          load: true
-          cache-to: type=gha
-          cache-from: type=gha
-
       - name: Build Release Binaries
         shell: bash
-        env:
-          BUILD_IMAGE: ghcr.io/webmeshproj/node-buildx:latest
-        run: make dist-linux-windows
+        run: make -j2 dist-linux dist-windows dist-darwin DIST_PARALLEL=2
+
+      - name: Compute Binary Checksums
+        shell: bash
+        run: |
+          ls -alh dist
+          cd dist ; sha256sum * > sha256sums.txt
 
       - name: Login to GHCR
         uses: docker/login-action@v2
@@ -154,7 +149,7 @@ jobs:
           echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
           echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build and Push Alpine Images
+      - name: Build Alpine Images
         uses: docker/build-push-action@v3
         id: alpine-build
         with:
@@ -165,7 +160,7 @@ jobs:
           cache-to: type=gha
           cache-from: type=gha
 
-      - name: Build and Push Distroless Images
+      - name: Build Distroless Images
         uses: docker/build-push-action@v3
         id: distroless-build
         with:
@@ -187,88 +182,24 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: artifacts-nix-windows
-          path: dist/*
-
-  build-darwin:
-    name: Build macOS Artifacts
-    runs-on: macos-latest
-    needs: [tests]
-    permissions:
-      contents: "write"
-      id-token: "write"
-      packages: "write"
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            web/dashboard/.yarn/cache
-            web/dashboard/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('web/dashboard/yarn.lock') }}
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          check-latest: true
-          cache-dependency-path: go.sum
-
-      - name: Download Go Modules
-        shell: bash
-        run: go mod download -x
-
-      - name: Install UPX
-        shell: bash
-        run: brew install upx
-
-      - name: Build Release Binaries
-        shell: bash
-        run: make dist-darwin -j 2
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: artifacts-darwin
+          name: artifacts
           path: dist/*
 
   publish:
     name: Publish Artifacts
     runs-on: ubuntu-latest
-    needs: [tests, build-nix-windows, build-darwin]
+    needs: [tests, build]
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     permissions:
       contents: "write"
       id-token: "write"
       packages: "write"
     steps:
-      - name: Download Nix/Windows Artifacts
+      - name: Download Artifacts
         uses: actions/download-artifact@v2
         with:
-          name: artifacts-nix-windows
+          name: artifacts
           path: dist
-
-      - name: Download macOS Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts-darwin
-          path: dist
-
-      - name: Compute Checksums
-        shell: bash
-        run: |
-          ls -alh dist
-          cd dist ; sha256sum * > sha256sums.txt
 
       - name: Publish Artifacts
         uses: softprops/action-gh-release@v1

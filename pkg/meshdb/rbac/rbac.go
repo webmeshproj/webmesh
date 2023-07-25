@@ -19,16 +19,12 @@ package rbac
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/models"
+	"github.com/webmeshproj/node/pkg/storage"
 )
 
 const (
@@ -42,6 +38,10 @@ const (
 	VotersGroup = "voters"
 	// BootstrapVotersRoleBinding is the name of the bootstrap voters rolebinding.
 	BootstrapVotersRoleBinding = "bootstrap-voters"
+
+	rolesPrefix        = "/registry/roles"
+	rolebindingsPrefix = "/registry/rolebindings"
+	groupsPrefix       = "/registry/groups"
 )
 
 // IsSystemRole returns true if the role is a system role.
@@ -113,12 +113,12 @@ type RBAC interface {
 }
 
 // New returns a new RBAC.
-func New(db meshdb.DB) RBAC {
-	return &rbac{db}
+func New(st storage.Storage) RBAC {
+	return &rbac{st}
 }
 
 type rbac struct {
-	meshdb.DB
+	storage.Storage
 }
 
 // PutRole creates or updates a role.
@@ -139,34 +139,34 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 	if len(role.GetRules()) == 0 {
 		return fmt.Errorf("role rules cannot be empty")
 	}
-	q := models.New(r.Write())
-	rules, err := json.Marshal(role.GetRules())
+	data, err := protojson.Marshal(role)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal role: %w", err)
 	}
-	params := models.PutRoleParams{
-		Name:      role.GetName(),
-		RulesJson: string(rules),
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
-	}
-	err = q.PutRole(ctx, params)
+	key := fmt.Sprintf("%s/%s", rolesPrefix, role.GetName())
+	err = r.Put(ctx, key, string(data))
 	if err != nil {
-		return fmt.Errorf("put db role: %w", err)
+		return fmt.Errorf("put role: %w", err)
 	}
 	return nil
 }
 
 // GetRole returns a role by name.
 func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
-	role, err := models.New(r.Read()).GetRole(ctx, name)
+	key := fmt.Sprintf("%s/%s", rolesPrefix, name)
+	data, err := r.Get(ctx, key)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == storage.ErrKeyNotFound {
 			return nil, ErrRoleNotFound
 		}
-		return nil, fmt.Errorf("get db role: %w", err)
+		return nil, fmt.Errorf("get role: %w", err)
 	}
-	return dbRoleToAPIRole(&role)
+	role := &v1.Role{}
+	err = protojson.Unmarshal([]byte(data), role)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal role: %w", err)
+	}
+	return role, nil
 }
 
 // DeleteRole deletes a role by name.
@@ -174,28 +174,27 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 	if IsSystemRole(name) {
 		return fmt.Errorf("%w %q", ErrIsSystemRole, name)
 	}
-	q := models.New(r.Write())
-	err := q.DeleteRole(ctx, name)
+	key := fmt.Sprintf("%s/%s", rolesPrefix, name)
+	err := r.Delete(ctx, key)
 	if err != nil {
-		return fmt.Errorf("delete db role: %w", err)
+		return fmt.Errorf("delete role: %w", err)
 	}
 	return nil
 }
 
 // ListRoles returns a list of all roles.
 func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
-	roles, err := models.New(r.Read()).ListRoles(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list db roles: %w", err)
-	}
-	out := make(RolesList, len(roles))
-	for i, role := range roles {
-		out[i], err = dbRoleToAPIRole(&role)
+	out := make(RolesList, 0)
+	err := r.IterPrefix(ctx, rolesPrefix, func(key, value string) error {
+		role := &v1.Role{}
+		err := protojson.Unmarshal([]byte(value), role)
 		if err != nil {
-			return nil, fmt.Errorf("convert db role: %w", err)
+			return fmt.Errorf("unmarshal role: %w", err)
 		}
-	}
-	return out, nil
+		out = append(out, role)
+		return nil
+	})
+	return out, err
 }
 
 // PutRoleBinding creates or updates a rolebinding.
@@ -219,55 +218,34 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 	if len(rolebinding.GetSubjects()) == 0 {
 		return fmt.Errorf("rolebinding subjects cannot be empty")
 	}
-	q := models.New(r.Write())
-	params := models.PutRoleBindingParams{
-		Name:      rolebinding.GetName(),
-		RoleName:  rolebinding.GetRole(),
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
-	}
-	var users, groups, nodes []string
-	for _, subject := range rolebinding.GetSubjects() {
-		switch subject.GetType() {
-		case v1.SubjectType_SUBJECT_NODE:
-			nodes = append(nodes, subject.GetName())
-		case v1.SubjectType_SUBJECT_USER:
-			users = append(users, subject.GetName())
-		case v1.SubjectType_SUBJECT_GROUP:
-			groups = append(groups, subject.GetName())
-		case v1.SubjectType_SUBJECT_ALL:
-			nodes = append(nodes, subject.GetName())
-			users = append(users, subject.GetName())
-			groups = append(groups, subject.GetName())
-		}
-	}
-	if len(nodes) > 0 {
-		params.NodeIds = sql.NullString{Valid: true, String: strings.Join(nodes, ",")}
-	}
-	if len(users) > 0 {
-		params.UserNames = sql.NullString{Valid: true, String: strings.Join(users, ",")}
-	}
-	if len(groups) > 0 {
-		params.GroupNames = sql.NullString{Valid: true, String: strings.Join(groups, ",")}
-	}
-	err := q.PutRoleBinding(ctx, params)
+	key := fmt.Sprintf("%s/%s", rolebindingsPrefix, rolebinding.GetName())
+	data, err := protojson.Marshal(rolebinding)
 	if err != nil {
-		return fmt.Errorf("put db rolebinding: %w", err)
+		return fmt.Errorf("marshal rolebinding: %w", err)
+	}
+	err = r.Put(ctx, key, string(data))
+	if err != nil {
+		return fmt.Errorf("put rolebinding: %w", err)
 	}
 	return nil
 }
 
 // GetRoleBinding returns a rolebinding by name.
 func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding, error) {
-	q := models.New(r.Read())
-	rb, err := q.GetRoleBinding(ctx, name)
+	key := fmt.Sprintf("%s/%s", rolebindingsPrefix, name)
+	data, err := r.Get(ctx, key)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == storage.ErrKeyNotFound {
 			return nil, ErrRoleBindingNotFound
 		}
-		return nil, fmt.Errorf("get db rolebinding: %w", err)
+		return nil, fmt.Errorf("get rolebinding: %w", err)
 	}
-	return dbRoleBindingToAPIRoleBinding(&rb), nil
+	rolebinding := &v1.RoleBinding{}
+	err = protojson.Unmarshal([]byte(data), rolebinding)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal rolebinding: %w", err)
+	}
+	return rolebinding, nil
 }
 
 // DeleteRoleBinding deletes a rolebinding by name.
@@ -275,26 +253,27 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 	if IsSystemRoleBinding(name) {
 		return fmt.Errorf("%w %q", ErrIsSystemRoleBinding, name)
 	}
-	q := models.New(r.Write())
-	err := q.DeleteRoleBinding(ctx, name)
+	key := fmt.Sprintf("%s/%s", rolebindingsPrefix, name)
+	err := r.Delete(ctx, key)
 	if err != nil {
-		return fmt.Errorf("delete db rolebinding: %w", err)
+		return fmt.Errorf("delete rolebinding: %w", err)
 	}
 	return nil
 }
 
 // ListRoleBindings returns a list of all rolebindings.
 func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) {
-	q := models.New(r.Read())
-	rbs, err := q.ListRoleBindings(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list db rolebindings: %w", err)
-	}
-	out := make([]*v1.RoleBinding, len(rbs))
-	for i, rb := range rbs {
-		out[i] = dbRoleBindingToAPIRoleBinding(&rb)
-	}
-	return out, nil
+	out := make([]*v1.RoleBinding, 0)
+	err := r.IterPrefix(ctx, rolebindingsPrefix, func(key, value string) error {
+		rolebinding := &v1.RoleBinding{}
+		err := protojson.Unmarshal([]byte(value), rolebinding)
+		if err != nil {
+			return fmt.Errorf("unmarshal rolebinding: %w", err)
+		}
+		out = append(out, rolebinding)
+		return nil
+	})
+	return out, err
 }
 
 // PutGroup creates or updates a group.
@@ -305,50 +284,34 @@ func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
 	if len(group.GetSubjects()) == 0 {
 		return fmt.Errorf("group subjects cannot be empty")
 	}
-	q := models.New(r.Write())
-	params := models.PutGroupParams{
-		Name:      group.GetName(),
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
-	}
-	var users, nodes []string
-	for _, subject := range group.GetSubjects() {
-		switch subject.GetType() {
-		case v1.SubjectType_SUBJECT_NODE:
-			nodes = append(nodes, subject.GetName())
-		case v1.SubjectType_SUBJECT_USER:
-			users = append(users, subject.GetName())
-		case v1.SubjectType_SUBJECT_ALL:
-			if subject.GetName() == "*" {
-				nodes = append(nodes, subject.GetName())
-				users = append(users, subject.GetName())
-			}
-		}
-	}
-	if len(nodes) > 0 {
-		params.Nodes = sql.NullString{Valid: true, String: strings.Join(nodes, ",")}
-	}
-	if len(users) > 0 {
-		params.Users = sql.NullString{Valid: true, String: strings.Join(users, ",")}
-	}
-	err := q.PutGroup(ctx, params)
+	key := fmt.Sprintf("%s/%s", groupsPrefix, group.GetName())
+	data, err := protojson.Marshal(group)
 	if err != nil {
-		return fmt.Errorf("put db group: %w", err)
+		return fmt.Errorf("marshal group: %w", err)
+	}
+	err = r.Put(ctx, key, string(data))
+	if err != nil {
+		return fmt.Errorf("put group: %w", err)
 	}
 	return nil
 }
 
 // GetGroup returns a group by name.
 func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
-	q := models.New(r.Read())
-	group, err := q.GetGroup(ctx, name)
+	key := fmt.Sprintf("%s/%s", groupsPrefix, name)
+	data, err := r.Get(ctx, key)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == storage.ErrKeyNotFound {
 			return nil, ErrGroupNotFound
 		}
-		return nil, fmt.Errorf("get db group: %w", err)
+		return nil, fmt.Errorf("get group: %w", err)
 	}
-	return dbGroupToAPIGroup(&group), nil
+	group := &v1.Group{}
+	err = protojson.Unmarshal([]byte(data), group)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal group: %w", err)
+	}
+	return group, nil
 }
 
 // DeleteGroup deletes a group by name.
@@ -356,48 +319,49 @@ func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 	if IsSystemGroup(name) {
 		return fmt.Errorf("%w %q", ErrIsSystemGroup, name)
 	}
-	q := models.New(r.Write())
-	err := q.DeleteGroup(ctx, name)
+	key := fmt.Sprintf("%s/%s", groupsPrefix, name)
+	err := r.Delete(ctx, key)
 	if err != nil {
-		return fmt.Errorf("delete db group: %w", err)
+		return fmt.Errorf("delete group: %w", err)
 	}
 	return nil
 }
 
 // ListGroups returns a list of all groups.
 func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
-	q := models.New(r.Read())
-	groups, err := q.ListGroups(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list db groups: %w", err)
-	}
-	out := make([]*v1.Group, len(groups))
-	for i, group := range groups {
-		out[i] = dbGroupToAPIGroup(&group)
-	}
-	return out, nil
+	out := make([]*v1.Group, 0)
+	err := r.IterPrefix(ctx, groupsPrefix, func(key, value string) error {
+		group := &v1.Group{}
+		err := protojson.Unmarshal([]byte(value), group)
+		if err != nil {
+			return fmt.Errorf("unmarshal group: %w", err)
+		}
+		out = append(out, group)
+		return nil
+	})
+	return out, err
 }
 
 // ListNodeRoles returns a list of all roles for a node.
 func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (RolesList, error) {
-	roles, err := models.New(r.Read()).ListBoundRolesForNode(ctx, models.ListBoundRolesForNodeParams{
-		NodeIds: sql.NullString{
-			String: nodeID,
-			Valid:  true,
-		},
-		Nodes: sql.NullString{
-			String: nodeID,
-			Valid:  true,
-		},
-	})
+	rbs, err := r.ListRoleBindings(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list db roles: %w", err)
+		return nil, fmt.Errorf("list rolebindings: %w", err)
 	}
-	out := make(RolesList, len(roles))
-	for i, role := range roles {
-		out[i], err = dbRoleToAPIRole(&role)
-		if err != nil {
-			return nil, fmt.Errorf("convert db role: %w", err)
+	out := make(RolesList, 0)
+RoleBindings:
+	for _, rb := range rbs {
+		for _, subject := range rb.GetSubjects() {
+			if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_NODE {
+				if subject.GetName() == "*" || subject.GetName() == nodeID {
+					role, err := r.GetRole(ctx, rb.GetRole())
+					if err != nil {
+						return nil, fmt.Errorf("get role: %w", err)
+					}
+					out = append(out, role)
+					continue RoleBindings
+				}
+			}
 		}
 	}
 	return out, nil
@@ -405,132 +369,25 @@ func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (RolesList, err
 
 // ListUserRoles returns a list of all roles for a user.
 func (r *rbac) ListUserRoles(ctx context.Context, user string) (RolesList, error) {
-	roles, err := models.New(r.Read()).ListBoundRolesForUser(ctx, models.ListBoundRolesForUserParams{
-		UserNames: sql.NullString{
-			String: user,
-			Valid:  true,
-		},
-		Users: sql.NullString{
-			String: user,
-			Valid:  true,
-		},
-	})
+	rbs, err := r.ListRoleBindings(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list db roles: %w", err)
+		return nil, fmt.Errorf("list rolebindings: %w", err)
 	}
-	out := make(RolesList, len(roles))
-	for i, role := range roles {
-		out[i], err = dbRoleToAPIRole(&role)
-		if err != nil {
-			return nil, fmt.Errorf("convert db role: %w", err)
+	out := make(RolesList, 0)
+RoleBindings:
+	for _, rb := range rbs {
+		for _, subject := range rb.GetSubjects() {
+			if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_USER {
+				if subject.GetName() == "*" || subject.GetName() == user {
+					role, err := r.GetRole(ctx, rb.GetRole())
+					if err != nil {
+						return nil, fmt.Errorf("get role: %w", err)
+					}
+					out = append(out, role)
+					continue RoleBindings
+				}
+			}
 		}
 	}
 	return out, nil
-}
-
-func dbRoleToAPIRole(dbRole *models.Role) (*v1.Role, error) {
-	out := &v1.Role{
-		Name:  dbRole.Name,
-		Rules: []*v1.Rule{},
-	}
-	err := json.Unmarshal([]byte(dbRole.RulesJson), &out.Rules)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal rules: %w", err)
-	}
-	return out, nil
-}
-
-func dbRoleBindingToAPIRoleBinding(dbRoleBinding *models.RoleBinding) *v1.RoleBinding {
-	out := &v1.RoleBinding{
-		Name:     dbRoleBinding.Name,
-		Role:     dbRoleBinding.RoleName,
-		Subjects: make([]*v1.Subject, 0),
-	}
-	if dbRoleBinding.UserNames.Valid {
-		for _, user := range strings.Split(dbRoleBinding.UserNames.String, ",") {
-			out.Subjects = append(out.Subjects, &v1.Subject{
-				Type: v1.SubjectType_SUBJECT_USER,
-				Name: user,
-			})
-		}
-	}
-	if dbRoleBinding.GroupNames.Valid {
-		for _, group := range strings.Split(dbRoleBinding.GroupNames.String, ",") {
-			out.Subjects = append(out.Subjects, &v1.Subject{
-				Type: v1.SubjectType_SUBJECT_GROUP,
-				Name: group,
-			})
-		}
-	}
-	if dbRoleBinding.NodeIds.Valid {
-		for _, node := range strings.Split(dbRoleBinding.NodeIds.String, ",") {
-			out.Subjects = append(out.Subjects, &v1.Subject{
-				Type: v1.SubjectType_SUBJECT_NODE,
-				Name: node,
-			})
-		}
-	}
-	// Check for the all case and squash down to a single subject.
-	if len(out.Subjects) == 3 {
-		alls := make([]bool, 3)
-		for i, subject := range out.Subjects {
-			if subject.Name == "*" {
-				alls[i] = true
-			} else {
-				alls[i] = false
-			}
-		}
-		if alls[0] && alls[1] && alls[2] {
-			out.Subjects = []*v1.Subject{
-				{
-					Type: v1.SubjectType_SUBJECT_ALL,
-					Name: "*",
-				},
-			}
-		}
-	}
-	return out
-}
-
-func dbGroupToAPIGroup(dbGroup *models.Group) *v1.Group {
-	out := &v1.Group{
-		Name:     dbGroup.Name,
-		Subjects: make([]*v1.Subject, 0),
-	}
-	if dbGroup.Users.Valid {
-		for _, user := range strings.Split(dbGroup.Users.String, ",") {
-			out.Subjects = append(out.Subjects, &v1.Subject{
-				Type: v1.SubjectType_SUBJECT_USER,
-				Name: user,
-			})
-		}
-	}
-	if dbGroup.Nodes.Valid {
-		for _, node := range strings.Split(dbGroup.Nodes.String, ",") {
-			out.Subjects = append(out.Subjects, &v1.Subject{
-				Type: v1.SubjectType_SUBJECT_NODE,
-				Name: node,
-			})
-		}
-	}
-	// Check for the all case and squash down to a single subject.
-	if len(out.Subjects) == 2 {
-		alls := make([]bool, 2)
-		for i, subject := range out.Subjects {
-			if subject.Name == "*" {
-				alls[i] = true
-			} else {
-				alls[i] = false
-			}
-		}
-		if alls[0] && alls[1] {
-			out.Subjects = []*v1.Subject{
-				{
-					Type: v1.SubjectType_SUBJECT_ALL,
-					Name: "*",
-				},
-			}
-		}
-	}
-	return out
 }
