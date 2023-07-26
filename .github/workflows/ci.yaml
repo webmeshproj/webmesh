@@ -13,6 +13,7 @@ env:
   NODE_VERSION: 18
   GOLANGCI_LINT_VERSION: v1.53.2
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
+  RELEASE_PARALLELISM: 3
 
 jobs:
   lint:
@@ -144,7 +145,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           version: latest
-          args: release ${{ steps.release-args.outputs.args }}
+          args: release --parallelism=${{ env.RELEASE_PARALLELISM }} ${{ steps.release-args.outputs.args }}
 
       - name: Login to GHCR
         uses: docker/login-action@v2
