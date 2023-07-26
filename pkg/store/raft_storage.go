@@ -17,9 +17,9 @@ limitations under the License.
 package store
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/golang/snappy"
@@ -27,8 +27,21 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/webmeshproj/node/pkg/context"
 	"github.com/webmeshproj/node/pkg/storage"
 )
+
+// LogStoreCloser is a LogStore that can be closed.
+type LogStoreCloser interface {
+	io.Closer
+	raft.LogStore
+}
+
+// StableStoreCloser is a StableStore that can be closed.
+type StableStoreCloser interface {
+	io.Closer
+	raft.StableStore
+}
 
 // raftStorage wraps the storage.Storage interface to force write operations through the Raft log.
 type raftStorage struct {
@@ -37,26 +50,36 @@ type raftStorage struct {
 }
 
 // Put sets the value of a key.
-func (r *raftStorage) Put(ctx context.Context, key, value string) error {
+func (rs *raftStorage) Put(ctx context.Context, key, value string) error {
 	logEntry := &v1.RaftLogEntry{
 		Type:  v1.RaftCommandType_PUT,
 		Key:   key,
 		Value: value,
 	}
-	return r.sendLog(ctx, logEntry)
+	return rs.sendLog(ctx, logEntry)
 }
 
 // Delete removes a key.
-func (r *raftStorage) Delete(ctx context.Context, key string) error {
+func (rs *raftStorage) Delete(ctx context.Context, key string) error {
 	logEntry := &v1.RaftLogEntry{
 		Type: v1.RaftCommandType_DELETE,
 		Key:  key,
 	}
-	return r.sendLog(ctx, logEntry)
+	return rs.sendLog(ctx, logEntry)
 }
 
-func (r *raftStorage) sendLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
-	timeout := r.store.opts.Raft.ApplyTimeout
+// Snapshot returns a snapshot of the storage.
+func (rs *raftStorage) Snapshot(ctx context.Context) (io.Reader, error) {
+	return nil, errors.New("not implemented")
+}
+
+// Restore restores a snapshot of the storage.
+func (rs *raftStorage) Restore(ctx context.Context, r io.Reader) error {
+	return errors.New("not implemented")
+}
+
+func (rs *raftStorage) sendLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
+	timeout := rs.store.opts.Raft.ApplyTimeout
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
@@ -64,7 +87,7 @@ func (r *raftStorage) sendLog(ctx context.Context, logEntry *v1.RaftLogEntry) er
 	if err != nil {
 		return fmt.Errorf("marshal log entry: %w", err)
 	}
-	f := r.store.raft.Apply(data, timeout)
+	f := rs.store.raft.Apply(data, timeout)
 	if err := f.Error(); err != nil {
 		if errors.Is(err, raft.ErrNotLeader) {
 			return ErrNotLeader
@@ -87,4 +110,24 @@ func marshalLogEntry(logEntry *v1.RaftLogEntry) ([]byte, error) {
 		return nil, fmt.Errorf("encode log entry: %w", err)
 	}
 	return data, nil
+}
+
+type monotonicLogStore struct{ raft.LogStore }
+
+var _ = raft.MonotonicLogStore(&monotonicLogStore{})
+
+func (m *monotonicLogStore) IsMonotonic() bool {
+	return true
+}
+
+func newInmemStore() *inMemoryCloser {
+	return &inMemoryCloser{raft.NewInmemStore()}
+}
+
+type inMemoryCloser struct {
+	*raft.InmemStore
+}
+
+func (i *inMemoryCloser) Close() error {
+	return nil
 }
