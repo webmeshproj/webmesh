@@ -107,11 +107,15 @@ DOCKER ?= docker
 docker-build: build ## Build the node docker image
 	$(DOCKER) build \
 		-f Dockerfile \
+		--build-arg TARGETOS=$(OS) \
+		--build-arg TARGETARCH=$(ARCH) \
 		-t $(IMAGE) .
 
 docker-build-distroless: build ## Build the distroless node docker image
 	$(DOCKER) build \
 		-f Dockerfile.distroless \
+		--build-arg TARGETOS=$(OS) \
+		--build-arg TARGETARCH=$(ARCH) \
 		-t $(IMAGE)-distroless .
 
 docker-push: docker-build ## Push the node docker image
