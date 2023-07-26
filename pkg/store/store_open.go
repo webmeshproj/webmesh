@@ -70,7 +70,7 @@ func (s *store) Open(ctx context.Context) (err error) {
 	}
 	// Ensure the data and snapshots directory exists.
 	if !s.opts.Raft.InMemory {
-		for _, dir := range []string{s.opts.Raft.LogPath(), s.opts.Raft.StableStorePath(), s.opts.Raft.DataStoragePath()} {
+		for _, dir := range []string{s.opts.Raft.StorePath(), s.opts.Raft.DataStoragePath()} {
 			err = os.MkdirAll(dir, 0755)
 			if err != nil {
 				return fmt.Errorf("mkdir %q: %w", dir, err)
@@ -98,20 +98,13 @@ func (s *store) Open(ctx context.Context) (err error) {
 			return handleErr(fmt.Errorf("new inmem storage: %w", err))
 		}
 	} else {
-		// logFilePath := filepath.Join(s.opts.Raft.LogPath(), "log.db")
-		// stableStorePath := filepath.Join(s.opts.Raft.StableStorePath(), "stable.db")
-		logFilePath := s.opts.Raft.LogPath()
-		stableStorePath := s.opts.Raft.StableStorePath()
-		logDB, err := raftbadger.New(log, logFilePath)
+		storePath := s.opts.Raft.StorePath()
+		raftstore, err := raftbadger.New(log, storePath)
 		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", logFilePath, err))
+			return handleErr(fmt.Errorf("new raftbadger store %q: %w", storePath, err))
 		}
-		s.logDB = logDB
-		stableDB, err := raftbadger.New(log, logFilePath)
-		if err != nil {
-			return handleErr(fmt.Errorf("new bolt store %q: %w", stableStorePath, err))
-		}
-		s.stableDB = stableDB
+		s.logDB = raftstore
+		s.stableDB = raftstore
 		s.raftSnapshots, err = raft.NewFileSnapshotStoreWithLogger(
 			s.opts.Raft.DataDir,
 			int(s.opts.Raft.SnapshotRetention),

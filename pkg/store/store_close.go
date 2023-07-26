@@ -95,7 +95,6 @@ func (s *store) Close() error {
 		"raft transport": s.raftTransport,
 		"raft database":  s.kvData,
 		"raft log db":    s.logDB,
-		"raft stable db": s.stableDB,
 	} {
 		s.log.Debug("closing " + name)
 		if err := closer.Close(); err != nil {
