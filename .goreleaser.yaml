@@ -148,6 +148,26 @@ archives:
       - goos: windows
         format: zip
 
+brews:
+  - ids: [webmesh]
+    folder: Formula
+    homepage: https://webmeshproj.github.io
+    description: WebMesh is a service mesh for the web
+    license: Apache 2.0
+    url_template: "https://github.com/webmeshproj/node/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    skip_upload: auto
+    repository:
+      owner: webmeshproj
+      name: homebrew-repo
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: Avi Zimmerman
+      email: avi.zimmerman@gmail.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    test: |
+      system "#{bin}/webmesh-node --version"
+      system "#{bin}/wmctl --version"
+
 nfpms:
   - id: webmesh
     maintainer: Avi Zimmerman <avi.zimmerman@gmail.com>
@@ -162,6 +182,25 @@ nfpms:
       - rpm
       - apk
       - archlinux
+
+# chocolateys:
+#   - ids: [webmesh]
+#     summary: WebMesh is a service mesh for the web
+#     description: |
+#       {{ .ProjectName }} installer package.
+#       WebMesh is a service mesh for the web
+#     owners: Webmesh Project
+#     authors: Avi Zimmerman
+#     project_url: https://webmeshproj.github.io
+#     docs_url: https://webmeshproj.github.io
+#     bug_tracker_url: "https://github.com/webmeshproj/node/issues"
+#     url_template: "https://github.com/webmeshproj/node/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+#     copyright: 2023 Avi Zimmerman
+#     license_url: https://github.com/webmeshproj/node/blob/main/LICENSE
+#     require_license_acceptance: false
+#     project_source_url: https://github.com/webmeshproj/node
+#     release_notes: "https://github.com/webmeshproj/node/releases/tag/v{{ .Version }}"
+#     api_key: '{{ .Env.CHOCOLATEY_API_KEY }}'
 
 signs:
   - cmd: cosign

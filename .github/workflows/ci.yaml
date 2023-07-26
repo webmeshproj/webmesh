@@ -143,6 +143,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v4
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         with:
           version: latest
           args: release --parallelism=${{ env.RELEASE_PARALLELISM }} ${{ steps.release-args.outputs.args }}
