@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -390,14 +389,4 @@ func (s *store) Stepdown(wait bool) error {
 		return nil
 	}
 	return f.Error()
-}
-
-type LogStoreCloser interface {
-	io.Closer
-	raft.LogStore
-}
-
-type StableStoreCloser interface {
-	io.Closer
-	raft.StableStore
 }

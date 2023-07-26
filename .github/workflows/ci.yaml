@@ -12,7 +12,7 @@ env:
   GO_VERSION: ^1.20
   NODE_VERSION: 18
   GOLANGCI_LINT_VERSION: v1.53.2
-  DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm
+  DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
 
 jobs:
   lint:
@@ -120,7 +120,7 @@ jobs:
 
       - name: Build Release Binaries
         shell: bash
-        run: make -j2 dist-linux dist-windows dist-darwin DIST_PARALLEL=2
+        run: make -j2 dist-linux dist-windows dist-darwin DIST_PARALLEL=4
 
       - name: Compute Binary Checksums
         shell: bash
@@ -150,18 +150,16 @@ jobs:
           echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
 
       - name: Build Alpine Images
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         id: alpine-build
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.alpine-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
-          cache-to: type=gha
-          cache-from: type=gha
 
       - name: Build Distroless Images
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         id: distroless-build
         with:
           context: .
