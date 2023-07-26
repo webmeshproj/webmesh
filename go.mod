@@ -35,9 +35,9 @@ require (
 	github.com/webmeshproj/raft-badger v0.0.0-20230726000837-2c984b2835ec
 	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090
-	golang.org/x/sync v0.1.0
+	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.10.0
-	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b
+	golang.zx2c4.com/wireguard v0.0.0-20230704135630-469159ecf7d1
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/grpc v1.55.0
 	google.golang.org/protobuf v1.31.0

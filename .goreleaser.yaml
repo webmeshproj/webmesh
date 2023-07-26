@@ -1,21 +1,119 @@
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
+project_name: webmesh
+
 before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
     # you may remove this if you don't need go generate
     - go generate ./...
+
 builds:
-  - env:
+  - id: node
+    main: cmd/node/main.go
+    binary: webmesh-node
+    env:
       - CGO_ENABLED=0
+    tags:
+      - osusergo
+      - netgo
+    ldflags:
+      - -s -w 
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.BuildDate={{.Date}}
     goos:
       - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - '386'
+      - ppc64le
+      - s390x
+      - mips64le
+      - mips64
+      - mipsle
+      - mips
+
+  - id: wmctl
+    main: cmd/wmctl/main.go
+    binary: wmctl
+    env:
+      - CGO_ENABLED=0
+    tags:
+      - osusergo
+      - netgo
+    ldflags:
+      - -s -w 
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.BuildDate={{.Date}}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - '386'
+      - ppc64le
+      - s390x
+      - mips64le
+      - mips64
+      - mipsle
+      - mips
+
+upx:
+  - enabled: true
+    compress: best
+    lzma: true
+    goos: 
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - '386'
+      - ppc64le
+      - mips
+      - mipsle
+    ids:
+      - node
+      - wmctl
+
+  - enabled: true
+    compress: best
+    lzma: true
+    goos: 
+      - darwin
+    goarch:
+      - amd64
+    ids:
+      - node
+      - wmctl
+
+  - enabled: true
+    compress: best
+    lzma: true
+    goos: 
+      - windows
+    goarch:
+      - amd64
+      - '386'
+    ids:
+      - node
+      - wmctl
 
 archives:
   - format: tar.gz
+    builds:
+      - node
+      - wmctl
     # this name template makes the OS and Arch compatible with the results of uname.
     name_template: >-
       {{ .ProjectName }}_
@@ -26,18 +124,30 @@ archives:
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     # use zip for windows archives
     format_overrides:
-    - goos: windows
-      format: zip
+      - goos: windows
+        format: zip
+
+nfpms:
+  - maintainer: Avi Zimmerman <avi.zimmerman@gmail.com>
+    description: WebMesh is a service mesh for the web
+    homepage: https://webmeshproj.github.io
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+      - apk
+
 checksum:
   name_template: 'checksums.txt'
+
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
+      - '^examples:'
 
 # The lines beneath this are called `modelines`. See `:help modeline`
 # Feel free to remove those if you don't want/use them.
