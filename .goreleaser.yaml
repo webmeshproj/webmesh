@@ -3,8 +3,8 @@ project_name: webmesh
 before:
   hooks:
     - go mod tidy
-    # The dashboard is buggy on windows systems depending on the setup
-    - "{{ if ne .Runtime.Goos \"windows\" }} go generate ./...{{ else }} echo {{ end }}"
+    - go generate ./...
+
 builds:
   - id: node
     main: cmd/node/main.go
