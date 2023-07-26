@@ -1,14 +1,10 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
 project_name: webmesh
 
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
-    - go generate ./...
-
+    # The dashboard is buggy on windows systems depending on the setup
+    - "{{ if ne .Runtime.Goos \"windows\" }} go generate ./...{{ else }} echo {{ end }}"
 builds:
   - id: node
     main: cmd/node/main.go
@@ -38,6 +34,25 @@ builds:
       - mips64
       - mipsle
       - mips
+
+  - id: node-docker-linux
+    main: cmd/node/main.go
+    binary: webmesh-node
+    env:
+      - CGO_ENABLED=0
+    tags:
+      - osusergo
+      - netgo
+    ldflags:
+      - -s -w 
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/$(NAME)/pkg/version.BuildDate={{.Date}}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
 
   - id: wmctl
     main: cmd/wmctl/main.go
@@ -132,6 +147,9 @@ nfpms:
     description: WebMesh is a service mesh for the web
     homepage: https://webmeshproj.github.io
     license: Apache 2.0
+    builds:
+      - node
+      - wmctl
     formats:
       - deb
       - rpm
@@ -148,6 +166,11 @@ changelog:
   filters:
     exclude:
       - '^examples:'
+
+release:
+  ids:
+    - node
+    - wmctl
 
 # The lines beneath this are called `modelines`. See `:help modeline`
 # Feel free to remove those if you don't want/use them.
