@@ -168,6 +168,9 @@ changelog:
       - '^examples:'
 
 release:
+  github:
+    owner: webmeshproj
+    name: node
   ids:
     - node
     - wmctl

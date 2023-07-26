@@ -212,3 +212,5 @@ jobs:
         with:
           version: latest
           args: release --clean --fail-fast
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
