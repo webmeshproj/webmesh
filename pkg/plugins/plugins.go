@@ -37,14 +37,6 @@ import (
 )
 
 var (
-	// BuiltIns are the built-in plugins.
-	BuiltIns = map[string]clients.PluginClient{
-		"ipam":       clients.NewInProcessClient(&ipam.Plugin{}),
-		"mtls":       clients.NewInProcessClient(&mtls.Plugin{}),
-		"basic-auth": clients.NewInProcessClient(&basicauth.Plugin{}),
-		"ldap":       clients.NewInProcessClient(&ldap.Plugin{}),
-	}
-
 	// ErrUnsupported is returned when a plugin capability is not supported
 	// by any of the registered plugins.
 	ErrUnsupported = status.Error(codes.Unimplemented, "unsupported plugin capability")
@@ -52,6 +44,12 @@ var (
 
 // NewManager creates a new plugin manager.
 func NewManager(ctx context.Context, db storage.Storage, opts *Options) (Manager, error) {
+	builtIns := map[string]clients.PluginClient{
+		"ipam":       clients.NewInProcessClient(&ipam.Plugin{}),
+		"mtls":       clients.NewInProcessClient(&mtls.Plugin{}),
+		"basic-auth": clients.NewInProcessClient(&basicauth.Plugin{}),
+		"ldap":       clients.NewInProcessClient(&ldap.Plugin{}),
+	}
 	var auth, ipamv4, ipamv6 clients.PluginClient
 	allPlugins := make(map[string]clients.PluginClient)
 	stores := make([]clients.PluginClient, 0)
@@ -61,7 +59,7 @@ func NewManager(ctx context.Context, db storage.Storage, opts *Options) (Manager
 		log.Info("loading plugin", "name", name)
 		log.Debug("plugin configuration", "config", cfg)
 		// Load the plugin.
-		plugin, err := newPluginClient(ctx, name, cfg)
+		plugin, err := newPluginClient(ctx, builtIns, name, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("load plugin %q: %w", name, err)
 		}
@@ -103,7 +101,7 @@ func NewManager(ctx context.Context, db storage.Storage, opts *Options) (Manager
 	}
 	// If both IPAM plugins are unconfigured, use the in-process IPAM plugin.
 	if ipamv4 == nil && ipamv6 == nil {
-		ipam := BuiltIns["ipam"]
+		ipam := builtIns["ipam"]
 		if _, err := ipam.Configure(ctx, &v1.PluginConfiguration{}); err != nil {
 			return nil, fmt.Errorf("configure in-process IPAM plugin: %w", err)
 		}
@@ -126,9 +124,9 @@ func NewManager(ctx context.Context, db storage.Storage, opts *Options) (Manager
 	return m, nil
 }
 
-func newPluginClient(ctx context.Context, name string, cfg *Config) (clients.PluginClient, error) {
+func newPluginClient(ctx context.Context, builtIns map[string]clients.PluginClient, name string, cfg *Config) (clients.PluginClient, error) {
 	// Check if the plugin is a built-in.
-	if builtIn, ok := BuiltIns[name]; ok {
+	if builtIn, ok := builtIns[name]; ok {
 		return builtIn, nil
 	}
 	// Special case of in-lined implementation

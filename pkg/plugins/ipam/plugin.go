@@ -44,6 +44,7 @@ type Plugin struct {
 
 	data    storage.Storage
 	datamux sync.Mutex
+	closec  chan struct{}
 }
 
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {
@@ -59,6 +60,7 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 }
 
 func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*emptypb.Empty, error) {
+	p.closec = make(chan struct{})
 	return &emptypb.Empty{}, nil
 }
 
@@ -66,11 +68,16 @@ func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
 	p.datamux.Lock()
 	p.data = plugindb.Open(srv)
 	p.datamux.Unlock()
-	<-srv.Context().Done()
-	return nil
+	select {
+	case <-p.closec:
+		return nil
+	case <-srv.Context().Done():
+		return srv.Context().Err()
+	}
 }
 
 func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	defer close(p.closec)
 	return &emptypb.Empty{}, p.data.Close()
 }
 

@@ -127,8 +127,7 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 ##@ Testing
 
 COVERAGE_FILE ?= coverage.out
-TEST_PARALLEL ?= 1
-TEST_ARGS     ?= -v -cover -tags "$(BUILD_TAGS)" -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
+TEST_ARGS     ?= -v -cover -tags "$(BUILD_TAGS)" -coverprofile=$(COVERAGE_FILE) -covermode=atomic
 test: fmt vet
 	go test $(TEST_ARGS) ./...
 	go tool cover -func=$(COVERAGE_FILE)
