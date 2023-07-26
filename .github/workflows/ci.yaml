@@ -120,7 +120,7 @@ jobs:
 
       - name: Build Release Binaries
         shell: bash
-        run: make -j2 dist-linux dist-windows dist-darwin DIST_PARALLEL=2
+        run: make -j2 dist-linux dist-windows dist-darwin DIST_PARALLEL=4
 
       - name: Compute Binary Checksums
         shell: bash
