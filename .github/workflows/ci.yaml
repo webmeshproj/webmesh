@@ -105,10 +105,6 @@ jobs:
           check-latest: true
           cache-dependency-path: go.sum
 
-      - name: Download Go Modules
-        shell: bash
-        run: go mod download -x
-
       - name: Setup Cosign
         uses: sigstore/cosign-installer@main
 
@@ -122,7 +118,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
-          args: release --snapshot --clean
+          args: release --snapshot --clean --fail-fast
 
       - name: Login to GHCR
         uses: docker/login-action@v2
@@ -173,12 +169,6 @@ jobs:
           cosign sign --yes --recursive ${ALPINE_IMAGE_NAME}@${{ steps.alpine-build.outputs.digest }}
           cosign sign --yes --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.distroless-build.outputs.digest }}
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: artifacts
-          path: dist/*
-
   publish:
     name: Publish Artifacts
     runs-on: ubuntu-latest
@@ -189,15 +179,36 @@ jobs:
       id-token: "write"
       packages: "write"
     steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v2
+      - name: Checkout Code
+        uses: actions/checkout@v3
         with:
-          name: artifacts
-          path: dist
+          fetch-depth: 0
 
-      - name: Publish Artifacts
-        uses: softprops/action-gh-release@v1
+      - name: Setup Node
+        uses: actions/setup-node@v2
         with:
-          name: "Release ${{ github.ref_name }}"
-          files: |
-            dist/*
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache Node Modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            web/dashboard/.yarn/cache
+            web/dashboard/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('web/dashboard/yarn.lock') }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+          cache-dependency-path: go.sum
+
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@main
+
+      - name: Run Goreleaser
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          version: latest
+          args: release --clean --fail-fast
