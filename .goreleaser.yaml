@@ -182,6 +182,17 @@ nfpms:
       - rpm
       - apk
       - archlinux
+    recommends:
+      - wireguard-tools
+    archlinux:
+      packager: Avi Zimmerman <avi.zimmerman@gmail.com>
+      pkgbase: webmesh
+    overrides:
+      rpm:
+        dependencies:
+          - elrepo-release
+          - epel-release
+          - kmod-wireguard
 
 # chocolateys:
 #   - ids: [webmesh]
