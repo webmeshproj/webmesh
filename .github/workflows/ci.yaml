@@ -140,6 +140,8 @@ jobs:
 
       - name: Run Goreleaser
         uses: goreleaser/goreleaser-action@v4
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           version: latest
           args: release ${{ steps.release-args.outputs.args }}
