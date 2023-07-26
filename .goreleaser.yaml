@@ -211,6 +211,7 @@ signs:
       - "--yes"
       - "--oidc-issuer=https://token.actions.githubusercontent.com"
       - "--output-signature=${signature}"
+      - "--output-certificate=${signature}.cert"
       - "${artifact}"
     artifacts: checksum
 
@@ -228,6 +229,7 @@ release:
     - webmesh
   extra_files:
     - glob: dist/*.sig
+    - glob: dist/*.sig.cert
 
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
