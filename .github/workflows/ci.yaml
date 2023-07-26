@@ -114,11 +114,22 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Get Release Args
+        shell: bash
+        id: release-args
+        run: |
+          if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
+              ARGS="--clean --fail-fast"
+          else
+              ARGS="--snapshot --clean --fail-fast"
+          fi
+          echo "args=${ARGS}" >> "${GITHUB_OUTPUT}"
+
       - name: Build Binaries
         uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
-          args: release --snapshot --clean --fail-fast
+          args: release ${{ steps.release-args.outputs.args }}
 
       - name: Login to GHCR
         uses: docker/login-action@v2
@@ -134,14 +145,14 @@ jobs:
         run: |
           ALPINE_IMAGES="${ALPINE_IMAGE_NAME}:latest,${ALPINE_IMAGE_NAME}:${{ github.sha }}"
           DISTROLESS_IMAGES="${DISTROLESS_IMAGE_NAME}:latest,${DISTROLESS_IMAGE_NAME}:${{ github.sha }}"
-          if [[ ${{ github.ref_name }} =~ ^v.* ]] ; then
-            ALPINE_IMAGES+=",${ALPINE_IMAGE_NAME}:${{ github.ref_name }}"
-            DISTROLESS_IMAGES+=",${DISTROLESS_IMAGE_NAME}:${{ github.ref_name }}"
+          if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
+              ALPINE_IMAGES+=",${ALPINE_IMAGE_NAME}:${{ github.ref_name }}"
+              DISTROLESS_IMAGES+=",${DISTROLESS_IMAGE_NAME}:${{ github.ref_name }}"
           fi
           echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
           echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build Alpine Images
+      - name: Build Alpine Container Images
         uses: docker/build-push-action@v4
         id: alpine-build
         with:
@@ -150,7 +161,7 @@ jobs:
           tags: ${{ steps.tags.outputs.alpine-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
 
-      - name: Build Distroless Images
+      - name: Build Distroless Container Images
         uses: docker/build-push-action@v4
         id: distroless-build
         with:
@@ -160,7 +171,7 @@ jobs:
           tags: ${{ steps.tags.outputs.distroless-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
 
-      - name: Sign Images
+      - name: Sign Container Images
         shell: bash
         if: ${{ github.event_name != 'pull_request' }}
         env:
@@ -168,49 +179,3 @@ jobs:
         run: |
           cosign sign --yes --recursive ${ALPINE_IMAGE_NAME}@${{ steps.alpine-build.outputs.digest }}
           cosign sign --yes --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.distroless-build.outputs.digest }}
-
-  publish:
-    name: Publish Artifacts
-    runs-on: ubuntu-latest
-    needs: [tests, build]
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}
-    permissions:
-      contents: "write"
-      id-token: "write"
-      packages: "write"
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            web/dashboard/.yarn/cache
-            web/dashboard/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('web/dashboard/yarn.lock') }}
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          check-latest: true
-          cache-dependency-path: go.sum
-
-      - name: Setup Cosign
-        uses: sigstore/cosign-installer@main
-
-      - name: Run Goreleaser
-        uses: goreleaser/goreleaser-action@v4
-        with:
-          version: latest
-          args: release --clean --fail-fast
-        env:
-          GITHUB_TOKEN: ${{ github.token }}

@@ -23,7 +23,7 @@ help: ## Display this help.
 
 GORELEASER ?= go run github.com/goreleaser/goreleaser@latest
 
-BUILD_ARGS ?= --snapshot --clean
+BUILD_ARGS ?= --snapshot --skip-sign --clean
 build: fmt vet ## Build node and wmctl binary for the local platform.
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl
 

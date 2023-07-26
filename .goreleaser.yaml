@@ -124,6 +124,24 @@ upx:
       - node
       - wmctl
 
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+signs:
+  - cmd: cosign
+    env:
+      - COSIGN_EXPERIMENTAL=1
+    args:
+      - "sign-blob"
+      - "--yes"
+      - "--oidc-issuer=https://token.actions.githubusercontent.com"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+    artifacts: all
+
 archives:
   - format: tar.gz
     builds:
@@ -154,12 +172,6 @@ nfpms:
       - deb
       - rpm
       - apk
-
-checksum:
-  name_template: 'checksums.txt'
-
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
 
 changelog:
   sort: asc
