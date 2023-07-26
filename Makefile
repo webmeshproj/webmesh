@@ -40,7 +40,7 @@ ifeq ($(OS),windows)
 # The windows binary is built via Linux in CI.
 build: fmt vet ## Build node binary for the local platform.
 else
-build: fmt vet generate ## Build node binary for the local platform.
+build: fmt vet generate
 endif
 	CGO_ENABLED=0 go build \
 		-tags "$(BUILD_TAGS)" \
@@ -58,7 +58,7 @@ build-ctl: fmt vet ## Build wmctl binary for the local platform.
 DIST_TEMPLATE := {{.Dir}}_{{.OS}}_{{.Arch}}
 DIST_PARALLEL ?= -1
 
-LINUX_ARCHS := amd64 arm64 arm 386 s390x ppc64le # mips64 mips64le
+LINUX_ARCHS := amd64 arm64 arm 386 s390x ppc64le mips64 mips64le mips mipsle
 dist-linux: generate ## Build distribution binaries for all Linux platforms.
 	go run github.com/mitchellh/gox@latest \
 		-os="linux" \
@@ -68,8 +68,14 @@ dist-linux: generate ## Build distribution binaries for all Linux platforms.
 		-parallel="$(DIST_PARALLEL)" \
 		-output="$(DIST)/$(DIST_TEMPLATE)" \
 		./cmd/$(NAME) ./cmd/$(CTL)
-	# We can only compress the amd/arm/386 binaries due to upx limitations.
-	upx --best --lzma $(DIST)/*_linux_amd64 $(DIST)/*_linux_arm* $(DIST)/*_linux_386
+	# We can compress all but the s390x/mips64 binaries.
+	upx --best --lzma \
+		$(DIST)/*_linux_amd64 \
+		$(DIST)/*_linux_arm* \
+		$(DIST)/*_linux_386 \
+		$(DIST)/*_linux_ppc64le \
+		$(DIST)/*_linux_mips \
+		$(DIST)/*_linux_mipsle
 
 WINDOWS_ARCHS := amd64
 dist-windows: generate ## Build distribution binaries for Windows.
