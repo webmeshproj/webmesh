@@ -122,7 +122,7 @@ jobs:
           if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
               ARGS="--clean --fail-fast"
           else
-              ARGS="--snapshot --clean --fail-fast --skip-sign"
+              ARGS="--snapshot --clean --fail-fast"
           fi
           echo "args=${ARGS}" >> "${GITHUB_OUTPUT}"
 
