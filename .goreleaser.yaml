@@ -173,7 +173,7 @@ signs:
       - "--oidc-issuer=https://token.actions.githubusercontent.com"
       - "--output-signature=${signature}"
       - "${artifact}"
-    artifacts: all
+    artifacts: checksum
 
 changelog:
   sort: asc
@@ -187,6 +187,8 @@ release:
     name: node
   ids:
     - webmesh
+  extra_files:
+    - glob: dist/*.sig
 
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
