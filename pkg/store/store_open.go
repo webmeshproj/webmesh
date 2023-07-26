@@ -39,6 +39,7 @@ func (s *store) Open(ctx context.Context) (err error) {
 	}
 	log := s.log
 	handleErr := func(err error) error {
+		s.kvSubCancel()
 		log.Error("failed to open store", slog.String("error", err.Error()))
 		if s.raftTransport != nil {
 			defer s.raftTransport.Close()

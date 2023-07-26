@@ -151,6 +151,7 @@ func New(opts *Options) (Store, error) {
 		readyErr:    make(chan error, 2),
 		nwTaskGroup: &taskGroup,
 		log:         log.With(slog.String("node-id", string(nodeID))),
+		kvSubCancel: func() {},
 	}
 	st.nw = net.New(st, &net.Options{
 		InterfaceName:         opts.WireGuard.InterfaceName,

@@ -39,6 +39,7 @@ func (s *store) Close() error {
 	// Stop the observers
 	close(s.observerClose)
 	<-s.observerDone
+	s.kvSubCancel()
 	if s.nw != nil {
 		defer func() {
 			s.log.Debug("closing network manager")
