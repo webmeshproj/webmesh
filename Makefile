@@ -22,8 +22,8 @@ help: ## Display this help.
 ##@ Build
 
 GORELEASER ?= go run github.com/goreleaser/goreleaser@latest
+BUILD_ARGS ?= --snapshot --clean --skip-sign
 
-BUILD_ARGS ?= --snapshot --skip-sign --clean
 build: fmt vet ## Build node and wmctl binary for the local platform.
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl
 
@@ -86,4 +86,4 @@ generate: ## Run go generate against code.
 	go generate ./...
 
 clean: ## Clean up build and development artifacts.
-	rm -rf dist
+	rm -rf dist/ $(COVERAGE_FILE)

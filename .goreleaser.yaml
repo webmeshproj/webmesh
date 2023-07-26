@@ -130,6 +130,39 @@ checksum:
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 
+archives:
+  - id: webmesh
+    format: tar.gz
+    builds:
+      - node
+      - wmctl
+    # this name template makes the OS and Arch compatible with the results of uname.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+
+nfpms:
+  - id: webmesh
+    maintainer: Avi Zimmerman <avi.zimmerman@gmail.com>
+    description: WebMesh is a service mesh for the web
+    homepage: https://webmeshproj.github.io
+    license: Apache 2.0
+    builds:
+      - node
+      - wmctl
+    formats:
+      - deb
+      - rpm
+      - apk
+      - archlinux
+
 signs:
   - cmd: cosign
     env:
@@ -142,37 +175,6 @@ signs:
       - "${artifact}"
     artifacts: all
 
-archives:
-  - format: tar.gz
-    builds:
-      - node
-      - wmctl
-    # this name template makes the OS and Arch compatible with the results of uname.
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
-    format_overrides:
-      - goos: windows
-        format: zip
-
-nfpms:
-  - maintainer: Avi Zimmerman <avi.zimmerman@gmail.com>
-    description: WebMesh is a service mesh for the web
-    homepage: https://webmeshproj.github.io
-    license: Apache 2.0
-    builds:
-      - node
-      - wmctl
-    formats:
-      - deb
-      - rpm
-      - apk
-
 changelog:
   sort: asc
   filters:
@@ -184,10 +186,7 @@ release:
     owner: webmeshproj
     name: node
   ids:
-    - node
-    - wmctl
+    - webmesh
 
-# The lines beneath this are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/use them.
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj

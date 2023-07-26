@@ -114,18 +114,31 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Get Release Args
+      - name: Compute Release Args
         shell: bash
         id: release-args
         run: |
           if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
               ARGS="--clean --fail-fast"
           else
-              ARGS="--snapshot --clean --fail-fast"
+              ARGS="--snapshot --clean --fail-fast --skip-sign"
           fi
           echo "args=${ARGS}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build Binaries
+      - name: Compute Image Tags
+        shell: bash
+        id: image-tags
+        run: |
+          ALPINE_IMAGES="${ALPINE_IMAGE_NAME}:latest,${ALPINE_IMAGE_NAME}:${{ github.sha }}"
+          DISTROLESS_IMAGES="${DISTROLESS_IMAGE_NAME}:latest,${DISTROLESS_IMAGE_NAME}:${{ github.sha }}"
+          if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
+              ALPINE_IMAGES+=",${ALPINE_IMAGE_NAME}:${{ github.ref_name }}"
+              DISTROLESS_IMAGES+=",${DISTROLESS_IMAGE_NAME}:${{ github.ref_name }}"
+          fi
+          echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
+          echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run Goreleaser
         uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
@@ -139,26 +152,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Get Image Tags
-        shell: bash
-        id: tags
-        run: |
-          ALPINE_IMAGES="${ALPINE_IMAGE_NAME}:latest,${ALPINE_IMAGE_NAME}:${{ github.sha }}"
-          DISTROLESS_IMAGES="${DISTROLESS_IMAGE_NAME}:latest,${DISTROLESS_IMAGE_NAME}:${{ github.sha }}"
-          if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
-              ALPINE_IMAGES+=",${ALPINE_IMAGE_NAME}:${{ github.ref_name }}"
-              DISTROLESS_IMAGES+=",${DISTROLESS_IMAGE_NAME}:${{ github.ref_name }}"
-          fi
-          echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
-          echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
-
       - name: Build Alpine Container Images
         uses: docker/build-push-action@v4
         id: alpine-build
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.tags.outputs.alpine-images }}
+          tags: ${{ steps.image-tags.outputs.alpine-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
 
       - name: Build Distroless Container Images
@@ -168,7 +168,7 @@ jobs:
           context: .
           file: Dockerfile.distroless
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.tags.outputs.distroless-images }}
+          tags: ${{ steps.image-tags.outputs.distroless-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
 
       - name: Sign Container Images
