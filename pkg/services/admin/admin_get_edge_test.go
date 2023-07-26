@@ -31,8 +31,7 @@ func TestGetEdge(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	server, close := newTestServer(ctx, t)
-	defer close()
+	server := newTestServer(t)
 
 	// Place a dummy peer
 	key, err := wgtypes.GenerateKey()

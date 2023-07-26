@@ -27,8 +27,7 @@ import (
 func TestPutGroup(t *testing.T) {
 	t.Parallel()
 
-	server, closer := newTestServer(context.Background(), t)
-	defer closer()
+	server := newTestServer(t)
 
 	tt := []testCase[v1.Group]{
 		{

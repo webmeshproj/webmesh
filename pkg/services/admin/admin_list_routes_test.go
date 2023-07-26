@@ -27,8 +27,7 @@ func TestListRoutes(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	server, close := newTestServer(context.Background(), t)
-	defer close()
+	server := newTestServer(t)
 
 	// Empty condition
 	routes, err := server.ListRoutes(ctx, nil)

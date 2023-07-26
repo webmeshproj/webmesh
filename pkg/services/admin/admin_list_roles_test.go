@@ -27,8 +27,7 @@ func TestListRoles(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	server, close := newTestServer(ctx, t)
-	defer close()
+	server := newTestServer(t)
 
 	// There is no empty condition due to system roles created during bootstrap
 

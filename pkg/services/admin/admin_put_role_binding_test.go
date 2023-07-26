@@ -29,8 +29,7 @@ import (
 func TestPutRoleBinding(t *testing.T) {
 	t.Parallel()
 
-	server, closer := newTestServer(context.Background(), t)
-	defer closer()
+	server := newTestServer(t)
 
 	// Pre-create a role to use for testing
 	_, err := server.PutRole(context.Background(), &v1.Role{

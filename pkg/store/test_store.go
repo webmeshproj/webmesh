@@ -30,7 +30,7 @@ import (
 // NewTestStore creates a new test store and waits for it to be ready.
 // The context is used to enforce startup timeouts.
 func NewTestStore(ctx context.Context) (Store, error) {
-	st, err := New(newTestOptions(ctx))
+	st, err := New(newTestOptions())
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Store, 
 	for i := 0; i < numNodes; i++ {
 		thisID := fmt.Sprintf("node-%d", i)
 		thisAddr := fmt.Sprintf("127.0.0.1:%d", startPort+i)
-		opts[i] = newTestOptions(ctx)
+		opts[i] = newTestOptions()
 		opts[i].Mesh.NodeID = thisID
 		opts[i].Bootstrap.AdvertiseAddress = thisAddr
 		opts[i].Bootstrap.Servers = strings.Join(bootstrapServers, ",")
@@ -99,7 +99,7 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Store, 
 	return stores, nil
 }
 
-func newTestOptions(ctx context.Context) *Options {
+func newTestOptions() *Options {
 	opts := NewOptions()
 	opts.Raft.ConnectionTimeout = 100 * time.Millisecond
 	opts.Raft.HeartbeatTimeout = 100 * time.Millisecond

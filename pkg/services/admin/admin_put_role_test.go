@@ -30,8 +30,7 @@ func TestPutRole(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	server, closer := newTestServer(ctx, t)
-	defer closer()
+	server := newTestServer(t)
 
 	tt := []testCase[v1.Role]{
 		{

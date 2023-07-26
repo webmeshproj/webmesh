@@ -21,16 +21,12 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/node/pkg/context"
 )
 
 func TestDeleteRoute(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	server, close := newTestServer(ctx, t)
-	defer close()
+	server := newTestServer(t)
 
 	tc := []testCase[v1.Route]{
 		{

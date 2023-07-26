@@ -27,13 +27,17 @@ import (
 	"github.com/webmeshproj/node/pkg/store"
 )
 
-func newTestServer(ctx context.Context, t *testing.T) (*Server, func()) {
+func newTestServer(t *testing.T) *Server {
 	t.Helper()
+	ctx := context.Background()
 	store, err := store.NewTestStore(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("error creating test store: %w", err))
 	}
-	return New(store, true), func() { store.Close() }
+	t.Cleanup(func() {
+		store.Close()
+	})
+	return New(store, true)
 }
 
 type testCase[REQ any] struct {

@@ -17,12 +17,8 @@ limitations under the License.
 package clients
 
 import (
-	"io"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/node/pkg/context"
@@ -47,22 +43,8 @@ func (p *inProcessPlugin) Configure(ctx context.Context, in *v1.PluginConfigurat
 }
 
 func (p *inProcessPlugin) InjectQuerier(ctx context.Context, opts ...grpc.CallOption) (v1.Plugin_InjectQuerierClient, error) {
-	schan := make(chan *v1.PluginQuery, 1)
-	rchan := make(chan *v1.PluginQueryResult, 1)
-	ctx, cancel := context.WithCancel(ctx)
-	srv := &inProcessQueryServer{ctx, schan, rchan}
-	cli := &inProcessQueryClient{ctx, cancel, schan, rchan}
-	go func() {
-		defer cancel()
-		err := p.server.InjectQuerier(srv)
-		if err != nil {
-			if err != io.EOF && status.Code(err) != codes.Unimplemented {
-				context.LoggerFrom(ctx).Error("error in plugin query", "error", err)
-			}
-		}
-	}()
-	p.queryStream = cli
-	return cli, nil
+	p.queryStream = inProcessQueryPipe(ctx, p.server)
+	return p.queryStream, nil
 }
 
 func (p *inProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {

@@ -21,36 +21,56 @@ import (
 	"io"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/node/pkg/context"
 )
 
-type inProcessQueryClient struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	schan  chan *v1.PluginQuery
-	rchan  chan *v1.PluginQueryResult
+func inProcessQueryPipe(ctx context.Context, server v1.PluginServer) v1.Plugin_InjectQuerierClient {
+	schan := make(chan *v1.PluginQuery, 1)
+	rchan := make(chan *v1.PluginQueryResult, 1)
+	ctx, cancel := context.WithCancel(ctx)
+	srv := &inProcessStreamServer[v1.PluginQuery, v1.PluginQueryResult]{ctx, schan, rchan}
+	cli := &inProcessStreamClient[v1.PluginQuery, v1.PluginQueryResult]{ctx, cancel, schan, rchan}
+	go func() {
+		defer cancel()
+		err := server.InjectQuerier(srv)
+		if err != nil {
+			if err != io.EOF && status.Code(err) != codes.Unimplemented {
+				context.LoggerFrom(ctx).Error("error in plugin query", "error", err)
+			}
+		}
+	}()
+	return cli
 }
 
-func (p *inProcessQueryClient) Context() context.Context {
+type inProcessStreamClient[REQ, RESP any] struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	schan  chan *REQ
+	rchan  chan *RESP
+}
+
+func (p *inProcessStreamClient[REQ, RESP]) Context() context.Context {
 	return p.ctx
 }
 
-func (p *inProcessQueryClient) Header() (metadata.MD, error) {
+func (p *inProcessStreamClient[REQ, RESP]) Header() (metadata.MD, error) {
 	return nil, nil
 }
 
-func (p *inProcessQueryClient) Trailer() metadata.MD {
+func (p *inProcessStreamClient[REQ, RESP]) Trailer() metadata.MD {
 	return nil
 }
 
-func (p *inProcessQueryClient) CloseSend() error {
+func (p *inProcessStreamClient[REQ, RESP]) CloseSend() error {
 	p.cancel()
 	return nil
 }
 
-func (p *inProcessQueryClient) Recv() (*v1.PluginQuery, error) {
+func (p *inProcessStreamClient[REQ, RESP]) Recv() (*REQ, error) {
 	select {
 	case <-p.ctx.Done():
 		return nil, io.EOF
@@ -59,11 +79,11 @@ func (p *inProcessQueryClient) Recv() (*v1.PluginQuery, error) {
 	}
 }
 
-func (p *inProcessQueryClient) RecvMsg(m interface{}) error {
+func (p *inProcessStreamClient[REQ, RESP]) RecvMsg(m interface{}) error {
 	return errors.New("not implemented")
 }
 
-func (p *inProcessQueryClient) Send(in *v1.PluginQueryResult) error {
+func (p *inProcessStreamClient[REQ, RESP]) Send(in *RESP) error {
 	select {
 	case <-p.ctx.Done():
 		return p.ctx.Err()
@@ -76,32 +96,32 @@ func (p *inProcessQueryClient) Send(in *v1.PluginQueryResult) error {
 	return nil
 }
 
-func (p *inProcessQueryClient) SendMsg(m interface{}) error {
-	return p.Send(m.(*v1.PluginQueryResult))
+func (p *inProcessStreamClient[REQ, RESP]) SendMsg(m interface{}) error {
+	return p.Send(m.(*RESP))
 }
 
-type inProcessQueryServer struct {
+type inProcessStreamServer[REQ, RESP any] struct {
 	ctx   context.Context
-	schan chan *v1.PluginQuery
-	rchan chan *v1.PluginQueryResult
+	schan chan *REQ
+	rchan chan *RESP
 }
 
-func (p *inProcessQueryServer) Context() context.Context {
+func (p *inProcessStreamServer[REQ, RESP]) Context() context.Context {
 	return p.ctx
 }
 
-func (p *inProcessQueryServer) SetHeader(metadata.MD) error {
+func (p *inProcessStreamServer[REQ, RESP]) SetHeader(metadata.MD) error {
 	return nil
 }
 
-func (p *inProcessQueryServer) SendHeader(m metadata.MD) error {
+func (p *inProcessStreamServer[REQ, RESP]) SendHeader(m metadata.MD) error {
 	return nil
 }
 
-func (p *inProcessQueryServer) SetTrailer(metadata.MD) {
+func (p *inProcessStreamServer[REQ, RESP]) SetTrailer(metadata.MD) {
 }
 
-func (p *inProcessQueryServer) Send(in *v1.PluginQuery) error {
+func (p *inProcessStreamServer[REQ, RESP]) Send(in *REQ) error {
 	select {
 	case <-p.ctx.Done():
 		return p.ctx.Err()
@@ -114,11 +134,11 @@ func (p *inProcessQueryServer) Send(in *v1.PluginQuery) error {
 	return nil
 }
 
-func (p *inProcessQueryServer) SendMsg(m interface{}) error {
-	return p.Send(m.(*v1.PluginQuery))
+func (p *inProcessStreamServer[REQ, RESP]) SendMsg(m interface{}) error {
+	return p.Send(m.(*REQ))
 }
 
-func (p *inProcessQueryServer) Recv() (*v1.PluginQueryResult, error) {
+func (p *inProcessStreamServer[REQ, RESP]) Recv() (*RESP, error) {
 	select {
 	case <-p.ctx.Done():
 		return nil, io.EOF
@@ -127,6 +147,6 @@ func (p *inProcessQueryServer) Recv() (*v1.PluginQueryResult, error) {
 	}
 }
 
-func (p *inProcessQueryServer) RecvMsg(m interface{}) error {
+func (p *inProcessStreamServer[REQ, RESP]) RecvMsg(m interface{}) error {
 	return errors.New("not implemented")
 }

@@ -167,7 +167,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
-	go func() {
+	go func(ctx context.Context) {
 		defer close(s.readyErr)
 		s.log.Info("waiting for raft to become ready")
 		<-s.ReadyNotify(ctx)
@@ -206,7 +206,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 			}
 			s.readyErr <- err
 		}
-	}()
+	}(ctx)
 	return nil
 }
 

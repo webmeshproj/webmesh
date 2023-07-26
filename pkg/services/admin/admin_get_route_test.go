@@ -29,8 +29,7 @@ func TestGetRoute(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	server, close := newTestServer(ctx, t)
-	defer close()
+	server := newTestServer(t)
 
 	// Pre populate the store with a route
 	_, err := server.PutRoute(ctx, &v1.Route{
