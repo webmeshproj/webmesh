@@ -23,7 +23,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // GetDefaultGateway returns the default gateway of the current system.

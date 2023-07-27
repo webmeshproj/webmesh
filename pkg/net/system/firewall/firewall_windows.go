@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 func newFirewall(opts *Options) (Firewall, error) {

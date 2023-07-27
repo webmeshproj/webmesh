@@ -20,8 +20,8 @@ package meshapi
 import (
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
 // Server is the webmesh Mesh service.

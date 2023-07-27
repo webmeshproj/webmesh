@@ -19,7 +19,7 @@ package services
 import (
 	"flag"
 
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 const (

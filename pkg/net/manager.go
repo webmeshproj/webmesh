@@ -30,16 +30,16 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/state"
-	"github.com/webmeshproj/node/pkg/net/datachannels"
-	"github.com/webmeshproj/node/pkg/net/endpoints"
-	"github.com/webmeshproj/node/pkg/net/mesh"
-	"github.com/webmeshproj/node/pkg/net/system"
-	"github.com/webmeshproj/node/pkg/net/system/firewall"
-	"github.com/webmeshproj/node/pkg/net/wireguard"
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/net/mesh"
+	"github.com/webmeshproj/webmesh/pkg/net/system"
+	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // Options are the options for the network manager.

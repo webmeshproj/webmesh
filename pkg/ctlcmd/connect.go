@@ -28,8 +28,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/ctlcmd/connect"
-	"github.com/webmeshproj/node/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/ctlcmd/connect"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 )
 
 var connectOpts connect.Options

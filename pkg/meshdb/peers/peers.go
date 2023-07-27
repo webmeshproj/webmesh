@@ -34,7 +34,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // ErrNodeNotFound is returned when a node is not found.

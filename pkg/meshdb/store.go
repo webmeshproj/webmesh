@@ -22,9 +22,9 @@ import (
 	"github.com/hashicorp/raft"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/webmeshproj/node/pkg/net/wireguard"
-	"github.com/webmeshproj/node/pkg/plugins"
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Store is the interface for interacting with the mesh database. It is a reduced

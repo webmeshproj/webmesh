@@ -32,13 +32,13 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/meshdb/networking"
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/meshdb/rbac"
-	"github.com/webmeshproj/node/pkg/meshdb/state"
-	meshnet "github.com/webmeshproj/node/pkg/net"
-	"github.com/webmeshproj/node/pkg/storage"
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	meshnet "github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 func (s *store) bootstrap(ctx context.Context) error {

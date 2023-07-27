@@ -31,10 +31,10 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/net/system"
-	"github.com/webmeshproj/node/pkg/net/system/link"
-	"github.com/webmeshproj/node/pkg/net/system/routes"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/net/system"
+	"github.com/webmeshproj/webmesh/pkg/net/system/link"
+	"github.com/webmeshproj/webmesh/pkg/net/system/routes"
 )
 
 // DefaultInterfaceName is the default name to use for the WireGuard interface.

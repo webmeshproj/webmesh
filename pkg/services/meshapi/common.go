@@ -20,7 +20,7 @@ import (
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
 func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Server) *v1.MeshNode {

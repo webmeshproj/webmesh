@@ -16,9 +16,9 @@ builds:
       - netgo
     ldflags:
       - -s -w 
-      - -X github.com/webmeshproj/node/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/node/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/node/pkg/version.BuildDate={{.Date}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
     goos:
       - linux
       - windows
@@ -45,9 +45,9 @@ builds:
       - netgo
     ldflags:
       - -s -w 
-      - -X github.com/webmeshproj/node/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/node/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/node/pkg/version.BuildDate={{.Date}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
     goos:
       - linux
     goarch:
@@ -64,9 +64,9 @@ builds:
       - netgo
     ldflags:
       - -s -w 
-      - -X github.com/webmeshproj/node/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/node/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/node/pkg/version.BuildDate={{.Date}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
     goos:
       - linux
       - windows
@@ -142,7 +142,7 @@ brews:
     homepage: https://webmeshproj.github.io
     description: WebMesh is a service mesh for the web
     license: Apache 2.0
-    url_template: "https://github.com/webmeshproj/node/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/webmeshproj/webmesh/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     skip_upload: auto
     repository:
       owner: webmeshproj
@@ -204,7 +204,7 @@ changelog:
 release:
   github:
     owner: webmeshproj
-    name: node
+    name: webmesh
   ids:
     - webmesh
   extra_files:

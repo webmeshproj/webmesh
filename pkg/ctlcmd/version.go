@@ -19,7 +19,7 @@ package ctlcmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/webmeshproj/node/pkg/version"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 func init() {

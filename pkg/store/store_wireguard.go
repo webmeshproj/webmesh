@@ -25,10 +25,10 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/meshdb/state"
-	meshnet "github.com/webmeshproj/node/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 )
 
 func (s *store) recoverWireguard(ctx context.Context) error {

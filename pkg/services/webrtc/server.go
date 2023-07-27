@@ -21,9 +21,9 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 
-	"github.com/webmeshproj/node/pkg/meshdb"
-	"github.com/webmeshproj/node/pkg/meshdb/state"
-	"github.com/webmeshproj/node/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
 // Server is the webmesh WebRTC service.

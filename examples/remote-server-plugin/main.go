@@ -9,11 +9,11 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/plugins"
-	"github.com/webmeshproj/node/pkg/plugins/plugindb"
-	"github.com/webmeshproj/node/pkg/storage"
-	"github.com/webmeshproj/node/pkg/version"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 func main() {

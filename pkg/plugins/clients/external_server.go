@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // ExternalServerConfig is the configuration for an external plugin server.

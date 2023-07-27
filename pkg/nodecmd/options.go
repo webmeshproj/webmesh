@@ -25,9 +25,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/webmeshproj/node/pkg/nodecmd/global"
-	"github.com/webmeshproj/node/pkg/services"
-	"github.com/webmeshproj/node/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/nodecmd/global"
+	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/store"
 )
 
 // Options are the node options.

@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/webmeshproj/node/pkg/ctlcmd/pki"
+	"github.com/webmeshproj/webmesh/pkg/ctlcmd/pki"
 )
 
 var (

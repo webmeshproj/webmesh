@@ -28,8 +28,8 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // State is the interface for querying mesh state.

@@ -21,8 +21,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/webmeshproj/node/pkg/context"
 	"golang.org/x/exp/slog"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 func Exec(ctx context.Context, command string, args ...string) error {

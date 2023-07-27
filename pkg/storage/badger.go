@@ -26,7 +26,7 @@ import (
 	"github.com/dgraph-io/badger/v4/pb"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 type badgerStorage struct {

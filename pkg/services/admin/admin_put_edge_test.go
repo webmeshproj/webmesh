@@ -24,7 +24,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
 
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
 func TestPutEdge(t *testing.T) {

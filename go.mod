@@ -1,4 +1,4 @@
-module github.com/webmeshproj/node
+module github.com/webmeshproj/webmesh
 
 go 1.20
 

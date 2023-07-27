@@ -24,7 +24,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 const admin = "admin"

@@ -27,7 +27,7 @@ import (
 	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
 
-	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // NewKernel creates a new kernel WireGuard interface on the host system with the given name.

@@ -28,7 +28,7 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 
-	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // Serve is a convenience function for serving a plugin. It should be used

@@ -27,8 +27,8 @@ import (
 	"github.com/pion/webrtc/v3"
 	"github.com/spf13/cobra"
 
-	"github.com/webmeshproj/node/pkg/ctlcmd/portforward"
-	"github.com/webmeshproj/node/pkg/net/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/ctlcmd/portforward"
+	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 )
 
 func init() {

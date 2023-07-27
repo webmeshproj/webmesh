@@ -27,8 +27,8 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb/raftlogs"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/raftlogs"
 )
 
 // Snapshot returns a Raft snapshot.

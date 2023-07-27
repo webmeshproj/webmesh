@@ -32,14 +32,14 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
-	"github.com/webmeshproj/node/pkg/meshdb/state"
-	"github.com/webmeshproj/node/pkg/net"
-	meshnet "github.com/webmeshproj/node/pkg/net"
-	"github.com/webmeshproj/node/pkg/net/wireguard"
-	"github.com/webmeshproj/node/pkg/plugins"
-	"github.com/webmeshproj/node/pkg/storage"
-	"github.com/webmeshproj/node/pkg/store/streamlayer"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/net"
+	meshnet "github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/store/streamlayer"
 )
 
 var (

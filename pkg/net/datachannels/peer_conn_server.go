@@ -27,7 +27,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // ServerPeerConnection represents a connection to a peer where we

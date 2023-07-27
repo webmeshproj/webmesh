@@ -22,9 +22,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/node/pkg/context"
-	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
-	"github.com/webmeshproj/node/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
 var getRoleBindingAction = rbac.Actions{

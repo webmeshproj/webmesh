@@ -31,16 +31,16 @@ import (
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/services/admin"
-	"github.com/webmeshproj/node/pkg/services/dashboard"
-	"github.com/webmeshproj/node/pkg/services/meshapi"
-	"github.com/webmeshproj/node/pkg/services/meshdns"
-	"github.com/webmeshproj/node/pkg/services/node"
-	"github.com/webmeshproj/node/pkg/services/peerdiscovery"
-	"github.com/webmeshproj/node/pkg/services/turn"
-	"github.com/webmeshproj/node/pkg/services/webrtc"
-	"github.com/webmeshproj/node/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/services/admin"
+	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
+	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
+	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
+	"github.com/webmeshproj/webmesh/pkg/services/node"
+	"github.com/webmeshproj/webmesh/pkg/services/peerdiscovery"
+	"github.com/webmeshproj/webmesh/pkg/services/turn"
+	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
+	"github.com/webmeshproj/webmesh/pkg/store"
 )
 
 // Server is the gRPC server.

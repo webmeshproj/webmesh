@@ -26,13 +26,13 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/webmeshproj/node/pkg/net/endpoints"
-	"github.com/webmeshproj/node/pkg/net/wireguard"
-	"github.com/webmeshproj/node/pkg/plugins"
-	"github.com/webmeshproj/node/pkg/services"
-	"github.com/webmeshproj/node/pkg/store"
-	"github.com/webmeshproj/node/pkg/store/streamlayer"
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/store/streamlayer"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 const (

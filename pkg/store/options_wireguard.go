@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/webmeshproj/node/pkg/net/system"
-	"github.com/webmeshproj/node/pkg/net/wireguard"
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/net/system"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 const (

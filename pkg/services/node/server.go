@@ -31,12 +31,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/node/pkg/meshdb/networking"
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
-	"github.com/webmeshproj/node/pkg/meshdb/state"
-	"github.com/webmeshproj/node/pkg/services/rbac"
-	"github.com/webmeshproj/node/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/store"
 )
 
 // Server is the webmesh node service.

@@ -27,8 +27,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/webmeshproj/node/pkg/services/meshdns"
-	"github.com/webmeshproj/node/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
+	"github.com/webmeshproj/webmesh/pkg/store"
 )
 
 // Options are options for configuring the connect command.

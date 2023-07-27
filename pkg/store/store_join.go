@@ -29,10 +29,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/context"
-	meshnet "github.com/webmeshproj/node/pkg/net"
-	"github.com/webmeshproj/node/pkg/plugins/basicauth"
-	"github.com/webmeshproj/node/pkg/plugins/ldap"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	meshnet "github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/plugins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
 )
 
 func (s *store) joinWithPeerDiscovery(ctx context.Context) error {

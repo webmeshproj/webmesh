@@ -34,7 +34,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/webmeshproj/node/pkg/ctlcmd/config"
+	"github.com/webmeshproj/webmesh/pkg/ctlcmd/config"
 )
 
 const (

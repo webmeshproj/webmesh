@@ -26,8 +26,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/node/pkg/net/datachannels"
-	"github.com/webmeshproj/node/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
 var canNegDataChannelAction = rbac.Actions{

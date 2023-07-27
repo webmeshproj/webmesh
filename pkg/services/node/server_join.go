@@ -29,11 +29,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
-	"github.com/webmeshproj/node/pkg/net/mesh"
-	"github.com/webmeshproj/node/pkg/services/leaderproxy"
-	"github.com/webmeshproj/node/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/net/mesh"
+	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
+	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
 var canVoteAction = &rbac.Action{

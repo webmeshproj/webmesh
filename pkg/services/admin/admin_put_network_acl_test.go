@@ -23,7 +23,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 
-	"github.com/webmeshproj/node/pkg/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 )
 
 func TestPutNetworkACL(t *testing.T) {

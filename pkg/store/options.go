@@ -26,8 +26,8 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/plugins"
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // Options are the options for the store.

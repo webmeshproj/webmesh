@@ -34,13 +34,13 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/plugins/basicauth"
-	"github.com/webmeshproj/node/pkg/plugins/ldap"
-	"github.com/webmeshproj/node/pkg/services/dashboard"
-	"github.com/webmeshproj/node/pkg/services/leaderproxy"
-	"github.com/webmeshproj/node/pkg/store"
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/plugins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
+	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
+	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
+	"github.com/webmeshproj/webmesh/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 const (

@@ -19,7 +19,7 @@ package routes
 import (
 	"context"
 
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // EnableIPForwarding enables IP forwarding.

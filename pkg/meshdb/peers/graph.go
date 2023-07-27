@@ -25,7 +25,7 @@ import (
 
 	"github.com/dominikbraun/graph"
 
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // GraphStore implements graph.Store[string, Node] where

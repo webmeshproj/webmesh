@@ -24,7 +24,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
 func (s *store) observe() (closeCh, doneCh chan struct{}) {

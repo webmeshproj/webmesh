@@ -22,7 +22,7 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // SetInterfaceAddress sets the address of the interface with the given name.

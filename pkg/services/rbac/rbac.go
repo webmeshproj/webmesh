@@ -23,10 +23,10 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/meshdb"
-	rbacdb "github.com/webmeshproj/node/pkg/meshdb/rbac"
-	"github.com/webmeshproj/node/pkg/services/leaderproxy"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
 // Evaluator is an interface for evaluating actions.
@@ -67,11 +67,11 @@ func (a *Action) action() *v1.RBACAction {
 // NewStoreEvaluator returns a ActionEvaluator that evaluates actions
 // against the roles in the given store.
 func NewStoreEvaluator(store meshdb.Store) Evaluator {
-	return &storeEvaluator{rbac: rbacdb.New(store.Storage())}
+	return &storeEvaluator{rbac: rbac.New(store.Storage())}
 }
 
 type storeEvaluator struct {
-	rbac rbacdb.RBAC
+	rbac rbac.RBAC
 }
 
 // Evaluate returns true if the given action is allowed for the peer information provided in the context.

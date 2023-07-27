@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/webmeshproj/node/pkg/ctlcmd"
+	"github.com/webmeshproj/webmesh/pkg/ctlcmd"
 )
 
 func main() {

@@ -28,7 +28,7 @@ import (
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Snapshotter is an interface for taking and restoring snapshots.

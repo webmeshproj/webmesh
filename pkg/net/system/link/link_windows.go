@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // Below functions are no-ops on Windows except for InterfaceNetwork.

@@ -33,7 +33,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/version"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // Plugin is the basicauth plugin.

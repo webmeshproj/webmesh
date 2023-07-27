@@ -27,9 +27,9 @@ import (
 	raftbadger "github.com/webmeshproj/raft-badger"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/meshdb/snapshots"
-	"github.com/webmeshproj/node/pkg/plugins"
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Open opens the store.

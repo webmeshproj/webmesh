@@ -22,7 +22,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 const anchorFile = "/etc/pf.anchors/com.webmesh"

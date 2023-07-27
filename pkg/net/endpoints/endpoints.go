@@ -23,8 +23,8 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/webmeshproj/node/pkg/net/system/link"
-	"github.com/webmeshproj/node/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/net/system/link"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // DetectOpts contains options for endpoint detection.

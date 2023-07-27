@@ -27,13 +27,13 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/plugins/basicauth"
-	"github.com/webmeshproj/node/pkg/plugins/clients"
-	"github.com/webmeshproj/node/pkg/plugins/ipam"
-	"github.com/webmeshproj/node/pkg/plugins/ldap"
-	"github.com/webmeshproj/node/pkg/plugins/mtls"
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/plugins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
+	"github.com/webmeshproj/webmesh/pkg/plugins/ipam"
+	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
+	"github.com/webmeshproj/webmesh/pkg/plugins/mtls"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var (

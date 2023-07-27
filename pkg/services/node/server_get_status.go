@@ -26,7 +26,7 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/webmeshproj/node/pkg/version"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.Status, error) {

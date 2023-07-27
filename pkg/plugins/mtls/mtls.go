@@ -28,7 +28,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/version"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // Plugin is the mTLS plugin.

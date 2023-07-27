@@ -22,8 +22,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/services/leaderproxy"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
 func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empty, error) {

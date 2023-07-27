@@ -31,10 +31,10 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/services"
-	"github.com/webmeshproj/node/pkg/store"
-	"github.com/webmeshproj/node/pkg/util"
-	"github.com/webmeshproj/node/pkg/version"
+	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 var (

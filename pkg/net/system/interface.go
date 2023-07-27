@@ -26,9 +26,9 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/node/pkg/context"
-	"github.com/webmeshproj/node/pkg/net/system/link"
-	"github.com/webmeshproj/node/pkg/net/system/routes"
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/net/system/link"
+	"github.com/webmeshproj/webmesh/pkg/net/system/routes"
 )
 
 // DefaultMTU is the default MTU for wireguard interfaces.

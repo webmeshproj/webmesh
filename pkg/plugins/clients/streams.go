@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 func inProcessQueryPipe(ctx context.Context, server v1.PluginServer) v1.Plugin_InjectQuerierClient {

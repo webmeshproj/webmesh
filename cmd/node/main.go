@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/webmeshproj/node/pkg/nodecmd"
+	"github.com/webmeshproj/webmesh/pkg/nodecmd"
 )
 
 func main() {

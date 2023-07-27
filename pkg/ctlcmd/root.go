@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/webmeshproj/node/pkg/ctlcmd/config"
+	"github.com/webmeshproj/webmesh/pkg/ctlcmd/config"
 )
 
 var (

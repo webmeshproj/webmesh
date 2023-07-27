@@ -30,7 +30,7 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
 
-	"github.com/webmeshproj/node/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // GetDefaultGateway returns the default gateway of the current system.

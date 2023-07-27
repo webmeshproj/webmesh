@@ -22,7 +22,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/webmeshproj/node/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 func TestSnapshotter(t *testing.T) {
