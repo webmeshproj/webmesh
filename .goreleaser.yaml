@@ -105,17 +105,6 @@ upx:
     compress: best
     lzma: true
     goos: 
-      - darwin
-    goarch:
-      - amd64
-    ids:
-      - node
-      - wmctl
-
-  - enabled: true
-    compress: best
-    lzma: true
-    goos: 
       - windows
     goarch:
       - amd64
@@ -136,7 +125,6 @@ archives:
     builds:
       - node
       - wmctl
-    # this name template makes the OS and Arch compatible with the results of uname.
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -193,25 +181,6 @@ nfpms:
           - elrepo-release
           - epel-release
           - kmod-wireguard
-
-# chocolateys:
-#   - ids: [webmesh]
-#     summary: WebMesh is a service mesh for the web
-#     description: |
-#       {{ .ProjectName }} installer package.
-#       WebMesh is a service mesh for the web
-#     owners: Webmesh Project
-#     authors: Avi Zimmerman
-#     project_url: https://webmeshproj.github.io
-#     docs_url: https://webmeshproj.github.io
-#     bug_tracker_url: "https://github.com/webmeshproj/node/issues"
-#     url_template: "https://github.com/webmeshproj/node/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-#     copyright: 2023 Avi Zimmerman
-#     license_url: https://github.com/webmeshproj/node/blob/main/LICENSE
-#     require_license_acceptance: false
-#     project_source_url: https://github.com/webmeshproj/node
-#     release_notes: "https://github.com/webmeshproj/node/releases/tag/v{{ .Version }}"
-#     api_key: '{{ .Env.CHOCOLATEY_API_KEY }}'
 
 signs:
   - cmd: cosign
