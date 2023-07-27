@@ -1,7 +1,7 @@
 # Webmesh
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/webmeshproj/node)](https://goreportcard.com/report/github.com/webmeshproj/node)
-![Build and Tests](https://github.com/webmeshproj/node/actions/workflows/ci.yaml/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/webmeshproj/webmesh)](https://goreportcard.com/report/github.com/webmeshproj/webmesh)
+![Build and Tests](https://github.com/webmeshproj/webmesh/actions/workflows/ci.yaml/badge.svg)
 
 Webmesh is a simple, distributed, and zero-configuration WireGuard™ mesh solution for Linux, FreeBSD, macOS, and Windows.
 It is designed to be easy to use, and to work well with existing network infrastructure.
