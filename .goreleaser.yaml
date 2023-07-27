@@ -16,9 +16,9 @@ builds:
       - netgo
     ldflags:
       - -s -w 
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.BuildDate={{.Date}}
+      - -X github.com/webmeshproj/node/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/node/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/node/pkg/version.BuildDate={{.Date}}
     goos:
       - linux
       - windows
@@ -45,9 +45,9 @@ builds:
       - netgo
     ldflags:
       - -s -w 
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.BuildDate={{.Date}}
+      - -X github.com/webmeshproj/node/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/node/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/node/pkg/version.BuildDate={{.Date}}
     goos:
       - linux
     goarch:
@@ -64,9 +64,9 @@ builds:
       - netgo
     ldflags:
       - -s -w 
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/$(NAME)/pkg/version.BuildDate={{.Date}}
+      - -X github.com/webmeshproj/node/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/node/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/node/pkg/version.BuildDate={{.Date}}
     goos:
       - linux
       - windows
