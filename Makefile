@@ -32,7 +32,7 @@ dist: fmt vet ## Build distribution binaries and packages for all platforms.
 
 DOCKER ?= docker
 
-docker-build: docker-build-bin ## Build the node docker image
+docker-build: docker-build-bin ## Build the node docker image for the current architecture.
 	$(DOCKER) build \
 		-f Dockerfile \
 		--build-arg PREFIX=node-docker-linux \
@@ -40,7 +40,7 @@ docker-build: docker-build-bin ## Build the node docker image
 		--build-arg TARGETARCH=$(ARCH) \
 		-t $(IMAGE) .
 
-docker-build-distroless: docker-build-bin ## Build the distroless node docker image
+docker-build-distroless: docker-build-bin ## Build the distroless node docker image for the current architecture.
 	$(DOCKER) build \
 		-f Dockerfile.distroless \
 		--build-arg PREFIX=node-docker-linux \
@@ -49,7 +49,7 @@ docker-build-distroless: docker-build-bin ## Build the distroless node docker im
 		-t $(DISTROLESS_IMAGE) .
 
 docker-build-bin:
-	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux
+	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux --single-target
 
 docker-push: docker-build ## Push the node docker image
 	$(DOCKER) push $(IMAGE)
