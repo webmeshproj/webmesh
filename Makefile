@@ -22,13 +22,13 @@ help: ## Display this help.
 ##@ Build
 
 GORELEASER ?= go run github.com/goreleaser/goreleaser@latest
-BUILD_ARGS ?= --snapshot --clean --skip-sign
+BUILD_ARGS ?= --snapshot --clean
 
 build: fmt vet ## Build node and wmctl binary for the local platform.
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl
 
 dist: fmt vet ## Build distribution binaries and packages for all platforms.
-	$(GORELEASER) release $(BUILD_ARGS)
+	$(GORELEASER) release --skip-sign $(BUILD_ARGS)
 
 DOCKER ?= docker
 
