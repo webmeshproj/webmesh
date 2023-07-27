@@ -86,13 +86,14 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), contextHandler(s.timeout, s.handleObserversLookup))
 	mux.HandleFunc(domPattern, contextHandler(s.timeout, s.handleMeshLookup))
 	mux.HandleFunc("", contextHandler(s.timeout, s.handleForwardLookup))
+	hdlr := s.validateRequest(s.denyZoneTransfers(mux.ServeDNS))
 	// Start the servers
 	var g errgroup.Group
 	if s.opts.UDPListenAddr != "" {
 		s.udpServer = &dns.Server{
 			Addr:    s.opts.UDPListenAddr,
 			Net:     "udp",
-			Handler: s.validateRequest(s.denyZoneTransfers(mux.ServeDNS)),
+			Handler: hdlr,
 		}
 		g.Go(func() error {
 			s.log.Info(fmt.Sprintf("starting meshdns udp server on %s", s.opts.UDPListenAddr))
@@ -103,7 +104,7 @@ func (s *Server) ListenAndServe() error {
 		s.tcpServer = &dns.Server{
 			Addr:    s.opts.TCPListenAddr,
 			Net:     "tcp",
-			Handler: mux,
+			Handler: hdlr,
 		}
 		g.Go(func() error {
 			s.log.Info(fmt.Sprintf("starting meshdns tcp server on %s", s.opts.UDPListenAddr))
