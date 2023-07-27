@@ -234,6 +234,9 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
 	}
 	s.meshDomain = s.opts.Bootstrap.MeshDomain
+	if !strings.HasSuffix(s.meshDomain, ".") {
+		s.meshDomain += "."
+	}
 	err = s.Storage().Put(ctx, state.MeshDomainKey, s.meshDomain)
 	if err != nil {
 		return fmt.Errorf("set mesh domain to db: %w", err)

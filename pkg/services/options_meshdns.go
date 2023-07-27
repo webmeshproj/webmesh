@@ -42,8 +42,6 @@ type MeshDNSOptions struct {
 	ListenUDP string `yaml:"listen-udp,omitempty" json:"listen-udp,omitempty" toml:"listen-udp,omitempty"`
 	// ListenTCP is the address to listen on for TCP DNS requests.
 	ListenTCP string `json:"listen-tcp,omitempty" yaml:"listen-tcp,omitempty" toml:"listen-tcp,omitempty"`
-	// TSIGKey is the TSIG key to use for DNS updates.
-	TSIGKey string `json:"tsig-key,omitempty" yaml:"tsig-key,omitempty" toml:"tsig-key,omitempty"`
 	// ReusePort sets the number of listeners to start on each port.
 	// This is only supported on Linux.
 	ReusePort int `json:"reuse-port,omitempty" yaml:"reuse-port,omitempty" toml:"reuse-port,omitempty"`
@@ -72,8 +70,6 @@ func (o *MeshDNSOptions) BindFlags(fs *flag.FlagSet) {
 		"UDP address to listen on for DNS requests.")
 	fs.StringVar(&o.ListenTCP, "services.mesh-dns.listen-tcp", util.GetEnvDefault(MeshDNSListenTCPEnvVar, ":5353"),
 		"TCP address to listen on for DNS requests.")
-	fs.StringVar(&o.TSIGKey, "services.mesh-dns.tsig-key", util.GetEnvDefault(MeshDNSTSIGKeyEnvVar, ""),
-		"TSIG key to use for mesh DNS.")
 	fs.IntVar(&o.ReusePort, "services.mesh-dns.reuse-port", util.GetEnvIntDefault(MeshDNSReusePortEnvVar, 0),
 		"Enable SO_REUSEPORT for mesh DNS.")
 	fs.BoolVar(&o.EnableCompression, "services.mesh-dns.enable-compression", util.GetEnvDefault(MeshDNSCompressionEnvVar, "true") == "true",

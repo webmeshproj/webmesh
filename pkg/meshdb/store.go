@@ -32,6 +32,8 @@ import (
 type Store interface {
 	// ID returns the ID of the node.
 	ID() string
+	// Domain returns the domain of the mesh network.
+	Domain() string
 	// Storage returns a storage interface for use by the application.
 	Storage() storage.Storage
 	// Raft returns the underlying Raft database.

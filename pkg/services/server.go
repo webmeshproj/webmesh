@@ -96,10 +96,8 @@ func NewServer(store store.Store, o *Options) (*Server, error) {
 		server.meshdns = meshdns.NewServer(store, &meshdns.Options{
 			UDPListenAddr:  o.MeshDNS.ListenUDP,
 			TCPListenAddr:  o.MeshDNS.ListenTCP,
-			TSIGKey:        o.MeshDNS.TSIGKey,
 			ReusePort:      o.MeshDNS.ReusePort,
 			Compression:    o.MeshDNS.EnableCompression,
-			Domain:         store.Domain(),
 			RequestTimeout: o.MeshDNS.RequestTimeout,
 		})
 	}

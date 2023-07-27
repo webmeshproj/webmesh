@@ -130,7 +130,6 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 		// Start a local MeshDNS server
 		server := meshdns.NewServer(st, &meshdns.Options{
 			UDPListenAddr: fmt.Sprintf(":%d", opts.LocalDNSPort),
-			Domain:        "webmesh.internal.",
 		})
 		go func() {
 			go func() {
