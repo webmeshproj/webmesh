@@ -18,6 +18,7 @@ If you'd like to play with the project on Kubernetes, there is a work-in-progres
 It works fine on most clusters, including ephemeral docker-based ones, but is not yet ready for production use.
 
 Detailed instructions can be found in the [Getting Started](https://webmeshproj.github.io/documentation/getting-started/) guide on the project website.
+The below instructions are a quick-start guide for running a simple mesh on a single host using `docker`.
 
 ```bash
 # You can remove the --global.no-ipv6 flag if you have IPv6 connectivity on your docker network.
