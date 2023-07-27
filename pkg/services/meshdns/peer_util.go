@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package meshdns contains the Mesh DNS server.
 package meshdns
 
 import (
@@ -27,18 +26,13 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
-var (
-	errNoIPv4 = fmt.Errorf("no IPv4 address")
-	errNoIPv6 = fmt.Errorf("no IPv6 address")
-)
-
-func (s *Server) appendPeerToMessage(ctx context.Context, q dns.Question, m *dns.Msg, peerID string) error {
+func (s *Server) appendPeerToMessage(ctx context.Context, r, m *dns.Msg, peerID string) error {
 	peer, err := s.peers.Get(ctx, peerID)
 	if err != nil {
 		return err
 	}
 	fqdn := s.newFQDN(peer.ID)
-	switch q.Qtype {
+	switch r.Question[0].Qtype {
 	case dns.TypeTXT:
 		s.log.Debug("handling leader TXT question")
 		m.Answer = append(m.Answer, newPeerTXTRecord(fqdn, &peer))
@@ -58,7 +52,7 @@ func (s *Server) appendPeerToMessage(ctx context.Context, q dns.Question, m *dns
 		s.log.Debug("handling leader A question")
 		if !peer.PrivateIPv4.IsValid() {
 			s.log.Debug("no private IPv4 address for peer")
-			return errNoIPv4
+			return errNoIPv4{}
 		}
 		m.Answer = append(m.Answer, &dns.A{
 			Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
@@ -69,7 +63,7 @@ func (s *Server) appendPeerToMessage(ctx context.Context, q dns.Question, m *dns
 		s.log.Debug("handling leader AAAA question")
 		if !peer.PrivateIPv6.IsValid() {
 			s.log.Debug("no private IPv6 address for peer")
-			return errNoIPv6
+			return errNoIPv6{}
 		}
 		m.Answer = append(m.Answer, &dns.AAAA{
 			Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
@@ -78,10 +72,6 @@ func (s *Server) appendPeerToMessage(ctx context.Context, q dns.Question, m *dns
 		m.Extra = append(m.Extra, newPeerTXTRecord(fqdn, &peer))
 	}
 	return nil
-}
-
-func (s *Server) newFQDN(id string) string {
-	return fmt.Sprintf("%s.%s", id, s.store.Domain())
 }
 
 func newPeerTXTRecord(name string, peer *peers.Node) *dns.TXT {

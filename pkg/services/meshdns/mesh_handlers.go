@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package meshdns contains the Mesh DNS server.
 package meshdns
 
 import (
@@ -31,7 +30,7 @@ func (s *Server) handleMeshLookup(ctx context.Context, w dns.ResponseWriter, r *
 	s.log.Debug("handling leader lookup")
 	m := s.newMsg(r)
 	nodeID := strings.Split(r.Question[0].Name, ".")[0]
-	err := s.appendPeerToMessage(ctx, r.Question[0], m, nodeID)
+	err := s.appendPeerToMessage(ctx, r, m, nodeID)
 	if err != nil {
 		s.writeMsg(w, r, m, errToRcode(err))
 		return
@@ -54,7 +53,7 @@ func (s *Server) handleLeaderLookup(ctx context.Context, w dns.ResponseWriter, r
 		Hdr:    dns.RR_Header{Name: s.newFQDN("leader"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
 		Target: s.newFQDN(nodeID),
 	})
-	err = s.appendPeerToMessage(ctx, r.Question[0], m, nodeID)
+	err = s.appendPeerToMessage(ctx, r, m, nodeID)
 	if err != nil {
 		s.writeMsg(w, r, m, errToRcode(err))
 		return
@@ -72,7 +71,7 @@ func (s *Server) handleVotersLookup(ctx context.Context, w dns.ResponseWriter, r
 				Hdr:    dns.RR_Header{Name: s.newFQDN("voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
 				Target: s.newFQDN(string(server.ID)),
 			})
-			err := s.appendPeerToMessage(ctx, r.Question[0], m, string(server.ID))
+			err := s.appendPeerToMessage(ctx, r, m, string(server.ID))
 			if err != nil {
 				s.writeMsg(w, r, m, errToRcode(err))
 				return
@@ -92,7 +91,7 @@ func (s *Server) handleObserversLookup(ctx context.Context, w dns.ResponseWriter
 				Hdr:    dns.RR_Header{Name: s.newFQDN("voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
 				Target: s.newFQDN(string(server.ID)),
 			})
-			err := s.appendPeerToMessage(ctx, r.Question[0], m, string(server.ID))
+			err := s.appendPeerToMessage(ctx, r, m, string(server.ID))
 			if err != nil {
 				s.writeMsg(w, r, m, errToRcode(err))
 				return

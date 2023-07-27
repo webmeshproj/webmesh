@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/miekg/dns"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
@@ -46,22 +47,27 @@ type Options struct {
 	RequestTimeout time.Duration
 	// Forwaders are the DNS forwarders to use.
 	Forwarders []string
+	// CacheSize is the size of the remote DNS cache.
+	CacheSize int
 }
 
 // NewServer returns a new Mesh DNS server.
 func NewServer(store meshdb.Store, o *Options) *Server {
-	timeout := o.RequestTimeout
-	if timeout == 0 {
-		timeout = 5 * time.Second
+	log := slog.Default().With("component", "mesh-dns")
+	srv := &Server{
+		store: store,
+		peers: peers.New(store.Storage()),
+		opts:  o,
+		log:   log,
 	}
-	return &Server{
-		store:   store,
-		peers:   peers.New(store.Storage()),
-		opts:    o,
-		soa:     fmt.Sprintf("%s.%s", store.ID(), store.Domain()),
-		timeout: timeout,
-		log:     slog.Default().With("component", "mesh-dns"),
+	var err error
+	if srv.opts.CacheSize > 0 {
+		srv.cache, err = lru.New[string, *dns.Msg](srv.opts.CacheSize)
+		if err != nil {
+			log.Warn(fmt.Sprintf("failed to create cache: %s", err))
+		}
 	}
+	return srv
 }
 
 // Server is the MeshDNS server.
@@ -71,8 +77,7 @@ type Server struct {
 	opts      *Options
 	udpServer *dns.Server
 	tcpServer *dns.Server
-	soa       string
-	timeout   time.Duration
+	cache     *lru.Cache[string, *dns.Msg]
 	log       *slog.Logger
 }
 
@@ -80,12 +85,16 @@ type Server struct {
 func (s *Server) ListenAndServe() error {
 	// Register the meshdns handlers
 	domPattern := strings.TrimSuffix(s.store.Domain(), ".")
+	timeout := s.opts.RequestTimeout
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
 	mux := dns.NewServeMux()
-	mux.HandleFunc(fmt.Sprintf("leader.%s", domPattern), contextHandler(s.timeout, s.handleLeaderLookup))
-	mux.HandleFunc(fmt.Sprintf("voters.%s", domPattern), contextHandler(s.timeout, s.handleVotersLookup))
-	mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), contextHandler(s.timeout, s.handleObserversLookup))
-	mux.HandleFunc(domPattern, contextHandler(s.timeout, s.handleMeshLookup))
-	mux.HandleFunc("", contextHandler(s.timeout, s.handleForwardLookup))
+	mux.HandleFunc(fmt.Sprintf("leader.%s", domPattern), contextHandler(timeout, s.handleLeaderLookup))
+	mux.HandleFunc(fmt.Sprintf("voters.%s", domPattern), contextHandler(timeout, s.handleVotersLookup))
+	mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), contextHandler(timeout, s.handleObserversLookup))
+	mux.HandleFunc(domPattern, contextHandler(timeout, s.handleMeshLookup))
+	mux.HandleFunc("", contextHandler(timeout, s.handleForwardLookup))
 	hdlr := s.validateRequest(s.denyZoneTransfers(mux.ServeDNS))
 	// Start the servers
 	var g errgroup.Group

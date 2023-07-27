@@ -14,55 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package meshdns contains the Mesh DNS server.
 package meshdns
 
 import (
-	"context"
-	"time"
-
 	"github.com/miekg/dns"
 	"golang.org/x/exp/slog"
-
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
-
-type contextDNSHandler func(context.Context, dns.ResponseWriter, *dns.Msg)
-
-func contextHandler(timeout time.Duration, next contextDNSHandler) dns.HandlerFunc {
-	return func(w dns.ResponseWriter, r *dns.Msg) {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		next(ctx, w, r)
-	}
-}
-
-func errToRcode(err error) int {
-	switch err {
-	case nil:
-		return dns.RcodeSuccess
-	case context.DeadlineExceeded:
-		return dns.RcodeServerFailure
-	case peers.ErrNodeNotFound, errNoIPv4, errNoIPv6:
-		return dns.RcodeNameError
-	default:
-		return dns.RcodeServerFailure
-	}
-}
-
-func (s *Server) newMsg(r *dns.Msg) *dns.Msg {
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.Compress = s.opts.Compression
-	m.Authoritative = true
-	m.RecursionAvailable = true
-	// m.Response = true
-	m.Ns = []dns.RR{&dns.SOA{
-		Hdr: dns.RR_Header{Name: s.store.Domain(), Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 1},
-		Ns:  s.soa,
-	}}
-	return m
-}
 
 func (s *Server) validateRequest(next dns.HandlerFunc) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
@@ -91,16 +48,5 @@ func (s *Server) denyZoneTransfers(next dns.HandlerFunc) dns.HandlerFunc {
 			}
 		}
 		next(w, r)
-	}
-}
-
-func (s *Server) writeMsg(w dns.ResponseWriter, req, reply *dns.Msg, rcode int) {
-	s.log.Debug("responding to DNS question",
-		slog.String("response", reply.String()),
-		slog.String("rcode", dns.RcodeToString[rcode]))
-	reply.SetRcode(req, rcode)
-	err := w.WriteMsg(reply)
-	if err != nil {
-		s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
 	}
 }

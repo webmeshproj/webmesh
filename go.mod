@@ -14,6 +14,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.0-rc.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.5
 	github.com/hashicorp/go-hclog v1.5.0
+	github.com/hashicorp/golang-lru/v2 v2.0.4
 	github.com/hashicorp/raft v1.5.0
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/jsimonetti/rtnetlink v1.3.3
