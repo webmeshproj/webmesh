@@ -22,13 +22,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 )
 
 // Open opens the store.
@@ -70,8 +69,8 @@ func (s *meshStore) Open(ctx context.Context) (err error) {
 			s.log.Error("failed to apply log to plugins", slog.String("error", err.Error()))
 		}
 	}
-	s.raft = meshraft.New(s.opts.Raft)
-	err = s.raft.Start(ctx, &meshraft.StartOptions{
+	s.raft = raft.New(s.opts.Raft)
+	err = s.raft.Start(ctx, &raft.StartOptions{
 		NodeID: s.ID(),
 	})
 	if err != nil {

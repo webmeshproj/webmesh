@@ -26,7 +26,6 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 
@@ -34,21 +33,15 @@ import (
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var (
-	// ErrNotLeader is returned when a Raft request is made to a
-	// non-leader node.
-	ErrNotLeader = fmt.Errorf("not leader")
-	// ErrNotOpen is returned when a Raft request is made to a
-	// non-open store.
+	// ErrNotOpen is returned when attempting to close a store that is not open.
 	ErrNotOpen = fmt.Errorf("not open")
 	// ErrOpen is returned when a store is already open.
 	ErrOpen = fmt.Errorf("already open")
-	// ErrNotReady is returned when a store is not ready.
-	ErrNotReady = fmt.Errorf("not ready")
 )
 
 // Mesh is the connection to the Webmesh. It controls raft consensus, plugins,
@@ -58,31 +51,22 @@ type Mesh interface {
 	ID() string
 	// Domain returns the domain of the mesh network.
 	Domain() string
-	// Open opens the connection to the mesh. This must be called before the mesh
-	// can be used.
+	// Open opens the connection to the mesh. This must be called before
+	// other methods can be used.
 	Open(context.Context) error
-	// IsOpen returns true if the Mesh is open.
-	IsOpen() bool
 	// Close closes the connection to the mesh and shuts down the storage.
 	Close() error
-	// State returns the current Raft state.
-	State() raft.RaftState
 	// Leader returns the current Raft leader ID.
-	Leader() (raft.ServerID, error)
-	// LeaderAddr returns the current Raft leader's raft address.
-	LeaderAddr() (string, error)
+	Leader() (string, error)
 	// LeaderRPCAddr returns the current Raft leader's gRPC address.
 	LeaderRPCAddr(ctx context.Context) (string, error)
 	// Storage returns a storage interface for use by the application.
 	Storage() storage.Storage
-	// Raft returns the Raft interface. Note that the returned value
-	// may be nil if the store is not open.
-	Raft() meshraft.Raft
-	// WireGuard returns the WireGuard interface. Note that the returned value
-	// may be nil if the store is not open.
+	// Raft returns the Raft interface.
+	Raft() raft.Raft
+	// WireGuard returns the WireGuard interface.
 	WireGuard() wireguard.Interface
-	// Plugins returns the plugin manager. Note that the returned value
-	// may be nil if the store is not open.
+	// Plugins returns the plugin manager.
 	Plugins() plugins.Manager
 }
 
@@ -110,7 +94,7 @@ func New(opts *Options) (Mesh, error) {
 	st := &meshStore{
 		opts:        opts,
 		tlsConfig:   tlsConfig,
-		nodeID:      raft.ServerID(nodeID),
+		nodeID:      nodeID,
 		nwTaskGroup: &taskGroup,
 		log:         log.With(slog.String("node-id", string(nodeID))),
 		kvSubCancel: func() {},
@@ -159,10 +143,10 @@ func determineNodeID(log *slog.Logger, tlsConfig *tls.Config, opts *Options) str
 
 type meshStore struct {
 	opts *Options
-	raft meshraft.Raft
+	raft raft.Raft
 	log  *slog.Logger
 
-	nodeID    raft.ServerID
+	nodeID    string
 	tlsConfig *tls.Config
 	plugins   plugins.Manager
 
@@ -188,37 +172,30 @@ func (s *meshStore) Domain() string {
 	return s.meshDomain
 }
 
-// IsOpen returns true if the store is open.
-func (s *meshStore) IsOpen() bool {
-	return s.open.Load()
-}
-
 // Storage returns a storage interface for use by the application.
 func (s *meshStore) Storage() storage.Storage {
 	return s.raft.Storage()
 }
 
 // Raft returns the Raft interface.
-func (s *meshStore) Raft() meshraft.Raft { return s.raft }
+func (s *meshStore) Raft() raft.Raft {
+	return s.raft
+}
 
 // WireGuard returns the WireGuard interface. Note that the returned value
 // may be nil if the store is not open.
-func (s *meshStore) WireGuard() wireguard.Interface { return s.nw.WireGuard() }
+func (s *meshStore) WireGuard() wireguard.Interface {
+	return s.nw.WireGuard()
+}
 
 // Plugins returns the plugin manager. Note that the returned value
 // may be nil if the store is not open.
-func (s *meshStore) Plugins() plugins.Manager { return s.plugins }
-
-// State returns the current Raft state.
-func (s *meshStore) State() raft.RaftState {
-	if s.raft == nil {
-		return raft.Shutdown
-	}
-	return s.raft.Raft().State()
+func (s *meshStore) Plugins() plugins.Manager {
+	return s.plugins
 }
 
 // Leader returns the current Raft leader.
-func (s *meshStore) Leader() (raft.ServerID, error) {
+func (s *meshStore) Leader() (string, error) {
 	if s.raft == nil || !s.open.Load() {
 		return "", ErrNotOpen
 	}
@@ -226,16 +203,7 @@ func (s *meshStore) Leader() (raft.ServerID, error) {
 	if id == "" {
 		return "", fmt.Errorf("no leader")
 	}
-	return id, nil
-}
-
-// LeaderAddr returns the address of the current leader.
-func (s *meshStore) LeaderAddr() (string, error) {
-	if !s.open.Load() {
-		return "", ErrNotOpen
-	}
-	addr, _ := s.raft.Raft().LeaderWithID()
-	return string(addr), nil
+	return string(id), nil
 }
 
 // LeaderRPCAddr returns the gRPC address of the current leader.

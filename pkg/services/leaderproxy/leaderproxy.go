@@ -32,6 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 )
 
+// Interceptor is the leaderproxy interceptor.
 type Interceptor struct {
 	store    mesh.Mesh
 	dialOpts []grpc.DialOption

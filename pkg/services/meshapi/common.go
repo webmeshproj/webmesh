@@ -23,11 +23,11 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
-func dbNodeToAPINode(node *peers.Node, leader raft.ServerID, servers []raft.Server) *v1.MeshNode {
+func dbNodeToAPINode(node *peers.Node, leader string, servers []raft.Server) *v1.MeshNode {
 	return node.Proto(func() v1.ClusterStatus {
 		for _, srv := range servers {
 			if string(srv.ID) == node.ID {
-				if srv.ID == leader {
+				if string(srv.ID) == leader {
 					return v1.ClusterStatus_CLUSTER_LEADER
 				}
 				switch srv.Suffrage {

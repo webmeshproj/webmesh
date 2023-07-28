@@ -33,7 +33,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 	if req.GetId() != "" && req.GetId() != string(s.store.ID()) {
 		return s.getRemoteNodeStatus(ctx, req.GetId())
 	}
-	var leader raft.ServerID
+	var leader string
 	var err error
 	leader, err = s.store.Leader()
 	if err != nil {
@@ -76,7 +76,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 			}
 			return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
 		}(),
-		CurrentLeader:    string(leader),
+		CurrentLeader:    leader,
 		CurrentTerm:      term,
 		LastLogIndex:     s.store.Raft().Raft().LastIndex(),
 		LastApplied:      s.store.Raft().Raft().AppliedIndex(),

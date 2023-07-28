@@ -20,11 +20,11 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 )
 
 func (s *meshStore) onObservation(ev raft.Observation) {

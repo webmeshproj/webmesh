@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
@@ -37,7 +36,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
-	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
@@ -80,7 +79,7 @@ func (s *meshStore) bootstrap(ctx context.Context) error {
 		// We're done here, but restore procedure needs to be documented
 		return s.recoverWireguard(ctx)
 	}
-	var bootstrapOpts meshraft.BootstrapOptions
+	var bootstrapOpts raft.BootstrapOptions
 	bootstrapOpts.Servers = s.opts.Bootstrap.Servers
 	if s.opts.Bootstrap.AdvertiseAddress != "" {
 		bootstrapOpts.AdvertiseAddress = s.opts.Bootstrap.AdvertiseAddress
@@ -96,7 +95,7 @@ func (s *meshStore) bootstrap(ctx context.Context) error {
 		// If the error is that we already bootstrapped and
 		// there were other servers to bootstrap with, then
 		// we might just need to rejoin the cluster.
-		if errors.Is(err, raft.ErrCantBootstrap) {
+		if errors.Is(err, raft.ErrAlreadyBootstrapped) {
 			if len(s.opts.Bootstrap.Servers) > 0 {
 				s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 				s.opts.Mesh.JoinAsVoter = true
@@ -309,7 +308,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	}
 	// Pre-create slots and edges for the other bootstrap servers.
 	for _, server := range cfg.Servers {
-		if server.ID == s.nodeID {
+		if string(server.ID) == s.nodeID {
 			continue
 		}
 		s.log.Info("creating node in database for bootstrap server",
@@ -439,14 +438,10 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get leader ID: %w", err)
 	}
-	// TODO: This might create a race condition where the leader readds itself with
-	// its wireguard address before we get here. We should instead match the leader
-	// to their initial bootstrap address.
-	config := s.raft.Configuration()
 	var advertiseAddress netip.AddrPort
-	for _, server := range config.Servers {
-		if server.ID == leader {
-			advertiseAddress, err = netip.ParseAddrPort(string(server.Address))
+	for id, addr := range s.opts.Bootstrap.Servers {
+		if id == leader {
+			advertiseAddress, err = netip.ParseAddrPort(addr)
 			if err != nil {
 				return fmt.Errorf("parse advertise address: %w", err)
 			}

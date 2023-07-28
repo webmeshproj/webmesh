@@ -102,9 +102,9 @@ type Options struct {
 	ShutdownTimeout time.Duration `json:"shutdown-timeout,omitempty" yaml:"shutdown-timeout,omitempty" toml:"shutdown-timeout,omitempty"`
 
 	// Below are callbacks used internally or by external packages.
-	OnApplyLog        func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry)    `json:"-" yaml:"-" toml:"-"`
-	OnSnapshotRestore func(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) `json:"-" yaml:"-" toml:"-"`
-	OnObservation     func(ev raft.Observation)                                              `json:"-" yaml:"-" toml:"-"`
+	OnApplyLog        func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) `json:"-" yaml:"-" toml:"-"`
+	OnSnapshotRestore func(ctx context.Context, meta *SnapshotMeta, data io.ReadCloser)   `json:"-" yaml:"-" toml:"-"`
+	OnObservation     func(ev Observation)                                                `json:"-" yaml:"-" toml:"-"`
 }
 
 // NewOptions returns new raft options with the default values.

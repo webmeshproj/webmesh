@@ -19,30 +19,27 @@ limitations under the License.
 package meshdb
 
 import (
-	"github.com/hashicorp/raft"
-
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Store is the interface for interacting with the mesh database. It is a reduced
-// version of the store.Store interface.
+// version of the mesh.Mesh interface.
 type Store interface {
 	// ID returns the ID of the node.
 	ID() string
 	// Domain returns the domain of the mesh network.
 	Domain() string
+	// Leader returns the current Raft leader.
+	Leader() (string, error)
 	// Storage returns a storage interface for use by the application.
 	Storage() storage.Storage
 	// Raft returns the underlying Raft database.
-	Raft() meshraft.Raft
-	// Leader returns the current Raft leader.
-	Leader() (raft.ServerID, error)
+	Raft() raft.Raft
 	// Plugins returns the plugins for the current node.
 	Plugins() plugins.Manager
-	// WireGuard returns the Wireguard interface. Note that the returned value
-	// may be nil if the store is not open.
+	// WireGuard returns the Wireguard interface.
 	WireGuard() wireguard.Interface
 }

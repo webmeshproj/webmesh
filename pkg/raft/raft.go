@@ -47,6 +47,31 @@ var (
 	ErrNotLeader = raft.ErrNotLeader
 )
 
+type (
+	// SnapshotMeta is an alias for raft.SnapshotMeta.
+	SnapshotMeta = raft.SnapshotMeta
+	// Observation is an alias for raft.Observation.
+	Observation = raft.Observation
+	// PeerObservation is an alias for raft.PeerObservation.
+	PeerObservation = raft.PeerObservation
+	// LeaderObservation is an alias for raft.LeaderObservation.
+	LeaderObservation = raft.LeaderObservation
+)
+
+// Raft states.
+const (
+	Follower  = raft.Follower
+	Candidate = raft.Candidate
+	Leader    = raft.Leader
+	Shutdown  = raft.Shutdown
+)
+
+// Raft suffrage states.
+const (
+	Voter    = raft.Voter
+	Nonvoter = raft.Nonvoter
+)
+
 // Raft is the interface for Raft consensus and storage.
 type Raft interface {
 	// Start starts the Raft node.
