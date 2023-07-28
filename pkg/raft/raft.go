@@ -368,8 +368,6 @@ func (r *raftNode) Storage() storage.Storage {
 
 // Stop stops the Raft node.
 func (r *raftNode) Stop(ctx context.Context) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	if !r.started.Load() {
 		return ErrClosed
 	}
@@ -396,6 +394,8 @@ func (r *raftNode) Stop(ctx context.Context) error {
 			r.log.Error("failed to take snapshot", slog.String("error", err.Error()))
 		}
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.raft.State() == raft.Leader {
 		r.log.Debug("raft node is current leader")
 		// If we are the leader we need to step down first.

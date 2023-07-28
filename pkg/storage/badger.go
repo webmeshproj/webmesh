@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/pb"
@@ -196,17 +197,21 @@ type logger struct {
 	*slog.Logger
 }
 
-func (l *logger) Errorf(msg string, args ...interface{}) {
-	l.Logger.Error(fmt.Sprintf(msg, args...))
+func (l *logger) Errorf(msg string, args ...any) {
+	l.Logger.Error(format(msg, args))
 }
-func (l *logger) Warningf(msg string, args ...interface{}) {
-	l.Logger.Warn(fmt.Sprintf(msg, args...))
-}
-
-func (l *logger) Infof(msg string, args ...interface{}) {
-	l.Logger.Info(fmt.Sprintf(msg, args...))
+func (l *logger) Warningf(msg string, args ...any) {
+	l.Logger.Warn(format(msg, args))
 }
 
-func (l *logger) Debugf(msg string, args ...interface{}) {
-	l.Logger.Debug(fmt.Sprintf(msg, args...))
+func (l *logger) Infof(msg string, args ...any) {
+	l.Logger.Info(format(msg, args))
+}
+
+func (l *logger) Debugf(msg string, args ...any) {
+	l.Logger.Debug(format(msg, args))
+}
+
+func format(msg string, args []any) string {
+	return strings.TrimSpace(fmt.Sprintf(msg, args...))
 }

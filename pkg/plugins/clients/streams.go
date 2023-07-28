@@ -38,7 +38,7 @@ func inProcessQueryPipe(ctx context.Context, server v1.PluginServer) v1.Plugin_I
 		defer cancel()
 		err := server.InjectQuerier(srv)
 		if err != nil {
-			if err != io.EOF && status.Code(err) != codes.Unimplemented {
+			if err != io.EOF && err != context.Canceled && status.Code(err) != codes.Unimplemented {
 				context.LoggerFrom(ctx).Error("error in plugin query", "error", err)
 			}
 		}
