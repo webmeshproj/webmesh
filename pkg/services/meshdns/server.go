@@ -97,7 +97,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc(fmt.Sprintf("voters.%s", domPattern), contextHandler(timeout, s.handleVotersLookup))
 	mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), contextHandler(timeout, s.handleObserversLookup))
 	mux.HandleFunc(domPattern, contextHandler(timeout, s.handleMeshLookup))
-	mux.HandleFunc(".", contextHandler(timeout, s.handleForwardLookup))
+	mux.HandleFunc(".", contextHandler(timeout, s.handleDefault))
 	hdlr := s.validateRequest(s.denyZoneTransfers(mux.ServeDNS))
 	// Start the servers
 	var g errgroup.Group

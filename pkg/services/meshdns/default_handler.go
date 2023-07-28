@@ -23,12 +23,22 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
-func (s *Server) handleForwardLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
+func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
+	q := r.Question[0]
+	if q.Qtype == dns.TypeNS && q.Name == "." {
+		// This is a root NS request, return the configured root NS records
+		s.log.Debug("handling root NS request")
+		// newMsg automatically adds the NS records for the root zone
+		m := s.newMsg(r)
+		s.writeMsg(w, r, m, dns.RcodeSuccess)
+		return
+	}
 	s.log.Debug("handling forward lookup")
 	if len(s.opts.Forwarders) == 0 {
 		// If there are no forwarders, return a NXDOMAIN
 		s.log.Debug("forward request with no forwarders configured")
-		s.writeMsg(w, r, nil, dns.RcodeNameError)
+		m := s.newMsg(r)
+		s.writeMsg(w, r, m, dns.RcodeNameError)
 		return
 	}
 	for _, forwarder := range s.opts.Forwarders {
