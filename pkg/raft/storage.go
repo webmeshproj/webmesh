@@ -90,7 +90,7 @@ func (r *raftNode) createDataStores(ctx context.Context) error {
 		return err
 	}
 	storePath := r.opts.StorePath()
-	raftstore, err := raftbadger.New(r.log.With("raftbadger"), storePath)
+	raftstore, err := raftbadger.New(r.log.With("component", "raftbadger"), storePath)
 	if err != nil {
 		return fmt.Errorf("new raft badger: %w", err)
 	}

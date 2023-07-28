@@ -33,9 +33,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.0.0
 	github.com/webmeshproj/api v0.2.0
-	github.com/webmeshproj/raft-badger v0.0.0-20230726000837-2c984b2835ec
+	github.com/webmeshproj/raft-badger v0.0.0-20230728220038-2f75bbd4d5ed
 	golang.org/x/crypto v0.11.0
-	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090
+	golang.org/x/exp v0.0.0-20230728194245-b0cb94b80691
 	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.10.0
 	golang.zx2c4.com/wireguard v0.0.0-20230704135630-469159ecf7d1
