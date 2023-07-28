@@ -40,7 +40,7 @@ func (s *Server) handleForwardLookup(ctx context.Context, w dns.ResponseWriter, 
 		}
 		s.log.Debug("forward lookup succeeded", slog.Duration("rtt", rtt))
 		if m.Rcode != dns.RcodeNameError {
-			s.writeMsg(w, r, m, dns.RcodeNameError)
+			s.writeMsg(w, r, m, m.Rcode)
 			return
 		}
 		// If the forwarder returned NXDOMAIN, try the next forwarder
