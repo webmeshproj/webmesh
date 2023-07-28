@@ -27,8 +27,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
-	"github.com/webmeshproj/webmesh/pkg/store"
 )
 
 // Options are options for configuring the connect command.
@@ -74,13 +74,13 @@ type Options struct {
 // is used to stop the node.
 func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	// Configure the raft store
-	storeOpts := store.NewOptions()
+	storeOpts := mesh.NewOptions()
 	storeOpts.Raft.InMemory = true
 	storeOpts.Raft.ListenAddress = fmt.Sprintf(":%d", opts.RaftPort)
 	storeOpts.Raft.LeaveOnShutdown = true
 	storeOpts.Raft.ShutdownTimeout = time.Second * 10
 	if opts.TLSCertFile != "" && opts.TLSKeyFile != "" {
-		storeOpts.Auth.MTLS = &store.MTLSOptions{
+		storeOpts.Auth.MTLS = &mesh.MTLSOptions{
 			CertFile: opts.TLSCertFile,
 			KeyFile:  opts.TLSKeyFile,
 		}
@@ -98,7 +98,7 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	storeOpts.WireGuard.PersistentKeepAlive = time.Second * 10
 
 	// Create the store
-	st, err := store.New(storeOpts)
+	st, err := mesh.New(storeOpts)
 	if err != nil {
 		return fmt.Errorf("create store: %w", err)
 	}

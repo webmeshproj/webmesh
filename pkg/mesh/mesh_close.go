@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package mesh
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 )
 
 // Close closes the store.
-func (s *store) Close() error {
+func (s *meshStore) Close() error {
 	if !s.open.Load() {
 		return ErrNotOpen
 	}

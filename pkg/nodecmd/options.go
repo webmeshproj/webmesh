@@ -25,16 +25,16 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/nodecmd/global"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/store"
 )
 
 // Options are the node options.
 type Options struct {
 	Global *global.Options `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty"`
 
-	Mesh     *store.Options    `yaml:",inline" json:",inline" toml:",inline"`
+	Mesh     *mesh.Options     `yaml:",inline" json:",inline" toml:",inline"`
 	Services *services.Options `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
 }
 
@@ -42,7 +42,7 @@ type Options struct {
 func NewOptions() *Options {
 	return &Options{
 		Global:   global.NewOptions(),
-		Mesh:     store.NewOptions(),
+		Mesh:     mesh.NewOptions(),
 		Services: services.NewOptions(),
 	}
 }

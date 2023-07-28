@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package mesh
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
-func (s *store) onObservation(ev raft.Observation) {
+func (s *meshStore) onObservation(ev raft.Observation) {
 	s.log.Debug("received observation event", slog.String("type", reflect.TypeOf(ev.Data).String()))
 	ctx := context.Background()
 	switch data := ev.Data.(type) {

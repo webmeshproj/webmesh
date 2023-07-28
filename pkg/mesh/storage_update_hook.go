@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package mesh
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
-func (s *store) onDBUpdate(key, value string) {
+func (s *meshStore) onDBUpdate(key, value string) {
 	s.log.Debug("db update trigger", "key", key)
 	if s.testStore {
 		return
@@ -51,7 +51,7 @@ func isRouteChangeKey(key string) bool {
 	return strings.HasPrefix(key, networking.RoutesPrefix)
 }
 
-func (s *store) queueRouteUpdate() {
+func (s *meshStore) queueRouteUpdate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
@@ -79,7 +79,7 @@ func (s *store) queueRouteUpdate() {
 	})
 }
 
-func (s *store) queuePeersUpdate() {
+func (s *meshStore) queuePeersUpdate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {

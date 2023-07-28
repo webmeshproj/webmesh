@@ -32,6 +32,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/admin"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
@@ -40,7 +41,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/peerdiscovery"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
-	"github.com/webmeshproj/webmesh/pkg/store"
 )
 
 // Server is the gRPC server.
@@ -50,12 +50,12 @@ type Server struct {
 	turn      *turn.Server
 	meshdns   *meshdns.Server
 	dashboard *dashboard.Server
-	store     store.Store
+	store     mesh.Mesh
 	log       *slog.Logger
 }
 
 // NewServer returns a new Server.
-func NewServer(store store.Store, o *Options) (*Server, error) {
+func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	log := slog.Default().With("component", "server")
 	if err := o.Validate(); err != nil {
 		return nil, err

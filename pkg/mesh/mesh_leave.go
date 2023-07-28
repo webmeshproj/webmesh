@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package store provides raft consensus and data storage for webmesh nodes.
-package store
+package mesh
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 
 // leaveCluster attempts to remove this node from the cluster. The node must
 // have already relinquished leadership before calling this method.
-func (s *store) leaveCluster(ctx context.Context) error {
+func (s *meshStore) leaveCluster(ctx context.Context) error {
 	s.log.Info("leaving cluster")
 	addr, err := s.LeaderRPCAddr(ctx)
 	if err != nil {

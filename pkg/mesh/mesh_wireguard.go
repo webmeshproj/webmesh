@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package mesh
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ import (
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 )
 
-func (s *store) recoverWireguard(ctx context.Context) error {
+func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	if s.testStore {
 		return nil
 	}
@@ -82,7 +82,7 @@ func (s *store) recoverWireguard(ctx context.Context) error {
 	return s.nw.RefreshPeers(ctx)
 }
 
-func (s *store) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
+func (s *meshStore) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
 	var key wgtypes.Key
 	var err error
 	if s.opts.WireGuard.KeyFile != "" {

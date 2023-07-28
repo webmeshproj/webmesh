@@ -31,8 +31,8 @@ import (
 
 	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/store"
 	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
@@ -130,34 +130,32 @@ func Execute() error {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
 
-	log.Info("starting raft node")
-
 	// Create and open the store
-	st, err := store.New(opts.Mesh)
+	st, err := mesh.New(opts.Mesh)
 	if err != nil {
-		return fmt.Errorf("failed to create raft store: %w", err)
+		return fmt.Errorf("failed to create mesh store: %w", err)
 	}
 
 	// Add flag for timeout
 	ctx := context.Background()
 	err = st.Open(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to open raft store: %w", err)
+		return fmt.Errorf("failed to open mesh store: %w", err)
 	}
 	handleErr := func(cause error) error {
 		if err := st.Close(); err != nil {
-			log.Error("failed to shutdown raft store", slog.String("error", err.Error()))
+			log.Error("failed to shutdown mesh store", slog.String("error", err.Error()))
 		}
-		return fmt.Errorf("failed to start raft node: %w", cause)
+		return fmt.Errorf("failed to start mesh node: %w", cause)
 	}
 	// Shutdown the store on exit
 	defer func() {
-		log.Info("shutting down raft store")
+		log.Info("shutting down mesh store")
 		if err = st.Close(); err != nil {
-			log.Error("failed to shutdown raft store", slog.String("error", err.Error()))
+			log.Error("failed to shutdown mesh store", slog.String("error", err.Error()))
 		}
 	}()
-	log.Info("raft store is ready, starting services")
+	log.Info("mesh store is ready, starting services")
 
 	if opts.Mesh.Auth != nil {
 		// TODO: Copy these options to the proxy options

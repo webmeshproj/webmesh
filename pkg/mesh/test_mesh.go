@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package mesh
 
 import (
 	"context"
@@ -27,14 +27,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// NewTestStore creates a new test store and waits for it to be ready.
+// NewTestMesh creates a new test mesh and waits for it to be ready.
 // The context is used to enforce startup timeouts.
-func NewTestStore(ctx context.Context) (Store, error) {
+func NewTestMesh(ctx context.Context) (Mesh, error) {
 	st, err := New(newTestOptions())
 	if err != nil {
 		return nil, err
 	}
-	stor := st.(*store)
+	stor := st.(*meshStore)
 	stor.testStore = true
 	if err := stor.Open(ctx); err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func NewTestStore(ctx context.Context) (Store, error) {
 // created in parallel without specifying unique raft ports. If startPort
 // is 0, a default port will be used. The number of nodes must be greater
 // than 0.
-func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Store, error) {
+func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Mesh, error) {
 	const defaultStartPort = 10000
 	if startPort == 0 {
 		startPort = defaultStartPort
@@ -69,13 +69,13 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Store, 
 		opts[i].Bootstrap.Servers = strings.Join(bootstrapServers, ",")
 		opts[i].Raft.ListenAddress = thisAddr
 	}
-	stores := make([]Store, numNodes)
+	stores := make([]Mesh, numNodes)
 	for i := 0; i < numNodes; i++ {
 		st, err := New(opts[i])
 		if err != nil {
 			return nil, err
 		}
-		stor := st.(*store)
+		stor := st.(*meshStore)
 		stor.testStore = true
 		stores[i] = stor
 	}

@@ -35,11 +35,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/plugins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
-	"github.com/webmeshproj/webmesh/pkg/store"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
@@ -156,7 +156,7 @@ func (o *Options) ListenPort() (int, error) {
 }
 
 // ServerOptions converts the options to gRPC server options.
-func (o *Options) ServerOptions(store store.Store, log *slog.Logger) (srvrOptions []grpc.ServerOption, proxyOptions []grpc.DialOption, err error) {
+func (o *Options) ServerOptions(store mesh.Mesh, log *slog.Logger) (srvrOptions []grpc.ServerOption, proxyOptions []grpc.DialOption, err error) {
 	var opts []grpc.ServerOption
 	if !o.Insecure {
 		tlsConfig, err := o.TLSConfig()

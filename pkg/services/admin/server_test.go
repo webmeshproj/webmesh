@@ -24,13 +24,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/webmesh/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 )
 
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	ctx := context.Background()
-	store, err := store.NewTestStore(ctx)
+	store, err := mesh.NewTestMesh(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("error creating test store: %w", err))
 	}

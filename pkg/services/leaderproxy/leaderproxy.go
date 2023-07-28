@@ -29,16 +29,16 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/store"
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 )
 
 type Interceptor struct {
-	store    store.Store
+	store    mesh.Mesh
 	dialOpts []grpc.DialOption
 }
 
 // New returns a new leader proxy interceptor.
-func New(store store.Store, dialOpts []grpc.DialOption) *Interceptor {
+func New(store mesh.Mesh, dialOpts []grpc.DialOption) *Interceptor {
 	return &Interceptor{
 		store:    store,
 		dialOpts: dialOpts,

@@ -26,12 +26,12 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/store"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
@@ -191,7 +191,7 @@ func (o *Options) Overlay(opts ...any) error {
 					},
 				}
 			}
-		case *store.Options:
+		case *mesh.Options:
 			if !v.Mesh.NoIPv4 {
 				v.Mesh.NoIPv4 = o.NoIPv4
 			}
@@ -206,7 +206,7 @@ func (o *Options) Overlay(opts ...any) error {
 			}
 			if o.MTLS {
 				if v.Auth.MTLS == nil {
-					v.Auth.MTLS = &store.MTLSOptions{
+					v.Auth.MTLS = &mesh.MTLSOptions{
 						CertFile: o.TLSCertFile,
 						KeyFile:  o.TLSKeyFile,
 					}

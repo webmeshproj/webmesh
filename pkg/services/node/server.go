@@ -31,19 +31,19 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/store"
 )
 
 // Server is the webmesh node service.
 type Server struct {
 	v1.UnimplementedNodeServer
 
-	store      store.Store
+	store      mesh.Mesh
 	peers      peers.Peers
 	meshstate  state.State
 	rbac       rbacdb.RBAC
@@ -66,7 +66,7 @@ type Server struct {
 // NewServer returns a new Server. Features are used for returning what features are enabled.
 // It is the callers responsibility to ensure those servers are registered on the node.
 // Insecure is used to disable authorization.
-func NewServer(store store.Store, proxyCreds []grpc.DialOption, features []v1.Feature, insecure bool) *Server {
+func NewServer(store mesh.Mesh, proxyCreds []grpc.DialOption, features []v1.Feature, insecure bool) *Server {
 	var rbaceval rbac.Evaluator
 	if insecure {
 		rbaceval = rbac.NewNoopEvaluator()

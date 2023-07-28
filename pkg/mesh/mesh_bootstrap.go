@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package mesh
 
 import (
 	"context"
@@ -42,7 +42,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
-func (s *store) bootstrap(ctx context.Context) error {
+func (s *meshStore) bootstrap(ctx context.Context) error {
 	// Check if the mesh network is defined
 	_, err := s.Storage().Get(ctx, state.IPv6PrefixKey)
 	var firstBootstrap bool
@@ -139,7 +139,7 @@ func (s *store) bootstrap(ctx context.Context) error {
 	return nil
 }
 
-func (s *store) initialBootstrapLeader(ctx context.Context) error {
+func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	cfg := s.raft.Configuration()
 
 	// Set initial cluster configurations to the raft log
@@ -455,7 +455,7 @@ func (s *store) initialBootstrapLeader(ctx context.Context) error {
 	return nil
 }
 
-func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raft.ServerID]int64) error {
+func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raft.ServerID]int64) error {
 	if s.testStore {
 		return nil
 	}
@@ -498,7 +498,7 @@ func (s *store) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raf
 	return s.join(ctx, joinAddr, 5)
 }
 
-func (s *store) rejoinBootstrapServer(ctx context.Context) error {
+func (s *meshStore) rejoinBootstrapServer(ctx context.Context) error {
 	servers := strings.Split(s.opts.Bootstrap.Servers, ",")
 	s.opts.Mesh.JoinAsVoter = true
 	for _, server := range servers {

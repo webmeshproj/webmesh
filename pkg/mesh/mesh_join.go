@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package mesh
 
 import (
 	"fmt"
@@ -35,7 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
 )
 
-func (s *store) joinWithPeerDiscovery(ctx context.Context) error {
+func (s *meshStore) joinWithPeerDiscovery(ctx context.Context) error {
 	log := s.log.With(slog.String("peer-discovery-addrs", strings.Join(s.opts.Mesh.PeerDiscoveryAddresses, ",")))
 	ctx = context.WithLogger(ctx, log)
 	log.Info("discovering joinable peers")
@@ -83,7 +83,7 @@ func (s *store) joinWithPeerDiscovery(ctx context.Context) error {
 	return nil
 }
 
-func (s *store) join(ctx context.Context, joinAddr string, maxRetries int) error {
+func (s *meshStore) join(ctx context.Context, joinAddr string, maxRetries int) error {
 	log := s.log.With(slog.String("join-addr", joinAddr))
 	ctx = context.WithLogger(ctx, log)
 	log.Info("joining mesh")
@@ -120,7 +120,7 @@ func (s *store) join(ctx context.Context, joinAddr string, maxRetries int) error
 	return err
 }
 
-func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
+func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 	log := context.LoggerFrom(ctx)
 	client := v1.NewNodeClient(c)
 	defer c.Close()
@@ -205,11 +205,11 @@ func (s *store) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
 	return nil
 }
 
-func (s *store) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
+func (s *meshStore) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
 	return grpc.DialContext(ctx, addr, s.grpcCreds(ctx)...)
 }
 
-func (s *store) grpcCreds(ctx context.Context) []grpc.DialOption {
+func (s *meshStore) grpcCreds(ctx context.Context) []grpc.DialOption {
 	log := context.LoggerFrom(ctx)
 	var opts []grpc.DialOption
 	if s.opts.TLS.Insecure {
