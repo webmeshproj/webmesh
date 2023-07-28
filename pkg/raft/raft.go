@@ -397,19 +397,9 @@ func (r *raftNode) Stop(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.raft.State() == raft.Leader {
-		r.log.Debug("raft node is current leader")
-		// If we are the leader we need to step down first.
-		if r.opts.LeaveOnShutdown {
-			// If we are leaving on shutdown, we need to remove ourselves from the cluster.
-			r.log.Debug("removing self from cluster")
-			if err := r.RemoveServer(ctx, string(r.nodeID), true); err != nil && err != ErrNotLeader {
-				return fmt.Errorf("remove self: %w", err)
-			}
-		}
-		// Try to step down again for good measure.
-		r.log.Debug("stepping down as leader")
+		r.log.Debug("raft node is current leader, stepping down")
 		if err := r.raft.LeadershipTransfer().Error(); err != nil && err != ErrNotLeader {
-			return fmt.Errorf("stepdown: %w", err)
+			r.log.Error("failed to transfer leadership", slog.String("error", err.Error()))
 		}
 	}
 	r.log.Debug("shutting down raft node")
