@@ -52,7 +52,6 @@ const (
 	RaftPreferIPv6EnvVar      = "RAFT_PREFER_IPV6"
 	LeaveOnShutdownEnvVar     = "RAFT_LEAVE_ON_SHUTDOWN"
 	StartupTimeoutEnvVar      = "RAFT_STARTUP_TIMEOUT"
-	ShutdownTimeoutEnvVar     = "RAFT_SHUTDOWN_TIMEOUT"
 
 	// RaftStorePath is the raft stable and log store directory.
 	RaftStorePath = "raft-store"
@@ -98,8 +97,6 @@ type Options struct {
 	PreferIPv6 bool `json:"prefer-ipv6,omitempty" yaml:"prefer-ipv6,omitempty" toml:"prefer-ipv6,omitempty"`
 	// LeaveOnShutdown is the leave on shutdown flag.
 	LeaveOnShutdown bool `json:"leave-on-shutdown,omitempty" yaml:"leave-on-shutdown,omitempty" toml:"leave-on-shutdown,omitempty"`
-	// ShutdownTimeout is the timeout for shutting down.
-	ShutdownTimeout time.Duration `json:"shutdown-timeout,omitempty" yaml:"shutdown-timeout,omitempty" toml:"shutdown-timeout,omitempty"`
 
 	// Below are callbacks used internally or by external packages.
 	OnApplyLog        func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) `json:"-" yaml:"-" toml:"-"`
@@ -124,7 +121,6 @@ func NewOptions() *Options {
 		SnapshotRetention:  3,
 		ObserverChanBuffer: 100,
 		LogLevel:           "info",
-		ShutdownTimeout:    time.Minute,
 	}
 }
 
@@ -166,8 +162,6 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 		"Raft observer channel buffer size.")
 	fl.BoolVar(&o.LeaveOnShutdown, "raft.leave-on-shutdown", util.GetEnvDefault(LeaveOnShutdownEnvVar, "false") == "true",
 		"Leave the cluster when the server shuts down.")
-	fl.DurationVar(&o.ShutdownTimeout, "raft.shutdown-timeout", util.GetEnvDurationDefault(ShutdownTimeoutEnvVar, time.Minute),
-		"Timeout for graceful shutdown.")
 }
 
 // Validate validates the raft options.

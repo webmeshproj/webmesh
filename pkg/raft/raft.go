@@ -376,15 +376,6 @@ func (r *raftNode) Stop(ctx context.Context) error {
 	defer r.started.Store(false)
 	defer r.raftTransport.Close()
 	defer r.closeDataStores(ctx)
-	if _, ok := ctx.Deadline(); !ok {
-		// Use the configured shutdown timeout
-		if r.opts.ShutdownTimeout > 0 {
-			var cancel context.CancelFunc
-			deadline := time.Now().Add(r.opts.ShutdownTimeout)
-			ctx, cancel = context.WithDeadline(ctx, deadline)
-			defer cancel()
-		}
-	}
 	// If we were not running in memory, force a snapshot.
 	if !r.opts.InMemory {
 		r.log.Debug("taking raft storage snapshot")

@@ -78,7 +78,6 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	storeOpts.Raft.InMemory = true
 	storeOpts.Raft.ListenAddress = fmt.Sprintf(":%d", opts.RaftPort)
 	storeOpts.Raft.LeaveOnShutdown = true
-	storeOpts.Raft.ShutdownTimeout = time.Second * 10
 	if opts.TLSCertFile != "" && opts.TLSKeyFile != "" {
 		storeOpts.Auth.MTLS = &mesh.MTLSOptions{
 			CertFile: opts.TLSCertFile,
