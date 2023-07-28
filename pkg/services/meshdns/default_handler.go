@@ -30,6 +30,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		s.log.Debug("handling root NS request")
 		// newMsg automatically adds the NS records for the root zone
 		m := s.newMsg(r)
+		m.Answer = append(m.Answer, s.newNSRecord())
 		s.writeMsg(w, r, m, dns.RcodeSuccess)
 		return
 	}

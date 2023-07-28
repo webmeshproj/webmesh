@@ -66,6 +66,19 @@ func (s *Server) newFQDN(id string) string {
 	return fmt.Sprintf("%s.%s", id, s.store.Domain())
 }
 
+func (s *Server) newNSRecord() dns.RR {
+	return &dns.NS{
+		Hdr: dns.RR_Header{
+			Name:     s.store.Domain(),
+			Rrtype:   dns.TypeNS,
+			Class:    dns.ClassINET,
+			Ttl:      1,
+			Rdlength: 0,
+		},
+		Ns: fmt.Sprintf("%s.%s", s.store.ID(), s.store.Domain()),
+	}
+}
+
 func (s *Server) newMsg(r *dns.Msg) *dns.Msg {
 	m := new(dns.Msg)
 	m.SetReply(r)
@@ -73,10 +86,7 @@ func (s *Server) newMsg(r *dns.Msg) *dns.Msg {
 	m.Authoritative = true
 	m.RecursionAvailable = true
 	// m.Response = true
-	m.Ns = []dns.RR{&dns.SOA{
-		Hdr: dns.RR_Header{Name: s.store.Domain(), Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 1},
-		Ns:  fmt.Sprintf("%s.%s", s.store.ID(), s.store.Domain()),
-	}}
+	m.Ns = []dns.RR{s.newNSRecord()}
 	return m
 }
 
