@@ -36,6 +36,9 @@ func (s *meshStore) onObservation(ev raft.Observation) {
 		if s.testStore {
 			return
 		}
+		if string(data.Peer.ID) == s.nodeID {
+			return
+		}
 		if err := s.nw.RefreshPeers(ctx); err != nil {
 			s.log.Error("wireguard refresh peers", slog.String("error", err.Error()))
 		}
