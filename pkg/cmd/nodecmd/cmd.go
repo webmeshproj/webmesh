@@ -136,7 +136,7 @@ func Execute() error {
 		return fmt.Errorf("failed to create mesh store: %w", err)
 	}
 
-	// Add flag for timeout
+	// TODO: Add flag for timeout
 	ctx := context.Background()
 	err = st.Open(ctx)
 	if err != nil {
@@ -186,7 +186,7 @@ func Execute() error {
 	// Create the services
 	srv, err := services.NewServer(st, opts.Services)
 	if err != nil {
-		return handleErr(fmt.Errorf("failed to gRPC server: %w", err))
+		return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 	}
 
 	// Start the gRPC server
