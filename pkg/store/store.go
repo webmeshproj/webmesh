@@ -23,23 +23,19 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
-	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
-	"github.com/webmeshproj/webmesh/pkg/net"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
+	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/store/streamlayer"
 )
 
 var (
@@ -71,43 +67,19 @@ type Store interface {
 	IsOpen() bool
 	// Close closes the store.
 	Close() error
-	// Ready returns true if the store is ready to serve requests.
-	Ready() bool
-	// ReadyNotify returns a channel that is closed when the store is ready
-	// to serve requests. Ready is defined as having a leader.
-	ReadyNotify(ctx context.Context) <-chan struct{}
-	// ReadyError returns a channel that will receive an error if the store
-	// fails to become ready. This is only applicable during an initial
-	// bootstrap. If the store is already bootstrapped then this channel
-	// will block until the store is ready and then return nil.
-	ReadyError(ctx context.Context) <-chan error
 	// State returns the current Raft state.
 	State() raft.RaftState
-	// IsLeader returns true if this node is the Raft leader.
-	IsLeader() bool
 	// Leader returns the current Raft leader ID.
 	Leader() (raft.ServerID, error)
 	// LeaderAddr returns the current Raft leader's raft address.
 	LeaderAddr() (string, error)
 	// LeaderRPCAddr returns the current Raft leader's gRPC address.
 	LeaderRPCAddr(ctx context.Context) (string, error)
-	// Stepdown forces this node to relinquish leadership to another node in
-	// the cluster. If wait is true then this method will block until the
-	// leadership transfer is complete and return any error that occurred.
-	Stepdown(wait bool) error
-	// AddNonVoter adds a non-voting node to the cluster with timeout enforced by the context.
-	AddNonVoter(ctx context.Context, id string, addr string) error
-	// AddVoter adds a voting node to the cluster with timeout enforced by the context.
-	AddVoter(ctx context.Context, id string, addr string) error
-	// DemoteVoter demotes a voting node to a non-voting node with timeout enforced by the context.
-	DemoteVoter(ctx context.Context, id string) error
-	// RemoveServer removes a peer from the cluster with timeout enforced by the context.
-	RemoveServer(ctx context.Context, id string, wait bool) error
 	// Storage returns a storage interface for use by the application.
 	Storage() storage.Storage
 	// Raft returns the Raft interface. Note that the returned value
 	// may be nil if the store is not open.
-	Raft() *raft.Raft
+	Raft() meshraft.Raft
 	// WireGuard returns the WireGuard interface. Note that the returned value
 	// may be nil if the store is not open.
 	WireGuard() wireguard.Interface
@@ -135,39 +107,16 @@ func New(opts *Options) (Store, error) {
 	if nodeID == "" || nodeID == hostnameFlagDefault {
 		nodeID = determineNodeID(log, tlsConfig, opts)
 	}
-	sl, err := streamlayer.New(&streamlayer.Options{
-		ListenAddress: opts.Raft.ListenAddress,
-	})
-	if err != nil {
-		return nil, err
-	}
 	var taskGroup errgroup.Group
 	taskGroup.SetLimit(1)
 	st := &store{
-		sl:          sl,
 		opts:        opts,
 		tlsConfig:   tlsConfig,
 		nodeID:      raft.ServerID(nodeID),
-		readyErr:    make(chan error, 2),
 		nwTaskGroup: &taskGroup,
 		log:         log.With(slog.String("node-id", string(nodeID))),
 		kvSubCancel: func() {},
 	}
-	st.nw = net.New(st, &net.Options{
-		InterfaceName:         opts.WireGuard.InterfaceName,
-		ForceReplace:          opts.WireGuard.ForceInterfaceName,
-		ListenPort:            opts.WireGuard.ListenPort,
-		PersistentKeepAlive:   opts.WireGuard.PersistentKeepAlive,
-		ForceTUN:              opts.WireGuard.ForceTUN,
-		Modprobe:              opts.WireGuard.Modprobe,
-		MTU:                   opts.WireGuard.MTU,
-		RecordMetrics:         opts.WireGuard.RecordMetrics,
-		RecordMetricsInterval: opts.WireGuard.RecordMetricsInterval,
-		RaftPort:              sl.ListenPort(),
-		GRPCPort:              opts.Mesh.GRPCPort,
-		ZoneAwarenessID:       opts.Mesh.ZoneAwarenessID,
-		DialOptions:           st.grpcCreds(context.Background()),
-	})
 	return st, nil
 }
 
@@ -206,39 +155,20 @@ func determineNodeID(log *slog.Logger, tlsConfig *tls.Config, opts *Options) str
 			slog.String("error", err.Error()))
 		return uuid.NewString()
 	}
-	log.Info("using system hostname as node ID",
-		slog.String("node-id", string(hostname)))
+	log.Info("using system hostname as node ID", slog.String("node-id", string(hostname)))
 	return hostname
 }
 
 type store struct {
-	sl   streamlayer.StreamLayer
 	opts *Options
+	raft meshraft.Raft
 	log  *slog.Logger
 
 	nodeID    raft.ServerID
 	tlsConfig *tls.Config
 	plugins   plugins.Manager
 
-	readyErr       chan error
-	firstBootstrap atomic.Bool
-
-	raft             *raft.Raft
-	lastAppliedIndex atomic.Uint64
-	currentTerm      atomic.Uint64
-	raftTransport    *raft.NetworkTransport
-	raftSnapshots    raft.SnapshotStore
-	logDB            LogStoreCloser
-	stableDB         StableStoreCloser
-	snapshotter      snapshots.Snapshotter
-
-	observerChan                chan raft.Observation
-	observer                    *raft.Observer
-	observerClose, observerDone chan struct{}
-
-	kvData      storage.Storage
 	kvSubCancel context.CancelFunc
-	dataMux     sync.RWMutex
 
 	nw          meshnet.Manager
 	nwTaskGroup *errgroup.Group
@@ -267,11 +197,11 @@ func (s *store) IsOpen() bool {
 
 // Storage returns a storage interface for use by the application.
 func (s *store) Storage() storage.Storage {
-	return &raftStorage{Storage: s.kvData, store: s}
+	return s.raft.Storage()
 }
 
 // Raft returns the Raft interface.
-func (s *store) Raft() *raft.Raft { return s.raft }
+func (s *store) Raft() meshraft.Raft { return s.raft }
 
 // WireGuard returns the WireGuard interface. Note that the returned value
 // may be nil if the store is not open.
@@ -286,57 +216,7 @@ func (s *store) State() raft.RaftState {
 	if s.raft == nil {
 		return raft.Shutdown
 	}
-	return s.raft.State()
-}
-
-// Ready returns true if the store is ready to serve requests. Ready is
-// defined as having a leader.
-func (s *store) Ready() bool {
-	leader, err := s.LeaderAddr()
-	return err == nil && leader != ""
-}
-
-// ReadyNotify returns a channel that is closed when the store is ready
-// to serve requests. Ready is defined as having a leader.
-func (s *store) ReadyNotify(ctx context.Context) <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		defer close(ch)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if s.Ready() {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}
-	}()
-	return ch
-}
-
-// ReadyError returns a channel that will receive an error if the store
-// fails to become ready or nil.
-func (s *store) ReadyError(ctx context.Context) <-chan error {
-	if !s.firstBootstrap.Load() {
-		go func() {
-			defer close(s.readyErr)
-			<-s.ReadyNotify(ctx)
-			if ctx.Err() != nil {
-				s.readyErr <- ctx.Err()
-				return
-			}
-			s.readyErr <- nil
-		}()
-	}
-	return s.readyErr
-}
-
-// IsLeader returns true if this node is the Raft leader.
-func (s *store) IsLeader() bool {
-	return s.State() == raft.Leader
+	return s.raft.Raft().State()
 }
 
 // Leader returns the current Raft leader.
@@ -344,7 +224,7 @@ func (s *store) Leader() (raft.ServerID, error) {
 	if s.raft == nil || !s.open.Load() {
 		return "", ErrNotOpen
 	}
-	_, id := s.raft.LeaderWithID()
+	_, id := s.raft.Raft().LeaderWithID()
 	if id == "" {
 		return "", fmt.Errorf("no leader")
 	}
@@ -356,7 +236,7 @@ func (s *store) LeaderAddr() (string, error) {
 	if !s.open.Load() {
 		return "", ErrNotOpen
 	}
-	addr, _ := s.raft.LeaderWithID()
+	addr, _ := s.raft.Raft().LeaderWithID()
 	return string(addr), nil
 }
 
@@ -373,21 +253,4 @@ func (s *store) LeaderRPCAddr(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return addr.String(), nil
-}
-
-// Stepdown forces this node to relinquish leadership to another node in
-// the cluster. If wait is true then this method will block until the
-// leadership transfer is complete and return any error that occurred.
-func (s *store) Stepdown(wait bool) error {
-	if !s.open.Load() {
-		return ErrNotOpen
-	}
-	if !s.IsLeader() {
-		return ErrNotLeader
-	}
-	f := s.raft.LeadershipTransfer()
-	if !wait {
-		return nil
-	}
-	return f.Error()
 }

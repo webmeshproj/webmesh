@@ -17,19 +17,18 @@ limitations under the License.
 package store
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/hashicorp/raft"
-	raftbadger "github.com/webmeshproj/raft-badger"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
 )
 
 // Open opens the store.
@@ -38,29 +37,6 @@ func (s *store) Open(ctx context.Context) (err error) {
 		return ErrOpen
 	}
 	log := s.log
-	handleErr := func(err error) error {
-		s.kvSubCancel()
-		log.Error("failed to open store", slog.String("error", err.Error()))
-		if s.raftTransport != nil {
-			defer s.raftTransport.Close()
-		}
-		if s.raft != nil {
-			if shutdownErr := s.raft.Shutdown().Error(); shutdownErr != nil {
-				err = fmt.Errorf("%w: %v", err, shutdownErr)
-			}
-		}
-		if s.logDB != nil {
-			if closeErr := s.logDB.Close(); closeErr != nil {
-				err = fmt.Errorf("%w: %v", err, closeErr)
-			}
-		}
-		if s.stableDB != nil {
-			if closeErr := s.stableDB.Close(); closeErr != nil {
-				err = fmt.Errorf("%w: %v", err, closeErr)
-			}
-		}
-		return err
-	}
 	// If bootstrap and force are set, clear the data directory.
 	if s.opts.Bootstrap.Enabled && s.opts.Bootstrap.Force {
 		log.Warn("force bootstrap enabled, clearing data directory")
@@ -69,119 +45,74 @@ func (s *store) Open(ctx context.Context) (err error) {
 			return fmt.Errorf("remove all %q: %w", s.opts.Raft.DataDir, err)
 		}
 	}
-	// Ensure the data and snapshots directory exists.
-	if !s.opts.Raft.InMemory {
-		for _, dir := range []string{s.opts.Raft.StorePath(), s.opts.Raft.DataStoragePath()} {
-			err = os.MkdirAll(dir, 0755)
-			if err != nil {
-				return fmt.Errorf("mkdir %q: %w", dir, err)
-			}
-		}
-		log = log.With(slog.String("data-dir", s.opts.Raft.DataDir))
-	} else {
-		log = log.With(slog.String("data-dir", ":memory:"))
-	}
-	// Create the raft network transport
-	log.Debug("creating raft network transport")
-	s.raftTransport = raft.NewNetworkTransport(s.sl,
-		s.opts.Raft.ConnectionPoolCount,
-		s.opts.Raft.ConnectionTimeout,
-		&logWriter{log: s.log},
-	)
-	// Create the raft stores.
-	log.Debug("creating data stores")
-	if s.opts.Raft.InMemory {
-		s.logDB = newInmemStore()
-		s.stableDB = newInmemStore()
-		s.raftSnapshots = raft.NewInmemSnapshotStore()
-		s.kvData, err = storage.New(&storage.Options{InMemory: true})
-		if err != nil {
-			return handleErr(fmt.Errorf("new inmem storage: %w", err))
-		}
-	} else {
-		storePath := s.opts.Raft.StorePath()
-		raftstore, err := raftbadger.New(log, storePath)
-		if err != nil {
-			return handleErr(fmt.Errorf("new raftbadger store %q: %w", storePath, err))
-		}
-		s.logDB = raftstore
-		s.stableDB = raftstore
-		s.raftSnapshots, err = raft.NewFileSnapshotStoreWithLogger(
-			s.opts.Raft.DataDir,
-			int(s.opts.Raft.SnapshotRetention),
-			s.opts.Raft.Logger("snapshots"),
-		)
-		if err != nil {
-			return handleErr(fmt.Errorf("new file snapshot store %q: %w", s.opts.Raft.DataDir, err))
-		}
-		s.kvData, err = storage.New(&storage.Options{DiskPath: s.opts.Raft.DataStoragePath()})
-		if err != nil {
-			return handleErr(fmt.Errorf("new disk storage: %w", err))
-		}
-	}
-	s.snapshotter = snapshots.New(s.kvData)
-	// Register an update hook to watch for node changes.
-	s.kvSubCancel, err = s.kvData.Subscribe(context.Background(), "", s.onDBUpdate)
-	if err != nil {
-		return handleErr(fmt.Errorf("subscribe: %w", err))
-	}
 	// Create the plugin manager
-	s.plugins, err = plugins.NewManager(ctx, s.Storage(), s.opts.Plugins)
+	s.plugins, err = plugins.NewManager(ctx, s.opts.Plugins)
 	if err != nil {
 		return fmt.Errorf("failed to load plugins: %w", err)
 	}
-	// Check if we have a snapshot to restore from.
-	log.Debug("checking for snapshot")
-	snapshots, err := s.raftSnapshots.List()
-	if err != nil {
-		return handleErr(fmt.Errorf("list snapshots: %w", err))
-	}
-	if len(snapshots) > 0 {
-		latest := snapshots[0]
-		log.Info("restoring from snapshot",
-			slog.String("id", latest.ID),
-			slog.Int("term", int(latest.Term)),
-			slog.Int("index", int(latest.Index)))
-		meta, reader, err := s.raftSnapshots.Open(latest.ID)
-		if err != nil {
-			return handleErr(fmt.Errorf("open snapshot: %w", err))
-		}
-		defer reader.Close()
-		var buf bytes.Buffer
-		tee := io.TeeReader(reader, &buf)
-		// Restore to the in-memory database.
-		if err = s.snapshotter.Restore(ctx, io.NopCloser(tee)); err != nil {
-			return handleErr(fmt.Errorf("restore snapshot: %w", err))
-		}
+	// Create the raft node
+	s.opts.Raft.OnObservation = s.onObservation
+	s.opts.Raft.OnSnapshotRestore = func(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) {
 		// Dispatch the snapshot to any storage plugins.
-		if err = s.plugins.ApplySnapshot(ctx, meta, io.NopCloser(&buf)); err != nil {
+		if err = s.plugins.ApplySnapshot(ctx, meta, data); err != nil {
 			// This is non-fatal for now.
-			log.Error("failed to apply snapshot to plugins", slog.String("error", err.Error()))
+			s.log.Error("failed to apply snapshot to plugins", slog.String("error", err.Error()))
 		}
-		s.currentTerm.Store(latest.Term)
-		s.lastAppliedIndex.Store(latest.Index)
 	}
-	// Create the raft instance.
-	log.Info("starting raft instance",
-		slog.String("listen-addr", string(s.raftTransport.LocalAddr())),
-	)
-	s.raft, err = raft.NewRaft(
-		s.opts.Raft.RaftConfig(s.ID()),
-		s,
-		&monotonicLogStore{s.logDB},
-		s.stableDB,
-		s.raftSnapshots,
-		s.raftTransport)
-	if err != nil {
-		return handleErr(fmt.Errorf("new raft: %w", err))
+	s.opts.Raft.OnApplyLog = func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) {
+		// Dispatch the log entry to any storage plugins.
+		if _, err := s.plugins.ApplyRaftLog(ctx, &v1.StoreLogRequest{
+			Term:  term,
+			Index: index,
+			Log:   log,
+		}); err != nil {
+			// This is non-fatal for now.
+			s.log.Error("failed to apply log to plugins", slog.String("error", err.Error()))
+		}
 	}
-	// Register observers.
-	s.observerChan = make(chan raft.Observation, s.opts.Raft.ObserverChanBuffer)
-	s.observer = raft.NewObserver(s.observerChan, false, func(o *raft.Observation) bool {
-		return true
+	s.raft = meshraft.New(s.opts.Raft)
+	err = s.raft.Start(ctx, &meshraft.StartOptions{
+		NodeID: s.ID(),
 	})
-	s.raft.RegisterObserver(s.observer)
-	s.observerClose, s.observerDone = s.observe()
+	if err != nil {
+		return fmt.Errorf("start raft: %w", err)
+	}
+	handleErr := func(err error) error {
+		s.kvSubCancel()
+		log.Error("failed to open store", slog.String("error", err.Error()))
+		perr := s.plugins.Close()
+		if perr != nil {
+			log.Error("failed to close plugins", slog.String("error", perr.Error()))
+		}
+		cerr := s.raft.Stop(ctx)
+		if cerr != nil {
+			log.Error("failed to stop raft node", slog.String("error", cerr.Error()))
+		}
+		return err
+	}
+	// Start serving storage queries for plugins.
+	go s.plugins.ServeStorage(s.raft.Storage())
+	// Register an update hook to watch for node changes.
+	s.kvSubCancel, err = s.raft.Storage().Subscribe(context.Background(), "", s.onDBUpdate)
+	if err != nil {
+		return handleErr(fmt.Errorf("subscribe: %w", err))
+	}
+	// Create the network manager
+	s.nw = net.New(s, &net.Options{
+		InterfaceName:         s.opts.WireGuard.InterfaceName,
+		ForceReplace:          s.opts.WireGuard.ForceInterfaceName,
+		ListenPort:            s.opts.WireGuard.ListenPort,
+		PersistentKeepAlive:   s.opts.WireGuard.PersistentKeepAlive,
+		ForceTUN:              s.opts.WireGuard.ForceTUN,
+		Modprobe:              s.opts.WireGuard.Modprobe,
+		MTU:                   s.opts.WireGuard.MTU,
+		RecordMetrics:         s.opts.WireGuard.RecordMetrics,
+		RecordMetricsInterval: s.opts.WireGuard.RecordMetricsInterval,
+		RaftPort:              s.raft.ListenPort(),
+		GRPCPort:              s.opts.Mesh.GRPCPort,
+		ZoneAwarenessID:       s.opts.Mesh.ZoneAwarenessID,
+		DialOptions:           s.grpcCreds(context.Background()),
+	})
 	if s.opts.Bootstrap.Enabled {
 		// Attempt bootstrap.
 		log.Info("bootstrapping cluster")

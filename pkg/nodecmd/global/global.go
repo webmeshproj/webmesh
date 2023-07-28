@@ -29,9 +29,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/store"
-	"github.com/webmeshproj/webmesh/pkg/store/streamlayer"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
@@ -230,7 +230,7 @@ func (o *Options) Overlay(opts ...any) error {
 			if primaryEndpoint.IsValid() {
 				var raftPort, wireguardPort uint16
 				for _, inOpts := range opts {
-					if vopt, ok := inOpts.(*streamlayer.Options); ok {
+					if vopt, ok := inOpts.(*raft.Options); ok {
 						_, port, err := net.SplitHostPort(vopt.ListenAddress)
 						if err != nil {
 							return fmt.Errorf("failed to parse raft listen address: %w", err)

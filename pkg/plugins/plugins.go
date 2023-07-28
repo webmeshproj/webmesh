@@ -33,7 +33,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins/ipam"
 	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/plugins/mtls"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var (
@@ -43,7 +42,7 @@ var (
 )
 
 // NewManager creates a new plugin manager.
-func NewManager(ctx context.Context, db storage.Storage, opts *Options) (Manager, error) {
+func NewManager(ctx context.Context, opts *Options) (Manager, error) {
 	builtIns := map[string]clients.PluginClient{
 		"ipam":       clients.NewInProcessClient(&ipam.Plugin{}),
 		"mtls":       clients.NewInProcessClient(&mtls.Plugin{}),
@@ -108,10 +107,8 @@ func NewManager(ctx context.Context, db storage.Storage, opts *Options) (Manager
 		ipamv4 = ipam
 		ipamv6 = ipam
 		allPlugins["ipam"] = ipam
-		// stores = append(stores, ipam)
 	}
 	m := &manager{
-		db:       db,
 		auth:     auth,
 		ipamv4:   ipamv4,
 		ipamv6:   ipamv6,
@@ -120,7 +117,6 @@ func NewManager(ctx context.Context, db storage.Storage, opts *Options) (Manager
 		plugins:  allPlugins,
 		log:      slog.Default().With("component", "plugin-manager"),
 	}
-	go m.handleQueries()
 	return m, nil
 }
 

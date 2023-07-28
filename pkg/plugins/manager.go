@@ -24,6 +24,8 @@ import (
 type Manager interface {
 	// Get returns the plugin with the given name.
 	Get(name string) (v1.PluginClient, bool)
+	// ServeStorage handles queries from plugins against the given storage backend.
+	ServeStorage(db storage.Storage)
 	// HasAuth returns true if the manager has an auth plugin.
 	HasAuth() bool
 	// AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin.
@@ -47,7 +49,7 @@ type Manager interface {
 }
 
 type manager struct {
-	db       storage.Storage
+	// db       storage.Storage
 	auth     clients.PluginClient
 	ipamv4   clients.PluginClient
 	ipamv6   clients.PluginClient
@@ -61,6 +63,11 @@ type manager struct {
 func (m *manager) Get(name string) (v1.PluginClient, bool) {
 	p, ok := m.plugins[name]
 	return p, ok
+}
+
+// ServeStorage handles queries from plugins against the given storage backend.
+func (m *manager) ServeStorage(db storage.Storage) {
+	m.handleQueries(db)
 }
 
 // HasAuth returns true if the manager has an auth plugin.
@@ -226,7 +233,7 @@ func (m *manager) Close() error {
 }
 
 // handleQueries handles SQL queries from plugins.
-func (m *manager) handleQueries() {
+func (m *manager) handleQueries(db storage.Storage) {
 	for plugin, client := range m.plugins {
 		ctx := context.Background()
 		q, err := client.InjectQuerier(ctx)
@@ -238,12 +245,12 @@ func (m *manager) handleQueries() {
 			m.log.Error("start query stream", "plugin", plugin, "error", err)
 			continue
 		}
-		go m.handleQueryClient(plugin, client, q)
+		go m.handleQueryClient(plugin, db, client, q)
 	}
 }
 
 // handleQueryClient handles a query client.
-func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, queries v1.Plugin_InjectQuerierClient) {
+func (m *manager) handleQueryClient(plugin string, db storage.Storage, client clients.PluginClient, queries v1.Plugin_InjectQuerierClient) {
 	defer func() {
 		if err := queries.CloseSend(); err != nil {
 			m.log.Error("close query stream", "plugin", plugin, "error", err)
@@ -267,7 +274,7 @@ func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, 
 			var result v1.PluginQueryResult
 			result.Id = query.GetId()
 			result.Key = query.GetQuery()
-			val, err := m.db.Get(queries.Context(), query.GetQuery())
+			val, err := db.Get(queries.Context(), query.GetQuery())
 			if err != nil {
 				result.Error = err.Error()
 			} else {
@@ -281,7 +288,7 @@ func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, 
 			var result v1.PluginQueryResult
 			result.Id = query.GetId()
 			result.Key = query.GetQuery()
-			keys, err := m.db.List(queries.Context(), query.GetQuery())
+			keys, err := db.List(queries.Context(), query.GetQuery())
 			if err != nil {
 				result.Error = err.Error()
 			} else {
@@ -294,7 +301,7 @@ func (m *manager) handleQueryClient(plugin string, client clients.PluginClient, 
 		case v1.PluginQuery_ITER:
 			var result v1.PluginQueryResult
 			result.Id = query.GetId()
-			err := m.db.IterPrefix(queries.Context(), query.GetQuery(), func(key, val string) error {
+			err := db.IterPrefix(queries.Context(), query.GetQuery(), func(key, val string) error {
 				result.Key = key
 				result.Value = []string{val}
 				err := queries.Send(&result)

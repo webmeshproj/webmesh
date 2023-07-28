@@ -27,6 +27,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
@@ -39,7 +40,7 @@ type Options struct {
 	// Bootstrap are options for bootstrapping the store.
 	Bootstrap *BootstrapOptions `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty" toml:"bootstrap,omitempty"`
 	// Raft are options for the raft store.
-	Raft *RaftOptions `json:"raft,omitempty" yaml:"raft,omitempty" toml:"raft,omitempty"`
+	Raft *raft.Options `json:"raft,omitempty" yaml:"raft,omitempty" toml:"raft,omitempty"`
 	// TLS are options for TLS.
 	TLS *TLSOptions `json:"tls,omitempty" yaml:"tls,omitempty" toml:"tls,omitempty"`
 	// WireGuard are options for WireGuard.
@@ -54,7 +55,7 @@ func NewOptions() *Options {
 		Auth:      NewAuthOptions(),
 		Mesh:      NewMeshOptions(),
 		Bootstrap: NewBootstrapOptions(),
-		Raft:      NewRaftOptions(),
+		Raft:      raft.NewOptions(),
 		TLS:       NewTLSOptions(),
 		WireGuard: NewWireGuardOptions(),
 		Plugins:   plugins.NewOptions(),
@@ -75,7 +76,7 @@ func (o *Options) BindFlags(fl *flag.FlagSet) {
 // Validate validates the options.
 func (o *Options) Validate() error {
 	if o.Raft == nil {
-		o.Raft = NewRaftOptions()
+		o.Raft = raft.NewOptions()
 	}
 	if o.Mesh == nil {
 		o.Mesh = NewMeshOptions()

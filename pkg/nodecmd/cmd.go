@@ -150,10 +150,6 @@ func Execute() error {
 		}
 		return fmt.Errorf("failed to start raft node: %w", cause)
 	}
-	log.Info("waiting for raft store to become ready")
-	if err := <-st.ReadyError(ctx); err != nil {
-		return handleErr(fmt.Errorf("failed to wait for raft store to become ready: %w", err))
-	}
 	// Shutdown the store on exit
 	defer func() {
 		log.Info("shutting down raft store")

@@ -36,7 +36,7 @@ var putGroupAction = rbac.Actions{
 }
 
 func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty, error) {
-	if !s.store.IsLeader() {
+	if !s.store.Raft().IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if group.GetName() == "" {

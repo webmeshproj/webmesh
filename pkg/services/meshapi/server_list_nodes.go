@@ -31,7 +31,7 @@ func (s *Server) ListNodes(ctx context.Context, req *emptypb.Empty) (*v1.NodeLis
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get node: %v", err)
 	}
-	servers := s.store.Raft().GetConfiguration().Configuration().Servers
+	servers := s.store.Raft().Configuration().Servers
 	leader, err := s.store.Leader()
 	if err != nil {
 		context.LoggerFrom(ctx).Error("failed to get leader", slog.String("error", err.Error()))

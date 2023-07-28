@@ -39,7 +39,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 	if err != nil {
 		s.log.Error("failed to lookup current leader", slog.String("error", err.Error()))
 	}
-	stats := s.store.Raft().Stats()
+	stats := s.store.Raft().Raft().Stats()
 	var term uint64
 	if termStr, ok := stats["term"]; ok {
 		term, err = strconv.ParseUint(termStr, 10, 64)
@@ -60,10 +60,10 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 		StartedAt: timestamppb.New(s.startedAt),
 		Features:  s.features,
 		ClusterStatus: func() v1.ClusterStatus {
-			if s.store.IsLeader() {
+			if s.store.Raft().IsLeader() {
 				return v1.ClusterStatus_CLUSTER_LEADER
 			}
-			config := s.store.Raft().GetConfiguration().Configuration()
+			config := s.store.Raft().Configuration()
 			for _, srv := range config.Servers {
 				if string(srv.ID) == s.store.ID() {
 					switch srv.Suffrage {
@@ -78,8 +78,8 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 		}(),
 		CurrentLeader:    string(leader),
 		CurrentTerm:      term,
-		LastLogIndex:     s.store.Raft().LastIndex(),
-		LastApplied:      s.store.Raft().AppliedIndex(),
+		LastLogIndex:     s.store.Raft().Raft().LastIndex(),
+		LastApplied:      s.store.Raft().Raft().AppliedIndex(),
 		InterfaceMetrics: ifaceMetrics,
 	}, nil
 }

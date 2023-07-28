@@ -244,8 +244,5 @@ func (s *Server) Watch(_ *healthpb.HealthCheckRequest, srv healthpb.Health_Watch
 }
 
 func (s *Server) currentStatus() healthpb.HealthCheckResponse_ServingStatus {
-	if s.store.Ready() {
-		return healthpb.HealthCheckResponse_SERVING
-	}
-	return healthpb.HealthCheckResponse_NOT_SERVING
+	return healthpb.HealthCheckResponse_SERVING
 }

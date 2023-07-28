@@ -14,18 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package raft
 
 import (
 	"errors"
 	"flag"
+	"io"
 	"path/filepath"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
@@ -52,13 +55,13 @@ const (
 	ShutdownTimeoutEnvVar     = "RAFT_SHUTDOWN_TIMEOUT"
 
 	// RaftStorePath is the raft stable and log store directory.
-	RaftStorePath = "raft-badger"
+	RaftStorePath = "raft-store"
 	// DataStoragePath is the raft data storage directory.
 	DataStoragePath = "raft-data"
 )
 
-// RaftOptions are the raft options.
-type RaftOptions struct {
+// Options are the raft options.
+type Options struct {
 	// ListenAddress is the address to listen on for raft.
 	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty"`
 	// DataDir is the directory to store data in.
@@ -97,11 +100,16 @@ type RaftOptions struct {
 	LeaveOnShutdown bool `json:"leave-on-shutdown,omitempty" yaml:"leave-on-shutdown,omitempty" toml:"leave-on-shutdown,omitempty"`
 	// ShutdownTimeout is the timeout for shutting down.
 	ShutdownTimeout time.Duration `json:"shutdown-timeout,omitempty" yaml:"shutdown-timeout,omitempty" toml:"shutdown-timeout,omitempty"`
+
+	// Below are callbacks used internally or by external packages.
+	OnApplyLog        func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry)    `json:"-" yaml:"-" toml:"-"`
+	OnSnapshotRestore func(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) `json:"-" yaml:"-" toml:"-"`
+	OnObservation     func(ev raft.Observation)                                              `json:"-" yaml:"-" toml:"-"`
 }
 
-// NewRaftOptions returns new raft options with the default values.
-func NewRaftOptions() *RaftOptions {
-	return &RaftOptions{
+// NewOptions returns new raft options with the default values.
+func NewOptions() *Options {
+	return &Options{
 		ListenAddress:      ":9443",
 		DataDir:            "/var/lib/webmesh/store",
 		ConnectionTimeout:  time.Second * 3,
@@ -121,7 +129,7 @@ func NewRaftOptions() *RaftOptions {
 }
 
 // BindFlags binds the flags to the options.
-func (o *RaftOptions) BindFlags(fl *flag.FlagSet) {
+func (o *Options) BindFlags(fl *flag.FlagSet) {
 	fl.StringVar(&o.ListenAddress, "raft.listen-address", util.GetEnvDefault(RaftListenAddressEnvVar, ":9443"),
 		"Raft listen address.")
 	fl.StringVar(&o.DataDir, "raft.data-dir", util.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
@@ -163,7 +171,7 @@ func (o *RaftOptions) BindFlags(fl *flag.FlagSet) {
 }
 
 // Validate validates the raft options.
-func (o *RaftOptions) Validate() error {
+func (o *Options) Validate() error {
 	if o == nil {
 		return errors.New("raft options are nil")
 	}
@@ -198,7 +206,7 @@ func (o *RaftOptions) Validate() error {
 }
 
 // RaftConfig builds a raft config.
-func (o *RaftOptions) RaftConfig(nodeID string) *raft.Config {
+func (o *Options) RaftConfig(nodeID string) *raft.Config {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
 	if o.HeartbeatTimeout != 0 {
@@ -223,24 +231,19 @@ func (o *RaftOptions) RaftConfig(nodeID string) *raft.Config {
 		config.SnapshotThreshold = o.SnapshotThreshold
 	}
 	config.LogLevel = hclog.LevelFromString(o.LogLevel).String()
-	config.Logger = o.Logger("raft")
+	config.Logger = &hclogAdapter{
+		Logger: slog.Default().With("component", "raft"),
+		level:  o.LogLevel,
+	}
 	return config
 }
 
-// Logger returns a new logger.
-func (o *RaftOptions) Logger(name string) hclog.Logger {
-	return &hclogAdapter{
-		Logger: slog.Default().With("component", name),
-		level:  o.LogLevel,
-	}
-}
-
 // StorePath returns the stable store path.
-func (o *RaftOptions) StorePath() string {
+func (o *Options) StorePath() string {
 	return filepath.Join(o.DataDir, RaftStorePath)
 }
 
 // DataStoragePath returns the data directory.
-func (o *RaftOptions) DataStoragePath() string {
+func (o *Options) DataStoragePath() string {
 	return filepath.Join(o.DataDir, DataStoragePath)
 }

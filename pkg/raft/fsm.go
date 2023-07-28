@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package raft
 
 import (
 	"fmt"
@@ -32,53 +32,53 @@ import (
 )
 
 // Snapshot returns a Raft snapshot.
-func (s *store) Snapshot() (raft.FSMSnapshot, error) {
-	s.dataMux.Lock()
-	defer s.dataMux.Unlock()
-	return s.snapshotter.Snapshot(context.Background())
+func (r *raftNode) Snapshot() (raft.FSMSnapshot, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// TODO: Set a timeout on this.
+	return r.snapshotter.Snapshot(context.Background())
 }
 
 // Restore restores a Raft snapshot.
-func (s *store) Restore(r io.ReadCloser) error {
-	s.dataMux.Lock()
-	defer s.dataMux.Unlock()
-	return s.snapshotter.Restore(context.Background(), r)
+func (r *raftNode) Restore(rdr io.ReadCloser) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// TODO: Set a timeout on this.
+	return r.snapshotter.Restore(context.Background(), rdr)
 }
 
 // ApplyBatch implements the raft.BatchingFSM interface.
-func (s *store) ApplyBatch(logs []*raft.Log) []any {
-	s.dataMux.Lock()
-	defer s.dataMux.Unlock()
-	s.log.Debug("applying batch", slog.Int("count", len(logs)))
+func (r *raftNode) ApplyBatch(logs []*raft.Log) []any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.log.Debug("applying batch", slog.Int("count", len(logs)))
 	res := make([]any, len(logs))
 	for i, l := range logs {
-		res[i] = s.applyLog(l)
+		res[i] = r.applyLog(l)
 	}
 	return res
 }
 
 // Apply applies a Raft log entry to the store.
-func (s *store) Apply(l *raft.Log) any {
-	s.dataMux.Lock()
-	defer s.dataMux.Unlock()
-	return s.applyLog(l)
+func (r *raftNode) Apply(l *raft.Log) any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.applyLog(l)
 }
 
-func (s *store) applyLog(l *raft.Log) (res any) {
-	log := s.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
+func (r *raftNode) applyLog(l *raft.Log) (res any) {
+	log := r.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
 	log.Debug("applying log", "type", l.Type.String())
-
 	start := time.Now()
 	defer func() {
 		log.Debug("finished applying log", slog.String("took", time.Since(start).String()))
 	}()
-	defer s.lastAppliedIndex.Store(l.Index)
-	defer s.currentTerm.Store(l.Term)
+	defer r.lastAppliedIndex.Store(l.Index)
+	defer r.currentTerm.Store(l.Term)
 
-	// Validate and store the term/index to the local DB
-
-	dbTerm := s.currentTerm.Load()
-	dbIndex := s.lastAppliedIndex.Load()
+	// Validate the term/index of the log entry.
+	dbTerm := r.currentTerm.Load()
+	dbIndex := r.lastAppliedIndex.Load()
 	log.Debug("last applied index",
 		slog.Int("last-term", int(dbTerm)),
 		slog.Int("last-index", int(dbIndex)))
@@ -120,29 +120,18 @@ func (s *store) applyLog(l *raft.Log) (res any) {
 
 	var ctx context.Context
 	var cancel context.CancelFunc
-	if s.opts.Raft.ApplyTimeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), s.opts.Raft.ApplyTimeout)
+	if r.opts.ApplyTimeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), r.opts.ApplyTimeout)
 	} else {
 		ctx, cancel = context.WithCancel(context.Background())
 	}
 	defer cancel()
 	ctx = context.WithLogger(ctx, log)
 
-	// Dispatch the log to all storage plugins when we are done.
-	// This is a no-op if there are no storage plugins.
-	defer func() {
-		responses, err := s.plugins.ApplyRaftLog(ctx, &v1.StoreLogRequest{
-			Term:  l.Term,
-			Index: l.Index,
-			Log:   &cmd,
-		})
-		if err != nil {
-			log.Error("errors while dispatching logs to plugins", slog.String("error", err.Error()))
-		}
-		for _, res := range responses {
-			log.Debug("plugin response", slog.Any("response", res))
-		}
-	}()
-
-	return raftlogs.Apply(ctx, s.kvData, &cmd)
+	if r.opts.OnApplyLog != nil {
+		// Call the OnApplyLog callback in a goroutine to not block the local storage.
+		go r.opts.OnApplyLog(ctx, l.Term, l.Index, &cmd)
+	}
+	// Apply the log entry to the database.
+	return raftlogs.Apply(ctx, r.dataDB, &cmd)
 }

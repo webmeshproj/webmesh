@@ -52,7 +52,7 @@ var canPutEdgeAction = &rbac.Action{
 }
 
 func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
-	if !s.store.IsLeader() {
+	if !s.store.Raft().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.joinmu.Lock()
@@ -152,7 +152,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// fully caught up before we start assigning it addresses
 	log.Info("sending barrier to raft cluster")
 	timeout := time.Second * 10 // TODO: Make this configurable
-	err = s.store.Raft().Barrier(timeout).Error()
+	err = s.store.Raft().Raft().Barrier(timeout).Error()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
@@ -375,12 +375,12 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	if req.GetAsVoter() {
 		log.Info("adding candidate to cluster", slog.String("raft_address", raftAddress))
-		if err := s.store.AddVoter(ctx, req.GetId(), raftAddress); err != nil {
+		if err := s.store.Raft().AddVoter(ctx, req.GetId(), raftAddress); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to add voter: %v", err)
 		}
 	} else {
 		log.Info("adding non-voter to cluster", slog.String("raft_address", raftAddress))
-		if err := s.store.AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
+		if err := s.store.Raft().AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to add non-voter: %v", err)
 		}
 	}

@@ -14,25 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package store
+package raft
 
 import (
-	"context"
 	"time"
 
 	"github.com/hashicorp/raft"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // AddNonVoter adds a non-voting node to the cluster.
-func (s *store) AddNonVoter(ctx context.Context, id string, addr string) error {
-	if !s.IsLeader() {
+func (r *raftNode) AddNonVoter(ctx context.Context, id string, addr string) error {
+	if r.raft.State() != raft.Leader {
 		return ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	f := s.raft.AddNonvoter(raft.ServerID(id), raft.ServerAddress(addr), 0, timeout)
+	f := r.raft.AddNonvoter(raft.ServerID(id), raft.ServerAddress(addr), 0, timeout)
 	err := f.Error()
 	if err != nil && err == raft.ErrNotLeader {
 		return ErrNotLeader
@@ -41,15 +42,15 @@ func (s *store) AddNonVoter(ctx context.Context, id string, addr string) error {
 }
 
 // AddVoter adds a voting node to the cluster.
-func (s *store) AddVoter(ctx context.Context, id string, addr string) error {
-	if !s.IsLeader() {
+func (r *raftNode) AddVoter(ctx context.Context, id string, addr string) error {
+	if r.raft.State() != raft.Leader {
 		return ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	f := s.raft.AddVoter(raft.ServerID(id), raft.ServerAddress(addr), 0, timeout)
+	f := r.raft.AddVoter(raft.ServerID(id), raft.ServerAddress(addr), 0, timeout)
 	err := f.Error()
 	if err != nil && err == raft.ErrNotLeader {
 		return ErrNotLeader
@@ -58,15 +59,15 @@ func (s *store) AddVoter(ctx context.Context, id string, addr string) error {
 }
 
 // DemoteVoter demotes a voting node to a non-voting node.
-func (s *store) DemoteVoter(ctx context.Context, id string) error {
-	if !s.IsLeader() {
+func (r *raftNode) DemoteVoter(ctx context.Context, id string) error {
+	if r.raft.State() != raft.Leader {
 		return ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	f := s.raft.DemoteVoter(raft.ServerID(id), 0, timeout)
+	f := r.raft.DemoteVoter(raft.ServerID(id), 0, timeout)
 	err := f.Error()
 	if err != nil && err == raft.ErrNotLeader {
 		return ErrNotLeader
@@ -75,15 +76,15 @@ func (s *store) DemoteVoter(ctx context.Context, id string) error {
 }
 
 // RemoveServer removes a node from the cluster.
-func (s *store) RemoveServer(ctx context.Context, id string, wait bool) error {
-	if !s.IsLeader() {
+func (r *raftNode) RemoveServer(ctx context.Context, id string, wait bool) error {
+	if r.raft.State() != raft.Leader {
 		return ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	f := s.raft.RemoveServer(raft.ServerID(id), 0, timeout)
+	f := r.raft.RemoveServer(raft.ServerID(id), 0, timeout)
 	if !wait {
 		return nil
 	}

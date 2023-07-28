@@ -50,7 +50,7 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Fast path - if we are the leader, it doesn't make sense to proxy the request.
 		log := context.LoggerFrom(ctx)
-		if i.store.IsLeader() {
+		if i.store.Raft().IsLeader() {
 			log.Debug("currently the leader, handling request locally", slog.String("method", info.FullMethod))
 			return handler(ctx, req)
 		}
@@ -77,7 +77,7 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		log := context.LoggerFrom(ss.Context())
-		if i.store.IsLeader() {
+		if i.store.Raft().IsLeader() {
 			log.Debug("currently the leader, handling stream locally", slog.String("method", info.FullMethod))
 			return handler(srv, ss)
 		}

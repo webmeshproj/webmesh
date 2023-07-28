@@ -55,18 +55,20 @@ type Options struct {
 func NewServer(store meshdb.Store, o *Options) *Server {
 	log := slog.Default().With("component", "mesh-dns")
 	srv := &Server{
-		store: store,
-		peers: peers.New(store.Storage()),
-		opts:  o,
-		log:   log,
+		store:     store,
+		peers:     peers.New(store.Storage()),
+		opts:      o,
+		log:       log,
+		forwarder: new(dns.Client),
 	}
-	var err error
 	if srv.opts.CacheSize > 0 {
+		var err error
 		srv.cache, err = lru.New[string, *dns.Msg](srv.opts.CacheSize)
 		if err != nil {
-			log.Warn(fmt.Sprintf("failed to create cache: %s", err))
+			log.Warn("failed to create remote lookup cache", slog.String("error", err.Error()))
 		}
 	}
+
 	return srv
 }
 
@@ -77,6 +79,7 @@ type Server struct {
 	opts      *Options
 	udpServer *dns.Server
 	tcpServer *dns.Server
+	forwarder *dns.Client
 	cache     *lru.Cache[string, *dns.Msg]
 	log       *slog.Logger
 }

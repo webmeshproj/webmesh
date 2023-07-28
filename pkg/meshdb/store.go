@@ -20,10 +20,10 @@ package meshdb
 
 import (
 	"github.com/hashicorp/raft"
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
+	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -37,11 +37,9 @@ type Store interface {
 	// Storage returns a storage interface for use by the application.
 	Storage() storage.Storage
 	// Raft returns the underlying Raft database.
-	Raft() *raft.Raft
+	Raft() meshraft.Raft
 	// Leader returns the current Raft leader.
 	Leader() (raft.ServerID, error)
-	// IsLeader returns whether the current node is the Raft leader.
-	IsLeader() bool
 	// Plugins returns the plugins for the current node.
 	Plugins() plugins.Manager
 	// WireGuard returns the Wireguard interface. Note that the returned value

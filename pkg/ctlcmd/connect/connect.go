@@ -105,26 +105,6 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	if err := st.Open(ctx); err != nil {
 		return fmt.Errorf("open store: %w", err)
 	}
-	select {
-	case <-stopChan:
-		return st.Close()
-	case <-ctx.Done():
-		err = ctx.Err()
-		closeErr := st.Close()
-		if closeErr != nil {
-			err = fmt.Errorf("%w: %w", ctx.Err(), closeErr)
-		}
-		return err
-	case <-st.ReadyNotify(ctx):
-		if ctx.Err() != nil {
-			err = fmt.Errorf("wait for store ready: %w", ctx.Err())
-			closeErr := st.Close()
-			if closeErr != nil {
-				err = fmt.Errorf("%w: %w", err, closeErr)
-			}
-			return err
-		}
-	}
 
 	if opts.LocalDNS {
 		// Start a local MeshDNS server

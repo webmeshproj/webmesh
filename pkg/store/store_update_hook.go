@@ -54,7 +54,7 @@ func isRouteChangeKey(key string) bool {
 func (s *store) queueRouteUpdate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	for s.lastAppliedIndex.Load() != s.raft.AppliedIndex() {
+	for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
 		if ctx.Err() != nil {
 			s.log.Warn("timed out waiting for raft to catch up before applying route update")
 			return
@@ -82,7 +82,7 @@ func (s *store) queueRouteUpdate() {
 func (s *store) queuePeersUpdate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	for s.lastAppliedIndex.Load() != s.raft.AppliedIndex() {
+	for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
 		if ctx.Err() != nil {
 			s.log.Warn("timed out waiting for raft to catch up before applying peer update")
 			return

@@ -30,7 +30,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
-	if !s.store.IsLeader() {
+	if !s.store.Raft().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	// Check that the node is indeed who they say they are
@@ -50,7 +50,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 		}
 	}
 	s.log.Info("removing raft server", "id", req.GetId())
-	err := s.store.RemoveServer(ctx, req.GetId(), false)
+	err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)
 	}

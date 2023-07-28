@@ -39,10 +39,6 @@ func NewTestStore(ctx context.Context) (Store, error) {
 	if err := stor.Open(ctx); err != nil {
 		return nil, err
 	}
-	err = <-stor.ReadyError(ctx)
-	if err != nil {
-		return nil, err
-	}
 	return stor, nil
 }
 
@@ -90,7 +86,7 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Store, 
 			if err := stores[i].Open(ctx); err != nil {
 				return err
 			}
-			return <-stores[i].ReadyError(ctx)
+			return nil
 		})
 	}
 	if err := g.Wait(); err != nil {

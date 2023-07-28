@@ -64,7 +64,7 @@ func (s *Server) handleLeaderLookup(ctx context.Context, w dns.ResponseWriter, r
 func (s *Server) handleVotersLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
 	s.log.Debug("handling voters lookup")
 	m := s.newMsg(r)
-	config := s.store.Raft().GetConfiguration().Configuration()
+	config := s.store.Raft().Configuration()
 	for _, server := range config.Servers {
 		if server.Suffrage == raft.Voter {
 			m.Answer = append(m.Answer, &dns.CNAME{
@@ -84,7 +84,7 @@ func (s *Server) handleVotersLookup(ctx context.Context, w dns.ResponseWriter, r
 func (s *Server) handleObserversLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
 	s.log.Debug("handling observers lookup")
 	m := s.newMsg(r)
-	config := s.store.Raft().GetConfiguration().Configuration()
+	config := s.store.Raft().Configuration()
 	for _, server := range config.Servers {
 		if server.Suffrage == raft.Nonvoter {
 			m.Answer = append(m.Answer, &dns.CNAME{
