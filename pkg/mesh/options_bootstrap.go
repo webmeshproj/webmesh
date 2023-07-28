@@ -21,6 +21,8 @@ import (
 	"flag"
 	"fmt"
 	"net/netip"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/util"
@@ -47,15 +49,15 @@ type BootstrapOptions struct {
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
 	// AdvertiseAddress is the initial address to advertise for raft consensus.
 	AdvertiseAddress string `json:"advertise-address,omitempty" yaml:"advertise-address,omitempty" toml:"advertise-address,omitempty"`
-	// Servers is a comma separated list of servers to bootstrap with. If not empty, all
-	// nodes in the list should be started with the same list and BootstrapIPv4Network. If the
-	// BootstrapIPv4Network is not the same, the first node to become leader will pick it. Servers
-	// should be in the form of <node-id>=<address> where address is the advertise address.
-	Servers string `json:"servers,omitempty" yaml:"servers,omitempty" toml:"servers,omitempty"`
-	// ServersGRPCPorts is a comma separated list of gRPC ports to bootstrap with. If empty, the node will
-	// use the advertise address and local gRPC port for every node in BootstrapServers. Ports should be
-	// in the form of <node-id>=<port>.
-	ServersGRPCPorts string `json:"servers-grpc-ports,omitempty" yaml:"servers-grpc-ports,omitempty" toml:"servers-grpc-ports,omitempty"`
+	// Servers is a map of node IDs to addresses to bootstrap with. If empty, the node will use the advertise
+	// address as the bootstrap server. If not empty, all nodes in the map should be started with the same
+	// list configurations. If any are different then the first node to become leader will pick them. This
+	// can cause bootstrap to fail when using ACLs. Servers should be in the form of <node-id>=<address>.
+	Servers map[string]string `json:"servers,omitempty" yaml:"servers,omitempty" toml:"servers,omitempty"`
+	// ServersGRPCPorts is a map of node IDs to gRPC ports to bootstrap with. If empty, the node will use the
+	// advertise address and locally configured gRPC port for every node in bootstrap-servers. Ports should
+	// be in the form of <node-id>=<port>.
+	ServersGRPCPorts map[string]int `json:"servers-grpc-ports,omitempty" yaml:"servers-grpc-ports,omitempty" toml:"servers-grpc-ports,omitempty"`
 	// IPv4Network is the IPv4 network of the mesh to write to the database when bootstraping a new cluster.
 	IPv4Network string `json:"ipv4-network,omitempty" yaml:"ipv4-network,omitempty" toml:"ipv4-network,omitempty"`
 	// MeshDomain is the domain of the mesh to write to the database when bootstraping a new cluster.
@@ -116,16 +118,34 @@ func (o *BootstrapOptions) Validate() error {
 	if !o.Enabled {
 		return nil
 	}
-	if o.Servers != "" {
-		if o.AdvertiseAddress == "" {
-			return errors.New("advertise address is required for bootstrapping with servers")
-		}
-		for _, server := range strings.Split(o.Servers, ",") {
+	if len(o.Servers) == 0 && os.Getenv(BootstrapServersEnvVar) != "" {
+		// Parse the servers from the environment variable.
+		o.Servers = make(map[string]string)
+		for _, server := range strings.Split(os.Getenv(BootstrapServersEnvVar), ",") {
 			parts := strings.Split(server, "=")
 			if len(parts) != 2 {
 				return fmt.Errorf("invalid bootstrap server: %s", server)
 			}
+			o.Servers[parts[0]] = parts[1]
 		}
+	}
+	if len(o.ServersGRPCPorts) == 0 && os.Getenv(BootstrapServersGRPCPortsEnvVar) != "" {
+		// Parse the servers from the environment variable.
+		o.ServersGRPCPorts = make(map[string]int)
+		for _, server := range strings.Split(os.Getenv(BootstrapServersGRPCPortsEnvVar), ",") {
+			parts := strings.Split(server, "=")
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid bootstrap server gRPC port: %s", server)
+			}
+			port, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return fmt.Errorf("invalid bootstrap server gRPC port: %s", server)
+			}
+			o.ServersGRPCPorts[parts[0]] = port
+		}
+	}
+	if len(o.Servers) > 0 && o.AdvertiseAddress == "" {
+		return errors.New("advertise address is required for bootstrapping with servers")
 	}
 	if o.IPv4Network == "" {
 		return errors.New("bootstrap IPv4 network is required for bootstrapping")
@@ -150,19 +170,44 @@ func (o *BootstrapOptions) BindFlags(fl *flag.FlagSet) {
 		`Raft advertise address. Required when bootstrapping a new cluster,
 but will be replaced with the WireGuard address after bootstrapping.`)
 
-	fl.StringVar(&o.Servers, "bootstrap.servers", util.GetEnvDefault(BootstrapServersEnvVar, ""),
-		`Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
-If empty, the node will use the advertise address as the bootstrap server. If not empty,
-all nodes in the list should be started with the same list configurations. If any are 
-different then the first node to become leader will pick them. This can cause bootstrap
-to fail when using ACLs. Servers should be in the form of <node-id>=<address> where 
-address is the raft advertise address.`)
+	fl.Func("bootstrap.servers", `Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
+	If empty, the node will use the advertise address as the bootstrap server. If not empty,
+	all nodes in the list should be started with the same list configurations. If any are 
+	different then the first node to become leader will pick them. This can cause bootstrap
+	to fail when using ACLs. Servers should be in the form of <node-id>=<address> where 
+	address is the raft advertise address.`,
+		func(val string) error {
+			o.Servers = make(map[string]string)
+			for _, server := range strings.Split(val, ",") {
+				parts := strings.Split(server, "=")
+				if len(parts) != 2 {
+					return fmt.Errorf("invalid bootstrap server: %s", server)
+				}
+				o.Servers[parts[0]] = parts[1]
+			}
+			return nil
+		})
 
-	fl.StringVar(&o.ServersGRPCPorts, "bootstrap.servers-grpc-ports", util.GetEnvDefault(BootstrapServersGRPCPortsEnvVar, ""),
+	fl.Func("bootstrap.servers-grpc-ports",
 		`Comma separated list of gRPC ports to bootstrap with. This is only used
 if bootstrap is true. If empty, the node will use the advertise address and
 locally configured gRPC port for every node in bootstrap-servers.
-Ports should be in the form of <node-id>=<port>.`)
+Ports should be in the form of <node-id>=<port>.`,
+		func(val string) error {
+			o.ServersGRPCPorts = make(map[string]int)
+			for _, server := range strings.Split(val, ",") {
+				parts := strings.Split(server, "=")
+				if len(parts) != 2 {
+					return fmt.Errorf("invalid bootstrap server gRPC port: %s", server)
+				}
+				port, err := strconv.Atoi(parts[1])
+				if err != nil {
+					return fmt.Errorf("invalid bootstrap server gRPC port: %s", server)
+				}
+				o.ServersGRPCPorts[parts[0]] = port
+			}
+			return nil
+		})
 
 	fl.StringVar(&o.IPv4Network, "bootstrap.ipv4-network", util.GetEnvDefault(BootstrapIPv4NetworkEnvVar, "172.16.0.0/12"),
 		"IPv4 network of the mesh to write to the database when bootstraping a new cluster.")

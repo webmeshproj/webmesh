@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -55,9 +54,10 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Mesh, e
 	if numNodes < 1 {
 		return nil, errors.New("invalid number of nodes")
 	}
-	bootstrapServers := make([]string, numNodes)
+	bootstrapServers := make(map[string]string)
 	for i := 0; i < numNodes; i++ {
-		bootstrapServers[i] = fmt.Sprintf("node-%d=127.0.0.1:%d", i, startPort+i)
+		nodeID := fmt.Sprintf("node-%d", i)
+		bootstrapServers[nodeID] = fmt.Sprintf("127.0.0.1:%d", startPort+i)
 	}
 	opts := make([]*Options, numNodes)
 	for i := 0; i < numNodes; i++ {
@@ -66,7 +66,7 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Mesh, e
 		opts[i] = newTestOptions()
 		opts[i].Mesh.NodeID = thisID
 		opts[i].Bootstrap.AdvertiseAddress = thisAddr
-		opts[i].Bootstrap.Servers = strings.Join(bootstrapServers, ",")
+		opts[i].Bootstrap.Servers = bootstrapServers
 		opts[i].Raft.ListenAddress = thisAddr
 	}
 	stores := make([]Mesh, numNodes)

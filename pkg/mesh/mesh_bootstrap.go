@@ -57,7 +57,7 @@ func (s *meshStore) bootstrap(ctx context.Context) error {
 		s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 		// We rejoin as a voter no matter what
 		s.opts.Mesh.JoinAsVoter = true
-		if s.opts.Bootstrap.Servers == "" {
+		if len(s.opts.Bootstrap.Servers) == 0 {
 			// We were the only bootstrap server, so we need to rejoin ourselves
 			// This is not foolproof, but it's the best we can do if the bootstrap
 			// flag is left on.
@@ -81,41 +81,15 @@ func (s *meshStore) bootstrap(ctx context.Context) error {
 		return s.recoverWireguard(ctx)
 	}
 	var bootstrapOpts meshraft.BootstrapOptions
+	bootstrapOpts.Servers = s.opts.Bootstrap.Servers
 	if s.opts.Bootstrap.AdvertiseAddress != "" {
 		bootstrapOpts.AdvertiseAddress = s.opts.Bootstrap.AdvertiseAddress
-	}
-	if s.opts.Bootstrap.Servers != "" {
-		bootstrapServers := strings.Split(s.opts.Bootstrap.Servers, ",")
-		servers := make(map[string]string)
-		for _, server := range bootstrapServers {
-			parts := strings.Split(server, "=")
-			if len(parts) != 2 {
-				return fmt.Errorf("invalid bootstrap server: %s", server)
-			}
-			servers[parts[0]] = parts[1]
-		}
-		bootstrapOpts.Servers = servers
-	}
-	grpcPorts := make(map[raft.ServerID]int64)
-	if s.opts.Bootstrap.ServersGRPCPorts != "" {
-		ports := strings.Split(s.opts.Bootstrap.ServersGRPCPorts, ",")
-		for _, port := range ports {
-			parts := strings.Split(port, "=")
-			if len(parts) != 2 {
-				return fmt.Errorf("invalid bootstrap server grpc port: %s", port)
-			}
-			p, err := strconv.ParseInt(parts[1], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid bootstrap server grpc port: %s", port)
-			}
-			grpcPorts[raft.ServerID(parts[0])] = p
-		}
 	}
 	bootstrapOpts.OnBootstrapped = func(isLeader bool) error {
 		if isLeader {
 			return s.initialBootstrapLeader(ctx)
 		}
-		return s.initialBootstrapNonLeader(ctx, grpcPorts)
+		return s.initialBootstrapNonLeader(ctx)
 	}
 	err = s.raft.Bootstrap(ctx, &bootstrapOpts)
 	if err != nil {
@@ -123,7 +97,7 @@ func (s *meshStore) bootstrap(ctx context.Context) error {
 		// there were other servers to bootstrap with, then
 		// we might just need to rejoin the cluster.
 		if errors.Is(err, raft.ErrCantBootstrap) {
-			if s.opts.Bootstrap.Servers != "" {
+			if len(s.opts.Bootstrap.Servers) > 0 {
 				s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 				s.opts.Mesh.JoinAsVoter = true
 				return s.rejoinBootstrapServer(ctx)
@@ -143,8 +117,6 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	cfg := s.raft.Configuration()
 
 	// Set initial cluster configurations to the raft log
-	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
-		slog.String("ipv4-network", s.opts.Bootstrap.IPv4Network))
 	meshnetworkv4, err := netip.ParsePrefix(s.opts.Bootstrap.IPv4Network)
 	if err != nil {
 		return fmt.Errorf("parse IPv4 network: %w", err)
@@ -153,10 +125,12 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("generate ULA: %w", err)
 	}
-	s.log.Info("generated IPv6 Mesh Network", slog.String("ula", meshnetworkv6.String()))
+	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
+		slog.String("ipv4-network", s.opts.Bootstrap.IPv4Network),
+		slog.String("ipv6-network", meshnetworkv6.String()))
 	err = s.Storage().Put(ctx, state.IPv6PrefixKey, meshnetworkv6.String())
 	if err != nil {
-		return fmt.Errorf("set ULA prefix to db: %w", err)
+		return fmt.Errorf("set IPv6 prefix to db: %w", err)
 	}
 	err = s.Storage().Put(ctx, state.IPv4PrefixKey, meshnetworkv4.String())
 	if err != nil {
@@ -170,7 +144,6 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("set mesh domain to db: %w", err)
 	}
-	s.log.Info("initialized network details")
 
 	// Initialize the RBAC system.
 	rb := rbac.New(s.Storage())
@@ -313,7 +286,6 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	// address. This is done by creating a new node in the database and then
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
-
 	p := peers.New(s.Storage())
 	params := &peers.PutOptions{
 		ID:                 s.ID(),
@@ -378,6 +350,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 			}
 		}
 	}
+	// Allocate mesh IP addresses for ourselves
 	var privatev4, privatev6 netip.Prefix
 	if !s.opts.Mesh.NoIPv4 {
 		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
@@ -415,11 +388,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	} else {
 		raftAddr = net.JoinHostPort(privatev6.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
 	}
-	err = s.raft.Raft().Barrier(time.Second * 5).Error()
-	if err != nil {
-		return fmt.Errorf("barrier: %w", err)
-	}
 	if s.testStore {
+		// We dont manage network connections on test stores
 		return nil
 	}
 	// Start network resources
@@ -445,6 +415,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("start net manager: %w", err)
 	}
+	// Make sure everyone is aware of the bootstrap data
+	err = s.raft.Raft().Barrier(time.Second * 5).Error()
+	if err != nil {
+		return fmt.Errorf("barrier: %w", err)
+	}
 	// We need to readd ourselves server to the cluster as a voter with the acquired address.
 	s.log.Info("re-adding ourselves to the cluster with the acquired wireguard address")
 	err = s.raft.AddVoter(ctx, s.ID(), raftAddr)
@@ -455,7 +430,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context) error {
 	return nil
 }
 
-func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, grpcPorts map[raft.ServerID]int64) error {
+func (s *meshStore) initialBootstrapNonLeader(ctx context.Context) error {
 	if s.testStore {
 		return nil
 	}
@@ -464,7 +439,7 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, grpcPorts map
 	if err != nil {
 		return fmt.Errorf("get leader ID: %w", err)
 	}
-	// TODO: This creates a race condition where the leader might readd itself with
+	// TODO: This might create a race condition where the leader readds itself with
 	// its wireguard address before we get here. We should instead match the leader
 	// to their initial bootstrap address.
 	config := s.raft.Configuration()
@@ -481,35 +456,29 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, grpcPorts map
 	if !advertiseAddress.IsValid() {
 		return fmt.Errorf("leader %s not found in configuration", leader)
 	}
-	var grpcPort int64
-	if port, ok := grpcPorts[raft.ServerID(leader)]; ok {
+	var grpcPort int
+	if port, ok := s.opts.Bootstrap.ServersGRPCPorts[string(leader)]; ok {
 		grpcPort = port
 	} else {
-		grpcPort = int64(s.opts.Mesh.GRPCPort)
+		grpcPort = s.opts.Mesh.GRPCPort
 	}
-	joinAddr := net.JoinHostPort(advertiseAddress.Addr().String(), strconv.Itoa(int(grpcPort)))
+	joinAddr := net.JoinHostPort(advertiseAddress.Addr().String(), strconv.Itoa(grpcPort))
 	s.opts.Mesh.JoinAsVoter = true
-	// TODO: Technically we want to wait for the first barrier to be reached before we
-	//       start the join process. This is because we want to make sure that the
-	//       leader has already written the first barrier to the log before we join.
-	//       However, this is not possible right now because we don't have a way to
-	//       wait for the first barrier to be reached.
 	time.Sleep(3 * time.Second)
 	return s.join(ctx, joinAddr, 5)
 }
 
 func (s *meshStore) rejoinBootstrapServer(ctx context.Context) error {
-	servers := strings.Split(s.opts.Bootstrap.Servers, ",")
 	s.opts.Mesh.JoinAsVoter = true
-	for _, server := range servers {
+	for id, server := range s.opts.Bootstrap.Servers {
 		parts := strings.Split(server, "=")
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid bootstrap server: %s", server)
 		}
-		if parts[0] == s.ID() {
+		if id == s.ID() {
 			continue
 		}
-		addr, err := net.ResolveTCPAddr("tcp", parts[1])
+		addr, err := net.ResolveTCPAddr("tcp", server)
 		if err != nil {
 			return fmt.Errorf("resolve advertise address: %w", err)
 		}

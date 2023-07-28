@@ -77,21 +77,21 @@ func (s *meshStore) Open(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("start raft: %w", err)
 	}
-	handleErr := func(err error) error {
+	// Start serving storage queries for plugins.
+	go s.plugins.ServeStorage(s.raft.Storage())
+	handleErr := func(cause error) error {
 		s.kvSubCancel()
 		log.Error("failed to open store", slog.String("error", err.Error()))
 		perr := s.plugins.Close()
 		if perr != nil {
-			log.Error("failed to close plugins", slog.String("error", perr.Error()))
+			log.Error("failed to close plugin manager", slog.String("error", perr.Error()))
 		}
 		cerr := s.raft.Stop(ctx)
 		if cerr != nil {
 			log.Error("failed to stop raft node", slog.String("error", cerr.Error()))
 		}
-		return err
+		return cause
 	}
-	// Start serving storage queries for plugins.
-	go s.plugins.ServeStorage(s.raft.Storage())
 	// Register an update hook to watch for node changes.
 	s.kvSubCancel, err = s.raft.Storage().Subscribe(context.Background(), "", s.onDBUpdate)
 	if err != nil {
