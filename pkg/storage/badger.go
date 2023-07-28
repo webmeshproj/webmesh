@@ -142,7 +142,7 @@ func (b *badgerStorage) IterPrefix(ctx context.Context, prefix string, fn Prefix
 func (b *badgerStorage) Snapshot(ctx context.Context) (io.Reader, error) {
 	if !b.db.Opts().InMemory {
 		err := b.db.RunValueLogGC(0.5)
-		if err != nil {
+		if err != nil && !errors.Is(err, badger.ErrNoRewrite) {
 			return nil, fmt.Errorf("badger run log gc: %w", err)
 		}
 	}
