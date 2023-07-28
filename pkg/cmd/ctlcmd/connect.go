@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/webmesh/pkg/ctlcmd/connect"
+	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd/connect"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 )
 

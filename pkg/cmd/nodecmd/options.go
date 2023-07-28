@@ -25,8 +25,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/global"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
-	"github.com/webmeshproj/webmesh/pkg/nodecmd/global"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
 

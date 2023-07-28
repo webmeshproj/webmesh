@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra/doc"
 
-	"github.com/webmeshproj/webmesh/pkg/ctlcmd"
+	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd"
 )
 
 func main() {
