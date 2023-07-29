@@ -54,6 +54,9 @@ func newBadgerStorage(opts *Options) (Storage, error) {
 
 // Get returns the value of a key.
 func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
+	if key == "" {
+		return "", errors.New("badger get: key is empty")
+	}
 	var value string
 	err := b.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
@@ -77,6 +80,9 @@ func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
 
 // Put sets the value of a key.
 func (b *badgerStorage) Put(ctx context.Context, key, value string) error {
+	if key == "" {
+		return errors.New("badger put: key is empty")
+	}
 	err := b.db.Update(func(txn *badger.Txn) error {
 		err := txn.Set([]byte(key), []byte(value))
 		if err != nil {
@@ -89,6 +95,9 @@ func (b *badgerStorage) Put(ctx context.Context, key, value string) error {
 
 // Delete removes a key.
 func (b *badgerStorage) Delete(ctx context.Context, key string) error {
+	if key == "" {
+		return errors.New("badger delete: key is empty")
+	}
 	err := b.db.Update(func(txn *badger.Txn) error {
 		err := txn.Delete([]byte(key))
 		if err != nil {
