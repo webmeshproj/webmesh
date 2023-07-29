@@ -72,6 +72,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		m, rtt, err := s.forwarder.ExchangeContext(ctx, r, forwarder)
 		if err != nil {
 			s.log.Error("failed to forward lookup", slog.String("error", err.Error()))
+			m := s.newMsg(r)
 			s.writeMsg(w, r, m, dns.RcodeServerFailure)
 			return
 		}

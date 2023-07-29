@@ -20,6 +20,7 @@ package dns
 
 import (
 	"bufio"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -52,7 +53,20 @@ func loadSystemConfig() (*DNSConfig, error) {
 		switch fields[0] {
 		case "nameserver":
 			if len(fields) > 1 {
-				conf.Servers = append(conf.Servers, fields[1])
+				var addrport netip.AddrPort
+				// Try to parse as a regular address
+				addr, err := netip.ParseAddr(fields[1])
+				if err == nil {
+					// Default to port 53
+					addrport = netip.AddrPortFrom(addr, 53)
+				} else {
+					// Try to parse as an address with port
+					addrport, err = netip.ParseAddrPort(fields[1])
+					if err != nil {
+						continue
+					}
+				}
+				conf.Servers = append(conf.Servers, addrport.String())
 			}
 		case "domain":
 			if len(fields) > 1 {
