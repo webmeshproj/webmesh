@@ -54,5 +54,9 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)
 	}
+	err = s.peers.Delete(ctx, req.GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
+	}
 	return &emptypb.Empty{}, nil
 }

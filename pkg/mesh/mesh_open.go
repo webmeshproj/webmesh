@@ -31,7 +31,7 @@ import (
 )
 
 // Open opens the store.
-func (s *meshStore) Open(ctx context.Context) (err error) {
+func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error) {
 	if s.open.Load() {
 		return ErrOpen
 	}
@@ -116,15 +116,15 @@ func (s *meshStore) Open(ctx context.Context) (err error) {
 	if s.opts.Bootstrap.Enabled {
 		// Attempt bootstrap.
 		log.Info("bootstrapping cluster")
-		if err = s.bootstrap(ctx); err != nil {
+		if err = s.bootstrap(ctx, features); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if s.opts.Mesh.JoinAddress != "" || len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
 		// Attempt to join the cluster.
 		if len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
-			err = s.joinWithPeerDiscovery(ctx)
+			err = s.joinWithPeerDiscovery(ctx, features)
 		} else {
-			err = s.join(ctx, s.opts.Mesh.JoinAddress, s.opts.Mesh.MaxJoinRetries)
+			err = s.join(ctx, features, s.opts.Mesh.JoinAddress, s.opts.Mesh.MaxJoinRetries)
 		}
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))

@@ -101,7 +101,7 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("create store: %w", err)
 	}
-	if err := st.Open(ctx); err != nil {
+	if err := st.Open(ctx, nil); err != nil {
 		return fmt.Errorf("open store: %w", err)
 	}
 

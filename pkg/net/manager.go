@@ -31,7 +31,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/dns"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
@@ -314,29 +314,46 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	defer m.wgmux.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
-	peers, err := mesh.WireGuardPeersFor(ctx, m.storage, m.opts.NodeID)
+	wgpeers, err := mesh.WireGuardPeersFor(ctx, m.storage, m.opts.NodeID)
 	if err != nil {
 		return fmt.Errorf("wireguard peers for: %w", err)
 	}
-	log.Debug("current wireguard peers", slog.Any("peers", peers))
+	log.Debug("current wireguard peers", slog.Any("peers", wgpeers))
 	currentPeers := m.wg.Peers()
 	seenPeers := make(map[string]struct{})
 	var iceServers []string
 	errs := make([]error, 0)
-	for _, peer := range peers {
+	for _, peer := range wgpeers {
 		seenPeers[peer.GetId()] = struct{}{}
 		// Check if we need to gather ice servers
 		if peer.GetIce() && len(iceServers) == 0 {
-			st := state.New(m.storage)
-			iceAddrs, err := st.ListPublicPeersWithFeature(ctx, m.opts.DialOptions, m.opts.NodeID, v1.Feature_ICE_NEGOTIATION)
+			peerdb := peers.New(m.storage)
+			icepeers, err := peerdb.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("list public peers with feature: %w", err))
 				continue
 			}
-			for _, addr := range iceAddrs {
-				iceServers = append(iceServers, addr.String())
+			for _, icepeer := range icepeers {
+			ICEEndpoint:
+				switch {
+				// Prefer primary endpoint
+				case icepeer.PrimaryEndpoint != "":
+					addr, err := netip.ParseAddr(peer.PrimaryEndpoint)
+					if err == nil {
+						addrport := netip.AddrPortFrom(addr, uint16(icepeer.GRPCPort))
+						iceServers = append(iceServers, addrport.String())
+						break ICEEndpoint
+					}
+					fallthrough
+				// Fall back to private endpoint
+				case icepeer.PrivateIPv4.IsValid():
+					addrport := netip.AddrPortFrom(icepeer.PrivateIPv4.Addr(), uint16(icepeer.GRPCPort))
+					iceServers = append(iceServers, addrport.String())
+				case icepeer.PrivateIPv6.IsValid():
+					addrport := netip.AddrPortFrom(icepeer.PrivateIPv6.Addr(), uint16(icepeer.GRPCPort))
+					iceServers = append(iceServers, addrport.String())
+				}
 			}
-			// TODO: cache these for a configurable amount of time
 		}
 		// Ensure the peer is configured
 		err := m.addPeer(ctx, peer, iceServers)

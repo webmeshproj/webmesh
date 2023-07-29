@@ -35,7 +35,7 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	}
 	stor := st.(*meshStore)
 	stor.testStore = true
-	if err := stor.Open(ctx); err != nil {
+	if err := stor.Open(ctx, nil); err != nil {
 		return nil, err
 	}
 	return stor, nil
@@ -83,7 +83,7 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Mesh, e
 	for i := 0; i < numNodes; i++ {
 		i := i
 		g.Go(func() error {
-			if err := stores[i].Open(ctx); err != nil {
+			if err := stores[i].Open(ctx, nil); err != nil {
 				return err
 			}
 			return nil

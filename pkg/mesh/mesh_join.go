@@ -35,7 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
 )
 
-func (s *meshStore) joinWithPeerDiscovery(ctx context.Context) error {
+func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Feature) error {
 	log := s.log.With(slog.String("peer-discovery-addrs", strings.Join(s.opts.Mesh.PeerDiscoveryAddresses, ",")))
 	ctx = context.WithLogger(ctx, log)
 	log.Info("discovering joinable peers")
@@ -64,7 +64,7 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context) error {
 		log.Info("discovered joinable peers", slog.Any("peers", resp.Peers))
 	Peers:
 		for _, peer := range resp.Peers {
-			err = s.join(ctx, peer.Address, s.opts.Mesh.MaxJoinRetries)
+			err = s.join(ctx, features, peer.Address, s.opts.Mesh.MaxJoinRetries)
 			if err != nil {
 				if ctx.Err() != nil {
 					return ctx.Err()
@@ -83,7 +83,7 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context) error {
 	return nil
 }
 
-func (s *meshStore) join(ctx context.Context, joinAddr string, maxRetries int) error {
+func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr string, maxRetries int) error {
 	log := s.log.With(slog.String("join-addr", joinAddr))
 	ctx = context.WithLogger(ctx, log)
 	log.Info("joining mesh")
@@ -104,7 +104,7 @@ func (s *meshStore) join(ctx context.Context, joinAddr string, maxRetries int) e
 			time.Sleep(time.Second)
 			continue
 		}
-		err = s.joinWithConn(ctx, conn)
+		err = s.joinWithConn(ctx, conn, features)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -120,7 +120,7 @@ func (s *meshStore) join(ctx context.Context, joinAddr string, maxRetries int) e
 	return err
 }
 
-func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn) error {
+func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, features []v1.Feature) error {
 	log := context.LoggerFrom(ctx)
 	client := v1.NewNodeClient(c)
 	defer c.Close()
@@ -145,6 +145,7 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn) error 
 		AsVoter:            s.opts.Mesh.JoinAsVoter,
 		Routes:             s.opts.Mesh.Routes,
 		DirectPeers:        s.opts.Mesh.DirectPeers,
+		Features:           features,
 	}
 	log.Debug("sending join request to node", slog.Any("req", req))
 	resp, err := client.Join(ctx, req)

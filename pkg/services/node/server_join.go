@@ -159,6 +159,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	log.Debug("barrier complete, all nodes caught up")
 
 	// Lookup the peer in the database
+	// TODO: This check is probably not needed anymore, we can just always create the peer
 	var peer peers.Node
 	peer, err = s.peers.Get(ctx, req.GetId())
 	if err != nil && err != peers.ErrNodeNotFound {
@@ -175,6 +176,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			ZoneAwarenessID:    req.GetZoneAwarenessId(),
 			GRPCPort:           int(req.GetGrpcPort()),
 			RaftPort:           int(req.GetRaftPort()),
+			Features:           req.GetFeatures(),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
@@ -190,6 +192,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			ZoneAwarenessID:    req.GetZoneAwarenessId(),
 			GRPCPort:           int(req.GetGrpcPort()),
 			RaftPort:           int(req.GetRaftPort()),
+			Features:           req.GetFeatures(),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
@@ -413,12 +416,20 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// If the caller needs ICE servers, find all the eligible peers and return them
 	if requiresICE {
-		iceAddrs, err := s.meshstate.ListPublicPeersWithFeature(ctx, s.proxyCreds, req.GetId(), v1.Feature_ICE_NEGOTIATION)
+		peers, err := s.peers.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to list peers by ICE feature: %v", err)
 		}
-		for _, addr := range iceAddrs {
-			resp.IceServers = append(resp.IceServers, addr.String())
+		for _, peer := range peers {
+			// We only return peers that are publicly accessible for now.
+			// This should be configurable in the future.
+			if peer.PrimaryEndpoint != "" {
+				addr, err := netip.ParseAddr(peer.PrimaryEndpoint)
+				if err == nil {
+					addrport := netip.AddrPortFrom(addr, uint16(peer.GRPCPort))
+					resp.IceServers = append(resp.IceServers, addrport.String())
+				}
+			}
 		}
 		if len(resp.IceServers) == 0 {
 			log.Warn("no peers with ICE negotiation feature found, rejecting join request")

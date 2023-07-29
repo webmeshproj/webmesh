@@ -24,10 +24,6 @@ import (
 	"net/netip"
 	"strings"
 
-	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
-	"google.golang.org/grpc"
-
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
@@ -51,10 +47,6 @@ type State interface {
 	// ListPeerPrivateRPCAddresses returns all private gRPC addresses in the mesh excluding a node.
 	// The map key is the node ID.
 	ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error)
-	// ListPublicPeersWithFeature returns all public peers of the given node with the given feature.
-	// TODO: Creds are needed because this method calls the peers to get their feature set.
-	// This should be replaced with tracking the features in the meshdb.
-	ListPublicPeersWithFeature(ctx context.Context, creds []grpc.DialOption, nodeID string, feature v1.Feature) (map[string]netip.AddrPort, error)
 }
 
 // ErrNodeNotFound is returned when a node is not found.
@@ -182,59 +174,6 @@ func (s *state) ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) 
 			return nil, fmt.Errorf("parse address for node %s: %v", nodeID, err)
 		}
 		out[n.ID] = netip.AddrPortFrom(addr, uint16(n.GRPCPort))
-	}
-	return out, nil
-}
-
-func (s *state) ListPublicPeersWithFeature(ctx context.Context, creds []grpc.DialOption, nodeID string, feature v1.Feature) (map[string]netip.AddrPort, error) {
-	publicAddrs, err := s.ListPeerPublicRPCAddresses(ctx, nodeID)
-	if err != nil {
-		return nil, fmt.Errorf("list public addresses: %w", err)
-	}
-	if len(publicAddrs) == 0 {
-		return nil, nil
-	}
-	privateAddrs, err := s.ListPeerPrivateRPCAddresses(ctx, nodeID)
-	if err != nil {
-		return nil, fmt.Errorf("list private addresses: %w", err)
-	}
-	out := make(map[string]netip.AddrPort)
-	for node, publicAddr := range publicAddrs {
-		privAddr, ok := privateAddrs[node]
-		if !ok {
-			continue
-		}
-		slog.Default().Debug("checking node for feature",
-			slog.String("feature", feature.String()),
-			slog.String("node", node),
-			slog.String("addr", privAddr.String()),
-		)
-		conn, err := grpc.DialContext(ctx, privAddr.String(), creds...)
-		if err != nil {
-			slog.Default().Debug("could not connect to node",
-				slog.String("node", node),
-				slog.String("addr", privAddr.String()),
-				slog.String("error", err.Error()))
-			continue
-		}
-		defer conn.Close()
-		cl := v1.NewNodeClient(conn)
-		// TODO: Need an RPC for just features
-		status, err := cl.GetStatus(ctx, &v1.GetStatusRequest{})
-		if err != nil {
-			slog.Default().Debug("could not get status from node",
-				slog.String("node", node),
-				slog.String("addr", privAddr.String()),
-				slog.String("error", err.Error()))
-			continue
-		}
-	Feats:
-		for _, f := range status.GetFeatures() {
-			if f == feature {
-				out[node] = publicAddr
-				break Feats
-			}
-		}
 	}
 	return out, nil
 }

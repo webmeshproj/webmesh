@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 
@@ -52,7 +53,7 @@ type Mesh interface {
 	Domain() string
 	// Open opens the connection to the mesh. This must be called before
 	// other methods can be used.
-	Open(context.Context) error
+	Open(ctx context.Context, features []v1.Feature) error
 	// Close closes the connection to the mesh and shuts down the storage.
 	Close() error
 	// Leader returns the current Raft leader ID.

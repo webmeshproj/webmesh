@@ -36,22 +36,23 @@ import (
 )
 
 const (
-	LogLevelEnvVar               = "GLOBAL_LOG_LEVEL"
-	TLSCertEnvVar                = "GLOBAL_TLS_CERT_FILE"
-	TLSKeyEnvVar                 = "GLOBAL_TLS_KEY_FILE"
-	TLACAEnvVar                  = "GLOBAL_TLS_CA_FILE"
-	TLSClientCAEnvVar            = "GLOBAL_TLS_CLIENT_CA_FILE"
-	MTLSEnvVar                   = "GLOBAL_MTLS"
-	VerifyChainOnlyEnvVar        = "GLOBAL_VERIFY_CHAIN_ONLY"
-	InsecureEnvVar               = "GLOBAL_INSECURE"
-	NoIPv4EnvVar                 = "GLOBAL_NO_IPV4"
-	NoIPv6EnvVar                 = "GLOBAL_NO_IPV6"
-	PrimaryEndpointEnvVar        = "GLOBAL_PRIMARY_ENDPOINT"
-	EndpointsEnvVar              = "GLOBAL_ENDPOINTS"
-	DetectEndpointsEnvVar        = "GLOBAL_DETECT_ENDPOINTS"
-	DetectPrivateEndpointsEnvVar = "GLOBAL_DETECT_PRIVATE_ENDPOINTS"
-	AllowRemoteDetectionEnvVar   = "GLOBAL_ALLOW_REMOTE_DETECTION"
-	DetectIPv6EnvVar             = "GLOBAL_DETECT_IPV6"
+	LogLevelEnvVar                    = "GLOBAL_LOG_LEVEL"
+	TLSCertEnvVar                     = "GLOBAL_TLS_CERT_FILE"
+	TLSKeyEnvVar                      = "GLOBAL_TLS_KEY_FILE"
+	TLACAEnvVar                       = "GLOBAL_TLS_CA_FILE"
+	TLSClientCAEnvVar                 = "GLOBAL_TLS_CLIENT_CA_FILE"
+	MTLSEnvVar                        = "GLOBAL_MTLS"
+	VerifyChainOnlyEnvVar             = "GLOBAL_VERIFY_CHAIN_ONLY"
+	InsecureEnvVar                    = "GLOBAL_INSECURE"
+	NoIPv4EnvVar                      = "GLOBAL_NO_IPV4"
+	NoIPv6EnvVar                      = "GLOBAL_NO_IPV6"
+	PrimaryEndpointEnvVar             = "GLOBAL_PRIMARY_ENDPOINT"
+	EndpointsEnvVar                   = "GLOBAL_ENDPOINTS"
+	DetectEndpointsEnvVar             = "GLOBAL_DETECT_ENDPOINTS"
+	DetectPrivateEndpointsEnvVar      = "GLOBAL_DETECT_PRIVATE_ENDPOINTS"
+	AllowRemoteDetectionEnvVar        = "GLOBAL_ALLOW_REMOTE_DETECTION"
+	DetectIPv6EnvVar                  = "GLOBAL_DETECT_IPV6"
+	DisableFeatureAdvertisementEnvVar = "GLOBAL_DISABLE_FEATURE_ADVERTISEMENT"
 )
 
 // Options are the global options.
@@ -95,6 +96,8 @@ type Options struct {
 	AllowRemoteDetection bool `yaml:"allow-remote-detection,omitempty" json:"allow-remote-detection,omitempty" toml:"allow-remote-detection,omitempty"`
 	// DetectIPv6 is true if IPv6 addresses should be included in detection.
 	DetectIPv6 bool `yaml:"detect-ipv6,omitempty" json:"detect-ipv6,omitempty" toml:"detect-ipv6,omitempty"`
+	// DisableFeatureAdvertisement is true if feature advertisement should be disabled.
+	DisableFeatureAdvertisement bool `yaml:"disable-feature-advertisement,omitempty" json:"disable-feature-advertisement,omitempty" toml:"disable-feature-advertisement,omitempty"`
 }
 
 // NewOptions creates new options.
@@ -142,6 +145,9 @@ When detect-endpoints is true, this value will be the first address detected.`)
 
 	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", util.GetEnvDefault(DetectIPv6EnvVar, "false") == "true",
 		"Detect IPv6 addresses. Default is to only detect IPv4.")
+
+	fs.BoolVar(&o.DisableFeatureAdvertisement, "global.disable-feature-advertisement", util.GetEnvDefault(DisableFeatureAdvertisementEnvVar, "false") == "true",
+		"Do not advertise features to the rest of the mesh.")
 }
 
 // Overlay overlays the global options onto the given option sets.

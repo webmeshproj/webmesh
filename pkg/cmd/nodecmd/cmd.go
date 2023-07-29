@@ -29,6 +29,7 @@ import (
 	"strings"
 	"syscall"
 
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
@@ -138,7 +139,11 @@ func Execute() error {
 
 	// TODO: Add flag for timeout
 	ctx := context.Background()
-	err = st.Open(ctx)
+	var features []v1.Feature
+	if !opts.Global.DisableFeatureAdvertisement {
+		features = opts.Services.ToFeatureSet()
+	}
+	err = st.Open(ctx, features)
 	if err != nil {
 		return fmt.Errorf("failed to open mesh store: %w", err)
 	}
