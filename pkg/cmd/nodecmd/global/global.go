@@ -234,6 +234,8 @@ func (o *Options) Overlay(opts ...any) error {
 				}
 			}
 			if primaryEndpoint.IsValid() {
+				// Determine the raft and wireguard ports so we can set our
+				// advertise addresses.
 				var raftPort, wireguardPort uint16
 				for _, inOpts := range opts {
 					if vopt, ok := inOpts.(*raft.Options); ok {
@@ -321,7 +323,20 @@ func (o *Options) Overlay(opts ...any) error {
 					v.TURN.PublicIP = primaryEndpoint.String()
 				}
 			}
-
+			if v.MeshDNS.Enabled && v.MeshDNS.ListenUDP != "" && !o.DisableFeatureAdvertisement {
+				// Set the advertise DNS port
+				dnsAddr, err := netip.ParseAddrPort(v.MeshDNS.ListenUDP)
+				if err != nil {
+					return fmt.Errorf("failed to parse listen address: %w", err)
+				}
+				for _, inOpts := range opts {
+					if vopt, ok := inOpts.(*mesh.Options); ok {
+						if vopt.Mesh.DNSPort == 0 {
+							vopt.Mesh.DNSPort = int(dnsAddr.Port())
+						}
+					}
+				}
+			}
 		}
 	}
 	return nil

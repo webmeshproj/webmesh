@@ -314,11 +314,8 @@ func (p *peers) ListByFeature(ctx context.Context, feature v1.Feature) ([]Node, 
 	}
 	out := make([]Node, 0)
 	for _, node := range nodes {
-		for _, f := range node.Features {
-			if f == feature {
-				out = append(out, node)
-				break
-			}
+		if node.HasFeature(feature) {
+			out = append(out, node)
 		}
 	}
 	return out, nil

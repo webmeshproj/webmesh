@@ -137,6 +137,7 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		PublicKey:          key.PublicKey().String(),
 		RaftPort:           int32(s.raft.ListenPort()),
 		GrpcPort:           int32(s.opts.Mesh.GRPCPort),
+		MeshdnsPort:        int32(s.opts.Mesh.DNSPort),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
 		WireguardEndpoints: s.opts.WireGuard.Endpoints,
 		ZoneAwarenessId:    s.opts.Mesh.ZoneAwarenessID,

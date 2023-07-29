@@ -408,6 +408,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Warn("could not lookup DNS servers", slog.String("error", err.Error()))
 	} else {
 		for _, peer := range dnsServers {
+			if peer.ID == req.GetId() {
+				continue
+			}
 			switch {
 			// Prefer the IPv4 address
 			case peer.PrivateDNSAddrV4().IsValid():
@@ -437,6 +440,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, status.Errorf(codes.Internal, "failed to list peers by ICE feature: %v", err)
 		}
 		for _, peer := range peers {
+			if peer.ID == req.GetId() {
+				continue
+			}
 			// We only return peers that are publicly accessible for now.
 			// This should be configurable in the future.
 			publicAddr := peer.PublicRPCAddr()
