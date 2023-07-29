@@ -106,6 +106,8 @@ type Manager interface {
 	// WireGuard returns the wireguard interface.
 	// The wireguard interface is only available after Start has been called.
 	WireGuard() wireguard.Interface
+	// Resolver returns a net.Resolver that can be used to resolve DNS names.
+	Resolver() *net.Resolver
 	// Close closes the network manager and cleans up any resources.
 	Close(ctx context.Context) error
 }
@@ -138,6 +140,19 @@ type clientPeerConn struct {
 func (m *manager) Firewall() firewall.Firewall { return m.fw }
 
 func (m *manager) WireGuard() wireguard.Interface { return m.wg }
+
+func (m *manager) Resolver() *net.Resolver {
+	if len(m.dnsservers) == 0 {
+		return net.DefaultResolver
+	}
+	// TODO: use all DNS servers
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, m.dnsservers[0].String())
+		},
+	}
+}
 
 func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	m.wgmux.Lock()
