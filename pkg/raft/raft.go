@@ -269,7 +269,7 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 	if opts.AdvertiseAddress == "" {
 		opts.AdvertiseAddress = fmt.Sprintf("localhost:%d", r.listenPort)
 	}
-	addr, err := r.resolveTCPAddr(ctx, opts.AdvertiseAddress, 3)
+	addr, err := r.resolveTCPAddr(ctx, opts.AdvertiseAddress, 15)
 	if err != nil {
 		r.mu.Unlock()
 		return fmt.Errorf("resolve advertise address: %w", err)
@@ -288,7 +288,7 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 			if nodeID == string(r.nodeID) {
 				continue
 			}
-			addr, err := r.resolveTCPAddr(ctx, listenAddres, 3)
+			addr, err := r.resolveTCPAddr(ctx, listenAddres, 15)
 			if err != nil {
 				r.mu.Unlock()
 				return fmt.Errorf("resolve server address: %w", err)
