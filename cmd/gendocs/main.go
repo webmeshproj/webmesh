@@ -57,7 +57,7 @@ func main() {
 		}
 		return
 	}
-	err = nodecmd.GenMarkdownTree(*out)
+	err = nodecmd.GenMarkdownDoc("Configuration", -10, *out)
 	if err != nil {
 		fatal(err)
 	}
