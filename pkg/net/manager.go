@@ -34,6 +34,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/net/dns"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
@@ -85,6 +86,8 @@ type StartOptions struct {
 	NetworkV4 netip.Prefix
 	// NetworkV6 is the IPv6 network to use for the node.
 	NetworkV6 netip.Prefix
+	// DNSServers are DNS servers to use for the node.
+	DNSServers []netip.AddrPort
 }
 
 // Manager is the interface for managing the network.
@@ -123,6 +126,7 @@ type manager struct {
 	wg           wireguard.Interface
 	iceConns     map[string]clientPeerConn
 	wgmux, pcmux sync.Mutex
+	dnsservers   []netip.AddrPort
 	masquerading bool
 }
 
@@ -219,6 +223,14 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("add wireguard forwarding rule: %w", err))
 	}
+	if len(opts.DNSServers) > 0 {
+		log.Debug("Configuring DNS servers", slog.Any("servers", opts.DNSServers))
+		err := dns.AddServers(m.wg.Name(), opts.DNSServers)
+		if err != nil {
+			return handleErr(fmt.Errorf("add dns servers: %w", err))
+		}
+		m.dnsservers = opts.DNSServers
+	}
 	return nil
 }
 
@@ -248,6 +260,13 @@ func (m *manager) Close(ctx context.Context) error {
 				log.Error("error clearing firewall rules", slog.String("error", err.Error()))
 			}
 		}()
+	}
+	if len(m.dnsservers) > 0 {
+		log.Debug("removing DNS servers", slog.Any("servers", m.dnsservers))
+		err := dns.RemoveServers(m.wg.Name(), m.dnsservers)
+		if err != nil {
+			log.Error("error removing DNS servers", slog.String("error", err.Error()))
+		}
 	}
 	if m.wg != nil {
 		log.Debug("closing wireguard interface")
