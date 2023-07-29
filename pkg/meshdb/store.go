@@ -19,14 +19,15 @@ limitations under the License.
 package meshdb
 
 import (
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// Store is the interface for interacting with the mesh database. It is a reduced
-// version of the mesh.Mesh interface.
+// Store is the interface for interacting with the mesh database and network.
+// It is a reduced version of the mesh.Mesh interface. This interface should
+// eventually go away.
 type Store interface {
 	// ID returns the ID of the node.
 	ID() string
@@ -40,6 +41,6 @@ type Store interface {
 	Raft() raft.Raft
 	// Plugins returns the plugins for the current node.
 	Plugins() plugins.Manager
-	// WireGuard returns the Wireguard interface.
-	WireGuard() wireguard.Interface
+	// Network returns the Network manager.
+	Network() net.Manager
 }

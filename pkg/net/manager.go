@@ -31,7 +31,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/dns"
@@ -40,11 +39,14 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // Options are the options for the network manager.
 type Options struct {
+	// NodeID is the ID of the node.
+	NodeID string
 	// InterfaceName is the name of the wireguard interface.
 	InterfaceName string
 	// ForceReplace is whether to force replace the wireguard interface.
@@ -113,9 +115,9 @@ type Manager interface {
 }
 
 // New creates a new network manager.
-func New(store meshdb.Store, opts *Options) Manager {
+func New(store storage.Storage, opts *Options) Manager {
 	return &manager{
-		store:    store,
+		storage:  store,
 		opts:     opts,
 		iceConns: make(map[string]clientPeerConn),
 	}
@@ -123,7 +125,7 @@ func New(store meshdb.Store, opts *Options) Manager {
 
 type manager struct {
 	opts         *Options
-	store        meshdb.Store
+	storage      storage.Storage
 	fw           firewall.Firewall
 	wg           wireguard.Interface
 	iceConns     map[string]clientPeerConn
@@ -191,7 +193,7 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 		}
 	}
 	wgopts := &wireguard.Options{
-		NodeID:              m.store.ID(),
+		NodeID:              m.opts.NodeID,
 		ListenPort:          m.opts.ListenPort,
 		Name:                m.opts.InterfaceName,
 		ForceName:           m.opts.ForceReplace,
@@ -312,7 +314,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	defer m.wgmux.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
-	peers, err := mesh.WireGuardPeersFor(ctx, m.store.Storage(), m.store.ID())
+	peers, err := mesh.WireGuardPeersFor(ctx, m.storage, m.opts.NodeID)
 	if err != nil {
 		return fmt.Errorf("wireguard peers for: %w", err)
 	}
@@ -325,8 +327,8 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 		seenPeers[peer.GetId()] = struct{}{}
 		// Check if we need to gather ice servers
 		if peer.GetIce() && len(iceServers) == 0 {
-			st := state.New(m.store.Storage())
-			iceAddrs, err := st.ListPublicPeersWithFeature(ctx, m.opts.DialOptions, m.store.ID(), v1.Feature_ICE_NEGOTIATION)
+			st := state.New(m.storage)
+			iceAddrs, err := st.ListPublicPeersWithFeature(ctx, m.opts.DialOptions, m.opts.NodeID, v1.Feature_ICE_NEGOTIATION)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("list public peers with feature: %w", err))
 				continue

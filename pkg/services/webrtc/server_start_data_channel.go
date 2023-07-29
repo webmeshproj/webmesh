@@ -118,7 +118,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	if r.GetProto() == "udp" && r.GetPort() == 0 {
 		log.Info("negotiating WireGuard proxy connection")
 		// Lookup our WireGuard port.
-		port, err := s.store.WireGuard().ListenPort()
+		port, err := s.store.Network().WireGuard().ListenPort()
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get WireGuard listen port: %v", err)
 		}

@@ -47,7 +47,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 			return nil, err
 		}
 	}
-	ifaceMetrics, err := s.store.WireGuard().Metrics()
+	ifaceMetrics, err := s.store.Network().WireGuard().Metrics()
 	if err != nil {
 		return nil, err
 	}

@@ -97,7 +97,8 @@ func (s *meshStore) Open(ctx context.Context) (err error) {
 		return handleErr(fmt.Errorf("subscribe: %w", err))
 	}
 	// Create the network manager
-	s.nw = net.New(s, &net.Options{
+	s.nw = net.New(s.Storage(), &net.Options{
+		NodeID:                s.ID(),
 		InterfaceName:         s.opts.WireGuard.InterfaceName,
 		ForceReplace:          s.opts.WireGuard.ForceInterfaceName,
 		ListenPort:            s.opts.WireGuard.ListenPort,

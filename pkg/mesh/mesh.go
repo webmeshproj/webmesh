@@ -30,8 +30,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
-	meshnet "github.com/webmeshproj/webmesh/pkg/net"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -64,9 +63,9 @@ type Mesh interface {
 	Storage() storage.Storage
 	// Raft returns the Raft interface.
 	Raft() raft.Raft
-	// WireGuard returns the WireGuard interface.
-	WireGuard() wireguard.Interface
-	// Plugins returns the plugin manager.
+	// Network returns the Network manager.
+	Network() net.Manager
+	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
 }
 
@@ -152,7 +151,7 @@ type meshStore struct {
 
 	kvSubCancel context.CancelFunc
 
-	nw          meshnet.Manager
+	nw          net.Manager
 	nwTaskGroup *errgroup.Group
 	meshDomain  string
 
@@ -182,10 +181,9 @@ func (s *meshStore) Raft() raft.Raft {
 	return s.raft
 }
 
-// WireGuard returns the WireGuard interface. Note that the returned value
-// may be nil if the store is not open.
-func (s *meshStore) WireGuard() wireguard.Interface {
-	return s.nw.WireGuard()
+// Network returns the Network manager.
+func (s *meshStore) Network() net.Manager {
+	return s.nw
 }
 
 // Plugins returns the plugin manager. Note that the returned value
