@@ -80,8 +80,9 @@ func (i *inMemoryCloser) Close() error {
 func (r *raftNode) createDataStores(ctx context.Context) error {
 	if r.opts.InMemory {
 		var err error
-		r.logDB = NewInmemStore()
-		r.stableDB = NewInmemStore()
+		raftstore := NewInmemStore()
+		r.logDB = raftstore
+		r.stableDB = raftstore
 		r.raftSnapshots = raft.NewInmemSnapshotStore()
 		r.dataDB, err = storage.New(&storage.Options{InMemory: true})
 		if err != nil {
@@ -148,6 +149,7 @@ func (rs *raftStorage) Put(ctx context.Context, key, value string) error {
 	if !rs.raft.IsLeader() {
 		return ErrNotLeader
 	}
+	// lock is taken in the FSM
 	logEntry := &v1.RaftLogEntry{
 		Type:  v1.RaftCommandType_PUT,
 		Key:   key,
@@ -161,6 +163,7 @@ func (rs *raftStorage) Delete(ctx context.Context, key string) error {
 	if !rs.raft.IsLeader() {
 		return ErrNotLeader
 	}
+	// lock is taken in the FSM
 	logEntry := &v1.RaftLogEntry{
 		Type: v1.RaftCommandType_DELETE,
 		Key:  key,

@@ -145,6 +145,7 @@ type raftNode struct {
 	logDB                       LogStoreCloser
 	stableDB                    StableStoreCloser
 	dataDB                      storage.Storage
+	raftDB                      *raftStorage
 	snapshotter                 snapshots.Snapshotter
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
@@ -200,6 +201,7 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 		defer r.raftTransport.Close()
 		return fmt.Errorf("create data stores: %w", err)
 	}
+	r.raftDB = &raftStorage{r.dataDB, r}
 	r.snapshotter = snapshots.New(r.dataDB)
 	handleErr := func(cause error) error {
 		defer r.raftTransport.Close()
@@ -363,7 +365,7 @@ func (r *raftNode) IsLeader() bool {
 
 // Storage returns the storage.
 func (r *raftNode) Storage() storage.Storage {
-	return &raftStorage{r.dataDB, r}
+	return r.raftDB
 }
 
 // Stop stops the Raft node.
