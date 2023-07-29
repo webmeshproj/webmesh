@@ -55,9 +55,7 @@ Administration of the network can be done via the [API](https://webmeshproj.gith
 ## Building
 
 The `Makefile` contains several targets for building the project.
-Since the project uses CGO, it is recommended to build the project in a container with static libraries.
-The helpers in the `Makefile` will do this for you when building for distribution.
-You can run `make help` to see all the available targets.It looks very interesting, but I'm still on the fence about it. It doesn't look so bad in practice without all the theoretical type parameters laid around.
+You can run `make help` to see all the available targets.
 
 ## Roadmap
 
