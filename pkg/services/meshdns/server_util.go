@@ -69,11 +69,10 @@ func (s *Server) newFQDN(id string) string {
 func (s *Server) newNSRecord() dns.RR {
 	return &dns.NS{
 		Hdr: dns.RR_Header{
-			Name:     s.store.Domain(),
-			Rrtype:   dns.TypeNS,
-			Class:    dns.ClassINET,
-			Ttl:      1,
-			Rdlength: 0,
+			Name:   s.store.Domain(),
+			Rrtype: dns.TypeNS,
+			Class:  dns.ClassINET,
+			Ttl:    1,
 		},
 		Ns: fmt.Sprintf("%s.%s", s.store.ID(), s.store.Domain()),
 	}
@@ -85,7 +84,6 @@ func (s *Server) newMsg(r *dns.Msg) *dns.Msg {
 	m.Compress = s.opts.Compression
 	m.Authoritative = true
 	m.RecursionAvailable = true
-	// m.Response = true
 	m.Ns = []dns.RR{s.newNSRecord()}
 	return m
 }
