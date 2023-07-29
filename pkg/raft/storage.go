@@ -145,6 +145,9 @@ type raftStorage struct {
 
 // Put sets the value of a key.
 func (rs *raftStorage) Put(ctx context.Context, key, value string) error {
+	if !rs.raft.IsLeader() {
+		return ErrNotLeader
+	}
 	logEntry := &v1.RaftLogEntry{
 		Type:  v1.RaftCommandType_PUT,
 		Key:   key,
@@ -155,6 +158,9 @@ func (rs *raftStorage) Put(ctx context.Context, key, value string) error {
 
 // Delete removes a key.
 func (rs *raftStorage) Delete(ctx context.Context, key string) error {
+	if !rs.raft.IsLeader() {
+		return ErrNotLeader
+	}
 	logEntry := &v1.RaftLogEntry{
 		Type: v1.RaftCommandType_DELETE,
 		Key:  key,
