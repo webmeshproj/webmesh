@@ -4,6 +4,7 @@
 ![Build and Tests](https://github.com/webmeshproj/webmesh/actions/workflows/ci.yaml/badge.svg)
 
 Webmesh is a simple, distributed, and zero-configuration WireGuard™ mesh solution for Linux, FreeBSD, macOS, and Windows.
+It allows for easily creating a mesh network between multiple hosts, and provides a simple API for managing the network.
 It is designed to be easy to use, and to work well with existing network infrastructure.
 For a more detailed introduction and extended documentation, please see the [project website](https://webmeshproj.github.io).
 
