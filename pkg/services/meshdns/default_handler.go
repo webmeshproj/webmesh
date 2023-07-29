@@ -55,7 +55,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	if s.cache != nil {
 		if val, ok := s.cache.Get(cachekey); ok {
 			s.log.Debug("cache hit")
-			if val.expires.After(time.Now()) {
+			if val.expires.Before(time.Now()) {
 				// cached response has expired
 				s.log.Debug("cached response has expired")
 				s.cache.Remove(cachekey)
