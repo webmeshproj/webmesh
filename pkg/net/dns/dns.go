@@ -17,7 +17,10 @@ limitations under the License.
 // Package dns contains utility functions for DNS.
 package dns
 
-import "time"
+import (
+	"net/netip"
+	"time"
+)
 
 var defaultNS = []string{"127.0.0.1:53", "[::1]:53"}
 
@@ -53,4 +56,16 @@ func GetSystemConfig() *DNSConfig {
 		return &defaultConfig
 	}
 	return cfg
+}
+
+// AddServers adds DNS servers to the system configuration. On Windows
+// the interface name is required.
+func AddServers(iface string, servers []netip.AddrPort) error {
+	return addServers(iface, servers)
+}
+
+// RemoveServers removes DNS servers from the system configuration. On Windows
+// the interface name is required.
+func RemoveServers(iface string, servers []netip.AddrPort) error {
+	return removeServers(iface, servers)
 }

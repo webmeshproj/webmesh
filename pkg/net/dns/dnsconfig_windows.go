@@ -17,12 +17,57 @@ limitations under the License.
 package dns
 
 import (
+	"fmt"
+	"net/netip"
+	"os/exec"
 	"strings"
 	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
+
+func addServers(iface string, servers []netip.AddrPort) error {
+	// Just use netsh
+	for i, server := range servers {
+		family := "ipv4"
+		if server.Addr().Is6() {
+			family = "ipv6"
+		}
+		args := []string{
+			"interface", family, "add", "dnsserver", iface,
+			fmt.Sprintf("address=%s", server.Addr().String()),
+			fmt.Sprintf("index=%d", i),
+		}
+		if server.Port() != 53 {
+			args = append(args, fmt.Sprintf("validate=no"))
+		}
+		cmd := exec.Command("netsh", args...)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeServers(iface string, servers []netip.AddrPort) error {
+	// Just use netsh
+	for _, server := range servers {
+		family := "ipv4"
+		if server.Addr().Is6() {
+			family = "ipv6"
+		}
+		args := []string{
+			"interface", family, "delete", "dnsserver", iface,
+			fmt.Sprintf("address=%s", server.Addr().String()),
+		}
+		cmd := exec.Command("netsh", args...)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func loadSystemConfig() (*DNSConfig, error) {
 	l := uint32(20000)

@@ -20,6 +20,7 @@ package dns
 
 import (
 	"bufio"
+	"io"
 	"net/netip"
 	"os"
 	"strconv"
@@ -27,7 +28,102 @@ import (
 	"time"
 )
 
-// loadSystemConfig load the system DNS configuration from /etc/resolv.conf.
+func addServers(_ string, servers []netip.AddrPort) error {
+	// Create a new resolvconf file, appending the new servers to the top
+	current, err := readResolvConf()
+	if err != nil {
+		return err
+	}
+	f, err := os.Create("/etc/resolv.conf")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	// Write the new servers
+	for _, server := range servers {
+		if server.Port() == 53 {
+			_, err = f.WriteString("nameserver " + server.Addr().String() + "\n")
+		} else {
+			_, err = f.WriteString("nameserver " + server.String() + "\n")
+		}
+		if err != nil {
+			return err
+		}
+	}
+	// Write the rest of the file
+	_, err = f.Write(current)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func removeServers(_ string, servers []netip.AddrPort) error {
+	// Create a new resolvconf file, removing the servers
+	// if encountered
+	current, err := readResolvConf()
+	if err != nil {
+		return err
+	}
+	f, err := os.Create("/etc/resolv.conf")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(strings.NewReader(string(current)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
+			// comment.
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 1 {
+			continue
+		}
+		switch fields[0] {
+		case "nameserver":
+			if len(fields) > 1 {
+				var addrport netip.AddrPort
+				// Try to parse as a regular address
+				addr, err := netip.ParseAddr(fields[1])
+				if err == nil {
+					// Default to port 53
+					addrport = netip.AddrPortFrom(addr, 53)
+				} else {
+					// Try to parse as an address with port
+					addrport, err = netip.ParseAddrPort(fields[1])
+					if err != nil {
+						continue
+					}
+				}
+				for _, server := range servers {
+					if addrport == server {
+						continue
+					}
+				}
+				_, err = f.WriteString(line + "\n")
+				if err != nil {
+					return err
+				}
+			}
+		default:
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return err
+	}
+	return nil
+}
+
 func loadSystemConfig() (*DNSConfig, error) {
 	conf := &DNSConfig{
 		Ndots:    1,
@@ -100,6 +196,9 @@ func loadSystemConfig() (*DNSConfig, error) {
 			}
 		}
 	}
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return nil, err
+	}
 	if len(conf.Servers) == 0 {
 		conf.Servers = defaultNS
 	}
@@ -116,4 +215,13 @@ func openResolvConf() (*os.File, error) {
 		return nil, err
 	}
 	return f, nil
+}
+
+func readResolvConf() ([]byte, error) {
+	f, err := openResolvConf()
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
 }
