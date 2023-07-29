@@ -36,6 +36,7 @@ const (
 	MeshDNSRequestTimeoutEnvVar    = "SERVICES_MESH_DNS_REQUEST_TIMEOUT"
 	MeshDNSForwardersEnvVar        = "SERVICES_MESH_DNS_FORWARDERS"
 	MeshDNSDisableForwardingEnvVar = "SERVICES_MESH_DNS_DISABLE_FORWARDING"
+	MeshDNSCacheSizeEnvVar         = "SERVICES_MESH_DNS_CACHE_SIZE"
 )
 
 // MeshDNSOptions are the mesh DNS options.
@@ -57,6 +58,8 @@ type MeshDNSOptions struct {
 	Forwarders []string `json:"forwarders,omitempty" yaml:"forwarders,omitempty" toml:"forwarders,omitempty"`
 	// DisableForwarding disables forwarding requests to the configured forwarders.
 	DisableForwarding bool `json:"disable-forwarding,omitempty" yaml:"disable-forwarding,omitempty" toml:"disable-forwarding,omitempty"`
+	// CacheSize is the size of the remote DNS cache.
+	CacheSize int `json:"cache-size,omitempty" yaml:"cache-size,omitempty" toml:"cache-size,omitempty"`
 }
 
 // NewMeshDNSOptions creates a new set of mesh DNS options.
@@ -90,6 +93,8 @@ func (o *MeshDNSOptions) BindFlags(fs *flag.FlagSet) {
 	})
 	fs.BoolVar(&o.DisableForwarding, "services.mesh-dns.disable-forwarding", util.GetEnvDefault(MeshDNSDisableForwardingEnvVar, "false") == "true",
 		"Disable forwarding requests to any configured forwarders.")
+	fs.IntVar(&o.CacheSize, "services.mesh-dns.cache-size", util.GetEnvIntDefault(MeshDNSCacheSizeEnvVar, 0),
+		"Size of the remote DNS cache. Defaults to 0 (disabled).")
 }
 
 // Validate validates the mesh DNS options.

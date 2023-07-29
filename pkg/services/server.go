@@ -94,11 +94,14 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	if o.MeshDNS.Enabled {
 		log.Debug("registering mesh dns")
 		server.meshdns = meshdns.NewServer(store, &meshdns.Options{
-			UDPListenAddr:  o.MeshDNS.ListenUDP,
-			TCPListenAddr:  o.MeshDNS.ListenTCP,
-			ReusePort:      o.MeshDNS.ReusePort,
-			Compression:    o.MeshDNS.EnableCompression,
-			RequestTimeout: o.MeshDNS.RequestTimeout,
+			UDPListenAddr:     o.MeshDNS.ListenUDP,
+			TCPListenAddr:     o.MeshDNS.ListenTCP,
+			ReusePort:         o.MeshDNS.ReusePort,
+			Compression:       o.MeshDNS.EnableCompression,
+			RequestTimeout:    o.MeshDNS.RequestTimeout,
+			Forwarders:        o.MeshDNS.Forwarders,
+			DisableForwarding: o.MeshDNS.DisableForwarding,
+			CacheSize:         o.MeshDNS.CacheSize,
 		})
 	}
 	if o.Dashboard.Enabled {
