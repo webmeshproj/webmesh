@@ -29,6 +29,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	dnsutil "github.com/webmeshproj/webmesh/pkg/net/dns"
 )
 
 // Options are the Mesh DNS server options.
@@ -45,8 +46,12 @@ type Options struct {
 	// RequestTimeout is the timeout for DNS requests.
 	// Defaults to 5 seconds.
 	RequestTimeout time.Duration
-	// Forwaders are the DNS forwarders to use.
+	// Forwaders are the DNS forwarders to use. If empty,
+	// the system DNS servers will be used.
 	Forwarders []string
+	// DisableForwarding disables forwarding requests to the
+	// configured forwarders.
+	DisableForwarding bool
 	// CacheSize is the size of the remote DNS cache.
 	CacheSize int
 }
@@ -63,12 +68,15 @@ func NewServer(store meshdb.Store, o *Options) *Server {
 	}
 	if srv.opts.CacheSize > 0 {
 		var err error
-		srv.cache, err = lru.New[string, *dns.Msg](srv.opts.CacheSize)
+		srv.cache, err = lru.New[cacheKey, cacheValue](srv.opts.CacheSize)
 		if err != nil {
 			log.Warn("failed to create remote lookup cache", slog.String("error", err.Error()))
 		}
 	}
-
+	if len(srv.opts.Forwarders) == 0 && !srv.opts.DisableForwarding {
+		syscfg := dnsutil.GetSystemConfig()
+		srv.opts.Forwarders = syscfg.Servers
+	}
 	return srv
 }
 
@@ -80,8 +88,18 @@ type Server struct {
 	udpServer *dns.Server
 	tcpServer *dns.Server
 	forwarder *dns.Client
-	cache     *lru.Cache[string, *dns.Msg]
+	cache     *lru.Cache[cacheKey, cacheValue]
 	log       *slog.Logger
+}
+
+type cacheKey struct {
+	qname string
+	qtype uint16
+}
+
+type cacheValue struct {
+	msg     *dns.Msg
+	expires time.Time
 }
 
 // ListenAndServe serves the Mesh DNS server.

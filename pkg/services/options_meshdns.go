@@ -19,19 +19,23 @@ package services
 import (
 	"errors"
 	"flag"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 const (
-	MeshDNSEnabledEnvVar        = "SERVICES_MESH_DNS_ENABLED"
-	MeshDNSListenUDPEnvVar      = "SERVICES_MESH_DNS_LISTEN_UDP"
-	MeshDNSListenTCPEnvVar      = "SERVICES_MESH_DNS_LISTEN_TCP"
-	MeshDNSTSIGKeyEnvVar        = "SERVICES_MESH_DNS_TSIG_KEY"
-	MeshDNSReusePortEnvVar      = "SERVICES_MESH_DNS_REUSE_PORT"
-	MeshDNSCompressionEnvVar    = "SERVICES_MESH_DNS_COMPRESSION"
-	MeshDNSRequestTimeoutEnvVar = "SERVICES_MESH_DNS_REQUEST_TIMEOUT"
+	MeshDNSEnabledEnvVar           = "SERVICES_MESH_DNS_ENABLED"
+	MeshDNSListenUDPEnvVar         = "SERVICES_MESH_DNS_LISTEN_UDP"
+	MeshDNSListenTCPEnvVar         = "SERVICES_MESH_DNS_LISTEN_TCP"
+	MeshDNSTSIGKeyEnvVar           = "SERVICES_MESH_DNS_TSIG_KEY"
+	MeshDNSReusePortEnvVar         = "SERVICES_MESH_DNS_REUSE_PORT"
+	MeshDNSCompressionEnvVar       = "SERVICES_MESH_DNS_COMPRESSION"
+	MeshDNSRequestTimeoutEnvVar    = "SERVICES_MESH_DNS_REQUEST_TIMEOUT"
+	MeshDNSForwardersEnvVar        = "SERVICES_MESH_DNS_FORWARDERS"
+	MeshDNSDisableForwardingEnvVar = "SERVICES_MESH_DNS_DISABLE_FORWARDING"
 )
 
 // MeshDNSOptions are the mesh DNS options.
@@ -49,6 +53,10 @@ type MeshDNSOptions struct {
 	EnableCompression bool `json:"compression,omitempty" yaml:"compression,omitempty" toml:"compression,omitempty"`
 	// RequestTimeout is the timeout for DNS requests.
 	RequestTimeout time.Duration `json:"request-timeout,omitempty" yaml:"request-timeout,omitempty" toml:"request-timeout,omitempty"`
+	// Forwarders are the DNS forwarders to use. If empty, the system DNS servers will be used.
+	Forwarders []string `json:"forwarders,omitempty" yaml:"forwarders,omitempty" toml:"forwarders,omitempty"`
+	// DisableForwarding disables forwarding requests to the configured forwarders.
+	DisableForwarding bool `json:"disable-forwarding,omitempty" yaml:"disable-forwarding,omitempty" toml:"disable-forwarding,omitempty"`
 }
 
 // NewMeshDNSOptions creates a new set of mesh DNS options.
@@ -76,6 +84,12 @@ func (o *MeshDNSOptions) BindFlags(fs *flag.FlagSet) {
 		"Enable DNS compression for mesh DNS.")
 	fs.DurationVar(&o.RequestTimeout, "services.mesh-dns.request-timeout", util.GetEnvDurationDefault(MeshDNSRequestTimeoutEnvVar, 5*time.Second),
 		"Timeout for mesh DNS requests.")
+	fs.Func("services.mesh-dns.forwarders", "DNS forwarders to use for mesh DNS. If empty, the system DNS servers will be used.", func(s string) error {
+		o.Forwarders = strings.Split(s, ",")
+		return nil
+	})
+	fs.BoolVar(&o.DisableForwarding, "services.mesh-dns.disable-forwarding", util.GetEnvDefault(MeshDNSDisableForwardingEnvVar, "false") == "true",
+		"Disable forwarding requests to any configured forwarders.")
 }
 
 // Validate validates the mesh DNS options.
@@ -83,6 +97,13 @@ func (o *MeshDNSOptions) Validate() error {
 	if o.Enabled {
 		if o.ListenTCP == "" && o.ListenUDP == "" {
 			return errors.New("must specify a TCP or UDP address for mesh DNS")
+		}
+		if len(o.Forwarders) == 0 && !o.DisableForwarding {
+			// Check the environment
+			envval := os.Getenv(MeshDNSForwardersEnvVar)
+			if envval != "" {
+				o.Forwarders = strings.Split(envval, ",")
+			}
 		}
 	}
 	return nil
