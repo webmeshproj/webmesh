@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	LeaderProxyEnabledEnvVar      = "SERVICES_API_LEADER_PROXY"
+	LeaderProxyDisabledEnvVar     = "SERVICES_API_DISABLE_LEADER_PROXY"
 	MeshEnabledEnvVar             = "SERVICES_API_MESH"
 	AdminEnabledEnvVar            = "SERVICES_API_ADMIN"
 	PeerDiscoveryEnabledEnvVar    = "SERVICES_API_PEER_DISCOVERY"
@@ -40,8 +40,8 @@ const (
 
 // APIOptions are the options for which APIs to register and expose.
 type APIOptions struct {
-	// LeaderProxy is true if the leader proxy API should be registered.
-	LeaderProxy bool `json:"leader-proxy,omitempty" yaml:"leader-proxy,omitempty" toml:"leader-proxy,omitempty"`
+	// DisableLeaderProxy is true if the leader proxy should be disabled.
+	DisableLeaderProxy bool `json:"disable-leader-proxy,omitempty" yaml:"disable-leader-proxy,omitempty" toml:"disable-leader-proxy,omitempty"`
 	// Mesh is true if the mesh API should be registered.
 	Mesh bool `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty"`
 	// Admin is true if the admin API should be registered.
@@ -107,8 +107,8 @@ func NewAPIOptions() *APIOptions {
 
 // BindFlags binds the flags. The options are returned
 func (o *APIOptions) BindFlags(fs *flag.FlagSet) {
-	fs.BoolVar(&o.LeaderProxy, "services.api.leader-proxy", util.GetEnvDefault(LeaderProxyEnabledEnvVar, "false") == "true",
-		"Enable the leader proxy.")
+	fs.BoolVar(&o.DisableLeaderProxy, "services.api.disable-leader-proxy", util.GetEnvDefault(LeaderProxyDisabledEnvVar, "false") == "true",
+		"Disable the leader proxy.")
 	fs.BoolVar(&o.Admin, "services.api.admin", util.GetEnvDefault(AdminEnabledEnvVar, "false") == "true",
 		"Enable the admin API.")
 	fs.BoolVar(&o.Mesh, "services.api.mesh", util.GetEnvDefault(MeshEnabledEnvVar, "false") == "true",

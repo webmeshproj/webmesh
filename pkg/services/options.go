@@ -212,7 +212,7 @@ func (o *Options) ServerOptions(store mesh.Mesh, log *slog.Logger) (srvrOptions 
 			proxyCreds = append(proxyCreds, ldap.NewCreds(o.API.ProxyAuth.LDAP.Username, o.API.ProxyAuth.LDAP.Password))
 		}
 	}
-	if o.API.LeaderProxy {
+	if !o.API.DisableLeaderProxy {
 		log.Debug("registering leader proxy interceptors")
 		leaderProxy := leaderproxy.New(store, proxyCreds)
 		unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
@@ -278,7 +278,7 @@ func (o *Options) ProxyTLSConfig() (*tls.Config, error) {
 // ToFeatureSet converts the options to a feature set.
 func (o *Options) ToFeatureSet() []v1.Feature {
 	features := []v1.Feature{v1.Feature_NODES}
-	if o.API.LeaderProxy {
+	if !o.API.DisableLeaderProxy {
 		features = append(features, v1.Feature_LEADER_PROXY)
 	}
 	if o.API.Mesh {
