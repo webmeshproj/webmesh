@@ -85,6 +85,8 @@ type Peers interface {
 	ListPublicNodes(ctx context.Context) ([]Node, error)
 	// ListByZoneID lists all nodes in a zone.
 	ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
+	// ListByFeature lists all nodes with a given feature.
+	ListByFeature(ctx context.Context, feature v1.Feature) ([]Node, error)
 	// AddEdge adds an edge between two nodes.
 	PutEdge(ctx context.Context, edge Edge) error
 	// RemoveEdge removes an edge between two nodes.
@@ -114,6 +116,8 @@ type Node struct {
 	GRPCPort int `json:"grpcPort"`
 	// RaftPort is the node's Raft port.
 	RaftPort int `json:"raftPort"`
+	// Features are the node's features.
+	Features []v1.Feature `json:"features"`
 	// CreatedAt is the time the node was created.
 	CreatedAt time.Time `json:"createdAt"`
 	// UpdatedAt is the time the node was last updated.
@@ -213,6 +217,7 @@ func (n *Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
 		}(),
 		UpdatedAt:     timestamppb.New(n.UpdatedAt),
 		CreatedAt:     timestamppb.New(n.CreatedAt),
+		Features:      n.Features,
 		ClusterStatus: status,
 	}
 }
@@ -245,6 +250,8 @@ type PutOptions struct {
 	GRPCPort int
 	// RaftPort is the node's Raft port.
 	RaftPort int
+	// Features are the node's features.
+	Features []v1.Feature
 }
 
 // PutLeaseOptions are options for creating or updating a node lease.
@@ -296,6 +303,7 @@ func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
 	node.ZoneAwarenessID = opts.ZoneAwarenessID
 	node.GRPCPort = opts.GRPCPort
 	node.RaftPort = opts.RaftPort
+	node.Features = opts.Features
 	node.UpdatedAt = time.Now().UTC()
 	// If the node doesn't exist, set the creation timestamp.
 	if errors.Is(err, graph.ErrVertexNotFound) {
@@ -384,7 +392,18 @@ func (p *peers) List(ctx context.Context) ([]Node, error) {
 	return out, err
 }
 
-// ListPublicNodes lists all public nodes.
+func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
+	keys, err := p.db.List(ctx, NodesPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("list keys: %w", err)
+	}
+	ids := make([]string, 0)
+	for _, key := range keys {
+		ids = append(ids, strings.TrimPrefix(key, NodesPrefix+"/"))
+	}
+	return ids, nil
+}
+
 func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
@@ -399,7 +418,6 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 	return out, nil
 }
 
-// ListByZoneID lists all nodes in a zone.
 func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
@@ -414,20 +432,23 @@ func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
 	return out, nil
 }
 
-// ListIDs returns a list of node IDs.
-func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
-	keys, err := p.db.List(ctx, NodesPrefix)
+func (p *peers) ListByFeature(ctx context.Context, feature v1.Feature) ([]Node, error) {
+	nodes, err := p.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list keys: %w", err)
+		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	ids := make([]string, 0)
-	for _, key := range keys {
-		ids = append(ids, strings.TrimPrefix(key, NodesPrefix+"/"))
+	out := make([]Node, 0)
+	for _, node := range nodes {
+		for _, f := range node.Features {
+			if f == feature {
+				out = append(out, node)
+				break
+			}
+		}
 	}
-	return ids, nil
+	return out, nil
 }
 
-// PutEdge adds or updates an edge between two nodes.
 func (p *peers) PutEdge(ctx context.Context, edge Edge) error {
 	if edge.From == edge.To {
 		return nil
@@ -461,7 +482,6 @@ func (p *peers) PutEdge(ctx context.Context, edge Edge) error {
 	return nil
 }
 
-// RemoveEdge removes an edge between two nodes.
 func (p *peers) RemoveEdge(ctx context.Context, from, to string) error {
 	err := p.graph.RemoveEdge(from, to)
 	if err != nil {
