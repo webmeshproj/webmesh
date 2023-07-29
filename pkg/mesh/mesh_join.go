@@ -137,7 +137,7 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		PublicKey:          key.PublicKey().String(),
 		RaftPort:           int32(s.raft.ListenPort()),
 		GrpcPort:           int32(s.opts.Mesh.GRPCPort),
-		MeshdnsPort:        int32(s.opts.Mesh.DNSPort),
+		MeshdnsPort:        int32(s.opts.Mesh.MeshDNSPort),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
 		WireguardEndpoints: s.opts.WireGuard.Endpoints,
 		ZoneAwarenessId:    s.opts.Mesh.ZoneAwarenessID,
@@ -202,6 +202,26 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		err = s.nw.AddPeer(ctx, peer, resp.GetIceServers())
 		if err != nil {
 			return fmt.Errorf("add peer: %w", err)
+		}
+	}
+	if s.opts.Mesh.UseMeshDNS {
+		var servers []netip.AddrPort
+		if s.opts.Mesh.MeshDNSPort != 0 {
+			// Use our local port.
+			addr := netip.MustParseAddr("127.0.0.1")
+			servers = append(servers, netip.AddrPortFrom(addr, uint16(s.opts.Mesh.MeshDNSPort)))
+		} else {
+			for _, server := range resp.GetDnsServers() {
+				addr, err := netip.ParseAddrPort(server)
+				if err != nil {
+					return fmt.Errorf("parse dns server: %w", err)
+				}
+				servers = append(servers, addr)
+			}
+		}
+		err = s.nw.AddDNSServers(ctx, servers)
+		if err != nil {
+			return fmt.Errorf("add dns servers: %w", err)
 		}
 	}
 	return nil

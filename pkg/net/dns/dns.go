@@ -33,6 +33,14 @@ var defaultConfig = DNSConfig{
 	UseTCP:   false,
 }
 
+func init() {
+	syscfg, err := loadSystemConfig()
+	if err != nil {
+		return
+	}
+	defaultConfig = *syscfg
+}
+
 // DNSConfig is a configuration for performing DNS lookups.
 type DNSConfig struct {
 	// Servers is the list of DNS servers to use.
@@ -50,12 +58,8 @@ type DNSConfig struct {
 }
 
 // GetSystemConfig returns the system DNS configuration.
-func GetSystemConfig() *DNSConfig {
-	cfg, err := loadSystemConfig()
-	if err != nil {
-		return &defaultConfig
-	}
-	return cfg
+func GetSystemConfig() DNSConfig {
+	return defaultConfig
 }
 
 // AddServers adds DNS servers to the system configuration. On Windows

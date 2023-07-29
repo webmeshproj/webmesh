@@ -33,7 +33,8 @@ const (
 	MaxJoinRetriesEnvVar         = "MESH_MAX_JOIN_RETRIES"
 	JoinTimeoutEnvVar            = "MESH_JOIN_TIMEOUT"
 	GRPCAdvertisePortEnvVar      = "MESH_GRPC_PORT"
-	DNSAdvertisePortEnvVar       = "MESH_DNS_PORT"
+	DNSAdvertisePortEnvVar       = "MESH_MESHDNS_PORT"
+	UseMeshDNSEnvVar             = "MESH_USE_MESHDNS"
 	PrimaryEndpointEnvVar        = "MESH_PRIMARY_ENDPOINT"
 	NodeRoutesEnvVar             = "MESH_ROUTES"
 	NodeDirectPeersEnvVar        = "MESH_DIRECT_PEERS"
@@ -65,8 +66,10 @@ type MeshOptions struct {
 	DirectPeers []string `json:"direct-peers,omitempty" yaml:"direct-peers,omitempty" toml:"direct-peers,omitempty"`
 	// GRPCPort is the port to advertise for gRPC.
 	GRPCPort int `json:"grpc-port,omitempty" yaml:"grpc-port,omitempty" toml:"grpc-port,omitempty"`
-	// DNSPort is the port to advertise for DNS.
-	DNSPort int `json:"dns-port,omitempty" yaml:"dns-port,omitempty" toml:"dns-port,omitempty"`
+	// MeshDNSPort is the port to advertise for DNS.
+	MeshDNSPort int `json:"meshdns-port,omitempty" yaml:"meshdns-port,omitempty" toml:"meshdns-port,omitempty"`
+	// UseMeshDNS indicates whether to set mesh DNS servers in the system configuration.
+	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty"`
 	// NoIPv4 disables IPv4 usage.
 	NoIPv4 bool `json:"no-ipv4,omitempty" yaml:"no-ipv4,omitempty" toml:"no-ipv4,omitempty"`
 	// NoIPv6 disables IPv6 usage.
@@ -124,8 +127,11 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
 		"Join the cluster as a voter. Default behavior is to join as an observer.")
 	fl.IntVar(&o.GRPCPort, "mesh.grpc-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
 		"GRPC advertise port.")
-	fl.IntVar(&o.DNSPort, "mesh.dns-port", util.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),
+	fl.IntVar(&o.MeshDNSPort, "mesh.meshdns-port", util.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),
 		"DNS advertise port. This is set automatically when advertising is enabled and the mesh-dns server is running. Default is 0 (disabled).")
+	fl.BoolVar(&o.UseMeshDNS, "mesh.use-meshdns", util.GetEnvDefault(UseMeshDNSEnvVar, "false") == "true",
+		"Set mesh DNS servers to the system configuration. If a local server is running, this will use the local server.")
+
 	fl.StringVar(&o.PrimaryEndpoint, "mesh.primary-endpoint", util.GetEnvDefault(PrimaryEndpointEnvVar, ""),
 		`The primary endpoint to broadcast when joining a cluster.
 This is only necessary if the node intends on being publicly accessible.`)

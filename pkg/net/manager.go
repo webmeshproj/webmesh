@@ -88,8 +88,6 @@ type StartOptions struct {
 	NetworkV4 netip.Prefix
 	// NetworkV6 is the IPv6 network to use for the node.
 	NetworkV6 netip.Prefix
-	// DNSServers are DNS servers to use for the node.
-	DNSServers []netip.AddrPort
 }
 
 // Manager is the interface for managing the network.
@@ -98,6 +96,8 @@ type Manager interface {
 	Start(ctx context.Context, opts *StartOptions) error
 	// StartMasquerade ensures that masquerading is enabled.
 	StartMasquerade(ctx context.Context) error
+	// AddDNSServers adds the given dns servers to the system configuration.
+	AddDNSServers(ctx context.Context, servers []netip.AddrPort) error
 	// AddPeer adds a peer to the wireguard interface.
 	AddPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) error
 	// RefreshPeers walks all peers in the database and ensures they are added to the wireguard interface.
@@ -240,14 +240,6 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("add wireguard forwarding rule: %w", err))
 	}
-	if len(opts.DNSServers) > 0 {
-		log.Debug("Configuring DNS servers", slog.Any("servers", opts.DNSServers))
-		err := dns.AddServers(m.wg.Name(), opts.DNSServers)
-		if err != nil {
-			return handleErr(fmt.Errorf("add dns servers: %w", err))
-		}
-		m.dnsservers = opts.DNSServers
-	}
 	return nil
 }
 
@@ -262,6 +254,16 @@ func (m *manager) StartMasquerade(ctx context.Context) error {
 		return fmt.Errorf("add masquerade rule: %w", err)
 	}
 	m.masquerading = true
+	return nil
+}
+
+func (m *manager) AddDNSServers(ctx context.Context, servers []netip.AddrPort) error {
+	context.LoggerFrom(ctx).Debug("Configuring DNS servers", slog.Any("servers", servers))
+	err := dns.AddServers(m.wg.Name(), servers)
+	if err != nil {
+		return fmt.Errorf("add dns servers: %w", err)
+	}
+	m.dnsservers = servers
 	return nil
 }
 

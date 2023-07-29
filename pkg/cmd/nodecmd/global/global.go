@@ -331,8 +331,8 @@ func (o *Options) Overlay(opts ...any) error {
 				}
 				for _, inOpts := range opts {
 					if vopt, ok := inOpts.(*mesh.Options); ok {
-						if vopt.Mesh.DNSPort == 0 {
-							vopt.Mesh.DNSPort = int(dnsAddr.Port())
+						if vopt.Mesh.MeshDNSPort == 0 {
+							vopt.Mesh.MeshDNSPort = int(dnsAddr.Port())
 						}
 					}
 				}
