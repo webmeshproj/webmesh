@@ -176,6 +176,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			ZoneAwarenessID:    req.GetZoneAwarenessId(),
 			GRPCPort:           int(req.GetGrpcPort()),
 			RaftPort:           int(req.GetRaftPort()),
+			DNSPort:            int(req.GetMeshdnsPort()),
 			Features:           req.GetFeatures(),
 		})
 		if err != nil {
@@ -192,6 +193,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			ZoneAwarenessID:    req.GetZoneAwarenessId(),
 			GRPCPort:           int(req.GetGrpcPort()),
 			RaftPort:           int(req.GetRaftPort()),
+			DNSPort:            int(req.GetMeshdnsPort()),
 			Features:           req.GetFeatures(),
 		})
 		if err != nil {
@@ -401,6 +403,20 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return ""
 		}(),
 	}
+	dnsServers, err := s.peers.ListByFeature(ctx, v1.Feature_MESH_DNS)
+	if err != nil {
+		log.Warn("could not lookup DNS servers", slog.String("error", err.Error()))
+	} else {
+		for _, peer := range dnsServers {
+			switch {
+			// Prefer the IPv4 address
+			case peer.PrivateDNSAddrV4().IsValid():
+				resp.DnsServers = append(resp.DnsServers, peer.PrivateDNSAddrV4().String())
+			case peer.PrivateDNSAddrV6().IsValid():
+				resp.DnsServers = append(resp.DnsServers, peer.PrivateDNSAddrV6().String())
+			}
+		}
+	}
 	peers, err := mesh.WireGuardPeersFor(ctx, s.store.Storage(), req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err)
@@ -423,12 +439,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		for _, peer := range peers {
 			// We only return peers that are publicly accessible for now.
 			// This should be configurable in the future.
-			if peer.PrimaryEndpoint != "" {
-				addr, err := netip.ParseAddr(peer.PrimaryEndpoint)
-				if err == nil {
-					addrport := netip.AddrPortFrom(addr, uint16(peer.GRPCPort))
-					resp.IceServers = append(resp.IceServers, addrport.String())
-				}
+			publicAddr := peer.PublicRPCAddr()
+			if publicAddr.IsValid() {
+				resp.IceServers = append(resp.IceServers, publicAddr.String())
 			}
 		}
 		if len(resp.IceServers) == 0 {

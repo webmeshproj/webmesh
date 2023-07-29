@@ -334,24 +334,15 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 				continue
 			}
 			for _, icepeer := range icepeers {
-			ICEEndpoint:
 				switch {
 				// Prefer primary endpoint
-				case icepeer.PrimaryEndpoint != "":
-					addr, err := netip.ParseAddr(peer.PrimaryEndpoint)
-					if err == nil {
-						addrport := netip.AddrPortFrom(addr, uint16(icepeer.GRPCPort))
-						iceServers = append(iceServers, addrport.String())
-						break ICEEndpoint
-					}
-					fallthrough
-				// Fall back to private endpoint
-				case icepeer.PrivateIPv4.IsValid():
-					addrport := netip.AddrPortFrom(icepeer.PrivateIPv4.Addr(), uint16(icepeer.GRPCPort))
-					iceServers = append(iceServers, addrport.String())
-				case icepeer.PrivateIPv6.IsValid():
-					addrport := netip.AddrPortFrom(icepeer.PrivateIPv6.Addr(), uint16(icepeer.GRPCPort))
-					iceServers = append(iceServers, addrport.String())
+				case icepeer.PublicRPCAddr().IsValid():
+					iceServers = append(iceServers, icepeer.PublicRPCAddr().String())
+				// Fall back to private endpoint (prefering IPv4)
+				case icepeer.PrivateRPCAddrV4().IsValid():
+					iceServers = append(iceServers, icepeer.PrivateRPCAddrV4().String())
+				case icepeer.PrivateRPCAddrV6().IsValid():
+					iceServers = append(iceServers, icepeer.PrivateRPCAddrV6().String())
 				}
 			}
 		}

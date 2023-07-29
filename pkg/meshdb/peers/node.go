@@ -49,6 +49,8 @@ type Node struct {
 	GRPCPort int `json:"grpcPort"`
 	// RaftPort is the node's Raft port.
 	RaftPort int `json:"raftPort"`
+	// DNSPort is the node's DNS port.
+	DNSPort int `json:"dnsPort"`
 	// Features are the node's features.
 	Features []v1.Feature `json:"features"`
 	// CreatedAt is the time the node was created.
@@ -65,6 +67,81 @@ func (n Node) HasFeature(feature v1.Feature) bool {
 		}
 	}
 	return false
+}
+
+// PublicRPCAddr returns the public address for the node's RPC server.
+// Be sure to check if the returned AddrPort IsValid.
+func (n Node) PublicRPCAddr() netip.AddrPort {
+	var addrport netip.AddrPort
+	if n.PrimaryEndpoint != "" {
+		addr, err := netip.ParseAddr(n.PrimaryEndpoint)
+		if err == nil {
+			addrport = netip.AddrPortFrom(addr, uint16(n.GRPCPort))
+		}
+	}
+	return addrport
+}
+
+// PrivateRPCAddrV4 returns the private IPv4 address for the node's RPC server.
+// Be sure to check if the returned AddrPort IsValid.
+func (n Node) PrivateRPCAddrV4() netip.AddrPort {
+	var addrport netip.AddrPort
+	if n.PrivateIPv4.IsValid() {
+		addrport = netip.AddrPortFrom(n.PrivateIPv4.Addr(), uint16(n.GRPCPort))
+	}
+	return addrport
+}
+
+// PrivateRPCAddrV6 returns the private IPv6 address for the node's RPC server.
+// Be sure to check if the returned AddrPort IsValid.
+func (n Node) PrivateRPCAddrV6() netip.AddrPort {
+	var addrport netip.AddrPort
+	if n.PrivateIPv6.IsValid() {
+		addrport = netip.AddrPortFrom(n.PrivateIPv6.Addr(), uint16(n.GRPCPort))
+	}
+	return addrport
+}
+
+// PublicDNSAddr returns the public address for the node's DNS server.
+// Be sure to check if the returned AddrPort IsValid.
+func (n Node) PublicDNSAddr() netip.AddrPort {
+	var addrport netip.AddrPort
+	if n.DNSPort == 0 {
+		return addrport
+	}
+	if n.PrimaryEndpoint != "" {
+		addr, err := netip.ParseAddr(n.PrimaryEndpoint)
+		if err == nil {
+			addrport = netip.AddrPortFrom(addr, uint16(n.DNSPort))
+		}
+	}
+	return addrport
+}
+
+// PrivateDNSAddrV4 returns the private IPv4 address for the node's DNS server.
+// Be sure to check if the returned AddrPort IsValid.
+func (n Node) PrivateDNSAddrV4() netip.AddrPort {
+	var addrport netip.AddrPort
+	if n.DNSPort == 0 {
+		return addrport
+	}
+	if n.PrivateIPv4.IsValid() {
+		addrport = netip.AddrPortFrom(n.PrivateIPv4.Addr(), uint16(n.DNSPort))
+	}
+	return addrport
+}
+
+// PrivateDNSAddrV6 returns the private IPv6 address for the node's DNS server.
+// Be sure to check if the returned AddrPort IsValid.
+func (n Node) PrivateDNSAddrV6() netip.AddrPort {
+	var addrport netip.AddrPort
+	if n.DNSPort == 0 {
+		return addrport
+	}
+	if n.PrivateIPv6.IsValid() {
+		addrport = netip.AddrPortFrom(n.PrivateIPv6.Addr(), uint16(n.DNSPort))
+	}
+	return addrport
 }
 
 // MarshalJSON marshals a Node to JSON.

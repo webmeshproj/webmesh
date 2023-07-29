@@ -122,6 +122,8 @@ type PutOptions struct {
 	GRPCPort int
 	// RaftPort is the node's Raft port.
 	RaftPort int
+	// DNSPort is the node's DNS port.
+	DNSPort int
 	// Features are the node's features.
 	Features []v1.Feature
 }
@@ -175,6 +177,7 @@ func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
 	node.ZoneAwarenessID = opts.ZoneAwarenessID
 	node.GRPCPort = opts.GRPCPort
 	node.RaftPort = opts.RaftPort
+	node.DNSPort = opts.DNSPort
 	node.Features = opts.Features
 	node.UpdatedAt = time.Now().UTC()
 	// If the node doesn't exist, set the creation timestamp.
