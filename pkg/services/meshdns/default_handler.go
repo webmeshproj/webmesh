@@ -52,18 +52,20 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	}
 	// Check the cache
 	cachekey := cacheKey{q.Name, q.Qtype}
-	if val, ok := s.cache.Get(cachekey); ok {
-		s.log.Debug("cache hit")
-		if val.expires.After(time.Now()) {
-			// cached response has expired
-			s.log.Debug("cached response has expired")
-			s.cache.Remove(cachekey)
-		} else {
-			// cached response is still valid
-			s.log.Debug("cached response is still valid")
-			m := val.msg.Copy()
-			s.writeMsg(w, r, m, m.Rcode)
-			return
+	if s.cache != nil {
+		if val, ok := s.cache.Get(cachekey); ok {
+			s.log.Debug("cache hit")
+			if val.expires.After(time.Now()) {
+				// cached response has expired
+				s.log.Debug("cached response has expired")
+				s.cache.Remove(cachekey)
+			} else {
+				// cached response is still valid
+				s.log.Debug("cached response is still valid")
+				m := val.msg.Copy()
+				s.writeMsg(w, r, m, m.Rcode)
+				return
+			}
 		}
 	}
 	for _, forwarder := range s.opts.Forwarders {
@@ -77,21 +79,23 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		if m.Rcode != dns.RcodeNameError {
 			// If the forwarder returned a non-NXDOMAIN response, save it in the cache
 			// and return it
-			cacheValue := cacheValue{
-				msg: m.Copy(),
-				// Use the first TTL in the answer section as the cache TTL
-				expires: func() time.Time {
-					if len(m.Answer) > 0 {
-						ttl := time.Duration(m.Answer[0].Header().Ttl) * time.Second
-						if ttl > 0 {
-							return time.Now().Add(ttl)
+			if s.cache != nil {
+				cacheValue := cacheValue{
+					msg: m.Copy(),
+					// Use the first TTL in the answer section as the cache TTL
+					expires: func() time.Time {
+						if len(m.Answer) > 0 {
+							ttl := time.Duration(m.Answer[0].Header().Ttl) * time.Second
+							if ttl > 0 {
+								return time.Now().Add(ttl)
+							}
 						}
-					}
-					// Default to 5 minutes
-					return time.Now().Add(5 * time.Minute)
-				}(),
+						// Default to 5 minutes
+						return time.Now().Add(5 * time.Minute)
+					}(),
+				}
+				s.cache.Add(cachekey, cacheValue)
 			}
-			s.cache.Add(cachekey, cacheValue)
 			s.writeMsg(w, r, m, m.Rcode)
 			return
 		}
