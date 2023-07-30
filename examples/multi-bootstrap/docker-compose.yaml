@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 networks:
   bootstrap:
@@ -14,7 +14,6 @@ volumes:
   bootstrap-node-3:
 
 services:
-
   bootstrap-node-1:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
@@ -37,7 +36,6 @@ services:
       - --raft.data-dir=/data
       - --raft.snapshot-threshold=10
       - --raft.log-level=debug
-      - --services.api.leader-proxy
       - --services.api.peer-discovery
       - --services.api.mesh
       - --services.api.webrtc

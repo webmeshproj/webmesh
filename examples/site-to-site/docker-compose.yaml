@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 networks:
   public-net:
@@ -29,7 +29,6 @@ volumes:
   site-3-leader:
 
 services:
-
   # Site 1
 
   site-1-leader:
@@ -55,7 +54,6 @@ services:
       - --bootstrap.default-network-policy=accept
       - --raft.data-dir=/data
       - --mesh.zone-awareness-id=site-1
-      - --services.api.leader-proxy
       - --services.api.mesh
       - --services.api.admin
       - --services.mesh-dns.enabled
@@ -63,7 +61,6 @@ services:
       - --services.metrics.listen-address=:8000
       - --services.dashboard.enabled
       - --services.dashboard.listen-address=:8080
-      - --wireguard.key-file=/data/wireguard.key
     ports:
       - 8000:8000
       - 8080:8080
@@ -144,9 +141,6 @@ services:
       - --bootstrap.default-network-policy=accept
       - --raft.data-dir=/data
       - --mesh.zone-awareness-id=site-2
-      - --services.api.leader-proxy
-      - --services.api.mesh
-      - --wireguard.key-file=/data/wireguard.key
     volumes:
       - site-2-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -222,9 +216,6 @@ services:
       - --bootstrap.default-network-policy=accept
       - --raft.data-dir=/data
       - --mesh.zone-awareness-id=site-3
-      - --services.api.leader-proxy
-      - --services.api.mesh
-      - --wireguard.key-file=/data/wireguard.key
     volumes:
       - site-3-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
