@@ -141,26 +141,6 @@ archives:
       - goos: windows
         format: zip
 
-brews:
-  - ids: [webmesh]
-    folder: Formula
-    homepage: https://webmeshproj.github.io
-    description: WebMesh is a service mesh for the web
-    license: Apache 2.0
-    url_template: "https://github.com/webmeshproj/webmesh/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    skip_upload: auto
-    repository:
-      owner: webmeshproj
-      name: homebrew-repo
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    commit_author:
-      name: Avi Zimmerman
-      email: avi.zimmerman@gmail.com
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    test: |
-      system "#{bin}/webmesh-node --version"
-      system "#{bin}/wmctl --version"
-
 nfpms:
   - id: webmesh
     maintainer: Avi Zimmerman <avi.zimmerman@gmail.com>
@@ -186,6 +166,26 @@ nfpms:
           - elrepo-release
           - epel-release
           - kmod-wireguard
+
+brews:
+  - ids: [webmesh]
+    folder: Formula
+    homepage: https://webmeshproj.github.io
+    description: WebMesh is a service mesh for the web
+    license: Apache 2.0
+    url_template: "https://github.com/webmeshproj/webmesh/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    skip_upload: auto
+    repository:
+      owner: webmeshproj
+      name: homebrew-repo
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: Avi Zimmerman
+      email: avi.zimmerman@gmail.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    test: |
+      system "#{bin}/webmesh-node --version"
+      system "#{bin}/wmctl --version"
 
 signs:
   - cmd: cosign
