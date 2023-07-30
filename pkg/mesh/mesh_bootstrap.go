@@ -476,10 +476,6 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1
 func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Feature) error {
 	s.opts.Mesh.JoinAsVoter = true
 	for id, server := range s.opts.Bootstrap.Servers {
-		parts := strings.Split(server, "=")
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid bootstrap server: %s", server)
-		}
 		if id == s.ID() {
 			continue
 		}
