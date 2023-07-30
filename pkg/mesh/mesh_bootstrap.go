@@ -81,9 +81,7 @@ func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error 
 	}
 	var bootstrapOpts raft.BootstrapOptions
 	bootstrapOpts.Servers = s.opts.Bootstrap.Servers
-	if s.opts.Bootstrap.AdvertiseAddress != "" {
-		bootstrapOpts.AdvertiseAddress = s.opts.Bootstrap.AdvertiseAddress
-	}
+	bootstrapOpts.AdvertiseAddress = s.opts.Bootstrap.AdvertiseAddress
 	bootstrapOpts.OnBootstrapped = func(isLeader bool) error {
 		if isLeader {
 			return s.initialBootstrapLeader(ctx, features)
