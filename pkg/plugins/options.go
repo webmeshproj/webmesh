@@ -160,7 +160,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		return nil
 	})
 	fs.Func("plugins.local", `A configuration for a local executable plugin.
-Provided in the format of path=/path/to/executable,config1=val1,config2=val2,...`, func(s string) error {
+Provided in the format of <path=/path/to/executable,config1=val1,config2=val2,...>`, func(s string) error {
 		keypairs := strings.Split(s, ",")
 		if len(keypairs) < 2 {
 			return fmt.Errorf("invalid local plugin configuration: %s", s)
@@ -188,7 +188,7 @@ Provided in the format of path=/path/to/executable,config1=val1,config2=val2,...
 	})
 	fs.Func("plugins.server", `A configuration for a remote server plugin. Configurations are the same as the local plugin,
 but with the addition of server configurations in the format of:
-server=rpcserver.com:8443[,insecure=true][,tls-ca-file=ca.crt][,tls-key-file=tls.key][,tls-cert-file=tls.crt]`, func(s string) error {
+<server=rpcserver.com:8443[,insecure=true][,tls-ca-file=ca.crt][,tls-key-file=tls.key][,tls-cert-file=tls.crt]>`, func(s string) error {
 		keypairs := strings.Split(s, ",")
 		if len(keypairs) < 2 {
 			return fmt.Errorf("invalid local plugin configuration: %s", s)

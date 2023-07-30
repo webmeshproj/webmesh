@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -91,15 +92,6 @@ FENCE
 	appendFlagSection("WireGuard Configurations", "wireguard", &sb)
 	appendFlagSection("Services Configurations", "services", &sb)
 	appendFlagSection("Plugin Configurations", "plugins", &sb)
-	extraPluginInfo := `
-Local executable plugins can be configured with the BACKTICK--plugins.localBACKTICK flag or configuration entry.
-These are provided as a list of paths and configurations in the format of BACKTICKpath=/path/to/executable,config1=val1,config2=val2,...BACKTICK.
-
-External server plugins are configured with the BACKTICK--plugins.serverBACKTICK flag or configuration entry.
-Configurations are the same as the local plugin, but with the addition of server configurations in the format of BACKTICKserver=rpcserver.com:8443[,insecure=true][,tls-ca-file=ca.crt][,tls-key-file=tls.key][,tls-cert-file=tls.crt]BACKTICK.
-`
-	extraPluginInfo = strings.ReplaceAll(extraPluginInfo, "BACKTICK", "`")
-	sb.WriteString(extraPluginInfo)
 	return os.WriteFile(outfile, []byte(sb.String()), 0644)
 }
 
@@ -111,7 +103,9 @@ func appendFlagSection(title string, flagPrefix string, sb *strings.Builder) {
 		if !strings.HasPrefix(f.Name, flagPrefix) {
 			return
 		}
-		usage := strings.Replace(f.Usage, "\n", " ", -1)
+		usage := strings.ReplaceAll(f.Usage, "\n", " ")
+		re := regexp.MustCompile("<(.*?)>")
+		usage = re.ReplaceAllString(usage, "`<$1>`")
 		sb.WriteString(fmt.Sprintf("| `--%s` | `%s` | `%s` | %s | %s |\n",
 			f.Name,
 			strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(f.Name, "-", "_"), ".", "_")),
