@@ -13,7 +13,6 @@ env:
   NODE_VERSION: 18
   GOLANGCI_LINT_VERSION: v1.53.2
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
-  RELEASE_PARALLELISM: 3
 
 jobs:
   lint:
@@ -109,25 +108,29 @@ jobs:
       - name: Setup Cosign
         uses: sigstore/cosign-installer@main
 
-      - name: Compute Release Args
+      - name: Setup UPX
         shell: bash
-        id: release-args
-        run: |
-          if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
-              ARGS="--clean --fail-fast"
-          else
-              ARGS="--snapshot --clean --fail-fast"
-          fi
-          echo "args=${ARGS}" >> "${GITHUB_OUTPUT}"
+        run: brew install upx
 
-      - name: Run Goreleaser
+      - name: Run Snapshot Release
         uses: goreleaser/goreleaser-action@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         with:
           version: latest
-          args: release --parallelism=${{ env.RELEASE_PARALLELISM }} ${{ steps.release-args.outputs.args }}
+          args: release --snapshot --clean --fail-fast
+
+      - name: Run Release
+        uses: goreleaser/goreleaser-action@v4
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        with:
+          version: latest
+          args: release --clean --fail-fast
 
   build-containers:
     name: Build Containers
@@ -172,17 +175,6 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Compute Build Args
-        shell: bash
-        id: build-args
-        run: |
-          if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
-              ARGS="--clean --id node-docker-linux"
-          else
-              ARGS="--snapshot --clean --id node-docker-linux"
-          fi
-          echo "args=${ARGS}" >> "${GITHUB_OUTPUT}"
-
       - name: Compute Image Tags
         shell: bash
         id: image-tags
@@ -196,14 +188,19 @@ jobs:
           echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
           echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
 
-      - name: Run Goreleaser
+      - name: Run Snapshot Build
         uses: goreleaser/goreleaser-action@v4
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         with:
           version: latest
-          args: build ${{ steps.build-args.outputs.args }}
+          args: build --snapshot --clean --id node-docker-linux
+
+      - name: Run Build
+        uses: goreleaser/goreleaser-action@v4
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          version: latest
+          args: build --clean --id node-docker-linux
 
       - name: Login to GHCR
         uses: docker/login-action@v2
