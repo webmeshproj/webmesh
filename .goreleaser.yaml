@@ -87,36 +87,36 @@ builds:
       - ppc64le
       - s390x
 
-upx:
-  - enabled: true
-    compress: best
-    lzma: true
-    goos: 
-      - linux
-    goarch:
-      - amd64
-      - arm64
-      - arm
-      - '386'
-      - ppc64le
-      - mips
-      - mipsle
-    ids:
-      - node
-      - wmctl
-      - node-docker-linux
+# upx:
+#   - enabled: true
+#     compress: best
+#     lzma: true
+#     goos: 
+#       - linux
+#     goarch:
+#       - amd64
+#       - arm64
+#       - arm
+#       - '386'
+#       - ppc64le
+#       - mips
+#       - mipsle
+#     ids:
+#       - node
+#       - wmctl
+#       - node-docker-linux
 
-  - enabled: true
-    compress: best
-    lzma: true
-    goos: 
-      - windows
-    goarch:
-      - amd64
-      - '386'
-    ids:
-      - node
-      - wmctl
+#   - enabled: true
+#     compress: best
+#     lzma: true
+#     goos: 
+#       - windows
+#     goarch:
+#       - amd64
+#       - '386'
+#     ids:
+#       - node
+#       - wmctl
 
 checksum:
   name_template: 'checksums.txt'
