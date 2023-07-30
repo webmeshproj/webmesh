@@ -35,25 +35,6 @@ builds:
       - mipsle
       - mips
 
-  - id: node-docker-linux
-    main: cmd/node/main.go
-    binary: webmesh-node
-    env:
-      - CGO_ENABLED=0
-    tags:
-      - osusergo
-      - netgo
-    ldflags:
-      - -s -w 
-      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
-    goos:
-      - linux
-    goarch:
-      - amd64
-      - arm64
-
   - id: wmctl
     main: cmd/wmctl/main.go
     binary: wmctl
@@ -83,6 +64,29 @@ builds:
       - mipsle
       - mips
 
+  - id: node-docker-linux
+    main: cmd/node/main.go
+    binary: webmesh-node
+    env:
+      - CGO_ENABLED=0
+    tags:
+      - osusergo
+      - netgo
+    ldflags:
+      - -s -w 
+      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - '386'
+      - ppc64le
+      - s390x
+
 upx:
   - enabled: true
     compress: best
@@ -100,6 +104,7 @@ upx:
     ids:
       - node
       - wmctl
+      - node-docker-linux
 
   - enabled: true
     compress: best
