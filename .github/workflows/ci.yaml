@@ -109,10 +109,6 @@ jobs:
       - name: Setup Cosign
         uses: sigstore/cosign-installer@main
 
-      - name: Setup UPX
-        shell: bash
-        run: brew install upx
-
       - name: Run Snapshot Release
         uses: goreleaser/goreleaser-action@v4
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
