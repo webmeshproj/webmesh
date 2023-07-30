@@ -325,14 +325,18 @@ func (o *Options) Overlay(opts ...any) error {
 			}
 			if v.MeshDNS.Enabled && v.MeshDNS.ListenUDP != "" && !o.DisableFeatureAdvertisement {
 				// Set the advertise DNS port
-				dnsAddr, err := netip.ParseAddrPort(v.MeshDNS.ListenUDP)
+				_, port, err := net.SplitHostPort(v.MeshDNS.ListenUDP)
+				if err != nil {
+					return fmt.Errorf("failed to parse listen address: %w", err)
+				}
+				portz, err := strconv.ParseUint(port, 10, 16)
 				if err != nil {
 					return fmt.Errorf("failed to parse listen address: %w", err)
 				}
 				for _, inOpts := range opts {
 					if vopt, ok := inOpts.(*mesh.Options); ok {
 						if vopt.Mesh.MeshDNSPort == 0 {
-							vopt.Mesh.MeshDNSPort = int(dnsAddr.Port())
+							vopt.Mesh.MeshDNSPort = int(portz)
 						}
 					}
 				}
