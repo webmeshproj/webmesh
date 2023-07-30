@@ -311,10 +311,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@quasar/extras@npm:^1.0.0":
-  version: 1.16.4
-  resolution: "@quasar/extras@npm:1.16.4"
-  checksum: ea063383881246c5f8a745fb64143c55f1aa66d170d1f8e8cadc81d034c69c3f1cffee1309a465e513941f7f3f9bd8809349c247cfe410cdd2fabb32dec6a1cc
+"@quasar/extras@npm:^1.16.5":
+  version: 1.16.5
+  resolution: "@quasar/extras@npm:1.16.5"
+  checksum: 9980351568c049517727804a87ad27df35c8e1123615df434c0544ee5a518613583d0dd600a7d7242dcac1b153acc0c8bf2811ae0bb3d8bd8221e0f178591a64
   languageName: node
   linkType: hard
 
@@ -3986,10 +3986,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"quasar@npm:^2.6.0":
-  version: 2.12.0
-  resolution: "quasar@npm:2.12.0"
-  checksum: 2bc624a78e415a77b789208ff7baed6a32fbedb97e22c2ce6642e4792f718dc154fc0121dd0a218533575b70db6b46172f24afb2f7c7871a70956612df538ce5
+"quasar@npm:^2.12.3":
+  version: 2.12.3
+  resolution: "quasar@npm:2.12.3"
+  checksum: 165136f4dd78ba6ca8097a2d64155bdd0af4bd9da182100643061ce32ae13fd57d49c311ad381d8779540ef2e6b28b7eaa8ac02bbf82edd0cfe694628bbc43d9
   languageName: node
   linkType: hard
 
@@ -4980,7 +4980,7 @@ __metadata:
     "@buf/tinyzimmer_webmesh-api.protocolbuffers_js": latest
     "@egjs/hammerjs": ^2.0.17
     "@quasar/app-vite": ^1.0.0
-    "@quasar/extras": ^1.0.0
+    "@quasar/extras": ^1.16.5
     "@types/google-protobuf": ^3.15.6
     "@types/node": ^12.20.21
     "@typescript-eslint/eslint-plugin": ^5.10.0
@@ -4999,7 +4999,7 @@ __metadata:
     pinia: ^2.0.11
     postcss: ^8.4.24
     prettier: ^2.5.1
-    quasar: ^2.6.0
+    quasar: ^2.12.3
     timsort: ^0.3.0
     typescript: ^4.5.4
     uuid: ^9.0.0
