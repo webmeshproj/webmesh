@@ -221,6 +221,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.image-tags.outputs.alpine-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
+          build-args: PREFIX=node-docker-linux
 
       - name: Build Distroless Container Images
         uses: docker/build-push-action@v4
@@ -231,6 +232,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.image-tags.outputs.distroless-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
+          build-args: PREFIX=node-docker-linux
 
       - name: Sign Container Images
         shell: bash
