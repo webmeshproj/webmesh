@@ -41,6 +41,10 @@ There is a question as to how many of those things should be "auto-configured" b
 Contributions are welcome and encouraged.
 Please see the [contributing](CONTRIBUTING.md) docs for more information.
 
+## Community
+
+Join me in the [webmesh](https://gophers.slack.com/archives/C05L44ZFG80) channel on the Gophers Slack.
+
 ## Special Thanks
 
 The developers of [rqlite](https://github.com/rqlite/rqlite) for inspiration on managing a distributed database.
