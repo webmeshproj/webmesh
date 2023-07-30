@@ -20,7 +20,6 @@ limitations under the License.
 package ipam
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/netip"
 	"sync"
@@ -105,18 +104,14 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 		return nil, fmt.Errorf("parse subnet: %w", err)
 	}
 	var allocated []netip.Prefix
-	err = p.data.IterPrefix(ctx, peers.NodesPrefix, func(key string, value string) error {
-		var node peers.Node
-		if err := json.Unmarshal([]byte(value), &node); err != nil {
-			return fmt.Errorf("unmarshal node: %w", err)
-		}
+	nodes, err := peers.New(p.data).List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list nodes: %w", err)
+	}
+	for _, node := range nodes {
 		if node.PrivateIPv4.IsValid() {
 			allocated = append(allocated, node.PrivateIPv4)
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("iterate nodes: %w", err)
 	}
 	allocatedSet, err := toPrefixSet(allocated)
 	if err != nil {
