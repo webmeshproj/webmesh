@@ -113,6 +113,8 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		ZoneAwarenessID:       s.opts.Mesh.ZoneAwarenessID,
 		DialOptions:           s.grpcCreds(context.Background()),
 	})
+	// At this point we are open for business.
+	s.open.Store(true)
 	if s.opts.Bootstrap.Enabled {
 		// Attempt bootstrap.
 		log.Info("bootstrapping cluster")
@@ -137,6 +139,5 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 			return fmt.Errorf("recover wireguard: %w", err)
 		}
 	}
-	s.open.Store(true)
 	return nil
 }
