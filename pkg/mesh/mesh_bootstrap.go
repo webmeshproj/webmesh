@@ -448,26 +448,25 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1
 	if err != nil {
 		return fmt.Errorf("get leader ID: %w", err)
 	}
-	var advertiseAddress netip.AddrPort
+	var advertiseAddress net.Addr
 	for id, addr := range s.opts.Bootstrap.Servers {
 		if id == leader {
-			advertiseAddress, err = netip.ParseAddrPort(addr)
+			advertiseAddress, err = util.ResolveTCPAddr(ctx, addr, 10)
 			if err != nil {
-				return fmt.Errorf("parse advertise address: %w", err)
+				return fmt.Errorf("resolve advertise address: %w", err)
 			}
-			break
 		}
 	}
-	if !advertiseAddress.IsValid() {
-		return fmt.Errorf("leader %s not found in configuration", leader)
-	}
+	// We need to extract the host part from the address
+	// since we are going to use it to join the cluster.
+	addr := advertiseAddress.(*net.TCPAddr).AddrPort()
 	var grpcPort int
 	if port, ok := s.opts.Bootstrap.ServersGRPCPorts[string(leader)]; ok {
 		grpcPort = port
 	} else {
 		grpcPort = s.opts.Mesh.GRPCPort
 	}
-	joinAddr := net.JoinHostPort(advertiseAddress.Addr().String(), strconv.Itoa(grpcPort))
+	joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
 	s.opts.Mesh.JoinAsVoter = true
 	time.Sleep(3 * time.Second)
 	return s.join(ctx, features, joinAddr, 5)
@@ -479,11 +478,21 @@ func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Fea
 		if id == s.ID() {
 			continue
 		}
-		addr, err := net.ResolveTCPAddr("tcp", server)
+		advertiseAddress, err := util.ResolveTCPAddr(ctx, server, 10)
 		if err != nil {
 			return fmt.Errorf("resolve advertise address: %w", err)
 		}
-		if err = s.join(ctx, features, addr.String(), 5); err != nil {
+		// We need to extract the host part from the address
+		// since we are going to use it to join the cluster.
+		addr := advertiseAddress.(*net.TCPAddr).AddrPort()
+		var grpcPort int
+		if port, ok := s.opts.Bootstrap.ServersGRPCPorts[id]; ok {
+			grpcPort = port
+		} else {
+			grpcPort = s.opts.Mesh.GRPCPort
+		}
+		joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
+		if err = s.join(ctx, features, joinAddr, 5); err != nil {
 			s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
 			continue
 		}

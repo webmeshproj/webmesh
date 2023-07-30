@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -34,6 +33,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 var (
@@ -271,7 +271,7 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 	if opts.AdvertiseAddress == "" {
 		opts.AdvertiseAddress = fmt.Sprintf("localhost:%d", r.listenPort)
 	}
-	addr, err := r.resolveTCPAddr(ctx, opts.AdvertiseAddress, 15)
+	addr, err := util.ResolveTCPAddr(ctx, opts.AdvertiseAddress, 15)
 	if err != nil {
 		r.mu.Unlock()
 		return fmt.Errorf("resolve advertise address: %w", err)
@@ -290,7 +290,7 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 			if nodeID == string(r.nodeID) {
 				continue
 			}
-			addr, err := r.resolveTCPAddr(ctx, listenAddres, 15)
+			addr, err := util.ResolveTCPAddr(ctx, listenAddres, 15)
 			if err != nil {
 				r.mu.Unlock()
 				return fmt.Errorf("resolve server address: %w", err)
@@ -401,29 +401,4 @@ func (r *raftNode) Stop(ctx context.Context) error {
 		return fmt.Errorf("raft shutdown: %w", err)
 	}
 	return nil
-}
-
-// resolveTCPAddr resolves a TCP address with retries and context.
-func (r *raftNode) resolveTCPAddr(ctx context.Context, lookup string, maxRetries int) (net.Addr, error) {
-	var addr net.Addr
-	var err error
-	var tries int
-	for tries < maxRetries {
-		addr, err = net.ResolveTCPAddr("tcp", lookup)
-		if err != nil {
-			tries++
-			err = fmt.Errorf("resolve tcp address: %w", err)
-			r.log.Error("failed to resolve advertise address", slog.String("error", err.Error()))
-			if tries < maxRetries {
-				select {
-				case <-ctx.Done():
-					return nil, fmt.Errorf("%w: %w", err, ctx.Err())
-				case <-time.After(time.Second * 1):
-					continue
-				}
-			}
-		}
-		break
-	}
-	return addr, err
 }

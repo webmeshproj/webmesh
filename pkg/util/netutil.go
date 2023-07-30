@@ -27,7 +27,36 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/slog"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
+
+// ResolveTCPAddr resolves a TCP address with retries and context.
+func ResolveTCPAddr(ctx context.Context, lookup string, maxRetries int) (net.Addr, error) {
+	var addr net.Addr
+	var err error
+	var tries int
+	for tries < maxRetries {
+		addr, err = net.ResolveTCPAddr("tcp", lookup)
+		if err != nil {
+			tries++
+			err = fmt.Errorf("resolve tcp address: %w", err)
+			context.LoggerFrom(ctx).Error("failed to resolve advertise address", slog.String("error", err.Error()))
+			if tries < maxRetries {
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("%w: %w", err, ctx.Err())
+				case <-time.After(time.Second * 1):
+					continue
+				}
+			}
+		}
+		break
+	}
+	return addr, err
+}
 
 // VerifyChainOnly is a function that can be used in a TLS configuration
 // to only verify that the certificate chain is valid.
