@@ -415,6 +415,17 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	if err != nil {
 		return fmt.Errorf("start net manager: %w", err)
 	}
+	if s.opts.Mesh.UseMeshDNS && s.opts.Mesh.MeshDNSPort != 0 {
+		addr := "127.0.0.1"
+		if s.opts.Mesh.NoIPv4 {
+			addr = "::1"
+		}
+		addrport := netip.AddrPortFrom(netip.MustParseAddr(addr), uint16(s.opts.Mesh.MeshDNSPort))
+		err = s.nw.AddDNSServers(ctx, []netip.AddrPort{addrport})
+		if err != nil {
+			return fmt.Errorf("add dns servers: %w", err)
+		}
+	}
 	// Make sure everyone is aware of the bootstrap data
 	err = s.raft.Raft().Barrier(time.Second * 5).Error()
 	if err != nil {

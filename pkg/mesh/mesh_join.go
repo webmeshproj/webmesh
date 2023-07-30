@@ -208,8 +208,11 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		var servers []netip.AddrPort
 		if s.opts.Mesh.MeshDNSPort != 0 {
 			// Use our local port.
-			addr := netip.MustParseAddr("127.0.0.1")
-			servers = append(servers, netip.AddrPortFrom(addr, uint16(s.opts.Mesh.MeshDNSPort)))
+			addr := "127.0.0.1"
+			if s.opts.Mesh.NoIPv4 {
+				addr = "::1"
+			}
+			servers = append(servers, netip.AddrPortFrom(netip.MustParseAddr(addr), uint16(s.opts.Mesh.MeshDNSPort)))
 		} else {
 			for _, server := range resp.GetDnsServers() {
 				addr, err := netip.ParseAddrPort(server)
