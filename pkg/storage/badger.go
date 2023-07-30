@@ -33,7 +33,7 @@ import (
 
 type badgerStorage struct {
 	db *badger.DB
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
 func newBadgerStorage(opts *Options) (Storage, error) {
@@ -56,8 +56,8 @@ func newBadgerStorage(opts *Options) (Storage, error) {
 
 // Get returns the value of a key.
 func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	if key == "" {
 		return "", errors.New("badger get: key is empty")
 	}
@@ -121,8 +121,8 @@ func (b *badgerStorage) Delete(ctx context.Context, key string) error {
 
 // List returns all keys with a given prefix.
 func (b *badgerStorage) List(ctx context.Context, prefix string) ([]string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	var keys []string
 	err := b.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -139,8 +139,8 @@ func (b *badgerStorage) List(ctx context.Context, prefix string) ([]string, erro
 
 // IterPrefix iterates over all keys with a given prefix.
 func (b *badgerStorage) IterPrefix(ctx context.Context, prefix string, fn PrefixIterator) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	err := b.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -161,6 +161,7 @@ func (b *badgerStorage) IterPrefix(ctx context.Context, prefix string, fn Prefix
 
 // Snapshot returns a snapshot of the storage.
 func (b *badgerStorage) Snapshot(ctx context.Context) (io.Reader, error) {
+	// Take an exclusive lock to prevent any writes while we snapshot.
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if !b.db.Opts().InMemory {
@@ -214,6 +215,8 @@ func (b *badgerStorage) Subscribe(ctx context.Context, prefix string, fn Subscri
 
 // Close closes the storage.
 func (b *badgerStorage) Close() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	return b.db.Close()
 }
 

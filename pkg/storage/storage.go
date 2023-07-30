@@ -34,7 +34,9 @@ type Storage interface {
 	Delete(ctx context.Context, key string) error
 	// List returns all keys with a given prefix.
 	List(ctx context.Context, prefix string) ([]string, error)
-	// IterPrefix iterates over all keys with a given prefix.
+	// IterPrefix iterates over all keys with a given prefix. It is important
+	// that the iterator not attempt any write operations as this will cause
+	// a deadlock.
 	IterPrefix(ctx context.Context, prefix string, fn PrefixIterator) error
 	// Snapshot returns a snapshot of the storage.
 	Snapshot(ctx context.Context) (io.Reader, error)
