@@ -74,7 +74,7 @@ jobs:
 
   build-binaries:
     name: Build Binary Artifacts
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     needs: [tests]
     permissions:
       contents: "write"
@@ -108,6 +108,10 @@ jobs:
 
       - name: Setup Cosign
         uses: sigstore/cosign-installer@main
+
+      - name: Setup UPX
+        shell: bash
+        run: brew install upx
 
       - name: Run Snapshot Release
         uses: goreleaser/goreleaser-action@v4
