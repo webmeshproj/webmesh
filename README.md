@@ -15,43 +15,10 @@ It implements the [Webmesh API](https://github.com/webmeshproj/api) in Go.
 
 ## Getting Started
 
-If you'd like to play with the project on Kubernetes, there is a work-in-progress Operator in the [operator](https://github.com/webmeshproj/operator/) repository.
 It works fine on most clusters, including ephemeral docker-based ones, but is not yet ready for production use.
 
 Detailed instructions can be found in the [Getting Started](https://webmeshproj.github.io/documentation/getting-started/) guide on the project website.
-The below instructions are a quick-start guide for running a simple mesh on a single host using `docker`.
-
-```bash
-# You can remove the --global.no-ipv6 flag if you have IPv6 connectivity on your docker network.
-docker run --rm --privileged --name=bootstrap-node ghcr.io/webmeshproj/node:latest \
-    --global.insecure \
-    --global.no-ipv6 \
-    --global.detect-endpoints \
-    --global.detect-private-endpoints \
-    --bootstrap.enabled
-```
-
-Once the node is ready, to join another node to the network you can run the following:
-
-```bash
-docker run --rm --privileged ghcr.io/webmeshproj/node:latest \
-    --global.insecure \
-    --global.no-ipv6 \
-    --mesh.join-address=bootstrap-node:8443
-```
-
-The two containers should now be connected to each other over WireGuard and you can exec into them to test connectivity.
-
-The `wmctl` utility included in this repository can also be used to connect and/or query the APIs.
-More documentation on the CLI utility will be added soon.
-
-```bash
-wmctl connect --insecure --no-ipv6 --join-server=<container_ip>:8443
-```
-
-Configuration can be provided as CLI flags (as shown above) or via a configuration file and environment variables.
-Full details can be found on the [configuration section](https://webmeshproj.github.io/documentation/configuration/) of the project website.
-Administration of the network can be done via the [API](https://webmeshproj.github.io/documentation/administration/) using the CLI or custom tooling.
+For examples of different topologies and using various features, see the [examples](examples/) directory.
 
 ## Building
 
