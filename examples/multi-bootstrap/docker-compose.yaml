@@ -8,11 +8,6 @@ networks:
         - subnet: 10.1.0.0/24
           gateway: 10.1.0.100
 
-volumes:
-  bootstrap-node-1:
-  bootstrap-node-2:
-  bootstrap-node-3:
-
 services:
   bootstrap-node-1:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -29,31 +24,18 @@ services:
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --global.log-level=debug
       - --bootstrap.enabled
       - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --raft.data-dir=/data
-      - --raft.snapshot-threshold=10
-      - --raft.log-level=debug
+      - --raft.in-memory
       - --services.api.peer-discovery
       - --services.api.mesh
-      - --services.api.webrtc
       - --services.metrics.enabled
-      - --services.turn.enabled
-      - --services.turn.public-ip=127.0.0.1
-      - --services.turn.stun-port-range=60000-60001
       - --services.mesh-dns.enabled
-      - --wireguard.key-file=/data/wireguard.key
     ports:
       - 8443:8443
-      - 3478:3478
       - 5354:5353/udp
       - 51820:51820/udp
-      - 60000-60001:60000-60001/udp
-      - 60000-60001:60000-60001/tcp
-    volumes:
-      - bootstrap-node-1:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   bootstrap-node-2:
@@ -68,17 +50,10 @@ services:
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --global.log-level=debug
       - --bootstrap.enabled
       - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --raft.data-dir=/data
-      - --raft.snapshot-threshold=10
-      - --raft.log-level=debug
-      - --services.api.leader-proxy
-      - --wireguard.key-file=/data/wireguard.key
-    volumes:
-      - bootstrap-node-2:/data
+      - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   bootstrap-node-3:
@@ -93,15 +68,8 @@ services:
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --global.log-level=debug
       - --bootstrap.enabled
       - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --raft.data-dir=/data
-      - --raft.snapshot-threshold=10
-      - --raft.log-level=debug
-      - --services.api.leader-proxy
-      - --wireguard.key-file=/data/wireguard.key
-    volumes:
-      - bootstrap-node-3:/data
+      - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

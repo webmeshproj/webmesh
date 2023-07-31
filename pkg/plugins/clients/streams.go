@@ -29,8 +29,9 @@ import (
 )
 
 func inProcessQueryPipe(ctx context.Context, server v1.PluginServer) v1.Plugin_InjectQuerierClient {
-	schan := make(chan *v1.PluginQuery, 1)
-	rchan := make(chan *v1.PluginQueryResult, 1)
+	// TODO: Make this configurable
+	schan := make(chan *v1.PluginQuery, 100)
+	rchan := make(chan *v1.PluginQueryResult, 100)
 	ctx, cancel := context.WithCancel(ctx)
 	srv := &inProcessStreamServer[v1.PluginQuery, v1.PluginQueryResult]{ctx, schan, rchan}
 	cli := &inProcessStreamClient[v1.PluginQuery, v1.PluginQueryResult]{ctx, cancel, schan, rchan}

@@ -91,11 +91,6 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		}
 		return cause
 	}
-	// Register an update hook to watch for node changes.
-	s.kvSubCancel, err = s.raft.Storage().Subscribe(context.Background(), "", s.onDBUpdate)
-	if err != nil {
-		return handleErr(fmt.Errorf("subscribe: %w", err))
-	}
 	// Create the network manager
 	s.nw = net.New(s.Storage(), &net.Options{
 		NodeID:                s.ID(),
@@ -138,6 +133,11 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		if err := s.recoverWireguard(ctx); err != nil {
 			return fmt.Errorf("recover wireguard: %w", err)
 		}
+	}
+	// Register an update hook to watch for network changes.
+	s.kvSubCancel, err = s.raft.Storage().Subscribe(context.Background(), "", s.onDBUpdate)
+	if err != nil {
+		return handleErr(fmt.Errorf("subscribe: %w", err))
 	}
 	return nil
 }

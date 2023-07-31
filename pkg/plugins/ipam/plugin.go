@@ -26,6 +26,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -103,25 +104,24 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	if err != nil {
 		return nil, fmt.Errorf("parse subnet: %w", err)
 	}
-	var allocated []netip.Prefix
 	nodes, err := peers.New(p.data).List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
+	allocated := make(map[netip.Prefix]struct{}, len(nodes))
+	context.LoggerFrom(ctx).Info("ipam list nodes", slog.Any("nodes", nodes))
 	for _, node := range nodes {
 		n := node
 		if n.PrivateIPv4.IsValid() {
-			allocated = append(allocated, n.PrivateIPv4)
+			allocated[n.PrivateIPv4] = struct{}{}
 		}
 	}
-	allocatedSet, err := toPrefixSet(allocated)
-	if err != nil {
-		return nil, fmt.Errorf("convert allocated IPv4s to set: %w", err)
-	}
-	prefix, err := next32(globalPrefix, allocatedSet)
+	context.LoggerFrom(ctx).Info("ipam allocated ips", slog.Any("allocated", allocated))
+	prefix, err := next32(globalPrefix, allocated)
 	if err != nil {
 		return nil, fmt.Errorf("find next available IPv4: %w", err)
 	}
+	context.LoggerFrom(ctx).Info("ipam allocated", slog.Any("allocated", prefix))
 	return &v1.AllocatedIP{
 		Ip: prefix.String(),
 	}, nil
@@ -156,13 +156,4 @@ func next32(cidr netip.Prefix, set map[netip.Prefix]struct{}) (netip.Prefix, err
 		ip = ip.Next()
 	}
 	return netip.Prefix{}, fmt.Errorf("no more addresses in %s", cidr)
-}
-
-func toPrefixSet(addrs []netip.Prefix) (map[netip.Prefix]struct{}, error) {
-	set := make(map[netip.Prefix]struct{})
-	for _, addr := range addrs {
-		ip := addr
-		set[ip] = struct{}{}
-	}
-	return set, nil
 }

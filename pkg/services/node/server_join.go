@@ -57,6 +57,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	s.joinmu.Lock()
 	defer s.joinmu.Unlock()
+	log := s.log.With("id", req.GetId())
+	log.Info("join request received", slog.Any("request", req))
 	// Check if we haven't loaded the mesh domain and prefixes into memory yet
 	var err error
 	if !s.ipv6Prefix.IsValid() {
@@ -146,8 +148,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
-	log := s.log.With("id", req.GetId())
-
 	// Issue a barrier to the raft cluster to ensure all nodes are
 	// fully caught up before we start assigning it addresses
 	log.Info("sending barrier to raft cluster")
@@ -157,6 +157,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
 	log.Debug("barrier complete, all nodes caught up")
+
+	cleanFuncs := make([]func(), 0)
+
+	handleErr := func(cause error) error {
+		for _, f := range cleanFuncs {
+			f()
+		}
+		return cause
+	}
 
 	// Handle any new routes
 	if len(req.GetRoutes()) > 0 {
@@ -187,6 +196,12 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to add route: %v", err)
 			}
+			cleanFuncs = append(cleanFuncs, func() {
+				err := s.networking.DeleteRoute(ctx, fmt.Sprintf("%s-auto", req.GetId()))
+				if err != nil {
+					log.Warn("failed to delete route", slog.String("error", err.Error()))
+				}
+			})
 			break
 		}
 	}
@@ -203,7 +218,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		Version: v1.AllocateIPRequest_IP_VERSION_6,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to allocate IPv6 address: %v", err)
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to allocate IPv6 address: %v", err))
 	}
 	log.Debug("assigned IPv6 address to peer", slog.String("ipv6", leasev6.String()))
 	// Acquire an IPv4 address for the peer only if requested
@@ -215,7 +230,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			Version: v1.AllocateIPRequest_IP_VERSION_4,
 		})
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to allocate IPv4 address: %v", err)
+			return nil, handleErr(status.Errorf(codes.Internal, "failed to allocate IPv4 address: %v", err))
 		}
 		log.Debug("assigned IPv4 address to peer", slog.String("ipv4", leasev4.String()))
 	}
@@ -234,8 +249,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		PrivateIPv6:        leasev6,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to persist peer's addresses: %v", err)
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer's addresses: %v", err))
 	}
+	cleanFuncs = append(cleanFuncs, func() {
+		err := s.peers.Delete(ctx, req.GetId())
+		if err != nil {
+			log.Warn("failed to delete peer", slog.String("error", err.Error()))
+		}
+	})
+	// At this point we want to
 	// Add an edge from the joining server to the caller
 	joiningServer := string(s.store.ID())
 	if proxiedFrom, ok := leaderproxy.ProxiedFrom(ctx); ok {
@@ -248,14 +270,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		Weight: 1,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
 	}
 	if req.GetPrimaryEndpoint() != "" {
 		// Add an edge between the caller and all other nodes with public endpoints
 		// TODO: This should be done according to network policy and batched
 		allPeers, err := s.peers.ListPublicNodes(ctx)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
+			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
 		for _, peer := range allPeers {
 			if peer.ID != req.GetId() && peer.PrimaryEndpoint != "" {
@@ -266,7 +288,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 					Weight: 99,
 				})
 				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+					return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
 				}
 			}
 		}
@@ -277,7 +299,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// TODO: Same as above - this should be done according to network policy and batched
 		zonePeers, err := s.peers.ListByZoneID(ctx, req.GetZoneAwarenessId())
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to list peers: %v", err)
+			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
 		for _, peer := range zonePeers {
 			if peer.ID == req.GetId() || peer.PrimaryEndpoint == "" {
@@ -291,7 +313,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 					Weight: 1,
 				})
 				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+					return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
 				}
 			}
 		}
@@ -304,7 +326,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			_, err := s.peers.Get(ctx, peer)
 			if err != nil {
 				if err != peers.ErrNodeNotFound {
-					return nil, status.Errorf(codes.Internal, "failed to get peer: %v", err)
+					return nil, handleErr(status.Errorf(codes.Internal, "failed to get peer: %v", err))
 				}
 				// The peer doesn't exist, so create a placeholder for it
 				log.Debug("registering empty peer", slog.String("peer", peer))
@@ -312,7 +334,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 					ID: peer,
 				})
 				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to register peer: %v", err)
+					return nil, handleErr(status.Errorf(codes.Internal, "failed to register peer: %v", err))
 				}
 			}
 			log.Debug("adding ICE edge to peer", slog.String("peer", peer))
@@ -325,7 +347,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				},
 			})
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to add edge: %v", err)
+				return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
 			}
 		}
 	}
@@ -346,15 +368,20 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if req.GetAsVoter() {
 		log.Info("adding candidate to cluster", slog.String("raft_address", raftAddress))
 		if err := s.store.Raft().AddVoter(ctx, req.GetId(), raftAddress); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to add voter: %v", err)
+			return nil, handleErr(status.Errorf(codes.Internal, "failed to add voter: %v", err))
 		}
 	} else {
 		log.Info("adding non-voter to cluster", slog.String("raft_address", raftAddress))
 		if err := s.store.Raft().AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to add non-voter: %v", err)
+			return nil, handleErr(status.Errorf(codes.Internal, "failed to add non-voter: %v", err))
 		}
 	}
-
+	cleanFuncs = append(cleanFuncs, func() {
+		err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
+		if err != nil {
+			log.Warn("failed to remove voter", slog.String("error", err.Error()))
+		}
+	})
 	// Start building the response
 	resp := &v1.JoinResponse{
 		MeshDomain:  s.meshDomain,
@@ -387,7 +414,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	peers, err := mesh.WireGuardPeersFor(ctx, s.store.Storage(), req.GetId())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err)
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
 	}
 	var requiresICE bool
 	for _, peer := range peers {
@@ -402,7 +429,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if requiresICE {
 		peers, err := s.peers.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to list peers by ICE feature: %v", err)
+			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers by ICE feature: %v", err))
 		}
 		for _, peer := range peers {
 			if peer.ID == req.GetId() {
@@ -417,10 +444,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 		if len(resp.IceServers) == 0 {
 			log.Warn("no peers with ICE negotiation feature found, rejecting join request")
-			return nil, status.Errorf(codes.FailedPrecondition, "no peers with ICE negotiation feature found")
+			return nil, handleErr(status.Errorf(codes.FailedPrecondition, "no peers with ICE negotiation feature found"))
 		}
 	}
 
-	log.Debug("sending join response", slog.Any("response", resp))
+	log.Info("sending join response", slog.Any("response", resp))
 	return resp, nil
 }

@@ -299,9 +299,9 @@ func (m *manager) handleQueryClient(plugin string, db storage.Storage, client cl
 				m.log.Error("send query result", "plugin", plugin, "error", err)
 			}
 		case v1.PluginQuery_ITER:
-			var result v1.PluginQueryResult
-			result.Id = query.GetId()
 			err := db.IterPrefix(queries.Context(), query.GetQuery(), func(key, val string) error {
+				var result v1.PluginQueryResult
+				result.Id = query.GetId()
 				result.Key = key
 				result.Value = []string{val}
 				err := queries.Send(&result)
@@ -311,6 +311,8 @@ func (m *manager) handleQueryClient(plugin string, db storage.Storage, client cl
 				m.log.Error("stream query results", "plugin", plugin, "error", err)
 				continue
 			}
+			var result v1.PluginQueryResult
+			result.Id = query.GetId()
 			result.Error = "EOF"
 			err = queries.Send(&result)
 			if err != nil {

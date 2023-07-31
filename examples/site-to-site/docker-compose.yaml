@@ -23,11 +23,6 @@ networks:
       config:
         - subnet: 10.3.0.0/24
 
-volumes:
-  site-1-leader:
-  site-2-leader:
-  site-3-leader:
-
 services:
   # Site 1
 
@@ -52,7 +47,7 @@ services:
       - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --bootstrap.default-network-policy=accept
-      - --raft.data-dir=/data
+      - --raft.in-memory
       - --mesh.zone-awareness-id=site-1
       - --services.api.mesh
       - --services.api.admin
@@ -66,8 +61,6 @@ services:
       - 8080:8080
       - 8443:8443
       - 5354:5353/udp
-    volumes:
-      - site-1-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-1-follower-1:
@@ -139,10 +132,8 @@ services:
       - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --bootstrap.default-network-policy=accept
-      - --raft.data-dir=/data
+      - --raft.in-memory
       - --mesh.zone-awareness-id=site-2
-    volumes:
-      - site-2-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-2-follower-1:
@@ -214,10 +205,8 @@ services:
       - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --bootstrap.default-network-policy=accept
-      - --raft.data-dir=/data
+      - --raft.in-memory
       - --mesh.zone-awareness-id=site-3
-    volumes:
-      - site-3-leader:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-3-follower-1:
