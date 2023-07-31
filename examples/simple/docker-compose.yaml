@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 networks:
   simple:
@@ -7,11 +7,7 @@ networks:
       config:
         - subnet: 10.1.0.0/24
 
-volumes:
-  bootstrap-node:
-
 services:
-
   bootstrap-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
@@ -26,16 +22,12 @@ services:
       - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --global.log-level=debug
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
-      - --raft.data-dir=/data
-      - --wireguard.key-file=/data/wireguard.key
+      - --raft.in-memory
     ports:
       - 8443:8443
       - 51820:51820/udp
-    volumes:
-      - bootstrap-node:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   join-node:

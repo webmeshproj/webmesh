@@ -28,6 +28,8 @@ type Manager interface {
 	ServeStorage(db storage.Storage)
 	// HasAuth returns true if the manager has an auth plugin.
 	HasAuth() bool
+	// HasWatchers returns true if the manager has any watch plugins.
+	HasWatchers() bool
 	// AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin.
 	// If no plugin is configured, the returned function is a pass-through.
 	AuthUnaryInterceptor() grpc.UnaryServerInterceptor
@@ -73,6 +75,11 @@ func (m *manager) ServeStorage(db storage.Storage) {
 // HasAuth returns true if the manager has an auth plugin.
 func (m *manager) HasAuth() bool {
 	return m.auth != nil
+}
+
+// HasWatchers returns true if the manager has any watch plugins.
+func (m *manager) HasWatchers() bool {
+	return len(m.emitters) > 0
 }
 
 // AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin.
