@@ -25,7 +25,6 @@ import (
 	"io"
 	"net/netip"
 	"strings"
-	"time"
 
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
@@ -69,9 +68,7 @@ type Peers interface {
 	// Graph returns the graph of nodes.
 	Graph() Graph
 	// Put creates or updates a node.
-	Put(ctx context.Context, opts *PutOptions) (Node, error)
-	// PutLease creates or updates a node lease.
-	PutLease(ctx context.Context, opts *PutLeaseOptions) error
+	Put(ctx context.Context, n Node) error
 	// Get gets a node by ID.
 	Get(ctx context.Context, id string) (Node, error)
 	// Delete deletes a node.
@@ -153,66 +150,21 @@ type peers struct {
 
 func (p *peers) Graph() Graph { return p.graph }
 
-func (p *peers) Put(ctx context.Context, opts *PutOptions) (Node, error) {
+func (p *peers) Put(ctx context.Context, node Node) error {
 	// Dedup the wireguard endpoints.
 	seen := make(map[string]struct{})
 	var wgendpoints []string
-	for _, endpoint := range opts.WireGuardEndpoints {
+	for _, endpoint := range node.WireGuardEndpoints {
 		if _, ok := seen[endpoint]; ok {
 			continue
 		}
 		seen[endpoint] = struct{}{}
 		wgendpoints = append(wgendpoints, endpoint)
 	}
-	// Get any existing node.
-	node, err := p.graph.Vertex(opts.ID)
-	if err != nil && !errors.Is(err, graph.ErrVertexNotFound) {
-		return Node{}, fmt.Errorf("get node: %w", err)
-	}
-	// Fill in the missing fields.
-	node.ID = opts.ID
-	node.PublicKey = opts.PublicKey
-	node.PrimaryEndpoint = opts.PrimaryEndpoint
 	node.WireGuardEndpoints = wgendpoints
-	node.ZoneAwarenessID = opts.ZoneAwarenessID
-	node.GRPCPort = opts.GRPCPort
-	node.RaftPort = opts.RaftPort
-	node.DNSPort = opts.DNSPort
-	node.Features = opts.Features
-	node.UpdatedAt = time.Now().UTC()
-	// If the node doesn't exist, set the creation timestamp.
-	if errors.Is(err, graph.ErrVertexNotFound) {
-		node.CreatedAt = node.UpdatedAt
-	}
-	err = p.graph.AddVertex(node)
+	err := p.graph.AddVertex(node)
 	if err != nil {
-		return Node{}, fmt.Errorf("add vertex: %w", err)
-	}
-	// Return the full node.
-	out, err := p.graph.Vertex(opts.ID)
-	if err != nil {
-		return Node{}, fmt.Errorf("get vertex: %w", err)
-	}
-	return out, nil
-}
-
-func (p *peers) PutLease(ctx context.Context, opts *PutLeaseOptions) error {
-	if !opts.IPv4.IsValid() && !opts.IPv6.IsValid() {
-		return errors.New("at least one of IPv4 or IPv6 must be set")
-	}
-	node, err := p.graph.Vertex(opts.ID)
-	if err != nil {
-		return fmt.Errorf("get node: %w", err)
-	}
-	if opts.IPv4.IsValid() {
-		node.PrivateIPv4 = opts.IPv4
-	}
-	if opts.IPv6.IsValid() {
-		node.PrivateIPv6 = opts.IPv6
-	}
-	err = p.graph.AddVertex(node)
-	if err != nil {
-		return fmt.Errorf("add vertex: %w", err)
+		return fmt.Errorf("put node: %w", err)
 	}
 	return nil
 }

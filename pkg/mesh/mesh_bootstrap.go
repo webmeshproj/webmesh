@@ -284,7 +284,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 	p := peers.New(s.Storage())
-	params := &peers.PutOptions{
+	self := peers.Node{
 		ID:                 s.ID(),
 		GRPCPort:           s.opts.Mesh.GRPCPort,
 		RaftPort:           s.raft.ListenPort(),
@@ -299,9 +299,33 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	if err != nil {
 		return fmt.Errorf("generate private key: %w", err)
 	}
-	params.PublicKey = wireguardKey.PublicKey()
-	s.log.Debug("creating node in database", slog.Any("params", params))
-	_, err = p.Put(ctx, params)
+	self.PublicKey = wireguardKey.PublicKey()
+	// Allocate addresses
+	var privatev4, privatev6 netip.Prefix
+	if !s.opts.Mesh.NoIPv4 {
+		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
+			NodeId:  s.ID(),
+			Subnet:  s.opts.Bootstrap.IPv4Network,
+			Version: v1.AllocateIPRequest_IP_VERSION_4,
+		})
+		if err != nil {
+			return fmt.Errorf("allocate IPv4 address: %w", err)
+		}
+		self.PrivateIPv4 = privatev4
+	}
+	if !s.opts.Mesh.NoIPv6 {
+		privatev6, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
+			NodeId:  s.ID(),
+			Subnet:  meshnetworkv6.String(),
+			Version: v1.AllocateIPRequest_IP_VERSION_6,
+		})
+		if err != nil {
+			return fmt.Errorf("allocate IPv4 address: %w", err)
+		}
+		self.PrivateIPv6 = privatev6
+	}
+	s.log.Debug("creating ourself in the database", slog.Any("params", self))
+	err = p.Put(ctx, self)
 	if err != nil {
 		return fmt.Errorf("create node: %w", err)
 	}
@@ -313,7 +337,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		s.log.Info("creating node in database for bootstrap server",
 			slog.String("server-id", string(server.ID)),
 		)
-		_, err = p.Put(ctx, &peers.PutOptions{
+		err = p.Put(ctx, peers.Node{
 			ID: string(server.ID),
 		})
 		if err != nil {
@@ -347,37 +371,6 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 				return fmt.Errorf("create edge: %w", err)
 			}
 		}
-	}
-	// Allocate mesh IP addresses for ourselves
-	var privatev4, privatev6 netip.Prefix
-	if !s.opts.Mesh.NoIPv4 {
-		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeId:  s.ID(),
-			Subnet:  s.opts.Bootstrap.IPv4Network,
-			Version: v1.AllocateIPRequest_IP_VERSION_4,
-		})
-		if err != nil {
-			return fmt.Errorf("allocate IPv4 address: %w", err)
-		}
-	}
-	if !s.opts.Mesh.NoIPv6 {
-		privatev6, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeId:  s.ID(),
-			Subnet:  meshnetworkv6.String(),
-			Version: v1.AllocateIPRequest_IP_VERSION_6,
-		})
-		if err != nil {
-			return fmt.Errorf("allocate IPv4 address: %w", err)
-		}
-	}
-	// Write the leases to the database
-	err = p.PutLease(ctx, &peers.PutLeaseOptions{
-		ID:   s.ID(),
-		IPv4: privatev4,
-		IPv6: privatev6,
-	})
-	if err != nil {
-		return fmt.Errorf("create lease: %w", err)
 	}
 	// Determine what our raft address will be
 	var raftAddr string

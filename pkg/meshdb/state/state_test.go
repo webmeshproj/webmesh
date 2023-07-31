@@ -226,37 +226,24 @@ func setupTest(t *testing.T) (*state, func()) {
 	}
 	p := peers.New(db)
 	// Node with public address
-	_, err = p.Put(ctx, &peers.PutOptions{
+	err = p.Put(ctx, peers.Node{
 		ID:              publicNode,
 		PublicKey:       mustGenerateKey(t),
 		PrimaryEndpoint: publicNodePublicAddr,
 		GRPCPort:        rpcPort,
 		RaftPort:        2,
+		PrivateIPv4:     netip.MustParsePrefix(publicNodePrivateAddr),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Node with private address
-	_, err = p.Put(ctx, &peers.PutOptions{
-		ID:        privateNode,
-		PublicKey: mustGenerateKey(t),
-		GRPCPort:  rpcPort,
-		RaftPort:  2,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Leases for each
-	err = p.PutLease(ctx, &peers.PutLeaseOptions{
-		ID:   publicNode,
-		IPv4: netip.MustParsePrefix(publicNodePrivateAddr),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = p.PutLease(ctx, &peers.PutLeaseOptions{
-		ID:   privateNode,
-		IPv4: netip.MustParsePrefix(privateNodePrivateAddr),
+	err = p.Put(ctx, peers.Node{
+		ID:          privateNode,
+		PublicKey:   mustGenerateKey(t),
+		GRPCPort:    rpcPort,
+		RaftPort:    2,
+		PrivateIPv4: netip.MustParsePrefix(privateNodePrivateAddr),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -40,7 +40,7 @@ func TestListEdges(t *testing.T) {
 		t.Errorf("GenerateKey() error = %v", err)
 		return
 	}
-	_, err = peers.New(server.store.Storage()).Put(ctx, &peers.PutOptions{
+	err = peers.New(server.store.Storage()).Put(ctx, peers.Node{
 		ID:        "foo",
 		PublicKey: key.PublicKey(),
 	})

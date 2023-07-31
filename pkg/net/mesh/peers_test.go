@@ -452,20 +452,14 @@ func TestWireGuardPeers(t *testing.T) {
 				t.Fatalf("put network acl: %v", err)
 			}
 			for peerID, addrs := range tc.peers {
-				_, err = peerdb.Put(ctx, &peers.PutOptions{
-					ID:        peerID,
-					PublicKey: mustGenerateKey(t).PublicKey(),
+				err = peerdb.Put(ctx, peers.Node{
+					ID:          peerID,
+					PublicKey:   mustGenerateKey(t).PublicKey(),
+					PrivateIPv4: netip.MustParsePrefix(addrs[0]),
+					PrivateIPv6: netip.MustParsePrefix(addrs[1]),
 				})
 				if err != nil {
 					t.Fatalf("put peer %q: %v", peerID, err)
-				}
-				err = peerdb.PutLease(ctx, &peers.PutLeaseOptions{
-					ID:   peerID,
-					IPv4: netip.MustParsePrefix(addrs[0]),
-					IPv6: netip.MustParsePrefix(addrs[1]),
-				})
-				if err != nil {
-					t.Fatalf("put lease for peer %q: %v", peerID, err)
 				}
 			}
 			for peerID, edges := range tc.edges {

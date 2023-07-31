@@ -53,8 +53,6 @@ type Node struct {
 	DNSPort int `json:"dnsPort"`
 	// Features are the node's features.
 	Features []v1.Feature `json:"features"`
-	// CreatedAt is the time the node was created.
-	CreatedAt time.Time `json:"createdAt"`
 	// UpdatedAt is the time the node was last updated.
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -217,6 +215,7 @@ func (n *Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
 		ZoneAwarenessId:    n.ZoneAwarenessID,
 		RaftPort:           int32(n.RaftPort),
 		GrpcPort:           int32(n.GRPCPort),
+		MeshdnsPort:        int32(n.DNSPort),
 		PublicKey: func() string {
 			if len(n.PublicKey) > 0 {
 				return n.PublicKey.String()
@@ -235,9 +234,10 @@ func (n *Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
 			}
 			return ""
 		}(),
-		UpdatedAt:     timestamppb.New(n.UpdatedAt),
-		CreatedAt:     timestamppb.New(n.CreatedAt),
-		Features:      n.Features,
+		Features:  n.Features,
+		UpdatedAt: timestamppb.New(n.UpdatedAt),
+		// TODO: Get rid of this field.
+		CreatedAt:     timestamppb.New(n.UpdatedAt),
 		ClusterStatus: status,
 	}
 }

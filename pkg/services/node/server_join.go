@@ -158,49 +158,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	log.Debug("barrier complete, all nodes caught up")
 
-	// Lookup the peer in the database
-	// TODO: This check is probably not needed anymore, we can just always create the peer
-	var peer peers.Node
-	peer, err = s.peers.Get(ctx, req.GetId())
-	if err != nil && err != peers.ErrNodeNotFound {
-		// Database error
-		return nil, status.Errorf(codes.Internal, "failed to get peer: %v", err)
-	} else if err == nil {
-		log.Info("peer already exists, updating")
-		// Peer already exists, update it
-		peer, err = s.peers.Put(ctx, &peers.PutOptions{
-			ID:                 req.GetId(),
-			PublicKey:          publicKey,
-			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
-			WireGuardEndpoints: req.GetWireguardEndpoints(),
-			ZoneAwarenessID:    req.GetZoneAwarenessId(),
-			GRPCPort:           int(req.GetGrpcPort()),
-			RaftPort:           int(req.GetRaftPort()),
-			DNSPort:            int(req.GetMeshdnsPort()),
-			Features:           req.GetFeatures(),
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
-		}
-	} else {
-		// New peer, create it
-		log.Info("registering new peer")
-		peer, err = s.peers.Put(ctx, &peers.PutOptions{
-			ID:                 req.GetId(),
-			PublicKey:          publicKey,
-			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
-			WireGuardEndpoints: req.GetWireguardEndpoints(),
-			ZoneAwarenessID:    req.GetZoneAwarenessId(),
-			GRPCPort:           int(req.GetGrpcPort()),
-			RaftPort:           int(req.GetRaftPort()),
-			DNSPort:            int(req.GetMeshdnsPort()),
-			Features:           req.GetFeatures(),
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to create peer: %v", err)
-		}
-	}
-
 	// Handle any new routes
 	if len(req.GetRoutes()) > 0 {
 		current, err := s.networking.GetRoutesByNode(ctx, req.GetId())
@@ -262,11 +219,19 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 		log.Debug("assigned IPv4 address to peer", slog.String("ipv4", leasev4.String()))
 	}
-	// Persist the peer's addresses
-	err = s.peers.PutLease(ctx, &peers.PutLeaseOptions{
-		ID:   req.GetId(),
-		IPv4: leasev4,
-		IPv6: leasev6,
+	// Write the peer to the database
+	err = s.peers.Put(ctx, peers.Node{
+		ID:                 req.GetId(),
+		PublicKey:          publicKey,
+		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
+		WireGuardEndpoints: req.GetWireguardEndpoints(),
+		ZoneAwarenessID:    req.GetZoneAwarenessId(),
+		GRPCPort:           int(req.GetGrpcPort()),
+		RaftPort:           int(req.GetRaftPort()),
+		DNSPort:            int(req.GetMeshdnsPort()),
+		Features:           req.GetFeatures(),
+		PrivateIPv4:        leasev4,
+		PrivateIPv6:        leasev6,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to persist peer's addresses: %v", err)
@@ -343,7 +308,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 				// The peer doesn't exist, so create a placeholder for it
 				log.Debug("registering empty peer", slog.String("peer", peer))
-				_, err = s.peers.Put(ctx, &peers.PutOptions{
+				err = s.peers.Put(ctx, peers.Node{
 					ID: peer,
 				})
 				if err != nil {
@@ -369,14 +334,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	var raftAddress string
 	if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
 		// Prefer IPv4 for raft
-		raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(peer.RaftPort))
+		raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
 	} else {
 		// Use IPv6
 		// TODO: doesn't work when we are IPv4 only. Need to fix this.
 		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
 		// We may as well use IPv4 for everything in that case. Leave it for now,
 		// but need to document these requirements fully for dual-stack setups.
-		raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(peer.RaftPort))
+		raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
 	}
 	if req.GetAsVoter() {
 		log.Info("adding candidate to cluster", slog.String("raft_address", raftAddress))

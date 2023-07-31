@@ -93,13 +93,17 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 		if tries > 0 {
 			log.Info("retrying join request", slog.Int("tries", tries))
 		}
-		conn, err := s.newGRPCConn(ctx, joinAddr)
+		var conn *grpc.ClientConn
+		conn, err = s.newGRPCConn(ctx, joinAddr)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
 			err = fmt.Errorf("dial join node: %w", err)
 			log.Error("gRPC dial failed", slog.String("error", err.Error()))
+			if tries >= maxRetries {
+				return err
+			}
 			tries++
 			time.Sleep(time.Second)
 			continue
@@ -111,6 +115,9 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 			}
 			err = fmt.Errorf("join node: %w", err)
 			log.Error("join failed", slog.String("error", err.Error()))
+			if tries >= maxRetries {
+				return err
+			}
 			tries++
 			time.Sleep(time.Second)
 			continue

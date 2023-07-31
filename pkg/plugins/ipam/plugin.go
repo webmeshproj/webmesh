@@ -109,8 +109,9 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 	for _, node := range nodes {
-		if node.PrivateIPv4.IsValid() {
-			allocated = append(allocated, node.PrivateIPv4)
+		n := node
+		if n.PrivateIPv4.IsValid() {
+			allocated = append(allocated, n.PrivateIPv4)
 		}
 	}
 	allocatedSet, err := toPrefixSet(allocated)

@@ -39,7 +39,7 @@ func TestPutEdge(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		_, err = p.Put(context.Background(), &peers.PutOptions{
+		err = p.Put(context.Background(), peers.Node{
 			ID:        peer,
 			PublicKey: key.PublicKey(),
 		})
