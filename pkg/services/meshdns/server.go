@@ -29,7 +29,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	dnsutil "github.com/webmeshproj/webmesh/pkg/net/dns"
+	dnsutil "github.com/webmeshproj/webmesh/pkg/net/system/dns"
 )
 
 // Options are the Mesh DNS server options.
