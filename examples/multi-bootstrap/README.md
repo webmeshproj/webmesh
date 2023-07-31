@@ -148,6 +148,3 @@ bootstrap-node-3.webmesh.internal. 1 IN A       10.10.10.3
 ;; MSG SIZE  rcvd: 591
 
 ```
-
-You can also try out the TURN server with the `wmctl port-forward` command.
-This will receive more documentation later.
