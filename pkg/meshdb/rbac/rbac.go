@@ -185,7 +185,7 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 // ListRoles returns a list of all roles.
 func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
 	out := make(RolesList, 0)
-	err := r.IterPrefix(ctx, rolesPrefix, func(key, value string) error {
+	err := r.IterPrefix(ctx, rolesPrefix, func(_, value string) error {
 		role := &v1.Role{}
 		err := protojson.Unmarshal([]byte(value), role)
 		if err != nil {
@@ -264,7 +264,7 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 // ListRoleBindings returns a list of all rolebindings.
 func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) {
 	out := make([]*v1.RoleBinding, 0)
-	err := r.IterPrefix(ctx, rolebindingsPrefix, func(key, value string) error {
+	err := r.IterPrefix(ctx, rolebindingsPrefix, func(_, value string) error {
 		rolebinding := &v1.RoleBinding{}
 		err := protojson.Unmarshal([]byte(value), rolebinding)
 		if err != nil {
@@ -330,7 +330,7 @@ func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 // ListGroups returns a list of all groups.
 func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
 	out := make([]*v1.Group, 0)
-	err := r.IterPrefix(ctx, groupsPrefix, func(key, value string) error {
+	err := r.IterPrefix(ctx, groupsPrefix, func(_, value string) error {
 		group := &v1.Group{}
 		err := protojson.Unmarshal([]byte(value), group)
 		if err != nil {

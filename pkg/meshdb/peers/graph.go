@@ -284,7 +284,7 @@ func (g *GraphStore) Edge(sourceNode, targetNode string) (graph.Edge[string], er
 // ListEdges should return all edges in the graph in a slice.
 func (g *GraphStore) ListEdges() ([]graph.Edge[string], error) {
 	edges := make([]graph.Edge[string], 0)
-	err := g.IterPrefix(context.Background(), EdgesPrefix, func(key, value string) error {
+	err := g.IterPrefix(context.Background(), EdgesPrefix, func(_, value string) error {
 		var edge Edge
 		err := json.Unmarshal([]byte(value), &edge)
 		if err != nil {

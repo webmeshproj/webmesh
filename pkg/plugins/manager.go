@@ -85,7 +85,7 @@ func (m *manager) HasWatchers() bool {
 // AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin.
 // If no plugin is configured, the returned function is a no-op.
 func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		if m.auth == nil {
 			return handler(ctx, req)
 		}
@@ -103,7 +103,7 @@ func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 // AuthStreamInterceptor returns a stream interceptor for the configured auth plugin.
 // If no plugin is configured, the returned function is a no-op.
 func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	return func(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if m.auth == nil {
 			return handler(srv, ss)
 		}

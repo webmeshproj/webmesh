@@ -207,7 +207,7 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 
 func (p *peers) List(ctx context.Context) ([]Node, error) {
 	out := make([]Node, 0)
-	err := p.db.IterPrefix(ctx, NodesPrefix, func(key, value string) error {
+	err := p.db.IterPrefix(ctx, NodesPrefix, func(_, value string) error {
 		var node Node
 		err := json.Unmarshal([]byte(value), &node)
 		if err != nil {
