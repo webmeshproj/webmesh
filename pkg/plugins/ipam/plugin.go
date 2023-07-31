@@ -26,7 +26,6 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -109,19 +108,16 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 	allocated := make(map[netip.Prefix]struct{}, len(nodes))
-	context.LoggerFrom(ctx).Info("ipam list nodes", slog.Any("nodes", nodes))
 	for _, node := range nodes {
 		n := node
 		if n.PrivateIPv4.IsValid() {
 			allocated[n.PrivateIPv4] = struct{}{}
 		}
 	}
-	context.LoggerFrom(ctx).Info("ipam allocated ips", slog.Any("allocated", allocated))
 	prefix, err := next32(globalPrefix, allocated)
 	if err != nil {
 		return nil, fmt.Errorf("find next available IPv4: %w", err)
 	}
-	context.LoggerFrom(ctx).Info("ipam allocated", slog.Any("allocated", prefix))
 	return &v1.AllocatedIP{
 		Ip: prefix.String(),
 	}, nil
