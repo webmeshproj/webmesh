@@ -16,7 +16,7 @@ It implements the [Webmesh API](https://github.com/webmeshproj/api) in Go.
 ## Getting Started
 
 Detailed instructions can be found in the [Getting Started](https://webmeshproj.github.io/documentation/getting-started/) guide on the project website.
-Examples of different topologies and the various features available, see the [examples](examples/) directory.
+For examples of different topologies and the various features available, see the [examples](examples/) directory.
 
 If you'd like to play with the project on Kubernetes, there is a work-in-progress Operator in the [operator](https://github.com/webmeshproj/operator/) repository.
 It works fine on most clusters, including ephemeral docker-based ones, but is not yet ready for production use.
