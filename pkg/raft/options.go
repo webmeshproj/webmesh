@@ -203,6 +203,7 @@ func (o *Options) Validate() error {
 func (o *Options) RaftConfig(nodeID string) *raft.Config {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
+	config.ShutdownOnRemove = true
 	if o.HeartbeatTimeout != 0 {
 		config.HeartbeatTimeout = o.HeartbeatTimeout
 	}
