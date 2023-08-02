@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 	v1 "github.com/webmeshproj/api/v1"
 )

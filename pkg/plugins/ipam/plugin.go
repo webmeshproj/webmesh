@@ -24,7 +24,6 @@ import (
 	"net/netip"
 	"sync"
 
-	_ "github.com/mattn/go-sqlite3"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 

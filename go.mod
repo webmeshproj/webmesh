@@ -18,7 +18,6 @@ require (
 	github.com/hashicorp/raft v1.5.0
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/jsimonetti/rtnetlink v1.3.3
-	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/miekg/dns v1.1.54
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pelletier/go-toml/v2 v2.0.7
