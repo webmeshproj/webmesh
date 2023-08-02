@@ -21,6 +21,7 @@ import (
 	"flag"
 	"io"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -107,8 +108,13 @@ type Options struct {
 // NewOptions returns new raft options with the default values.
 func NewOptions() *Options {
 	return &Options{
-		ListenAddress:      ":9443",
-		DataDir:            "/var/lib/webmesh/store",
+		ListenAddress: ":9443",
+		DataDir: func() string {
+			if runtime.GOOS == "windows" {
+				return "C:\\ProgramData\\webmesh\\store"
+			}
+			return "/var/lib/webmesh/store"
+		}(),
 		ConnectionTimeout:  time.Second * 3,
 		HeartbeatTimeout:   time.Second * 3,
 		ElectionTimeout:    time.Second * 3,
