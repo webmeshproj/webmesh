@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -71,6 +72,13 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				"ca-file": s,
 			},
 		}
+		if s == "" {
+			return fmt.Errorf("invalid ca-file value: %s", s)
+		}
+		_, err := os.Stat(s)
+		if err != nil {
+			return fmt.Errorf("invalid ca-file value: %s", s)
+		}
 		return nil
 	})
 	fs.Func("plugins.basic-auth.htpasswd-file", "Enables the basic auth plugin with the path to a htpasswd file", func(s string) error {
@@ -79,6 +87,13 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				"htpasswd-file": s,
 			},
 		}
+		if s == "" {
+			return fmt.Errorf("invalid htpasswd-file value: %s", s)
+		}
+		_, err := os.Stat(s)
+		if err != nil {
+			return fmt.Errorf("invalid htpasswd-file value: %s", s)
+		}
 		return nil
 	})
 	fs.Func("plugins.ldap.server", "Enables the ldap plugin with the server address", func(s string) error {
@@ -86,6 +101,15 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
 			}
+		}
+		if s == "" {
+			return fmt.Errorf("invalid server value: %s", s)
+		}
+		toCheck := strings.TrimPrefix(s, "ldap://")
+		toCheck = strings.TrimPrefix(toCheck, "ldaps://")
+		_, _, err := net.SplitHostPort(toCheck)
+		if err != nil {
+			return fmt.Errorf("invalid server value: %s", s)
 		}
 		o.Plugins["ldap"].Config["server"] = s
 		return nil
@@ -96,6 +120,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				Config: map[string]any{},
 			}
 		}
+		if s == "" {
+			return fmt.Errorf("invalid bind-dn value: %s", s)
+		}
 		o.Plugins["ldap"].Config["bind-dn"] = s
 		return nil
 	})
@@ -104,6 +131,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
 			}
+		}
+		if s == "" {
+			return fmt.Errorf("invalid bind-password value: %s", s)
 		}
 		o.Plugins["ldap"].Config["bind-password"] = s
 		return nil
@@ -114,6 +144,13 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				Config: map[string]any{},
 			}
 		}
+		if s == "" {
+			return fmt.Errorf("invalid ca-file value: %s", s)
+		}
+		_, err := os.Stat(s)
+		if err != nil {
+			return fmt.Errorf("invalid ca-file value: %s", s)
+		}
 		o.Plugins["ldap"].Config["ca-file"] = s
 		return nil
 	})
@@ -122,6 +159,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
 			}
+		}
+		if s == "" {
+			return fmt.Errorf("invalid user-base-dn value: %s", s)
 		}
 		o.Plugins["ldap"].Config["user-base-dn"] = s
 		return nil
@@ -132,6 +172,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				Config: map[string]any{},
 			}
 		}
+		if s == "" {
+			return fmt.Errorf("invalid user-id-attribute value: %s", s)
+		}
 		o.Plugins["ldap"].Config["user-id-attribute"] = s
 		return nil
 	})
@@ -140,6 +183,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
 			}
+		}
+		if s == "" {
+			return fmt.Errorf("invalid node-id-attribute value: %s", s)
 		}
 		o.Plugins["ldap"].Config["node-id-attribute"] = s
 		return nil
@@ -150,6 +196,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				Config: map[string]any{},
 			}
 		}
+		if s == "" {
+			return fmt.Errorf("invalid user-status-attribute value: %s", s)
+		}
 		o.Plugins["ldap"].Config["user-status-attribute"] = s
 		return nil
 	})
@@ -158,6 +207,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
 			}
+		}
+		if s == "" {
+			return fmt.Errorf("invalid user-disabled-value value: %s", s)
 		}
 		o.Plugins["ldap"].Config["user-disabled-value"] = s
 		return nil
@@ -181,6 +233,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				Config: map[string]any{},
 			}
 		}
+		if !strings.HasPrefix(s, "/") {
+			return fmt.Errorf("invalid path prefix: %s", s)
+		}
 		o.Plugins["debug"].Config["path-prefix"] = s
 		return nil
 	})
@@ -190,9 +245,13 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				Config: map[string]any{},
 			}
 		}
-		b, err := strconv.ParseBool(s)
-		if err != nil {
-			return fmt.Errorf("invalid disable-pprof value: %s", s)
+		var err error
+		b := true
+		if s != "" {
+			b, err = strconv.ParseBool(s)
+			if err != nil {
+				return fmt.Errorf("invalid disable-pprof value: %s", s)
+			}
 		}
 		o.Plugins["debug"].Config["disable-pprof"] = b
 		return nil
@@ -203,6 +262,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				Config: map[string]any{},
 			}
 		}
+		if s == "" {
+			return fmt.Errorf("invalid pprof-profiles value: %s", s)
+		}
 		o.Plugins["debug"].Config["pprof-profiles"] = strings.Split(s, ",")
 		return nil
 	})
@@ -212,9 +274,13 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				Config: map[string]any{},
 			}
 		}
-		b, err := strconv.ParseBool(s)
-		if err != nil {
-			return fmt.Errorf("invalid enable-db-querier value: %s", s)
+		var err error
+		b := true
+		if s != "" {
+			b, err = strconv.ParseBool(s)
+			if err != nil {
+				return fmt.Errorf("invalid enable-db-querier value: %s", s)
+			}
 		}
 		o.Plugins["debug"].Config["enable-db-querier"] = b
 		return nil
