@@ -24,25 +24,11 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
-
-var getRoleAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_ROLES,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
 
 func (s *Server) GetRole(ctx context.Context, role *v1.Role) (*v1.Role, error) {
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
-	}
-	if ok, err := s.rbacEval.Evaluate(ctx, getRoleAction.For(role.GetName())); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate get role action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get roles")
 	}
 	role, err := s.rbac.GetRole(ctx, role.GetName())
 	if err != nil {

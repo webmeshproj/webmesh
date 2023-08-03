@@ -65,7 +65,7 @@ func init() {
 	cobra.CheckErr(putRoleCmd.MarkFlagRequired("verb"))
 	cobra.CheckErr(putRoleCmd.MarkFlagRequired("resource"))
 	cobra.CheckErr(putRoleCmd.RegisterFlagCompletionFunc("verb", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"put", "get", "delete", "*"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"put", "delete", "*"}, cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(putRoleCmd.RegisterFlagCompletionFunc("resource", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"votes", "roles", "rolebindings", "groups", "networkacls", "datachannels", "*"}, cobra.ShellCompDirectiveNoFileComp
@@ -172,8 +172,6 @@ var putRoleCmd = &cobra.Command{
 							switch verb {
 							case "put":
 								verbs[i] = v1.RuleVerb_VERB_PUT
-							case "get":
-								verbs[i] = v1.RuleVerb_VERB_GET
 							case "delete":
 								verbs[i] = v1.RuleVerb_VERB_DELETE
 							case "*":

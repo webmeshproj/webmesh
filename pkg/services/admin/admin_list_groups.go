@@ -24,23 +24,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
-var listGroupsAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_GROUPS,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
-
 func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listGroupsAction); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate list groups action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
-	}
 	groups, err := s.rbac.ListGroups(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

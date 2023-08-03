@@ -24,23 +24,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
-var listRoutesAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_ROUTES,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
-
 func (s *Server) ListRoutes(ctx context.Context, _ *emptypb.Empty) (*v1.Routes, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listRoutesAction); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate list routes action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network routes")
-	}
 	routes, err := s.networking.ListRoutes(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

@@ -24,25 +24,11 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
-
-var getGroupAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_GROUPS,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
 
 func (s *Server) GetGroup(ctx context.Context, group *v1.Group) (*v1.Group, error) {
 	if group.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name is required")
-	}
-	if ok, err := s.rbacEval.Evaluate(ctx, getGroupAction.For(group.GetName())); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate get group action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get groups")
 	}
 	group, err := s.rbac.GetGroup(ctx, group.GetName())
 	if err != nil {

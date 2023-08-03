@@ -24,23 +24,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
-var listEdgesAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_EDGES,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
-
 func (s *Server) ListEdges(ctx context.Context, _ *emptypb.Empty) (*v1.MeshEdges, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listEdgesAction); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate list edges action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to list edges")
-	}
 	edges, err := s.peers.Graph().Edges()
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

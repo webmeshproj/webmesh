@@ -24,23 +24,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
-var listNetworkACLsAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
-
 func (s *Server) ListNetworkACLs(ctx context.Context, _ *emptypb.Empty) (*v1.NetworkACLs, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listNetworkACLsAction); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate list network acls action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network acls")
-	}
 	acls, err := s.networking.ListNetworkACLs(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

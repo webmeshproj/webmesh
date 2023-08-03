@@ -25,7 +25,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-func newIPTablesFirewall(opts *Options) (Firewall, error) {
+func newIPTablesFirewall(_ *Options) (Firewall, error) {
 	fw := &iptablesFirewall{
 		log: slog.Default().With(slog.String("component", "iptables-firewall")),
 	}

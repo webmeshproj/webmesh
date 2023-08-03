@@ -24,15 +24,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
-
-var getEdgeAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_EDGES,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
 
 func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, error) {
 	if edge.GetSource() == "" {
@@ -40,14 +32,6 @@ func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, 
 	}
 	if edge.GetTarget() == "" {
 		return nil, status.Error(codes.InvalidArgument, "edge target is required")
-	}
-	for _, id := range []string{edge.GetSource(), edge.GetTarget()} {
-		if ok, err := s.rbacEval.Evaluate(ctx, getEdgeAction.For(id)); !ok {
-			if err != nil {
-				context.LoggerFrom(ctx).Error("failed to evaluate put edge action", "error", err)
-			}
-			return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put the given edge")
-		}
 	}
 	graphEdge, err := s.peers.Graph().Edge(edge.GetSource(), edge.GetTarget())
 	if err != nil {

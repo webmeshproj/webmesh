@@ -24,25 +24,11 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
-
-var getNetworkACLAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_NETWORK_ACLS,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
 
 func (s *Server) GetNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*v1.NetworkACL, error) {
 	if acl.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "acl name is required")
-	}
-	if ok, err := s.rbacEval.Evaluate(ctx, getNetworkACLAction.For(acl.GetName())); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate get network acl action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network acls")
 	}
 	out, err := s.networking.GetNetworkACL(ctx, acl.GetName())
 	if err != nil {

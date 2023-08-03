@@ -71,7 +71,7 @@ type Mesh interface {
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh
-// before it can become ready to use.
+// before it can be used.
 func New(opts *Options) (Mesh, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err

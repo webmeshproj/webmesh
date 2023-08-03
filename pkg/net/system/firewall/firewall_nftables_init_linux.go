@@ -28,9 +28,9 @@ import (
 
 const (
 	// Table Names
-	inetFilterTable = "filter"
-	inetNatTable    = "nat"
-	inetRawTable    = "raw"
+	inetFilterTable = "meshfilter"
+	inetNatTable    = "meshnat"
+	inetRawTable    = "meshraw"
 	// Raw Chains
 	inetRawPrerouting = "prerouting"
 	// NAT Chains

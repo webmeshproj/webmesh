@@ -24,23 +24,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
-var listRolesAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_ROLES,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
-
 func (s *Server) ListRoles(ctx context.Context, _ *emptypb.Empty) (*v1.Roles, error) {
-	if ok, err := s.rbacEval.Evaluate(ctx, listRolesAction); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate list roles action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to list roles")
-	}
 	roles, err := s.rbac.ListRoles(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

@@ -180,7 +180,7 @@ func TestPutRole(t *testing.T) {
 				Name: "foo",
 				Rules: []*v1.Rule{
 					{
-						Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_GET},
+						Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_PUT},
 						Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
 					},
 				},

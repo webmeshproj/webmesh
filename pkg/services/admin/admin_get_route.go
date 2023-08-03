@@ -24,25 +24,11 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
-
-var getRouteAction = rbac.Actions{
-	{
-		Resource: v1.RuleResource_RESOURCE_ROUTES,
-		Verb:     v1.RuleVerb_VERB_GET,
-	},
-}
 
 func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, error) {
 	if route.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "route name is required")
-	}
-	if ok, err := s.rbacEval.Evaluate(ctx, getRouteAction.For(route.GetName())); !ok {
-		if err != nil {
-			context.LoggerFrom(ctx).Error("failed to evaluate get route action", "error", err)
-		}
-		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to get network routes")
 	}
 	route, err := s.networking.GetRoute(ctx, route.GetName())
 	if err != nil {
