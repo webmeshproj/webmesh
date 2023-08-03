@@ -59,8 +59,8 @@ type Server struct {
 	proxyCreds []grpc.DialOption
 	// insecure flags that no authentication plugins are enabled.
 	insecure bool
-	// lock taken during the join process to prevent concurrent joins.
-	joinmu sync.Mutex
+	// lock taken during the join/update process to prevent concurrent node changes.
+	mu sync.Mutex
 }
 
 // NewServer returns a new Server. Features are used for returning what features are enabled.

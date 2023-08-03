@@ -23,6 +23,8 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 func (s *Server) Snapshot(ctx context.Context, req *v1.SnapshotRequest) (*v1.SnapshotResponse, error) {
@@ -30,14 +32,19 @@ func (s *Server) Snapshot(ctx context.Context, req *v1.SnapshotRequest) (*v1.Sna
 	if err := f.Error(); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create snapshot: %v", err)
 	}
-	_, r, err := f.Open()
+	meta, r, err := f.Open()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to open snapshot: %v", err)
 	}
 	defer r.Close()
+	s.log.Debug("sending snapshot", "index", meta.Index, "term", meta.Term, "size", util.PrettyByteSize(meta.Size))
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to read snapshot: %v", err)
 	}
-	return &v1.SnapshotResponse{Snapshot: data}, nil
+	return &v1.SnapshotResponse{
+		LastLogIndex: meta.Index,
+		CurrentTerm:  meta.Term,
+		Snapshot:     data,
+	}, nil
 }

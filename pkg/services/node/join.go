@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
@@ -55,40 +54,22 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if !s.store.Raft().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
-	s.joinmu.Lock()
-	defer s.joinmu.Unlock()
-	log := s.log.With("id", req.GetId())
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	log := s.log.With("op", "join", "id", req.GetId())
+	ctx = context.WithLogger(ctx, log)
+
 	log.Info("join request received", slog.Any("request", req))
 	// Check if we haven't loaded the mesh domain and prefixes into memory yet
-	var err error
-	if !s.ipv6Prefix.IsValid() {
-		s.ipv6Prefix, err = s.meshstate.GetIPv6Prefix(ctx)
-		if err != nil {
-			// DB error, bail
-			return nil, status.Errorf(codes.Internal, "failed to get IPv6 prefix: %v", err)
-		}
-	}
-	if !s.ipv4Prefix.IsValid() {
-		s.ipv4Prefix, err = s.meshstate.GetIPv4Prefix(ctx)
-		if err != nil {
-			// DB error, bail
-			return nil, status.Errorf(codes.Internal, "failed to get IPv4 prefix: %v", err)
-		}
-	}
-	if s.meshDomain == "" {
-		s.meshDomain, err = s.meshstate.GetMeshDomain(ctx)
-		if err != nil {
-			// DB error, bail
-			return nil, status.Errorf(codes.Internal, "failed to get mesh domain: %v", err)
-		}
+	err := s.loadMeshState(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load mesh state: %v", err)
 	}
 
 	// Validate inputs
 	if req.GetId() == "" {
-		// TODO: This is technically not required if we are using authenticated gRPC
 		return nil, status.Error(codes.InvalidArgument, "node id required")
 	} else if !peers.IsValidID(req.GetId()) {
-		// TODO: Have a list of invalid characters
 		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if len(req.GetRoutes()) > 0 {
@@ -106,18 +87,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Check that the node is indeed who they say they are
 	if !s.insecure {
-		if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
-			if proxiedFor != req.GetId() {
-				return nil, status.Errorf(codes.PermissionDenied, "proxied for %s, not %s", proxiedFor, req.GetId())
-			}
-		} else {
-			if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
-				if peer != req.GetId() {
-					return nil, status.Errorf(codes.PermissionDenied, "peer id %s, not %s", peer, req.GetId())
-				}
-			} else {
-				return nil, status.Error(codes.PermissionDenied, "no peer authentication info in context")
-			}
+		if !nodeIDMatchesContext(ctx, req.GetId()) {
+			return nil, status.Errorf(codes.PermissionDenied, "node id %s does not match authenticated caller", req.GetId())
 		}
 		// We can go ahead and check here if the node is allowed to do what
 		// they want.
@@ -150,7 +121,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Issue a barrier to the raft cluster to ensure all nodes are
 	// fully caught up before we start assigning it addresses
-	log.Info("sending barrier to raft cluster")
+	log.Debug("sending barrier to raft cluster")
 	timeout := time.Second * 10 // TODO: Make this configurable
 	err = s.store.Raft().Raft().Barrier(timeout).Error()
 	if err != nil {
@@ -158,8 +129,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	log.Debug("barrier complete, all nodes caught up")
 
+	// Start building a list of clean up functions to run if we fail
 	cleanFuncs := make([]func(), 0)
-
 	handleErr := func(cause error) error {
 		for _, f := range cleanFuncs {
 			f()
@@ -169,40 +140,16 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Handle any new routes
 	if len(req.GetRoutes()) > 0 {
-		current, err := s.networking.GetRoutesByNode(ctx, req.GetId())
+		created, err := s.ensurePeerRoutes(ctx, req.GetId(), req.GetRoutes())
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get current routes: %v", err)
-		}
-		for _, route := range req.GetRoutes() {
-			// Check if the node is already assigned this route
-			var found bool
-			for _, r := range current {
-				for _, cidr := range r.DestinationCidrs {
-					if cidr == route {
-						found = true
-						break
-					}
-				}
-			}
-			if found {
-				continue
-			}
-			// Add a new route
-			err = s.networking.PutRoute(ctx, &v1.Route{
-				Name:             fmt.Sprintf("%s-auto", req.GetId()),
-				Node:             req.GetId(),
-				DestinationCidrs: req.GetRoutes(),
-			})
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to add route: %v", err)
-			}
+			return nil, handleErr(status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err))
+		} else if created {
 			cleanFuncs = append(cleanFuncs, func() {
-				err := s.networking.DeleteRoute(ctx, fmt.Sprintf("%s-auto", req.GetId()))
+				err := s.networking.DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
 				if err != nil {
 					log.Warn("failed to delete route", slog.String("error", err.Error()))
 				}
 			})
-			break
 		}
 	}
 
@@ -249,7 +196,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		PrivateIPv6:        leasev6,
 	})
 	if err != nil {
-		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer's addresses: %v", err))
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to raft log: %v", err))
 	}
 	cleanFuncs = append(cleanFuncs, func() {
 		err := s.peers.Delete(ctx, req.GetId())

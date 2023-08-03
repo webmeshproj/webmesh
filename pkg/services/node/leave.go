@@ -49,7 +49,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 			}
 		}
 	}
-	s.log.Info("removing raft server", "id", req.GetId())
+	s.log.Info("removing mesh node", "id", req.GetId())
 	err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)

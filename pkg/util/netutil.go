@@ -60,7 +60,7 @@ func ResolveTCPAddr(ctx context.Context, lookup string, maxRetries int) (net.Add
 
 // VerifyChainOnly is a function that can be used in a TLS configuration
 // to only verify that the certificate chain is valid.
-func VerifyChainOnly(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+func VerifyChainOnly(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	roots := x509.NewCertPool()
 	if systemPool, err := x509.SystemCertPool(); err == nil {
 		roots = systemPool

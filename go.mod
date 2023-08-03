@@ -31,7 +31,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.0.0
-	github.com/webmeshproj/api v0.2.1
+	github.com/webmeshproj/api v0.2.2-0.20230803165352-8e06d34c8122
 	github.com/webmeshproj/raft-badger v0.0.0-20230728220038-2f75bbd4d5ed
 	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20230728194245-b0cb94b80691
@@ -51,6 +51,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cilium/ebpf v0.11.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
