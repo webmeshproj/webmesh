@@ -19,6 +19,7 @@ package plugins
 import (
 	"flag"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -62,6 +63,8 @@ func NewOptions() *Options {
 
 // BindFlags binds the plugin flags to the given flag set.
 func (o *Options) BindFlags(fs *flag.FlagSet) {
+	// Built-in plugins
+
 	fs.Func("plugins.mtls.ca-file", "Enables the mTLS plugin with the path to a CA for verifying certificates", func(s string) error {
 		o.Plugins["mtls"] = &Config{
 			Config: map[string]any{
@@ -159,6 +162,66 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["user-disabled-value"] = s
 		return nil
 	})
+	fs.Func("plugins.debug.listen-address", "Enables the debug plugin with the listen address", func(s string) error {
+		if o.Plugins["debug"] == nil {
+			o.Plugins["debug"] = &Config{
+				Config: map[string]any{},
+			}
+		}
+		_, _, err := net.SplitHostPort(s)
+		if err != nil {
+			return fmt.Errorf("invalid listen address: %s", s)
+		}
+		o.Plugins["debug"].Config["listen-address"] = s
+		return nil
+	})
+	fs.Func("plugins.debug.path-prefix", "Enables the debug plugin with the path prefix", func(s string) error {
+		if o.Plugins["debug"] == nil {
+			o.Plugins["debug"] = &Config{
+				Config: map[string]any{},
+			}
+		}
+		o.Plugins["debug"].Config["path-prefix"] = s
+		return nil
+	})
+	fs.Func("plugins.debug.disable-pprof", "Enables the debug plugin with pprof disabled", func(s string) error {
+		if o.Plugins["debug"] == nil {
+			o.Plugins["debug"] = &Config{
+				Config: map[string]any{},
+			}
+		}
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return fmt.Errorf("invalid disable-pprof value: %s", s)
+		}
+		o.Plugins["debug"].Config["disable-pprof"] = b
+		return nil
+	})
+	fs.Func("plugins.debug.pprof-profiles", "Enables the debug plugin with the pprof profiles", func(s string) error {
+		if o.Plugins["debug"] == nil {
+			o.Plugins["debug"] = &Config{
+				Config: map[string]any{},
+			}
+		}
+		o.Plugins["debug"].Config["pprof-profiles"] = strings.Split(s, ",")
+		return nil
+	})
+	fs.Func("plugins.debug.enable-db-querier", "Enables the debug plugin with the database querier enabled", func(s string) error {
+		if o.Plugins["debug"] == nil {
+			o.Plugins["debug"] = &Config{
+				Config: map[string]any{},
+			}
+		}
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return fmt.Errorf("invalid enable-db-querier value: %s", s)
+		}
+		o.Plugins["debug"].Config["enable-db-querier"] = b
+		return nil
+	})
+
+	// External Plugins
+
 	fs.Func("plugins.local", `A configuration for a local executable plugin.
 Provided in the format of <path=/path/to/executable,config1=val1,config2=val2,...>`, func(s string) error {
 		keypairs := strings.Split(s, ",")

@@ -75,6 +75,8 @@ func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
 }
 
 func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	p.datamux.Lock()
+	defer p.datamux.Unlock()
 	defer close(p.closec)
 	return &emptypb.Empty{}, p.data.Close()
 }
@@ -136,6 +138,7 @@ func (p *Plugin) allocateV6(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	}, nil
 }
 
+// TODO: Release is not implemented server-side yet either.
 func (p *Plugin) Release(context.Context, *v1.ReleaseIPRequest) (*emptypb.Empty, error) {
 	// No-op, we don't actually track leases explicitly
 	return &emptypb.Empty{}, nil

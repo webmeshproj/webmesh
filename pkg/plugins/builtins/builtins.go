@@ -19,6 +19,7 @@ package builtins
 
 import (
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/debug"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ipam"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/mtls"
@@ -32,5 +33,6 @@ func NewPluginMap() map[string]clients.PluginClient {
 		"mtls":       clients.NewInProcessClient(&mtls.Plugin{}),
 		"basic-auth": clients.NewInProcessClient(&basicauth.Plugin{}),
 		"ldap":       clients.NewInProcessClient(&ldap.Plugin{}),
+		"debug":      clients.NewInProcessClient(&debug.Plugin{}),
 	}
 }
