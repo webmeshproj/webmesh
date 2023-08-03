@@ -76,7 +76,7 @@ var initPkiCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initializes the PKI for a cluster using mTLS",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		err := pki.New(pkiDirectory).Generate(pkiGenOpts)
 		if err != nil {
 			return err
@@ -90,7 +90,7 @@ var issueCmd = &cobra.Command{
 	Use:   "issue",
 	Short: "Issues a certificate for a node",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		err := pki.New(pkiDirectory).Issue(pkiIssueOpts)
 		if err != nil {
 			return err
@@ -104,7 +104,7 @@ var genConfigCmd = &cobra.Command{
 	Use:   "gen-config",
 	Short: "Generate a CLI configuration from a certificate",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		err := pki.New(pkiDirectory).GenerateConfig(pkiGenConfigOpts)
 		if err != nil {
 			return err

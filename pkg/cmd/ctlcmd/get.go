@@ -85,7 +85,7 @@ var getGraphCmd = &cobra.Command{
 	Use:   "graph",
 	Short: "Get the mesh graph in DOT format",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		client, closer, err := cliConfig.NewMeshClient()
 		if err != nil {
 			return err
@@ -239,7 +239,7 @@ var getEdgesCmd = &cobra.Command{
 	Use:     "edges",
 	Short:   "Get edges from the mesh",
 	Aliases: []string{"edge"},
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		client, closer, err := cliConfig.NewAdminClient()
 		if err != nil {
 			return err

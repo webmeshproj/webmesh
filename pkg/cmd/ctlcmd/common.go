@@ -68,7 +68,7 @@ func encodeListToStdout[T proto.Message](cmd *cobra.Command, resp []T) error {
 }
 
 func completeNodes(maxNodes int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		if maxNodes > 0 && len(args) >= maxNodes {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -95,7 +95,7 @@ func completeNodes(maxNodes int) func(*cobra.Command, []string, string) ([]strin
 }
 
 func completeRoles(maxRoles int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		if maxRoles > 0 && len(args) >= maxRoles {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -122,7 +122,7 @@ func completeRoles(maxRoles int) func(*cobra.Command, []string, string) ([]strin
 }
 
 func completeRoleBindings(maxRoleBindings int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		if maxRoleBindings > 0 && len(args) >= maxRoleBindings {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -149,7 +149,7 @@ func completeRoleBindings(maxRoleBindings int) func(*cobra.Command, []string, st
 }
 
 func completeGroups(maxGroups int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		if maxGroups > 0 && len(args) >= maxGroups {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -176,7 +176,7 @@ func completeGroups(maxGroups int) func(*cobra.Command, []string, string) ([]str
 }
 
 func completeNetworkACLs(maxACLs int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		if maxACLs > 0 && len(args) >= maxACLs {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -203,7 +203,7 @@ func completeNetworkACLs(maxACLs int) func(*cobra.Command, []string, string) ([]
 }
 
 func completeRoutes(maxRoutes int) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		if maxRoutes > 0 && len(args) >= maxRoutes {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

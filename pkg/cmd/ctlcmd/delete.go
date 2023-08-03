@@ -168,7 +168,7 @@ var deleteEdgesCmd = &cobra.Command{
 	Use:     "edges",
 	Short:   "Delete edges from the mesh",
 	Aliases: []string{"edge"},
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		client, closer, err := cliConfig.NewAdminClient()
 		if err != nil {
 			return err

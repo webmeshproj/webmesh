@@ -25,9 +25,11 @@ services:
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
       - --raft.in-memory
+      - --plugins.debug.listen-address=:6060
+      - --plugins.debug.enable-db-querier=true
     ports:
+      - 6060:6060
       - 8443:8443
-      - 51820:51820/udp
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   join-node:

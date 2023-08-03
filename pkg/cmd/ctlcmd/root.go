@@ -47,14 +47,14 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&configFileFlag, "config", "c", "", "Path to the CLI configuration file")
 }
 
-// Execute runs the root command.
-func Execute() error {
-	return rootCmd.Execute()
-}
-
 // Root returns the root command.
 func Root() *cobra.Command {
 	return rootCmd
+}
+
+// Execute runs the root command.
+func Execute() error {
+	return Root().Execute()
 }
 
 var rootCmd = &cobra.Command{
@@ -62,7 +62,7 @@ var rootCmd = &cobra.Command{
 	Short:         "wmctl is a CLI tool for managing a webmesh",
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		if configFileFlag != "" {
 			if err := cliConfig.LoadFile(configFileFlag); err != nil {
 				return fmt.Errorf("failed to load CLI config: %w", err)

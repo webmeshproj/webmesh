@@ -65,7 +65,7 @@ var connectCmd = &cobra.Command{
 	RunE:         doConnect,
 }
 
-func doConnect(cmd *cobra.Command, args []string) error {
+func doConnect(cmd *cobra.Command, _ []string) error {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: func() slog.Level {
 			switch strings.ToLower(connectLogLevel) {

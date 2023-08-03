@@ -37,7 +37,7 @@ func init() {
 var snapshotCmd = &cobra.Command{
 	Use:   "snapshot",
 	Short: "Take a snapshot of the current state of the mesh",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		var out io.Writer
 		if snapshotOutput == "" || snapshotOutput == "-" {
 			out = cmd.OutOrStdout()

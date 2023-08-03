@@ -25,6 +25,7 @@ import (
 	"io"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
@@ -162,6 +163,7 @@ func (p *peers) Put(ctx context.Context, node Node) error {
 		wgendpoints = append(wgendpoints, endpoint)
 	}
 	node.WireGuardEndpoints = wgendpoints
+	node.UpdatedAt = time.Now().UTC()
 	err := p.graph.AddVertex(node)
 	if err != nil {
 		return fmt.Errorf("put node: %w", err)

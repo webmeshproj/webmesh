@@ -96,6 +96,9 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 			return nil, fmt.Errorf("failed to decode configuration: %w", err)
 		}
 	}
+	if opts.DisablePProf && !opts.EnableDBQuerier {
+		return nil, fmt.Errorf("both pprof and db querier are disabled")
+	}
 	go p.serve(opts)
 	return &emptypb.Empty{}, nil
 }
@@ -126,18 +129,20 @@ func (p *Plugin) serve(opts Options) {
 	defer close(p.servec)
 	log := slog.Default().With("plugin", "debug")
 	mux := http.NewServeMux()
-	if len(opts.PprofProfiles) == 0 {
-		opts.PprofProfiles = []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex"}
-	}
+	pathPrefix := strings.TrimSuffix(opts.PathPrefix, "/")
 	if !opts.DisablePProf {
-		for _, profile := range opts.PprofProfiles {
-			mux.Handle(fmt.Sprintf("%s/pprof/%s", opts.PathPrefix, profile), pprof.Handler(profile))
+		pprofProfiles := opts.PprofProfiles
+		if len(pprofProfiles) == 0 {
+			pprofProfiles = []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex"}
+		}
+		for _, profile := range pprofProfiles {
+			mux.Handle(fmt.Sprintf("%s/pprof/%s", pathPrefix, profile), pprof.Handler(profile))
 		}
 	}
 	if opts.EnableDBQuerier {
-		mux.HandleFunc(fmt.Sprintf("%s/db/list", opts.PathPrefix), p.handleDBList)
-		mux.HandleFunc(fmt.Sprintf("%s/db/get", opts.PathPrefix), p.handleDBGet)
-		mux.HandleFunc(fmt.Sprintf("%s/db/iter-prefix", opts.PathPrefix), p.handleDBIterPrefix)
+		mux.HandleFunc(fmt.Sprintf("%s/db/list", pathPrefix), p.handleDBList)
+		mux.HandleFunc(fmt.Sprintf("%s/db/get", pathPrefix), p.handleDBGet)
+		mux.HandleFunc(fmt.Sprintf("%s/db/iter-prefix", pathPrefix), p.handleDBIterPrefix)
 	}
 	server := &http.Server{
 		Addr:    opts.ListenAddress,
