@@ -17,12 +17,22 @@ limitations under the License.
 package node
 
 import (
+	"errors"
+	"net/netip"
+	"sort"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
 func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateResponse, error) {
@@ -39,6 +49,162 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	err := s.loadMeshState(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load mesh state: %v", err)
+	}
+
+	// Validate inputs
+	if req.GetId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "node id required")
+	} else if !peers.IsValidID(req.GetId()) {
+		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
+	}
+	if len(req.GetRoutes()) > 0 {
+		for _, route := range req.GetRoutes() {
+			_, err := netip.ParsePrefix(route)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid route %q: %v", route, err)
+			}
+		}
+	}
+	var publicKey wgtypes.Key
+	if req.GetPublicKey() != "" {
+		publicKey, err = wgtypes.ParseKey(req.GetPublicKey())
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
+		}
+	}
+
+	// Check that the node is indeed who they say they are
+	if !s.insecure {
+		if !nodeIDMatchesContext(ctx, req.GetId()) {
+			return nil, status.Errorf(codes.PermissionDenied, "node id %s does not match authenticated caller", req.GetId())
+		}
+		// We can go ahead and check here if the node is allowed to do what they want.
+		var actions rbac.Actions
+		if req.GetAsVoter() {
+			actions = append(actions, canVoteAction)
+		}
+		if len(req.GetRoutes()) > 0 {
+			actions = append(actions, canPutRouteAction)
+		}
+		if len(actions) > 0 {
+			allowed, err := s.rbacEval.Evaluate(ctx, actions)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to evaluate permissions: %v", err)
+			}
+			if !allowed {
+				s.log.Warn("Node not allowed to perform requested actions",
+					slog.String("id", req.GetId()),
+					slog.Any("actions", actions))
+				return nil, status.Error(codes.PermissionDenied, "not allowed")
+			}
+		}
+	}
+
+	// Issue a barrier to the raft cluster to ensure all nodes are
+	// fully caught up before we make changes
+	log.Debug("sending barrier to raft cluster")
+	timeout := time.Second * 10 // TODO: Make this configurable
+	err = s.store.Raft().Raft().Barrier(timeout).Error()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
+	}
+	log.Debug("barrier complete, all nodes caught up")
+
+	// Lookup the peer's current state
+	var currentSuffrage raft.ServerSuffrage = -1
+	var currentAddress raft.ServerAddress = ""
+	cfg := s.store.Raft().Configuration()
+	peer, err := s.peers.Get(ctx, req.GetId())
+	if err != nil {
+		if errors.Is(err, peers.ErrNodeNotFound) {
+			return nil, status.Errorf(codes.Internal, "failed to lookup peer: %v", err)
+		}
+		// Peer doesn't exist, they need to call Join first
+		return nil, status.Errorf(codes.FailedPrecondition, "node %s not found", req.GetId())
+	}
+	// Determine the peer's current status
+	for _, server := range cfg.Servers {
+		if server.ID == raft.ServerID(peer.ID) {
+			currentSuffrage = server.Suffrage
+			break
+		}
+	}
+	if currentSuffrage == -1 || currentAddress == "" {
+		// We weren't able to determine their suffrage...strange
+		return nil, status.Errorf(codes.Internal, "failed to determine peer suffrage")
+	}
+	// Ensure any new routes
+	_, err = s.ensurePeerRoutes(ctx, peer.ID, req.GetRoutes())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err)
+	}
+	// Overwrite any provided fields
+	var hasChanges bool
+	toUpdate := &peer
+	// Check the public key
+	if publicKey != (wgtypes.Key{}) && publicKey != peer.PublicKey {
+		toUpdate.PublicKey = publicKey
+		hasChanges = true
+	}
+	// Check the raft, grpc, and meshdns ports
+	if req.GetRaftPort() != 0 && req.GetRaftPort() != int32(peer.RaftPort) {
+		toUpdate.RaftPort = int(req.GetRaftPort())
+		hasChanges = true
+	}
+	if req.GetGrpcPort() != 0 && req.GetGrpcPort() != int32(peer.GRPCPort) {
+		toUpdate.GRPCPort = int(req.GetGrpcPort())
+		hasChanges = true
+	}
+	if req.GetMeshdnsPort() != 0 && req.GetMeshdnsPort() != int32(peer.DNSPort) {
+		toUpdate.DNSPort = int(req.GetMeshdnsPort())
+		hasChanges = true
+	}
+	// Check endpoints
+	if req.GetPrimaryEndpoint() != "" && req.GetPrimaryEndpoint() != peer.PrimaryEndpoint {
+		toUpdate.PrimaryEndpoint = req.GetPrimaryEndpoint()
+		hasChanges = true
+	}
+	if len(req.GetWireguardEndpoints()) > 0 {
+		sort.Strings(req.GetWireguardEndpoints())
+		sort.Strings(peer.WireGuardEndpoints)
+		if !cmp.Equal(req.GetWireguardEndpoints(), peer.WireGuardEndpoints) {
+			toUpdate.WireGuardEndpoints = req.GetWireguardEndpoints()
+			hasChanges = true
+		}
+	}
+	// Zone awareness
+	if req.GetZoneAwarenessId() != "" && req.GetZoneAwarenessId() != peer.ZoneAwarenessID {
+		toUpdate.ZoneAwarenessID = req.GetZoneAwarenessId()
+		hasChanges = true
+	}
+	// Features
+	if len(req.GetFeatures()) > 0 {
+		reqFeats := SortedFeatures(req.GetFeatures())
+		peerFeats := SortedFeatures(peer.Features)
+		sort.Sort(reqFeats)
+		sort.Sort(peerFeats)
+		if !cmp.Equal(reqFeats, peerFeats) {
+			toUpdate.Features = req.GetFeatures()
+			hasChanges = true
+		}
+	}
+
+	// Apply any node changes
+	if hasChanges {
+		log.Debug("updating peer", slog.Any("peer", toUpdate))
+		err = s.peers.Put(ctx, *toUpdate)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
+		}
+	}
+
+	// Change to voter if requested and not already
+	if req.GetAsVoter() && currentSuffrage != raft.Voter {
+		// Promote to voter
+		log.Info("promoting to voter", slog.String("raft_address", string(currentAddress)))
+		if err := s.store.Raft().AddVoter(ctx, peer.ID, string(currentAddress)); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to promote to voter: %v", err)
+		}
 	}
 	return &v1.UpdateResponse{}, nil
 }
