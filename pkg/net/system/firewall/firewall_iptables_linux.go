@@ -25,6 +25,10 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+// newIPTablesFirewall returns a new iptables firewall manager. This firewall manager
+// is technically not safe for use with multiple interfaces. The Close method may restore
+// rules from another interface. But documentation should push people to use nftables instead.
+// This is just a fallback.
 func newIPTablesFirewall(_ *Options) (Firewall, error) {
 	fw := &iptablesFirewall{
 		log: slog.Default().With(slog.String("component", "iptables-firewall")),
@@ -62,6 +66,10 @@ func (fw *iptablesFirewall) Clear(ctx context.Context) error {
 	}
 	// Restore initial rules
 	for _, rule := range fw.initialRules {
+		if strings.HasPrefix(rule, "#") {
+			// Comment, skip
+			continue
+		}
 		err = fw.exec(ctx, strings.Fields(rule)...)
 		if err != nil {
 			return err

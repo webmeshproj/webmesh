@@ -42,10 +42,10 @@ const (
 	inetForwardChain = "forward"
 )
 
-func (fw *firewall) initialize() error {
+func (fw *firewall) initialize(opts *Options) error {
 	var err error
 	for _, f := range []func() error{
-		fw.initTables,
+		func() error { return fw.initTables(opts) },
 		fw.initChains,
 		fw.initInputChain,
 	} {
@@ -56,9 +56,18 @@ func (fw *firewall) initialize() error {
 	return fw.conn.Flush()
 }
 
-func (fw *firewall) initTables() error {
+func (fw *firewall) initTables(opts *Options) error {
+	filterTable := inetFilterTable
+	natTable := inetNatTable
+	rawTable := inetRawTable
+	if opts.ID != "" {
+		filterTable = fmt.Sprintf("%s_%s", inetFilterTable, opts.ID)
+		natTable = fmt.Sprintf("%s_%s", inetNatTable, opts.ID)
+		rawTable = fmt.Sprintf("%s_%s", inetRawTable, opts.ID)
+	}
+	tablesNames := []string{filterTable, natTable, rawTable}
 	fw.ti = nftableslib.InitNFTables(fw.conn).Tables()
-	for _, table := range []string{inetFilterTable, inetNatTable, inetRawTable} {
+	for _, table := range tablesNames {
 		_, err := fw.ti.Table(table, nftables.TableFamilyINet)
 		if err == nil {
 			// Table exists, flush it
@@ -70,15 +79,15 @@ func (fw *firewall) initTables() error {
 			return fmt.Errorf("failed to create table: %w", err)
 		}
 	}
-	filterchains, err := fw.ti.Table(inetFilterTable, nftables.TableFamilyINet)
+	filterchains, err := fw.ti.Table(filterTable, nftables.TableFamilyINet)
 	if err != nil {
 		return fmt.Errorf("failed to load filter table: %w", err)
 	}
-	natchains, err := fw.ti.Table(inetNatTable, nftables.TableFamilyINet)
+	natchains, err := fw.ti.Table(natTable, nftables.TableFamilyINet)
 	if err != nil {
 		return fmt.Errorf("failed to load NAT table: %w", err)
 	}
-	rawchains, err := fw.ti.Table(inetRawTable, nftables.TableFamilyINet)
+	rawchains, err := fw.ti.Table(rawTable, nftables.TableFamilyINet)
 	if err != nil {
 		return fmt.Errorf("failed to load raw table: %w", err)
 	}

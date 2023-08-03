@@ -29,7 +29,11 @@ const anchorFile = "/etc/pf.anchors/com.webmesh"
 
 func newFirewall(opts *Options) (Firewall, error) {
 	// Make sure we can touch the anchor file
-	err := os.WriteFile(anchorFile, []byte{}, 0644)
+	afile := anchorFile
+	if opts.ID != "" {
+		afile = fmt.Sprintf("%s.%s", anchorFile, opts.ID)
+	}
+	err := os.WriteFile(afile, []byte{}, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("touch anchor file: %w", err)
 	}
@@ -39,20 +43,25 @@ func newFirewall(opts *Options) (Firewall, error) {
 		if strings.Contains(string(out), "pf already enabled") {
 			return &pfctlFirewall{
 				enabledAtStart: true,
+				anchorFile:     afile,
 			}, nil
 		}
 		return nil, fmt.Errorf("enable pfctl: %w", err)
 	}
-	return &pfctlFirewall{enabledAtStart: false}, nil
+	return &pfctlFirewall{
+		enabledAtStart: false,
+		anchorFile:     afile,
+	}, nil
 }
 
 type pfctlFirewall struct {
 	enabledAtStart bool
+	anchorFile     string
 }
 
 // AddWireguardForwarding should configure the firewall to allow forwarding traffic on the wireguard interface.
 func (pf *pfctlFirewall) AddWireguardForwarding(ctx context.Context, ifaceName string) error {
-	f, err := os.OpenFile(anchorFile, os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(pf.anchorFile, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("open anchor file: %w", err)
 	}
@@ -68,7 +77,7 @@ func (pf *pfctlFirewall) AddWireguardForwarding(ctx context.Context, ifaceName s
 
 // AddMasquerade should configure the firewall to masquerade outbound traffic on the wireguard interface.
 func (pf *pfctlFirewall) AddMasquerade(ctx context.Context, ifaceName string) error {
-	f, err := os.OpenFile(anchorFile, os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(pf.anchorFile, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("open anchor file: %w", err)
 	}
@@ -85,7 +94,7 @@ func (pf *pfctlFirewall) AddMasquerade(ctx context.Context, ifaceName string) er
 // Clear should clear any changes made to the firewall.
 func (pf *pfctlFirewall) Clear(ctx context.Context) error {
 	// Clear the anchor file
-	err := os.WriteFile(anchorFile, []byte{}, 0644)
+	err := os.WriteFile(pf.anchorFile, []byte{}, 0644)
 	if err != nil {
 		return fmt.Errorf("clear anchor file: %w", err)
 	}
@@ -99,6 +108,11 @@ func (pf *pfctlFirewall) Close(ctx context.Context) error {
 	err := pf.Clear(ctx)
 	if err != nil {
 		return fmt.Errorf("clear: %w", err)
+	}
+	// Delete the anchor file
+	err = os.Remove(pf.anchorFile)
+	if err != nil {
+		return fmt.Errorf("remove anchor file: %w", err)
 	}
 	// If we started with pf disabled, re-disable it
 	if !pf.enabledAtStart {

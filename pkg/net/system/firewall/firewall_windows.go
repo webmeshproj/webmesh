@@ -50,8 +50,14 @@ func (wf *winFirewall) AddWireguardForwarding(ctx context.Context, ifaceName str
 
 // AddMasquerade should configure the firewall to masquerade outbound traffic on the wireguard interface.
 func (wf *winFirewall) AddMasquerade(ctx context.Context, ifaceName string) error {
-	err := util.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
+	iface, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		return err
+	}
+	index := iface.Index
+	err = util.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
 		`name="WireGuard Masquerade"`, "dir=out", "action=allow",
+		fmt.Sprintf("interface=%d", index),
 	)
 	if err != nil {
 		return err
