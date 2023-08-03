@@ -168,7 +168,8 @@ func (p *Plugin) handleDBList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log := context.LoggerFrom(r.Context())
-	prefix := r.URL.Query().Get("prefix")
+	prefix := r.URL.Query().Get("q")
+	// We are okay with empty prefix, will return all keys
 	log.Info("listing keys for prefix from database", "prefix", prefix)
 	resp, err := p.data.List(r.Context(), prefix)
 	if err != nil {
@@ -176,7 +177,7 @@ func (p *Plugin) handleDBList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Debug("got keys", "resp", resp)
-	fmt.Fprintf(w, "%s\n", strings.Join(resp, "\n"))
+	fmt.Fprint(w, strings.Join(resp, "\n"))
 }
 
 func (p *Plugin) handleDBGet(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +189,7 @@ func (p *Plugin) handleDBGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log := context.LoggerFrom(r.Context())
-	key := r.URL.Query().Get("key")
+	key := r.URL.Query().Get("q")
 	if key == "" {
 		log.Error("missing key parameter in request")
 		http.Error(w, "missing key", http.StatusBadRequest)
@@ -202,7 +203,7 @@ func (p *Plugin) handleDBGet(w http.ResponseWriter, r *http.Request) {
 	}
 	resp = strings.TrimSpace(resp)
 	log.Debug("got key", "key", key, "resp", resp)
-	fmt.Fprintf(w, "%s\n", resp)
+	fmt.Fprint(w, resp)
 }
 
 func (p *Plugin) handleDBIterPrefix(w http.ResponseWriter, r *http.Request) {
