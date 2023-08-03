@@ -28,11 +28,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/plugins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins"
 	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
-	"github.com/webmeshproj/webmesh/pkg/plugins/ipam"
-	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
-	"github.com/webmeshproj/webmesh/pkg/plugins/mtls"
 )
 
 var (
@@ -43,12 +40,7 @@ var (
 
 // NewManager creates a new plugin manager.
 func NewManager(ctx context.Context, opts *Options) (Manager, error) {
-	builtIns := map[string]clients.PluginClient{
-		"ipam":       clients.NewInProcessClient(&ipam.Plugin{}),
-		"mtls":       clients.NewInProcessClient(&mtls.Plugin{}),
-		"basic-auth": clients.NewInProcessClient(&basicauth.Plugin{}),
-		"ldap":       clients.NewInProcessClient(&ldap.Plugin{}),
-	}
+	builtIns := builtins.NewPluginMap()
 	var auth, ipamv4, ipamv6 clients.PluginClient
 	allPlugins := make(map[string]clients.PluginClient)
 	stores := make([]clients.PluginClient, 0)

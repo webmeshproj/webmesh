@@ -31,8 +31,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
-	"github.com/webmeshproj/webmesh/pkg/plugins/basicauth"
-	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 )
 
 func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Feature) error {

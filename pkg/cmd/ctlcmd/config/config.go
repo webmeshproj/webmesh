@@ -36,8 +36,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
-	"github.com/webmeshproj/webmesh/pkg/plugins/basicauth"
-	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 

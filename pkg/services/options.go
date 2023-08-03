@@ -36,8 +36,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
-	"github.com/webmeshproj/webmesh/pkg/plugins/basicauth"
-	"github.com/webmeshproj/webmesh/pkg/plugins/ldap"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/util"
