@@ -60,7 +60,7 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 ##@ Testing
 
 COVERAGE_FILE := coverage.out
-TEST_ARGS     := -v -cover -coverprofile=$(COVERAGE_FILE) -covermode=atomic
+TEST_ARGS     := -v -cover -coverprofile=$(COVERAGE_FILE) -covermode=atomic -race
 
 test: fmt vet
 	go test $(TEST_ARGS) ./...
