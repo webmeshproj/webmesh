@@ -88,3 +88,9 @@ generate: ## Run go generate against code.
 
 clean: ## Clean up build and development artifacts.
 	rm -rf dist/ $(COVERAGE_FILE)
+
+build-ctl:
+	$(GORELEASER) build --single-target $(BUILD_ARGS) --id $(CTL) -o dist/$(CTL)
+
+install-ctl: build-ctl
+	install -m 755 dist/$(CTL) $(shell go env GOPATH)/bin/$(CTL)
