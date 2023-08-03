@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"strings"
 	"sync"
 
 	"github.com/mitchellh/mapstructure"
@@ -44,6 +45,7 @@ type Plugin struct {
 	data    storage.Storage
 	datamux sync.Mutex
 	closec  chan struct{}
+	servec  chan struct{}
 }
 
 // Options are the options for the debug plugin.
@@ -85,6 +87,7 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 // Configure configures the plugin.
 func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*emptypb.Empty, error) {
 	p.closec = make(chan struct{})
+	p.servec = make(chan struct{})
 	opts := NewDefaultOptions()
 	cfg := req.GetConfig().AsMap()
 	if len(cfg) > 0 {
@@ -114,11 +117,13 @@ func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
 func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
-	defer close(p.closec)
+	close(p.closec)
+	<-p.servec
 	return &emptypb.Empty{}, p.data.Close()
 }
 
 func (p *Plugin) serve(opts Options) {
+	defer close(p.servec)
 	log := slog.Default().With("plugin", "debug")
 	mux := http.NewServeMux()
 	if len(opts.PprofProfiles) == 0 {
@@ -136,7 +141,7 @@ func (p *Plugin) serve(opts Options) {
 	}
 	server := &http.Server{
 		Addr:    opts.ListenAddress,
-		Handler: mux,
+		Handler: logRequest(mux),
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.WithLogger(context.Background(), log)
 		},
@@ -149,7 +154,7 @@ func (p *Plugin) serve(opts Options) {
 	}()
 	<-p.closec
 	log.Info("closing debug server")
-	if err := server.Close(); err != nil {
+	if err := server.Shutdown(context.Background()); err != nil {
 		log.Error("error closing debug server", "err", err.Error())
 	}
 }
@@ -157,26 +162,65 @@ func (p *Plugin) serve(opts Options) {
 func (p *Plugin) handleDBList(w http.ResponseWriter, r *http.Request) {
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
+	defer r.Body.Close()
 	if p.data == nil {
 		http.Error(w, "plugin not configured", http.StatusInternalServerError)
 		return
 	}
+	log := context.LoggerFrom(r.Context())
+	prefix := r.URL.Query().Get("prefix")
+	log.Info("listing keys for prefix from database", "prefix", prefix)
+	resp, err := p.data.List(r.Context(), prefix)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log.Debug("got keys", "resp", resp)
+	fmt.Fprintf(w, "%s\n", strings.Join(resp, "\n"))
 }
 
 func (p *Plugin) handleDBGet(w http.ResponseWriter, r *http.Request) {
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
+	defer r.Body.Close()
 	if p.data == nil {
 		http.Error(w, "plugin not configured", http.StatusInternalServerError)
 		return
 	}
+	log := context.LoggerFrom(r.Context())
+	key := r.URL.Query().Get("key")
+	if key == "" {
+		log.Error("missing key parameter in request")
+		http.Error(w, "missing key", http.StatusBadRequest)
+		return
+	}
+	log.Info("getting key from database", "key", key)
+	resp, err := p.data.Get(r.Context(), key)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp = strings.TrimSpace(resp)
+	log.Debug("got key", "key", key, "resp", resp)
+	fmt.Fprintf(w, "%s\n", resp)
 }
 
 func (p *Plugin) handleDBIterPrefix(w http.ResponseWriter, r *http.Request) {
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
+	defer r.Body.Close()
 	if p.data == nil {
 		http.Error(w, "plugin not configured", http.StatusInternalServerError)
 		return
+	}
+	// TODO: may be pointless to implement this
+	http.Error(w, "not implemented", http.StatusNotImplemented)
+}
+
+func logRequest(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := context.LoggerFrom(r.Context())
+		log.Info("request", "method", r.Method, "url", r.URL.String())
+		next.ServeHTTP(w, r)
 	}
 }
