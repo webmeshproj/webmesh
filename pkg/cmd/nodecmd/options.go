@@ -23,13 +23,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"text/tabwriter"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/global"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -121,15 +122,15 @@ be equivalent to the shown command line flag:
 
 `)
 
-	util.FlagsUsage(fs, "Global Configurations:", "global")
-	util.FlagsUsage(fs, "Mesh Configurations:", "mesh")
-	util.FlagsUsage(fs, "Authentication Configurations:", "auth")
-	util.FlagsUsage(fs, "Bootstrap Configurations:", "bootstrap")
-	util.FlagsUsage(fs, "Raft Configurations:", "raft")
-	util.FlagsUsage(fs, "TLS Configurations:", "tls")
-	util.FlagsUsage(fs, "WireGuard Configurations:", "wireguard")
-	util.FlagsUsage(fs, "Service Configurations:", "services")
-	util.FlagsUsage(fs, "Plugin Configurations:", "plugins")
+	flagsUsage(fs, "Global Configurations:", "global")
+	flagsUsage(fs, "Mesh Configurations:", "mesh")
+	flagsUsage(fs, "Authentication Configurations:", "auth")
+	flagsUsage(fs, "Bootstrap Configurations:", "bootstrap")
+	flagsUsage(fs, "Raft Configurations:", "raft")
+	flagsUsage(fs, "TLS Configurations:", "tls")
+	flagsUsage(fs, "WireGuard Configurations:", "wireguard")
+	flagsUsage(fs, "Service Configurations:", "services")
+	flagsUsage(fs, "Plugin Configurations:", "plugins")
 
 	fmt.Fprint(os.Stderr, "General Flags\n\n")
 	fmt.Fprint(os.Stderr, "  --config         Load flags from the given configuration file\n")
@@ -138,4 +139,33 @@ be equivalent to the shown command line flag:
 	fmt.Fprint(os.Stderr, "  --help       Show this help message\n")
 	fmt.Fprint(os.Stderr, "  --version    Show version information and exit\n")
 	fmt.Fprint(os.Stderr, "\n")
+}
+
+// FlagsUsage prints the usage of all flags with the given prefix.
+func flagsUsage(fs *flag.FlagSet, title, prefix string) {
+	t := tabwriter.NewWriter(os.Stderr, 1, 4, 4, ' ', 0)
+	defer t.Flush()
+	fmt.Fprintf(t, "%s\n\n", title)
+	fs.VisitAll(func(f *flag.Flag) {
+		if !strings.HasPrefix(f.Name, prefix) {
+			return
+		}
+		usageLines := strings.Split(f.Usage, "\n")
+		if len(usageLines) > 1 {
+			fmt.Fprintln(t)
+		}
+		if f.DefValue == "" {
+			fmt.Fprintf(t, "\t--%s\t\t%s\n", f.Name, usageLines[0])
+		} else {
+			fmt.Fprintf(t, "\t--%s\t(default: %s)\t%s\n", f.Name, f.DefValue, usageLines[0])
+		}
+		if len(usageLines) == 1 {
+			return
+		}
+		for _, line := range usageLines[1:] {
+			fmt.Fprintf(t, "\t\t\t%s\n", line)
+		}
+		fmt.Fprintln(t)
+	})
+	fmt.Fprintf(t, "\n")
 }
