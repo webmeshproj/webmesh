@@ -19,7 +19,6 @@ package webrtc
 
 import (
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
@@ -34,11 +33,10 @@ type Server struct {
 	meshstate   state.State
 	rbacEval    rbac.Evaluator
 	stunServers []string
-	proxyCreds  []grpc.DialOption
 }
 
 // NewServer returns a new Server.
-func NewServer(store meshdb.Store, proxyCreds []grpc.DialOption, stunServers []string, insecure bool) *Server {
+func NewServer(store meshdb.Store, stunServers []string, insecure bool) *Server {
 	var rbaceval rbac.Evaluator
 	if insecure {
 		rbaceval = rbac.NewNoopEvaluator()
@@ -50,6 +48,5 @@ func NewServer(store meshdb.Store, proxyCreds []grpc.DialOption, stunServers []s
 		meshstate:   state.New(store.Storage()),
 		rbacEval:    rbaceval,
 		stunServers: stunServers,
-		proxyCreds:  proxyCreds,
 	}
 }

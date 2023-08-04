@@ -25,7 +25,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
@@ -223,12 +222,12 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRTC_StartDataChannelServer, r *v1.StartDataChannelRequest, remoteAddr string) error {
 	// Start a negotiation with the peer.
 	log.Info("negotiating data channel with remote peer")
-	client, closer, err := s.newPeerClient(clientStream.Context(), r.GetNodeId())
+	conn, err := s.store.Dial(clientStream.Context(), r.GetNodeId())
 	if err != nil {
 		return err
 	}
-	defer closer.Close()
-	negotiateStream, err := client.NegotiateDataChannel(clientStream.Context())
+	defer conn.Close()
+	negotiateStream, err := v1.NewNodeClient(conn).NegotiateDataChannel(clientStream.Context())
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to negotiate data channel with peer: %s", err.Error())
 	}
@@ -347,17 +346,4 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 			return nil
 		}
 	}
-}
-
-func (s *Server) newPeerClient(ctx context.Context, id string) (v1.NodeClient, io.Closer, error) {
-	addr, err := s.meshstate.GetNodePrivateRPCAddress(ctx, id)
-	if err != nil {
-		context.LoggerFrom(ctx).Error("failed to get peer address", slog.String("error", err.Error()))
-		return nil, nil, status.Error(codes.NotFound, "failed to get peer address")
-	}
-	conn, err := grpc.DialContext(ctx, addr.String(), s.proxyCreds...)
-	if err != nil {
-		return nil, nil, status.Errorf(codes.FailedPrecondition, "could not connect to node %s: %s", id, err.Error())
-	}
-	return v1.NewNodeClient(conn), conn, nil
 }

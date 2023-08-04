@@ -60,7 +60,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err
 	}
-	serveOpts, proxyCreds, err := o.ServerOptions(store, log)
+	serveOpts, err := o.ServerOptions(store, log)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	if o.API.WebRTC {
 		log.Debug("registering webrtc api")
 		stunURLs := strings.Split(o.API.STUNServers, ",")
-		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, proxyCreds, stunURLs, insecureServices))
+		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, stunURLs, insecureServices))
 	}
 	if o.MeshDNS.Enabled {
 		log.Debug("registering mesh dns")
@@ -113,7 +113,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	}
 	// Always register the node server
 	log.Debug("registering node server")
-	v1.RegisterNodeServer(server, node.NewServer(store, proxyCreds, o.ToFeatureSet(), insecureServices))
+	v1.RegisterNodeServer(server, node.NewServer(store, o.ToFeatureSet(), insecureServices))
 	// Register the health service
 	log.Debug("registering health service")
 	healthpb.RegisterHealthServer(server, server)

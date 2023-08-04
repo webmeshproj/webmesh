@@ -18,11 +18,9 @@ package services
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"flag"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -36,8 +34,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
-	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
-	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/util"
@@ -156,12 +152,12 @@ func (o *Options) ListenPort() (int, error) {
 }
 
 // ServerOptions converts the options to gRPC server options.
-func (o *Options) ServerOptions(store mesh.Mesh, log *slog.Logger) (srvrOptions []grpc.ServerOption, proxyOptions []grpc.DialOption, err error) {
+func (o *Options) ServerOptions(store mesh.Mesh, log *slog.Logger) (srvrOptions []grpc.ServerOption, err error) {
 	var opts []grpc.ServerOption
 	if !o.Insecure {
 		tlsConfig, err := o.TLSConfig()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		// Bit of a hack, but if we are using the mTLS plugin, we need to make sure
 		// the server requests a client certificate.
@@ -186,7 +182,7 @@ func (o *Options) ServerOptions(store mesh.Mesh, log *slog.Logger) (srvrOptions 
 		unarymiddlewares = append(unarymiddlewares, metrics.UnaryServerInterceptor())
 		streammiddlewares = append(streammiddlewares, metrics.StreamServerInterceptor())
 		if err := promapi.Register(metrics); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	if store.Plugins().HasAuth() {
@@ -194,33 +190,15 @@ func (o *Options) ServerOptions(store mesh.Mesh, log *slog.Logger) (srvrOptions 
 		unarymiddlewares = append(unarymiddlewares, store.Plugins().AuthUnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, store.Plugins().AuthStreamInterceptor())
 	}
-	proxyTLS, err := o.ProxyTLSConfig()
-	if err != nil {
-		return nil, nil, err
-	}
-	var proxyCreds []grpc.DialOption
-	if proxyTLS != nil {
-		proxyCreds = append(proxyCreds, grpc.WithTransportCredentials(credentials.NewTLS(proxyTLS)))
-	} else {
-		proxyCreds = append(proxyCreds, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	}
-	if o.API.ProxyAuth != nil {
-		if o.API.ProxyAuth.Basic != nil {
-			proxyCreds = append(proxyCreds, basicauth.NewCreds(o.API.ProxyAuth.Basic.Username, o.API.ProxyAuth.Basic.Password))
-		}
-		if o.API.ProxyAuth.LDAP != nil {
-			proxyCreds = append(proxyCreds, ldap.NewCreds(o.API.ProxyAuth.LDAP.Username, o.API.ProxyAuth.LDAP.Password))
-		}
-	}
 	if !o.API.DisableLeaderProxy {
 		log.Debug("registering leader proxy interceptors")
-		leaderProxy := leaderproxy.New(store, proxyCreds)
+		leaderProxy := leaderproxy.New(store)
 		unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
 	}
 	opts = append(opts, grpc.ChainUnaryInterceptor(unarymiddlewares...))
 	opts = append(opts, grpc.ChainStreamInterceptor(streammiddlewares...))
-	return opts, proxyCreds, nil
+	return opts, nil
 }
 
 // TLSConfig returns the TLS configuration.
@@ -236,43 +214,6 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 		Certificates: []tls.Certificate{cert},
 	}
 	return config, nil
-}
-
-// ProxyTLSConfig returns the TLS configuration for proxying.
-func (o *Options) ProxyTLSConfig() (*tls.Config, error) {
-	if o.API.ProxyInsecure {
-		return nil, nil
-	}
-	var config tls.Config
-	if o.API.ProxyAuth != nil && o.API.ProxyAuth.MTLS != nil {
-		cert, err := tls.LoadX509KeyPair(o.API.ProxyAuth.MTLS.CertFile, o.API.ProxyAuth.MTLS.KeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("load x509 key pair: %w", err)
-		}
-		config.Certificates = []tls.Certificate{cert}
-	}
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		slog.Default().Warn("failed to load system cert pool", slog.String("error", err.Error()))
-		pool = x509.NewCertPool()
-	}
-	if o.API.ProxyTLSCAFile != "" {
-		ca, err := os.ReadFile(o.API.ProxyTLSCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("read ca file: %w", err)
-		}
-		if ok := pool.AppendCertsFromPEM(ca); !ok {
-			return nil, fmt.Errorf("append certs from pem")
-		}
-	}
-	config.RootCAs = pool
-	if o.API.ProxyVerifyChainOnly {
-		config.InsecureSkipVerify = true
-		config.VerifyPeerCertificate = util.VerifyChainOnly
-	} else if o.API.ProxyInsecureSkipVerify {
-		config.InsecureSkipVerify = true
-	}
-	return &config, nil
 }
 
 // ToFeatureSet converts the options to a feature set.

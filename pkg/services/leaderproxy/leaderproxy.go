@@ -34,15 +34,13 @@ import (
 
 // Interceptor is the leaderproxy interceptor.
 type Interceptor struct {
-	store    mesh.Mesh
-	dialOpts []grpc.DialOption
+	store mesh.Mesh
 }
 
 // New returns a new leader proxy interceptor.
-func New(store mesh.Mesh, dialOpts []grpc.DialOption) *Interceptor {
+func New(store mesh.Mesh) *Interceptor {
 	return &Interceptor{
-		store:    store,
-		dialOpts: dialOpts,
+		store: store,
 	}
 }
 

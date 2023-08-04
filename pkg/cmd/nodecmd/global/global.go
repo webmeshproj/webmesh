@@ -291,29 +291,6 @@ func (o *Options) Overlay(opts ...any) error {
 			if v.TLSKeyFile == "" {
 				v.TLSKeyFile = o.TLSKeyFile
 			}
-			if o.TLSCertFile != "" && o.TLSKeyFile != "" {
-				if v.API.ProxyAuth == nil {
-					v.API.ProxyAuth = &services.ProxyAuth{}
-				}
-				if v.API.ProxyAuth.MTLS == nil {
-					v.API.ProxyAuth.MTLS = &services.MTLSOptions{}
-				}
-				if v.API.ProxyAuth.MTLS.CertFile == "" {
-					v.API.ProxyAuth.MTLS.CertFile = o.TLSCertFile
-				}
-				if v.API.ProxyAuth.MTLS.KeyFile == "" {
-					v.API.ProxyAuth.MTLS.KeyFile = o.TLSKeyFile
-				}
-			}
-			if v.API.ProxyTLSCAFile == "" {
-				v.API.ProxyTLSCAFile = o.TLSCAFile
-			}
-			if !v.API.ProxyVerifyChainOnly {
-				v.API.ProxyVerifyChainOnly = o.VerifyChainOnly
-			}
-			if !v.API.ProxyInsecure {
-				v.API.ProxyInsecure = o.Insecure
-			}
 			if v.TURN.Enabled {
 				if v.TURN.Endpoint == "" && primaryEndpoint.IsValid() {
 					v.TURN.Endpoint = fmt.Sprintf("stun:%s",

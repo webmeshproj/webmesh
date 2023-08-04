@@ -18,18 +18,12 @@ limitations under the License.
 package node
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"net/netip"
 	"sync"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
@@ -56,7 +50,6 @@ type Server struct {
 	features   []v1.Feature
 	startedAt  time.Time
 	log        *slog.Logger
-	proxyCreds []grpc.DialOption
 	// insecure flags that no authentication plugins are enabled.
 	insecure bool
 	// lock taken during the join/update process to prevent concurrent node changes.
@@ -66,7 +59,7 @@ type Server struct {
 // NewServer returns a new Server. Features are used for returning what features are enabled.
 // It is the callers responsibility to ensure those servers are registered on the node.
 // Insecure is used to disable authorization.
-func NewServer(store mesh.Mesh, proxyCreds []grpc.DialOption, features []v1.Feature, insecure bool) *Server {
+func NewServer(store mesh.Mesh, features []v1.Feature, insecure bool) *Server {
 	var rbaceval rbac.Evaluator
 	if insecure {
 		rbaceval = rbac.NewNoopEvaluator()
@@ -82,32 +75,7 @@ func NewServer(store mesh.Mesh, proxyCreds []grpc.DialOption, features []v1.Feat
 		networking: networking.New(store.Storage()),
 		features:   features,
 		startedAt:  time.Now(),
-		proxyCreds: proxyCreds,
 		insecure:   insecure,
 		log:        slog.Default().With("component", "node-server"),
 	}
-}
-
-func (s *Server) newPrivateRemoteNodeConn(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
-	addr, err := s.meshstate.GetNodePrivateRPCAddress(ctx, nodeID)
-	if err != nil {
-		if errors.Is(err, state.ErrNodeNotFound) {
-			return nil, status.Errorf(codes.NotFound, "node %s not found", nodeID)
-		}
-		return nil, status.Errorf(codes.FailedPrecondition, "could not find rpc address for node %s: %s", nodeID, err.Error())
-	}
-	s.log.Info("dialing node", slog.String("node", nodeID), slog.String("addr", addr.String()))
-	conn, err := s.newRemoteNodeConnForAddr(ctx, addr.String())
-	if err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, "could not connect to node %s: %s", nodeID, err.Error())
-	}
-	return conn, nil
-}
-
-func (s *Server) newRemoteNodeConnForAddr(ctx context.Context, addr string) (*grpc.ClientConn, error) {
-	conn, err := grpc.DialContext(ctx, addr, s.proxyCreds...)
-	if err != nil {
-		return nil, fmt.Errorf("could not connect to node %s: %w", addr, err)
-	}
-	return conn, nil
 }
