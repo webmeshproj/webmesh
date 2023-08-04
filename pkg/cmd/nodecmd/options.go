@@ -64,6 +64,22 @@ func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	return o
 }
 
+// Validate runs all the validation checks.
+func (o *Options) Validate() error {
+	if len(o.Bridge.Meshes) > 0 {
+		return o.Bridge.Validate()
+	}
+	err := o.Mesh.Validate()
+	if err != nil {
+		return err
+	}
+	err = o.Services.Validate()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Marshal returns the marshaled options.
 func (o *Options) Marshal() ([]byte, error) {
 	var buf bytes.Buffer

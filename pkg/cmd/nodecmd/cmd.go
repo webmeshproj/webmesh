@@ -39,11 +39,12 @@ import (
 )
 
 var (
-	flagset     = flag.NewFlagSet("webmesh-node", flag.ContinueOnError)
-	versionFlag = flagset.Bool("version", false, "Print version information and exit")
-	configFlag  = flagset.String("config", "", "Path to a configuration file")
-	printConfig = flagset.Bool("print-config", false, "Print the configuration and exit")
-	opts        = NewOptions().BindFlags(flagset)
+	flagset      = flag.NewFlagSet("webmesh-node", flag.ContinueOnError)
+	versionFlag  = flagset.Bool("version", false, "Print version information and exit")
+	configFlag   = flagset.String("config", "", "Path to a configuration file")
+	printConfig  = flagset.Bool("print-config", false, "Print the configuration and exit")
+	startTimeout = flagset.Duration("start-timeout", 0, "Timeout for starting the node (default: no timeout)")
+	opts         = NewOptions().BindFlags(flagset)
 
 	log = slog.Default()
 )
@@ -57,7 +58,6 @@ func Execute() error {
 		}
 		return err
 	}
-
 	if *versionFlag {
 		fmt.Println("Webmesh Node")
 		fmt.Println("  Version:   ", version.Version)
@@ -65,7 +65,6 @@ func Execute() error {
 		fmt.Println("  Build Date:", version.BuildDate)
 		return nil
 	}
-
 	if *configFlag != "" {
 		f, err := os.Open(*configFlag)
 		if err != nil {
@@ -76,12 +75,10 @@ func Execute() error {
 			return fmt.Errorf("failed to decode config file: %w", err)
 		}
 	}
-
 	err = opts.Global.Overlay(opts.Mesh, opts.Services)
 	if err != nil {
 		return err
 	}
-
 	if *printConfig {
 		out, err := json.MarshalIndent(opts, "", "  ")
 		if err != nil {
@@ -90,16 +87,10 @@ func Execute() error {
 		fmt.Println(string(out))
 		return nil
 	}
-
-	if !opts.Mesh.Bootstrap.Enabled && opts.Mesh.Mesh.JoinAddress == "" {
-		if _, err := os.Stat(opts.Mesh.Raft.DataDir); os.IsNotExist(err) {
-			if !opts.Mesh.Raft.InMemory {
-				flagset.Usage()
-				return fmt.Errorf("must specify either --bootstrap.enabled or --mesh.join-address when --raft.data-dir does not exist")
-			}
-		}
+	if err := opts.Validate(); err != nil {
+		flagset.Usage()
+		return err
 	}
-
 	log = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: func() slog.Level {
 			switch strings.ToLower(opts.Global.LogLevel) {
@@ -127,6 +118,13 @@ func Execute() error {
 	// Log all options at debug level
 	log.Debug("current configuration", slog.Any("options", opts))
 
+	if len(opts.Bridge.Meshes) > 0 {
+		return executeBridgedMesh()
+	}
+	return executeSingleMesh()
+}
+
+func executeSingleMesh() error {
 	if (opts.Global.NoIPv4 && opts.Global.NoIPv6) || (opts.Mesh.Mesh.NoIPv4 && opts.Mesh.Mesh.NoIPv6) {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
@@ -137,8 +135,12 @@ func Execute() error {
 		return fmt.Errorf("failed to create mesh store: %w", err)
 	}
 
-	// TODO: Add flag for timeout
 	ctx := context.Background()
+	if *startTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *startTimeout)
+		defer cancel()
+	}
 	var features []v1.Feature
 	if !opts.Global.DisableFeatureAdvertisement {
 		features = opts.Services.ToFeatureSet()
@@ -185,6 +187,9 @@ func Execute() error {
 	// Stop the gRPC server
 	log.Info("shutting down gRPC server")
 	srv.Stop()
+	return nil
+}
 
+func executeBridgedMesh() error {
 	return nil
 }
