@@ -107,9 +107,10 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 
 	if opts.LocalDNS {
 		// Start a local MeshDNS server
-		server := meshdns.NewServer(st, &meshdns.Options{
+		server := meshdns.NewServer(&meshdns.Options{
 			UDPListenAddr: fmt.Sprintf(":%d", opts.LocalDNSPort),
 		})
+		server.RegisterDomain(st)
 		go func() {
 			go func() {
 				if err := server.ListenAndServe(); err != nil {

@@ -93,7 +93,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	}
 	if o.MeshDNS.Enabled {
 		log.Debug("registering mesh dns")
-		server.meshdns = meshdns.NewServer(store, &meshdns.Options{
+		server.meshdns = meshdns.NewServer(&meshdns.Options{
 			UDPListenAddr:     o.MeshDNS.ListenUDP,
 			TCPListenAddr:     o.MeshDNS.ListenTCP,
 			ReusePort:         o.MeshDNS.ReusePort,
@@ -103,6 +103,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 			DisableForwarding: o.MeshDNS.DisableForwarding,
 			CacheSize:         o.MeshDNS.CacheSize,
 		})
+		server.meshdns.RegisterDomain(store)
 	}
 	if o.Dashboard.Enabled {
 		log.Debug("registering dashboard handlers")

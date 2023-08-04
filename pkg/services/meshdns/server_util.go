@@ -24,6 +24,7 @@ import (
 	"github.com/miekg/dns"
 	"golang.org/x/exp/slog"
 
+	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
@@ -62,29 +63,31 @@ func contextHandler(timeout time.Duration, next contextDNSHandler) dns.HandlerFu
 	}
 }
 
-func (s *Server) newFQDN(id string) string {
-	return fmt.Sprintf("%s.%s", id, s.store.Domain())
+func newFQDN(mesh meshdb.Store, id string) string {
+	return fmt.Sprintf("%s.%s", id, mesh.Domain())
 }
 
-func (s *Server) newNSRecord() dns.RR {
+func newNSRecord(mesh meshdb.Store) dns.RR {
 	return &dns.NS{
 		Hdr: dns.RR_Header{
-			Name:   s.store.Domain(),
+			Name:   mesh.Domain(),
 			Rrtype: dns.TypeNS,
 			Class:  dns.ClassINET,
 			Ttl:    1,
 		},
-		Ns: fmt.Sprintf("%s.%s", s.store.ID(), s.store.Domain()),
+		Ns: fmt.Sprintf("%s.%s", mesh.ID(), mesh.Domain()),
 	}
 }
 
-func (s *Server) newMsg(r *dns.Msg) *dns.Msg {
+func (s *Server) newMsg(mesh meshdb.Store, r *dns.Msg) *dns.Msg {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.Compress = s.opts.Compression
 	m.Authoritative = true
 	m.RecursionAvailable = true
-	m.Ns = []dns.RR{s.newNSRecord()}
+	if mesh != nil {
+		m.Ns = []dns.RR{newNSRecord(mesh)}
+	}
 	return m
 }
 

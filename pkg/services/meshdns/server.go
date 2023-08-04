@@ -20,6 +20,7 @@ package meshdns
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -28,7 +29,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	dnsutil "github.com/webmeshproj/webmesh/pkg/net/system/dns"
 )
 
@@ -57,15 +57,15 @@ type Options struct {
 }
 
 // NewServer returns a new Mesh DNS server.
-func NewServer(store meshdb.Store, o *Options) *Server {
+func NewServer(o *Options) *Server {
 	log := slog.Default().With("component", "mesh-dns")
 	srv := &Server{
-		store:     store,
-		peers:     peers.New(store.Storage()),
+		mux:       dns.NewServeMux(),
 		opts:      o,
 		log:       log,
 		forwarder: new(dns.Client),
 	}
+	srv.mux.HandleFunc(".", contextHandler(o.RequestTimeout, srv.handleDefault))
 	if srv.opts.CacheSize > 0 {
 		var err error
 		srv.cache, err = lru.New[cacheKey, cacheValue](srv.opts.CacheSize)
@@ -82,14 +82,15 @@ func NewServer(store meshdb.Store, o *Options) *Server {
 
 // Server is the MeshDNS server.
 type Server struct {
-	store     meshdb.Store
-	peers     peers.Peers
 	opts      *Options
+	stores    []meshdb.Store
+	mux       *dns.ServeMux
 	udpServer *dns.Server
 	tcpServer *dns.Server
 	forwarder *dns.Client
 	cache     *lru.Cache[cacheKey, cacheValue]
 	log       *slog.Logger
+	mu        sync.Mutex
 }
 
 type cacheKey struct {
@@ -102,21 +103,26 @@ type cacheValue struct {
 	expires time.Time
 }
 
-// ListenAndServe serves the Mesh DNS server.
-func (s *Server) ListenAndServe() error {
-	// Register the meshdns handlers
-	domPattern := strings.TrimSuffix(s.store.Domain(), ".")
+// RegisterDomain registers a new domain to be served by the Mesh DNS server.
+func (s *Server) RegisterDomain(mesh meshdb.Store) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	domPattern := strings.TrimSuffix(mesh.Domain(), ".")
 	timeout := s.opts.RequestTimeout
 	if timeout == 0 {
 		timeout = 5 * time.Second
 	}
-	mux := dns.NewServeMux()
-	mux.HandleFunc(fmt.Sprintf("leader.%s", domPattern), contextHandler(timeout, s.handleLeaderLookup))
-	mux.HandleFunc(fmt.Sprintf("voters.%s", domPattern), contextHandler(timeout, s.handleVotersLookup))
-	mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), contextHandler(timeout, s.handleObserversLookup))
-	mux.HandleFunc(domPattern, contextHandler(timeout, s.handleMeshLookup))
-	mux.HandleFunc(".", contextHandler(timeout, s.handleDefault))
-	hdlr := s.validateRequest(s.denyZoneTransfers(mux.ServeDNS))
+	s.mux.HandleFunc(fmt.Sprintf("leader.%s", domPattern), contextHandler(timeout, s.leaderLookupHandler(mesh)))
+	s.mux.HandleFunc(fmt.Sprintf("voters.%s", domPattern), contextHandler(timeout, s.votersLookupHandler(mesh)))
+	s.mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), contextHandler(timeout, s.observersLookupHandler(mesh)))
+	s.mux.HandleFunc(domPattern, contextHandler(timeout, s.meshLookupHandler(mesh)))
+	s.stores = append(s.stores, mesh)
+}
+
+// ListenAndServe serves the Mesh DNS server.
+func (s *Server) ListenAndServe() error {
+	// Register the meshdns handlers
+	hdlr := s.validateRequest(s.denyZoneTransfers(s.mux.ServeDNS))
 	// Start the servers
 	var g errgroup.Group
 	if s.opts.UDPListenAddr != "" {
