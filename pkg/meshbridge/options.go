@@ -68,6 +68,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				}
 				raftPort++
 				grpcPort++
+				wgPort++
 			}
 		}
 	}
