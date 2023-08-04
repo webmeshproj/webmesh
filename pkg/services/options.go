@@ -122,21 +122,6 @@ func (o *Options) Validate() error {
 			return fmt.Errorf("TLS key file must be specified")
 		}
 	}
-	if o.API == nil {
-		o.API = NewAPIOptions()
-	}
-	if o.MeshDNS == nil {
-		o.MeshDNS = NewMeshDNSOptions()
-	}
-	if o.TURN == nil {
-		o.TURN = NewTURNOptions()
-	}
-	if o.Metrics == nil {
-		o.Metrics = NewMetricsOptions()
-	}
-	if o.Dashboard == nil {
-		o.Dashboard = dashboard.NewOptions()
-	}
 	if err := o.API.Validate(); err != nil {
 		return err
 	}
@@ -230,28 +215,30 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 // ToFeatureSet converts the options to a feature set.
 func (o *Options) ToFeatureSet() []v1.Feature {
 	features := []v1.Feature{v1.Feature_NODES}
-	if !o.API.DisableLeaderProxy {
-		features = append(features, v1.Feature_LEADER_PROXY)
+	if o.API != nil {
+		if !o.API.DisableLeaderProxy {
+			features = append(features, v1.Feature_LEADER_PROXY)
+		}
+		if o.API.Mesh {
+			features = append(features, v1.Feature_MESH_API)
+		}
+		if o.API.Admin {
+			features = append(features, v1.Feature_ADMIN_API)
+		}
+		if o.API.PeerDiscovery {
+			features = append(features, v1.Feature_PEER_DISCOVERY)
+		}
+		if o.API.WebRTC {
+			features = append(features, v1.Feature_ICE_NEGOTIATION)
+		}
 	}
-	if o.API.Mesh {
-		features = append(features, v1.Feature_MESH_API)
-	}
-	if o.API.Admin {
-		features = append(features, v1.Feature_ADMIN_API)
-	}
-	if o.API.PeerDiscovery {
-		features = append(features, v1.Feature_PEER_DISCOVERY)
-	}
-	if o.API.WebRTC {
-		features = append(features, v1.Feature_ICE_NEGOTIATION)
-	}
-	if o.Metrics.Enabled {
+	if o.Metrics != nil && o.Metrics.Enabled {
 		features = append(features, v1.Feature_METRICS)
 	}
-	if o.TURN.Enabled {
+	if o.TURN != nil && o.TURN.Enabled {
 		features = append(features, v1.Feature_TURN_SERVER)
 	}
-	if o.MeshDNS.Enabled {
+	if o.MeshDNS != nil && o.MeshDNS.Enabled {
 		features = append(features, v1.Feature_MESH_DNS)
 	}
 	return features

@@ -185,7 +185,7 @@ func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
 // Validate validates the raft options.
 func (o *Options) Validate() error {
 	if o == nil {
-		return errors.New("raft options are nil")
+		return errors.New("raft options cannot be empty")
 	}
 	if o.DataDir == "" && !o.InMemory {
 		return errors.New("data directory is required")

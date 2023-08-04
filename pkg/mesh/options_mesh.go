@@ -160,6 +160,9 @@ This is only necessary if the node intends on being publicly accessible.`)
 
 // Validate validates the MeshOptions.
 func (o *MeshOptions) Validate() error {
+	if o == nil {
+		return fmt.Errorf("mesh options cannot be empty")
+	}
 	if o.NoIPv4 && o.NoIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}

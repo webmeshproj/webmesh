@@ -103,6 +103,9 @@ func (o *MeshDNSOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 
 // Validate validates the mesh DNS options.
 func (o *MeshDNSOptions) Validate() error {
+	if o == nil {
+		return nil
+	}
 	if o.Enabled {
 		if o.ListenTCP == "" && o.ListenUDP == "" {
 			return errors.New("must specify a TCP or UDP address for mesh DNS")

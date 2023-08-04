@@ -76,24 +76,26 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	if insecureServices {
 		log.Warn("running services without authentication")
 	}
-	if o.API.Admin {
-		log.Debug("registering admin api")
-		v1.RegisterAdminServer(server, admin.New(store, insecureServices))
+	if o.API != nil {
+		if o.API.Admin {
+			log.Debug("registering admin api")
+			v1.RegisterAdminServer(server, admin.New(store, insecureServices))
+		}
+		if o.API.Mesh {
+			log.Debug("registering mesh api")
+			v1.RegisterMeshServer(server, meshapi.NewServer(store))
+		}
+		if o.API.PeerDiscovery {
+			log.Debug("registering peer discovery api")
+			v1.RegisterPeerDiscoveryServer(server, peerdiscovery.NewServer(store))
+		}
+		if o.API.WebRTC {
+			log.Debug("registering webrtc api")
+			stunURLs := strings.Split(o.API.STUNServers, ",")
+			v1.RegisterWebRTCServer(server, webrtc.NewServer(store, stunURLs, insecureServices))
+		}
 	}
-	if o.API.Mesh {
-		log.Debug("registering mesh api")
-		v1.RegisterMeshServer(server, meshapi.NewServer(store))
-	}
-	if o.API.PeerDiscovery {
-		log.Debug("registering peer discovery api")
-		v1.RegisterPeerDiscoveryServer(server, peerdiscovery.NewServer(store))
-	}
-	if o.API.WebRTC {
-		log.Debug("registering webrtc api")
-		stunURLs := strings.Split(o.API.STUNServers, ",")
-		v1.RegisterWebRTCServer(server, webrtc.NewServer(store, stunURLs, insecureServices))
-	}
-	if o.MeshDNS.Enabled {
+	if o.MeshDNS != nil && o.MeshDNS.Enabled {
 		log.Debug("registering mesh dns")
 		server.meshdns = meshdns.NewServer(&meshdns.Options{
 			UDPListenAddr:     o.MeshDNS.ListenUDP,
@@ -107,7 +109,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		})
 		server.meshdns.RegisterDomain(store)
 	}
-	if o.Dashboard.Enabled {
+	if o.Dashboard != nil && o.Dashboard.Enabled {
 		log.Debug("registering dashboard handlers")
 		server.dashboard, err = dashboard.NewServer(server.srv, o.Dashboard)
 		if err != nil {
@@ -130,7 +132,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 // then blocks until the gRPC server exits.
 func (s *Server) ListenAndServe() error {
 	s.mu.Lock()
-	if s.opts.Metrics.Enabled {
+	if s.opts.Metrics != nil && s.opts.Metrics.Enabled {
 		go func() {
 			s.log.Info(fmt.Sprintf("Starting HTTP metrics server on %s", s.opts.Metrics.ListenAddress))
 			http.Handle(s.opts.Metrics.Path, promhttp.Handler())
@@ -139,7 +141,7 @@ func (s *Server) ListenAndServe() error {
 			}
 		}()
 	}
-	if s.opts.TURN.Enabled {
+	if s.opts.TURN != nil && s.opts.TURN.Enabled {
 		var err error
 		s.log.Info(fmt.Sprintf("Starting TURN server on %s:%d", s.opts.TURN.ListenAddress, s.opts.TURN.ListenPort))
 		s.turn, err = turn.NewServer(&turn.Options{

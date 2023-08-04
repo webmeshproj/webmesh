@@ -78,6 +78,9 @@ func (o *APIOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 
 // Validate validates the options.
 func (o *APIOptions) Validate() error {
+	if o == nil {
+		return nil
+	}
 	if o.WebRTC && o.STUNServers == "" {
 		return errors.New("STUN servers must be specified if the WebRTC API is enabled")
 	}

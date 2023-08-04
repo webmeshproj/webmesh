@@ -87,6 +87,9 @@ func (o *TURNOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 
 // Validate validates the options.
 func (o *TURNOptions) Validate() error {
+	if o == nil {
+		return nil
+	}
 	if o.Enabled {
 		if o.PublicIP == "" {
 			return errors.New("must specify a public IP for the TURN server")

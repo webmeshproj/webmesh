@@ -94,22 +94,7 @@ func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
 
 // Validate validates the options.
 func (o *Options) Validate() error {
-	if o.Raft == nil {
-		o.Raft = raft.NewOptions(0)
-	}
-	if o.Mesh == nil {
-		o.Mesh = NewMeshOptions(0)
-	}
-	if o.Bootstrap == nil {
-		o.Bootstrap = NewBootstrapOptions()
-	}
-	if o.TLS == nil {
-		o.TLS = NewTLSOptions()
-	}
-	if o.WireGuard == nil {
-		o.WireGuard = NewWireGuardOptions("", 0)
-	}
-	if !o.Bootstrap.Enabled {
+	if o.Bootstrap == nil || !o.Bootstrap.Enabled {
 		if o.Mesh.JoinAddress == "" && len(o.Mesh.PeerDiscoveryAddresses) == 0 {
 			return fmt.Errorf("must specify either bootstrap.enabled or mesh.join-address or mesh.peer-discovery-addresses")
 		}

@@ -115,7 +115,7 @@ func NewBootstrapOptions() *BootstrapOptions {
 
 // Validate validates the bootstrap options.
 func (o *BootstrapOptions) Validate() error {
-	if !o.Enabled {
+	if o == nil || !o.Enabled {
 		return nil
 	}
 	if len(o.Servers) == 0 && os.Getenv(BootstrapServersEnvVar) != "" {

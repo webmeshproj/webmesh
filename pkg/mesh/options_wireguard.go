@@ -148,6 +148,9 @@ packets are sent.`)
 
 // Validate validates the options.
 func (o *WireGuardOptions) Validate() error {
+	if o == nil {
+		return errors.New("wireguard configuration cannot be empty")
+	}
 	if o.ListenPort <= 1024 {
 		return errors.New("wireguard.listen-port must be greater than 1024")
 	}
