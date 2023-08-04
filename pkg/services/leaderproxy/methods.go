@@ -36,6 +36,7 @@ const (
 var MethodPolicyMap = map[string]MethodPolicy{
 	// Node API
 	v1.Node_Join_FullMethodName:                 RequireLeader,
+	v1.Node_Update_FullMethodName:               RequireLeader,
 	v1.Node_Leave_FullMethodName:                RequireLeader,
 	v1.Node_GetStatus_FullMethodName:            RequireLocal,
 	v1.Node_Snapshot_FullMethodName:             AllowNonLeader,

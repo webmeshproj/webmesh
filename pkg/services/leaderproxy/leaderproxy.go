@@ -113,6 +113,8 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	// Node API
 	case v1.Node_Join_FullMethodName:
 		return v1.NewNodeClient(conn).Join(ctx, req.(*v1.JoinRequest))
+	case v1.Node_Update_FullMethodName:
+		return v1.NewNodeClient(conn).Update(ctx, req.(*v1.UpdateRequest))
 	case v1.Node_Leave_FullMethodName:
 		return v1.NewNodeClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
 	case v1.Node_Snapshot_FullMethodName:
