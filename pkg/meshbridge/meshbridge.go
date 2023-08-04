@@ -52,6 +52,8 @@ func New(opts *Options) (Bridge, error) {
 	meshes := make(map[string]mesh.Mesh)
 	for meshID, meshOpts := range opts.Meshes {
 		id := meshID
+		// For now we only allow IPv6 on bridged meshes.
+		meshOpts.Mesh.Mesh.NoIPv4 = true
 		m, err := mesh.NewWithLogger(meshOpts.Mesh, slog.Default().With("mesh-id", id))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create mesh %q: %w", id, err)
