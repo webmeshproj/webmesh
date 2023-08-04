@@ -18,7 +18,6 @@ limitations under the License.
 package mesh
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -29,10 +28,16 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
@@ -56,10 +61,12 @@ type Mesh interface {
 	Open(ctx context.Context, features []v1.Feature) error
 	// Close closes the connection to the mesh and shuts down the storage.
 	Close() error
+	// Dial opens a new gRPC connection to the given node.
+	Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error)
+	// DialLeader opens a new gRPC connection to the current Raft leader.
+	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
 	// Leader returns the current Raft leader ID.
 	Leader() (string, error)
-	// LeaderRPCAddr returns the current Raft leader's gRPC address.
-	LeaderRPCAddr(ctx context.Context) (string, error)
 	// Storage returns a storage interface for use by the application.
 	Storage() storage.Storage
 	// Raft returns the Raft interface.
@@ -193,6 +200,30 @@ func (s *meshStore) Plugins() plugins.Manager {
 	return s.plugins
 }
 
+// DialLeader opens a new gRPC connection to the current Raft leader.
+func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
+	if s.raft == nil || !s.open.Load() {
+		return nil, ErrNotOpen
+	}
+	leader, err := s.Leader()
+	if err != nil {
+		return nil, err
+	}
+	return s.Dial(ctx, leader)
+}
+
+// Dial opens a new gRPC connection to the given node.
+func (s *meshStore) Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
+	if s.raft == nil || !s.open.Load() {
+		return nil, ErrNotOpen
+	}
+	addr, err := state.New(s.Storage()).GetNodePrivateRPCAddress(ctx, nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("get node private rpc address: %w", err)
+	}
+	return s.newGRPCConn(ctx, addr.String())
+}
+
 // Leader returns the current Raft leader.
 func (s *meshStore) Leader() (string, error) {
 	if s.raft == nil || !s.open.Load() {
@@ -205,17 +236,28 @@ func (s *meshStore) Leader() (string, error) {
 	return string(id), nil
 }
 
-// LeaderRPCAddr returns the gRPC address of the current leader.
-func (s *meshStore) LeaderRPCAddr(ctx context.Context) (string, error) {
-	leader, err := s.Leader()
-	if err != nil {
-		return "", err
+func (s *meshStore) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
+	return grpc.DialContext(ctx, addr, s.grpcCreds(ctx)...)
+}
+
+func (s *meshStore) grpcCreds(ctx context.Context) []grpc.DialOption {
+	log := context.LoggerFrom(ctx)
+	var opts []grpc.DialOption
+	if s.opts.TLS.Insecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		// MTLS is included in the TLS config already if enabled.
+		log.Debug("using TLS credentials")
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
 	}
-	s.log.Debug("looking up rpc address for leader", slog.String("leader", string(leader)))
-	state := state.New(s.Storage())
-	addr, err := state.GetNodePrivateRPCAddress(ctx, string(leader))
-	if err != nil {
-		return "", err
+	if s.opts.Auth != nil {
+		if s.opts.Auth.Basic != nil {
+			log.Debug("using basic auth credentials")
+			opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
+		} else if s.opts.Auth.LDAP != nil {
+			log.Debug("using LDAP auth credentials")
+			opts = append(opts, ldap.NewCreds(s.opts.Auth.LDAP.Username, s.opts.Auth.LDAP.Password))
+		}
 	}
-	return addr.String(), nil
+	return opts
 }

@@ -18,7 +18,9 @@ package mesh
 
 import (
 	"context"
+	"fmt"
 
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 )
 
@@ -60,4 +62,20 @@ func (s *meshStore) Close() error {
 	}
 	s.log.Debug("all services shut down")
 	return nil
+}
+
+// leaveCluster attempts to remove this node from the cluster. The node must
+// have already relinquished leadership before calling this method.
+func (s *meshStore) leaveCluster(ctx context.Context) error {
+	s.log.Info("leaving cluster")
+	conn, err := s.DialLeader(ctx)
+	if err != nil {
+		return fmt.Errorf("dial leader: %w", err)
+	}
+	defer conn.Close()
+	client := v1.NewNodeClient(conn)
+	_, err = client.Leave(ctx, &v1.LeaveRequest{
+		Id: s.ID(),
+	})
+	return err
 }

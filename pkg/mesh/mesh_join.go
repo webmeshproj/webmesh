@@ -25,14 +25,10 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
-	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
-	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 )
 
 func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Feature) error {
@@ -235,30 +231,4 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		}
 	}
 	return nil
-}
-
-func (s *meshStore) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, addr, s.grpcCreds(ctx)...)
-}
-
-func (s *meshStore) grpcCreds(ctx context.Context) []grpc.DialOption {
-	log := context.LoggerFrom(ctx)
-	var opts []grpc.DialOption
-	if s.opts.TLS.Insecure {
-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else {
-		// MTLS is included in the TLS config already if enabled.
-		log.Debug("using TLS credentials")
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
-	}
-	if s.opts.Auth != nil {
-		if s.opts.Auth.Basic != nil {
-			log.Debug("using basic auth credentials")
-			opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
-		} else if s.opts.Auth.LDAP != nil {
-			log.Debug("using LDAP auth credentials")
-			opts = append(opts, ldap.NewCreds(s.opts.Auth.LDAP.Username, s.opts.Auth.LDAP.Password))
-		}
-	}
-	return opts
 }

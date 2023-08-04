@@ -102,7 +102,7 @@ func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 }
 
 func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	conn, err := i.newLeaderConn(ctx)
+	conn, err := i.store.DialLeader(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 }
 
 func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	conn, err := i.newLeaderConn(ss.Context())
+	conn, err := i.store.DialLeader(ss.Context())
 	if err != nil {
 		return err
 	}
@@ -215,20 +215,6 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 	default:
 		return status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}
-}
-
-func (i *Interceptor) newLeaderConn(ctx context.Context) (*grpc.ClientConn, error) {
-	leaderAddr, err := i.store.LeaderRPCAddr(ctx)
-	if err != nil {
-		context.LoggerFrom(ctx).Error("could not get leader address", slog.String("error", err.Error()))
-		return nil, status.Errorf(codes.Unavailable, "no leader available to serve the request: %s", err.Error())
-	}
-	context.LoggerFrom(ctx).Info("dialing leader to serve request", slog.String("leader", leaderAddr))
-	conn, err := grpc.DialContext(ctx, leaderAddr, i.dialOpts...)
-	if err != nil {
-		return nil, status.Errorf(codes.Unavailable, "could not connect to leader to serve the request: %s", err.Error())
-	}
-	return conn, nil
 }
 
 func proxyStream[S, R any](ctx context.Context, ss grpc.ServerStream, cs grpc.ClientStream) error {
