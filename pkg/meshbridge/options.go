@@ -69,41 +69,25 @@ func (o *Options) Validate() error {
 	if len(o.Meshes) == 0 {
 		return fmt.Errorf("no meshes specified")
 	}
-	grpcUnique, err := o.allGRPCPortsUnique()
-	if err != nil {
-		return err
-	} else if !grpcUnique {
-		return fmt.Errorf("grpc listen ports must be unique for each mesh connection")
-	}
-	raftUnique, err := o.allRaftPortsUnique()
-	if err != nil {
-		return err
-	} else if !raftUnique {
-		return fmt.Errorf("raft listen ports must be unique for each mesh connection")
-	}
-	dnsUnique, err := o.allDNSPortsUnique()
-	if err != nil {
-		return err
-	} else if !dnsUnique {
-		return fmt.Errorf("dns listen ports must be unique for each mesh connection")
-	}
-	turnUnique, err := o.allTURNPortsUnique()
-	if err != nil {
-		return err
-	} else if !turnUnique {
-		return fmt.Errorf("turn listen ports must be unique for each mesh connection")
-	}
-	dashboardUnique, err := o.allDashboardsUnique()
-	if err != nil {
-		return err
-	} else if !dashboardUnique {
-		return fmt.Errorf("dashboard listen ports must be unique for each mesh connection")
-	}
-	metricsUnique, err := o.allMetricsListenersUnique()
-	if err != nil {
-		return err
-	} else if !metricsUnique {
-		return fmt.Errorf("metrics listen ports must be unique for each mesh connection")
+	for _, validator := range []struct {
+		validate func() (bool, error)
+		failMsg  string
+	}{
+		{o.allDataDirsUnique, "raft data dirs must be unique (or otherwise in-memory) for each mesh connection"},
+		{o.allGRPCPortsUnique, "grpc listen ports must be unique for each mesh connection"},
+		{o.allRaftPortsUnique, "raft listen ports must be unique for each mesh connection"},
+		{o.allDNSPortsUnique, "dns listen ports must be unique for each mesh connection"},
+		{o.allTURNPortsUnique, "turn listen ports must be unique for each mesh connection"},
+		{o.allDashboardsUnique, "dashboard listen ports must be unique for each mesh connection"},
+		{o.allMetricsListenersUnique, "metrics listen ports must be unique for each mesh connection"},
+	} {
+		valid, err := validator.validate()
+		if err != nil {
+			return err
+		}
+		if !valid {
+			return fmt.Errorf(validator.failMsg)
+		}
 	}
 	for name, opts := range o.Meshes {
 		err := opts.Validate()
@@ -139,6 +123,16 @@ func (o *MeshOptions) Validate() error {
 		return err
 	}
 	return nil
+}
+
+func (o *Options) allDataDirsUnique() (bool, error) {
+	var datadirs []string
+	for _, opts := range o.Meshes {
+		if !opts.Mesh.Raft.InMemory {
+			datadirs = append(datadirs, opts.Mesh.Raft.DataDir)
+		}
+	}
+	return util.AllUnique(datadirs), nil
 }
 
 func (o *Options) allGRPCPortsUnique() (bool, error) {
