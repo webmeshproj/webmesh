@@ -301,7 +301,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	}
 	self.PublicKey = wireguardKey.PublicKey()
 	// Allocate addresses
-	var privatev4, privatev6 netip.Prefix
+	var privatev4 netip.Prefix
 	if !s.opts.Mesh.NoIPv4 {
 		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
 			NodeId:  s.ID(),
@@ -313,17 +313,16 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		}
 		self.PrivateIPv4 = privatev4
 	}
-	if !s.opts.Mesh.NoIPv6 {
-		privatev6, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeId:  s.ID(),
-			Subnet:  meshnetworkv6.String(),
-			Version: v1.AllocateIPRequest_IP_VERSION_6,
-		})
-		if err != nil {
-			return fmt.Errorf("allocate IPv4 address: %w", err)
-		}
-		self.PrivateIPv6 = privatev6
+	// We always assign a v6 address, even if we're not using it.
+	privatev6, err := s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
+		NodeId:  s.ID(),
+		Subnet:  meshnetworkv6.String(),
+		Version: v1.AllocateIPRequest_IP_VERSION_6,
+	})
+	if err != nil {
+		return fmt.Errorf("allocate IPv4 address: %w", err)
 	}
+	self.PrivateIPv6 = privatev6
 	s.log.Debug("creating ourself in the database", slog.Any("params", self))
 	err = p.Put(ctx, self)
 	if err != nil {
@@ -386,21 +385,13 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	// Start network resources
 	s.log.Info("starting network manager")
 	opts := &meshnet.StartOptions{
-		Key:       wireguardKey,
-		AddressV4: privatev4,
-		AddressV6: privatev6,
-		NetworkV4: func() netip.Prefix {
-			if s.opts.Mesh.NoIPv4 {
-				return netip.Prefix{}
-			}
-			return meshnetworkv4
-		}(),
-		NetworkV6: func() netip.Prefix {
-			if s.opts.Mesh.NoIPv6 {
-				return netip.Prefix{}
-			}
-			return meshnetworkv6
-		}(),
+		Key:         wireguardKey,
+		AddressV4:   privatev4,
+		AddressV6:   privatev6,
+		NetworkV4:   meshnetworkv4,
+		NetworkV6:   meshnetworkv6,
+		DisableIPv4: s.opts.Mesh.NoIPv4,
+		DisableIPv6: s.opts.Mesh.NoIPv6,
 	}
 	err = s.nw.Start(ctx, opts)
 	if err != nil {

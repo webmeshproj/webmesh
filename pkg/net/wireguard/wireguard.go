@@ -98,6 +98,10 @@ type Options struct {
 	// MetricsInterval is the interval at which to update metrics.
 	// Defaults to 15 seconds.
 	MetricsInterval time.Duration
+	// DisableIPv4 disables IPv4 on the interface.
+	DisableIPv4 bool
+	// DisableIPv6 disables IPv6 on the interface.
+	DisableIPv6 bool
 }
 
 type wginterface struct {
@@ -144,11 +148,13 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	}
 	log.Info("creating wireguard interface", "name", opts.Name)
 	iface, err := system.New(ctx, &system.Options{
-		Name:      opts.Name,
-		NetworkV4: opts.AddressV4,
-		NetworkV6: opts.AddressV6,
-		ForceTUN:  opts.ForceTUN,
-		MTU:       uint32(opts.MTU),
+		Name:        opts.Name,
+		AddressV4:   opts.AddressV4,
+		AddressV6:   opts.AddressV6,
+		ForceTUN:    opts.ForceTUN,
+		MTU:         uint32(opts.MTU),
+		DisableIPv4: opts.DisableIPv4,
+		DisableIPv6: opts.DisableIPv6,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new interface: %w", err)

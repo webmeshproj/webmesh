@@ -62,15 +62,19 @@ type Interface interface {
 type Options struct {
 	// Name is the name of the interface.
 	Name string
-	// NetworkV4 is the private IPv4 network of this interface.
-	NetworkV4 netip.Prefix
-	// NetworkV6 is the private IPv6 network of this interface.
-	NetworkV6 netip.Prefix
+	// AddressV4 is the private IPv4 network of this interface.
+	AddressV4 netip.Prefix
+	// AddressV6 is the private IPv6 network of this interface.
+	AddressV6 netip.Prefix
 	// ForceTUN forces the use of a TUN interface.
 	ForceTUN bool
 	// MTU is the MTU of the interface. If unset, it will be automatically
 	// detected from the host.
 	MTU uint32
+	// DisableIPv4 disables IPv4 on the interface.
+	DisableIPv4 bool
+	// DisableIPv6 disables IPv6 on the interface.
+	DisableIPv6 bool
 }
 
 // IsRouteExists returns true if the given error is a route exists error.
@@ -127,16 +131,24 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			}
 		}
 	}
-	for _, addr := range []netip.Prefix{opts.NetworkV4, opts.NetworkV6} {
-		if addr.IsValid() {
-			err := link.SetInterfaceAddress(ctx, opts.Name, addr)
-			if err != nil {
-				derr := iface.close(ctx)
-				if derr != nil {
-					return nil, fmt.Errorf("set address %q on wireguard interface: %w, destroy interface: %v", addr.String(), err, derr)
-				}
-				return nil, fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
+	if !opts.DisableIPv4 && opts.AddressV4.IsValid() {
+		err := iface.setInterfaceAddress(ctx, opts.AddressV4)
+		if err != nil {
+			derr := iface.close(ctx)
+			if derr != nil {
+				return nil, fmt.Errorf("%w, destroy interface: %v", err, derr)
 			}
+			return nil, err
+		}
+	}
+	if !opts.DisableIPv6 && opts.AddressV6.IsValid() {
+		err := iface.setInterfaceAddress(ctx, opts.AddressV6)
+		if err != nil {
+			derr := iface.close(ctx)
+			if derr != nil {
+				return nil, fmt.Errorf("%w, destroy interface: %v", err, derr)
+			}
+			return nil, err
 		}
 	}
 	return iface, nil
@@ -147,19 +159,27 @@ type sysInterface struct {
 	close func(context.Context) error
 }
 
+func (l *sysInterface) setInterfaceAddress(ctx context.Context, addr netip.Prefix) error {
+	err := link.SetInterfaceAddress(ctx, l.opts.Name, addr)
+	if err != nil {
+		return fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
+	}
+	return nil
+}
+
 // Name returns the real name of the interface.
 func (l *sysInterface) Name() string {
 	return l.opts.Name
 }
 
-// AddressV4 should return the current private address of this interface
+// AddressV4 should return the current private address of this interface.
 func (l *sysInterface) AddressV4() netip.Prefix {
-	return l.opts.NetworkV4
+	return l.opts.AddressV4
 }
 
-// AddressV6 should return the current private address of this interface
+// AddressV6 should return the current private address of this interface.
 func (l *sysInterface) AddressV6() netip.Prefix {
-	return l.opts.NetworkV6
+	return l.opts.AddressV6
 }
 
 // Up activates the interface

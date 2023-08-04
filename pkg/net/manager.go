@@ -88,12 +88,20 @@ type StartOptions struct {
 	NetworkV4 netip.Prefix
 	// NetworkV6 is the IPv6 network to use for the node.
 	NetworkV6 netip.Prefix
+	// DisableIPv4 disables IPv4 on the interface.
+	DisableIPv4 bool
+	// DisableIPv6 disables IPv6 on the interface.
+	DisableIPv6 bool
 }
 
 // Manager is the interface for managing the network.
 type Manager interface {
 	// Start starts the network manager.
 	Start(ctx context.Context, opts *StartOptions) error
+	// NetworkV4 returns the current IPv4 network. The returned value may be invalid.
+	NetworkV4() netip.Prefix
+	// NetworkV6 returns the current IPv6 network, even if it is disabled.
+	NetworkV6() netip.Prefix
 	// StartMasquerade ensures that masquerading is enabled.
 	StartMasquerade(ctx context.Context) error
 	// AddDNSServers adds the given dns servers to the system configuration.
@@ -124,19 +132,28 @@ func New(store storage.Storage, opts *Options) Manager {
 }
 
 type manager struct {
-	opts         *Options
-	storage      storage.Storage
-	fw           firewall.Firewall
-	wg           wireguard.Interface
-	iceConns     map[string]clientPeerConn
-	wgmux, pcmux sync.Mutex
-	dnsservers   []netip.AddrPort
-	masquerading bool
+	opts                 *Options
+	storage              storage.Storage
+	fw                   firewall.Firewall
+	wg                   wireguard.Interface
+	iceConns             map[string]clientPeerConn
+	dnsservers           []netip.AddrPort
+	networkv4, networkv6 netip.Prefix
+	masquerading         bool
+	wgmu, pcmu           sync.Mutex
 }
 
 type clientPeerConn struct {
 	peerConn  *datachannels.WireGuardProxyClient
 	localAddr netip.AddrPort
+}
+
+func (m *manager) NetworkV4() netip.Prefix {
+	return m.networkv4
+}
+
+func (m *manager) NetworkV6() netip.Prefix {
+	return m.networkv6
 }
 
 func (m *manager) Firewall() firewall.Firewall { return m.fw }
@@ -157,8 +174,8 @@ func (m *manager) Resolver() *net.Resolver {
 }
 
 func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
-	m.wgmux.Lock()
-	defer m.wgmux.Unlock()
+	m.wgmu.Lock()
+	defer m.wgmu.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	handleErr := func(err error) error {
 		if m.wg != nil {
@@ -206,6 +223,8 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 		MetricsInterval:     m.opts.RecordMetricsInterval,
 		AddressV4:           opts.AddressV4,
 		AddressV6:           opts.AddressV6,
+		DisableIPv4:         opts.DisableIPv4,
+		DisableIPv6:         opts.DisableIPv6,
 	}
 	log.Info("Configuring wireguard", slog.Any("opts", wgopts))
 	m.wg, err = wireguard.New(ctx, wgopts)
@@ -216,27 +235,29 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("configure wireguard: %w", err))
 	}
-	if opts.NetworkV6.IsValid() {
+	if opts.NetworkV6.IsValid() && !opts.DisableIPv6 {
 		log.Debug("Adding IPv6 network route", slog.String("network", opts.NetworkV6.String()))
 		err = m.wg.AddRoute(ctx, opts.NetworkV6)
 		if err != nil && !system.IsRouteExists(err) {
 			return handleErr(fmt.Errorf("wireguard add mesh network route: %w", err))
 		}
 	}
-	if opts.AddressV6.IsValid() {
+	if opts.AddressV6.IsValid() && !opts.DisableIPv6 {
 		log.Debug("Adding IPv6 address route", slog.String("address", opts.AddressV6.String()))
 		err = m.wg.AddRoute(ctx, opts.AddressV6)
 		if err != nil && !system.IsRouteExists(err) {
 			return handleErr(fmt.Errorf("wireguard add ipv6 route: %w", err))
 		}
 	}
-	if opts.NetworkV4.IsValid() {
+	if opts.NetworkV4.IsValid() && !opts.DisableIPv4 {
 		log.Debug("Adding IPv4 network route", slog.String("network", opts.NetworkV4.String()))
 		err = m.wg.AddRoute(ctx, opts.NetworkV4)
 		if err != nil && !system.IsRouteExists(err) {
 			return handleErr(fmt.Errorf("wireguard add mesh network route: %w", err))
 		}
 	}
+	m.networkv4 = opts.NetworkV4
+	m.networkv6 = opts.NetworkV6
 	log.Debug("Configuring forwarding on wireguard interface", slog.String("interface", m.wg.Name()))
 	err = m.fw.AddWireguardForwarding(ctx, m.wg.Name())
 	if err != nil {
@@ -249,8 +270,8 @@ func (m *manager) StartMasquerade(ctx context.Context) error {
 	if m.masquerading {
 		return nil
 	}
-	m.wgmux.Lock()
-	defer m.wgmux.Unlock()
+	m.wgmu.Lock()
+	defer m.wgmu.Unlock()
 	err := m.fw.AddMasquerade(ctx, m.wg.Name())
 	if err != nil {
 		return fmt.Errorf("add masquerade rule: %w", err)
@@ -270,8 +291,8 @@ func (m *manager) AddDNSServers(ctx context.Context, servers []netip.AddrPort) e
 }
 
 func (m *manager) Close(ctx context.Context) error {
-	m.wgmux.Lock()
-	defer m.wgmux.Unlock()
+	m.wgmu.Lock()
+	defer m.wgmu.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	if m.fw != nil {
 		// Clear the firewall rules after wireguard is shutdown
@@ -303,8 +324,8 @@ func (m *manager) AddPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	if m.wg == nil {
 		return nil
 	}
-	m.wgmux.Lock()
-	defer m.wgmux.Unlock()
+	m.wgmu.Lock()
+	defer m.wgmu.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
 	return m.addPeer(ctx, peer, iceServers)
@@ -314,8 +335,8 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	if m.wg == nil {
 		return nil
 	}
-	m.wgmux.Lock()
-	defer m.wgmux.Unlock()
+	m.wgmu.Lock()
+	defer m.wgmu.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
 	wgpeers, err := mesh.WireGuardPeersFor(ctx, m.storage, m.opts.NodeID)
@@ -360,12 +381,12 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	for _, peer := range currentPeers {
 		if _, ok := seenPeers[peer]; !ok {
 			log.Debug("removing peer", slog.String("peer_id", peer))
-			m.pcmux.Lock()
+			m.pcmu.Lock()
 			if conn, ok := m.iceConns[peer]; ok {
 				conn.peerConn.Close()
 				delete(m.iceConns, peer)
 			}
-			m.pcmux.Unlock()
+			m.pcmu.Unlock()
 			if err := m.wg.DeletePeer(ctx, peer); err != nil {
 				errs = append(errs, fmt.Errorf("delete peer: %w", err))
 			}
@@ -449,6 +470,7 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 		// TODO: Try all ICE servers
 		return m.negotiateICEConn(ctx, iceServers[0], peer)
 	}
+	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
 	if peer.GetPrimaryEndpoint() != "" {
 		addr, err := net.ResolveUDPAddr("udp", peer.GetPrimaryEndpoint())
 		if err != nil {
@@ -511,8 +533,8 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 }
 
 func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, peer *v1.WireGuardPeer) (netip.AddrPort, error) {
-	m.pcmux.Lock()
-	defer m.pcmux.Unlock()
+	m.pcmu.Lock()
+	defer m.pcmu.Unlock()
 	log := context.LoggerFrom(ctx)
 	if conn, ok := m.iceConns[peer.GetId()]; ok {
 		// We already have an ICE connection for this peer
@@ -543,9 +565,9 @@ func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, 
 				log.Error("error refreshing peers after ICE connection closed", slog.String("error", err.Error()))
 			}
 		}()
-		m.pcmux.Lock()
+		m.pcmu.Lock()
 		delete(m.iceConns, peer.GetId())
-		m.pcmux.Unlock()
+		m.pcmu.Unlock()
 	}()
 	peerconn := clientPeerConn{
 		peerConn:  pc,

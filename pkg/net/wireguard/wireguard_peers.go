@@ -78,11 +78,17 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	for _, ip := range peer.AllowedIPs {
 		var ipnet net.IPNet
 		if ip.Addr().Is4() {
+			if w.opts.DisableIPv4 {
+				continue
+			}
 			ipnet = net.IPNet{
 				IP:   ip.Addr().AsSlice(),
 				Mask: net.CIDRMask(ip.Bits(), 32),
 			}
 		} else {
+			if w.opts.DisableIPv6 {
+				continue
+			}
 			ipnet = net.IPNet{
 				IP:   ip.Addr().AsSlice(),
 				Mask: net.CIDRMask(ip.Bits(), 128),
@@ -94,11 +100,17 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	for _, ip := range peer.AllowedRoutes {
 		var ipnet net.IPNet
 		if ip.Addr().Is4() {
+			if w.opts.DisableIPv4 {
+				continue
+			}
 			ipnet = net.IPNet{
 				IP:   ip.Addr().AsSlice(),
 				Mask: net.CIDRMask(ip.Bits(), 32),
 			}
 		} else {
+			if w.opts.DisableIPv6 {
+				continue
+			}
 			ipnet = net.IPNet{
 				IP:   ip.Addr().AsSlice(),
 				Mask: net.CIDRMask(ip.Bits(), 128),
@@ -134,19 +146,19 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		addr, _ := netip.AddrFromSlice(ip.IP)
 		ones, _ := ip.Mask.Size()
 		prefix := netip.PrefixFrom(addr, ones)
-		if prefix.Addr().Is6() && w.opts.AddressV6.IsValid() {
-			if w.opts.AddressV6.Contains(addr) {
-				// Don't readd routes to our own network
-				continue
-			}
-			w.log.Debug("adding ipv6 route", slog.Any("prefix", prefix))
+		if prefix.Addr().Is4() && !w.opts.DisableIPv4 {
+			w.log.Debug("adding ipv4 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
 			}
 		}
-		if prefix.Addr().Is4() && w.opts.AddressV4.IsValid() {
-			w.log.Debug("adding ipv4 route", slog.Any("prefix", prefix))
+		if prefix.Addr().Is6() && !w.opts.DisableIPv6 {
+			if w.opts.AddressV6.Contains(addr) {
+				// Don't readd routes to our own network
+				continue
+			}
+			w.log.Debug("adding ipv6 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)

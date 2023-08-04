@@ -162,39 +162,36 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		s.meshDomain += "."
 	}
 	var addressv4, addressv6, networkv4, networkv6 netip.Prefix
-	if !s.opts.Mesh.NoIPv4 {
-		if resp.AddressIpv4 != "" {
-			addressv4, err = netip.ParsePrefix(resp.AddressIpv4)
-			if err != nil {
-				return fmt.Errorf("parse ipv4 address: %w", err)
-			}
-		}
-		networkv4, err = netip.ParsePrefix(resp.NetworkIpv4)
+	// We always parse addresses and let the net manager decide what to use
+	if resp.AddressIpv4 != "" {
+		addressv4, err = netip.ParsePrefix(resp.AddressIpv4)
 		if err != nil {
-			return fmt.Errorf("parse ipv4 network: %w", err)
+			return fmt.Errorf("parse ipv4 address: %w", err)
 		}
 	}
-	if !s.opts.Mesh.NoIPv6 {
-		if resp.AddressIpv6 != "" {
-			addressv6, err = netip.ParsePrefix(resp.AddressIpv6)
-			if err != nil {
-				return fmt.Errorf("parse ipv6 address: %w", err)
-			}
-		}
-		networkv6, err = netip.ParsePrefix(resp.NetworkIpv6)
-		if err != nil {
-			return fmt.Errorf("parse ipv6 network: %w", err)
-		}
+	networkv4, err = netip.ParsePrefix(resp.NetworkIpv4)
+	if err != nil {
+		return fmt.Errorf("parse ipv4 network: %w", err)
+	}
+	addressv6, err = netip.ParsePrefix(resp.AddressIpv6)
+	if err != nil {
+		return fmt.Errorf("parse ipv6 address: %w", err)
+	}
+	networkv6, err = netip.ParsePrefix(resp.NetworkIpv6)
+	if err != nil {
+		return fmt.Errorf("parse ipv6 network: %w", err)
 	}
 	log.Info("configuring wireguard",
 		slog.String("networkv4", addressv4.String()),
 		slog.String("networkv6", addressv6.String()))
 	opts := &meshnet.StartOptions{
-		Key:       key,
-		AddressV4: addressv4,
-		AddressV6: addressv6,
-		NetworkV4: networkv4,
-		NetworkV6: networkv6,
+		Key:         key,
+		AddressV4:   addressv4,
+		AddressV6:   addressv6,
+		NetworkV4:   networkv4,
+		NetworkV6:   networkv6,
+		DisableIPv4: !s.opts.Mesh.NoIPv4 && addressv4.IsValid(),
+		DisableIPv6: !s.opts.Mesh.NoIPv6 && addressv6.IsValid(),
 	}
 	err = s.nw.Start(ctx, opts)
 	if err != nil {
