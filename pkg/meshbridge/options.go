@@ -19,11 +19,13 @@ package meshbridge
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // Options are options for the bridge.
@@ -64,6 +66,45 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 
 // Validate validates the options.
 func (o *Options) Validate() error {
+	if len(o.Meshes) == 0 {
+		return fmt.Errorf("no meshes specified")
+	}
+	grpcUnique, err := o.allGRPCPortsUnique()
+	if err != nil {
+		return err
+	} else if !grpcUnique {
+		return fmt.Errorf("grpc listen ports must be unique for each mesh connection")
+	}
+	raftUnique, err := o.allRaftPortsUnique()
+	if err != nil {
+		return err
+	} else if !raftUnique {
+		return fmt.Errorf("raft listen ports must be unique for each mesh connection")
+	}
+	dnsUnique, err := o.allDNSPortsUnique()
+	if err != nil {
+		return err
+	} else if !dnsUnique {
+		return fmt.Errorf("dns listen ports must be unique for each mesh connection")
+	}
+	turnUnique, err := o.allTURNPortsUnique()
+	if err != nil {
+		return err
+	} else if !turnUnique {
+		return fmt.Errorf("turn listen ports must be unique for each mesh connection")
+	}
+	dashboardUnique, err := o.allDashboardsUnique()
+	if err != nil {
+		return err
+	} else if !dashboardUnique {
+		return fmt.Errorf("dashboard listen ports must be unique for each mesh connection")
+	}
+	metricsUnique, err := o.allMetricsListenersUnique()
+	if err != nil {
+		return err
+	} else if !metricsUnique {
+		return fmt.Errorf("metrics listen ports must be unique for each mesh connection")
+	}
 	for name, opts := range o.Meshes {
 		err := opts.Validate()
 		if err != nil {
@@ -98,4 +139,88 @@ func (o *MeshOptions) Validate() error {
 		return err
 	}
 	return nil
+}
+
+func (o *Options) allGRPCPortsUnique() (bool, error) {
+	var addrs []string
+	for _, opts := range o.Meshes {
+		addrs = append(addrs, opts.Services.ListenAddress)
+	}
+	return allAddrPortsUnique(addrs)
+}
+
+func (o *Options) allRaftPortsUnique() (bool, error) {
+	var addrs []string
+	for _, opts := range o.Meshes {
+		addrs = append(addrs, opts.Mesh.Raft.ListenAddress)
+	}
+	return allAddrPortsUnique(addrs)
+}
+
+func (o *Options) allTURNPortsUnique() (bool, error) {
+	var addrs []string
+	for _, opts := range o.Meshes {
+		if opts.Services.TURN.Enabled {
+			addrs = append(addrs, opts.Services.TURN.ListenAddress)
+		}
+	}
+	return allAddrPortsUnique(addrs)
+}
+
+func (o *Options) allDashboardsUnique() (bool, error) {
+	var addrs []string
+	for _, opts := range o.Meshes {
+		if opts.Services.Dashboard.Enabled {
+			addrs = append(addrs, opts.Services.Dashboard.ListenAddress)
+		}
+	}
+	return allAddrPortsUnique(addrs)
+}
+
+func (o *Options) allMetricsListenersUnique() (bool, error) {
+	var addrs []string
+	for _, opts := range o.Meshes {
+		if opts.Services.Metrics.Enabled {
+			addrs = append(addrs, opts.Services.Metrics.ListenAddress)
+		}
+	}
+	return allAddrPortsUnique(addrs)
+}
+
+func (o *Options) allDNSPortsUnique() (bool, error) {
+	var tcpAddrs, udpAddrs []string
+	for _, opts := range o.Meshes {
+		if !opts.Services.MeshDNS.Enabled {
+			continue
+		}
+		tcpAddrs = append(tcpAddrs, opts.Services.MeshDNS.ListenTCP)
+		udpAddrs = append(udpAddrs, opts.Services.MeshDNS.ListenUDP)
+	}
+	ok, err := allAddrPortsUnique(tcpAddrs)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, nil
+	}
+	ok, err = allAddrPortsUnique(udpAddrs)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, nil
+	}
+	return true, nil
+}
+
+func allAddrPortsUnique([]string) (bool, error) {
+	var ports []string
+	for _, addr := range []string{} {
+		_, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return false, err
+		}
+		ports = append(ports, port)
+	}
+	return util.AllUnique(ports), nil
 }

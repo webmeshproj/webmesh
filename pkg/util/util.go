@@ -44,3 +44,14 @@ func PrettyByteSize(b int64) string {
 	}
 	return fmt.Sprintf("%.1fYiB", bf)
 }
+
+func AllUnique[T comparable](sl []T) bool {
+	seen := make(map[T]bool)
+	for _, v := range sl {
+		if seen[v] {
+			return false
+		}
+		seen[v] = true
+	}
+	return true
+}
