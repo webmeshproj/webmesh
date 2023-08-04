@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -52,6 +53,7 @@ type Server struct {
 	dashboard *dashboard.Server
 	store     mesh.Mesh
 	log       *slog.Logger
+	mu        sync.Mutex
 }
 
 // NewServer returns a new Server.
@@ -127,6 +129,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 // ListenAndServe starts the gRPC server and optional metrics server
 // then blocks until the gRPC server exits.
 func (s *Server) ListenAndServe() error {
+	s.mu.Lock()
 	if s.opts.Metrics.Enabled {
 		go func() {
 			s.log.Info(fmt.Sprintf("Starting HTTP metrics server on %s", s.opts.Metrics.ListenAddress))
@@ -147,6 +150,7 @@ func (s *Server) ListenAndServe() error {
 			PortRange:        s.opts.TURN.STUNPortRange,
 		})
 		if err != nil {
+			s.mu.Unlock()
 			return fmt.Errorf("create turn server: %w", err)
 		}
 	}
@@ -167,9 +171,11 @@ func (s *Server) ListenAndServe() error {
 	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
 	lis, err := net.Listen("tcp", s.opts.ListenAddress)
 	if err != nil {
+		s.mu.Unlock()
 		return fmt.Errorf("start TCP listener: %w", err)
 	}
 	defer lis.Close()
+	s.mu.Unlock()
 	if err := s.srv.Serve(lis); err != nil {
 		return fmt.Errorf("grpc serve: %w", err)
 	}
@@ -186,28 +192,37 @@ func (s *Server) GetServiceInfo() map[string]grpc.ServiceInfo {
 	return s.srv.GetServiceInfo()
 }
 
-// Stop stops the gRPC server gracefully.
+// Stop stops the gRPC server gracefully. You cannot use the server again
+// after calling Stop.
 func (s *Server) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.turn != nil {
 		s.log.Info("Shutting down TURN server")
 		if err := s.turn.Close(); err != nil {
 			s.log.Error("turn server shutdown failed", slog.String("error", err.Error()))
 		}
+		s.turn = nil
 	}
 	if s.meshdns != nil {
 		s.log.Info("Shutting down meshdns server")
 		if err := s.meshdns.Shutdown(); err != nil {
 			s.log.Error("meshdns server shutdown failed", slog.String("error", err.Error()))
 		}
+		s.meshdns = nil
 	}
 	if s.dashboard != nil {
 		s.log.Info("Shutting down dashboard server")
 		if err := s.dashboard.Shutdown(context.Background()); err != nil {
 			s.log.Error("dashboard server shutdown failed", slog.String("error", err.Error()))
 		}
+		s.dashboard = nil
 	}
-	s.log.Info("Shutting down gRPC server")
-	s.srv.GracefulStop()
+	if s.srv != nil {
+		s.log.Info("Shutting down gRPC server")
+		s.srv.GracefulStop()
+		s.srv = nil
+	}
 }
 
 // Check implements grpc.health.v1.HealthServer.
