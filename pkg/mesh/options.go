@@ -63,14 +63,14 @@ func NewOptions() *Options {
 }
 
 // BindFlags binds the options to the flags.
-func (o *Options) BindFlags(fl *flag.FlagSet) {
-	o.Auth.BindFlags(fl)
-	o.Mesh.BindFlags(fl)
-	o.Bootstrap.BindFlags(fl)
-	o.Raft.BindFlags(fl)
-	o.TLS.BindFlags(fl)
-	o.WireGuard.BindFlags(fl)
-	o.Plugins.BindFlags(fl)
+func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
+	o.Auth.BindFlags(fl, prefix...)
+	o.Mesh.BindFlags(fl, prefix...)
+	o.Bootstrap.BindFlags(fl, prefix...)
+	o.Raft.BindFlags(fl, prefix...)
+	o.TLS.BindFlags(fl, prefix...)
+	o.WireGuard.BindFlags(fl, prefix...)
+	o.Plugins.BindFlags(fl, prefix...)
 }
 
 // Validate validates the options.

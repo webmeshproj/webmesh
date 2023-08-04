@@ -19,6 +19,7 @@ package mesh
 import (
 	"errors"
 	"flag"
+	"strings"
 )
 
 const (
@@ -76,43 +77,47 @@ func NewAuthOptions() *AuthOptions {
 }
 
 // BindFlags binds the flags to the options.
-func (o *AuthOptions) BindFlags(fl *flag.FlagSet) {
-	fl.Func("auth.mtls.cert-file", "The path to a TLS certificate file to present when joining.", func(s string) error {
+func (o *AuthOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fl.Func(p+"auth.mtls.cert-file", "The path to a TLS certificate file to present when joining.", func(s string) error {
 		if o.MTLS == nil {
 			o.MTLS = &MTLSOptions{}
 		}
 		o.MTLS.CertFile = s
 		return nil
 	})
-	fl.Func("auth.mtls.key-file", "The path to a TLS key file for the certificate.", func(s string) error {
+	fl.Func(p+"auth.mtls.key-file", "The path to a TLS key file for the certificate.", func(s string) error {
 		if o.MTLS == nil {
 			o.MTLS = &MTLSOptions{}
 		}
 		o.MTLS.KeyFile = s
 		return nil
 	})
-	fl.Func("auth.basic.username", "A username to use for basic auth.", func(s string) error {
+	fl.Func(p+"auth.basic.username", "A username to use for basic auth.", func(s string) error {
 		if o.Basic == nil {
 			o.Basic = &BasicAuthOptions{}
 		}
 		o.Basic.Username = s
 		return nil
 	})
-	fl.Func("auth.basic.password", "A password to use for basic auth.", func(s string) error {
+	fl.Func(p+"auth.basic.password", "A password to use for basic auth.", func(s string) error {
 		if o.Basic == nil {
 			o.Basic = &BasicAuthOptions{}
 		}
 		o.Basic.Password = s
 		return nil
 	})
-	fl.Func("auth.ldap.username", "A username to use for LDAP auth.", func(s string) error {
+	fl.Func(p+"auth.ldap.username", "A username to use for LDAP auth.", func(s string) error {
 		if o.LDAP == nil {
 			o.LDAP = &LDAPAuthOptions{}
 		}
 		o.LDAP.Username = s
 		return nil
 	})
-	fl.Func("auth.ldap.password", "A password to use for LDAP auth.", func(s string) error {
+	fl.Func(p+"auth.ldap.password", "A password to use for LDAP auth.", func(s string) error {
 		if o.LDAP == nil {
 			o.LDAP = &LDAPAuthOptions{}
 		}

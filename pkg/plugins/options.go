@@ -63,10 +63,15 @@ func NewOptions() *Options {
 }
 
 // BindFlags binds the plugin flags to the given flag set.
-func (o *Options) BindFlags(fs *flag.FlagSet) {
+func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+
 	// Built-in plugins
 
-	fs.Func("plugins.mtls.ca-file", "Enables the mTLS plugin with the path to a CA for verifying certificates", func(s string) error {
+	fs.Func(p+"plugins.mtls.ca-file", "Enables the mTLS plugin with the path to a CA for verifying certificates", func(s string) error {
 		o.Plugins["mtls"] = &Config{
 			Config: map[string]any{
 				"ca-file": s,
@@ -81,7 +86,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		}
 		return nil
 	})
-	fs.Func("plugins.basic-auth.htpasswd-file", "Enables the basic auth plugin with the path to a htpasswd file", func(s string) error {
+	fs.Func(p+"plugins.basic-auth.htpasswd-file", "Enables the basic auth plugin with the path to a htpasswd file", func(s string) error {
 		o.Plugins["basic-auth"] = &Config{
 			Config: map[string]any{
 				"htpasswd-file": s,
@@ -96,7 +101,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		}
 		return nil
 	})
-	fs.Func("plugins.ldap.server", "Enables the ldap plugin with the server address", func(s string) error {
+	fs.Func(p+"plugins.ldap.server", "Enables the ldap plugin with the server address", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -114,7 +119,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["server"] = s
 		return nil
 	})
-	fs.Func("plugins.ldap.bind-dn", "Enables the ldap plugin with the bind DN", func(s string) error {
+	fs.Func(p+"plugins.ldap.bind-dn", "Enables the ldap plugin with the bind DN", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -126,7 +131,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["bind-dn"] = s
 		return nil
 	})
-	fs.Func("plugins.ldap.bind-password", "Enables the ldap plugin with the bind password", func(s string) error {
+	fs.Func(p+"plugins.ldap.bind-password", "Enables the ldap plugin with the bind password", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -138,7 +143,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["bind-password"] = s
 		return nil
 	})
-	fs.Func("plugins.ldap.ca-file", "Enables the ldap plugin with the path to a CA for verifying certificates", func(s string) error {
+	fs.Func(p+"plugins.ldap.ca-file", "Enables the ldap plugin with the path to a CA for verifying certificates", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -154,7 +159,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["ca-file"] = s
 		return nil
 	})
-	fs.Func("plugins.ldap.user-base-dn", "Enables the ldap plugin with the user base DN", func(s string) error {
+	fs.Func(p+"plugins.ldap.user-base-dn", "Enables the ldap plugin with the user base DN", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -166,7 +171,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["user-base-dn"] = s
 		return nil
 	})
-	fs.Func("plugins.ldap.user-id-attribute", "Enables the ldap plugin with the user ID attribute", func(s string) error {
+	fs.Func(p+"plugins.ldap.user-id-attribute", "Enables the ldap plugin with the user ID attribute", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -178,7 +183,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["user-id-attribute"] = s
 		return nil
 	})
-	fs.Func("plugins.ldap.node-id-attribute", "Enables the ldap plugin with the node ID attribute", func(s string) error {
+	fs.Func(p+"plugins.ldap.node-id-attribute", "Enables the ldap plugin with the node ID attribute", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -190,7 +195,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["node-id-attribute"] = s
 		return nil
 	})
-	fs.Func("plugins.ldap.user-status-attribute", "Enables the ldap plugin with the user status attribute", func(s string) error {
+	fs.Func(p+"plugins.ldap.user-status-attribute", "Enables the ldap plugin with the user status attribute", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -202,7 +207,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["user-status-attribute"] = s
 		return nil
 	})
-	fs.Func("plugins.ldap.user-disabled-value", "Enables the ldap plugin with the user disabled value", func(s string) error {
+	fs.Func(p+"plugins.ldap.user-disabled-value", "Enables the ldap plugin with the user disabled value", func(s string) error {
 		if o.Plugins["ldap"] == nil {
 			o.Plugins["ldap"] = &Config{
 				Config: map[string]any{},
@@ -214,7 +219,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["ldap"].Config["user-disabled-value"] = s
 		return nil
 	})
-	fs.Func("plugins.debug.listen-address", "Enables the debug plugin with the listen address", func(s string) error {
+	fs.Func(p+"plugins.debug.listen-address", "Enables the debug plugin with the listen address", func(s string) error {
 		if o.Plugins["debug"] == nil {
 			o.Plugins["debug"] = &Config{
 				Config: map[string]any{},
@@ -227,7 +232,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["debug"].Config["listen-address"] = s
 		return nil
 	})
-	fs.Func("plugins.debug.path-prefix", "Enables the debug plugin with the path prefix", func(s string) error {
+	fs.Func(p+"plugins.debug.path-prefix", "Enables the debug plugin with the path prefix", func(s string) error {
 		if o.Plugins["debug"] == nil {
 			o.Plugins["debug"] = &Config{
 				Config: map[string]any{},
@@ -239,7 +244,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["debug"].Config["path-prefix"] = s
 		return nil
 	})
-	fs.Func("plugins.debug.disable-pprof", "Enables the debug plugin with pprof disabled", func(s string) error {
+	fs.Func(p+"plugins.debug.disable-pprof", "Enables the debug plugin with pprof disabled", func(s string) error {
 		if o.Plugins["debug"] == nil {
 			o.Plugins["debug"] = &Config{
 				Config: map[string]any{},
@@ -256,7 +261,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["debug"].Config["disable-pprof"] = b
 		return nil
 	})
-	fs.Func("plugins.debug.pprof-profiles", "Enables the debug plugin with the pprof profiles", func(s string) error {
+	fs.Func(p+"plugins.debug.pprof-profiles", "Enables the debug plugin with the pprof profiles", func(s string) error {
 		if o.Plugins["debug"] == nil {
 			o.Plugins["debug"] = &Config{
 				Config: map[string]any{},
@@ -268,7 +273,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 		o.Plugins["debug"].Config["pprof-profiles"] = strings.Split(s, ",")
 		return nil
 	})
-	fs.Func("plugins.debug.enable-db-querier", "Enables the debug plugin with the database querier enabled", func(s string) error {
+	fs.Func(p+"plugins.debug.enable-db-querier", "Enables the debug plugin with the database querier enabled", func(s string) error {
 		if o.Plugins["debug"] == nil {
 			o.Plugins["debug"] = &Config{
 				Config: map[string]any{},
@@ -288,7 +293,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 
 	// External Plugins
 
-	fs.Func("plugins.local", `A configuration for a local executable plugin.
+	fs.Func(p+"plugins.local", `A configuration for a local executable plugin.
 Provided in the format of <path=/path/to/executable,config1=val1,config2=val2,...>`, func(s string) error {
 		keypairs := strings.Split(s, ",")
 		if len(keypairs) < 2 {
@@ -315,7 +320,7 @@ Provided in the format of <path=/path/to/executable,config1=val1,config2=val2,..
 		o.Plugins[cfg.Path] = &cfg
 		return nil
 	})
-	fs.Func("plugins.server", `A configuration for a remote server plugin. Configurations are the same as the local plugin,
+	fs.Func(p+"plugins.server", `A configuration for a remote server plugin. Configurations are the same as the local plugin,
 but with the addition of server configurations in the format of:
 <server=rpcserver.com:8443[,insecure=true][,tls-ca-file=ca.crt][,tls-key-file=tls.key][,tls-cert-file=tls.crt]>`, func(s string) error {
 		keypairs := strings.Split(s, ",")

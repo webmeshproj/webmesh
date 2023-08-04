@@ -39,18 +39,18 @@ import (
 )
 
 var (
-	fs          = flag.NewFlagSet("node", flag.ContinueOnError)
-	versionFlag = fs.Bool("version", false, "Print version information and exit")
-	configFlag  = fs.String("config", "", "Path to a configuration file")
-	printConfig = fs.Bool("print-config", false, "Print the configuration and exit")
-	opts        = NewOptions().BindFlags(fs)
+	flagset     = flag.NewFlagSet("webmesh-node", flag.ContinueOnError)
+	versionFlag = flagset.Bool("version", false, "Print version information and exit")
+	configFlag  = flagset.String("config", "", "Path to a configuration file")
+	printConfig = flagset.Bool("print-config", false, "Print the configuration and exit")
+	opts        = NewOptions().BindFlags(flagset)
 
 	log = slog.Default()
 )
 
 func Execute() error {
-	fs.Usage = usage
-	err := fs.Parse(os.Args[1:])
+	flagset.Usage = usage
+	err := flagset.Parse(os.Args[1:])
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -94,7 +94,7 @@ func Execute() error {
 	if !opts.Mesh.Bootstrap.Enabled && opts.Mesh.Mesh.JoinAddress == "" {
 		if _, err := os.Stat(opts.Mesh.Raft.DataDir); os.IsNotExist(err) {
 			if !opts.Mesh.Raft.InMemory {
-				fs.Usage()
+				flagset.Usage()
 				return fmt.Errorf("must specify either --bootstrap.enabled or --mesh.join-address when --raft.data-dir does not exist")
 			}
 		}

@@ -18,6 +18,7 @@ package mesh
 
 import (
 	"flag"
+	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
@@ -49,13 +50,17 @@ func NewTLSOptions() *TLSOptions {
 }
 
 // BindFlags binds the TLS options to the flag set.
-func (o *TLSOptions) BindFlags(fl *flag.FlagSet) {
-	fl.StringVar(&o.CAFile, "tls.ca-file", util.GetEnvDefault(CAFileEnvVar, ""),
+func (o *TLSOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fl.StringVar(&o.CAFile, p+"tls.ca-file", util.GetEnvDefault(CAFileEnvVar, ""),
 		"Path to a TLS CA certificate for verifying peer certificates.")
-	fl.BoolVar(&o.VerifyChainOnly, "tls.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
+	fl.BoolVar(&o.VerifyChainOnly, p+"tls.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
 		"Only verify the certificate chain of peer certificates.")
-	fl.BoolVar(&o.InsecureSkipVerify, "tls.insecure-skip-verify", util.GetEnvDefault(InsecureSkipVerifyEnvVar, "false") == "true",
+	fl.BoolVar(&o.InsecureSkipVerify, p+"tls.insecure-skip-verify", util.GetEnvDefault(InsecureSkipVerifyEnvVar, "false") == "true",
 		"Skip verification of peer certificates.")
-	fl.BoolVar(&o.Insecure, "tls.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
+	fl.BoolVar(&o.Insecure, p+"tls.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Don't use TLS for peer communication.")
 }

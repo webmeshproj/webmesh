@@ -18,6 +18,7 @@ package services
 
 import (
 	"flag"
+	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
@@ -48,11 +49,15 @@ func NewMetricsOptions() *MetricsOptions {
 }
 
 // BindFlags binds the flags.
-func (o *MetricsOptions) BindFlags(fs *flag.FlagSet) {
-	fs.BoolVar(&o.Enabled, "services.metrics.enabled", util.GetEnvDefault(MetricsEnabledEnvVar, "false") == "true",
+func (o *MetricsOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fs.BoolVar(&o.Enabled, p+"services.metrics.enabled", util.GetEnvDefault(MetricsEnabledEnvVar, "false") == "true",
 		"Enable gRPC metrics.")
-	fs.StringVar(&o.ListenAddress, "services.metrics.listen-address", util.GetEnvDefault(MetricsListenAddressEnvVar, ":8000"),
+	fs.StringVar(&o.ListenAddress, p+"services.metrics.listen-address", util.GetEnvDefault(MetricsListenAddressEnvVar, ":8000"),
 		"gRPC metrics listen address.")
-	fs.StringVar(&o.Path, "services.metrics.path", util.GetEnvDefault(MetricsPathEnvVar, "/metrics"),
+	fs.StringVar(&o.Path, p+"services.metrics.path", util.GetEnvDefault(MetricsPathEnvVar, "/metrics"),
 		"gRPC metrics path.")
 }

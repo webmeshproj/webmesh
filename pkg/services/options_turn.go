@@ -19,6 +19,7 @@ package services
 import (
 	"errors"
 	"flag"
+	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
@@ -63,20 +64,24 @@ func NewTURNOptions() *TURNOptions {
 }
 
 // BindFlags binds the flags.
-func (o *TURNOptions) BindFlags(fs *flag.FlagSet) {
-	fs.BoolVar(&o.Enabled, "services.turn.enabled", util.GetEnvDefault(TURNEnabledEnvVar, "false") == "true",
+func (o *TURNOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fs.BoolVar(&o.Enabled, p+"services.turn.enabled", util.GetEnvDefault(TURNEnabledEnvVar, "false") == "true",
 		"Enable the TURN server.")
-	fs.StringVar(&o.Endpoint, "services.turn.endpoint", util.GetEnvDefault(TURNServerEndpointEnvVar, ""),
+	fs.StringVar(&o.Endpoint, p+"services.turn.endpoint", util.GetEnvDefault(TURNServerEndpointEnvVar, ""),
 		"The TURN server endpoint. If empty, the public IP will be used.")
-	fs.StringVar(&o.PublicIP, "services.turn.public-ip", util.GetEnvDefault(TURNServerPublicIPEnvVar, ""),
+	fs.StringVar(&o.PublicIP, p+"services.turn.public-ip", util.GetEnvDefault(TURNServerPublicIPEnvVar, ""),
 		"The address advertised for STUN requests.")
-	fs.StringVar(&o.ListenAddress, "services.turn.listen-address", util.GetEnvDefault(TURNServerListenAddressEnvVar, "0.0.0.0"),
+	fs.StringVar(&o.ListenAddress, p+"services.turn.listen-address", util.GetEnvDefault(TURNServerListenAddressEnvVar, "0.0.0.0"),
 		"Address to listen on for TURN connections.")
-	fs.IntVar(&o.ListenPort, "services.turn.listen-port", util.GetEnvIntDefault(TURNServerPortEnvVar, 3478),
+	fs.IntVar(&o.ListenPort, p+"services.turn.listen-port", util.GetEnvIntDefault(TURNServerPortEnvVar, 3478),
 		"Port to listen on for TURN connections.")
-	fs.StringVar(&o.ServerRealm, "services.turn.server-realm", util.GetEnvDefault(TURNServerRealmEnvVar, "webmesh.io"),
+	fs.StringVar(&o.ServerRealm, p+"services.turn.server-realm", util.GetEnvDefault(TURNServerRealmEnvVar, "webmesh.io"),
 		"Realm used for TURN server authentication.")
-	fs.StringVar(&o.STUNPortRange, "services.turn.stun-port-range", util.GetEnvDefault(TURNSTUNPortRangeEnvVar, "49152-65535"),
+	fs.StringVar(&o.STUNPortRange, p+"services.turn.stun-port-range", util.GetEnvDefault(TURNSTUNPortRangeEnvVar, "49152-65535"),
 		"Port range to use for STUN.")
 }
 

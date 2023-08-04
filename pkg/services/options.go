@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -81,21 +82,25 @@ func NewOptions() *Options {
 }
 
 // BindFlags binds the gRPC options to the given flag set.
-func (o *Options) BindFlags(fs *flag.FlagSet) {
-	fs.StringVar(&o.ListenAddress, "services.listen-address", util.GetEnvDefault(ListenAddressEnvVar, ":8443"),
+func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fs.StringVar(&o.ListenAddress, p+"services.listen-address", util.GetEnvDefault(ListenAddressEnvVar, ":8443"),
 		"gRPC server listen address.")
-	fs.StringVar(&o.TLSCertFile, "services.tls-cert-file", util.GetEnvDefault(CertFileEnvVar, ""),
+	fs.StringVar(&o.TLSCertFile, p+"services.tls-cert-file", util.GetEnvDefault(CertFileEnvVar, ""),
 		"gRPC server TLS certificate file.")
-	fs.StringVar(&o.TLSKeyFile, "services.tls-key-file", util.GetEnvDefault(KeyFileEnvVar, ""),
+	fs.StringVar(&o.TLSKeyFile, p+"services.tls-key-file", util.GetEnvDefault(KeyFileEnvVar, ""),
 		"gRPC server TLS key file.")
-	fs.BoolVar(&o.Insecure, "services.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
+	fs.BoolVar(&o.Insecure, p+"services.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Don't use TLS for the gRPC server.")
 
-	o.API.BindFlags(fs)
-	o.MeshDNS.BindFlags(fs)
-	o.TURN.BindFlags(fs)
-	o.Metrics.BindFlags(fs)
-	o.Dashboard.BindFlags(fs)
+	o.API.BindFlags(fs, prefix...)
+	o.MeshDNS.BindFlags(fs, prefix...)
+	o.TURN.BindFlags(fs, prefix...)
+	o.Metrics.BindFlags(fs, prefix...)
+	o.Dashboard.BindFlags(fs, prefix...)
 }
 
 // Validate validates the options.

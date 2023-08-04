@@ -105,50 +105,51 @@ func NewMeshOptions() *MeshOptions {
 const hostnameFlagDefault = "<hostname>"
 
 // BindFlags binds the MeshOptions to a flag set.
-func (o *MeshOptions) BindFlags(fl *flag.FlagSet) {
-	fl.StringVar(&o.NodeID, "mesh.node-id", util.GetEnvDefault(NodeIDEnvVar, hostnameFlagDefault),
+func (o *MeshOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fl.StringVar(&o.NodeID, p+"mesh.node-id", util.GetEnvDefault(NodeIDEnvVar, hostnameFlagDefault),
 		`Store node ID. If not set, the ID comes from the following decision tree.
 1. If mTLS is enabled, the node ID is the CN of the client certificate.
 2. If mTLS is not enabled, the node ID is the hostname of the machine.
 3. If the hostname is not available, the node ID is a random UUID (should only be used for testing).`)
-
-	fl.StringVar(&o.ZoneAwarenessID, "mesh.zone-awareness-id", util.GetEnvDefault(ZoneAwarenessIDEnvVar, ""),
+	fl.StringVar(&o.ZoneAwarenessID, p+"mesh.zone-awareness-id", util.GetEnvDefault(ZoneAwarenessIDEnvVar, ""),
 		"Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.")
-	fl.StringVar(&o.JoinAddress, "mesh.join-address", util.GetEnvDefault(JoinAddressEnvVar, ""),
+	fl.StringVar(&o.JoinAddress, p+"mesh.join-address", util.GetEnvDefault(JoinAddressEnvVar, ""),
 		"Address of a node to join.")
-	fl.Func("mesh.peer-discovery-addresses", "Addresses to use for peer discovery.", func(val string) error {
+	fl.Func(p+"mesh.peer-discovery-addresses", "Addresses to use for peer discovery.", func(val string) error {
 		o.PeerDiscoveryAddresses = strings.Split(val, ",")
 		return nil
 	})
-	fl.IntVar(&o.MaxJoinRetries, "mesh.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
+	fl.IntVar(&o.MaxJoinRetries, p+"mesh.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
 		"Maximum number of join retries.")
-
-	fl.BoolVar(&o.JoinAsVoter, "mesh.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
+	fl.BoolVar(&o.JoinAsVoter, p+"mesh.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
 		"Join the cluster as a voter. Default behavior is to join as an observer.")
-	fl.IntVar(&o.GRPCPort, "mesh.grpc-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
+	fl.IntVar(&o.GRPCPort, p+"mesh.grpc-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
 		"GRPC advertise port.")
-	fl.IntVar(&o.MeshDNSPort, "mesh.meshdns-port", util.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),
+	fl.IntVar(&o.MeshDNSPort, p+"mesh.meshdns-port", util.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),
 		"DNS advertise port. This is set automatically when advertising is enabled and the mesh-dns server is running. Default is 0 (disabled).")
-	fl.BoolVar(&o.UseMeshDNS, "mesh.use-meshdns", util.GetEnvDefault(UseMeshDNSEnvVar, "false") == "true",
+	fl.BoolVar(&o.UseMeshDNS, p+"mesh.use-meshdns", util.GetEnvDefault(UseMeshDNSEnvVar, "false") == "true",
 		"Set mesh DNS servers to the system configuration. If a local server is running, this will use the local server.")
-
-	fl.StringVar(&o.PrimaryEndpoint, "mesh.primary-endpoint", util.GetEnvDefault(PrimaryEndpointEnvVar, ""),
+	fl.StringVar(&o.PrimaryEndpoint, p+"mesh.primary-endpoint", util.GetEnvDefault(PrimaryEndpointEnvVar, ""),
 		`The primary endpoint to broadcast when joining a cluster.
 This is only necessary if the node intends on being publicly accessible.`)
-	fl.Func("mesh.routes", `Comma separated list of additional routes to advertise to the mesh.
+	fl.Func(p+"mesh.routes", `Comma separated list of additional routes to advertise to the mesh.
 	These routes are advertised to all peers. If the node is not allowed
 	to put routes in the mesh, the node will be unable to join.`, func(s string) error {
 		o.Routes = strings.Split(s, ",")
 		return nil
 	})
-	fl.Func("mesh.direct-peers", `Comma separated list of peers to request direct edges to.
+	fl.Func(p+"mesh.direct-peers", `Comma separated list of peers to request direct edges to.
 	If the node is not allowed to create edges and data channels, the node will be unable to join.`, func(s string) error {
 		o.DirectPeers = strings.Split(s, ",")
 		return nil
 	})
-	fl.BoolVar(&o.NoIPv4, "mesh.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
+	fl.BoolVar(&o.NoIPv4, p+"mesh.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Do not request IPv4 assignments when joining.")
-	fl.BoolVar(&o.NoIPv6, "mesh.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
+	fl.BoolVar(&o.NoIPv6, p+"mesh.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
 		"Do not request IPv6 assignments when joining.")
 }
 

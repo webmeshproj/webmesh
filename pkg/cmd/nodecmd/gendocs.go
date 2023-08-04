@@ -99,7 +99,7 @@ func appendFlagSection(title string, flagPrefix string, sb *strings.Builder) {
 	sb.WriteString(fmt.Sprintf("## %s\n\n", title))
 	sb.WriteString("| CLI Flag | Env Var | Config File | Default | Description |\n")
 	sb.WriteString("| -------- | ------- | ----------- | ------- | ----------- |\n")
-	fs.VisitAll(func(f *flag.Flag) {
+	flagset.VisitAll(func(f *flag.Flag) {
 		if !strings.HasPrefix(f.Name, flagPrefix) {
 			return
 		}

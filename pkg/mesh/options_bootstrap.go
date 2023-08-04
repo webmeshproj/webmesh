@@ -162,15 +162,17 @@ func (o *BootstrapOptions) Validate() error {
 }
 
 // BindFlags binds the bootstrap options to the flag set.
-func (o *BootstrapOptions) BindFlags(fl *flag.FlagSet) {
-	fl.BoolVar(&o.Enabled, "bootstrap.enabled", util.GetEnvDefault(BootstrapEnabledEnvVar, "false") == "true",
+func (o *BootstrapOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fl.BoolVar(&o.Enabled, p+"bootstrap.enabled", util.GetEnvDefault(BootstrapEnabledEnvVar, "false") == "true",
 		"Bootstrap the cluster.")
-
-	fl.StringVar(&o.AdvertiseAddress, "bootstrap.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, ""),
+	fl.StringVar(&o.AdvertiseAddress, p+"bootstrap.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, ""),
 		`Raft advertise address. Required when bootstrapping a new cluster,
 but will be replaced with the WireGuard address after bootstrapping.`)
-
-	fl.Func("bootstrap.servers", `Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
+	fl.Func(p+"bootstrap.servers", `Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
 	If empty, the node will use the advertise address as the bootstrap server. If not empty,
 	all nodes in the list should be started with the same list configurations. If any are 
 	different then the first node to become leader will pick them. This can cause bootstrap
@@ -187,8 +189,7 @@ but will be replaced with the WireGuard address after bootstrapping.`)
 			}
 			return nil
 		})
-
-	fl.Func("bootstrap.servers-grpc-ports",
+	fl.Func(p+"bootstrap.servers-grpc-ports",
 		`Comma separated list of gRPC ports to bootstrap with. This is only used
 if bootstrap is true. If empty, the node will use the advertise address and
 locally configured gRPC port for every node in bootstrap-servers.
@@ -208,25 +209,18 @@ Ports should be in the form of <node-id>=<port>.`,
 			}
 			return nil
 		})
-
-	fl.StringVar(&o.IPv4Network, "bootstrap.ipv4-network", util.GetEnvDefault(BootstrapIPv4NetworkEnvVar, "172.16.0.0/12"),
+	fl.StringVar(&o.IPv4Network, p+"bootstrap.ipv4-network", util.GetEnvDefault(BootstrapIPv4NetworkEnvVar, "172.16.0.0/12"),
 		"IPv4 network of the mesh to write to the database when bootstraping a new cluster.")
-
-	fl.StringVar(&o.MeshDomain, "bootstrap.mesh-domain", util.GetEnvDefault(BootstrapMeshDomainEnvVar, "webmesh.internal"),
+	fl.StringVar(&o.MeshDomain, p+"bootstrap.mesh-domain", util.GetEnvDefault(BootstrapMeshDomainEnvVar, "webmesh.internal"),
 		"Domain of the mesh to write to the database when bootstraping a new cluster.")
-
-	fl.StringVar(&o.Admin, "bootstrap.admin", util.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
+	fl.StringVar(&o.Admin, p+"bootstrap.admin", util.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
 		"Admin username to bootstrap the cluster with.")
-
-	fl.StringVar(&o.Voters, "bootstrap.voters", util.GetEnvDefault(BootstrapVotersEnvVar, ""),
+	fl.StringVar(&o.Voters, p+"bootstrap.voters", util.GetEnvDefault(BootstrapVotersEnvVar, ""),
 		"Comma separated list of voters to bootstrap the cluster with. bootstrap-servers are already included in this list.")
-
-	fl.StringVar(&o.DefaultNetworkPolicy, "bootstrap.default-network-policy", util.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
+	fl.StringVar(&o.DefaultNetworkPolicy, p+"bootstrap.default-network-policy", util.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
 		"Default network policy to bootstrap the cluster with.")
-
-	fl.StringVar(&o.RestoreSnapshot, "bootstrap.restore-snapshot", util.GetEnvDefault(BootstrapRestoreSnapshotEnvVar, ""),
+	fl.StringVar(&o.RestoreSnapshot, p+"bootstrap.restore-snapshot", util.GetEnvDefault(BootstrapRestoreSnapshotEnvVar, ""),
 		"Path to a snapshot to restore from when bootstrapping a new cluster.")
-
-	fl.BoolVar(&o.Force, "bootstrap.force", util.GetEnvDefault(ForceBootstrapClusterEnvVar, "false") == "true",
+	fl.BoolVar(&o.Force, p+"bootstrap.force", util.GetEnvDefault(ForceBootstrapClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
 }

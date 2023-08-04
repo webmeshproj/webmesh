@@ -65,16 +65,20 @@ type Options struct {
 }
 
 // BindFlags binds the options to a flag set.
-func (o *Options) BindFlags(fs *flag.FlagSet) {
-	fs.BoolVar(&o.Enabled, "services.dashboard.enabled", util.GetEnvDefault(DashboardEnabledEnvVar, "false") == "true",
+func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fs.BoolVar(&o.Enabled, p+"services.dashboard.enabled", util.GetEnvDefault(DashboardEnabledEnvVar, "false") == "true",
 		"Enable the web dashboard.")
-	fs.StringVar(&o.ListenAddress, "services.dashboard.listen-address", util.GetEnvDefault(DashboardListenEnvVar, ":8080"),
+	fs.StringVar(&o.ListenAddress, p+"services.dashboard.listen-address", util.GetEnvDefault(DashboardListenEnvVar, ":8080"),
 		"The address for the dashboard to listen on.")
-	fs.StringVar(&o.TLSCertFile, "services.dashboard.tls-cert-file", util.GetEnvDefault(DashboardTLSCertEnvVar, ""),
+	fs.StringVar(&o.TLSCertFile, p+"services.dashboard.tls-cert-file", util.GetEnvDefault(DashboardTLSCertEnvVar, ""),
 		"The path to a certificate file to use for TLS.")
-	fs.StringVar(&o.TLSKeyFile, "services.dashboard.tls-key-file", util.GetEnvDefault(DashboardTLSKeyEnvVar, ""),
+	fs.StringVar(&o.TLSKeyFile, p+"services.dashboard.tls-key-file", util.GetEnvDefault(DashboardTLSKeyEnvVar, ""),
 		"The path to a key file to use for TLS.")
-	fs.StringVar(&o.Prefix, "services.dashboard.prefix", util.GetEnvDefault(DashboardPrefixEnvVar, ""),
+	fs.StringVar(&o.Prefix, p+"services.dashboard.prefix", util.GetEnvDefault(DashboardPrefixEnvVar, ""),
 		"The path prefix to use for the dashboard.")
 }
 

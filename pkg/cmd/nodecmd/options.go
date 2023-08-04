@@ -30,6 +30,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/global"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
@@ -38,8 +39,9 @@ import (
 type Options struct {
 	Global *global.Options `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty"`
 
-	Mesh     *mesh.Options     `yaml:",inline" json:",inline" toml:",inline"`
-	Services *services.Options `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
+	Mesh     *mesh.Options       `yaml:",inline" json:",inline" toml:",inline"`
+	Bridge   *meshbridge.Options `yaml:"bridge,omitempty" json:"bridge,omitempty" toml:"bridge,omitempty"`
+	Services *services.Options   `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
 }
 
 // NewOptions creates new options.
@@ -48,6 +50,7 @@ func NewOptions() *Options {
 		Global:   global.NewOptions(),
 		Mesh:     mesh.NewOptions(),
 		Services: services.NewOptions(),
+		Bridge:   meshbridge.NewOptions(),
 	}
 }
 
@@ -57,6 +60,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	o.Global.BindFlags(fs)
 	o.Mesh.BindFlags(fs)
 	o.Services.BindFlags(fs)
+	o.Bridge.BindFlags(fs)
 	return o
 }
 
@@ -122,15 +126,15 @@ be equivalent to the shown command line flag:
 
 `)
 
-	flagsUsage(fs, "Global Configurations:", "global")
-	flagsUsage(fs, "Mesh Configurations:", "mesh")
-	flagsUsage(fs, "Authentication Configurations:", "auth")
-	flagsUsage(fs, "Bootstrap Configurations:", "bootstrap")
-	flagsUsage(fs, "Raft Configurations:", "raft")
-	flagsUsage(fs, "TLS Configurations:", "tls")
-	flagsUsage(fs, "WireGuard Configurations:", "wireguard")
-	flagsUsage(fs, "Service Configurations:", "services")
-	flagsUsage(fs, "Plugin Configurations:", "plugins")
+	flagsUsage(flagset, "Global Configurations:", "global")
+	flagsUsage(flagset, "Mesh Configurations:", "mesh")
+	flagsUsage(flagset, "Authentication Configurations:", "auth")
+	flagsUsage(flagset, "Bootstrap Configurations:", "bootstrap")
+	flagsUsage(flagset, "Raft Configurations:", "raft")
+	flagsUsage(flagset, "TLS Configurations:", "tls")
+	flagsUsage(flagset, "WireGuard Configurations:", "wireguard")
+	flagsUsage(flagset, "Service Configurations:", "services")
+	flagsUsage(flagset, "Plugin Configurations:", "plugins")
 
 	fmt.Fprint(os.Stderr, "General Flags\n\n")
 	fmt.Fprint(os.Stderr, "  --config         Load flags from the given configuration file\n")
