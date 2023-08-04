@@ -49,7 +49,7 @@ docker-build-distroless: docker-build-bin ## Build the distroless node docker im
 		-t $(DISTROLESS_IMAGE) .
 
 docker-build-bin:
-	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux --single-target
+	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux
 
 docker-push: docker-build ## Push the node docker image
 	$(DOCKER) push $(IMAGE)
@@ -62,7 +62,7 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 COVERAGE_FILE := coverage.out
 TEST_ARGS     := -v -cover -coverprofile=$(COVERAGE_FILE) -covermode=atomic -race
 
-test: fmt vet
+test: fmt vet ## Run unit tests.
 	go test $(TEST_ARGS) ./...
 	go tool cover -func=$(COVERAGE_FILE)
 
