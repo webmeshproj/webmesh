@@ -135,9 +135,12 @@ type Server struct {
 }
 
 func (s *Server) ListenAndServe() error {
+	log := slog.Default()
 	if s.TLSConfig != nil {
+		log.Info("serving dashboard over TLS", "address", s.Addr)
 		return s.Server.ListenAndServeTLS("", "")
 	}
+	log.Info("serving dashboard over HTTP", "address", s.Addr)
 	return s.Server.ListenAndServe()
 }
 

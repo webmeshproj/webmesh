@@ -132,7 +132,7 @@ func executeSingleMesh() error {
 	// Create and open the store
 	st, err := mesh.New(opts.Mesh)
 	if err != nil {
-		return fmt.Errorf("failed to create mesh store: %w", err)
+		return fmt.Errorf("failed to create mesh connection: %w", err)
 	}
 
 	ctx := context.Background()
@@ -147,19 +147,19 @@ func executeSingleMesh() error {
 	}
 	err = st.Open(ctx, features)
 	if err != nil {
-		return fmt.Errorf("failed to open mesh store: %w", err)
+		return fmt.Errorf("failed to open mesh connection: %w", err)
 	}
 	handleErr := func(cause error) error {
 		if err := st.Close(); err != nil {
-			log.Error("failed to shutdown mesh store", slog.String("error", err.Error()))
+			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
 		}
 		return fmt.Errorf("failed to start mesh node: %w", cause)
 	}
 	// Shutdown the store on exit
 	defer func() {
-		log.Info("shutting down mesh store")
+		log.Info("shutting down mesh connection")
 		if err = st.Close(); err != nil {
-			log.Error("failed to shutdown mesh store", slog.String("error", err.Error()))
+			log.Error("failed to shutdown mesh connection", slog.String("error", err.Error()))
 		}
 	}()
 	log.Info("mesh connection is ready, starting services")
