@@ -111,6 +111,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 
 // Validate validates the options.
 func (o *Options) Validate() error {
+	if o == nil {
+		return fmt.Errorf("options are nil")
+	}
 	if o.ListenAddress == "" {
 		return fmt.Errorf("listen address must be specified")
 	}

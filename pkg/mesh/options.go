@@ -94,6 +94,9 @@ func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
 
 // Validate validates the options.
 func (o *Options) Validate() error {
+	if o == nil {
+		return fmt.Errorf("options are nil")
+	}
 	if o.Bootstrap == nil || !o.Bootstrap.Enabled {
 		if o.Mesh.JoinAddress == "" && len(o.Mesh.PeerDiscoveryAddresses) == 0 {
 			return fmt.Errorf("must specify either bootstrap.enabled or mesh.join-address or mesh.peer-discovery-addresses")
