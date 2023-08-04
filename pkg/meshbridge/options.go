@@ -85,6 +85,7 @@ func (o *Options) Validate() error {
 		failMsg  string
 	}{
 		{o.allDataDirsUnique, "raft data dirs must be unique (or otherwise in-memory) for each mesh connection"},
+		{o.allWireGuardPortsUnique, "wireguard listen ports must be unique for each mesh connection"},
 		{o.allGRPCPortsUnique, "grpc listen ports must be unique for each mesh connection"},
 		{o.allRaftPortsUnique, "raft listen ports must be unique for each mesh connection"},
 		{o.allDNSPortsUnique, "dns listen ports must be unique for each mesh connection"},
@@ -144,6 +145,14 @@ func (o *Options) allDataDirsUnique() (bool, error) {
 		}
 	}
 	return util.AllUnique(datadirs), nil
+}
+
+func (o *Options) allWireGuardPortsUnique() (bool, error) {
+	var ports []int
+	for _, opts := range o.Meshes {
+		ports = append(ports, opts.Mesh.WireGuard.ListenPort)
+	}
+	return util.AllUnique(ports), nil
 }
 
 func (o *Options) allGRPCPortsUnique() (bool, error) {
