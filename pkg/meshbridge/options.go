@@ -26,6 +26,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util"
@@ -65,15 +66,14 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				o.Meshes[meshID] = &MeshOptions{
 					Mesh:     mesh.NewOptions(ifaceName, wgPort, grpcPort, raftPort),
 					Services: services.NewOptions(grpcPort),
+					Plugins:  plugins.NewOptions(),
 				}
+				o.Meshes[meshID].BindFlags(fs, "bridge", meshID)
 				raftPort++
 				grpcPort++
 				wgPort++
 			}
 		}
-	}
-	for name, opts := range o.Meshes {
-		opts.BindFlags(fs, "bridge", name)
 	}
 }
 
@@ -117,12 +117,15 @@ type MeshOptions struct {
 	Mesh *mesh.Options `json:",inline" yaml:",inline" toml:",inline"`
 	// Services are the options for services to run and/or advertise.
 	Services *services.Options `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
+	// Plugins are the options for plugins to run with this mesh.
+	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
 }
 
 // BindFlags binds the options to the given flagset.
 func (o *MeshOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	o.Mesh.BindFlags(fs, prefix...)
 	o.Services.BindFlags(fs, prefix...)
+	o.Plugins.BindFlags(fs, prefix...)
 }
 
 // Validate validates the options.

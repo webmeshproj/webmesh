@@ -76,7 +76,7 @@ func Execute() error {
 			return fmt.Errorf("failed to decode config file: %w", err)
 		}
 	}
-	err = opts.Global.Overlay(opts.Mesh, opts.Services)
+	err = opts.Global.Overlay(opts.Mesh, opts.Services, opts.Bridge)
 	if err != nil {
 		return err
 	}

@@ -27,6 +27,7 @@ import (
 	"strconv"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
@@ -184,141 +185,158 @@ func (o *Options) Overlay(opts ...any) error {
 	}
 	for _, opt := range opts {
 		switch v := opt.(type) {
-		case *plugins.Options:
-			if o.MTLS && v.Plugins["mtls"] == nil {
-				v.Plugins["mtls"] = &plugins.Config{
-					Config: map[string]any{
-						"ca-file": func() string {
-							if o.TLSClientCAFile != "" {
-								return o.TLSClientCAFile
-							}
-							return o.TLSCAFile
-						}(),
-					},
-				}
+		case *meshbridge.Options:
+			if len(v.Meshes) == 0 {
+				continue
 			}
+			// Meshbridge is a special case, we don't override everything
 		case *mesh.Options:
-			if !v.Mesh.NoIPv4 {
-				v.Mesh.NoIPv4 = o.NoIPv4
-			}
-			if !v.Mesh.NoIPv6 {
-				v.Mesh.NoIPv6 = o.NoIPv6
-			}
-			if !v.TLS.Insecure {
-				v.TLS.Insecure = o.Insecure
-			}
-			if !v.TLS.VerifyChainOnly {
-				v.TLS.VerifyChainOnly = o.VerifyChainOnly
-			}
-			if o.MTLS {
-				if v.Auth.MTLS == nil {
-					v.Auth.MTLS = &mesh.MTLSOptions{
-						CertFile: o.TLSCertFile,
-						KeyFile:  o.TLSKeyFile,
-					}
-				}
-			}
-			if v.TLS.CAFile == "" {
-				v.TLS.CAFile = o.TLSCAFile
-			}
-			if o.MTLS && v.Plugins.Plugins["mtls"] == nil {
-				v.Plugins.Plugins["mtls"] = &plugins.Config{
-					Config: map[string]any{
-						"ca-file": func() string {
-							if o.TLSClientCAFile != "" {
-								return o.TLSClientCAFile
-							}
-							return o.TLSCAFile
-						}(),
-					},
-				}
-			}
-			if primaryEndpoint.IsValid() {
-				// Determine the raft and wireguard ports so we can set our
-				// advertise addresses.
-				var raftPort, wireguardPort uint16
-				for _, inOpts := range opts {
-					if vopt, ok := inOpts.(*raft.Options); ok {
-						_, port, err := net.SplitHostPort(vopt.ListenAddress)
-						if err != nil {
-							return fmt.Errorf("failed to parse raft listen address: %w", err)
-						}
-						raftPortz, err := strconv.ParseUint(port, 10, 16)
-						if err != nil {
-							return fmt.Errorf("failed to parse raft listen address: %w", err)
-						}
-						raftPort = uint16(raftPortz)
-					}
-				}
-				for _, inOpts := range opts {
-					if vopt, ok := inOpts.(*wireguard.Options); ok {
-						wireguardPort = uint16(vopt.ListenPort)
-					}
-				}
-				if raftPort == 0 {
-					raftPort = 9443
-				}
-				if wireguardPort == 0 {
-					wireguardPort = 51820
-				}
-				if v.Mesh.PrimaryEndpoint == "" {
-					v.Mesh.PrimaryEndpoint = primaryEndpoint.String()
-				}
-				if len(v.WireGuard.Endpoints) == 0 {
-					var eps []string
-					if primaryEndpoint.IsValid() {
-						eps = append(eps, netip.AddrPortFrom(primaryEndpoint, uint16(wireguardPort)).String())
-					}
-					for _, endpoint := range detectedEndpoints {
-						ep := netip.AddrPortFrom(endpoint.Addr(), uint16(wireguardPort)).String()
-						if ep != v.Mesh.PrimaryEndpoint {
-							eps = append(eps, ep)
-						}
-					}
-					v.WireGuard.Endpoints = eps
-				}
-				if v.Bootstrap.AdvertiseAddress == "" {
-					v.Bootstrap.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
-				}
+			if err := o.mergeMeshOptions(v, primaryEndpoint, detectedEndpoints); err != nil {
+				return err
 			}
 		case *services.Options:
-			if !v.Insecure {
-				v.Insecure = o.Insecure
-			}
-			if v.TLSCertFile == "" {
-				v.TLSCertFile = o.TLSCertFile
-			}
-			if v.TLSKeyFile == "" {
-				v.TLSKeyFile = o.TLSKeyFile
-			}
-			if v.TURN.Enabled {
-				if v.TURN.Endpoint == "" && primaryEndpoint.IsValid() {
-					v.TURN.Endpoint = fmt.Sprintf("stun:%s",
-						net.JoinHostPort(primaryEndpoint.String(), strconv.Itoa(v.TURN.ListenPort)))
-				}
-				if v.TURN.PublicIP == "" && primaryEndpoint.IsValid() {
-					v.TURN.PublicIP = primaryEndpoint.String()
+			var meshopts *mesh.Options
+			for _, inOpts := range opts {
+				if vopt, ok := inOpts.(*mesh.Options); ok {
+					meshopts = vopt
 				}
 			}
-			if v.MeshDNS.Enabled && v.MeshDNS.ListenUDP != "" && !o.DisableFeatureAdvertisement {
-				// Set the advertise DNS port
-				_, port, err := net.SplitHostPort(v.MeshDNS.ListenUDP)
-				if err != nil {
-					return fmt.Errorf("failed to parse listen address: %w", err)
-				}
-				portz, err := strconv.ParseUint(port, 10, 16)
-				if err != nil {
-					return fmt.Errorf("failed to parse listen address: %w", err)
-				}
-				for _, inOpts := range opts {
-					if vopt, ok := inOpts.(*mesh.Options); ok {
-						if vopt.Mesh.MeshDNSPort == 0 {
-							vopt.Mesh.MeshDNSPort = int(portz)
-						}
-					}
-				}
+			if err := o.mergeServicesOptions(v, meshopts, primaryEndpoint); err != nil {
+				return err
 			}
 		}
 	}
 	return nil
+}
+
+func (o *Options) mergeMeshOptions(opts *mesh.Options, primaryEndpoint netip.Addr, detectedEndpoints endpoints.PrefixList) error {
+	o.mergePluginOptions(opts.Plugins)
+	if !opts.Mesh.NoIPv4 {
+		opts.Mesh.NoIPv4 = o.NoIPv4
+	}
+	if !opts.Mesh.NoIPv6 {
+		opts.Mesh.NoIPv6 = o.NoIPv6
+	}
+	if !opts.TLS.Insecure {
+		opts.TLS.Insecure = o.Insecure
+	}
+	if !opts.TLS.VerifyChainOnly {
+		opts.TLS.VerifyChainOnly = o.VerifyChainOnly
+	}
+	if o.MTLS {
+		if opts.Auth.MTLS == nil {
+			opts.Auth.MTLS = &mesh.MTLSOptions{
+				CertFile: o.TLSCertFile,
+				KeyFile:  o.TLSKeyFile,
+			}
+		}
+	}
+	if opts.TLS.CAFile == "" {
+		opts.TLS.CAFile = o.TLSCAFile
+	}
+	if o.MTLS && opts.Plugins.Plugins["mtls"] == nil {
+		opts.Plugins.Plugins["mtls"] = &plugins.Config{
+			Config: map[string]any{
+				"ca-file": func() string {
+					if o.TLSClientCAFile != "" {
+						return o.TLSClientCAFile
+					}
+					return o.TLSCAFile
+				}(),
+			},
+		}
+	}
+	if !primaryEndpoint.IsValid() {
+		return nil
+	}
+	// Determine the raft and wireguard ports so we can set our
+	// advertise addresses.
+	var raftPort, wireguardPort uint16
+	wireguardPort = uint16(opts.WireGuard.ListenPort)
+	_, port, err := net.SplitHostPort(opts.Raft.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("failed to parse raft listen address: %w", err)
+	}
+	raftPortz, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return fmt.Errorf("failed to parse raft listen address: %w", err)
+	}
+	raftPort = uint16(raftPortz)
+	if raftPort == 0 {
+		raftPort = raft.DefaultListenPort
+	}
+	if wireguardPort == 0 {
+		wireguardPort = wireguard.DefaultListenPort
+	}
+	if opts.Mesh.PrimaryEndpoint == "" {
+		opts.Mesh.PrimaryEndpoint = primaryEndpoint.String()
+	}
+	if len(opts.WireGuard.Endpoints) == 0 {
+		var eps []string
+		if primaryEndpoint.IsValid() {
+			eps = append(eps, netip.AddrPortFrom(primaryEndpoint, uint16(wireguardPort)).String())
+		}
+		for _, endpoint := range detectedEndpoints {
+			ep := netip.AddrPortFrom(endpoint.Addr(), uint16(wireguardPort)).String()
+			if ep != opts.Mesh.PrimaryEndpoint {
+				eps = append(eps, ep)
+			}
+		}
+		opts.WireGuard.Endpoints = eps
+	}
+	if opts.Bootstrap.AdvertiseAddress == "" {
+		opts.Bootstrap.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
+	}
+	return nil
+}
+
+func (o *Options) mergeServicesOptions(opts *services.Options, meshopts *mesh.Options, primaryEndpoint netip.Addr) error {
+	if !opts.Insecure {
+		opts.Insecure = o.Insecure
+	}
+	if opts.TLSCertFile == "" {
+		opts.TLSCertFile = o.TLSCertFile
+	}
+	if opts.TLSKeyFile == "" {
+		opts.TLSKeyFile = o.TLSKeyFile
+	}
+	if opts.TURN != nil && opts.TURN.Enabled {
+		if opts.TURN.Endpoint == "" && primaryEndpoint.IsValid() {
+			opts.TURN.Endpoint = fmt.Sprintf("stun:%s",
+				net.JoinHostPort(primaryEndpoint.String(), strconv.Itoa(opts.TURN.ListenPort)))
+		}
+		if opts.TURN.PublicIP == "" && primaryEndpoint.IsValid() {
+			opts.TURN.PublicIP = primaryEndpoint.String()
+		}
+	}
+	if meshopts != nil {
+		if opts.MeshDNS != nil && opts.MeshDNS.Enabled && opts.MeshDNS.ListenUDP != "" && !o.DisableFeatureAdvertisement {
+			// Set the advertise DNS port
+			_, port, err := net.SplitHostPort(opts.MeshDNS.ListenUDP)
+			if err != nil {
+				return fmt.Errorf("failed to parse listen address: %w", err)
+			}
+			portz, err := strconv.ParseUint(port, 10, 16)
+			if err != nil {
+				return fmt.Errorf("failed to parse listen address: %w", err)
+			}
+			meshopts.Mesh.MeshDNSPort = int(portz)
+		}
+	}
+	return nil
+}
+
+func (o *Options) mergePluginOptions(opts *plugins.Options) {
+	if o.MTLS && opts.Plugins["mtls"] == nil {
+		opts.Plugins["mtls"] = &plugins.Config{
+			Config: map[string]any{
+				"ca-file": func() string {
+					if o.TLSClientCAFile != "" {
+						return o.TLSClientCAFile
+					}
+					return o.TLSCAFile
+				}(),
+			},
+		}
+	}
 }

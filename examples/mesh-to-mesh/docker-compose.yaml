@@ -33,7 +33,7 @@ services:
         ipv4_address: 10.1.0.2
         ipv6_address: 2001:3200:3201::2
     hostname: site-1-node
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE", "SYS_ADMIN"]
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
     entrypoint:
@@ -55,7 +55,7 @@ services:
         ipv4_address: 10.2.0.2
         ipv6_address: 2001:3200:3202::2
     hostname: site-1-node
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE", "SYS_ADMIN"]
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
     entrypoint:
@@ -66,3 +66,28 @@ services:
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
       - --raft.in-memory
+
+  # bridge-node:
+  #   image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+  #   build:
+  #     context: ../..
+  #     dockerfile: Dockerfile
+  #   networks:
+  #     site1:
+  #       ipv4_address: 10.1.0.3
+  #       ipv6_address: 2001:3200:3201::3
+  #     site2:
+  #       ipv4_address: 10.2.0.3
+  #       ipv6_address: 2001:3200:3202::3
+  #   hostname: bridge-node
+  #   cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+  #   sysctls:
+  #     - net.ipv6.conf.all.disable_ipv6=0
+  #   entrypoint:
+  #     - /webmesh-node
+  #     - --global.insecure
+  #     - --global.detect-endpoints
+  #     - --global.detect-private-endpoints
+  #     - --bootstrap.enabled
+  #     - --bootstrap.default-network-policy=accept
+  #     - --raft.in-memory
