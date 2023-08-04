@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 networks:
   simple:
@@ -13,7 +13,6 @@ volumes:
   bootstrap-node:
 
 services:
-
   bootstrap-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
@@ -23,7 +22,7 @@ services:
       simple:
     hostname: bootstrap-node
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --global.detect-endpoints
@@ -44,7 +43,7 @@ services:
       simple:
     hostname: join-node
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --raft.in-memory

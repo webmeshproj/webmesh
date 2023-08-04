@@ -19,7 +19,7 @@ services:
         ipv4_address: 10.1.0.1
     hostname: bootstrap-node-1
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --global.detect-endpoints
@@ -45,7 +45,7 @@ services:
         ipv4_address: 10.1.0.2
     hostname: bootstrap-node-2
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --global.detect-endpoints
@@ -63,7 +63,7 @@ services:
         ipv4_address: 10.1.0.3
     hostname: bootstrap-node-3
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --global.detect-endpoints

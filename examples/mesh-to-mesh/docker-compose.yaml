@@ -1,0 +1,33 @@
+version: "3"
+
+networks:
+  site1:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.1.0.0/24
+          gateway: 10.1.0.1
+        - subnet: 2001:1000:1000::/64
+          gateway: 2001:1000:1000::1
+
+services:
+  site-1-node:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site1:
+    hostname: site-1-node
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    entrypoint:
+      - /webmesh-node
+      - --global.insecure
+      - --global.detect-endpoints
+      - --global.detect-private-endpoints
+      - --bootstrap.enabled
+      - --bootstrap.default-network-policy=accept
+      - --raft.in-memory

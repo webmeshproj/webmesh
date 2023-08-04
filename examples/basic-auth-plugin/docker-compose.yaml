@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 networks:
   bootstrap:
@@ -11,7 +11,6 @@ volumes:
   bootstrap-node:
 
 services:
-
   bootstrap-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
@@ -22,7 +21,7 @@ services:
         ipv4_address: 10.1.0.5
     hostname: bootstrap-node
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.log-level=debug
       - --global.no-ipv6
@@ -47,7 +46,7 @@ services:
       bootstrap:
     hostname: join-node
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.log-level=debug
       - --global.no-ipv6

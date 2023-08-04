@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 networks:
   public-net:
@@ -22,7 +22,6 @@ volumes:
   bootstrap-node:
 
 services:
-  
   # Bootstrap/TURN Node
 
   bootstrap-node:
@@ -32,7 +31,7 @@ services:
         ipv4_address: 10.30.0.1
     hostname: bootstrap-node
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
@@ -59,7 +58,7 @@ services:
       - bootstrap-node:/data
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-    
+
   site-1-peer:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
@@ -67,7 +66,7 @@ services:
       site-1:
     hostname: site-1-peer
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --global.log-level=debug
@@ -86,7 +85,7 @@ services:
       site-2:
     hostname: site-2-peer
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --global.log-level=debug

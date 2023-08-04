@@ -1,5 +1,5 @@
 FROM scratch
 
 ARG TARGETOS TARGETARCH PREFIX=node
-ADD dist/${PREFIX}_${TARGETOS}_${TARGETARCH}*/webmesh-node /node
-ENTRYPOINT ["/node"]
+ADD dist/${PREFIX}_${TARGETOS}_${TARGETARCH}*/webmesh-node /webmesh-node
+ENTRYPOINT ["/webmesh-node"]

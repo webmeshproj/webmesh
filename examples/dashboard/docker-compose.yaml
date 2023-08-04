@@ -20,7 +20,7 @@ services:
       simple:
     hostname: bootstrap-node
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --global.detect-endpoints
@@ -52,7 +52,7 @@ services:
       simple:
     hostname: join-node
     entrypoint:
-      - /node
+      - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
       - --raft.in-memory
