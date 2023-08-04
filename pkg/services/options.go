@@ -45,6 +45,8 @@ const (
 	CertFileEnvVar      = "SERVICES_TLS_CERT_FILE"
 	KeyFileEnvVar       = "SERVICES_TLS_KEY_FILE"
 	InsecureEnvVar      = "SERVICES_INSECURE"
+
+	DefaultGRPCPort = 8443
 )
 
 // Options contains the configuration for the gRPC server.
@@ -69,10 +71,14 @@ type Options struct {
 	Dashboard *dashboard.Options `json:"dashboard,omitempty" yaml:"dashboard,omitempty" toml:"dashboard,omitempty"`
 }
 
-// NewOptions returns new Options with sensible defaults.
-func NewOptions() *Options {
+// NewOptions returns new Options with sensible defaults. If grpcPort is 0
+// the default port is used.
+func NewOptions(grpcPort int) *Options {
+	if grpcPort == 0 {
+		grpcPort = DefaultGRPCPort
+	}
 	return &Options{
-		ListenAddress: ":8443",
+		ListenAddress: fmt.Sprintf(":%d", grpcPort),
 		API:           NewAPIOptions(),
 		MeshDNS:       NewMeshDNSOptions(),
 		TURN:          NewTURNOptions(),

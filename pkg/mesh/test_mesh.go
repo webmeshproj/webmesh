@@ -96,7 +96,7 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Mesh, e
 }
 
 func newTestOptions() *Options {
-	opts := NewOptions()
+	opts := NewOptions(0, 0)
 	opts.Raft.ConnectionTimeout = 100 * time.Millisecond
 	opts.Raft.HeartbeatTimeout = 100 * time.Millisecond
 	opts.Raft.ElectionTimeout = 100 * time.Millisecond

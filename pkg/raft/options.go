@@ -19,6 +19,7 @@ package raft
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"path/filepath"
 	"runtime"
@@ -59,6 +60,8 @@ const (
 	RaftStorePath = "raft-store"
 	// DataStoragePath is the raft data storage directory.
 	DataStoragePath = "raft-data"
+	// DefaultListenPort is the default raft listen port
+	DefaultListenPort = 9443
 )
 
 // Options are the raft options.
@@ -106,10 +109,14 @@ type Options struct {
 	OnObservation     func(ev Observation)                                                `json:"-" yaml:"-" toml:"-"`
 }
 
-// NewOptions returns new raft options with the default values.
-func NewOptions() *Options {
+// NewOptions returns new raft options with the default values and given listen port.
+// If the port is 0, the default is used.
+func NewOptions(port int) *Options {
+	if port == 0 {
+		port = DefaultListenPort
+	}
 	return &Options{
-		ListenAddress: ":9443",
+		ListenAddress: fmt.Sprintf("%d", port),
 		DataDir: func() string {
 			if runtime.GOOS == "windows" {
 				return "C:\\ProgramData\\webmesh\\store"

@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
@@ -44,6 +45,8 @@ func NewOptions() *Options {
 // BindFlags binds the options to the given flagset.
 func (o *Options) BindFlags(fs *flag.FlagSet) {
 	// Iterate flags to determine which bridge options to bind.
+	raftPort := raft.DefaultListenPort
+	grpcPort := services.DefaultGRPCPort
 	for _, arg := range os.Args {
 		if strings.HasPrefix(arg, "--bridge.") {
 			parts := strings.Split(arg, ".")
@@ -53,9 +56,11 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 			meshID := parts[1]
 			if _, ok := o.Meshes[meshID]; !ok {
 				o.Meshes[meshID] = &MeshOptions{
-					Mesh:     mesh.NewOptions(),
-					Services: services.NewOptions(),
+					Mesh:     mesh.NewOptions(grpcPort, raftPort),
+					Services: services.NewOptions(grpcPort),
 				}
+				raftPort++
+				grpcPort++
 			}
 		}
 	}

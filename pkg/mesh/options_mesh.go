@@ -77,8 +77,12 @@ type MeshOptions struct {
 	NoIPv6 bool `json:"no-ipv6,omitempty" yaml:"no-ipv6,omitempty" toml:"no-ipv6,omitempty"`
 }
 
-// NewMeshOptions creates a new MeshOptions with default values.
-func NewMeshOptions() *MeshOptions {
+// NewMeshOptions creates a new MeshOptions with default values. If the grpcPort
+// is 0, the default is used.
+func NewMeshOptions(grpcPort int) *MeshOptions {
+	if grpcPort == 0 {
+		grpcPort = DefaultGRPCPort
+	}
 	return &MeshOptions{
 		PeerDiscoveryAddresses: func() []string {
 			if val, ok := os.LookupEnv(PeerDiscoveryAddressesEnvVar); ok {
@@ -99,7 +103,7 @@ func NewMeshOptions() *MeshOptions {
 			return nil
 		}(),
 		MaxJoinRetries: 10,
-		GRPCPort:       8443,
+		GRPCPort:       grpcPort,
 	}
 }
 

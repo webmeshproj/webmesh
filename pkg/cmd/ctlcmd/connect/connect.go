@@ -74,7 +74,7 @@ type Options struct {
 // is used to stop the node.
 func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	// Configure the raft store
-	storeOpts := mesh.NewOptions()
+	storeOpts := mesh.NewOptions(0, 0)
 	storeOpts.Raft.InMemory = true
 	storeOpts.Raft.ListenAddress = fmt.Sprintf(":%d", opts.RaftPort)
 	storeOpts.Raft.LeaveOnShutdown = true

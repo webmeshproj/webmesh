@@ -31,6 +31,11 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
+const (
+	// DefaultGRPCPort is the default gRPC port.
+	DefaultGRPCPort = 8443
+)
+
 // Options are the options for the store.
 type Options struct {
 	// Auth are options for authentication to the mesh.
@@ -49,13 +54,14 @@ type Options struct {
 	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
 }
 
-// NewOptions returns new options with sensible defaults.
-func NewOptions() *Options {
+// NewOptions returns new options with sensible defaults. If either of the ports
+// are 0, the defaults are used.
+func NewOptions(grpcPort, raftPort int) *Options {
 	return &Options{
 		Auth:      NewAuthOptions(),
-		Mesh:      NewMeshOptions(),
+		Mesh:      NewMeshOptions(grpcPort),
 		Bootstrap: NewBootstrapOptions(),
-		Raft:      raft.NewOptions(),
+		Raft:      raft.NewOptions(raftPort),
 		TLS:       NewTLSOptions(),
 		WireGuard: NewWireGuardOptions(),
 		Plugins:   plugins.NewOptions(),
@@ -76,10 +82,10 @@ func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
 // Validate validates the options.
 func (o *Options) Validate() error {
 	if o.Raft == nil {
-		o.Raft = raft.NewOptions()
+		o.Raft = raft.NewOptions(0)
 	}
 	if o.Mesh == nil {
-		o.Mesh = NewMeshOptions()
+		o.Mesh = NewMeshOptions(0)
 	}
 	if o.Bootstrap == nil {
 		o.Bootstrap = NewBootstrapOptions()
