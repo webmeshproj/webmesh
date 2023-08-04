@@ -37,6 +37,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system/routes"
 )
 
+// DefaultListenPort is the default listen port for the WireGuard interface.
+const DefaultListenPort = 51820
+
 // DefaultInterfaceName is the default name to use for the WireGuard interface.
 var DefaultInterfaceName = "webmesh0"
 

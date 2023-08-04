@@ -48,7 +48,7 @@ type Options struct {
 func NewOptions() *Options {
 	return &Options{
 		Global:   global.NewOptions(),
-		Mesh:     mesh.NewOptions(0, 0),
+		Mesh:     mesh.NewDefaultOptions(),
 		Services: services.NewOptions(0),
 		Bridge:   meshbridge.NewOptions(),
 	}

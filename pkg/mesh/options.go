@@ -54,16 +54,29 @@ type Options struct {
 	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
 }
 
-// NewOptions returns new options with sensible defaults. If either of the ports
-// are 0, the defaults are used.
-func NewOptions(grpcPort, raftPort int) *Options {
+// NewOptions returns new options with sensible defaults. If any of the options
+// are their zero value, their defaults are used.
+func NewOptions(interfaceName string, wireguardPort, grpcPort, raftPort int) *Options {
 	return &Options{
 		Auth:      NewAuthOptions(),
 		Mesh:      NewMeshOptions(grpcPort),
 		Bootstrap: NewBootstrapOptions(),
 		Raft:      raft.NewOptions(raftPort),
 		TLS:       NewTLSOptions(),
-		WireGuard: NewWireGuardOptions(),
+		WireGuard: NewWireGuardOptions(interfaceName, wireguardPort),
+		Plugins:   plugins.NewOptions(),
+	}
+}
+
+// NewDefaultOptions is like NewOptions but takes no arguments and assumes all defaults.
+func NewDefaultOptions() *Options {
+	return &Options{
+		Auth:      NewAuthOptions(),
+		Mesh:      NewMeshOptions(0),
+		Bootstrap: NewBootstrapOptions(),
+		Raft:      raft.NewOptions(0),
+		TLS:       NewTLSOptions(),
+		WireGuard: NewWireGuardOptions("", 0),
 		Plugins:   plugins.NewOptions(),
 	}
 }
@@ -94,7 +107,7 @@ func (o *Options) Validate() error {
 		o.TLS = NewTLSOptions()
 	}
 	if o.WireGuard == nil {
-		o.WireGuard = NewWireGuardOptions()
+		o.WireGuard = NewWireGuardOptions("", 0)
 	}
 	if !o.Bootstrap.Enabled {
 		if o.Mesh.JoinAddress == "" && len(o.Mesh.PeerDiscoveryAddresses) == 0 {

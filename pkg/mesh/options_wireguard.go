@@ -83,10 +83,17 @@ type WireGuardOptions struct {
 }
 
 // WireGuardOptions returns a new WireGuardOptions with sensible defaults.
-func NewWireGuardOptions() *WireGuardOptions {
+// If name or port are empty, default are used.
+func NewWireGuardOptions(name string, port int) *WireGuardOptions {
+	if name == "" {
+		name = wireguard.DefaultInterfaceName
+	}
+	if port == 0 {
+		port = wireguard.DefaultListenPort
+	}
 	return &WireGuardOptions{
-		ListenPort:            51820,
-		InterfaceName:         wireguard.DefaultInterfaceName,
+		ListenPort:            port,
+		InterfaceName:         name,
 		MTU:                   system.DefaultMTU,
 		KeyRotationInterval:   time.Hour * 24 * 7,
 		RecordMetrics:         false,
