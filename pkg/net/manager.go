@@ -73,6 +73,10 @@ type Options struct {
 	ZoneAwarenessID string
 	// DialOptions are the dial options to use when calling peer nodes.
 	DialOptions []grpc.DialOption
+	// DisableIPv4 disables IPv4 on the interface.
+	DisableIPv4 bool
+	// DisableIPv6 disables IPv6 on the interface.
+	DisableIPv6 bool
 }
 
 // StartOptions are the options for starting the network manager and configuring
@@ -88,10 +92,6 @@ type StartOptions struct {
 	NetworkV4 netip.Prefix
 	// NetworkV6 is the IPv6 network to use for the node.
 	NetworkV6 netip.Prefix
-	// DisableIPv4 disables IPv4 on the interface.
-	DisableIPv4 bool
-	// DisableIPv6 disables IPv6 on the interface.
-	DisableIPv6 bool
 }
 
 // Manager is the interface for managing the network.
@@ -223,8 +223,8 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 		MetricsInterval:     m.opts.RecordMetricsInterval,
 		AddressV4:           opts.AddressV4,
 		AddressV6:           opts.AddressV6,
-		DisableIPv4:         opts.DisableIPv4,
-		DisableIPv6:         opts.DisableIPv6,
+		DisableIPv4:         m.opts.DisableIPv4,
+		DisableIPv6:         m.opts.DisableIPv6,
 	}
 	log.Info("Configuring wireguard", slog.Any("opts", wgopts))
 	m.wg, err = wireguard.New(ctx, wgopts)
@@ -235,21 +235,21 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("configure wireguard: %w", err))
 	}
-	if opts.NetworkV6.IsValid() && !opts.DisableIPv6 {
+	if opts.NetworkV6.IsValid() && !m.opts.DisableIPv6 {
 		log.Debug("Adding IPv6 network route", slog.String("network", opts.NetworkV6.String()))
 		err = m.wg.AddRoute(ctx, opts.NetworkV6)
 		if err != nil && !system.IsRouteExists(err) {
 			return handleErr(fmt.Errorf("wireguard add mesh network route: %w", err))
 		}
 	}
-	if opts.AddressV6.IsValid() && !opts.DisableIPv6 {
+	if opts.AddressV6.IsValid() && !m.opts.DisableIPv6 {
 		log.Debug("Adding IPv6 address route", slog.String("address", opts.AddressV6.String()))
 		err = m.wg.AddRoute(ctx, opts.AddressV6)
 		if err != nil && !system.IsRouteExists(err) {
 			return handleErr(fmt.Errorf("wireguard add ipv6 route: %w", err))
 		}
 	}
-	if opts.NetworkV4.IsValid() && !opts.DisableIPv4 {
+	if opts.NetworkV4.IsValid() && !m.opts.DisableIPv4 {
 		log.Debug("Adding IPv4 network route", slog.String("network", opts.NetworkV4.String()))
 		err = m.wg.AddRoute(ctx, opts.NetworkV4)
 		if err != nil && !system.IsRouteExists(err) {
@@ -414,20 +414,34 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 		if err != nil {
 			return fmt.Errorf("parse peer allowed ip: %w", err)
 		}
+		if m.opts.DisableIPv4 && prefix.Addr().Is4() {
+			continue
+		}
+		if m.opts.DisableIPv6 && prefix.Addr().Is6() {
+			continue
+		}
 		allowedIPs = append(allowedIPs, prefix)
 	}
-	allowedRoutes := make([]netip.Prefix, len(peer.GetAllowedRoutes()))
-	for i, ip := range peer.GetAllowedRoutes() {
-		allowedRoutes[i], err = netip.ParsePrefix(ip)
+	allowedRoutes := make([]netip.Prefix, 0)
+	for _, ip := range peer.GetAllowedRoutes() {
+		prefix, err := netip.ParsePrefix(ip)
 		if err != nil {
 			return fmt.Errorf("parse peer allowed route: %w", err)
 		}
+		if m.opts.DisableIPv4 && prefix.Addr().Is4() {
+			continue
+		}
+		if m.opts.DisableIPv6 && prefix.Addr().Is6() {
+			continue
+		}
+		allowedRoutes = append(allowedRoutes, prefix)
 	}
 	wgpeer := wireguard.Peer{
-		ID:         peer.GetId(),
-		PublicKey:  key,
-		Endpoint:   endpoint,
-		AllowedIPs: allowedIPs,
+		ID:            peer.GetId(),
+		PublicKey:     key,
+		Endpoint:      endpoint,
+		AllowedIPs:    allowedIPs,
+		AllowedRoutes: allowedRoutes,
 	}
 	log.Debug("ensuring wireguard peer", slog.Any("peer", &wgpeer))
 	err = m.wg.PutPeer(ctx, &wgpeer)
@@ -441,7 +455,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 		defer cancel()
 		var addr netip.Prefix
 		var err error
-		if peer.AddressIpv4 != "" {
+		if !m.opts.DisableIPv4 && peer.AddressIpv4 != "" {
 			addr, err = netip.ParsePrefix(peer.AddressIpv4)
 		} else {
 			addr, err = netip.ParsePrefix(peer.AddressIpv6)

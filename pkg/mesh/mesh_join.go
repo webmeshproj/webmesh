@@ -17,6 +17,7 @@ limitations under the License.
 package mesh
 
 import (
+	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -29,6 +30,10 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
+)
+
+var (
+	errFatalJoin = fmt.Errorf("fatal join error")
 )
 
 func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Feature) error {
@@ -106,6 +111,9 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 		}
 		err = s.joinWithConn(ctx, conn, features)
 		if err != nil {
+			if errors.Is(err, errFatalJoin) {
+				return err
+			}
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -127,9 +135,9 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 	log := context.LoggerFrom(ctx)
 	client := v1.NewNodeClient(c)
 	defer c.Close()
-	if s.opts.Mesh.GRPCPort == 0 {
+	if s.opts.Mesh.GRPCAdvertisePort == 0 {
 		// Assume the default port.
-		s.opts.Mesh.GRPCPort = 8443
+		s.opts.Mesh.GRPCAdvertisePort = 8443
 	}
 	key, err := s.loadWireGuardKey(ctx)
 	if err != nil {
@@ -139,8 +147,8 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		Id:                 s.ID(),
 		PublicKey:          key.PublicKey().String(),
 		RaftPort:           int32(s.raft.ListenPort()),
-		GrpcPort:           int32(s.opts.Mesh.GRPCPort),
-		MeshdnsPort:        int32(s.opts.Mesh.MeshDNSPort),
+		GrpcPort:           int32(s.opts.Mesh.GRPCAdvertisePort),
+		MeshdnsPort:        int32(s.opts.Mesh.MeshDNSAdvertisePort),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
 		WireguardEndpoints: s.opts.WireGuard.Endpoints,
 		ZoneAwarenessId:    s.opts.Mesh.ZoneAwarenessID,
@@ -181,50 +189,46 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 	if err != nil {
 		return fmt.Errorf("parse ipv6 network: %w", err)
 	}
-	log.Info("configuring wireguard",
-		slog.String("networkv4", addressv4.String()),
-		slog.String("networkv6", addressv6.String()))
 	opts := &meshnet.StartOptions{
-		Key:         key,
-		AddressV4:   addressv4,
-		AddressV6:   addressv6,
-		NetworkV4:   networkv4,
-		NetworkV6:   networkv6,
-		DisableIPv4: !s.opts.Mesh.NoIPv4 && addressv4.IsValid(),
-		DisableIPv6: !s.opts.Mesh.NoIPv6 && addressv6.IsValid(),
+		Key:       key,
+		AddressV4: addressv4,
+		AddressV6: addressv6,
+		NetworkV4: networkv4,
+		NetworkV6: networkv6,
 	}
+	log.Debug("starting network manager", slog.Any("opts", opts))
 	err = s.nw.Start(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("start network manager: %w", err)
+		return fmt.Errorf("%w starting network manager: %w", errFatalJoin, err)
 	}
 	for _, peer := range resp.GetPeers() {
 		log.Info("adding peer", slog.Any("peer", peer))
 		err = s.nw.AddPeer(ctx, peer, resp.GetIceServers())
 		if err != nil {
-			return fmt.Errorf("add peer: %w", err)
+			return fmt.Errorf("%w adding peer: %w", errFatalJoin, err)
 		}
 	}
 	if s.opts.Mesh.UseMeshDNS {
 		var servers []netip.AddrPort
-		if s.opts.Mesh.MeshDNSPort != 0 {
+		if s.opts.Mesh.MeshDNSAdvertisePort != 0 {
 			// Use our local port.
 			addr := "127.0.0.1"
 			if s.opts.Mesh.NoIPv4 {
 				addr = "::1"
 			}
-			servers = append(servers, netip.AddrPortFrom(netip.MustParseAddr(addr), uint16(s.opts.Mesh.MeshDNSPort)))
+			servers = append(servers, netip.AddrPortFrom(netip.MustParseAddr(addr), uint16(s.opts.Mesh.MeshDNSAdvertisePort)))
 		} else {
 			for _, server := range resp.GetDnsServers() {
 				addr, err := netip.ParseAddrPort(server)
 				if err != nil {
-					return fmt.Errorf("parse dns server: %w", err)
+					return fmt.Errorf("%w parsing dns server: %w", errFatalJoin, err)
 				}
 				servers = append(servers, addr)
 			}
 		}
 		err = s.nw.AddDNSServers(ctx, servers)
 		if err != nil {
-			return fmt.Errorf("add dns servers: %w", err)
+			return fmt.Errorf("%w adding dns servers: %w", errFatalJoin, err)
 		}
 	}
 	return nil

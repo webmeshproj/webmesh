@@ -78,7 +78,7 @@ func NewOptions(grpcPort int) *Options {
 		grpcPort = DefaultGRPCPort
 	}
 	return &Options{
-		ListenAddress: fmt.Sprintf(":%d", grpcPort),
+		ListenAddress: fmt.Sprintf("[::]:%d", grpcPort),
 		API:           NewAPIOptions(),
 		MeshDNS:       NewMeshDNSOptions(),
 		TURN:          NewTURNOptions(),
@@ -93,7 +93,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fs.StringVar(&o.ListenAddress, p+"services.listen-address", util.GetEnvDefault(ListenAddressEnvVar, ":8443"),
+	fs.StringVar(&o.ListenAddress, p+"services.listen-address", util.GetEnvDefault(ListenAddressEnvVar, "[::]:8443"),
 		"gRPC server listen address.")
 	fs.StringVar(&o.TLSCertFile, p+"services.tls-cert-file", util.GetEnvDefault(CertFileEnvVar, ""),
 		"gRPC server TLS certificate file.")
@@ -116,6 +116,10 @@ func (o *Options) Validate() error {
 	}
 	if o.ListenAddress == "" {
 		return fmt.Errorf("listen address must be specified")
+	}
+	_, _, err := net.SplitHostPort(o.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("listen address is invalid: %w", err)
 	}
 	if !o.Insecure {
 		if o.TLSCertFile == "" {

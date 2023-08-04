@@ -82,13 +82,13 @@ func NewDefaultOptions() *Options {
 }
 
 // BindFlags binds the options to the flags.
-func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
+func (o *Options) BindFlags(fl *flag.FlagSet, ifaceName string, prefix ...string) {
 	o.Auth.BindFlags(fl, prefix...)
 	o.Mesh.BindFlags(fl, prefix...)
 	o.Bootstrap.BindFlags(fl, prefix...)
 	o.Raft.BindFlags(fl, prefix...)
 	o.TLS.BindFlags(fl, prefix...)
-	o.WireGuard.BindFlags(fl, prefix...)
+	o.WireGuard.BindFlags(fl, ifaceName, prefix...)
 	o.Plugins.BindFlags(fl, prefix...)
 }
 

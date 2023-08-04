@@ -54,7 +54,7 @@ services:
       site2:
         ipv4_address: 10.2.0.2
         ipv6_address: 2001:3200:3202::2
-    hostname: site-1-node
+    hostname: site-2-node
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
@@ -67,27 +67,37 @@ services:
       - --bootstrap.default-network-policy=accept
       - --raft.in-memory
 
-  # bridge-node:
-  #   image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-  #   build:
-  #     context: ../..
-  #     dockerfile: Dockerfile
-  #   networks:
-  #     site1:
-  #       ipv4_address: 10.1.0.3
-  #       ipv6_address: 2001:3200:3201::3
-  #     site2:
-  #       ipv4_address: 10.2.0.3
-  #       ipv6_address: 2001:3200:3202::3
-  #   hostname: bridge-node
-  #   cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
-  #   sysctls:
-  #     - net.ipv6.conf.all.disable_ipv6=0
-  #   entrypoint:
-  #     - /webmesh-node
-  #     - --global.insecure
-  #     - --global.detect-endpoints
-  #     - --global.detect-private-endpoints
-  #     - --bootstrap.enabled
-  #     - --bootstrap.default-network-policy=accept
-  #     - --raft.in-memory
+  bridge-node:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site1:
+        ipv4_address: 10.1.0.3
+        ipv6_address: 2001:3200:3201::3
+      site2:
+        ipv4_address: 10.2.0.3
+        ipv6_address: 2001:3200:3202::3
+    hostname: bridge-node
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    entrypoint:
+      - /webmesh-node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.detect-endpoints
+      - --global.detect-private-endpoints
+      # Site 1 Options
+      - --bridge.site-1.mesh.join-address=site-1-node:8443
+      - --bridge.site-1.raft.in-memory
+      - --bridge.site-1.wireguard.listen-port=51821
+      - --bridge.site-1.services.listen-address=:8443
+      - --bridge.site-1.raft.listen-address=:9443
+      # Site 2 Options
+      - --bridge.site-2.mesh.join-address=site-2-node:8443
+      - --bridge.site-2.raft.in-memory
+      - --bridge.site-2.services.listen-address=:8444
+      - --bridge.site-2.wireguard.listen-port=51822
+      - --bridge.site-2.raft.listen-address=:9444

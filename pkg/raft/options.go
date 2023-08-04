@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -116,7 +117,7 @@ func NewOptions(port int) *Options {
 		port = DefaultListenPort
 	}
 	return &Options{
-		ListenAddress: fmt.Sprintf("%d", port),
+		ListenAddress: fmt.Sprintf("[::]:%d", port),
 		DataDir: func() string {
 			if runtime.GOOS == "windows" {
 				return "C:\\ProgramData\\webmesh\\store"
@@ -144,7 +145,7 @@ func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fl.StringVar(&o.ListenAddress, p+"raft.listen-address", util.GetEnvDefault(RaftListenAddressEnvVar, ":9443"),
+	fl.StringVar(&o.ListenAddress, p+"raft.listen-address", util.GetEnvDefault(RaftListenAddressEnvVar, "[::]:9443"),
 		"Raft listen address.")
 	fl.StringVar(&o.DataDir, p+"raft.data-dir", util.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
 		"Store data directory.")
@@ -186,6 +187,10 @@ func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
 func (o *Options) Validate() error {
 	if o == nil {
 		return errors.New("raft options cannot be empty")
+	}
+	_, _, err := net.SplitHostPort(o.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("listen address is invalid: %w", err)
 	}
 	if o.DataDir == "" && !o.InMemory {
 		return errors.New("data directory is required")

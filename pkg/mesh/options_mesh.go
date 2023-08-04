@@ -33,8 +33,8 @@ const (
 	JoinAsVoterEnvVar            = "MESH_JOIN_AS_VOTER"
 	MaxJoinRetriesEnvVar         = "MESH_MAX_JOIN_RETRIES"
 	JoinTimeoutEnvVar            = "MESH_JOIN_TIMEOUT"
-	GRPCAdvertisePortEnvVar      = "MESH_GRPC_PORT"
-	DNSAdvertisePortEnvVar       = "MESH_MESHDNS_PORT"
+	GRPCAdvertisePortEnvVar      = "MESH_GRPC_ADVERTISE_PORT"
+	DNSAdvertisePortEnvVar       = "MESH_MESHDNS_ADVERTISE_PORT"
 	UseMeshDNSEnvVar             = "MESH_USE_MESHDNS"
 	PrimaryEndpointEnvVar        = "MESH_PRIMARY_ENDPOINT"
 	NodeRoutesEnvVar             = "MESH_ROUTES"
@@ -65,10 +65,10 @@ type MeshOptions struct {
 	// DirectPeers are peers to request direct edges to. If the node is not allowed to create edges
 	// and data channels, the node will be unable to join.
 	DirectPeers []string `json:"direct-peers,omitempty" yaml:"direct-peers,omitempty" toml:"direct-peers,omitempty"`
-	// GRPCPort is the port to advertise for gRPC.
-	GRPCPort int `json:"grpc-port,omitempty" yaml:"grpc-port,omitempty" toml:"grpc-port,omitempty"`
-	// MeshDNSPort is the port to advertise for DNS.
-	MeshDNSPort int `json:"meshdns-port,omitempty" yaml:"meshdns-port,omitempty" toml:"meshdns-port,omitempty"`
+	// GRPCAdvertisePort is the port to advertise for gRPC.
+	GRPCAdvertisePort int `json:"grpc-advertise-port,omitempty" yaml:"grpc-advertise-port,omitempty" toml:"grpc-advertise-port,omitempty"`
+	// MeshDNSAdvertisePort is the port to advertise for DNS.
+	MeshDNSAdvertisePort int `json:"meshdns-advertise-port,omitempty" yaml:"meshdns-advertise-port,omitempty" toml:"meshdns-advertise-port,omitempty"`
 	// UseMeshDNS indicates whether to set mesh DNS servers in the system configuration.
 	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty"`
 	// NoIPv4 disables IPv4 usage.
@@ -102,8 +102,8 @@ func NewMeshOptions(grpcPort int) *MeshOptions {
 			}
 			return nil
 		}(),
-		MaxJoinRetries: 10,
-		GRPCPort:       grpcPort,
+		MaxJoinRetries:    10,
+		GRPCAdvertisePort: grpcPort,
 	}
 }
 
@@ -132,9 +132,9 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
 		"Maximum number of join retries.")
 	fl.BoolVar(&o.JoinAsVoter, p+"mesh.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
 		"Join the cluster as a voter. Default behavior is to join as an observer.")
-	fl.IntVar(&o.GRPCPort, p+"mesh.grpc-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
+	fl.IntVar(&o.GRPCAdvertisePort, p+"mesh.grpc-advertise-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
 		"GRPC advertise port.")
-	fl.IntVar(&o.MeshDNSPort, p+"mesh.meshdns-port", util.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),
+	fl.IntVar(&o.MeshDNSAdvertisePort, p+"mesh.meshdns-advertise-port", util.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),
 		"DNS advertise port. This is set automatically when advertising is enabled and the mesh-dns server is running. Default is 0 (disabled).")
 	fl.BoolVar(&o.UseMeshDNS, p+"mesh.use-meshdns", util.GetEnvDefault(UseMeshDNSEnvVar, "false") == "true",
 		"Set mesh DNS servers to the system configuration. If a local server is running, this will use the local server.")

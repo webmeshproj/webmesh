@@ -55,7 +55,7 @@ func New(opts *Options) (Bridge, error) {
 		// For now we only allow IPv6 on bridged meshes.
 		meshOpts.Mesh.Mesh.NoIPv4 = true
 		// We handle DNS on the bridge level.
-		meshOpts.Mesh.Mesh.MeshDNSPort = 0
+		meshOpts.Mesh.Mesh.MeshDNSAdvertisePort = 0
 		meshOpts.Mesh.Mesh.UseMeshDNS = false
 		meshOpts.Services.MeshDNS = nil
 		m, err := mesh.NewWithLogger(meshOpts.Mesh, slog.Default().With("mesh-id", id))

@@ -108,14 +108,14 @@ func NewWireGuardOptions(name string, port int) *WireGuardOptions {
 }
 
 // BindFlags binds the options to the given flag set.
-func (o *WireGuardOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
+func (o *WireGuardOptions) BindFlags(fl *flag.FlagSet, defaultIfaceName string, prefix ...string) {
 	var p string
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
 	fl.IntVar(&o.ListenPort, p+"wireguard.listen-port", util.GetEnvIntDefault(WireguardListenPortEnvVar, 51820),
 		"The WireGuard listen port.")
-	fl.StringVar(&o.InterfaceName, p+"wireguard.interface-name", util.GetEnvDefault(WireguardNameEnvVar, wireguard.DefaultInterfaceName),
+	fl.StringVar(&o.InterfaceName, p+"wireguard.interface-name", util.GetEnvDefault(WireguardNameEnvVar, defaultIfaceName),
 		"The WireGuard interface name.")
 	fl.BoolVar(&o.ForceInterfaceName, p+"wireguard.force-interface-name", util.GetEnvDefault(WireguardForceNameEnvVar, "false") == "true",
 		"Force the use of the given name by deleting any pre-existing interface with the same name.")
@@ -153,9 +153,6 @@ func (o *WireGuardOptions) Validate() error {
 	}
 	if o.ListenPort <= 1024 {
 		return errors.New("wireguard.listen-port must be greater than 1024")
-	}
-	if o.InterfaceName == "" {
-		return errors.New("wireguard.name must not be empty")
 	}
 	if o.PersistentKeepAlive < 0 {
 		return errors.New("wireguard.persistent-keepalive must not be negative")

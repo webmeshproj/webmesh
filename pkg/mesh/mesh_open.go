@@ -104,9 +104,11 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		RecordMetrics:         s.opts.WireGuard.RecordMetrics,
 		RecordMetricsInterval: s.opts.WireGuard.RecordMetricsInterval,
 		RaftPort:              s.raft.ListenPort(),
-		GRPCPort:              s.opts.Mesh.GRPCPort,
+		GRPCPort:              s.opts.Mesh.GRPCAdvertisePort,
 		ZoneAwarenessID:       s.opts.Mesh.ZoneAwarenessID,
 		DialOptions:           s.grpcCreds(context.Background()),
+		DisableIPv4:           s.opts.Mesh.NoIPv4,
+		DisableIPv6:           s.opts.Mesh.NoIPv6,
 	})
 	// At this point we are open for business.
 	s.open.Store(true)

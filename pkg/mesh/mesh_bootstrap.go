@@ -286,7 +286,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	p := peers.New(s.Storage())
 	self := peers.Node{
 		ID:                 s.ID(),
-		GRPCPort:           s.opts.Mesh.GRPCPort,
+		GRPCPort:           s.opts.Mesh.GRPCAdvertisePort,
 		RaftPort:           s.raft.ListenPort(),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
 		WireGuardEndpoints: s.opts.WireGuard.Endpoints,
@@ -385,24 +385,22 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	// Start network resources
 	s.log.Info("starting network manager")
 	opts := &meshnet.StartOptions{
-		Key:         wireguardKey,
-		AddressV4:   privatev4,
-		AddressV6:   privatev6,
-		NetworkV4:   meshnetworkv4,
-		NetworkV6:   meshnetworkv6,
-		DisableIPv4: s.opts.Mesh.NoIPv4,
-		DisableIPv6: s.opts.Mesh.NoIPv6,
+		Key:       wireguardKey,
+		AddressV4: privatev4,
+		AddressV6: privatev6,
+		NetworkV4: meshnetworkv4,
+		NetworkV6: meshnetworkv6,
 	}
 	err = s.nw.Start(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("start net manager: %w", err)
 	}
-	if s.opts.Mesh.UseMeshDNS && s.opts.Mesh.MeshDNSPort != 0 {
+	if s.opts.Mesh.UseMeshDNS && s.opts.Mesh.MeshDNSAdvertisePort != 0 {
 		addr := "127.0.0.1"
 		if s.opts.Mesh.NoIPv4 {
 			addr = "::1"
 		}
-		addrport := netip.AddrPortFrom(netip.MustParseAddr(addr), uint16(s.opts.Mesh.MeshDNSPort))
+		addrport := netip.AddrPortFrom(netip.MustParseAddr(addr), uint16(s.opts.Mesh.MeshDNSAdvertisePort))
 		err = s.nw.AddDNSServers(ctx, []netip.AddrPort{addrport})
 		if err != nil {
 			return fmt.Errorf("add dns servers: %w", err)
@@ -448,7 +446,7 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1
 	if port, ok := s.opts.Bootstrap.ServersGRPCPorts[string(leader)]; ok {
 		grpcPort = port
 	} else {
-		grpcPort = s.opts.Mesh.GRPCPort
+		grpcPort = s.opts.Mesh.GRPCAdvertisePort
 	}
 	joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
 	s.opts.Mesh.JoinAsVoter = true
@@ -473,7 +471,7 @@ func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Fea
 		if port, ok := s.opts.Bootstrap.ServersGRPCPorts[id]; ok {
 			grpcPort = port
 		} else {
-			grpcPort = s.opts.Mesh.GRPCPort
+			grpcPort = s.opts.Mesh.GRPCAdvertisePort
 		}
 		joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
 		if err = s.join(ctx, features, joinAddr, 5); err != nil {

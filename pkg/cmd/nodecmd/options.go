@@ -58,7 +58,7 @@ func NewOptions() *Options {
 // for convenience.
 func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	o.Global.BindFlags(fs)
-	o.Mesh.BindFlags(fs)
+	o.Mesh.BindFlags(fs, "")
 	o.Services.BindFlags(fs)
 	o.Bridge.BindFlags(fs)
 	return o

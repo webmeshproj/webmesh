@@ -121,6 +121,9 @@ type wginterface struct {
 // New creates a new wireguard interface.
 func New(ctx context.Context, opts *Options) (Interface, error) {
 	log := context.LoggerFrom(ctx).With("component", "wireguard")
+	if opts.Name == "" {
+		opts.Name = DefaultInterfaceName
+	}
 	if opts.ForceName {
 		log.Info("forcing wireguard interface name", "name", opts.Name)
 		iface, err := net.InterfaceByName(opts.Name)

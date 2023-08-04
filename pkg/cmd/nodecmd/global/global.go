@@ -319,6 +319,15 @@ func (o *Options) mergeServicesOptions(opts *services.Options, meshopts *mesh.Op
 		}
 	}
 	if meshopts != nil {
+		_, port, err := net.SplitHostPort(opts.ListenAddress)
+		if err != nil {
+			return fmt.Errorf("failed to parse listen address: %w", err)
+		}
+		portz, err := strconv.ParseUint(port, 10, 16)
+		if err != nil {
+			return err
+		}
+		meshopts.Mesh.GRPCAdvertisePort = int(portz)
 		if opts.MeshDNS != nil && opts.MeshDNS.Enabled && opts.MeshDNS.ListenUDP != "" && !o.DisableFeatureAdvertisement {
 			// Set the advertise DNS port
 			_, port, err := net.SplitHostPort(opts.MeshDNS.ListenUDP)
@@ -329,7 +338,7 @@ func (o *Options) mergeServicesOptions(opts *services.Options, meshopts *mesh.Op
 			if err != nil {
 				return fmt.Errorf("failed to parse listen address: %w", err)
 			}
-			meshopts.Mesh.MeshDNSPort = int(portz)
+			meshopts.Mesh.MeshDNSAdvertisePort = int(portz)
 		}
 	}
 	return nil

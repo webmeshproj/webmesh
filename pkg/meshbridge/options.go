@@ -66,7 +66,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 					Mesh:     mesh.NewOptions(ifaceName, wgPort, grpcPort, raftPort),
 					Services: services.NewOptions(grpcPort),
 				}
-				o.Meshes[meshID].BindFlags(fs, "bridge", meshID)
+				o.Meshes[meshID].BindFlags(fs, ifaceName, "bridge", meshID)
+				// TODO: These don't take because of the way environment variable
+				// parsing is included in flag parsing. This needs to be decoupled.
 				raftPort++
 				grpcPort++
 				wgPort++
@@ -119,8 +121,8 @@ type MeshOptions struct {
 }
 
 // BindFlags binds the options to the given flagset.
-func (o *MeshOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
-	o.Mesh.BindFlags(fs, prefix...)
+func (o *MeshOptions) BindFlags(fs *flag.FlagSet, ifaceName string, prefix ...string) {
+	o.Mesh.BindFlags(fs, ifaceName, prefix...)
 	o.Services.BindFlags(fs, prefix...)
 }
 
@@ -227,13 +229,14 @@ func (o *Options) allDNSPortsUnique() (bool, error) {
 	return true, nil
 }
 
-func allAddrPortsUnique([]string) (bool, error) {
+func allAddrPortsUnique(addrs []string) (bool, error) {
 	var ports []string
-	for _, addr := range []string{} {
+	for _, addr := range addrs {
 		_, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			return false, err
 		}
+		fmt.Println("port", port)
 		ports = append(ports, port)
 	}
 	return util.AllUnique(ports), nil
