@@ -189,7 +189,16 @@ func (o *Options) Overlay(opts ...any) error {
 			if len(v.Meshes) == 0 {
 				continue
 			}
-			// Meshbridge is a special case, we don't override everything
+			for _, opts := range v.Meshes {
+				err := o.mergeMeshOptions(opts.Mesh, primaryEndpoint, detectedEndpoints)
+				if err != nil {
+					return err
+				}
+				err = o.mergeServicesOptions(opts.Services, opts.Mesh, primaryEndpoint)
+				if err != nil {
+					return err
+				}
+			}
 		case *mesh.Options:
 			if err := o.mergeMeshOptions(v, primaryEndpoint, detectedEndpoints); err != nil {
 				return err
