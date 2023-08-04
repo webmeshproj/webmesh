@@ -17,7 +17,6 @@ limitations under the License.
 package link
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -28,6 +27,8 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // ActivateInterface activates the interface with the given name.
@@ -61,9 +62,7 @@ func ActivateInterface(ctx context.Context, name string) error {
 		Flags:  unix.IFF_UP,
 		Change: unix.IFF_UP,
 	}
-	slog.Default().Debug("set interface up",
-		slog.Any("request", req),
-		slog.String("interface", iface.Name))
+	context.LoggerFrom(ctx).Debug("set interface up", slog.Any("request", req), slog.String("interface", iface.Name))
 	err = conn.Link.Set(req)
 	if err != nil {
 		return fmt.Errorf("set interface up: %w", err)
@@ -102,7 +101,7 @@ func DeactivateInterface(ctx context.Context, name string) error {
 		Flags:  0x0,
 		Change: 0x1,
 	}
-	slog.Default().Debug("deactivate interface", slog.Any("request", req))
+	context.LoggerFrom(ctx).Debug("deactivate interface", slog.Any("request", req))
 	err = conn.Link.Set(req)
 	if err != nil {
 		return fmt.Errorf("set interface down: %w", err)
@@ -124,6 +123,7 @@ func RemoveInterface(ctx context.Context, ifaceName string) error {
 		}
 		return fmt.Errorf("failed to get interface: %w", err)
 	}
+	context.LoggerFrom(ctx).Debug("remove interface", slog.String("interface", iface.Name))
 	return conn.Link.Delete(uint32(iface.Index))
 }
 

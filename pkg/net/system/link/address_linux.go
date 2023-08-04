@@ -17,68 +17,28 @@ limitations under the License.
 package link
 
 import (
-	"context"
-	"encoding/binary"
+	"errors"
 	"fmt"
-	"net"
 	"net/netip"
 
-	"github.com/jsimonetti/rtnetlink"
-	"golang.org/x/exp/slog"
-	"golang.org/x/sys/unix"
+	"github.com/vishvananda/netlink"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // SetInterfaceAddress sets the address of the interface with the given name.
-func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
-	iface, err := net.InterfaceByName(name)
+func SetInterfaceAddress(_ context.Context, name string, addr netip.Prefix) error {
+	link, err := netlink.LinkByName(name)
 	if err != nil {
-		if isNoSuchInterfaceErr(err) {
+		var notExistsErr *netlink.LinkNotFoundError
+		if errors.As(err, &notExistsErr) {
 			return ErrLinkNotExists
 		}
-		return fmt.Errorf("get interface by name: %w", err)
-	}
-
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
 		return err
 	}
-	defer conn.Close()
-
-	// Detect network family
-	family := unix.AF_INET6
-	if addr.Addr().Is4() {
-		family = unix.AF_INET
-	}
-
-	// Calculate the prefix length
-	ones := addr.Bits()
-
-	// Calculate the broadcast IP - only used when family is AF_INET
-	var brd net.IP
-	if addr.Addr().Is4() {
-		to4 := addr.Addr().AsSlice()
-		mask := net.CIDRMask(ones, 32)
-		brd = make(net.IP, len(to4))
-		binary.BigEndian.PutUint32(brd, binary.BigEndian.Uint32(to4)|^binary.BigEndian.Uint32(net.IP(mask).To4()))
-	}
-
-	req := &rtnetlink.AddressMessage{
-		Family:       uint8(family),
-		PrefixLength: uint8(ones),
-		Scope:        unix.RT_SCOPE_UNIVERSE,
-		Index:        uint32(iface.Index),
-		Attributes: &rtnetlink.AddressAttributes{
-			Address:   addr.Addr().AsSlice(),
-			Local:     addr.Addr().AsSlice(),
-			Broadcast: brd,
-		},
-	}
-	slog.Default().With("addr", "add").
-		Debug("adding address", slog.Any("request", req))
-	// Add the address to the interface
-	err = conn.Address.New(req)
+	nladdr, err := netlink.ParseAddr(addr.String())
 	if err != nil {
-		return fmt.Errorf("add address to interface: %w", err)
+		return fmt.Errorf("netlink parse addr: %w", err)
 	}
-	return nil
+	return netlink.AddrAdd(link, nladdr)
 }

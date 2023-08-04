@@ -2,16 +2,25 @@ version: "3"
 
 networks:
   site1:
+    enable_ipv6: true
     driver: bridge
-    driver_opts:
-      com.docker.network.enable_ipv6: "true"
     ipam:
       driver: default
       config:
         - subnet: 10.1.0.0/24
           gateway: 10.1.0.1
-        - subnet: 2001:1000:1000::/64
-          gateway: 2001:1000:1000::1
+        - subnet: 2001:3200:3201::/64
+          gateway: 2001:3200:3201::1
+  site2:
+    enable_ipv6: true
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.2.0.0/24
+          gateway: 10.2.0.1
+        - subnet: 2001:3200:3202::/64
+          gateway: 2001:3200:3202::1
 
 services:
   site-1-node:
@@ -21,8 +30,34 @@ services:
       dockerfile: Dockerfile
     networks:
       site1:
+        ipv4_address: 10.1.0.2
+        ipv6_address: 2001:3200:3201::2
     hostname: site-1-node
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE", "SYS_ADMIN"]
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    entrypoint:
+      - /webmesh-node
+      - --global.insecure
+      - --global.detect-endpoints
+      - --global.detect-private-endpoints
+      - --bootstrap.enabled
+      - --bootstrap.default-network-policy=accept
+      - --raft.in-memory
+
+  site-2-node:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      site2:
+        ipv4_address: 10.2.0.2
+        ipv6_address: 2001:3200:3202::2
+    hostname: site-1-node
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE", "SYS_ADMIN"]
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
     entrypoint:
       - /webmesh-node
       - --global.insecure

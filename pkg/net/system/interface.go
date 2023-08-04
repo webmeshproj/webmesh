@@ -160,6 +160,7 @@ type sysInterface struct {
 }
 
 func (l *sysInterface) setInterfaceAddress(ctx context.Context, addr netip.Prefix) error {
+	context.LoggerFrom(ctx).Debug("setting interface address", "address", addr.String())
 	err := link.SetInterfaceAddress(ctx, l.opts.Name, addr)
 	if err != nil {
 		return fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
