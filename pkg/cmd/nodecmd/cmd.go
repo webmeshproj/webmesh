@@ -33,6 +33,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/version"
@@ -118,28 +119,28 @@ func Execute() error {
 	// Log all options at debug level
 	log.Debug("current configuration", slog.Any("options", opts))
 
-	if len(opts.Bridge.Meshes) > 0 {
-		return executeBridgedMesh()
-	}
-	return executeSingleMesh()
-}
-
-func executeSingleMesh() error {
-	if (opts.Global.NoIPv4 && opts.Global.NoIPv6) || (opts.Mesh.Mesh.NoIPv4 && opts.Mesh.Mesh.NoIPv6) {
-		return fmt.Errorf("cannot disable both IPv4 and IPv6")
-	}
-
-	// Create and open the store
-	st, err := mesh.New(opts.Mesh)
-	if err != nil {
-		return fmt.Errorf("failed to create mesh connection: %w", err)
-	}
-
 	ctx := context.Background()
 	if *startTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *startTimeout)
 		defer cancel()
+	}
+
+	if len(opts.Bridge.Meshes) > 0 {
+		return executeBridgedMesh(ctx)
+	}
+	return executeSingleMesh(ctx)
+}
+
+func executeSingleMesh(ctx context.Context) error {
+	if (opts.Global.NoIPv4 && opts.Global.NoIPv6) || (opts.Mesh.Mesh.NoIPv4 && opts.Mesh.Mesh.NoIPv6) {
+		return fmt.Errorf("cannot disable both IPv4 and IPv6")
+	}
+
+	// Connect to the mesh
+	st, err := mesh.New(opts.Mesh)
+	if err != nil {
+		return fmt.Errorf("failed to create mesh connection: %w", err)
 	}
 	var features []v1.Feature
 	if !opts.Global.DisableFeatureAdvertisement {
@@ -155,22 +156,13 @@ func executeSingleMesh() error {
 		}
 		return fmt.Errorf("failed to start mesh node: %w", cause)
 	}
-	// Shutdown the store on exit
-	defer func() {
-		log.Info("shutting down mesh connection")
-		if err = st.Close(); err != nil {
-			log.Error("failed to shutdown mesh connection", slog.String("error", err.Error()))
-		}
-	}()
 	log.Info("mesh connection is ready, starting services")
 
-	// Create the services
+	// Start the mesh services
 	srv, err := services.NewServer(st, opts.Services)
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 	}
-
-	// Start the gRPC server
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			err = handleErr(err)
@@ -184,12 +176,41 @@ func executeSingleMesh() error {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 
+	// Shutdown the mesh connection last
+	defer func() {
+		log.Info("shutting down mesh connection")
+		if err = st.Close(); err != nil {
+			log.Error("failed to shutdown mesh connection", slog.String("error", err.Error()))
+		}
+	}()
+
 	// Stop the gRPC server
 	log.Info("shutting down gRPC server")
 	srv.Stop()
 	return nil
 }
 
-func executeBridgedMesh() error {
-	return nil
+func executeBridgedMesh(ctx context.Context) error {
+	br, err := meshbridge.New(opts.Bridge)
+	if err != nil {
+		return fmt.Errorf("failed to create mesh bridge: %w", err)
+	}
+	err = br.Start(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start mesh bridge: %w", err)
+	}
+	defer func() {
+		err := br.Stop(context.Background())
+		if err != nil {
+			log.Error("failed to shutdown mesh bridge", slog.String("error", err.Error()))
+		}
+	}()
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	select {
+	case <-sig:
+		return nil
+	case err := <-br.ServeError():
+		return fmt.Errorf("mesh bridge failed: %w", err)
+	}
 }
