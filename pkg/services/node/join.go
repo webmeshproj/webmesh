@@ -306,10 +306,12 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
 	} else {
 		// Use IPv6
-		// TODO: doesn't work when we are IPv4 only. Need to fix this.
+		// TODO: Doesn't work when we are IPv4 only. Need to fix this.
 		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
 		// We may as well use IPv4 for everything in that case. Leave it for now,
 		// but need to document these requirements fully for dual-stack setups.
+		// Another option is to create another role of being neither an observer or voter,
+		// in which case another subscription method needs to be exposed for receiving updates.
 		raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
 	}
 	if req.GetAsVoter() {
