@@ -80,6 +80,12 @@ type Mesh interface {
 // New creates a new Mesh. You must call Open() on the returned mesh
 // before it can be used.
 func New(opts *Options) (Mesh, error) {
+	return NewWithLogger(opts, slog.Default())
+}
+
+// NewWithLogger creates a new Mesh with the given logger. You must call
+// Open() on the returned mesh before it can be used.
+func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
@@ -92,7 +98,7 @@ func New(opts *Options) (Mesh, error) {
 			return nil, err
 		}
 	}
-	log := slog.Default().With(slog.String("component", "store"))
+	log = log.With(slog.String("component", "mesh"))
 	if nodeID == "" || nodeID == hostnameFlagDefault {
 		nodeID = determineNodeID(log, tlsConfig, opts)
 	}

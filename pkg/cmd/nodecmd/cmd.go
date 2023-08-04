@@ -162,7 +162,7 @@ func executeSingleMesh() error {
 			log.Error("failed to shutdown mesh store", slog.String("error", err.Error()))
 		}
 	}()
-	log.Info("mesh store is ready, starting services")
+	log.Info("mesh connection is ready, starting services")
 
 	// Create the services
 	srv, err := services.NewServer(st, opts.Services)
