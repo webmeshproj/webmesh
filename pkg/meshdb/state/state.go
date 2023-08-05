@@ -36,8 +36,6 @@ type State interface {
 	GetIPv4Prefix(ctx context.Context) (netip.Prefix, error)
 	// GetMeshDomain returns the mesh domain.
 	GetMeshDomain(ctx context.Context) (string, error)
-	// GetNodePrivateRPCAddress returns the private gRPC address for a node.
-	GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (netip.AddrPort, error)
 	// ListPublicRPCAddresses returns all public gRPC addresses in the mesh.
 	// The map key is the node ID.
 	ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error)
@@ -90,26 +88,6 @@ func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
 
 func (s *state) GetMeshDomain(ctx context.Context) (string, error) {
 	return s.Get(ctx, MeshDomainKey)
-}
-
-func (s *state) GetNodePrivateRPCAddress(ctx context.Context, nodeID string) (netip.AddrPort, error) {
-	peer, err := peers.New(s).Get(ctx, nodeID)
-	if err != nil {
-		return netip.AddrPort{}, err
-	}
-	var addr netip.Addr
-	if peer.PrivateIPv4.IsValid() {
-		// Prefer IPv4
-		ip := strings.Split(peer.PrivateIPv4.String(), "/")[0]
-		addr, err = netip.ParseAddr(ip)
-	} else {
-		ip := strings.Split(peer.PrivateIPv6.String(), "/")[0]
-		addr, err = netip.ParseAddr(ip)
-	}
-	if err != nil {
-		return netip.AddrPort{}, fmt.Errorf("parse address for node %s: %v", nodeID, err)
-	}
-	return netip.AddrPortFrom(addr, uint16(peer.GRPCPort)), nil
 }
 
 func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {

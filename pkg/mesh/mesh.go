@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"github.com/google/uuid"
 	v1 "github.com/webmeshproj/api/v1"
@@ -33,7 +34,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
@@ -47,6 +48,8 @@ var (
 	ErrNotOpen = fmt.Errorf("not open")
 	// ErrOpen is returned when a store is already open.
 	ErrOpen = fmt.Errorf("already open")
+	// ErrNoLeader is returned when there is no Raft leader.
+	ErrNoLeader = fmt.Errorf("no leader")
 )
 
 // Mesh is the connection to the Webmesh. It controls raft consensus, plugins,
@@ -59,6 +62,9 @@ type Mesh interface {
 	// Open opens the connection to the mesh. This must be called before
 	// other methods can be used.
 	Open(ctx context.Context, features []v1.Feature) error
+	// Ready returns a channel that will be closed when the mesh is ready.
+	// Ready is defined as having a leader.
+	Ready() <-chan struct{}
 	// Close closes the connection to the mesh and shuts down the storage.
 	Close() error
 	// Dial opens a new gRPC connection to the given node.
@@ -206,6 +212,24 @@ func (s *meshStore) Plugins() plugins.Manager {
 	return s.plugins
 }
 
+// Ready returns a channel that will be closed when the mesh is ready.
+// Ready is defined as having a leader.
+func (s *meshStore) Ready() <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		defer close(ch)
+		for {
+			_, err := s.Leader()
+			if err != nil {
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+			return
+		}
+	}()
+	return ch
+}
+
 // DialLeader opens a new gRPC connection to the current Raft leader.
 func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 	if s.raft == nil || !s.open.Load() {
@@ -223,11 +247,29 @@ func (s *meshStore) Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, 
 	if s.raft == nil || !s.open.Load() {
 		return nil, ErrNotOpen
 	}
-	addr, err := state.New(s.Storage()).GetNodePrivateRPCAddress(ctx, nodeID)
+	node, err := peers.New(s.Storage()).Get(ctx, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("get node private rpc address: %w", err)
 	}
-	return s.newGRPCConn(ctx, addr.String())
+	if s.opts.Mesh.NoIPv4 {
+		addr := node.PrivateRPCAddrV6()
+		if !addr.IsValid() {
+			return nil, fmt.Errorf("node %q has no private IPv6 address", nodeID)
+		}
+		return s.newGRPCConn(ctx, addr.String())
+	}
+	if s.opts.Mesh.NoIPv6 {
+		addr := node.PrivateRPCAddrV4()
+		if !addr.IsValid() {
+			return nil, fmt.Errorf("node %q has no private IPv4 address", nodeID)
+		}
+		return s.newGRPCConn(ctx, addr.String())
+	}
+	// Fallback to whichever is valid if both are present (preferring IPv6)
+	if node.PrivateRPCAddrV6().IsValid() {
+		return s.newGRPCConn(ctx, node.PrivateRPCAddrV6().String())
+	}
+	return s.newGRPCConn(ctx, node.PrivateRPCAddrV4().String())
 }
 
 // Leader returns the current Raft leader.
@@ -237,7 +279,7 @@ func (s *meshStore) Leader() (string, error) {
 	}
 	_, id := s.raft.Raft().LeaderWithID()
 	if id == "" {
-		return "", fmt.Errorf("no leader")
+		return "", ErrNoLeader
 	}
 	return string(id), nil
 }

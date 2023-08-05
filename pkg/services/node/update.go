@@ -59,9 +59,13 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	}
 	if len(req.GetRoutes()) > 0 {
 		for _, route := range req.GetRoutes() {
-			_, err := netip.ParsePrefix(route)
+			route, err := netip.ParsePrefix(route)
 			if err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "invalid route %q: %v", route, err)
+			}
+			// Make sure the route does not overlap with a mesh reserved prefix
+			if route.Contains(s.ipv4Prefix.Addr()) || route.Contains(s.ipv6Prefix.Addr()) {
+				return nil, status.Errorf(codes.InvalidArgument, "route %q overlaps with mesh prefix", route)
 			}
 		}
 	}
@@ -126,6 +130,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	for _, server := range cfg.Servers {
 		if server.ID == raft.ServerID(peer.ID) {
 			currentSuffrage = server.Suffrage
+			currentAddress = server.Address
 			break
 		}
 	}

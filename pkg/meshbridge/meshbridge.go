@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
@@ -105,6 +106,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		meshID := id
 		features := meshOpts.Services.ToFeatureSet()
 		// Open the mesh connection
+		m.log.Info("opening mesh", slog.String("mesh-id", meshID))
 		mesh := m.Mesh(meshID)
 		if mesh == nil {
 			// This should never happen
@@ -114,6 +116,11 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to open mesh %q: %w", meshID, err))
 		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-mesh.Ready():
+		}
 		cleanFuncs = append(cleanFuncs, func() {
 			err := mesh.Close()
 			if err != nil {
@@ -121,6 +128,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 			}
 		})
 		// Create the services for this mesh
+		m.log.Info("starting mesh services", slog.String("mesh-id", meshID))
 		srv, err := services.NewServer(mesh, meshOpts.Services)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
@@ -133,6 +141,32 @@ func (m *meshBridge) Start(ctx context.Context) error {
 				m.srvErrs <- err
 			}
 		}()
+	}
+	// We need to dial each mesh's leader and tell them we can route the other
+	// meshes.
+	for meshID, mesh := range m.meshes {
+		var toBroadcast []string
+		for otherID, otherMesh := range m.meshes {
+			if otherID != meshID {
+				toBroadcast = append(toBroadcast, otherMesh.Network().NetworkV6().String())
+			}
+		}
+		// TODO: Check if any unique non-internal routes are broadcasted
+		// by the other meshes and add them to this list (per a configuration flag).
+		conn, err := mesh.DialLeader(ctx)
+		if err != nil {
+			return handleErr(fmt.Errorf("failed to dial leader for mesh %q: %w", meshID, err))
+		}
+		defer conn.Close()
+		m.log.Info("broadcasting routes to mesh", slog.String("mesh-id", meshID), slog.Any("routes", toBroadcast))
+		cli := v1.NewNodeClient(conn)
+		_, err = cli.Update(ctx, &v1.UpdateRequest{
+			Id:     mesh.ID(),
+			Routes: toBroadcast,
+		})
+		if err != nil {
+			return handleErr(fmt.Errorf("failed to broadcast routes for mesh %q: %w", meshID, err))
+		}
 	}
 	return nil
 }

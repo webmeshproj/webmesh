@@ -85,29 +85,6 @@ func TestGetMeshDomain(t *testing.T) {
 	}
 }
 
-func TestGetNodePrivateRPCAddress(t *testing.T) {
-	t.Parallel()
-
-	state, teardown := setupTest(t)
-	defer teardown()
-	// Node with public address
-	addr, err := state.GetNodePrivateRPCAddress(context.Background(), "public")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if addr.String() != "172.16.0.1:1" {
-		t.Errorf("expected '172.16.0.1:1', got %s", addr)
-	}
-	// Node with private address
-	addr, err = state.GetNodePrivateRPCAddress(context.Background(), "private")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if addr.String() != "172.16.0.2:1" {
-		t.Errorf("expected '172.16.0.2:1', got %s", addr)
-	}
-}
-
 func TestListPublicRPCAddresses(t *testing.T) {
 	t.Parallel()
 
