@@ -108,15 +108,19 @@ func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 	if nodeID == "" || nodeID == hostnameFlagDefault {
 		nodeID = determineNodeID(log, tlsConfig, opts)
 	}
-	var taskGroup errgroup.Group
-	taskGroup.SetLimit(2)
+	var peerUpdateGroup, routeUpdateGroup, dnsUpdateGroup errgroup.Group
+	peerUpdateGroup.SetLimit(1)
+	routeUpdateGroup.SetLimit(1)
+	dnsUpdateGroup.SetLimit(1)
 	st := &meshStore{
-		opts:        opts,
-		tlsConfig:   tlsConfig,
-		nodeID:      nodeID,
-		nwTaskGroup: &taskGroup,
-		log:         log.With(slog.String("node-id", string(nodeID))),
-		kvSubCancel: func() {},
+		opts:             opts,
+		tlsConfig:        tlsConfig,
+		nodeID:           nodeID,
+		peerUpdateGroup:  &peerUpdateGroup,
+		routeUpdateGroup: &routeUpdateGroup,
+		dnsUpdateGroup:   &dnsUpdateGroup,
+		log:              log.With(slog.String("node-id", string(nodeID))),
+		kvSubCancel:      func() {},
 	}
 	return st, nil
 }
@@ -161,22 +165,19 @@ func determineNodeID(log *slog.Logger, tlsConfig *tls.Config, opts *Options) str
 }
 
 type meshStore struct {
-	opts *Options
-	raft raft.Raft
-	log  *slog.Logger
-
-	nodeID    string
-	tlsConfig *tls.Config
-	plugins   plugins.Manager
-
-	kvSubCancel context.CancelFunc
-
-	nw          net.Manager
-	nwTaskGroup *errgroup.Group
-	meshDomain  string
-
-	open atomic.Bool
-
+	opts             *Options
+	raft             raft.Raft
+	log              *slog.Logger
+	nodeID           string
+	tlsConfig        *tls.Config
+	plugins          plugins.Manager
+	kvSubCancel      context.CancelFunc
+	nw               net.Manager
+	peerUpdateGroup  *errgroup.Group
+	routeUpdateGroup *errgroup.Group
+	dnsUpdateGroup   *errgroup.Group
+	meshDomain       string
+	open             atomic.Bool
 	// a flag set on test stores to indicate skipping certain operations
 	testStore bool
 }

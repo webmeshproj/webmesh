@@ -18,16 +18,20 @@ limitations under the License.
 package meshdns
 
 import (
+	"context"
 	"fmt"
+	"net/netip"
 	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/miekg/dns"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	dnsutil "github.com/webmeshproj/webmesh/pkg/net/system/dns"
 )
 
@@ -59,11 +63,12 @@ type Options struct {
 func NewServer(o *Options) *Server {
 	log := slog.Default().With("component", "mesh-dns")
 	srv := &Server{
-		mux:       dns.NewServeMux(),
-		opts:      o,
-		log:       log,
-		forwarder: new(dns.Client),
-		meshmuxes: make([]*meshLookupMux, 0),
+		mux:        dns.NewServeMux(),
+		opts:       o,
+		log:        log,
+		forwarders: make([]string, 0),
+		meshmuxes:  make([]*meshLookupMux, 0),
+		subCancels: make([]func(), 0),
 	}
 	if srv.opts.CacheSize > 0 {
 		var err error
@@ -72,24 +77,27 @@ func NewServer(o *Options) *Server {
 			log.Warn("failed to create remote lookup cache", slog.String("error", err.Error()))
 		}
 	}
-	if len(srv.opts.Forwarders) == 0 && !srv.opts.DisableForwarding {
+	forwarders := o.Forwarders
+	if len(forwarders) == 0 && !o.DisableForwarding {
 		syscfg := dnsutil.GetSystemConfig()
-		srv.opts.Forwarders = syscfg.Servers
+		forwarders = syscfg.Servers
 	}
+	srv.forwarders = append(srv.forwarders, forwarders...)
 	return srv
 }
 
 // Server is the MeshDNS server.
 type Server struct {
-	opts      *Options
-	meshmuxes []*meshLookupMux
-	mux       *dns.ServeMux
-	udpServer *dns.Server
-	tcpServer *dns.Server
-	forwarder *dns.Client
-	cache     *lru.Cache[cacheKey, cacheValue]
-	log       *slog.Logger
-	mu        sync.Mutex
+	opts       *Options
+	meshmuxes  []*meshLookupMux
+	mux        *dns.ServeMux
+	udpServer  *dns.Server
+	tcpServer  *dns.Server
+	forwarders []string
+	cache      *lru.Cache[cacheKey, cacheValue]
+	log        *slog.Logger
+	subCancels []func()
+	mu         sync.RWMutex
 }
 
 type cacheKey struct {
@@ -102,21 +110,99 @@ type cacheValue struct {
 	expires time.Time
 }
 
+type DomainOptions struct {
+	// Mesh is the mesh that this domain belongs to.
+	Mesh meshdb.Store
+	// IPv6Only indicates that this domain should only respond to IPv6 requests.
+	IPv6Only bool
+	// SubscribeForwarders indicates that new forwarders added to the mesh should be
+	// appeneded to the current server.
+	SubscribeForwarders bool
+}
+
 // RegisterDomain registers a new domain to be served by the Mesh DNS server.
-func (s *Server) RegisterDomain(mesh meshdb.Store, ipv6Only bool) {
+func (s *Server) RegisterDomain(opts DomainOptions) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// Check if we have an overlapping domain. This is not a good way to run this,
-	// but we'll support it for test cases.
+	// but we'll support it for test cases. A flag should maybe be exposed to cause
+	// this to error.
+	var found bool
 	for _, mux := range s.meshmuxes {
-		if mesh.Domain() == mux.domain {
-			mux.appendMesh(mesh)
-			return
+		if opts.Mesh.Domain() == mux.domain {
+			mux.appendMesh(opts.Mesh)
+			found = true
 		}
 	}
-	mux := s.newMeshLookupMux(mesh, ipv6Only)
-	s.mux.Handle(mesh.Domain(), mux)
-	s.meshmuxes = append(s.meshmuxes, mux)
+	if !found {
+		mux := s.newMeshLookupMux(opts.Mesh, opts.IPv6Only)
+		s.mux.Handle(opts.Mesh.Domain(), mux)
+		s.meshmuxes = append(s.meshmuxes, mux)
+	}
+	if opts.SubscribeForwarders {
+		cancel, err := opts.Mesh.Storage().Subscribe(context.Background(), peers.NodesPrefix, func(_, _ string) {
+			peers, err := peers.New(opts.Mesh.Storage()).ListByFeature(context.Background(), v1.Feature_FORWARD_MESH_DNS)
+			if err != nil {
+				s.log.Warn("failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
+				return
+			}
+			if len(peers) == 0 {
+				return
+			}
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			// Gather forwarders
+			seen := make(map[string]bool)
+			for _, peer := range peers {
+				if peer.PrivateDNSAddrV4().IsValid() && !opts.IPv6Only {
+					// Prefer IPv4
+					seen[peer.PrivateDNSAddrV4().String()] = true
+					continue
+				}
+				if peer.PrivateDNSAddrV6().IsValid() {
+					seen[peer.PrivateDNSAddrV6().String()] = true
+				}
+			}
+			// Update forwarders
+			newForwarders := make([]string, 0)
+			for _, forwarder := range s.forwarders {
+				addrPort, err := netip.ParseAddrPort(forwarder)
+				if err != nil {
+					// Shouldn't happen
+					s.log.Warn("failed to parse forward DNS address", "error", err.Error())
+					continue
+				}
+				// If this isn't a mesh address, keep it in the list
+				if addrPort.Addr().Is4() && !opts.Mesh.Network().NetworkV4().Contains(addrPort.Addr()) {
+					newForwarders = append(newForwarders, forwarder)
+					continue
+				}
+				if addrPort.Addr().Is6() && !opts.Mesh.Network().NetworkV6().Contains(addrPort.Addr()) {
+					newForwarders = append(newForwarders, forwarder)
+					continue
+				}
+				// Already registered mesh forwarder, keep it in the current position
+				if _, ok := seen[forwarder]; ok {
+					newForwarders = append(newForwarders, forwarder)
+					seen[forwarder] = false
+					continue
+				}
+			}
+			// Add any forwarders not in the list yet
+			for forwarder, toAdd := range seen {
+				if toAdd {
+					newForwarders = append(newForwarders, forwarder)
+				}
+			}
+			s.log.Info("updating meshdns forwarders", slog.Any("forwarders", newForwarders))
+			s.forwarders = newForwarders
+		})
+		if err != nil {
+			return fmt.Errorf("failed to subscribe to meshdb: %w", err)
+		}
+		s.subCancels = append(s.subCancels, cancel)
+	}
+	return nil
 }
 
 // ListenAndServe serves the Mesh DNS server.
@@ -153,7 +239,12 @@ func (s *Server) ListenAndServe() error {
 
 // Shutdown shuts down the Mesh DNS server.
 func (s *Server) Shutdown() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	var closeErr error
+	for _, cancel := range s.subCancels {
+		cancel()
+	}
 	if s.udpServer != nil {
 		if err := s.udpServer.Shutdown(); err != nil {
 			closeErr = fmt.Errorf("udp server shutdown: %w", err)

@@ -20,6 +20,7 @@ package dns
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"net/netip"
 	"os"
@@ -44,7 +45,9 @@ func addServers(_ string, servers []netip.AddrPort) error {
 		if server.Port() == 53 {
 			_, err = f.WriteString("nameserver " + server.Addr().String() + "\n")
 		} else {
-			_, err = f.WriteString("nameserver " + server.String() + "\n")
+			// We need to always format as [host]:port
+			serverStr := fmt.Sprintf("[%s]:%d", server.Addr().String(), server.Port())
+			_, err = f.WriteString("nameserver " + serverStr + "\n")
 		}
 		if err != nil {
 			return err
@@ -71,6 +74,8 @@ func removeServers(_ string, servers []netip.AddrPort) error {
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(strings.NewReader(string(current)))
+
+Lines:
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
@@ -103,7 +108,7 @@ func removeServers(_ string, servers []netip.AddrPort) error {
 				}
 				for _, server := range servers {
 					if addrport == server {
-						continue
+						continue Lines
 					}
 				}
 				_, err = f.WriteString(line + "\n")

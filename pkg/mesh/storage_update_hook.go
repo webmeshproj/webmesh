@@ -32,10 +32,16 @@ func (s *meshStore) onDBUpdate(key, value string) {
 	if s.testStore {
 		return
 	}
-	if isNodeChangeKey(key) {
+	switch {
+	case isNodeChangeKey(key):
 		// Potentially need to update wireguard peers
 		go s.queuePeersUpdate()
-	} else if isRouteChangeKey(key) {
+		if s.opts.Mesh != nil && s.opts.Mesh.UseMeshDNS && s.opts.Mesh.MeshDNSAdvertisePort == 0 {
+			// Peer update, we want to use meshdns, and we dont have our own server
+			// so we need to refresh the meshdns servers
+			go s.queueMeshDNSUpdate()
+		}
+	case isRouteChangeKey(key):
 		// Potentially need to update wireguard routes and peers
 		go s.queuePeersUpdate()
 		go s.queueRouteUpdate()
@@ -61,7 +67,7 @@ func (s *meshStore) queueRouteUpdate() {
 		}
 		time.Sleep(time.Second)
 	}
-	s.nwTaskGroup.TryGo(func() error {
+	s.routeUpdateGroup.TryGo(func() error {
 		nw := networking.New(s.Storage())
 		routes, err := nw.GetRoutesByNode(ctx, s.ID())
 		if err != nil {
@@ -89,10 +95,29 @@ func (s *meshStore) queuePeersUpdate() {
 		}
 		time.Sleep(time.Second)
 	}
-	s.nwTaskGroup.TryGo(func() error {
+	s.peerUpdateGroup.TryGo(func() error {
 		s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
 		if err := s.nw.RefreshPeers(context.Background()); err != nil {
 			s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
+		}
+		return nil
+	})
+}
+
+func (s *meshStore) queueMeshDNSUpdate() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
+		if ctx.Err() != nil {
+			s.log.Warn("timed out waiting for raft to catch up before applying meshdns update")
+			return
+		}
+		time.Sleep(time.Second)
+	}
+	s.dnsUpdateGroup.TryGo(func() error {
+		s.log.Debug("applied batch with possible DNS changes, refreshing servers")
+		if err := s.nw.RefreshDNSServers(context.Background()); err != nil {
+			s.log.Error("refresh dnd servers failed", slog.String("error", err.Error()))
 		}
 		return nil
 	})

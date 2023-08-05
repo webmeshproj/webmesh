@@ -99,10 +99,10 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 	// Create the store
 	st, err := mesh.New(storeOpts)
 	if err != nil {
-		return fmt.Errorf("create store: %w", err)
+		return fmt.Errorf("create mesh: %w", err)
 	}
 	if err := st.Open(ctx, nil); err != nil {
-		return fmt.Errorf("open store: %w", err)
+		return fmt.Errorf("open mesh connection: %w", err)
 	}
 
 	if opts.LocalDNS {
@@ -110,16 +110,27 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 		server := meshdns.NewServer(&meshdns.Options{
 			UDPListenAddr: fmt.Sprintf(":%d", opts.LocalDNSPort),
 		})
-		server.RegisterDomain(st, false)
+		err := server.RegisterDomain(meshdns.DomainOptions{
+			Mesh: st,
+		})
+		if err != nil {
+			defer func() {
+				err := st.Close()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "ERROR: close mesh: %v\n", err)
+				}
+			}()
+			return fmt.Errorf("register domain: %w", err)
+		}
 		go func() {
 			go func() {
 				if err := server.ListenAndServe(); err != nil {
-					fmt.Fprintf(os.Stderr, "dns serve: %v\n", err)
+					fmt.Fprintf(os.Stderr, "ERROR: dns serve: %v\n", err)
 				}
 			}()
 			<-stopChan
 			if err := server.Shutdown(); err != nil {
-				fmt.Fprintf(os.Stderr, "dns shutdown: %v\n", err)
+				fmt.Fprintf(os.Stderr, "ERROR: dns shutdown: %v\n", err)
 			}
 		}()
 	}

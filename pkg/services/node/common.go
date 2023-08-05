@@ -94,9 +94,3 @@ func nodeIDMatchesContext(ctx context.Context, nodeID string) bool {
 	}
 	return false
 }
-
-type SortedFeatures []v1.Feature
-
-func (s SortedFeatures) Len() int           { return len(s) }
-func (s SortedFeatures) Less(i, j int) bool { return s[i] < s[j] }
-func (s SortedFeatures) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }

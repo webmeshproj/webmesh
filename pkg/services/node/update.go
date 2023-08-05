@@ -184,14 +184,8 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	}
 	// Features
 	if len(req.GetFeatures()) > 0 {
-		reqFeats := SortedFeatures(req.GetFeatures())
-		peerFeats := SortedFeatures(peer.Features)
-		sort.Sort(reqFeats)
-		sort.Sort(peerFeats)
-		if !cmp.Equal(reqFeats, peerFeats) {
-			toUpdate.Features = req.GetFeatures()
-			hasChanges = true
-		}
+		toUpdate.Features = req.GetFeatures()
+		hasChanges = true
 	}
 
 	// Apply any node changes

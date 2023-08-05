@@ -106,6 +106,9 @@ type Manager interface {
 	StartMasquerade(ctx context.Context) error
 	// AddDNSServers adds the given dns servers to the system configuration.
 	AddDNSServers(ctx context.Context, servers []netip.AddrPort) error
+	// RefreshDNSServers checks which peers in the database are offering DNS
+	// and updates the system configuration accordingly.
+	RefreshDNSServers(ctx context.Context) error
 	// AddPeer adds a peer to the wireguard interface.
 	AddPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) error
 	// RefreshPeers walks all peers in the database and ensures they are added to the wireguard interface.
@@ -140,7 +143,7 @@ type manager struct {
 	dnsservers           []netip.AddrPort
 	networkv4, networkv6 netip.Prefix
 	masquerading         bool
-	wgmu, pcmu           sync.Mutex
+	dnsmu, wgmu, pcmu    sync.Mutex
 }
 
 type clientPeerConn struct {
@@ -281,12 +284,68 @@ func (m *manager) StartMasquerade(ctx context.Context) error {
 }
 
 func (m *manager) AddDNSServers(ctx context.Context, servers []netip.AddrPort) error {
+	m.dnsmu.Lock()
+	defer m.dnsmu.Unlock()
 	context.LoggerFrom(ctx).Debug("Configuring DNS servers", slog.Any("servers", servers))
 	err := dns.AddServers(m.wg.Name(), servers)
 	if err != nil {
 		return fmt.Errorf("add dns servers: %w", err)
 	}
-	m.dnsservers = servers
+	m.dnsservers = append(m.dnsservers, servers...)
+	return nil
+}
+
+func (m *manager) RefreshDNSServers(ctx context.Context) error {
+	m.dnsmu.Lock()
+	defer m.dnsmu.Unlock()
+	context.LoggerFrom(ctx).Debug("Refreshing MeshDNS servers")
+	servers, err := peers.New(m.storage).ListByFeature(ctx, v1.Feature_MESH_DNS)
+	if err != nil {
+		return fmt.Errorf("list peers with feature: %w", err)
+	}
+	seen := make(map[netip.AddrPort]bool)
+	for _, server := range servers {
+		if server.PrivateDNSAddrV4().IsValid() && !m.opts.DisableIPv4 {
+			seen[server.PrivateDNSAddrV4()] = true
+		}
+		if server.PrivateDNSAddrV6().IsValid() && !m.opts.DisableIPv6 {
+			seen[server.PrivateDNSAddrV6()] = true
+		}
+	}
+	// Find out which (if any) DNS servers we are removing
+	toRemove := make([]netip.AddrPort, 0)
+	for _, server := range m.dnsservers {
+		if _, ok := seen[server]; !ok {
+			toRemove = append(toRemove, server)
+		} else if ok {
+			// We don't need to readd them
+			seen[server] = false
+		}
+	}
+	// Reset our dnsservers and determine which servers to add
+	// to the system
+	m.dnsservers = make([]netip.AddrPort, 0)
+	toAdd := make([]netip.AddrPort, 0)
+	for server, needsAdd := range seen {
+		m.dnsservers = append(m.dnsservers, server)
+		if needsAdd {
+			toAdd = append(toAdd, server)
+		}
+	}
+	// Add the new servers first
+	if len(toAdd) > 0 {
+		err := dns.AddServers(m.wg.Name(), toAdd)
+		if err != nil {
+			return fmt.Errorf("add dns servers: %w", err)
+		}
+	}
+	// Remove the old servers
+	if len(toRemove) > 0 {
+		err := dns.RemoveServers(m.wg.Name(), toRemove)
+		if err != nil {
+			return fmt.Errorf("remove dns servers: %w", err)
+		}
+	}
 	return nil
 }
 

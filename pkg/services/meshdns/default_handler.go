@@ -26,6 +26,8 @@ import (
 )
 
 func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	q := r.Question[0]
 	if q.Qtype == dns.TypeNS && q.Name == "." {
 		// This is a root NS request, return the configured root NS records
@@ -48,7 +50,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		return
 	}
 	s.log.Debug("handling forward lookup")
-	if len(s.opts.Forwarders) == 0 {
+	if len(s.forwarders) == 0 {
 		// If there are no forwarders, return a NXDOMAIN
 		s.log.Debug("forward request with no forwarders configured")
 		m := s.newMsg(nil, r)
@@ -73,13 +75,20 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 			}
 		}
 	}
-	for _, forwarder := range s.opts.Forwarders {
-		m, rtt, err := s.forwarder.ExchangeContext(ctx, r, forwarder)
+	cli := new(dns.Client)
+	cli.Timeout = time.Second // TODO: Make this configurable
+	for _, forwarder := range s.forwarders {
+		m, rtt, err := cli.ExchangeContext(ctx, r.Copy(), forwarder)
 		if err != nil {
-			s.log.Error("failed to forward lookup", slog.String("error", err.Error()))
-			m := s.newMsg(nil, r)
-			s.writeMsg(w, r, m, dns.RcodeServerFailure)
-			return
+			if ctx.Err() != nil {
+				s.log.Error("failed to forward lookup", slog.String("error", err.Error()))
+				m := s.newMsg(nil, r)
+				s.writeMsg(w, r, m, dns.RcodeServerFailure)
+				return
+			}
+			// Try the next forwarder
+			s.log.Debug("forward lookup failed", slog.String("error", err.Error()))
+			continue
 		}
 		s.log.Debug("forward lookup succeeded", slog.Duration("rtt", rtt))
 		if m.Rcode != dns.RcodeNameError {

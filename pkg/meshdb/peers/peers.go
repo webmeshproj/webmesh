@@ -240,8 +240,9 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 	}
 	out := make([]Node, 0)
 	for _, node := range nodes {
-		if node.PrimaryEndpoint != "" {
-			out = append(out, node)
+		n := node
+		if n.PrimaryEndpoint != "" {
+			out = append(out, n)
 		}
 	}
 	return out, nil
@@ -254,8 +255,9 @@ func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
 	}
 	out := make([]Node, 0)
 	for _, node := range nodes {
-		if node.ZoneAwarenessID == zoneID {
-			out = append(out, node)
+		n := node
+		if n.ZoneAwarenessID == zoneID {
+			out = append(out, n)
 		}
 	}
 	return out, nil
@@ -268,8 +270,9 @@ func (p *peers) ListByFeature(ctx context.Context, feature v1.Feature) ([]Node, 
 	}
 	out := make([]Node, 0)
 	for _, node := range nodes {
-		if node.HasFeature(feature) {
-			out = append(out, node)
+		n := node
+		if n.HasFeature(feature) {
+			out = append(out, n)
 		}
 	}
 	return out, nil

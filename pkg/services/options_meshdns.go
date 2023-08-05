@@ -27,16 +27,17 @@ import (
 )
 
 const (
-	MeshDNSEnabledEnvVar           = "SERVICES_MESHDNS_ENABLED"
-	MeshDNSListenUDPEnvVar         = "SERVICES_MESHDNS_LISTEN_UDP"
-	MeshDNSListenTCPEnvVar         = "SERVICES_MESHDNS_LISTEN_TCP"
-	MeshDNSTSIGKeyEnvVar           = "SERVICES_MESHDNS_TSIG_KEY"
-	MeshDNSReusePortEnvVar         = "SERVICES_MESHDNS_REUSE_PORT"
-	MeshDNSCompressionEnvVar       = "SERVICES_MESHDNS_COMPRESSION"
-	MeshDNSRequestTimeoutEnvVar    = "SERVICES_MESHDNS_REQUEST_TIMEOUT"
-	MeshDNSForwardersEnvVar        = "SERVICES_MESHDNS_FORWARDERS"
-	MeshDNSDisableForwardingEnvVar = "SERVICES_MESHDNS_DISABLE_FORWARDING"
-	MeshDNSCacheSizeEnvVar         = "SERVICES_MESHDNS_CACHE_SIZE"
+	MeshDNSEnabledEnvVar             = "SERVICES_MESHDNS_ENABLED"
+	MeshDNSListenUDPEnvVar           = "SERVICES_MESHDNS_LISTEN_UDP"
+	MeshDNSListenTCPEnvVar           = "SERVICES_MESHDNS_LISTEN_TCP"
+	MeshDNSTSIGKeyEnvVar             = "SERVICES_MESHDNS_TSIG_KEY"
+	MeshDNSReusePortEnvVar           = "SERVICES_MESHDNS_REUSE_PORT"
+	MeshDNSCompressionEnvVar         = "SERVICES_MESHDNS_COMPRESSION"
+	MeshDNSRequestTimeoutEnvVar      = "SERVICES_MESHDNS_REQUEST_TIMEOUT"
+	MeshDNSForwardersEnvVar          = "SERVICES_MESHDNS_FORWARDERS"
+	MeshDNSSubscribeForwardersEnvVar = "SERVICES_MESHDNS_SUBSCRIBE_FORWARDERS"
+	MeshDNSDisableForwardingEnvVar   = "SERVICES_MESHDNS_DISABLE_FORWARDING"
+	MeshDNSCacheSizeEnvVar           = "SERVICES_MESHDNS_CACHE_SIZE"
 )
 
 // MeshDNSOptions are the mesh DNS options.
@@ -56,7 +57,10 @@ type MeshDNSOptions struct {
 	RequestTimeout time.Duration `json:"request-timeout,omitempty" yaml:"request-timeout,omitempty" toml:"request-timeout,omitempty"`
 	// Forwarders are the DNS forwarders to use. If empty, the system DNS servers will be used.
 	Forwarders []string `json:"forwarders,omitempty" yaml:"forwarders,omitempty" toml:"forwarders,omitempty"`
-	// DisableForwarding disables forwarding requests to the configured forwarders.
+	// SubscribeForwarders will subscribe to new nodes that are able to forward requests for other meshes.
+	// These forwarders will be placed at the bottom of the forwarders list.
+	SubscribeForwarders bool `json:"subscribe-forwarders,omitempty" yaml:"subscribe-forwarders,omitempty" toml:"subscribe-forwarders,omitempty"`
+	// DisableForwarding disables forwarding requests entirely.
 	DisableForwarding bool `json:"disable-forwarding,omitempty" yaml:"disable-forwarding,omitempty" toml:"disable-forwarding,omitempty"`
 	// CacheSize is the size of the remote DNS cache.
 	CacheSize int `json:"cache-size,omitempty" yaml:"cache-size,omitempty" toml:"cache-size,omitempty"`
@@ -70,6 +74,13 @@ func NewMeshDNSOptions() *MeshDNSOptions {
 		ListenTCP:         ":5353",
 		EnableCompression: true,
 		RequestTimeout:    time.Second * 5,
+		Forwarders: func() []string {
+			envval := os.Getenv(MeshDNSForwardersEnvVar)
+			if envval != "" {
+				return strings.Split(envval, ",")
+			}
+			return nil
+		}(),
 	}
 }
 
@@ -95,8 +106,11 @@ func (o *MeshDNSOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 		o.Forwarders = strings.Split(s, ",")
 		return nil
 	})
+	fs.BoolVar(&o.SubscribeForwarders, p+"services.meshdns.subscribe-forwarders", util.GetEnvDefault(MeshDNSSubscribeForwardersEnvVar, "false") == "true",
+		`Subscribe to new nodes that are able to forward requests for other meshes. 
+These forwarders will be placed at the bottom of the forwarders list.`)
 	fs.BoolVar(&o.DisableForwarding, p+"services.meshdns.disable-forwarding", util.GetEnvDefault(MeshDNSDisableForwardingEnvVar, "false") == "true",
-		"Disable forwarding requests to any configured forwarders.")
+		"Disable forwarding requests entirely. Takes precedence over other forwarding configurations.")
 	fs.IntVar(&o.CacheSize, p+"services.meshdns.cache-size", util.GetEnvIntDefault(MeshDNSCacheSizeEnvVar, 0),
 		"Size of the remote DNS cache. Defaults to 0 (disabled).")
 }
@@ -109,13 +123,6 @@ func (o *MeshDNSOptions) Validate() error {
 	if o.Enabled {
 		if o.ListenTCP == "" && o.ListenUDP == "" {
 			return errors.New("must specify a TCP or UDP address for mesh DNS")
-		}
-		if len(o.Forwarders) == 0 && !o.DisableForwarding {
-			// Check the environment
-			envval := os.Getenv(MeshDNSForwardersEnvVar)
-			if envval != "" {
-				o.Forwarders = strings.Split(envval, ",")
-			}
 		}
 	}
 	return nil

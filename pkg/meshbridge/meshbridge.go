@@ -29,7 +29,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
@@ -173,7 +172,14 @@ func (m *meshBridge) Start(ctx context.Context) error {
 			CacheSize:         m.opts.MeshDNS.CacheSize,
 		})
 		for _, mesh := range m.meshes {
-			m.meshdns.RegisterDomain(mesh, true)
+			ms := mesh
+			err := m.meshdns.RegisterDomain(meshdns.DomainOptions{
+				Mesh:     ms,
+				IPv6Only: true,
+			})
+			if err != nil {
+				return handleErr(fmt.Errorf("failed to register mesh %q with meshdns: %w", ms.ID(), err))
+			}
 		}
 		go func() {
 			if err := m.meshdns.ListenAndServe(); err != nil {
@@ -183,7 +189,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		}()
 	}
 	var dnsport uint16
-	if m.opts.UseMeshDNS {
+	if m.opts.MeshDNS != nil && m.opts.MeshDNS.Enabled {
 		_, udpPort, err := net.SplitHostPort(m.opts.MeshDNS.ListenUDP)
 		if err != nil {
 			// Should have never passed validate
@@ -195,8 +201,10 @@ func (m *meshBridge) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to parse meshdns udp listen port: %w", err)
 		}
 		dnsport = uint16(zport)
+	}
+	if m.opts.UseMeshDNS {
 		addrport := netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), dnsport)
-		err = dns.AddServers("", []netip.AddrPort{addrport})
+		err := dns.AddServers("", []netip.AddrPort{addrport})
 		if err != nil {
 			// Make this non-fatal for now
 			m.log.Warn("failed to add meshdns server to system dns", slog.String("error", err.Error()))
@@ -213,53 +221,53 @@ func (m *meshBridge) Start(ctx context.Context) error {
 				toBroadcast = append(toBroadcast, otherMesh.Network().NetworkV6().String())
 			}
 		}
+		// TODO: Check if any unique non-internal routes are broadcasted
+		// by the other meshes and add them to this list (per a configuration flag).
+		// Will need to subscribe to route updates from the other meshes.
 		req := &v1.UpdateRequest{
 			Id:     mesh.ID(),
 			Routes: toBroadcast,
 		}
 		if m.opts.MeshDNS != nil && m.opts.MeshDNS.Enabled {
-			// Tell the leader we can do meshdns now
+			// Tell the leader we can do forwarded meshdns now also
 			currentFeats := m.opts.Meshes[meshID].Services.ToFeatureSet()
-			currentFeats = append(currentFeats, v1.Feature_MESH_DNS, v1.Feature_FORWARD_MESH_DNS)
-			req.Features = currentFeats
+			req.Features = append(currentFeats, v1.Feature_MESH_DNS, v1.Feature_FORWARD_MESH_DNS)
 			req.MeshdnsPort = int32(dnsport)
 		}
-		// TODO: Check if any unique non-internal routes are broadcasted
-		// by the other meshes and add them to this list (per a configuration flag).
 		m.log.Info("broadcasting routes and features to mesh", slog.String("mesh-id", meshID), slog.Any("request", req))
 		var tries int
-		var err error
-		for tries <= 5 {
+		// TODO: Make this configurable
+		var maxTries = 5
+		for tries <= maxTries {
 			if ctx.Err() != nil {
 				return fmt.Errorf("context canceled: %w", ctx.Err())
 			}
-			var conn *grpc.ClientConn
-			tryctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			defer cancel()
-			conn, err = mesh.DialLeader(tryctx)
-			if err != nil {
-				m.log.Error("failed to dial leader", slog.String("mesh-id", meshID), slog.String("error", err.Error()))
-				err = fmt.Errorf("failed to dial leader for mesh %q: %w", meshID, err)
-				tries++
-				time.Sleep(time.Second)
-				continue
+			err := m.broadcastRoutesAndFeatures(ctx, mesh, req)
+			if err == nil {
+				break
 			}
-			defer conn.Close()
+			m.log.Error("failed to broadcast routes and features", slog.String("mesh-id", meshID), slog.String("error", err.Error()))
+			if tries >= maxTries {
+				return handleErr(fmt.Errorf("broadcast routes and features for mesh %q: %w", meshID, err))
+			}
+			tries++
+			time.Sleep(time.Second)
+		}
+	}
+	return nil
+}
 
-			cli := v1.NewNodeClient(conn)
-			_, err = cli.Update(tryctx, req)
-			if err != nil {
-				m.log.Error("failed to broadcast routes and features", slog.String("mesh-id", meshID), slog.String("error", err.Error()))
-				err = fmt.Errorf("failed to broadcast routes and features for mesh %q: %w", meshID, err)
-				tries++
-				time.Sleep(time.Second)
-				continue
-			}
-			break
-		}
-		if err != nil {
-			return handleErr(err)
-		}
+func (m *meshBridge) broadcastRoutesAndFeatures(ctx context.Context, mesh mesh.Mesh, req *v1.UpdateRequest) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	conn, err := mesh.DialLeader(ctx)
+	if err != nil {
+		return fmt.Errorf("dial leader: %w", err)
+	}
+	defer conn.Close()
+	_, err = v1.NewNodeClient(conn).Update(ctx, req)
+	if err != nil {
+		return fmt.Errorf("broadcast updates: %w", err)
 	}
 	return nil
 }

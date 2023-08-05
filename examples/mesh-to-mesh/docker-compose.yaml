@@ -36,6 +36,8 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
+    ports:
+      - 6060:6060
     entrypoint:
       - /webmesh-node
       # Typical insecure/private testing options
@@ -49,6 +51,14 @@ services:
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
       - --bootstrap.mesh-domain=site-1.internal
+      # Run a local meshdns server and subscribe to forwarders for other domains
+      - --services.meshdns.enabled
+      - --services.meshdns.subscribe-forwarders
+      - --services.meshdns.listen-udp=:53
+      # Set the system resolvers to the meshdns resolver
+      - --mesh.use-meshdns
+      - --plugins.debug.listen-address=:6060
+      - --plugins.debug.enable-db-querier=true
 
   site-2-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -93,10 +103,6 @@ services:
       - net.ipv6.conf.all.disable_ipv6=0
       - net.ipv4.ip_forward=1
       - net.ipv6.conf.all.forwarding=1
-    ports:
-      - 6061:6061
-      - 6062:6062
-      - 6363:5353/udp
     entrypoint:
       - /webmesh-node
       - --global.insecure
@@ -122,4 +128,3 @@ services:
       # site-1.internal and site-2.internal.
       - --bridge.services.meshdns.enabled
       - --bridge.services.meshdns.listen-udp=:5353
-      - --bridge.use-meshdns
