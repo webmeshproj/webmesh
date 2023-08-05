@@ -17,6 +17,7 @@ limitations under the License.
 package meshdns
 
 import (
+	"strings"
 	"time"
 
 	"github.com/miekg/dns"
@@ -50,7 +51,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		return
 	}
 	s.log.Debug("handling forward lookup")
-	if len(s.forwarders) == 0 {
+	if len(s.extforwarders) == 0 && len(s.meshforwarders) == 0 {
 		// If there are no forwarders, return a NXDOMAIN
 		s.log.Debug("forward request with no forwarders configured")
 		m := s.newMsg(nil, r)
@@ -75,9 +76,26 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 			}
 		}
 	}
+	// determine our forwarding order
+	var forwarders []string
+	if q.Qclass == dns.ClassCHAOS {
+		// If this is a CHAOS query, only use the mesh forwarders
+		forwarders = s.meshforwarders
+	} else {
+		// Otherwise, inspect the domain to see if it's a mesh domain.
+		// TODO: This is a super ugly hack assuming everyone ends in
+		// .internal. Really this should be enforced by the mesh somehow.
+		if strings.HasSuffix(strings.TrimSuffix(q.Name, "."), ".internal") {
+			// Prioritize mesh forwarders
+			forwarders = append(s.meshforwarders, s.extforwarders...)
+		} else {
+			// Prioritize external forwarders
+			forwarders = append(s.extforwarders, s.meshforwarders...)
+		}
+	}
 	cli := new(dns.Client)
 	cli.Timeout = time.Second // TODO: Make this configurable
-	for _, forwarder := range s.forwarders {
+	for _, forwarder := range forwarders {
 		m, rtt, err := cli.ExchangeContext(ctx, r.Copy(), forwarder)
 		if err != nil {
 			if ctx.Err() != nil {

@@ -20,7 +20,6 @@ package meshdns
 import (
 	"context"
 	"fmt"
-	"net/netip"
 	"sync"
 	"time"
 
@@ -63,12 +62,13 @@ type Options struct {
 func NewServer(o *Options) *Server {
 	log := slog.Default().With("component", "mesh-dns")
 	srv := &Server{
-		mux:        dns.NewServeMux(),
-		opts:       o,
-		log:        log,
-		forwarders: make([]string, 0),
-		meshmuxes:  make([]*meshLookupMux, 0),
-		subCancels: make([]func(), 0),
+		mux:            dns.NewServeMux(),
+		opts:           o,
+		log:            log,
+		extforwarders:  make([]string, 0),
+		meshforwarders: make([]string, 0),
+		meshmuxes:      make([]*meshLookupMux, 0),
+		subCancels:     make([]func(), 0),
 	}
 	if srv.opts.CacheSize > 0 {
 		var err error
@@ -82,22 +82,23 @@ func NewServer(o *Options) *Server {
 		syscfg := dnsutil.GetSystemConfig()
 		forwarders = syscfg.Servers
 	}
-	srv.forwarders = append(srv.forwarders, forwarders...)
+	srv.extforwarders = append(srv.extforwarders, forwarders...)
 	return srv
 }
 
 // Server is the MeshDNS server.
 type Server struct {
-	opts       *Options
-	meshmuxes  []*meshLookupMux
-	mux        *dns.ServeMux
-	udpServer  *dns.Server
-	tcpServer  *dns.Server
-	forwarders []string
-	cache      *lru.Cache[cacheKey, cacheValue]
-	log        *slog.Logger
-	subCancels []func()
-	mu         sync.RWMutex
+	opts           *Options
+	meshmuxes      []*meshLookupMux
+	mux            *dns.ServeMux
+	udpServer      *dns.Server
+	tcpServer      *dns.Server
+	extforwarders  []string
+	meshforwarders []string
+	cache          *lru.Cache[cacheKey, cacheValue]
+	log            *slog.Logger
+	subCancels     []func()
+	mu             sync.RWMutex
 }
 
 type cacheKey struct {
@@ -165,22 +166,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 			}
 			// Update forwarders
 			newForwarders := make([]string, 0)
-			for _, forwarder := range s.forwarders {
-				addrPort, err := netip.ParseAddrPort(forwarder)
-				if err != nil {
-					// Shouldn't happen
-					s.log.Warn("failed to parse forward DNS address", "error", err.Error())
-					continue
-				}
-				// If this isn't a mesh address, keep it in the list
-				if addrPort.Addr().Is4() && !opts.Mesh.Network().NetworkV4().Contains(addrPort.Addr()) {
-					newForwarders = append(newForwarders, forwarder)
-					continue
-				}
-				if addrPort.Addr().Is6() && !opts.Mesh.Network().NetworkV6().Contains(addrPort.Addr()) {
-					newForwarders = append(newForwarders, forwarder)
-					continue
-				}
+			for _, forwarder := range s.meshforwarders {
 				// Already registered mesh forwarder, keep it in the current position
 				if _, ok := seen[forwarder]; ok {
 					newForwarders = append(newForwarders, forwarder)
@@ -195,7 +181,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 				}
 			}
 			s.log.Info("updating meshdns forwarders", slog.Any("forwarders", newForwarders))
-			s.forwarders = newForwarders
+			s.meshforwarders = newForwarders
 		})
 		if err != nil {
 			return fmt.Errorf("failed to subscribe to meshdb: %w", err)
