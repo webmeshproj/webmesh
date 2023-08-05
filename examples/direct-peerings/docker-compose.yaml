@@ -47,9 +47,6 @@ services:
       # Enable an embedded TURN server. You can optionally use a public one.
       - --services.turn.enabled
       - --services.turn.public-ip=10.30.0.1
-    ports:
-      - 8443:8443
-      - 8080:8080
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
