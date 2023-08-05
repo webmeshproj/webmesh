@@ -267,11 +267,11 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 }
 
 func (m *manager) StartMasquerade(ctx context.Context) error {
+	m.wgmu.Lock()
+	defer m.wgmu.Unlock()
 	if m.masquerading {
 		return nil
 	}
-	m.wgmu.Lock()
-	defer m.wgmu.Unlock()
 	err := m.fw.AddMasquerade(ctx, m.wg.Name())
 	if err != nil {
 		return fmt.Errorf("add masquerade rule: %w", err)
@@ -321,22 +321,22 @@ func (m *manager) Close(ctx context.Context) error {
 }
 
 func (m *manager) AddPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) error {
+	m.wgmu.Lock()
+	defer m.wgmu.Unlock()
 	if m.wg == nil {
 		return nil
 	}
-	m.wgmu.Lock()
-	defer m.wgmu.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
 	return m.addPeer(ctx, peer, iceServers)
 }
 
 func (m *manager) RefreshPeers(ctx context.Context) error {
+	m.wgmu.Lock()
+	defer m.wgmu.Unlock()
 	if m.wg == nil {
 		return nil
 	}
-	m.wgmu.Lock()
-	defer m.wgmu.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
 	wgpeers, err := mesh.WireGuardPeersFor(ctx, m.storage, m.opts.NodeID)

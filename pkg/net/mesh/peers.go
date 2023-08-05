@@ -29,6 +29,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
@@ -150,7 +151,7 @@ func recursePeers(
 				if err != nil {
 					return nil, nil, fmt.Errorf("parse prefix: %w", err)
 				}
-				if !contains(allowedIPs, prefix) && !contains(thisRoutes, prefix) {
+				if !util.Contains(allowedIPs, prefix) && !util.Contains(thisRoutes, prefix) {
 					allowedIPs = append(allowedIPs, prefix)
 				}
 			}
@@ -159,7 +160,7 @@ func recursePeers(
 		// The peer doesn't expose routes but we do, so we need to add our routes to the peer
 		// TODO: There is a third condition where we both expose routes and there are non-overlapping routes
 		for _, prefix := range thisRoutes {
-			if !contains(allowedRoutes, prefix) {
+			if !util.Contains(allowedRoutes, prefix) {
 				allowedRoutes = append(allowedRoutes, prefix)
 			}
 		}
@@ -169,12 +170,12 @@ func recursePeers(
 		return nil, nil, fmt.Errorf("recurse edge allowed IPs: %w", err)
 	}
 	for _, ip := range edgeIPs {
-		if !contains(allowedIPs, ip) {
+		if !util.Contains(allowedIPs, ip) {
 			allowedIPs = append(allowedIPs, ip)
 		}
 	}
 	for _, route := range edgeRoutes {
-		if !contains(allowedRoutes, route) {
+		if !util.Contains(allowedRoutes, route) {
 			allowedRoutes = append(allowedRoutes, route)
 		}
 	}
@@ -233,7 +234,7 @@ func recurseEdges(
 					if err != nil {
 						return nil, nil, fmt.Errorf("parse prefix: %w", err)
 					}
-					if !contains(allowedIPs, prefix) && !contains(thisRoutes, prefix) {
+					if !util.Contains(allowedIPs, prefix) && !util.Contains(thisRoutes, prefix) {
 						allowedIPs = append(allowedIPs, prefix)
 					}
 				}
@@ -242,7 +243,7 @@ func recurseEdges(
 			// The peer doesn't expose routes but we do, so we need to add our routes to the peer
 			// TODO: There is a third condition where we both expose routes and there are non-overlapping routes
 			for _, prefix := range thisRoutes {
-				if !contains(allowedRoutes, prefix) {
+				if !util.Contains(allowedRoutes, prefix) {
 					allowedRoutes = append(allowedRoutes, prefix)
 				}
 			}
@@ -252,23 +253,15 @@ func recurseEdges(
 			return nil, nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}
 		for _, ip := range ips {
-			if !contains(allowedIPs, ip) {
+			if !util.Contains(allowedIPs, ip) {
 				allowedIPs = append(allowedIPs, ip)
 			}
 		}
 		for _, ipRoute := range ipRoutes {
-			if !contains(allowedRoutes, ipRoute) {
+			if !util.Contains(allowedRoutes, ipRoute) {
 				allowedRoutes = append(allowedRoutes, ipRoute)
 			}
 		}
 	}
 	return
-}
-func contains(ss []netip.Prefix, s netip.Prefix) bool {
-	for _, v := range ss {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }

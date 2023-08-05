@@ -109,7 +109,7 @@ func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 		nodeID = determineNodeID(log, tlsConfig, opts)
 	}
 	var taskGroup errgroup.Group
-	taskGroup.SetLimit(1)
+	taskGroup.SetLimit(2)
 	st := &meshStore{
 		opts:        opts,
 		tlsConfig:   tlsConfig,

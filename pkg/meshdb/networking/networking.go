@@ -210,10 +210,9 @@ func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) ([]*v
 	out := make([]*v1.Route, 0)
 	for _, route := range routes {
 		r := route
-		if r.GetNode() != nodeName {
-			continue
+		if r.GetNode() == nodeName {
+			out = append(out, r)
 		}
-		out = append(out, r)
 	}
 	return out, nil
 }

@@ -142,7 +142,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	}
 	w.registerPeer(peerCfg.PublicKey, peer)
 	// Add routes to the allowed IPs
-	for _, ip := range allowedIPs {
+	for _, ip := range append(allowedIPs, allowedRoutes...) {
 		addr, _ := netip.AddrFromSlice(ip.IP)
 		ones, _ := ip.Mask.Size()
 		prefix := netip.PrefixFrom(addr, ones)
