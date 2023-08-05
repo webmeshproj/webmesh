@@ -19,7 +19,6 @@ package meshdns
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -64,8 +63,8 @@ func NewServer(o *Options) *Server {
 		opts:      o,
 		log:       log,
 		forwarder: new(dns.Client),
+		meshmuxes: make([]*meshLookupMux, 0),
 	}
-	srv.mux.HandleFunc(".", contextHandler(o.RequestTimeout, srv.handleDefault))
 	if srv.opts.CacheSize > 0 {
 		var err error
 		srv.cache, err = lru.New[cacheKey, cacheValue](srv.opts.CacheSize)
@@ -83,7 +82,7 @@ func NewServer(o *Options) *Server {
 // Server is the MeshDNS server.
 type Server struct {
 	opts      *Options
-	stores    []meshdb.Store
+	meshmuxes []*meshLookupMux
 	mux       *dns.ServeMux
 	udpServer *dns.Server
 	tcpServer *dns.Server
@@ -107,21 +106,23 @@ type cacheValue struct {
 func (s *Server) RegisterDomain(mesh meshdb.Store) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	domPattern := strings.TrimSuffix(mesh.Domain(), ".")
-	timeout := s.opts.RequestTimeout
-	if timeout == 0 {
-		timeout = 5 * time.Second
+	// Check if we have an overlapping domain. This is not a good way to run this,
+	// but we'll support it for test cases.
+	for _, mux := range s.meshmuxes {
+		if mesh.Domain() == mux.domain {
+			mux.appendMesh(mesh)
+			return
+		}
 	}
-	s.mux.HandleFunc(fmt.Sprintf("leader.%s", domPattern), contextHandler(timeout, s.leaderLookupHandler(mesh)))
-	s.mux.HandleFunc(fmt.Sprintf("voters.%s", domPattern), contextHandler(timeout, s.votersLookupHandler(mesh)))
-	s.mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), contextHandler(timeout, s.observersLookupHandler(mesh)))
-	s.mux.HandleFunc(domPattern, contextHandler(timeout, s.meshLookupHandler(mesh)))
-	s.stores = append(s.stores, mesh)
+	mux := s.newMeshLookupMux(mesh)
+	s.mux.Handle(mesh.Domain(), mux)
+	s.meshmuxes = append(s.meshmuxes, mux)
 }
 
 // ListenAndServe serves the Mesh DNS server.
 func (s *Server) ListenAndServe() error {
-	// Register the meshdns handlers
+	// Register the default handlers
+	s.mux.HandleFunc(".", s.contextHandler(s.handleDefault))
 	hdlr := s.validateRequest(s.denyZoneTransfers(s.mux.ServeDNS))
 	// Start the servers
 	var g errgroup.Group

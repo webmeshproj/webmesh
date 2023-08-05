@@ -55,27 +55,15 @@ func errToRcode(err error) int {
 
 type contextDNSHandler func(context.Context, dns.ResponseWriter, *dns.Msg)
 
-func contextHandler(timeout time.Duration, next contextDNSHandler) dns.HandlerFunc {
+func (s *Server) contextHandler(next contextDNSHandler) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
+		timeout := s.opts.RequestTimeout
+		if timeout == 0 {
+			timeout = 5 * time.Second
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		next(ctx, w, r)
-	}
-}
-
-func newFQDN(mesh meshdb.Store, id string) string {
-	return fmt.Sprintf("%s.%s", id, mesh.Domain())
-}
-
-func newNSRecord(mesh meshdb.Store) dns.RR {
-	return &dns.NS{
-		Hdr: dns.RR_Header{
-			Name:   mesh.Domain(),
-			Rrtype: dns.TypeNS,
-			Class:  dns.ClassINET,
-			Ttl:    1,
-		},
-		Ns: fmt.Sprintf("%s.%s", mesh.ID(), mesh.Domain()),
 	}
 }
 
@@ -92,12 +80,26 @@ func (s *Server) newMsg(mesh meshdb.Store, r *dns.Msg) *dns.Msg {
 }
 
 func (s *Server) writeMsg(w dns.ResponseWriter, req, reply *dns.Msg, rcode int) {
-	s.log.Debug("responding to DNS question",
-		slog.String("response", reply.String()),
-		slog.String("rcode", dns.RcodeToString[rcode]))
+	s.log.Debug("responding to DNS question", slog.String("response", reply.String()), slog.String("rcode", dns.RcodeToString[rcode]))
 	reply.SetRcode(req, rcode)
 	err := w.WriteMsg(reply)
 	if err != nil {
 		s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+	}
+}
+
+func newFQDN(mesh meshdb.Store, id string) string {
+	return dns.CanonicalName(fmt.Sprintf("%s.%s", id, mesh.Domain()))
+}
+
+func newNSRecord(mesh meshdb.Store) dns.RR {
+	return &dns.NS{
+		Hdr: dns.RR_Header{
+			Name:   dns.CanonicalName(mesh.Domain()),
+			Rrtype: dns.TypeNS,
+			Class:  dns.ClassINET,
+			Ttl:    1,
+		},
+		Ns: dns.CanonicalName(fmt.Sprintf("%s.%s", mesh.ID(), mesh.Domain())),
 	}
 }

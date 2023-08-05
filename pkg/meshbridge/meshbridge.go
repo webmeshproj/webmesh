@@ -29,6 +29,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 )
 
 // Bridge is the interface for a mesh bridge. It manages multiple mesh connections
@@ -57,7 +58,7 @@ func New(opts *Options) (Bridge, error) {
 		id := meshID
 		// For now we only allow IPv6 on bridged meshes.
 		meshOpts.Mesh.Mesh.NoIPv4 = true
-		// We handle DNS on the bridge level.
+		// We handle DNS on the bridge level only.
 		meshOpts.Mesh.Mesh.MeshDNSAdvertisePort = 0
 		meshOpts.Mesh.Mesh.UseMeshDNS = false
 		meshOpts.Services.MeshDNS = nil
@@ -67,11 +68,15 @@ func New(opts *Options) (Bridge, error) {
 		}
 		meshes[id] = m
 	}
+	errBuf := len(meshes)
+	if opts.MeshDNS != nil && opts.MeshDNS.Enabled {
+		errBuf++
+	}
 	return &meshBridge{
 		opts:    opts,
 		meshes:  meshes,
 		servers: make(map[string]*services.Server, len(meshes)),
-		srvErrs: make(chan error, len(meshes)),
+		srvErrs: make(chan error, errBuf),
 		log:     slog.Default().With("component", "meshbridge"),
 	}, nil
 }
@@ -80,6 +85,7 @@ type meshBridge struct {
 	opts    *Options
 	meshes  map[string]mesh.Mesh
 	servers map[string]*services.Server
+	meshdns *meshdns.Server
 	srvErrs chan error
 	log     *slog.Logger
 }
@@ -104,6 +110,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		}
 		return fmt.Errorf("failed to start bridge: %w", cause)
 	}
+	// Start all the mesh connections
 	for id, meshOpts := range m.opts.Meshes {
 		meshID := id
 		features := meshOpts.Services.ToFeatureSet()
@@ -140,6 +147,28 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		go func() {
 			if err := srv.ListenAndServe(); err != nil {
 				m.log.Error("gRPC server failed", slog.String("mesh-id", meshID), slog.String("error", err.Error()))
+				m.srvErrs <- err
+			}
+		}()
+	}
+	// Start a MeshDNS server if enabled
+	if m.opts.MeshDNS != nil && m.opts.MeshDNS.Enabled {
+		m.meshdns = meshdns.NewServer(&meshdns.Options{
+			UDPListenAddr:     m.opts.MeshDNS.ListenUDP,
+			TCPListenAddr:     m.opts.MeshDNS.ListenTCP,
+			ReusePort:         m.opts.MeshDNS.ReusePort,
+			Compression:       m.opts.MeshDNS.EnableCompression,
+			RequestTimeout:    m.opts.MeshDNS.RequestTimeout,
+			Forwarders:        m.opts.MeshDNS.Forwarders,
+			DisableForwarding: m.opts.MeshDNS.DisableForwarding,
+			CacheSize:         m.opts.MeshDNS.CacheSize,
+		})
+		for _, mesh := range m.meshes {
+			m.meshdns.RegisterDomain(mesh)
+		}
+		go func() {
+			if err := m.meshdns.ListenAndServe(); err != nil {
+				m.log.Error("meshdns server failed", slog.String("error", err.Error()))
 				m.srvErrs <- err
 			}
 		}()

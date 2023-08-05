@@ -31,9 +31,11 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		// This is a root NS request, return the configured root NS records
 		s.log.Debug("handling root NS request")
 		m := s.newMsg(nil, r)
-		for _, st := range s.stores {
-			m.Ns = append(m.Ns, newNSRecord(st))
-			m.Answer = append(m.Answer, newNSRecord(st))
+		for _, mux := range s.meshmuxes {
+			mux.mu.RLock()
+			m.Ns = append(m.Ns, newNSRecord(mux.meshes[0]))
+			m.Answer = append(m.Answer, newNSRecord(mux.meshes[0]))
+			mux.mu.RUnlock()
 		}
 		s.writeMsg(w, r, m, dns.RcodeSuccess)
 		return

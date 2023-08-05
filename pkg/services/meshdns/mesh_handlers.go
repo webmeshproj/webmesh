@@ -17,7 +17,9 @@ limitations under the License.
 package meshdns
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/raft"
 	"github.com/miekg/dns"
@@ -25,87 +27,134 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
-func (s *Server) meshLookupHandler(mesh meshdb.Store) contextDNSHandler {
-	return func(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
-		s.log.Debug("handling leader lookup")
+type meshLookupMux struct {
+	*dns.ServeMux
+	*Server
+	domain string
+	meshes []meshdb.Store
+	mu     sync.RWMutex
+}
+
+func (s *Server) newMeshLookupMux(mesh meshdb.Store) *meshLookupMux {
+	mux := &meshLookupMux{
+		ServeMux: dns.NewServeMux(),
+		Server:   s,
+		domain:   mesh.Domain(),
+		meshes:   []meshdb.Store{mesh},
+	}
+	domPattern := strings.TrimSuffix(mesh.Domain(), ".")
+	mux.HandleFunc(fmt.Sprintf("leader.%s", domPattern), s.contextHandler(mux.handleLeaderLookup))
+	mux.HandleFunc(fmt.Sprintf("voters.%s", domPattern), s.contextHandler(mux.handleVotersLookup))
+	mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), s.contextHandler(mux.handleObserversLookup))
+	mux.HandleFunc(domPattern, s.contextHandler(mux.handleMeshLookup))
+	return mux
+}
+
+func (s *meshLookupMux) appendMesh(mesh meshdb.Store) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.meshes = append(s.meshes, mesh)
+}
+
+func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	s.log.Debug("handling mesh lookup")
+	for _, mesh := range s.meshes {
 		m := s.newMsg(mesh, r)
 		nodeID := strings.Split(r.Question[0].Name, ".")[0]
 		err := s.appendPeerToMessage(ctx, mesh, r, m, nodeID)
 		if err != nil {
+			if err == peers.ErrNodeNotFound {
+				// Try the next mesh
+				continue
+			}
 			s.writeMsg(w, r, m, errToRcode(err))
 			return
 		}
 		s.writeMsg(w, r, m, dns.RcodeSuccess)
 	}
+	// NXDOMAIN
+	m := s.newMsg(s.meshes[0], r) // TODO: Match the NS record to our ID where the request came from
+	s.writeMsg(w, r, m, dns.RcodeNameError)
 }
 
-func (s *Server) leaderLookupHandler(mesh meshdb.Store) contextDNSHandler {
-	return func(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
-		s.log.Debug("handling leader lookup")
-		m := s.newMsg(mesh, r)
-		leaderID, err := mesh.Leader()
-		if err != nil {
-			s.log.Error("failed to get leader", slog.String("error", err.Error()))
-			s.writeMsg(w, r, m, dns.RcodeServerFailure)
-			return
-		}
-		nodeID := string(leaderID)
-		// Add a CNAME record for the leader
-		m.Answer = append(m.Answer, &dns.CNAME{
-			Hdr:    dns.RR_Header{Name: newFQDN(mesh, "leader"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
-			Target: newFQDN(mesh, nodeID),
-		})
-		err = s.appendPeerToMessage(ctx, mesh, r, m, nodeID)
-		if err != nil {
-			s.writeMsg(w, r, m, errToRcode(err))
-			return
-		}
-		s.writeMsg(w, r, m, dns.RcodeSuccess)
+func (s *meshLookupMux) handleLeaderLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	s.log.Debug("handling leader lookup")
+	// We only serve these for the first registered mesh
+	// TODO: Determine where the request came from
+	mesh := s.meshes[0]
+	m := s.newMsg(mesh, r)
+	leaderID, err := mesh.Leader()
+	if err != nil {
+		s.log.Error("failed to get leader", slog.String("error", err.Error()))
+		s.writeMsg(w, r, m, dns.RcodeServerFailure)
+		return
 	}
+	nodeID := string(leaderID)
+	m.Answer = append(m.Answer, &dns.CNAME{
+		Hdr:    dns.RR_Header{Name: newFQDN(mesh, "leader"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
+		Target: newFQDN(mesh, nodeID),
+	})
+	err = s.appendPeerToMessage(ctx, mesh, r, m, nodeID)
+	if err != nil {
+		s.writeMsg(w, r, m, errToRcode(err))
+		return
+	}
+	s.writeMsg(w, r, m, dns.RcodeSuccess)
 }
 
-func (s *Server) votersLookupHandler(mesh meshdb.Store) contextDNSHandler {
-	return func(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
-		s.log.Debug("handling voters lookup")
-		m := s.newMsg(mesh, r)
-		config := mesh.Raft().Configuration()
-		for _, server := range config.Servers {
-			if server.Suffrage == raft.Voter {
-				m.Answer = append(m.Answer, &dns.CNAME{
-					Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
-					Target: newFQDN(mesh, string(server.ID)),
-				})
-				err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID))
-				if err != nil {
-					s.writeMsg(w, r, m, errToRcode(err))
-					return
-				}
+func (s *meshLookupMux) handleVotersLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	s.log.Debug("handling voters lookup")
+	// We only serve these for the first registered mesh
+	// TODO: Determine where the request came from
+	mesh := s.meshes[0]
+	m := s.newMsg(mesh, r)
+	config := mesh.Raft().Configuration()
+	for _, server := range config.Servers {
+		if server.Suffrage == raft.Voter {
+			m.Answer = append(m.Answer, &dns.CNAME{
+				Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
+				Target: newFQDN(mesh, string(server.ID)),
+			})
+			err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID))
+			if err != nil {
+				s.writeMsg(w, r, m, errToRcode(err))
+				return
 			}
 		}
-		s.writeMsg(w, r, m, dns.RcodeSuccess)
 	}
+	s.writeMsg(w, r, m, dns.RcodeSuccess)
 }
 
-func (s *Server) observersLookupHandler(mesh meshdb.Store) contextDNSHandler {
-	return func(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
-		s.log.Debug("handling observers lookup")
-		m := s.newMsg(mesh, r)
-		config := mesh.Raft().Configuration()
-		for _, server := range config.Servers {
-			if server.Suffrage == raft.Nonvoter {
-				m.Answer = append(m.Answer, &dns.CNAME{
-					Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
-					Target: newFQDN(mesh, string(server.ID)),
-				})
-				err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID))
-				if err != nil {
-					s.writeMsg(w, r, m, errToRcode(err))
-					return
-				}
+func (s *meshLookupMux) handleObserversLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	s.log.Debug("handling observers lookup")
+	// We only serve these for the first registered mesh
+	// TODO: Determine where the request came from
+	mesh := s.meshes[0]
+	m := s.newMsg(mesh, r)
+	config := mesh.Raft().Configuration()
+	for _, server := range config.Servers {
+		if server.Suffrage == raft.Nonvoter {
+			m.Answer = append(m.Answer, &dns.CNAME{
+				Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
+				Target: newFQDN(mesh, string(server.ID)),
+			})
+			err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID))
+			if err != nil {
+				s.writeMsg(w, r, m, errToRcode(err))
+				return
 			}
 		}
-		s.writeMsg(w, r, m, dns.RcodeSuccess)
 	}
+	s.writeMsg(w, r, m, dns.RcodeSuccess)
 }

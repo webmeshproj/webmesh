@@ -35,6 +35,8 @@ import (
 type Options struct {
 	// Meshes are the meshes to bridge.
 	Meshes map[string]*MeshOptions `json:",inline" yaml:",inline" toml:",inline"`
+	// MeshDNS are options for running a meshdns server bridging all meshes.
+	MeshDNS *services.MeshDNSOptions `json:"meshdns,omitempty" yaml:"meshdns,omitempty" toml:"meshdns,omitempty"`
 }
 
 // NewOptions returns new options.
@@ -46,6 +48,7 @@ func NewOptions() *Options {
 
 // BindFlags binds the options to the given flagset.
 func (o *Options) BindFlags(fs *flag.FlagSet) {
+	o.MeshDNS.BindFlags(fs, "bridge")
 	// Iterate flags to determine which bridge options to bind.
 	raftPort := raft.DefaultListenPort
 	grpcPort := services.DefaultGRPCPort
@@ -90,6 +93,7 @@ func (o *Options) Validate() error {
 		{o.allWireGuardPortsUnique, "wireguard listen ports must be unique for each mesh connection"},
 		{o.allGRPCPortsUnique, "grpc listen ports must be unique for each mesh connection"},
 		{o.allRaftPortsUnique, "raft listen ports must be unique for each mesh connection"},
+		// We currently force all meshes into a single DNS - but keep the validator here anyway
 		{o.allDNSPortsUnique, "dns listen ports must be unique for each mesh connection"},
 		{o.allTURNPortsUnique, "turn listen ports must be unique for each mesh connection"},
 		{o.allDashboardsUnique, "dashboard listen ports must be unique for each mesh connection"},
