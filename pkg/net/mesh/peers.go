@@ -156,15 +156,16 @@ func recursePeers(
 				}
 			}
 		}
-	} else if len(thisRoutes) > 0 {
-		// The peer doesn't expose routes but we do, so we need to add our routes to the peer
-		// TODO: There is a third condition where we both expose routes and there are non-overlapping routes
-		for _, prefix := range thisRoutes {
-			if !util.Contains(allowedRoutes, prefix) {
-				allowedRoutes = append(allowedRoutes, prefix)
-			}
-		}
 	}
+	// } else if len(thisRoutes) > 0 {
+	// 	// The peer doesn't expose routes but we do, so we need to add our routes to the peer
+	// 	// TODO: There is a third condition where we both expose routes and there are non-overlapping routes
+	// 	for _, prefix := range thisRoutes {
+	// 		if !util.Contains(allowedRoutes, prefix) {
+	// 			allowedRoutes = append(allowedRoutes, prefix)
+	// 		}
+	// 	}
+	// }
 	edgeIPs, edgeRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, node, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("recurse edge allowed IPs: %w", err)
@@ -239,15 +240,16 @@ func recurseEdges(
 					}
 				}
 			}
-		} else if len(thisRoutes) > 0 {
-			// The peer doesn't expose routes but we do, so we need to add our routes to the peer
-			// TODO: There is a third condition where we both expose routes and there are non-overlapping routes
-			for _, prefix := range thisRoutes {
-				if !util.Contains(allowedRoutes, prefix) {
-					allowedRoutes = append(allowedRoutes, prefix)
-				}
-			}
 		}
+		// } else if len(thisRoutes) > 0 {
+		// 	// The peer doesn't expose routes but we do, so we need to add our routes to the peer
+		// 	// TODO: There is a third condition where we both expose routes and there are non-overlapping routes
+		// 	for _, prefix := range thisRoutes {
+		// 		if !util.Contains(allowedRoutes, prefix) {
+		// 			allowedRoutes = append(allowedRoutes, prefix)
+		// 		}
+		// 	}
+		// }
 		ips, ipRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, &targetNode, visited)
 		if err != nil {
 			return nil, nil, fmt.Errorf("recurse allowed IPs: %w", err)
