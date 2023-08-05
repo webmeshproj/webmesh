@@ -36,8 +36,6 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
-    ports:
-      - 6060:6060
     entrypoint:
       - /webmesh-node
       # Typical insecure/private testing options
@@ -54,11 +52,8 @@ services:
       # Run a local meshdns server and subscribe to forwarders for other domains
       - --services.meshdns.enabled
       - --services.meshdns.subscribe-forwarders
-      - --services.meshdns.listen-udp=:53
       # Set the system resolvers to the meshdns resolver
       - --mesh.use-meshdns
-      - --plugins.debug.listen-address=:6060
-      - --plugins.debug.enable-db-querier=true
 
   site-2-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -84,6 +79,9 @@ services:
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
       - --bootstrap.mesh-domain=site-2.internal
+      - --services.meshdns.enabled
+      - --services.meshdns.subscribe-forwarders
+      - --mesh.use-meshdns
 
   bridge-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -102,6 +100,8 @@ services:
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
       - net.ipv4.ip_forward=1
+      # At the very least ipv6 forwarding is required for bridged
+      # meshes to be able to communicate with each other.
       - net.ipv6.conf.all.forwarding=1
     entrypoint:
       - /webmesh-node
@@ -114,17 +114,12 @@ services:
       - --bridge.site-1.wireguard.listen-port=51821
       - --bridge.site-1.services.listen-address=:8443
       - --bridge.site-1.raft.listen-address=:9443
-      - --bridge.site-1.plugins.debug.listen-address=:6061
-      - --bridge.site-1.plugins.debug.enable-db-querier=true
       # Site 2 Options
       - --bridge.site-2.mesh.join-address=site-2-node:8443
       - --bridge.site-2.raft.in-memory
       - --bridge.site-2.services.listen-address=:8444
       - --bridge.site-2.wireguard.listen-port=51822
       - --bridge.site-2.raft.listen-address=:9444
-      - --bridge.site-2.plugins.debug.listen-address=:6062
-      - --bridge.site-2.plugins.debug.enable-db-querier=true
       # Bridged DNS Options. The DNS server will handle queries for both
-      # site-1.internal and site-2.internal.
+      # site-1.internal and site-2.internal and act as a forwarder for each.
       - --bridge.services.meshdns.enabled
-      - --bridge.services.meshdns.listen-udp=:5353

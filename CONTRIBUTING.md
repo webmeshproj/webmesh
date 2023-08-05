@@ -9,6 +9,8 @@ There are several areas where help is needed/welcomed, including:
 - Frontend (Preferably in Vue by someone who actually knows what they're doing :stuck_out_tongue:)
 - Design/Architecture
 
+A better list will come in the future, but a simple `git grep TODO` will return a list of things that need to be done ranging from small to large.
+
 Protocol Buffers are used for all APIs and inter-node communcation.
 They can be found in the [api](https://github.com/webmeshproj/api) repository.
 

@@ -70,8 +70,8 @@ type MeshDNSOptions struct {
 func NewMeshDNSOptions() *MeshDNSOptions {
 	return &MeshDNSOptions{
 		Enabled:           false,
-		ListenUDP:         ":5353",
-		ListenTCP:         ":5353",
+		ListenUDP:         ":53",
+		ListenTCP:         ":53",
 		EnableCompression: true,
 		RequestTimeout:    time.Second * 5,
 		Forwarders: func() []string {
@@ -92,9 +92,9 @@ func (o *MeshDNSOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	}
 	fs.BoolVar(&o.Enabled, p+"services.meshdns.enabled", util.GetEnvDefault(MeshDNSEnabledEnvVar, "false") == "true",
 		"Enable mesh DNS.")
-	fs.StringVar(&o.ListenUDP, p+"services.meshdns.listen-udp", util.GetEnvDefault(MeshDNSListenUDPEnvVar, ":5353"),
+	fs.StringVar(&o.ListenUDP, p+"services.meshdns.listen-udp", util.GetEnvDefault(MeshDNSListenUDPEnvVar, ":53"),
 		"UDP address to listen on for DNS requests.")
-	fs.StringVar(&o.ListenTCP, p+"services.meshdns.listen-tcp", util.GetEnvDefault(MeshDNSListenTCPEnvVar, ":5353"),
+	fs.StringVar(&o.ListenTCP, p+"services.meshdns.listen-tcp", util.GetEnvDefault(MeshDNSListenTCPEnvVar, ":53"),
 		"TCP address to listen on for DNS requests.")
 	fs.IntVar(&o.ReusePort, p+"services.meshdns.reuse-port", util.GetEnvIntDefault(MeshDNSReusePortEnvVar, 0),
 		"Enable SO_REUSEPORT for mesh DNS.")
