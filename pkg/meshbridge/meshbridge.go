@@ -220,7 +220,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		if m.opts.MeshDNS != nil && m.opts.MeshDNS.Enabled {
 			// Tell the leader we can do meshdns now
 			currentFeats := m.opts.Meshes[meshID].Services.ToFeatureSet()
-			currentFeats = append(currentFeats, v1.Feature_MESH_DNS)
+			currentFeats = append(currentFeats, v1.Feature_MESH_DNS, v1.Feature_FORWARD_MESH_DNS)
 			req.Features = currentFeats
 			req.MeshdnsPort = int32(dnsport)
 		}
