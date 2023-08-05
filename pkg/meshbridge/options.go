@@ -37,18 +37,22 @@ type Options struct {
 	Meshes map[string]*MeshOptions `json:",inline" yaml:",inline" toml:",inline"`
 	// MeshDNS are options for running a meshdns server bridging all meshes.
 	MeshDNS *services.MeshDNSOptions `json:"meshdns,omitempty" yaml:"meshdns,omitempty" toml:"meshdns,omitempty"`
+	// UseMeshDNS is true if the bridge should use the meshdns server.
+	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty"`
 }
 
 // NewOptions returns new options.
 func NewOptions() *Options {
 	return &Options{
-		Meshes: map[string]*MeshOptions{},
+		Meshes:  map[string]*MeshOptions{},
+		MeshDNS: services.NewMeshDNSOptions(),
 	}
 }
 
 // BindFlags binds the options to the given flagset.
 func (o *Options) BindFlags(fs *flag.FlagSet) {
 	o.MeshDNS.BindFlags(fs, "bridge")
+	fs.BoolVar(&o.UseMeshDNS, "bridge.use-meshdns", o.UseMeshDNS, "use the meshdns server for system DNS")
 	// Iterate flags to determine which bridge options to bind.
 	raftPort := raft.DefaultListenPort
 	grpcPort := services.DefaultGRPCPort
@@ -60,6 +64,11 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				continue
 			}
 			meshID := parts[1]
+			// We ignore the terms "meshdns" and "use-meshdns" here because they overlap,
+			// but needs to be documented.
+			if meshID == "meshdns" || meshID == "use-meshdns" {
+				continue
+			}
 			if _, ok := o.Meshes[meshID]; !ok {
 				ifaceName := wireguard.DefaultInterfaceName
 				if runtime.GOOS != "darwin" {

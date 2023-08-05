@@ -21,6 +21,10 @@ package meshbridge
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/netip"
+	"runtime"
+	"strconv"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -28,6 +32,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 )
@@ -49,6 +54,9 @@ type Bridge interface {
 
 // New creates a new bridge.
 func New(opts *Options) (Bridge, error) {
+	if runtime.GOOS == "windows" {
+		return nil, fmt.Errorf("bridge mode is not supported on windows")
+	}
 	err := opts.Validate()
 	if err != nil {
 		return nil, err
@@ -82,12 +90,13 @@ func New(opts *Options) (Bridge, error) {
 }
 
 type meshBridge struct {
-	opts    *Options
-	meshes  map[string]mesh.Mesh
-	servers map[string]*services.Server
-	meshdns *meshdns.Server
-	srvErrs chan error
-	log     *slog.Logger
+	opts      *Options
+	meshes    map[string]mesh.Mesh
+	servers   map[string]*services.Server
+	meshdns   *meshdns.Server
+	systemdns []netip.AddrPort
+	srvErrs   chan error
+	log       *slog.Logger
 }
 
 // Mesh returns the mesh with the given ID.
@@ -173,6 +182,28 @@ func (m *meshBridge) Start(ctx context.Context) error {
 			}
 		}()
 	}
+	var dnsport uint16
+	if m.opts.UseMeshDNS {
+		_, udpPort, err := net.SplitHostPort(m.opts.MeshDNS.ListenUDP)
+		if err != nil {
+			// Should have never passed validate
+			return fmt.Errorf("failed to parse meshdns udp listen address: %w", err)
+		}
+		zport, err := strconv.ParseUint(udpPort, 10, 16)
+		if err != nil {
+			// Should have never passed validate
+			return fmt.Errorf("failed to parse meshdns udp listen port: %w", err)
+		}
+		dnsport = uint16(zport)
+		addrport := netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), dnsport)
+		err = dns.AddServers("", []netip.AddrPort{addrport})
+		if err != nil {
+			// Make this non-fatal for now
+			m.log.Warn("failed to add meshdns server to system dns", slog.String("error", err.Error()))
+		} else {
+			m.systemdns = append(m.systemdns, addrport)
+		}
+	}
 	// We need to dial each mesh's leader and tell them we can route the other
 	// meshes.
 	for meshID, mesh := range m.meshes {
@@ -198,12 +229,20 @@ func (m *meshBridge) Start(ctx context.Context) error {
 				continue
 			}
 			defer conn.Close()
-			m.log.Info("broadcasting routes to mesh", slog.String("mesh-id", meshID), slog.Any("routes", toBroadcast))
-			cli := v1.NewNodeClient(conn)
-			_, err = cli.Update(ctx, &v1.UpdateRequest{
+			req := &v1.UpdateRequest{
 				Id:     mesh.ID(),
 				Routes: toBroadcast,
-			})
+			}
+			if m.opts.MeshDNS != nil && m.opts.MeshDNS.Enabled {
+				// Tell the leader we can do meshdns now
+				currentFeats := m.opts.Meshes[meshID].Services.ToFeatureSet()
+				currentFeats = append(currentFeats, v1.Feature_MESH_DNS)
+				req.Features = currentFeats
+				req.MeshdnsPort = int32(dnsport)
+			}
+			m.log.Info("broadcasting routes and features to mesh", slog.String("mesh-id", meshID), slog.Any("request", req))
+			cli := v1.NewNodeClient(conn)
+			_, err = cli.Update(ctx, req)
 			if err != nil {
 				err = fmt.Errorf("failed to broadcast routes for mesh %q: %w", meshID, err)
 				tries++
@@ -221,6 +260,19 @@ func (m *meshBridge) Start(ctx context.Context) error {
 
 // Stop stops the bridge. This closes all meshes and services.
 func (m *meshBridge) Stop(ctx context.Context) error {
+	if len(m.systemdns) > 0 {
+		err := dns.RemoveServers("", m.systemdns)
+		if err != nil {
+			m.log.Warn("failed to remove meshdns server from system dns", slog.String("error", err.Error()))
+		}
+	}
+	if m.meshdns != nil {
+		m.log.Info("shutting down meshdns server")
+		err := m.meshdns.Shutdown()
+		if err != nil {
+			m.log.Warn("failed to shutdown meshdns server", slog.String("error", err.Error()))
+		}
+	}
 	for meshID, srv := range m.servers {
 		m.log.Info("shutting down gRPC server", slog.String("mesh-id", meshID))
 		srv.Stop()
