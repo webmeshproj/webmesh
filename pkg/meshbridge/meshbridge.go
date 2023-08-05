@@ -46,6 +46,9 @@ type Bridge interface {
 	// ServeError returns a channel that will receive an error if any gRPC server
 	// fails.
 	ServeError() <-chan error
+	// Resolver returns a net.Resolver that can be used to resolve DNS names.
+	// If the meshdns server is not enabled, this returns the system resolver.
+	Resolver() *net.Resolver
 	// Mesh returns the mesh with the given ID. If ID is an invalid mesh ID,
 	// nil is returned.
 	Mesh(id string) mesh.Mesh
@@ -107,6 +110,19 @@ func (m *meshBridge) Mesh(id string) mesh.Mesh {
 // fails.
 func (m *meshBridge) ServeError() <-chan error {
 	return m.srvErrs
+}
+
+func (m *meshBridge) Resolver() *net.Resolver {
+	if m.meshdns == nil {
+		return net.DefaultResolver
+	}
+	// TODO: use all DNS servers
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, m.opts.MeshDNS.ListenUDP)
+		},
+	}
 }
 
 // Start starts the bridge. This opens all meshes and services.
