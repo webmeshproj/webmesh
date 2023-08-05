@@ -27,16 +27,16 @@ import (
 )
 
 const (
-	MeshDNSEnabledEnvVar           = "SERVICES_MESH_DNS_ENABLED"
-	MeshDNSListenUDPEnvVar         = "SERVICES_MESH_DNS_LISTEN_UDP"
-	MeshDNSListenTCPEnvVar         = "SERVICES_MESH_DNS_LISTEN_TCP"
-	MeshDNSTSIGKeyEnvVar           = "SERVICES_MESH_DNS_TSIG_KEY"
-	MeshDNSReusePortEnvVar         = "SERVICES_MESH_DNS_REUSE_PORT"
-	MeshDNSCompressionEnvVar       = "SERVICES_MESH_DNS_COMPRESSION"
-	MeshDNSRequestTimeoutEnvVar    = "SERVICES_MESH_DNS_REQUEST_TIMEOUT"
-	MeshDNSForwardersEnvVar        = "SERVICES_MESH_DNS_FORWARDERS"
-	MeshDNSDisableForwardingEnvVar = "SERVICES_MESH_DNS_DISABLE_FORWARDING"
-	MeshDNSCacheSizeEnvVar         = "SERVICES_MESH_DNS_CACHE_SIZE"
+	MeshDNSEnabledEnvVar           = "SERVICES_MESHDNS_ENABLED"
+	MeshDNSListenUDPEnvVar         = "SERVICES_MESHDNS_LISTEN_UDP"
+	MeshDNSListenTCPEnvVar         = "SERVICES_MESHDNS_LISTEN_TCP"
+	MeshDNSTSIGKeyEnvVar           = "SERVICES_MESHDNS_TSIG_KEY"
+	MeshDNSReusePortEnvVar         = "SERVICES_MESHDNS_REUSE_PORT"
+	MeshDNSCompressionEnvVar       = "SERVICES_MESHDNS_COMPRESSION"
+	MeshDNSRequestTimeoutEnvVar    = "SERVICES_MESHDNS_REQUEST_TIMEOUT"
+	MeshDNSForwardersEnvVar        = "SERVICES_MESHDNS_FORWARDERS"
+	MeshDNSDisableForwardingEnvVar = "SERVICES_MESHDNS_DISABLE_FORWARDING"
+	MeshDNSCacheSizeEnvVar         = "SERVICES_MESHDNS_CACHE_SIZE"
 )
 
 // MeshDNSOptions are the mesh DNS options.
@@ -79,25 +79,25 @@ func (o *MeshDNSOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fs.BoolVar(&o.Enabled, p+"services.mesh-dns.enabled", util.GetEnvDefault(MeshDNSEnabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.Enabled, p+"services.meshdns.enabled", util.GetEnvDefault(MeshDNSEnabledEnvVar, "false") == "true",
 		"Enable mesh DNS.")
-	fs.StringVar(&o.ListenUDP, p+"services.mesh-dns.listen-udp", util.GetEnvDefault(MeshDNSListenUDPEnvVar, ":5353"),
+	fs.StringVar(&o.ListenUDP, p+"services.meshdns.listen-udp", util.GetEnvDefault(MeshDNSListenUDPEnvVar, ":5353"),
 		"UDP address to listen on for DNS requests.")
-	fs.StringVar(&o.ListenTCP, p+"services.mesh-dns.listen-tcp", util.GetEnvDefault(MeshDNSListenTCPEnvVar, ":5353"),
+	fs.StringVar(&o.ListenTCP, p+"services.meshdns.listen-tcp", util.GetEnvDefault(MeshDNSListenTCPEnvVar, ":5353"),
 		"TCP address to listen on for DNS requests.")
-	fs.IntVar(&o.ReusePort, p+"services.mesh-dns.reuse-port", util.GetEnvIntDefault(MeshDNSReusePortEnvVar, 0),
+	fs.IntVar(&o.ReusePort, p+"services.meshdns.reuse-port", util.GetEnvIntDefault(MeshDNSReusePortEnvVar, 0),
 		"Enable SO_REUSEPORT for mesh DNS.")
-	fs.BoolVar(&o.EnableCompression, p+"services.mesh-dns.enable-compression", util.GetEnvDefault(MeshDNSCompressionEnvVar, "true") == "true",
+	fs.BoolVar(&o.EnableCompression, p+"services.meshdns.enable-compression", util.GetEnvDefault(MeshDNSCompressionEnvVar, "true") == "true",
 		"Enable DNS compression for mesh DNS.")
-	fs.DurationVar(&o.RequestTimeout, p+"services.mesh-dns.request-timeout", util.GetEnvDurationDefault(MeshDNSRequestTimeoutEnvVar, 5*time.Second),
+	fs.DurationVar(&o.RequestTimeout, p+"services.meshdns.request-timeout", util.GetEnvDurationDefault(MeshDNSRequestTimeoutEnvVar, 5*time.Second),
 		"Timeout for mesh DNS requests.")
-	fs.Func(p+"services.mesh-dns.forwarders", "DNS forwarders to use for mesh DNS. If empty, the system DNS servers will be used.", func(s string) error {
+	fs.Func(p+"services.meshdns.forwarders", "DNS forwarders to use for mesh DNS. If empty, the system DNS servers will be used.", func(s string) error {
 		o.Forwarders = strings.Split(s, ",")
 		return nil
 	})
-	fs.BoolVar(&o.DisableForwarding, p+"services.mesh-dns.disable-forwarding", util.GetEnvDefault(MeshDNSDisableForwardingEnvVar, "false") == "true",
+	fs.BoolVar(&o.DisableForwarding, p+"services.meshdns.disable-forwarding", util.GetEnvDefault(MeshDNSDisableForwardingEnvVar, "false") == "true",
 		"Disable forwarding requests to any configured forwarders.")
-	fs.IntVar(&o.CacheSize, p+"services.mesh-dns.cache-size", util.GetEnvIntDefault(MeshDNSCacheSizeEnvVar, 0),
+	fs.IntVar(&o.CacheSize, p+"services.meshdns.cache-size", util.GetEnvIntDefault(MeshDNSCacheSizeEnvVar, 0),
 		"Size of the remote DNS cache. Defaults to 0 (disabled).")
 }
 

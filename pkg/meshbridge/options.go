@@ -64,9 +64,9 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 				continue
 			}
 			meshID := parts[1]
-			// We ignore the terms "meshdns" and "use-meshdns" here because they overlap,
+			// We ignore the terms "services" and "use-meshdns" here because they overlap,
 			// but needs to be documented.
-			if meshID == "meshdns" || meshID == "use-meshdns" {
+			if meshID == "services" || meshID == "use-meshdns" {
 				continue
 			}
 			if _, ok := o.Meshes[meshID]; !ok {
@@ -249,7 +249,6 @@ func allAddrPortsUnique(addrs []string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		fmt.Println("port", port)
 		ports = append(ports, port)
 	}
 	return util.AllUnique(ports), nil

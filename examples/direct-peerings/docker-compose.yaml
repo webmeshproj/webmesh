@@ -18,9 +18,6 @@ networks:
       config:
         - subnet: 10.20.0.0/24
 
-volumes:
-  bootstrap-node:
-
 services:
   # Bootstrap/TURN Node
 
@@ -40,7 +37,7 @@ services:
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.100.10.0/24
       - --bootstrap.default-network-policy=accept
-      - --raft.data-dir=/data
+      - --raft.in-memory
       - --wireguard.key-file=/data/wireguard.key
       - --wireguard.force-interface-name
       - --services.api.mesh
@@ -54,8 +51,6 @@ services:
     ports:
       - 8443:8443
       - 8080:8080
-    volumes:
-      - bootstrap-node:/data
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 

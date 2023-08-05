@@ -88,6 +88,7 @@ services:
     ports:
       - 6061:6061
       - 6062:6062
+      - 6363:5353/udp
     entrypoint:
       - /webmesh-node
       - --global.insecure
@@ -109,3 +110,7 @@ services:
       - --bridge.site-2.raft.listen-address=:9444
       - --bridge.site-2.plugins.debug.listen-address=:6062
       - --bridge.site-2.plugins.debug.enable-db-querier=true
+      # Bridged DNS Options
+      - --bridge.services.meshdns.enabled
+      - --bridge.services.meshdns.listen-udp=:5353
+      - --bridge.use-meshdns

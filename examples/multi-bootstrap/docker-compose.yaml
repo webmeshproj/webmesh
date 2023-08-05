@@ -31,7 +31,7 @@ services:
       - --services.api.peer-discovery
       - --services.api.mesh
       - --services.metrics.enabled
-      - --services.mesh-dns.enabled
+      - --services.meshdns.enabled
     ports:
       - 8443:8443
       - 5354:5353/udp

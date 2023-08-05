@@ -51,7 +51,7 @@ services:
       - --mesh.zone-awareness-id=site-1
       - --services.api.mesh
       - --services.api.admin
-      - --services.mesh-dns.enabled
+      - --services.meshdns.enabled
       - --services.metrics.enabled
       - --services.metrics.listen-address=:8000
       - --services.dashboard.enabled

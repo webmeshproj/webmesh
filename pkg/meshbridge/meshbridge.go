@@ -213,38 +213,44 @@ func (m *meshBridge) Start(ctx context.Context) error {
 				toBroadcast = append(toBroadcast, otherMesh.Network().NetworkV6().String())
 			}
 		}
+		req := &v1.UpdateRequest{
+			Id:     mesh.ID(),
+			Routes: toBroadcast,
+		}
+		if m.opts.MeshDNS != nil && m.opts.MeshDNS.Enabled {
+			// Tell the leader we can do meshdns now
+			currentFeats := m.opts.Meshes[meshID].Services.ToFeatureSet()
+			currentFeats = append(currentFeats, v1.Feature_MESH_DNS)
+			req.Features = currentFeats
+			req.MeshdnsPort = int32(dnsport)
+		}
 		// TODO: Check if any unique non-internal routes are broadcasted
 		// by the other meshes and add them to this list (per a configuration flag).
+		m.log.Info("broadcasting routes and features to mesh", slog.String("mesh-id", meshID), slog.Any("request", req))
 		var tries int
 		var err error
 		for tries <= 3 {
+			if ctx.Err() != nil {
+				return fmt.Errorf("context canceled: %w", ctx.Err())
+			}
 			var conn *grpc.ClientConn
-			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			conn, err = mesh.DialLeader(ctx)
-			cancel()
+			tryctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			conn, err = mesh.DialLeader(tryctx)
 			if err != nil {
+				m.log.Error("failed to dial leader", slog.String("mesh-id", meshID), slog.String("error", err.Error()))
 				err = fmt.Errorf("failed to dial leader for mesh %q: %w", meshID, err)
 				tries++
 				time.Sleep(time.Second)
 				continue
 			}
 			defer conn.Close()
-			req := &v1.UpdateRequest{
-				Id:     mesh.ID(),
-				Routes: toBroadcast,
-			}
-			if m.opts.MeshDNS != nil && m.opts.MeshDNS.Enabled {
-				// Tell the leader we can do meshdns now
-				currentFeats := m.opts.Meshes[meshID].Services.ToFeatureSet()
-				currentFeats = append(currentFeats, v1.Feature_MESH_DNS)
-				req.Features = currentFeats
-				req.MeshdnsPort = int32(dnsport)
-			}
-			m.log.Info("broadcasting routes and features to mesh", slog.String("mesh-id", meshID), slog.Any("request", req))
+
 			cli := v1.NewNodeClient(conn)
-			_, err = cli.Update(ctx, req)
+			_, err = cli.Update(tryctx, req)
 			if err != nil {
-				err = fmt.Errorf("failed to broadcast routes for mesh %q: %w", meshID, err)
+				m.log.Error("failed to broadcast routes and features", slog.String("mesh-id", meshID), slog.String("error", err.Error()))
+				err = fmt.Errorf("failed to broadcast routes and features for mesh %q: %w", meshID, err)
 				tries++
 				time.Sleep(time.Second)
 				continue
