@@ -43,6 +43,7 @@ services:
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
+      - --bootstrap.mesh-domain=site-1.internal
       - --raft.in-memory
 
   site-2-node:
@@ -65,6 +66,7 @@ services:
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
+      - --bootstrap.mesh-domain=site-2.internal
       - --raft.in-memory
 
   bridge-node:
