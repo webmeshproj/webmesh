@@ -21,9 +21,11 @@ package meshbridge
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
+	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -153,19 +155,36 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		}
 		// TODO: Check if any unique non-internal routes are broadcasted
 		// by the other meshes and add them to this list (per a configuration flag).
-		conn, err := mesh.DialLeader(ctx)
-		if err != nil {
-			return handleErr(fmt.Errorf("failed to dial leader for mesh %q: %w", meshID, err))
+		var tries int
+		var err error
+		for tries <= 3 {
+			var conn *grpc.ClientConn
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			conn, err = mesh.DialLeader(ctx)
+			cancel()
+			if err != nil {
+				err = fmt.Errorf("failed to dial leader for mesh %q: %w", meshID, err)
+				tries++
+				time.Sleep(time.Second)
+				continue
+			}
+			defer conn.Close()
+			m.log.Info("broadcasting routes to mesh", slog.String("mesh-id", meshID), slog.Any("routes", toBroadcast))
+			cli := v1.NewNodeClient(conn)
+			_, err = cli.Update(ctx, &v1.UpdateRequest{
+				Id:     mesh.ID(),
+				Routes: toBroadcast,
+			})
+			if err != nil {
+				err = fmt.Errorf("failed to broadcast routes for mesh %q: %w", meshID, err)
+				tries++
+				time.Sleep(time.Second)
+				continue
+			}
+			break
 		}
-		defer conn.Close()
-		m.log.Info("broadcasting routes to mesh", slog.String("mesh-id", meshID), slog.Any("routes", toBroadcast))
-		cli := v1.NewNodeClient(conn)
-		_, err = cli.Update(ctx, &v1.UpdateRequest{
-			Id:     mesh.ID(),
-			Routes: toBroadcast,
-		})
 		if err != nil {
-			return handleErr(fmt.Errorf("failed to broadcast routes for mesh %q: %w", meshID, err))
+			return handleErr(err)
 		}
 	}
 	return nil

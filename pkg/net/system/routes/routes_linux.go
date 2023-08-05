@@ -34,7 +34,7 @@ import (
 )
 
 // GetDefaultGateway returns the default gateway of the current system.
-func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
+func GetDefaultGateway(_ context.Context) (netip.Addr, error) {
 	f, err := os.Open("/proc/net/route")
 	if err != nil {
 		return netip.Addr{}, fmt.Errorf("could not open /proc/net/route: %w", err)
