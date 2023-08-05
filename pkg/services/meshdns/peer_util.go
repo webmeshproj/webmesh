@@ -27,50 +27,59 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
-func (s *Server) appendPeerToMessage(ctx context.Context, st meshdb.Store, r, m *dns.Msg, peerID string) error {
+func (s *Server) appendPeerToMessage(ctx context.Context, st meshdb.Store, r, m *dns.Msg, peerID string, ipv6Only bool) error {
 	peer, err := peers.New(st.Storage()).Get(ctx, peerID)
 	if err != nil {
 		return err
 	}
 	fqdn := newFQDN(st, peer.ID)
-	switch r.Question[0].Qtype {
-	case dns.TypeTXT:
-		s.log.Debug("handling leader TXT question")
-		m.Answer = append(m.Answer, newPeerTXTRecord(fqdn, &peer))
-		if peer.PrivateIPv4.IsValid() {
-			m.Extra = append(m.Extra, &dns.A{
+	for i, q := range r.Question {
+		switch q.Qtype {
+		case dns.TypeTXT:
+			s.log.Debug("handling peer TXT question")
+			m.Answer = append(m.Answer, newPeerTXTRecord(fqdn, &peer))
+			if !ipv6Only && peer.PrivateIPv4.IsValid() {
+				m.Extra = append(m.Extra, &dns.A{
+					Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
+					A:   peer.PrivateIPv4.Addr().AsSlice(),
+				})
+			}
+			if peer.PrivateIPv6.IsValid() {
+				m.Extra = append(m.Extra, &dns.AAAA{
+					Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
+					AAAA: peer.PrivateIPv6.Addr().AsSlice(),
+				})
+			}
+		case dns.TypeA:
+			if ipv6Only {
+				if i != len(r.Question)-1 {
+					// Maybe they asked for a AAAA also
+					continue
+				}
+				return errNoIPv4{}
+			}
+			s.log.Debug("handling peer A question")
+			if !peer.PrivateIPv4.IsValid() {
+				s.log.Debug("no private IPv4 address for peer")
+				return errNoIPv4{}
+			}
+			m.Answer = append(m.Answer, &dns.A{
 				Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
 				A:   peer.PrivateIPv4.Addr().AsSlice(),
 			})
-		}
-		if peer.PrivateIPv6.IsValid() {
-			m.Extra = append(m.Extra, &dns.AAAA{
+			m.Extra = append(m.Extra, newPeerTXTRecord(fqdn, &peer))
+		case dns.TypeAAAA:
+			s.log.Debug("handling peer AAAA question")
+			if !peer.PrivateIPv6.IsValid() {
+				s.log.Debug("no private IPv6 address for peer")
+				return errNoIPv6{}
+			}
+			m.Answer = append(m.Answer, &dns.AAAA{
 				Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
 				AAAA: peer.PrivateIPv6.Addr().AsSlice(),
 			})
+			m.Extra = append(m.Extra, newPeerTXTRecord(fqdn, &peer))
 		}
-	case dns.TypeA:
-		s.log.Debug("handling leader A question")
-		if !peer.PrivateIPv4.IsValid() {
-			s.log.Debug("no private IPv4 address for peer")
-			return errNoIPv4{}
-		}
-		m.Answer = append(m.Answer, &dns.A{
-			Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
-			A:   peer.PrivateIPv4.Addr().AsSlice(),
-		})
-		m.Extra = append(m.Extra, newPeerTXTRecord(fqdn, &peer))
-	case dns.TypeAAAA:
-		s.log.Debug("handling leader AAAA question")
-		if !peer.PrivateIPv6.IsValid() {
-			s.log.Debug("no private IPv6 address for peer")
-			return errNoIPv6{}
-		}
-		m.Answer = append(m.Answer, &dns.AAAA{
-			Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
-			AAAA: peer.PrivateIPv6.Addr().AsSlice(),
-		})
-		m.Extra = append(m.Extra, newPeerTXTRecord(fqdn, &peer))
 	}
 	return nil
 }

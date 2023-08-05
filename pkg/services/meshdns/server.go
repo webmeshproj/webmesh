@@ -103,7 +103,7 @@ type cacheValue struct {
 }
 
 // RegisterDomain registers a new domain to be served by the Mesh DNS server.
-func (s *Server) RegisterDomain(mesh meshdb.Store) {
+func (s *Server) RegisterDomain(mesh meshdb.Store, ipv6Only bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// Check if we have an overlapping domain. This is not a good way to run this,
@@ -114,7 +114,7 @@ func (s *Server) RegisterDomain(mesh meshdb.Store) {
 			return
 		}
 	}
-	mux := s.newMeshLookupMux(mesh)
+	mux := s.newMeshLookupMux(mesh, ipv6Only)
 	s.mux.Handle(mesh.Domain(), mux)
 	s.meshmuxes = append(s.meshmuxes, mux)
 }

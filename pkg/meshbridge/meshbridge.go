@@ -173,7 +173,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 			CacheSize:         m.opts.MeshDNS.CacheSize,
 		})
 		for _, mesh := range m.meshes {
-			m.meshdns.RegisterDomain(mesh)
+			m.meshdns.RegisterDomain(mesh, true)
 		}
 		go func() {
 			if err := m.meshdns.ListenAndServe(); err != nil {
@@ -229,7 +229,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		m.log.Info("broadcasting routes and features to mesh", slog.String("mesh-id", meshID), slog.Any("request", req))
 		var tries int
 		var err error
-		for tries <= 3 {
+		for tries <= 5 {
 			if ctx.Err() != nil {
 				return fmt.Errorf("context canceled: %w", ctx.Err())
 			}

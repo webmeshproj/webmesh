@@ -33,17 +33,19 @@ import (
 type meshLookupMux struct {
 	*dns.ServeMux
 	*Server
-	domain string
-	meshes []meshdb.Store
-	mu     sync.RWMutex
+	domain   string
+	ipv6Only bool
+	meshes   []meshdb.Store
+	mu       sync.RWMutex
 }
 
-func (s *Server) newMeshLookupMux(mesh meshdb.Store) *meshLookupMux {
+func (s *Server) newMeshLookupMux(mesh meshdb.Store, ipv6Only bool) *meshLookupMux {
 	mux := &meshLookupMux{
 		ServeMux: dns.NewServeMux(),
 		Server:   s,
 		domain:   mesh.Domain(),
 		meshes:   []meshdb.Store{mesh},
+		ipv6Only: ipv6Only,
 	}
 	domPattern := strings.TrimSuffix(mesh.Domain(), ".")
 	mux.HandleFunc(fmt.Sprintf("leader.%s", domPattern), s.contextHandler(mux.handleLeaderLookup))
@@ -66,7 +68,7 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 	for _, mesh := range s.meshes {
 		m := s.newMsg(mesh, r)
 		nodeID := strings.Split(r.Question[0].Name, ".")[0]
-		err := s.appendPeerToMessage(ctx, mesh, r, m, nodeID)
+		err := s.appendPeerToMessage(ctx, mesh, r, m, nodeID, s.ipv6Only)
 		if err != nil {
 			if err == peers.ErrNodeNotFound {
 				// Try the next mesh
@@ -101,7 +103,7 @@ func (s *meshLookupMux) handleLeaderLookup(ctx context.Context, w dns.ResponseWr
 		Hdr:    dns.RR_Header{Name: newFQDN(mesh, "leader"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
 		Target: newFQDN(mesh, nodeID),
 	})
-	err = s.appendPeerToMessage(ctx, mesh, r, m, nodeID)
+	err = s.appendPeerToMessage(ctx, mesh, r, m, nodeID, s.ipv6Only)
 	if err != nil {
 		s.writeMsg(w, r, m, errToRcode(err))
 		return
@@ -124,7 +126,7 @@ func (s *meshLookupMux) handleVotersLookup(ctx context.Context, w dns.ResponseWr
 				Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
 				Target: newFQDN(mesh, string(server.ID)),
 			})
-			err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID))
+			err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID), s.ipv6Only)
 			if err != nil {
 				s.writeMsg(w, r, m, errToRcode(err))
 				return
@@ -149,7 +151,7 @@ func (s *meshLookupMux) handleObserversLookup(ctx context.Context, w dns.Respons
 				Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
 				Target: newFQDN(mesh, string(server.ID)),
 			})
-			err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID))
+			err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID), s.ipv6Only)
 			if err != nil {
 				s.writeMsg(w, r, m, errToRcode(err))
 				return

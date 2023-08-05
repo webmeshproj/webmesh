@@ -110,7 +110,7 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 		server := meshdns.NewServer(&meshdns.Options{
 			UDPListenAddr: fmt.Sprintf(":%d", opts.LocalDNSPort),
 		})
-		server.RegisterDomain(st)
+		server.RegisterDomain(st, false)
 		go func() {
 			go func() {
 				if err := server.ListenAndServe(); err != nil {

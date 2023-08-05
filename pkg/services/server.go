@@ -107,7 +107,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 			DisableForwarding: o.MeshDNS.DisableForwarding,
 			CacheSize:         o.MeshDNS.CacheSize,
 		})
-		server.meshdns.RegisterDomain(store)
+		server.meshdns.RegisterDomain(store, false)
 	}
 	if o.Dashboard != nil && o.Dashboard.Enabled {
 		log.Debug("registering dashboard handlers")
