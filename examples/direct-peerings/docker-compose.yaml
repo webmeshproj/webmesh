@@ -29,7 +29,6 @@ services:
     hostname: bootstrap-node
     entrypoint:
       - /webmesh-node
-      - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
       - --global.primary-endpoint=10.30.0.1
@@ -38,14 +37,14 @@ services:
       - --bootstrap.ipv4-network=10.100.10.0/24
       - --bootstrap.default-network-policy=accept
       - --raft.in-memory
-      - --wireguard.key-file=/data/wireguard.key
-      - --wireguard.force-interface-name
       - --services.api.mesh
       - --services.api.admin
-      - --services.api.webrtc
-      - --services.api.stun-servers=stun:10.30.0.1:3478
       - --services.dashboard.enabled
       - --services.dashboard.listen-address=:8080
+      # Enable the WebRTC API to help nodes with ICE connectivity.
+      - --services.api.webrtc
+      - --services.api.stun-servers=stun:10.30.0.1:3478
+      # Enable an embedded TURN server. You can optionally use a public one.
       - --services.turn.enabled
       - --services.turn.public-ip=10.30.0.1
     ports:
@@ -64,12 +63,9 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
-      - --global.log-level=debug
       - --raft.in-memory
       - --mesh.join-address=10.30.0.1:8443
-      - --mesh.max-join-retries=15
       - --mesh.direct-peers=site-2-peer
-      - --wireguard.force-interface-name
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -83,11 +79,8 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
-      - --global.log-level=debug
       - --raft.in-memory
       - --mesh.join-address=10.30.0.1:8443
-      - --mesh.max-join-retries=15
       - --mesh.direct-peers=site-1-peer
-      - --wireguard.force-interface-name
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
