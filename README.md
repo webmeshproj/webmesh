@@ -30,7 +30,6 @@ You can run `make help` to see all the available targets.
 
 - [ ] GUI Application. In the works over [here](https://github.com/webmeshproj/app).
 - [ ] Potential SaaS offering for those who don't want to run their own controllers or have a simple off-site backup of the mesh state.
-- [ ] Ability to peer with other meshes. This would allow for a mesh to be split into multiple smaller meshes that can still communicate with each other.
 
 Most other functionality that is provided by other similar projects already exists in the kernel or in other projects.
 For example, NAT64 and DNS64 have several ways of being configured, but could still be seen as a potential common use-case.
