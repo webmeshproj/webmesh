@@ -63,7 +63,7 @@ type Mesh interface {
 	// other methods can be used.
 	Open(ctx context.Context, features []v1.Feature) error
 	// Ready returns a channel that will be closed when the mesh is ready.
-	// Ready is defined as having a leader.
+	// Ready is defined as having a leader and knowing its address.
 	Ready() <-chan struct{}
 	// Close closes the connection to the mesh and shuts down the storage.
 	Close() error
@@ -213,13 +213,20 @@ func (s *meshStore) Plugins() plugins.Manager {
 }
 
 // Ready returns a channel that will be closed when the mesh is ready.
-// Ready is defined as having a leader.
+// Ready is defined as having a leader and knowing its address.
 func (s *meshStore) Ready() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {
 		defer close(ch)
 		for {
-			_, err := s.Leader()
+			leader, err := s.Leader()
+			if err != nil {
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, err = peers.New(s.Storage()).Get(ctx, leader)
+			cancel()
 			if err != nil {
 				time.Sleep(50 * time.Millisecond)
 				continue

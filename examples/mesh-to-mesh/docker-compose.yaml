@@ -83,9 +83,11 @@ services:
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
+    ports:
+      - 6061:6061
+      - 6062:6062
     entrypoint:
       - /webmesh-node
-      - --global.log-level=debug
       - --global.insecure
       - --global.detect-endpoints
       - --global.detect-private-endpoints
@@ -95,9 +97,13 @@ services:
       - --bridge.site-1.wireguard.listen-port=51821
       - --bridge.site-1.services.listen-address=:8443
       - --bridge.site-1.raft.listen-address=:9443
+      - --bridge.site-1.plugins.debug.listen-address=:6061
+      - --bridge.site-1.plugins.debug.enable-db-querier=true
       # Site 2 Options
       - --bridge.site-2.mesh.join-address=site-2-node:8443
       - --bridge.site-2.raft.in-memory
       - --bridge.site-2.services.listen-address=:8444
       - --bridge.site-2.wireguard.listen-port=51822
       - --bridge.site-2.raft.listen-address=:9444
+      - --bridge.site-2.plugins.debug.listen-address=:6062
+      - --bridge.site-2.plugins.debug.enable-db-querier=true
