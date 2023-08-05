@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra/doc"
 
@@ -57,7 +58,11 @@ func main() {
 		}
 		return
 	}
-	err = nodecmd.GenMarkdownDoc("Configuration", -10, *out)
+	err = nodecmd.GenMarkdownDoc("Configuration", -10, filepath.Join(*out, "configuration.md"))
+	if err != nil {
+		fatal(err)
+	}
+	err = nodecmd.GenBridgeMarkdownDoc("Bridge Configuration", -9, filepath.Join(*out, "bridge-configuration.md"))
 	if err != nil {
 		fatal(err)
 	}

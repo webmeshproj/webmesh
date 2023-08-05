@@ -22,8 +22,13 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshbridge"
+	"github.com/webmeshproj/webmesh/pkg/services"
 )
 
+// GenMarkdownDoc generates markdown documentation for the node command
 func GenMarkdownDoc(title string, weight int, outfile string) error {
 	var sb strings.Builder
 	// Doc header
@@ -95,8 +100,53 @@ FENCE
 	return os.WriteFile(outfile, []byte(sb.String()), 0644)
 }
 
+// GenBridgeMarkdownDoc generates the markdown documentation for the bridge commands.
+func GenBridgeMarkdownDoc(title string, weight int, outfile string) error {
+	var sb strings.Builder
+	opts.Bridge.Meshes = make(map[string]*meshbridge.MeshOptions)
+	opts.Bridge.Meshes["<mesh-id>"] = &meshbridge.MeshOptions{
+		Mesh:     mesh.NewDefaultOptions(),
+		Services: services.NewOptions(0),
+	}
+	opts.Bridge.Meshes["<mesh-id>"].BindFlags(flagset, "<iface-name>", "bridge", "<mesh-id>")
+	// Doc header
+	sb.WriteString(fmt.Sprintf(`---
+title: %s
+weight: %d
+---
+`, title, weight))
+
+	// Prelude
+	prelude := `
+In bridge mode, the options are identical to the node command, except you define multiple mesh connections.
+Each mesh connection is defined by a unique mesh ID and it's connection and service options.
+One notable exception is that MeshDNS servers defined on the mesh level are ignored in favor of the global one.
+
+In contrast to a regular node, environment variables are not supported.
+They will take precedence over the defaults in some cases, but not all.
+Global flags are supported, but do not override TLS and some WireGuard configurations.
+`
+	sb.WriteString(prelude)
+	appendFlagSection("Global Configurations", "global", &sb)
+	appendFlagSectionNoEnv("Mesh DNS Server Configurations", "bridge.services.meshdns", &sb)
+	appendFlagSectionNoEnv("Mesh DNS Client Configurations", "bridge.use-meshdns", &sb)
+	appendFlagSectionNoEnv("Mesh Configurations", "bridge.<mesh-id>.mesh", &sb)
+	appendFlagSectionNoEnv("Auth Configurations", "bridge.<mesh-id>.auth", &sb)
+	// Auth disclaimer about needing more flags
+	sb.WriteString("_TODO: Generic flags need to be provided for external plugin auth providers_\n\n")
+	appendFlagSectionNoEnv("Bootstrap Configurations", "bridge.<mesh-id>.bootstrap", &sb)
+	appendFlagSectionNoEnv("Raft Configurations", "bridge.<mesh-id>.raft", &sb)
+	appendFlagSectionNoEnv("TLS Configurations", "bridge.<mesh-id>.tls", &sb)
+	appendFlagSectionNoEnv("WireGuard Configurations", "bridge.<mesh-id>.wireguard", &sb)
+	appendFlagSectionNoEnv("Services Configurations", "bridge.<mesh-id>.services", &sb, "meshdns")
+	appendFlagSectionNoEnv("Plugin Configurations", "bridge.<mesh-id>.plugins", &sb)
+	return os.WriteFile(outfile, []byte(sb.String()), 0644)
+}
+
 func appendFlagSection(title string, flagPrefix string, sb *strings.Builder) {
-	sb.WriteString(fmt.Sprintf("## %s\n\n", title))
+	if title != "" {
+		sb.WriteString(fmt.Sprintf("## %s\n\n", title))
+	}
 	sb.WriteString("| CLI Flag | Env Var | Config File | Default | Description |\n")
 	sb.WriteString("| -------- | ------- | ----------- | ------- | ----------- |\n")
 	flagset.VisitAll(func(f *flag.Flag) {
@@ -116,7 +166,39 @@ func appendFlagSection(title string, flagPrefix string, sb *strings.Builder) {
 				}
 				return fmt.Sprintf("`%s`", f.DefValue)
 			}(),
-			usage))
+			usage,
+		))
+	})
+	sb.WriteString("\n")
+}
+
+func appendFlagSectionNoEnv(title string, flagPrefix string, sb *strings.Builder, skipStr ...string) {
+	sb.WriteString(fmt.Sprintf("## %s\n\n", title))
+	sb.WriteString("| CLI Flag | Config File | Default | Description |\n")
+	sb.WriteString("| -------- | ----------- | ------- | ----------- |\n")
+	flagset.VisitAll(func(f *flag.Flag) {
+		for _, str := range skipStr {
+			if strings.Contains(f.Name, str) {
+				return
+			}
+		}
+		if !strings.HasPrefix(f.Name, flagPrefix) {
+			return
+		}
+		usage := strings.ReplaceAll(f.Usage, "\n", " ")
+		re := regexp.MustCompile("<(.*?)>")
+		usage = re.ReplaceAllString(usage, "`<$1>`")
+		sb.WriteString(fmt.Sprintf("| `--%s` | `%s` | %s | %s |\n",
+			f.Name,
+			f.Name,
+			func() string {
+				if f.DefValue == "" {
+					return ""
+				}
+				return fmt.Sprintf("`%s`", f.DefValue)
+			}(),
+			usage,
+		))
 	})
 	sb.WriteString("\n")
 }
