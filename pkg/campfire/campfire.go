@@ -19,7 +19,6 @@ package campfire
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/pion/datachannel"
@@ -123,12 +122,44 @@ func New(ctx context.Context, opts Options) (*CampFire, error) {
 	}
 
 	// Everything below broken
-	var sd sdp.SessionDescription
-	sd.Origin.Username = "-"
-	sd.URI = &url.URL{
-		Scheme: "turn",
-		Host:   loc.TURNServer,
+	localDesc := cf.LocalDescription()
+	raw, err := localDesc.Unmarshal()
+	if err != nil {
+		defer cf.PeerConnection.Close()
+		return nil, fmt.Errorf("unmarshal local description: %w", err)
 	}
+	var fingerprint string
+	for _, a := range raw.Attributes {
+		if a.Key == "fingerprint" {
+			fingerprint = a.Value
+			break
+		}
+	}
+	sd := &sdp.SessionDescription{}
+	sd.Origin.Username = "-"
+	sd.Origin.SessionID = 0
+	sd.Origin.SessionVersion = 0
+	sd.Origin.NetworkType = "IN"
+	sd.Origin.AddressType = "IP4"
+	sd.Origin.UnicastAddress = "0.0.0.0"
+	sd.SessionName = sdp.SessionName(loc.Secret)
+	sd.TimeDescriptions = append(sd.TimeDescriptions, sdp.TimeDescription{Timing: sdp.Timing{0, 0}})
+	sd.ConnectionInformation = &sdp.ConnectionInformation{
+		NetworkType: "IN",
+		AddressType: "IP4",
+		Address: &sdp.Address{
+			Address: "0.0.0.0",
+		},
+	}
+	sd = sd.WithFingerprint("sha-256", strings.TrimPrefix(fingerprint, "sha-256 "))
+	sd.Attributes = append(sd.Attributes, sdp.Attribute{
+		Key:   "ice-ufrag",
+		Value: "-",
+	})
+	sd.Attributes = append(sd.Attributes, sdp.Attribute{
+		Key:   "ice-pwd",
+		Value: "-",
+	})
 	out, err := sd.Marshal()
 	if err != nil {
 		defer cf.PeerConnection.Close()
