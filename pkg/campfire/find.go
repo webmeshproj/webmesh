@@ -19,7 +19,6 @@ package campfire
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"net/http"
@@ -71,23 +70,17 @@ func FindCampFire(psk []byte, turnServers []string) (*CampFireLocation, error) {
 }
 
 func computeSecret(psk []byte) ([]byte, error) {
+	plaintext := make([]byte, aes.BlockSize+len(psk))
+	time := Now().UTC().Truncate(time.Hour).Format("2006-01-02 15:00:00")
+	copy(plaintext, time)
 	block, err := aes.NewCipher(psk)
 	if err != nil {
 		return nil, fmt.Errorf("create cipher: %w", err)
 	}
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("create GCM: %w", err)
-	}
-	// Compute a fixed nonce for the given PSK. Otherwise, we'd need to
-	// store the nonce somewhere.
-	nonce := make([]byte, aesgcm.NonceSize())
-	h := sha256.New()
-	h.Write(psk)
-	h.Sum(nonce)
-	time := Now().UTC().Truncate(time.Hour).Format("2006-01-02 15:00:00")
-	secret := aesgcm.Seal(nil, nonce, []byte(time), nil)
-	return secret, nil
+	aescbc := cipher.NewCBCEncrypter(block, make([]byte, aes.BlockSize))
+	out := make([]byte, len(plaintext))
+	aescbc.CryptBlocks(out, plaintext)
+	return out, nil
 }
 
 var (
