@@ -19,9 +19,11 @@ package campfire
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/pion/datachannel"
+	"github.com/pion/sdp/v3"
 	"github.com/pion/webrtc/v3"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -114,9 +116,36 @@ func New(ctx context.Context, opts Options) (*CampFire, error) {
 		defer cf.PeerConnection.Close()
 		return nil, fmt.Errorf("create offer: %w", err)
 	}
-	if err := cf.SetLocalDescription(offer); err != nil {
+	err = cf.SetLocalDescription(offer)
+	if err != nil {
 		defer cf.PeerConnection.Close()
 		return nil, fmt.Errorf("set local description: %w", err)
+	}
+	sd, err := sdp.NewJSEPSessionDescription(true)
+	if err != nil {
+		defer cf.PeerConnection.Close()
+		return nil, fmt.Errorf("new JSEP session description: %w", err)
+	}
+	sd.Origin.Username = "-"
+	sd.URI = &url.URL{
+		Scheme: "turn",
+		Opaque: loc.Secret,
+		Host:   loc.TURNServer,
+	}
+	// sd.SessionName = sdp.SessionName(loc.Secret)
+	out, err := sd.Marshal()
+	if err != nil {
+		defer cf.PeerConnection.Close()
+		return nil, fmt.Errorf("marshal session description: %w", err)
+	}
+	answer := webrtc.SessionDescription{
+		Type: webrtc.SDPTypeAnswer,
+		SDP:  string(out),
+	}
+	err = cf.SetRemoteDescription(answer)
+	if err != nil {
+		defer cf.PeerConnection.Close()
+		return nil, fmt.Errorf("set remote description: %w", err)
 	}
 	return cf, nil
 }
