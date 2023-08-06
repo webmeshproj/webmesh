@@ -29,6 +29,9 @@ import (
 	"time"
 )
 
+// Now is the current time. It is a variable so it can be mocked out in tests.
+var Now = time.Now
+
 // CampFire is the secret and location of a campfire.
 type CampFire struct {
 	// Secret is the computed ID from the PSK.
@@ -37,12 +40,17 @@ type CampFire struct {
 	TURNServer string
 }
 
+// PSKSize is the size of the PSK in bytes.
+const PSKSize = 32
+
 // FindCampFire finds a campfire using the given PSK and TURN servers.
 // If turnServers is empty, a default list will be fetched from
 // always-online-stun.
 func FindCampFire(psk []byte, turnServers []string) (*CampFire, error) {
 	if len(psk) == 0 {
 		return nil, fmt.Errorf("PSK must not be empty")
+	} else if len(psk) != PSKSize {
+		return nil, fmt.Errorf("PSK must be %d bytes", PSKSize)
 	}
 	if len(turnServers) == 0 {
 		var err error
@@ -78,7 +86,7 @@ func computeSecret(psk []byte) ([]byte, error) {
 	h := sha256.New()
 	h.Write(psk)
 	h.Sum(nonce)
-	hour := time.Now().UTC().Hour()
+	hour := Now().UTC().Hour()
 	secret := aesgcm.Seal(nil, nonce, []byte(fmt.Sprintf("%02d:00", hour)), nil)
 	return secret, nil
 }
