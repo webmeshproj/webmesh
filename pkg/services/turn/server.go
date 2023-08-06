@@ -70,7 +70,7 @@ func NewServer(o *Options) (*Server, error) {
 	log.Info("Listening for STUN requests", slog.String("listen-addr", udpListenAddr))
 	s, err := turn.NewServer(turn.ServerConfig{
 		Realm: o.Realm,
-		LoggerFactory: &loggerFactory{
+		LoggerFactory: &LoggerFactory{
 			Logger: log.With("channel", "turn"),
 		},
 		// Set AuthHandler callback

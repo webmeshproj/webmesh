@@ -42,11 +42,11 @@ func FuzzFindCampFire(f *testing.F) {
 		f.Add([]byte(tc))
 	}
 	f.Fuzz(func(t *testing.T, psk []byte) {
-		resp1, err := FindCampFire(psk, testTURNServers)
+		resp1, err := FindCampFire(psk, nil)
 		if err != nil {
 			t.Skip(err)
 		}
-		resp2, err := FindCampFire(psk, testTURNServers)
+		resp2, err := FindCampFire(psk, nil)
 		if err != nil {
 			t.Skip(err)
 		}
@@ -57,43 +57,4 @@ func FuzzFindCampFire(f *testing.F) {
 			t.Fatalf("expected %q, got %q", resp1.TURNServer, resp2.TURNServer)
 		}
 	})
-}
-
-var testTURNServers = []string{
-	"stun.voipdiscount.com:3478",
-	"stun.ladridiricette.it:3478",
-	"stun.tel2.co.uk:3478",
-	"stun.counterpath.com:3478",
-	"stun.gmx.net:3478",
-	"stun.commpeak.com:3478",
-	"stun3.l.google.com:19305",
-	"stun.wifirst.net:3478",
-	"stun.romaaeterna.nl:3478",
-	"stun.teliax.com:3478",
-	"stun.istitutogramscisiciliano.it:3478",
-	"stun.voipbuster.com:3478",
-	"stun.nfon.net:3478",
-	"stun.deepfinesse.com:3478",
-	"stun.thebrassgroup.it:3478",
-	"stun.mobile-italia.com:3478",
-	"stun.dcalling.de:3478",
-	"stun.halonet.pl:3478",
-	"stun.openvoip.it:3478",
-	"stun.mywatson.it:3478",
-	"stun.bitburger.de:3478",
-	"stun.eol.co.nz:3478",
-	"stun.comrex.com:3478",
-	"stun.sipdiscount.com:3478",
-	"stun.siptrunk.com:3478",
-	"stun.telbo.com:3478",
-	"stun.ipfire.org:3478",
-	"stun.graftlab.com:3478",
-	"stun.cellmail.com:3478",
-	"stun.medvc.eu:3478",
-	"stun.romancecompass.com:3478",
-	"stun.lleida.net:3478",
-	"stun.rynga.com:3478",
-	"stun.ekiga.net:3478",
-	"stun.url.net.au:3478",
-	"stun.hide.me:3478",
 }

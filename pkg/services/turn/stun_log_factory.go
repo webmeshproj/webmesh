@@ -23,11 +23,11 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-type loggerFactory struct {
+type LoggerFactory struct {
 	*slog.Logger
 }
 
-func (f *loggerFactory) NewLogger(scope string) logging.LeveledLogger {
+func (f *LoggerFactory) NewLogger(scope string) logging.LeveledLogger {
 	return &slogLogger{f.Logger.With(slog.String("scope", scope))}
 }
 

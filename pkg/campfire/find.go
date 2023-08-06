@@ -19,13 +19,28 @@ package campfire
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	_ "embed"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 )
+
+// defaultTURNServers is a list of default TURN servers gathered from always-online-stun.
+var defaultTURNServers []string
+
+//go:embed valid_hosts.txt
+var alwaysOnHostsFile []byte
+
+var once sync.Once
+
+// GetDefaultTURNServers returns the default list of TURN servers.
+func GetDefaultTURNServers() []string {
+	once.Do(func() {
+		defaultTURNServers = strings.Split(strings.TrimSpace(string(alwaysOnHostsFile)), "\n")
+	})
+	return defaultTURNServers
+}
 
 // Now is the current time. It is a variable so it can be mocked out in tests.
 var Now = time.Now
@@ -51,11 +66,7 @@ func FindCampFire(psk []byte, turnServers []string) (*CampFireLocation, error) {
 		return nil, fmt.Errorf("PSK must be %d bytes", PSKSize)
 	}
 	if len(turnServers) == 0 {
-		var err error
-		turnServers, err = getDefaultTURNList()
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch default TURN servers: %w", err)
-		}
+		turnServers = GetDefaultTURNServers()
 	}
 	secret, err := computeSecret(psk)
 	if err != nil {
@@ -81,33 +92,4 @@ func computeSecret(psk []byte) ([]byte, error) {
 	out := make([]byte, len(plaintext))
 	aescbc.CryptBlocks(out, plaintext)
 	return out, nil
-}
-
-var (
-	once               sync.Once
-	serverFetchErr     error
-	defaultTURNServers []string
-	defaultTURNListURL = "https://raw.githubusercontent.com/pradt2/always-online-stun/master/valid_hosts.txt"
-)
-
-func getDefaultTURNList() ([]string, error) {
-	once.Do(func() {
-		resp, err := http.Get(defaultTURNListURL)
-		if err != nil {
-			serverFetchErr = err
-			return
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			serverFetchErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-			return
-		}
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			serverFetchErr = err
-			return
-		}
-		defaultTURNServers = strings.Split(strings.TrimSpace(string(body)), "\n")
-	})
-	return defaultTURNServers, serverFetchErr
 }
