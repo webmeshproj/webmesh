@@ -121,18 +121,14 @@ func New(ctx context.Context, opts Options) (*CampFire, error) {
 		defer cf.PeerConnection.Close()
 		return nil, fmt.Errorf("set local description: %w", err)
 	}
-	sd, err := sdp.NewJSEPSessionDescription(true)
-	if err != nil {
-		defer cf.PeerConnection.Close()
-		return nil, fmt.Errorf("new JSEP session description: %w", err)
-	}
+
+	// Everything below broken
+	var sd sdp.SessionDescription
 	sd.Origin.Username = "-"
 	sd.URI = &url.URL{
 		Scheme: "turn",
-		Opaque: loc.Secret,
 		Host:   loc.TURNServer,
 	}
-	// sd.SessionName = sdp.SessionName(loc.Secret)
 	out, err := sd.Marshal()
 	if err != nil {
 		defer cf.PeerConnection.Close()
