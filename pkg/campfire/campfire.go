@@ -98,6 +98,10 @@ func getDefaultTURNList() ([]string, error) {
 			return
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			serverFetchErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+			return
+		}
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			serverFetchErr = err
