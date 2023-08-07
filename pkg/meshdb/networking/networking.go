@@ -110,7 +110,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 	if err != nil {
 		return fmt.Errorf("marshal network acl: %w", err)
 	}
-	err = n.Put(ctx, key, string(data))
+	err = n.Put(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put network acl: %w", err)
 	}
@@ -176,7 +176,7 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
 	}
-	err = n.Put(ctx, key, string(data))
+	err = n.Put(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put network route: %w", err)
 	}

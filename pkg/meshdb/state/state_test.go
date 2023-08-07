@@ -189,15 +189,15 @@ func setupTest(t *testing.T) (*state, func()) {
 		}
 	}
 	ctx := context.Background()
-	err = db.Put(ctx, IPv6PrefixKey, ipv6Prefix)
+	err = db.Put(ctx, IPv6PrefixKey, ipv6Prefix, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.Put(ctx, IPv4PrefixKey, ipv4Prefix)
+	err = db.Put(ctx, IPv4PrefixKey, ipv4Prefix, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.Put(ctx, MeshDomainKey, domain)
+	err = db.Put(ctx, MeshDomainKey, domain, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

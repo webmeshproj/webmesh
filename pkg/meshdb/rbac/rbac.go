@@ -144,7 +144,7 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 		return fmt.Errorf("marshal role: %w", err)
 	}
 	key := fmt.Sprintf("%s/%s", rolesPrefix, role.GetName())
-	err = r.Put(ctx, key, string(data))
+	err = r.Put(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put role: %w", err)
 	}
@@ -223,7 +223,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 	if err != nil {
 		return fmt.Errorf("marshal rolebinding: %w", err)
 	}
-	err = r.Put(ctx, key, string(data))
+	err = r.Put(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put rolebinding: %w", err)
 	}
@@ -289,7 +289,7 @@ func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
 	if err != nil {
 		return fmt.Errorf("marshal group: %w", err)
 	}
-	err = r.Put(ctx, key, string(data))
+	err = r.Put(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put group: %w", err)
 	}

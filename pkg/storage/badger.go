@@ -23,6 +23,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/pb"
@@ -83,14 +84,18 @@ func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
 }
 
 // Put sets the value of a key.
-func (b *badgerStorage) Put(ctx context.Context, key, value string) error {
+func (b *badgerStorage) Put(ctx context.Context, key, value string, ttl time.Duration) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if key == "" {
 		return errors.New("badger put: key is empty")
 	}
 	err := b.db.Update(func(txn *badger.Txn) error {
-		err := txn.Set([]byte(key), []byte(value))
+		e := badger.NewEntry([]byte(key), []byte(value))
+		if ttl > 0 {
+			e = e.WithTTL(ttl)
+		}
+		err := txn.SetEntry(e)
 		if err != nil {
 			return fmt.Errorf("badger put: %w", err)
 		}

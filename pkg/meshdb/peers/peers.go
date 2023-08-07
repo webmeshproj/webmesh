@@ -34,6 +34,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // ErrNodeNotFound is returned when a node is not found.
@@ -51,9 +52,15 @@ func graphHasher(n Node) string { return n.ID }
 // InvalidNodeIDChars are the characters that are not allowed in node IDs.
 var InvalidNodeIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', ','}
 
+// ReservedNodeIDs are reserved node IDs.
+var ReservedNodeIDs = []string{"self", "local", "localhost", "leader", "voters", "observers"}
+
 // IsValidID returns true if the given node ID is valid.
 func IsValidID(id string) bool {
 	if len(id) == 0 {
+		return false
+	}
+	if util.Contains(ReservedNodeIDs, id) {
 		return false
 	}
 	for _, c := range InvalidNodeIDChars {

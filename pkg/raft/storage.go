@@ -28,6 +28,7 @@ import (
 	raftbadger "github.com/webmeshproj/raft-badger"
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -170,7 +171,7 @@ type raftStorage struct {
 }
 
 // Put sets the value of a key.
-func (rs *raftStorage) Put(ctx context.Context, key, value string) error {
+func (rs *raftStorage) Put(ctx context.Context, key, value string, ttl time.Duration) error {
 	if !rs.raft.IsVoter() {
 		return ErrNotVoter
 	}
@@ -178,6 +179,7 @@ func (rs *raftStorage) Put(ctx context.Context, key, value string) error {
 		Type:  v1.RaftCommandType_PUT,
 		Key:   key,
 		Value: value,
+		Ttl:   durationpb.New(ttl),
 	}
 	if rs.raft.IsLeader() {
 		// lock is taken in the FSM

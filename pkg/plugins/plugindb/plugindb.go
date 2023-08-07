@@ -23,6 +23,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	v1 "github.com/webmeshproj/api/v1"
@@ -68,7 +69,7 @@ func (p *pluginDB) Get(ctx context.Context, key string) (string, error) {
 }
 
 // Put sets the value of a key.
-func (p *pluginDB) Put(ctx context.Context, key, value string) error {
+func (p *pluginDB) Put(ctx context.Context, key, value string, ttl time.Duration) error {
 	return errors.New("put not implemented")
 }
 

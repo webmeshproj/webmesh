@@ -22,14 +22,15 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 )
 
 // Storage is the interface for storing and retrieving data about the state of the mesh.
 type Storage interface {
 	// Get returns the value of a key.
 	Get(ctx context.Context, key string) (string, error)
-	// Put sets the value of a key.
-	Put(ctx context.Context, key, value string) error
+	// Put sets the value of a key. TTL is optional and can be set to 0.
+	Put(ctx context.Context, key, value string, ttl time.Duration) error
 	// Delete removes a key.
 	Delete(ctx context.Context, key string) error
 	// List returns all keys with a given prefix.

@@ -62,7 +62,7 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 		return fmt.Errorf("marshal node: %w", err)
 	}
 	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
-	if err := g.Put(context.Background(), key, string(data)); err != nil {
+	if err := g.Put(context.Background(), key, string(data), 0); err != nil {
 		return fmt.Errorf("put node: %w", err)
 	}
 	return nil
@@ -196,7 +196,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 	if err != nil {
 		return fmt.Errorf("marshal edge: %w", err)
 	}
-	err = g.Put(context.Background(), edgeKey, string(edgeData))
+	err = g.Put(context.Background(), edgeKey, string(edgeData), 0)
 	if err != nil {
 		return fmt.Errorf("put node edge: %w", err)
 	}
@@ -223,7 +223,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[s
 	if err != nil {
 		return fmt.Errorf("marshal edge: %w", err)
 	}
-	err = g.Put(context.Background(), key, string(edgeData))
+	err = g.Put(context.Background(), key, string(edgeData), 0)
 	if err != nil {
 		return fmt.Errorf("put node edge: %w", err)
 	}

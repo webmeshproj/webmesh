@@ -775,6 +775,8 @@ github.com/webmeshproj/api v0.2.2-0.20230805122547-7f2baf7dddfb h1:sh0aAQdno3o4a
 github.com/webmeshproj/api v0.2.2-0.20230805122547-7f2baf7dddfb/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.2.2-0.20230807164822-0b2f14e8b343 h1:P7mkXjyYEr/GyV4c2sd46XTn+KVo5F26U1rZM9nlCv8=
 github.com/webmeshproj/api v0.2.2-0.20230807164822-0b2f14e8b343/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.2.2-0.20230807180518-13dc50ba34c9 h1:uHjWHa9dVhRdIFP5VbSNlCmIEpNb0Yh7vMcOJfDK+VQ=
+github.com/webmeshproj/api v0.2.2-0.20230807180518-13dc50ba34c9/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/raft-badger v0.0.0-20230728220038-2f75bbd4d5ed h1:ebSdqO+ryXs1OLIwND1w5LZPtIpUUd5srVz0wjmIyEY=
 github.com/webmeshproj/raft-badger v0.0.0-20230728220038-2f75bbd4d5ed/go.mod h1:mYAIfxV0SQOggTTmRnt0641S0T1PkbXYlJY5Dpy+p/Y=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=
