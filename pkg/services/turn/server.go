@@ -68,6 +68,10 @@ func NewServer(o *Options) (*Server, error) {
 	}
 	log := slog.Default().With("component", "turn-server")
 	log.Info("Listening for STUN requests", slog.String("listen-addr", udpListenAddr))
+	logWrapper := &stunLogger{
+		PacketConn: udpConn,
+		log:        log.With("channel", "stun"),
+	}
 	s, err := turn.NewServer(turn.ServerConfig{
 		Realm:         o.Realm,
 		LoggerFactory: util.NewSTUNLoggerFactory(log.With("server", "turn")),
@@ -81,10 +85,7 @@ func NewServer(o *Options) (*Server, error) {
 		// PacketConnConfigs is a list of UDP Listeners and the configuration around them
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
-				PacketConn: &stunLogger{
-					PacketConn: udpConn,
-					log:        log.With("channel", "stun"),
-				},
+				PacketConn: &campFireManager{PacketConn: logWrapper, log: log.With("channel", "relay")},
 				RelayAddressGenerator: &turn.RelayAddressGeneratorPortRange{
 					RelayAddress: net.ParseIP(o.PublicIP),
 					Address:      o.ListenAddressUDP,
