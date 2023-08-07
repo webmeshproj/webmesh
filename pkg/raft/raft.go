@@ -30,6 +30,7 @@ import (
 
 	"github.com/hashicorp/raft"
 	"golang.org/x/exp/slog"
+	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -45,6 +46,8 @@ var (
 	ErrAlreadyBootstrapped = raft.ErrCantBootstrap
 	// ErrNotLeader is returned when the Raft node is not the leader.
 	ErrNotLeader = raft.ErrNotLeader
+	// ErrNotVoter is returned when the Raft node is not a voter.
+	ErrNotVoter = raft.ErrNotVoter
 )
 
 type (
@@ -57,6 +60,20 @@ type (
 	// LeaderObservation is an alias for raft.LeaderObservation.
 	LeaderObservation = raft.LeaderObservation
 )
+
+// LeaderDialer is the interface for dialing the leader.
+type LeaderDialer interface {
+	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
+}
+
+// LeaderDialerFunc is the function signature for dialing the leader.
+// It is supplied by the mesh during startup. It can be used as an
+// alternative to the LeaderDialer interface.
+type LeaderDialerFunc func(ctx context.Context) (*grpc.ClientConn, error)
+
+func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
+	return f(ctx)
+}
 
 // Raft states.
 const (
@@ -94,6 +111,8 @@ type Raft interface {
 	ListenPort() int
 	// IsLeader returns true if the Raft node is the leader.
 	IsLeader() bool
+	// IsVoter returns true if the Raft node is a voter.
+	IsVoter() bool
 	// AddNonVoter adds a non-voting node to the cluster with timeout enforced by the context.
 	AddNonVoter(ctx context.Context, id string, addr string) error
 	// AddVoter adds a voting node to the cluster with timeout enforced by the context.
@@ -127,8 +146,8 @@ type BootstrapOptions struct {
 }
 
 // New returns a new Raft node.
-func New(opts *Options) Raft {
-	return newRaftNode(opts)
+func New(opts *Options, dialer LeaderDialer) Raft {
+	return newRaftNode(opts, dialer)
 }
 
 // raftNode is a Raft node. It implements the Raft interface.
@@ -150,19 +169,20 @@ type raftNode struct {
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
 	observerClose, observerDone chan struct{}
+	leaderDialer                LeaderDialer
 	log                         *slog.Logger
 	mu                          sync.Mutex
 }
 
 // newRaftNode returns a new Raft node.
-func newRaftNode(opts *Options) *raftNode {
+func newRaftNode(opts *Options, dialer LeaderDialer) *raftNode {
 	log := slog.Default().With(slog.String("component", "raft"))
 	if opts.InMemory {
 		log = log.With(slog.String("storage", "memory"))
 	} else {
 		log = log.With(slog.String("storage", opts.DataDir))
 	}
-	return &raftNode{opts: opts, log: log}
+	return &raftNode{opts: opts, log: log, leaderDialer: dialer}
 }
 
 // Start starts the Raft node.
@@ -361,6 +381,17 @@ func (r *raftNode) LastAppliedIndex() uint64 {
 // IsLeader returns true if the Raft node is the leader.
 func (r *raftNode) IsLeader() bool {
 	return r.raft.State() == raft.Leader
+}
+
+// IsVoter returns true if the Raft node is a voter.
+func (r *raftNode) IsVoter() bool {
+	config := r.Configuration()
+	for _, server := range config.Servers {
+		if server.ID == r.nodeID {
+			return server.Suffrage == raft.Voter
+		}
+	}
+	return false
 }
 
 // Storage returns the storage.

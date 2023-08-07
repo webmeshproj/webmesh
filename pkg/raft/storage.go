@@ -17,7 +17,6 @@ limitations under the License.
 package raft
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +29,7 @@ import (
 	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -171,29 +171,37 @@ type raftStorage struct {
 
 // Put sets the value of a key.
 func (rs *raftStorage) Put(ctx context.Context, key, value string) error {
-	if !rs.raft.IsLeader() {
-		return ErrNotLeader
+	if !rs.raft.IsVoter() {
+		return ErrNotVoter
 	}
-	// lock is taken in the FSM
-	logEntry := &v1.RaftLogEntry{
+	logEntry := v1.RaftLogEntry{
 		Type:  v1.RaftCommandType_PUT,
 		Key:   key,
 		Value: value,
 	}
-	return rs.sendLog(ctx, logEntry)
+	if rs.raft.IsLeader() {
+		// lock is taken in the FSM
+		return rs.applyLog(ctx, &logEntry)
+	}
+	// We need to forward the request to the leader.
+	return rs.sendLogToLeader(ctx, &logEntry)
 }
 
 // Delete removes a key.
 func (rs *raftStorage) Delete(ctx context.Context, key string) error {
-	if !rs.raft.IsLeader() {
-		return ErrNotLeader
+	if !rs.raft.IsVoter() {
+		return ErrNotVoter
 	}
-	// lock is taken in the FSM
-	logEntry := &v1.RaftLogEntry{
+	logEntry := v1.RaftLogEntry{
 		Type: v1.RaftCommandType_DELETE,
 		Key:  key,
 	}
-	return rs.sendLog(ctx, logEntry)
+	if rs.raft.IsLeader() {
+		// lock is taken in the FSM
+		return rs.applyLog(ctx, &logEntry)
+	}
+	// We need to forward the request to the leader.
+	return rs.sendLogToLeader(ctx, &logEntry)
 }
 
 // Snapshot returns a snapshot of the storage.
@@ -206,7 +214,27 @@ func (rs *raftStorage) Restore(ctx context.Context, r io.Reader) error {
 	return errors.New("not implemented")
 }
 
-func (rs *raftStorage) sendLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
+func (rs *raftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLogEntry) error {
+	log := context.LoggerFrom(ctx)
+	log.Debug("sending log to leader")
+	c, err := rs.raft.leaderDialer.DialLeader(ctx)
+	if err != nil {
+		return fmt.Errorf("dial leader: %w", err)
+	}
+	defer c.Close()
+	cli := v1.NewNodeClient(c)
+	resp, err := cli.Apply(ctx, logEntry)
+	if err != nil {
+		return fmt.Errorf("apply log entry: %w", err)
+	}
+	log.Debug("applied log entry", slog.String("time", resp.GetTime()))
+	if resp.GetError() != "" {
+		return fmt.Errorf("apply log entry: %s", resp.GetError())
+	}
+	return nil
+}
+
+func (rs *raftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
 	timeout := rs.raft.opts.ApplyTimeout
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
