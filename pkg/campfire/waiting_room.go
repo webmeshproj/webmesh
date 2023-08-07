@@ -45,6 +45,8 @@ type WaitingRoom interface {
 	Peers() <-chan peer.AddrInfo
 	// Location returns the location of the campfire.
 	Location() *Location
+	// Errors returns a channel that receives errors.
+	Errors() <-chan error
 	// Close closes the waiting room.
 	Close() error
 }
@@ -142,6 +144,11 @@ func (w *waitingRoom) Peers() <-chan peer.AddrInfo {
 // Location returns the location of the campfire.
 func (w *waitingRoom) Location() *Location {
 	return w.loc
+}
+
+// Errors returns a channel that receives errors.
+func (w *waitingRoom) Errors() <-chan error {
+	return w.errc
 }
 
 // Close closes the waiting room.
