@@ -51,11 +51,17 @@ func main() {
 		os.Exit(1)
 	}
 	defer cf.Close()
-	select {
-	case <-ctx.Done():
-	case <-cf.Ready():
-	case err := <-cf.Errors():
-		log.Error("error", "error", err.Error())
+WaitForReady:
+	for {
+		select {
+		case <-ctx.Done():
+			log.Error("error", "error", ctx.Err().Error())
+			return
+		case err := <-cf.Errors():
+			log.Error("error", "error", err.Error())
+		case <-cf.Ready():
+			break WaitForReady
+		}
 	}
 	for {
 		conn, err := cf.Accept()
