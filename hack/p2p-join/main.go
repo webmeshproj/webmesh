@@ -13,8 +13,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/campfire"
 )
 
-var ()
-
 func main() {
 	psk := flag.String("psk", "", "pre-shared key")
 	logLevel := flag.String("log-level", "info", "log level")

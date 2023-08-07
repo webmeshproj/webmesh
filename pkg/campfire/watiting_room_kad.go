@@ -42,9 +42,9 @@ import (
 // kadWaitingRoom is a simple implementation of WaitingRoom. It uses
 // kad-dht to find peers.
 type kadWaitingRoom struct {
-	loc    *Location
 	host   host.Host
 	dht    *dht.IpfsDHT
+	loc    *Location
 	connc  chan Stream
 	peerc  chan Stream
 	errc   chan error
@@ -53,7 +53,7 @@ type kadWaitingRoom struct {
 
 // NewKadWaitingRoom creates a new waiting room using kad-dht to find peers.
 func NewKadWaitingRoom(ctx context.Context, opts Options) (WaitingRoom, error) {
-	log := context.LoggerFrom(ctx).With("protocol", "campfire", "component", "waiting-room")
+	log := context.LoggerFrom(ctx).With("protocol", "campfire", "component", "waiting-room", "type", "kad")
 	loc, err := Find(opts.PSK, opts.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find campfire: %w", err)
