@@ -69,10 +69,8 @@ func NewServer(o *Options) (*Server, error) {
 	log := slog.Default().With("component", "turn-server")
 	log.Info("Listening for STUN requests", slog.String("listen-addr", udpListenAddr))
 	s, err := turn.NewServer(turn.ServerConfig{
-		Realm: o.Realm,
-		LoggerFactory: &LoggerFactory{
-			Logger: log.With("channel", "turn"),
-		},
+		Realm:         o.Realm,
+		LoggerFactory: util.NewSTUNLoggerFactory(log.With("server", "turn")),
 		// Set AuthHandler callback
 		// This is called every time a user tries to authenticate with the TURN server
 		// Return the key for that user, or false when no user is found

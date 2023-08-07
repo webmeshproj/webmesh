@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-func FuzzFindCampFire(f *testing.F) {
+func FuzzFind(f *testing.F) {
 	Now = func() time.Time {
 		return time.Unix(0, 0)
 	}
@@ -42,11 +42,11 @@ func FuzzFindCampFire(f *testing.F) {
 		f.Add([]byte(tc))
 	}
 	f.Fuzz(func(t *testing.T, psk []byte) {
-		resp1, err := FindCampFire(psk, nil)
+		resp1, err := Find(psk, nil)
 		if err != nil {
 			t.Skip(err)
 		}
-		resp2, err := FindCampFire(psk, nil)
+		resp2, err := Find(psk, nil)
 		if err != nil {
 			t.Skip(err)
 		}

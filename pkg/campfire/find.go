@@ -19,47 +19,41 @@ package campfire
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	_ "embed"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 )
-
-// defaultTURNServers is a list of default TURN servers gathered from always-online-stun.
-var defaultTURNServers []string
-
-//go:embed valid_hosts.txt
-var alwaysOnHostsFile []byte
-
-var once sync.Once
-
-// GetDefaultTURNServers returns the default list of TURN servers.
-func GetDefaultTURNServers() []string {
-	once.Do(func() {
-		defaultTURNServers = strings.Split(strings.TrimSpace(string(alwaysOnHostsFile)), "\n")
-	})
-	return defaultTURNServers
-}
-
-// Now is the current time. It is a variable so it can be mocked out in tests.
-var Now = time.Now
-
-// CampFireLocation is the secret and location of a campfire.
-type CampFireLocation struct {
-	// Secret is the computed ID from the PSK.
-	Secret string
-	// TURNServer is the selected TURN server.
-	TURNServer string
-}
 
 // PSKSize is the size of the PSK in bytes.
 const PSKSize = 32
 
-// FindCampFire finds a campfire using the given PSK and TURN servers.
+// Now is the current time. It is a variable so it can be mocked out in tests.
+var Now = time.Now
+
+// Location is the secret and location of a campfire.
+type Location struct {
+	// Secret is the computed ID from the PSK.
+	Secret string
+	// TURNServer is the selected TURN server.
+	TURNServer string
+	// ExpiresAt is the time at which the campfire expires.
+	ExpiresAt time.Time
+}
+
+// Expired returns a channel that is closed when the campfire expires.
+func (l *Location) Expired() <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		<-time.After(time.Until(l.ExpiresAt))
+		close(ch)
+	}()
+	return ch
+}
+
+// Find finds a campfire using the given PSK and TURN servers.
 // If turnServers is empty, a default list will be fetched from
 // always-online-stun.
-func FindCampFire(psk []byte, turnServers []string) (*CampFireLocation, error) {
+func Find(psk []byte, turnServers []string) (*Location, error) {
 	if len(psk) == 0 {
 		return nil, fmt.Errorf("PSK must not be empty")
 	} else if len(psk) != PSKSize {
@@ -68,22 +62,27 @@ func FindCampFire(psk []byte, turnServers []string) (*CampFireLocation, error) {
 	if len(turnServers) == 0 {
 		turnServers = GetDefaultTURNServers()
 	}
-	secret, err := computeSecret(psk)
+	t := Now().UTC().Truncate(time.Hour)
+	secret, err := computeSecret(t, psk)
 	if err != nil {
 		return nil, fmt.Errorf("compute secret: %w", err)
 	}
 	mod := len(turnServers)
 	turnServer := turnServers[secret[0]%byte(mod)]
-	return &CampFireLocation{
+	if !strings.HasPrefix(turnServer, "turn:") {
+		turnServer = "turn:" + turnServer
+	}
+	return &Location{
 		Secret:     fmt.Sprintf("%x", secret),
 		TURNServer: turnServer,
+		ExpiresAt:  t.Add(time.Hour),
 	}, nil
 }
 
-func computeSecret(psk []byte) ([]byte, error) {
+func computeSecret(time time.Time, psk []byte) ([]byte, error) {
 	plaintext := make([]byte, aes.BlockSize+len(psk))
-	time := Now().UTC().Truncate(time.Hour).Format("2006-01-02 15:00:00")
-	copy(plaintext, time)
+	timeStr := time.Format("2006-01-02 15:00:00")
+	copy(plaintext, timeStr)
 	block, err := aes.NewCipher(psk)
 	if err != nil {
 		return nil, fmt.Errorf("create cipher: %w", err)
