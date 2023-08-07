@@ -164,17 +164,20 @@ func NewKadWaitingRoom(ctx context.Context, opts Options) (WaitingRoom, error) {
 	dutil.Advertise(ctx, routingDiscovery, room.loc.Secret, discovery.TTL(time.Hour))
 	log.Info("DHT bootstrapped, waiting by the camp fire...")
 	go func() {
-		peerinfo, err := routingDiscovery.FindPeers(ctx, room.loc.Secret)
-		if err != nil {
-			log.Error("failed to find peers", "error", err.Error())
-			room.errc <- err
-			return
-		}
 		for {
 			select {
 			case <-room.closec:
 				return
-			case peer := <-peerinfo:
+			default:
+			}
+			log.Debug("looking for peers...")
+			peerinfo, err := routingDiscovery.FindPeers(ctx, room.loc.Secret)
+			if err != nil {
+				log.Error("failed to find peers", "error", err.Error())
+				room.errc <- err
+				return
+			}
+			for peer := range peerinfo {
 				if peer.ID == room.host.ID() || peer.ID == "" {
 					continue
 				}
