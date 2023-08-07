@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"os"
 
 	"golang.org/x/exp/slog"
@@ -47,17 +48,18 @@ func main() {
 					log.Error("read error", "error", err.Error())
 					return
 				}
-				log.Info("read line", "line", string(line))
+				fmt.Print(string(line))
+				fmt.Fprint(os.Stdin, "> ")
 			}
 		}()
 		stdin := bufio.NewReader(os.Stdin)
 		for {
+			fmt.Fprint(os.Stdin, "> ")
 			line, err := stdin.ReadBytes('\n')
 			if err != nil {
 				log.Error("read error", "error", err.Error())
 				return
 			}
-			log.Info("read line", "line", string(line))
 			if _, err := conn.Write(line); err != nil {
 				log.Error("write error", "error", err.Error())
 				return

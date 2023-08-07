@@ -61,6 +61,7 @@ type waitingRoom struct {
 	closec chan struct{}
 }
 
+// NewKadWaitingRoom creates a new waiting room using kad-dht to find peers.
 func NewKadWaitingRoom(ctx context.Context, opts *Options) (WaitingRoom, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire", "component", "waiting-room")
 	loc, err := Find(opts.PSK, opts.TURNServers)
