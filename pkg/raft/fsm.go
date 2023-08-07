@@ -21,11 +21,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/golang/snappy"
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slog"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/raftlogs"
@@ -103,11 +101,7 @@ func (r *raftNode) applyLog(l *raft.Log) (res any) {
 	}
 
 	// Decode the log entry
-	var cmd v1.RaftLogEntry
-	decoded, err := snappy.Decode(nil, l.Data)
-	if err == nil {
-		err = proto.Unmarshal(decoded, &cmd)
-	}
+	cmd, err := UnmarshalLogEntry(l.Data)
 	if err != nil {
 		// This is a fatal error. We can't apply the log entry if we can't
 		// decode it. This should never happen.
@@ -130,8 +124,8 @@ func (r *raftNode) applyLog(l *raft.Log) (res any) {
 
 	if r.opts.OnApplyLog != nil {
 		// Call the OnApplyLog callback in a goroutine to not block the local storage.
-		go r.opts.OnApplyLog(ctx, l.Term, l.Index, &cmd)
+		go r.opts.OnApplyLog(ctx, l.Term, l.Index, cmd)
 	}
 	// Apply the log entry to the database.
-	return raftlogs.Apply(ctx, r.dataDB, &cmd)
+	return raftlogs.Apply(ctx, r.dataDB, cmd)
 }

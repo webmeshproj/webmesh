@@ -17,26 +17,89 @@ limitations under the License.
 package turn
 
 import (
+	"bytes"
+	"encoding/json"
 	"net"
 
+	"github.com/pion/stun"
 	"golang.org/x/exp/slog"
 )
 
 type campFireManager struct {
 	net.PacketConn
-	log *slog.Logger
+	log       *slog.Logger
+	campfires map[string]*campFire
+}
+
+func newCampFireManager(pc net.PacketConn, log *slog.Logger) *campFireManager {
+	return &campFireManager{
+		PacketConn: pc,
+		log:        log,
+		campfires:  make(map[string]*campFire),
+	}
 }
 
 func (s *campFireManager) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	if n, err = s.PacketConn.WriteTo(p, addr); err == nil {
-		s.log.Info("Generic outbound message", slog.Any("msg", string(p)))
+	if n, err = s.PacketConn.WriteTo(p, addr); err == nil && !stun.IsMessage(p) {
+		data := p[:n]
+		s.log.Debug("out-of-band outbound message", slog.Any("msg", string(data)))
+		if isCampFireMessage(data) {
+			s.log.Debug("handling outbound campfire message", slog.Any("msg", string(data)))
+			var msg campFireMessage
+			if derr := msg.decode(data); err != nil {
+				s.log.Warn("failed to decode campfire message", slog.String("error", derr.Error()))
+				return
+			}
+			s.handleCampFireMessage(&msg)
+		}
 	}
 	return
 }
 
 func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	if n, addr, err = s.PacketConn.ReadFrom(p); err == nil {
-		s.log.Info("Generic inbound message", slog.Any("msg", string(p)))
+	if n, addr, err = s.PacketConn.ReadFrom(p); err == nil && !stun.IsMessage(p) {
+		data := p[:n]
+		s.log.Debug("out-of-band inbound message", slog.Any("msg", string(data)))
+		if isCampFireMessage(data) {
+			s.log.Debug("handling inbound campfire message", slog.Any("msg", string(data)))
+			var msg campFireMessage
+			if derr := msg.decode(data); err != nil {
+				s.log.Warn("failed to decode campfire message", slog.String("error", derr.Error()))
+				return
+			}
+			s.handleCampFireMessage(&msg)
+		}
 	}
 	return
+}
+
+func (s *campFireManager) handleCampFireMessage(msg *campFireMessage) {
+	s.log.Debug("handling campfire message", slog.Any("msg", msg))
+	if msg.PSK == "" {
+		s.log.Warn("campfire message missing psk")
+		return
+	}
+}
+
+type campFire struct{}
+
+type campFireMessage struct {
+	PSK string
+}
+
+// func (c *campFireMessage) encode() ([]byte, error) {
+// 	var buf bytes.Buffer
+// 	buf.WriteString("CAMPFIRE ")
+// 	err := json.NewEncoder(&buf).Encode(c)
+// 	return buf.Bytes(), err
+// }
+
+func (c *campFireMessage) decode(p []byte) error {
+	data := bytes.TrimPrefix(p, []byte("CAMPFIRE "))
+	err := json.NewDecoder(bytes.NewReader(data)).Decode(c)
+	return err
+}
+
+func isCampFireMessage(p []byte) bool {
+	return bytes.HasPrefix(p, []byte("CAMPFIRE "))
 }

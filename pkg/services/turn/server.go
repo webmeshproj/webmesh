@@ -85,7 +85,7 @@ func NewServer(o *Options) (*Server, error) {
 		// PacketConnConfigs is a list of UDP Listeners and the configuration around them
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
-				PacketConn: &campFireManager{PacketConn: logWrapper, log: log.With("channel", "relay")},
+				PacketConn: newCampFireManager(logWrapper, log.With("channel", "relay")),
 				RelayAddressGenerator: &turn.RelayAddressGeneratorPortRange{
 					RelayAddress: net.ParseIP(o.PublicIP),
 					Address:      o.ListenAddressUDP,

@@ -117,6 +117,8 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewNodeClient(conn).Update(ctx, req.(*v1.UpdateRequest))
 	case v1.Node_Leave_FullMethodName:
 		return v1.NewNodeClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
+	case v1.Node_Apply_FullMethodName:
+		return v1.NewNodeClient(conn).Apply(ctx, req.(*v1.RaftLogEntry))
 	case v1.Node_Snapshot_FullMethodName:
 		return v1.NewNodeClient(conn).Snapshot(ctx, req.(*v1.SnapshotRequest))
 	case v1.Node_GetStatus_FullMethodName:

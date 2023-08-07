@@ -33,6 +33,31 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
+// MarshalLogEntry marshals a RaftLogEntry.
+func MarshalLogEntry(logEntry *v1.RaftLogEntry) ([]byte, error) {
+	data, err := proto.Marshal(logEntry)
+	if err == nil {
+		data = snappy.Encode(nil, data)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("encode log entry: %w", err)
+	}
+	return data, nil
+}
+
+// UnmarshalLogEntry unmarshals a RaftLogEntry.
+func UnmarshalLogEntry(data []byte) (*v1.RaftLogEntry, error) {
+	data, err := snappy.Decode(nil, data)
+	if err != nil {
+		return nil, fmt.Errorf("decode log entry: %w", err)
+	}
+	logEntry := &v1.RaftLogEntry{}
+	if err := proto.Unmarshal(data, logEntry); err != nil {
+		return nil, fmt.Errorf("unmarshal log entry: %w", err)
+	}
+	return logEntry, nil
+}
+
 // LogStoreCloser is a LogStore that can be closed.
 type LogStoreCloser interface {
 	io.Closer
@@ -186,7 +211,7 @@ func (rs *raftStorage) sendLog(ctx context.Context, logEntry *v1.RaftLogEntry) e
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	data, err := marshalLogEntry(logEntry)
+	data, err := MarshalLogEntry(logEntry)
 	if err != nil {
 		return fmt.Errorf("marshal log entry: %w", err)
 	}
@@ -202,15 +227,4 @@ func (rs *raftStorage) sendLog(ctx context.Context, logEntry *v1.RaftLogEntry) e
 		return fmt.Errorf("apply log entry data: %s", resp.GetError())
 	}
 	return nil
-}
-
-func marshalLogEntry(logEntry *v1.RaftLogEntry) ([]byte, error) {
-	data, err := proto.Marshal(logEntry)
-	if err == nil {
-		data = snappy.Encode(nil, data)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("encode log entry: %w", err)
-	}
-	return data, nil
 }
