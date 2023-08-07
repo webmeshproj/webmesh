@@ -28,7 +28,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	"github.com/pion/datachannel"
@@ -38,8 +37,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
-
-const Protocol = protocol.ID("/webmesh/campfire/1.0.0")
 
 // CampFire is a connection to one or more peers sharing the same pre-shared
 // key.
