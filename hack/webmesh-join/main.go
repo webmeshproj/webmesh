@@ -48,7 +48,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	cf := campfire.Join(ctx, room)
+	cf := campfire.JoinViaRoom(ctx, room)
 	defer cf.Close()
 WaitForReady:
 	for {

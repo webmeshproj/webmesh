@@ -25,7 +25,7 @@ import (
 // defaultTURNServers is a list of default TURN servers gathered from always-online-stun.
 var defaultTURNServers []string
 
-//go:embed valid_hosts.txt
+//go:embed zcampfire_hosts.txt
 var alwaysOnHostsFile []byte
 
 var once sync.Once

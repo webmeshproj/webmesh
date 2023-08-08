@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package campfire implements the "camp fire" protocol.
 package campfire
 
 import (
@@ -29,9 +28,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
-// CampFire is a connection to one or more peers sharing the same pre-shared
-// key.
-type CampFire struct {
+type roomCampFire struct {
 	room    WaitingRoom
 	errc    chan error
 	readyc  chan struct{}
@@ -40,24 +37,15 @@ type CampFire struct {
 	log     *slog.Logger
 }
 
-// Options are options for creating or joining a new camp fire.
-type Options struct {
-	// PSK is the pre-shared key.
-	PSK []byte
-	// TURNServers is an optional list of turn servers to use.
-	TURNServers []string
-}
-
-// Join joins a camp fire with the given pre-shared key on the list of turn
-// servers.
-func Join(ctx context.Context, room WaitingRoom) *CampFire {
-	cf := CampFire{
+// JoinViaRoom joins a camp fire using the given waiting room.
+func JoinViaRoom(ctx context.Context, room WaitingRoom) CampFire {
+	cf := roomCampFire{
 		errc:    make(chan error, 3),
 		readyc:  make(chan struct{}),
 		acceptc: make(chan datachannel.ReadWriteCloser, 1),
 		closec:  make(chan struct{}),
 	}
-	cf.log = context.LoggerFrom(ctx).With("protocol", "campfire")
+	cf.log = context.LoggerFrom(ctx).With("protocol", "campfire", "method", "waiting-room")
 	cf.room = room
 	go func() {
 		for {
@@ -76,29 +64,29 @@ func Join(ctx context.Context, room WaitingRoom) *CampFire {
 	return &cf
 }
 
-func (cf *CampFire) Accept() (datachannel.ReadWriteCloser, error) {
+func (cf *roomCampFire) Accept() (datachannel.ReadWriteCloser, error) {
 	select {
 	case <-cf.closec:
-		return nil, fmt.Errorf("camp fire closed")
+		return nil, ErrClosed
 	case <-cf.readyc:
 		return <-cf.acceptc, nil
 	}
 }
 
-func (cf *CampFire) Close() error {
+func (cf *roomCampFire) Close() error {
 	close(cf.closec)
 	return cf.room.Close()
 }
 
-func (cf *CampFire) Errors() <-chan error {
+func (cf *roomCampFire) Errors() <-chan error {
 	return cf.errc
 }
 
-func (cf *CampFire) Ready() <-chan struct{} {
+func (cf *roomCampFire) Ready() <-chan struct{} {
 	return cf.readyc
 }
 
-func (cf *CampFire) onNewPeerConnection(ctx context.Context, stream Stream) {
+func (cf *roomCampFire) onNewPeerConnection(ctx context.Context, stream Stream) {
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
@@ -223,7 +211,7 @@ func (cf *CampFire) onNewPeerConnection(ctx context.Context, stream Stream) {
 	}()
 }
 
-func (cf *CampFire) onNewIncomingStream(ctx context.Context, stream Stream) {
+func (cf *roomCampFire) onNewIncomingStream(ctx context.Context, stream Stream) {
 	cf.log.Info("new incoming stream", "peer", stream.PeerID())
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
