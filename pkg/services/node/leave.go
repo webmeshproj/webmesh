@@ -17,7 +17,10 @@ limitations under the License.
 package node
 
 import (
+	"time"
+
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -33,6 +36,8 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 	if !s.store.Raft().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// Check that the node is indeed who they say they are
 	if !s.insecure {
 		if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
@@ -49,6 +54,16 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 			}
 		}
 	}
+	defer func() {
+		s.log.Debug("sending barrier to raft cluster")
+		timeout := time.Second * 10 // TODO: Make this configurable
+		err := s.store.Raft().Raft().Barrier(timeout).Error()
+		if err != nil {
+			s.log.Error("failed to send barrier", slog.String("error", err.Error()))
+			return
+		}
+		s.log.Debug("barrier complete, update published to all nodes")
+	}()
 	s.log.Info("removing mesh node", "id", req.GetId())
 	err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
 	if err != nil {

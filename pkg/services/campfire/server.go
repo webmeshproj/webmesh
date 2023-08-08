@@ -28,10 +28,16 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // DefaultListenUDP is the default UDP address to listen on.
 const DefaultListenUDP = ":4095"
+
+const (
+	CampfireEnabledEnvVar   = "SERVICES_CAMPFIRE_ENABLED"
+	CampfireListenUDPEnvVar = "SERVICES_CAMPFIRE_LISTEN_UDP"
+)
 
 // Options are options for the campfire service.
 type Options struct {
@@ -55,8 +61,8 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fs.BoolVar(&o.Enabled, p+"enabled", o.Enabled, "whether the campfire service is enabled")
-	fs.StringVar(&o.ListenUDP, p+"listen-udp", o.ListenUDP, "the UDP address to listen on")
+	fs.BoolVar(&o.Enabled, p+"services.campfire.enabled", util.GetEnvDefault(CampfireEnabledEnvVar, "false") == "true", "whether the campfire service is enabled")
+	fs.StringVar(&o.ListenUDP, p+"services.campfire.listen-udp", util.GetEnvDefault(CampfireListenUDPEnvVar, DefaultListenUDP), "the UDP address to listen on")
 }
 
 // Validate validates the campfire service options.

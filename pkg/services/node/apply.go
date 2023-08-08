@@ -23,6 +23,7 @@ import (
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
@@ -35,6 +36,8 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !s.store.Raft().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	start := time.Now()
 	peer, ok := peer.FromContext(ctx)
 	if !ok {
@@ -58,11 +61,30 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !found {
 		return nil, status.Errorf(codes.FailedPrecondition, "peer not found in configuration")
 	}
+	s.log.Debug("sending barrier to raft cluster")
+	timeout := time.Second * 10 // TODO: Make this configurable
+	err := s.store.Raft().Raft().Barrier(timeout).Error()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
+	}
+	s.log.Debug("barrier complete, all nodes caught up")
+	// Send another barrier after we're done to ensure all nodes are
+	// fully caught up before we return
+	defer func() {
+		s.log.Debug("sending barrier to raft cluster")
+		timeout := time.Second * 10 // TODO: Make this configurable
+		err := s.store.Raft().Raft().Barrier(timeout).Error()
+		if err != nil {
+			s.log.Error("failed to send barrier", slog.String("error", err.Error()))
+			return
+		}
+		s.log.Debug("barrier complete, update published to all nodes")
+	}()
 	data, err := meshraft.MarshalLogEntry(log)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "marshal log entry: %v", err)
 	}
-	timeout := time.Second * 15
+	timeout = time.Second * 15
 	err = s.store.Raft().Raft().Apply(data, timeout).Error()
 	return &v1.RaftApplyResponse{
 		Time: time.Since(start).String(),

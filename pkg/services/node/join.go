@@ -133,6 +133,19 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	log.Debug("barrier complete, all nodes caught up")
 
+	// Send another barrier after we're done to ensure all nodes are
+	// fully caught up before we return
+	defer func() {
+		log.Debug("sending barrier to raft cluster")
+		timeout := time.Second * 10 // TODO: Make this configurable
+		err = s.store.Raft().Raft().Barrier(timeout).Error()
+		if err != nil {
+			log.Error("failed to send barrier", slog.String("error", err.Error()))
+			return
+		}
+		log.Debug("barrier complete, update published to all nodes")
+	}()
+
 	// Start building a list of clean up functions to run if we fail
 	cleanFuncs := make([]func(), 0)
 	handleErr := func(cause error) error {

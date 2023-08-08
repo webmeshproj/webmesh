@@ -114,6 +114,19 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	}
 	log.Debug("barrier complete, all nodes caught up")
 
+	// Send another barrier after we're done to ensure all nodes are
+	// fully caught up before we return
+	defer func() {
+		log.Debug("sending barrier to raft cluster")
+		timeout := time.Second * 10 // TODO: Make this configurable
+		err = s.store.Raft().Raft().Barrier(timeout).Error()
+		if err != nil {
+			log.Error("failed to send barrier", slog.String("error", err.Error()))
+			return
+		}
+		log.Debug("barrier complete, update published to all nodes")
+	}()
+
 	// Lookup the peer's current state
 	var currentSuffrage raft.ServerSuffrage = -1
 	var currentAddress raft.ServerAddress = ""

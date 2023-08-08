@@ -58,10 +58,10 @@ func NewClientWithID(addr, id string) (*Client, error) {
 	cl := &Client{
 		MessageStream: NewMessageStream(c),
 		id:            id,
-		msgc:          make(chan Message, 1),
-		oob:           make(chan Message, 1),
-		ackc:          make(chan Message, 1),
-		errc:          make(chan Message, 1),
+		msgc:          make(chan Message, 3),
+		oob:           make(chan Message, 3),
+		ackc:          make(chan Message, 3),
+		errc:          make(chan Message, 3),
 		log:           slog.Default().With("client", "campfire"),
 	}
 	go cl.recvMessages()
