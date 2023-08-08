@@ -237,6 +237,16 @@ func (rs *raftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLog
 }
 
 func (rs *raftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
+	defer func() {
+		timeout := rs.raft.opts.ApplyTimeout
+		if deadline, ok := ctx.Deadline(); ok {
+			timeout = time.Until(deadline)
+		}
+		err := rs.raft.Raft().Barrier(timeout).Error()
+		if err != nil {
+			rs.raft.log.Error("barrier error", slog.String("error", err.Error()))
+		}
+	}()
 	timeout := rs.raft.opts.ApplyTimeout
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
