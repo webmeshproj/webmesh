@@ -171,6 +171,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 // DeletePeer removes a peer from the wireguard configuration.
 func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
 	if key, ok := w.popPeerKey(id); ok {
+		w.log.Debug("deleting peer", slog.String("id", id), slog.String("key", key.String()))
 		return w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 			Peers: []wgtypes.PeerConfig{
 				{
@@ -194,9 +195,11 @@ func (w *wginterface) registerPeer(key wgtypes.Key, peer *Peer) {
 func (w *wginterface) popPeerKey(id string) (wgtypes.Key, bool) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
-	for id, k := range w.peers {
-		delete(w.peers, id)
-		return k, true
+	for peerID, peerKey := range w.peers {
+		if peerID == id {
+			delete(w.peers, id)
+			return peerKey, true
+		}
 	}
 	return wgtypes.Key{}, false
 }
