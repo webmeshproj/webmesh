@@ -35,6 +35,7 @@ type Client struct {
 	oob   chan Message
 	msgc  chan Message
 	ackc  chan Message
+	errc  chan Message
 	log   *slog.Logger
 	mu    sync.Mutex
 }
@@ -60,6 +61,7 @@ func NewClientWithID(addr, id string) (*Client, error) {
 		msgc:          make(chan Message, 1),
 		oob:           make(chan Message, 1),
 		ackc:          make(chan Message, 1),
+		errc:          make(chan Message, 1),
 		log:           slog.Default().With("client", "campfire"),
 	}
 	go cl.recvMessages()
@@ -81,6 +83,8 @@ func (c *Client) Join(ctx context.Context, name string) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case msg := <-c.errc:
+		return fmt.Errorf("send join message: %s", msg.Body)
 	case <-c.ackc:
 	}
 	c.rooms = append(c.rooms, name)
@@ -102,6 +106,8 @@ func (c *Client) Leave(ctx context.Context, name string) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case msg := <-c.errc:
+		return fmt.Errorf("send leave message: %s", msg.Body)
 	case <-c.ackc:
 	}
 	for i, room := range c.rooms {
@@ -128,6 +134,8 @@ func (c *Client) List(ctx context.Context, name string) ([]string, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
+	case msg := <-c.errc:
+		return nil, fmt.Errorf("send list message: %s", msg.Body)
 	case <-c.ackc:
 	}
 	out := make([]string, 0)
@@ -170,6 +178,8 @@ func (c *Client) Send(ctx context.Context, name, to, msg string) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case msg := <-c.errc:
+		return fmt.Errorf("send message: %s", msg.Body)
 	case <-c.ackc:
 	}
 	return nil
@@ -191,6 +201,8 @@ func (c *Client) Close(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case msg := <-c.errc:
+			return fmt.Errorf("leave room: %s", msg.Body)
 		case <-c.ackc:
 		}
 	}
@@ -214,6 +226,8 @@ func (c *Client) recvMessages() {
 			c.ackc <- msg
 		case MessageTypeMessage:
 			c.oob <- msg
+		case MessageTypeError:
+			c.errc <- msg
 		default:
 			c.msgc <- msg
 		}

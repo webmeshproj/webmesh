@@ -46,6 +46,9 @@ const (
 	// MessageTypeACK is an ACK message type.
 	// This is a server-only message type.
 	MessageTypeACK
+	// MessageTypeError is an error message type.
+	// This is a server-only message type.
+	MessageTypeError
 )
 
 // Message is a campfire message.

@@ -27,9 +27,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 )
 
-// CampFirePrefix is the prefix for campfire service paths.
-const CampFirePrefix = "/campfire"
-
 // Options are options for the campfire service.
 type Options struct {
 	// ListenUDP is the UDP address to listen on.
@@ -76,6 +73,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 // Shutdown shuts down the campfire service.
 func (s *Server) Shutdown(ctx context.Context) error {
+	close(s.closec)
 	return nil
 }
 
