@@ -69,7 +69,7 @@ test: fmt vet ## Run unit tests.
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 lint: ## Run linters.
-	$(GO) run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run
+	$(GO) run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --timeout=5m
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
