@@ -26,21 +26,22 @@ import (
 )
 
 const (
-	NodeIDEnvVar                 = "MESH_NODE_ID"
-	ZoneAwarenessIDEnvVar        = "MESH_ZONE_AWARENESS_ID"
-	JoinAddressEnvVar            = "MESH_JOIN_ADDRESS"
-	PeerDiscoveryAddressesEnvVar = "MESH_PEER_DISCOVERY_ADDRESSES"
-	JoinAsVoterEnvVar            = "MESH_JOIN_AS_VOTER"
-	MaxJoinRetriesEnvVar         = "MESH_MAX_JOIN_RETRIES"
-	JoinTimeoutEnvVar            = "MESH_JOIN_TIMEOUT"
-	GRPCAdvertisePortEnvVar      = "MESH_GRPC_ADVERTISE_PORT"
-	DNSAdvertisePortEnvVar       = "MESH_MESHDNS_ADVERTISE_PORT"
-	UseMeshDNSEnvVar             = "MESH_USE_MESHDNS"
-	PrimaryEndpointEnvVar        = "MESH_PRIMARY_ENDPOINT"
-	NodeRoutesEnvVar             = "MESH_ROUTES"
-	NodeDirectPeersEnvVar        = "MESH_DIRECT_PEERS"
-	NoIPv4EnvVar                 = "MESH_NO_IPV4"
-	NoIPv6EnvVar                 = "MESH_NO_IPV6"
+	NodeIDEnvVar                  = "MESH_NODE_ID"
+	ZoneAwarenessIDEnvVar         = "MESH_ZONE_AWARENESS_ID"
+	JoinAddressEnvVar             = "MESH_JOIN_ADDRESS"
+	PeerDiscoveryAddressesEnvVar  = "MESH_PEER_DISCOVERY_ADDRESSES"
+	JoinAsVoterEnvVar             = "MESH_JOIN_AS_VOTER"
+	MaxJoinRetriesEnvVar          = "MESH_MAX_JOIN_RETRIES"
+	JoinTimeoutEnvVar             = "MESH_JOIN_TIMEOUT"
+	GRPCAdvertisePortEnvVar       = "MESH_GRPC_ADVERTISE_PORT"
+	DNSAdvertisePortEnvVar        = "MESH_MESHDNS_ADVERTISE_PORT"
+	UseMeshDNSEnvVar              = "MESH_USE_MESHDNS"
+	PrimaryEndpointEnvVar         = "MESH_PRIMARY_ENDPOINT"
+	NodeRoutesEnvVar              = "MESH_ROUTES"
+	NodeDirectPeersEnvVar         = "MESH_DIRECT_PEERS"
+	HeartbeatPurgeThresholdEnvVar = "MESH_HEARTBEAT_PURGE_THRESHOLD"
+	NoIPv4EnvVar                  = "MESH_NO_IPV4"
+	NoIPv6EnvVar                  = "MESH_NO_IPV6"
 )
 
 // MeshOptions are the options for participating in a mesh.
@@ -71,6 +72,8 @@ type MeshOptions struct {
 	MeshDNSAdvertisePort int `json:"meshdns-advertise-port,omitempty" yaml:"meshdns-advertise-port,omitempty" toml:"meshdns-advertise-port,omitempty"`
 	// UseMeshDNS indicates whether to set mesh DNS servers in the system configuration.
 	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty"`
+	// HeartbeatPurgeThreshold is the threshold of failed heartbeats for purging a peer.
+	HeartbeatPurgeThreshold int `json:"heartbeat-purge-threshold,omitempty" yaml:"heartbeat-purge-threshold,omitempty" toml:"heartbeat-purge-threshold,omitempty"`
 	// NoIPv4 disables IPv4 usage.
 	NoIPv4 bool `json:"no-ipv4,omitempty" yaml:"no-ipv4,omitempty" toml:"no-ipv4,omitempty"`
 	// NoIPv6 disables IPv6 usage.
@@ -152,6 +155,8 @@ This is only necessary if the node intends on being publicly accessible.`)
 		o.DirectPeers = strings.Split(s, ",")
 		return nil
 	})
+	fl.IntVar(&o.HeartbeatPurgeThreshold, p+"mesh.heartbeat-purge-threshold", util.GetEnvIntDefault(HeartbeatPurgeThresholdEnvVar, 0),
+		"Threshold of failed heartbeats for purging a peer. Default is 0 (disabled).")
 	fl.BoolVar(&o.NoIPv4, p+"mesh.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Do not request IPv4 assignments when joining.")
 	fl.BoolVar(&o.NoIPv6, p+"mesh.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",

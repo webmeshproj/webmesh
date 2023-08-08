@@ -50,7 +50,7 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		return fmt.Errorf("failed to load plugins: %w", err)
 	}
 	// Create the raft node
-	s.opts.Raft.OnObservation = s.onObservation
+	s.opts.Raft.OnObservation = s.newObserver()
 	s.opts.Raft.OnSnapshotRestore = func(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) {
 		// Dispatch the snapshot to any storage plugins.
 		if err = s.plugins.ApplySnapshot(ctx, meta, data); err != nil {

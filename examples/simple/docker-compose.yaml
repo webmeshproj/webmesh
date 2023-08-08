@@ -18,6 +18,7 @@ services:
     hostname: bootstrap-node
     entrypoint:
       - /webmesh-node
+      - --global.log-level=debug
       - --global.insecure
       - --global.no-ipv6
       - --global.detect-endpoints
@@ -25,6 +26,7 @@ services:
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
       - --raft.in-memory
+      - --mesh.heartbeat-purge-threshold=30
       - --plugins.debug.listen-address=:6060
       - --plugins.debug.enable-db-querier=true
     ports:

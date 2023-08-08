@@ -57,6 +57,9 @@ func NewGraphStore(st storage.Storage) graph.Store[string, Node] {
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no
 // error should be returned.
 func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexProperties) error {
+	if nodeID == "" {
+		return fmt.Errorf("node ID must not be empty")
+	}
 	data, err := json.Marshal(node)
 	if err != nil {
 		return fmt.Errorf("marshal node: %w", err)
@@ -71,6 +74,10 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 // Vertex should return the vertex and vertex properties with the given hash value. If the
 // vertex doesn't exist, ErrVertexNotFound should be returned.
 func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexProperties, err error) {
+	if nodeID == "" {
+		err = fmt.Errorf("node ID must not be empty")
+		return
+	}
 	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
 	data, err := g.Get(context.Background(), key)
 	if err != nil {
@@ -90,6 +97,9 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 // exist, ErrVertexNotFound should be returned. If the vertex has edges to other vertices,
 // ErrVertexHasEdges should be returned.
 func (g *GraphStore) RemoveVertex(nodeID string) error {
+	if nodeID == "" {
+		return fmt.Errorf("node ID must not be empty")
+	}
 	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
 	_, err := g.Get(context.Background(), key)
 	if err != nil {

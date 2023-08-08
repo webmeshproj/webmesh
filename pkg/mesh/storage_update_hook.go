@@ -59,13 +59,14 @@ func isRouteChangeKey(key string) bool {
 func (s *meshStore) queueRouteUpdate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
-		if ctx.Err() != nil {
-			s.log.Warn("timed out waiting for raft to catch up before applying route update")
-			return
-		}
-		time.Sleep(time.Second)
-	}
+	// TODO: this is a hack, we should be able to wait for the raft index to catch up
+	// for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
+	// 	if ctx.Err() != nil {
+	// 		s.log.Warn("timed out waiting for raft to catch up before applying route update")
+	// 		return
+	// 	}
+	// }
+	time.Sleep(time.Second)
 	s.routeUpdateGroup.TryGo(func() error {
 		nw := networking.New(s.Storage())
 		routes, err := nw.GetRoutesByNode(ctx, s.ID())
@@ -87,16 +88,17 @@ func (s *meshStore) queueRouteUpdate() {
 func (s *meshStore) queuePeersUpdate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
-		if ctx.Err() != nil {
-			s.log.Warn("timed out waiting for raft to catch up before applying peer update")
-			return
-		}
-		time.Sleep(time.Second)
-	}
+	// TODO: this is a hack, we should be able to wait for the raft index to catch up
+	// for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
+	// 	if ctx.Err() != nil {
+	// 		s.log.Warn("timed out waiting for raft to catch up before applying peer update")
+	// 		return
+	// 	}
+	// }
+	time.Sleep(time.Second)
 	s.peerUpdateGroup.TryGo(func() error {
 		s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
-		if err := s.nw.RefreshPeers(context.Background()); err != nil {
+		if err := s.nw.RefreshPeers(ctx); err != nil {
 			s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
 		}
 		return nil
@@ -106,16 +108,18 @@ func (s *meshStore) queuePeersUpdate() {
 func (s *meshStore) queueMeshDNSUpdate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
-		if ctx.Err() != nil {
-			s.log.Warn("timed out waiting for raft to catch up before applying meshdns update")
-			return
-		}
-		time.Sleep(time.Second)
-	}
+	// TODO: this is a hack, we should be able to wait for the raft index to catch up
+	// for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
+	// 	if ctx.Err() != nil {
+	// 		s.log.Warn("timed out waiting for raft to catch up before applying meshdns update")
+	// 		return
+	// 	}
+	// 	time.Sleep(time.Second)
+	// }
+	time.Sleep(time.Second)
 	s.dnsUpdateGroup.TryGo(func() error {
 		s.log.Debug("applied batch with possible DNS changes, refreshing servers")
-		if err := s.nw.RefreshDNSServers(context.Background()); err != nil {
+		if err := s.nw.RefreshDNSServers(ctx); err != nil {
 			s.log.Error("refresh dnd servers failed", slog.String("error", err.Error()))
 		}
 		return nil
