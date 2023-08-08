@@ -18,7 +18,10 @@ limitations under the License.
 package campfire
 
 import (
+	"errors"
+	"flag"
 	"net"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slog"
@@ -27,10 +30,50 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 )
 
+// DefaultListenUDP is the default UDP address to listen on.
+const DefaultListenUDP = ":4095"
+
 // Options are options for the campfire service.
 type Options struct {
+	// Enabled is whether the campfire service is enabled.
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
 	// ListenUDP is the UDP address to listen on.
-	ListenUDP string
+	ListenUDP string `json:"listen-udp,omitempty" yaml:"listen-udp,omitempty" toml:"listen-udp,omitempty"`
+}
+
+// NewOptions returns new campfire service options.
+func NewOptions() *Options {
+	return &Options{
+		Enabled:   false,
+		ListenUDP: DefaultListenUDP,
+	}
+}
+
+// BindFlags binds the campfire service options to flags.
+func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
+	var p string
+	if len(prefix) > 0 {
+		p = strings.Join(prefix, ".") + "."
+	}
+	fs.BoolVar(&o.Enabled, p+"enabled", o.Enabled, "whether the campfire service is enabled")
+	fs.StringVar(&o.ListenUDP, p+"listen-udp", o.ListenUDP, "the UDP address to listen on")
+}
+
+// Validate validates the campfire service options.
+func (o *Options) Validate() error {
+	if o == nil {
+		return nil
+	}
+	if o.Enabled {
+		if o.ListenUDP == "" {
+			return errors.New("campfire listen UDP address is required")
+		}
+		_, _, err := net.SplitHostPort(o.ListenUDP)
+		if err != nil {
+			return errors.New("campfire listen UDP address is invalid")
+		}
+	}
+	return nil
 }
 
 // Server is the campfire service.
@@ -43,9 +86,9 @@ type Server struct {
 }
 
 // NewServer returns a new campfire service.
-func NewServer(mesh meshdb.Store, opts Options) *Server {
+func NewServer(mesh meshdb.Store, opts *Options) *Server {
 	return &Server{
-		opts:   opts,
+		opts:   *opts,
 		mesh:   mesh,
 		closec: make(chan struct{}),
 		log:    slog.Default().With("service", "campfire"),
@@ -75,10 +118,9 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 }
 
 // Shutdown shuts down the campfire service.
-func (s *Server) Shutdown(ctx context.Context) error {
+func (s *Server) Shutdown(ctx context.Context) {
 	s.rooms.Close()
 	close(s.closec)
-	return nil
 }
 
 func (s *Server) handlePktRead(c net.PacketConn) {

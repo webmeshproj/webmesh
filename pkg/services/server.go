@@ -35,6 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/admin"
+	"github.com/webmeshproj/webmesh/pkg/services/campfire"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -47,11 +48,12 @@ import (
 // Server is the gRPC server.
 type Server struct {
 	opts      *Options
+	store     mesh.Mesh
 	srv       *grpc.Server
 	turn      *turn.Server
 	meshdns   *meshdns.Server
 	dashboard *dashboard.Server
-	store     mesh.Mesh
+	campfire  *campfire.Server
 	log       *slog.Logger
 	mu        sync.Mutex
 }
@@ -122,6 +124,10 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 			return nil, err
 		}
 	}
+	if o.Campfire != nil && o.Campfire.Enabled {
+		log.Debug("registering campfire service")
+		server.campfire = campfire.NewServer(store, o.Campfire)
+	}
 	// Always register the node server
 	log.Debug("registering node server")
 	v1.RegisterNodeServer(server, node.NewServer(store, o.ToFeatureSet(), insecureServices))
@@ -176,6 +182,13 @@ func (s *Server) ListenAndServe() error {
 			}
 		}()
 	}
+	if s.campfire != nil {
+		go func() {
+			if err := s.campfire.ListenAndServe(context.Background()); err != nil {
+				s.log.Error("campfire server failed", slog.String("error", err.Error()))
+			}
+		}()
+	}
 	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
 	lis, err := net.Listen("tcp", s.opts.ListenAddress)
 	if err != nil {
@@ -225,6 +238,11 @@ func (s *Server) Stop() {
 			s.log.Error("dashboard server shutdown failed", slog.String("error", err.Error()))
 		}
 		s.dashboard = nil
+	}
+	if s.campfire != nil {
+		s.log.Info("Shutting down campfire server")
+		s.campfire.Shutdown(context.Background())
+		s.campfire = nil
 	}
 	if s.srv != nil {
 		s.log.Info("Shutting down gRPC server")

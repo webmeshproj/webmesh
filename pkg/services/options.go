@@ -35,6 +35,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/services/campfire"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/util"
@@ -69,6 +70,8 @@ type Options struct {
 	Metrics *MetricsOptions `json:"metrics,omitempty" yaml:"metrics,omitempty" toml:"metrics,omitempty"`
 	// Dashboard options
 	Dashboard *dashboard.Options `json:"dashboard,omitempty" yaml:"dashboard,omitempty" toml:"dashboard,omitempty"`
+	// Campfire options
+	Campfire *campfire.Options `json:"campfire,omitempty" yaml:"campfire,omitempty" toml:"campfire,omitempty"`
 }
 
 // NewOptions returns new Options with sensible defaults. If grpcPort is 0
@@ -84,6 +87,7 @@ func NewOptions(grpcPort int) *Options {
 		TURN:          NewTURNOptions(),
 		Metrics:       NewMetricsOptions(),
 		Dashboard:     dashboard.NewOptions(),
+		Campfire:      campfire.NewOptions(),
 	}
 }
 
@@ -107,6 +111,7 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	o.TURN.BindFlags(fs, prefix...)
 	o.Metrics.BindFlags(fs, prefix...)
 	o.Dashboard.BindFlags(fs, prefix...)
+	o.Campfire.BindFlags(fs, prefix...)
 }
 
 // Validate validates the options.
@@ -136,6 +141,9 @@ func (o *Options) Validate() error {
 		return err
 	}
 	if err := o.TURN.Validate(); err != nil {
+		return err
+	}
+	if err := o.Campfire.Validate(); err != nil {
 		return err
 	}
 	return nil

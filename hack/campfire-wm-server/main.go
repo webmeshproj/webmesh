@@ -39,7 +39,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	server := campfire.NewServer(mesh, campfire.Options{
+	server := campfire.NewServer(mesh, &campfire.Options{
 		ListenUDP: ":4095",
 	})
 	if err := server.ListenAndServe(context.Background()); err != nil {

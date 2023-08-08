@@ -14,6 +14,7 @@ import (
 )
 
 func main() {
+	addr := flag.String("addr", "127.0.0.1:4095", "address to connect to")
 	logLevel := flag.String("log-level", "info", "log level")
 	flag.Parse()
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
@@ -35,10 +36,10 @@ func main() {
 		}(),
 	}))
 	slog.SetDefault(log)
-	cf, err := campfire.NewClient("127.0.0.1:4095")
+	cf, err := campfire.NewClient(*addr)
 	// cf, err := campfire.NewWebmeshWaitingRoom(ctx, campfire.Options{
 	// 	PSK:         []byte(*psk),
-	// 	TURNServers: []string{"127.0.0.1:4095"},
+	// 	TURNServers: []string{*addr},
 	// })
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
