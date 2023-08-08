@@ -119,7 +119,7 @@ func (r *RoomManager) HandleMessage(srcaddr net.Addr, msg *Message) {
 				r.log.Error("failed to send list", "error", err)
 			}
 		}
-		m.Body = "EOF"
+		m.Body = EOF.Error()
 		err = r.sendToMember(srcaddr, &m)
 		if err != nil {
 			r.log.Error("failed to send EOF", "error", err)

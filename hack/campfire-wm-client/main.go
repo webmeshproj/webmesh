@@ -1,26 +1,21 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"strings"
 
 	"golang.org/x/exp/slog"
 
-	"github.com/webmeshproj/webmesh/pkg/campfire"
+	"github.com/webmeshproj/webmesh/pkg/services/campfire"
 )
 
 func main() {
-	psk := flag.String("psk", "", "pre-shared key")
 	logLevel := flag.String("log-level", "info", "log level")
 	flag.Parse()
-	if *psk == "" {
-		fmt.Fprintln(os.Stderr, "psk is required")
-		os.Exit(1)
-	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: func() slog.Level {
 			switch strings.ToLower(*logLevel) {
@@ -40,24 +35,87 @@ func main() {
 		}(),
 	}))
 	slog.SetDefault(log)
-	ctx := context.Background()
-	cf, err := campfire.NewWebmeshWaitingRoom(ctx, campfire.Options{
-		PSK:         []byte(*psk),
-		TURNServers: []string{"127.0.0.1:4095"},
-	})
+	cf, err := campfire.NewClient("127.0.0.1:4095")
+	// cf, err := campfire.NewWebmeshWaitingRoom(ctx, campfire.Options{
+	// 	PSK:         []byte(*psk),
+	// 	TURNServers: []string{"127.0.0.1:4095"},
+	// })
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
 		os.Exit(1)
 	}
-	defer cf.Close()
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
+	go func() {
+		for msg := range cf.Messages() {
+			fmt.Fprintf(os.Stderr, "message: %+v\n", msg)
+			fmt.Fprintf(os.Stderr, "> ")
+		}
+	}()
 
-	select {
-	case <-sig:
-	case err := <-cf.Errors():
-		fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
-		os.Exit(1)
+	in := bufio.NewScanner(os.Stdin)
+	fmt.Fprintf(os.Stderr, "> ")
+	for in.Scan() {
+		text := in.Text()
+		if text == "" {
+			continue
+		}
+		fields := strings.Fields(text)
+		switch fields[0] {
+		case "join":
+			if len(fields) < 2 {
+				fmt.Fprintln(os.Stderr, "ERROR: join <room>")
+				goto Next
+			}
+			if err := cf.Join(context.Background(), fields[1]); err != nil {
+				fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
+				goto Next
+			}
+			fmt.Fprintln(os.Stderr, "joined room", fields[1])
+		case "leave":
+			if len(fields) < 2 {
+				fmt.Fprintln(os.Stderr, "ERROR: leave <room>")
+				goto Next
+			}
+			if err := cf.Leave(context.Background(), fields[1]); err != nil {
+				fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
+				goto Next
+			}
+			fmt.Fprintln(os.Stderr, "left room", fields[1])
+		case "msg":
+			if len(fields) < 3 {
+				fmt.Fprintln(os.Stderr, "ERROR: msg <room> <message>")
+				goto Next
+			}
+			if err := cf.Send(context.Background(), fields[1], fields[2], strings.Join(fields[3:], " ")); err != nil {
+				fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
+				goto Next
+			}
+		case "list":
+			if len(fields) < 2 {
+				fmt.Fprintln(os.Stderr, "ERROR: list <room>")
+				goto Next
+			}
+			members, err := cf.List(context.Background(), fields[1])
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
+				goto Next
+			}
+			fmt.Fprintln(os.Stderr, "members of room", fields[1])
+			for _, member := range members {
+				fmt.Fprintln(os.Stderr, "  ", member)
+			}
+		case "help":
+			fmt.Fprintln(os.Stderr, "commands:")
+			fmt.Fprintln(os.Stderr, "  join <room>")
+			fmt.Fprintln(os.Stderr, "  leave <room>")
+			fmt.Fprintln(os.Stderr, "  msg <room> <message>")
+			fmt.Fprintln(os.Stderr, "  list <room>")
+			fmt.Fprintln(os.Stderr, "  exit")
+		case "exit":
+			cf.Close(context.Background())
+			os.Exit(0)
+		}
+	Next:
+		fmt.Fprintf(os.Stderr, "> ")
 	}
 }

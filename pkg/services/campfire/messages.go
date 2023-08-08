@@ -19,12 +19,15 @@ package campfire
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
+	"io"
 	"net"
 )
 
 // MessageType is a message type.
 type MessageType int
+
+// EOF is an EOF error.
+var EOF = io.EOF
 
 const (
 	// MessageTypeUnknown is an unknown message type.
@@ -89,13 +92,6 @@ func (m *MessageStream) SendMessage(msg Message) error {
 	_, err = m.Write(b)
 	if err != nil {
 		return err
-	}
-	ack, err := m.RecvMessage()
-	if err != nil {
-		return err
-	}
-	if ack.Type != MessageTypeACK {
-		return fmt.Errorf("expected ACK, got %d", ack.Type)
 	}
 	return err
 }
