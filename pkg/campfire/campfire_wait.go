@@ -24,7 +24,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"text/template"
 
@@ -99,7 +98,7 @@ func (o *offlineCampFire) handlePeerConnections() {
 		Certificates: o.certs,
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{strings.Replace(o.loc.TURNServer, "turn", "stun", 1)},
+				URLs:       []string{o.loc.TURNServer},
 				Username:   "-",
 				Credential: "-",
 			},

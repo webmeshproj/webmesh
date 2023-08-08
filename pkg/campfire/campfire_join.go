@@ -54,7 +54,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{strings.Replace(loc.TURNServer, "turn", "stun", 1)},
+				URLs:       []string{loc.TURNServer},
 				Username:   "-",
 				Credential: "-",
 			},
