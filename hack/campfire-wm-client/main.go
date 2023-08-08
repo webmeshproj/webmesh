@@ -86,6 +86,15 @@ func main() {
 				fmt.Fprintln(os.Stderr, "ERROR: msg <room> <message>")
 				goto Next
 			}
+			if err := cf.Send(context.Background(), fields[1], "", strings.Join(fields[2:], " ")); err != nil {
+				fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
+				goto Next
+			}
+		case "send":
+			if len(fields) < 4 {
+				fmt.Fprintln(os.Stderr, "ERROR: send <room> <to> <message>")
+				goto Next
+			}
 			if err := cf.Send(context.Background(), fields[1], fields[2], strings.Join(fields[3:], " ")); err != nil {
 				fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
 				goto Next
