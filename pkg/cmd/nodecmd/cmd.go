@@ -23,6 +23,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -30,7 +31,6 @@ import (
 	"syscall"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"

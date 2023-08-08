@@ -20,11 +20,10 @@ package system
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"runtime"
 	"strings"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/system/link"

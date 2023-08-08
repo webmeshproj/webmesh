@@ -19,6 +19,7 @@ package services
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"

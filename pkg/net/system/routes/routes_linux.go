@@ -21,13 +21,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/netip"
 	"os"
 	"strings"
 
 	"github.com/jsimonetti/rtnetlink"
-	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
 
 	"github.com/webmeshproj/webmesh/pkg/context"

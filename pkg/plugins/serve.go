@@ -19,13 +19,13 @@ package plugins
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"

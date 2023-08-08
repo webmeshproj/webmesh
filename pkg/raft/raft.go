@@ -23,13 +23,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/hashicorp/raft"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"

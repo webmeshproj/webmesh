@@ -16,7 +16,7 @@ limitations under the License.
 
 package routes
 
-import "golang.org/x/exp/slog"
+import "log/slog"
 
 // EnableIPForwarding enables IP forwarding.
 func EnableIPForwarding() error {

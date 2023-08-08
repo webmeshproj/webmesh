@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/net/system/link"
-	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // DetectOpts contains options for endpoint detection.
@@ -178,7 +178,7 @@ func detectFromInterfaces(opts *DetectOpts) (PrefixList, error) {
 		if iface.Flags&net.FlagPointToPoint != 0 {
 			continue
 		}
-		if util.Contains(opts.SkipInterfaces, iface.Name) {
+		if slices.Contains(opts.SkipInterfaces, iface.Name) {
 			continue
 		}
 		addrs, err := iface.Addrs()

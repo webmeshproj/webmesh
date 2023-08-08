@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -29,7 +30,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
@@ -151,7 +151,7 @@ func recursePeers(
 				if err != nil {
 					return nil, nil, fmt.Errorf("parse prefix: %w", err)
 				}
-				if !util.Contains(allowedIPs, prefix) && !util.Contains(thisRoutes, prefix) {
+				if !slices.Contains(allowedIPs, prefix) && !slices.Contains(thisRoutes, prefix) {
 					allowedIPs = append(allowedIPs, prefix)
 				}
 			}
@@ -162,12 +162,12 @@ func recursePeers(
 		return nil, nil, fmt.Errorf("recurse edge allowed IPs: %w", err)
 	}
 	for _, ip := range edgeIPs {
-		if !util.Contains(allowedIPs, ip) {
+		if !slices.Contains(allowedIPs, ip) {
 			allowedIPs = append(allowedIPs, ip)
 		}
 	}
 	for _, route := range edgeRoutes {
-		if !util.Contains(allowedRoutes, route) {
+		if !slices.Contains(allowedRoutes, route) {
 			allowedRoutes = append(allowedRoutes, route)
 		}
 	}
@@ -226,7 +226,7 @@ func recurseEdges(
 					if err != nil {
 						return nil, nil, fmt.Errorf("parse prefix: %w", err)
 					}
-					if !util.Contains(allowedIPs, prefix) && !util.Contains(thisRoutes, prefix) {
+					if !slices.Contains(allowedIPs, prefix) && !slices.Contains(thisRoutes, prefix) {
 						allowedIPs = append(allowedIPs, prefix)
 					}
 				}
@@ -237,12 +237,12 @@ func recurseEdges(
 			return nil, nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}
 		for _, ip := range ips {
-			if !util.Contains(allowedIPs, ip) {
+			if !slices.Contains(allowedIPs, ip) {
 				allowedIPs = append(allowedIPs, ip)
 			}
 		}
 		for _, ipRoute := range ipRoutes {
-			if !util.Contains(allowedRoutes, ipRoute) {
+			if !slices.Contains(allowedRoutes, ipRoute) {
 				allowedRoutes = append(allowedRoutes, ipRoute)
 			}
 		}

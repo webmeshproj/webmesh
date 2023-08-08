@@ -19,10 +19,9 @@ package firewall
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strings"
-
-	"golang.org/x/exp/slog"
 )
 
 // newIPTablesFirewall returns a new iptables firewall manager. This firewall manager

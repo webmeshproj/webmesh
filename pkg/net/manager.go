@@ -19,6 +19,7 @@ package net
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/netip"
 	"runtime"
@@ -26,7 +27,6 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
 

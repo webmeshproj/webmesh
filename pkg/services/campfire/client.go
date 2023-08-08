@@ -18,11 +18,11 @@ package campfire
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 
 	"github.com/google/uuid"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )

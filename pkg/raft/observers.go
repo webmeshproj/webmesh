@@ -17,8 +17,9 @@ limitations under the License.
 package raft
 
 import (
+	"log/slog"
+
 	"github.com/hashicorp/raft"
-	"golang.org/x/exp/slog"
 )
 
 func (r *raftNode) observe() (closeCh, doneCh chan struct{}) {

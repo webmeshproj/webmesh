@@ -20,6 +20,7 @@ package debug
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -28,7 +29,6 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"

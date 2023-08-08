@@ -3,12 +3,12 @@ package plugins
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/netip"
 	"strings"
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"

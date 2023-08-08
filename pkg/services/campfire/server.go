@@ -20,11 +20,10 @@ package campfire
 import (
 	"errors"
 	"flag"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"

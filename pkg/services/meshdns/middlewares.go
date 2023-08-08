@@ -17,8 +17,9 @@ limitations under the License.
 package meshdns
 
 import (
+	"log/slog"
+
 	"github.com/miekg/dns"
-	"golang.org/x/exp/slog"
 )
 
 func (s *Server) validateRequest(next dns.HandlerFunc) dns.HandlerFunc {

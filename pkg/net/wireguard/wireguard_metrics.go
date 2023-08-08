@@ -19,13 +19,13 @@ package wireguard
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 )
 
 // Peer Metrics

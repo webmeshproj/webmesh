@@ -18,11 +18,11 @@ package campfire
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/stun"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/util"

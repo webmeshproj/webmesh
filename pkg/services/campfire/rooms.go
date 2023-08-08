@@ -19,13 +19,12 @@ package campfire
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"path"
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 )

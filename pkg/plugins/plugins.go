@@ -19,9 +19,9 @@ package plugins
 
 import (
 	"fmt"
+	"log/slog"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"

@@ -19,13 +19,13 @@ package link
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/netip"
 	"strings"
 
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/vishvananda/netlink"
-	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
 
 	"github.com/webmeshproj/webmesh/pkg/context"

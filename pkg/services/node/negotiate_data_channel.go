@@ -18,11 +18,11 @@ package node
 
 import (
 	"io"
+	"log/slog"
 	"net"
 	"strconv"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 

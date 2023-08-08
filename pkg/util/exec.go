@@ -18,10 +18,9 @@ package util
 
 import (
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strings"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )

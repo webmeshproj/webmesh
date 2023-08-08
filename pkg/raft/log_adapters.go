@@ -20,9 +20,9 @@ import (
 	"context"
 	"io"
 	"log"
+	"log/slog"
 
 	"github.com/hashicorp/go-hclog"
-	"golang.org/x/exp/slog"
 )
 
 var _ hclog.Logger = (*hclogAdapter)(nil)

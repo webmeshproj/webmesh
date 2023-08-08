@@ -20,13 +20,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd/connect"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"

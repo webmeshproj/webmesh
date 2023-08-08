@@ -18,9 +18,9 @@ package link
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/jsimonetti/rtnetlink"
-	"golang.org/x/exp/slog"
 	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"

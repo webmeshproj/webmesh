@@ -18,12 +18,12 @@ limitations under the License.
 package node
 
 import (
+	"log/slog"
 	"net/netip"
 	"sync"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"

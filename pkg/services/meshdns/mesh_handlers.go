@@ -18,12 +18,12 @@ package meshdns
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 
 	"github.com/hashicorp/raft"
 	"github.com/miekg/dns"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"

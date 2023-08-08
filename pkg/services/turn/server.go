@@ -19,11 +19,11 @@ package turn
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"strconv"
 
 	"github.com/pion/turn/v2"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/util"
 )

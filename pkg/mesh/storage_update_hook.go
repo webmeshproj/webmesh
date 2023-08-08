@@ -18,10 +18,9 @@ package mesh
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"

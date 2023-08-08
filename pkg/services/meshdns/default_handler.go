@@ -17,11 +17,11 @@ limitations under the License.
 package meshdns
 
 import (
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/miekg/dns"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )

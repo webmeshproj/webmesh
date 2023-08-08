@@ -4,8 +4,10 @@ REPO  ?= ghcr.io/webmeshproj
 IMAGE ?= $(REPO)/$(NAME):latest
 DISTROLESS_IMAGE ?= $(REPO)/$(NAME)-distroless:latest
 
-ARCH  ?= $(shell go env GOARCH)
-OS    ?= $(shell go env GOOS)
+
+GO    ?= go
+ARCH  ?= $(shell $(GO) env GOARCH)
+OS    ?= $(shell $(GO) env GOOS)
 
 ifeq ($(OS),Windows_NT)
 	OS := windows
@@ -21,7 +23,7 @@ help: ## Display this help.
 
 ##@ Build
 
-GORELEASER ?= go run github.com/goreleaser/goreleaser@latest
+GORELEASER ?= $(GO) run github.com/goreleaser/goreleaser@latest
 BUILD_ARGS ?= --snapshot --clean
 
 build: fmt vet ## Build node and wmctl binary for the local platform.
@@ -63,28 +65,28 @@ COVERAGE_FILE := coverage.out
 TEST_ARGS     := -v -cover -coverprofile=$(COVERAGE_FILE) -covermode=atomic -race
 
 test: fmt vet ## Run unit tests.
-	go test $(TEST_ARGS) ./...
-	go tool cover -func=$(COVERAGE_FILE)
+	$(GO) test $(TEST_ARGS) ./...
+	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 lint: ## Run linters.
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run
+	$(GO) run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 ifeq ($(OS),windows)
 	echo "Skipping go fmt on windows"
 else
-	go fmt ./...
+	$(GO) fmt ./...
 endif
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	go vet ./...
+	$(GO) vet ./...
 
 ##@ Misc
 
 generate: ## Run go generate against code.
-	go generate ./...
+	$(GO) generate ./...
 
 clean: ## Clean up build and development artifacts.
 	rm -rf dist/ $(COVERAGE_FILE)

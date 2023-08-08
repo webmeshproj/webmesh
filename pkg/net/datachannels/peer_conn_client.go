@@ -21,13 +21,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"sync/atomic"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/util"

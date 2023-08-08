@@ -23,10 +23,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/hashicorp/raft"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )

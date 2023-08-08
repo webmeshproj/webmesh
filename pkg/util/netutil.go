@@ -21,14 +21,13 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"net"
 	"net/netip"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )

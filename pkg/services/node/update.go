@@ -18,6 +18,7 @@ package node
 
 import (
 	"errors"
+	"log/slog"
 	"net/netip"
 	"sort"
 	"time"
@@ -25,7 +26,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,7 +35,6 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // ErrNodeNotFound is returned when a node is not found.
@@ -60,7 +60,7 @@ func IsValidID(id string) bool {
 	if len(id) == 0 {
 		return false
 	}
-	if util.Contains(ReservedNodeIDs, id) {
+	if slices.Contains(ReservedNodeIDs, id) {
 		return false
 	}
 	for _, c := range InvalidNodeIDChars {

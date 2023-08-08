@@ -19,9 +19,9 @@ package context
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"

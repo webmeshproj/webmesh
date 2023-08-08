@@ -19,10 +19,10 @@ package turn
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net"
 
 	"github.com/pion/stun"
-	"golang.org/x/exp/slog"
 )
 
 type campFireManager struct {

@@ -18,9 +18,9 @@ package util
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/pion/logging"
-	"golang.org/x/exp/slog"
 )
 
 type STUNLoggerFactory struct {

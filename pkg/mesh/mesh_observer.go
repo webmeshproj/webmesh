@@ -18,10 +18,10 @@ package mesh
 
 import (
 	"context"
+	"log/slog"
 	"reflect"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/raft"

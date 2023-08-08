@@ -24,12 +24,12 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"

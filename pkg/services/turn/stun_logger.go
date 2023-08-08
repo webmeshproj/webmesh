@@ -17,10 +17,10 @@ limitations under the License.
 package turn
 
 import (
+	"log/slog"
 	"net"
 
 	"github.com/pion/stun"
-	"golang.org/x/exp/slog"
 )
 
 // stunLogger wraps a PacketConn and prints incoming/outgoing STUN packets

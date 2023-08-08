@@ -22,9 +22,8 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"

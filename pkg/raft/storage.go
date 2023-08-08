@@ -20,13 +20,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/golang/snappy"
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	raftbadger "github.com/webmeshproj/raft-badger"
-	"golang.org/x/exp/slog"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 

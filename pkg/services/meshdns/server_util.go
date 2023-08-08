@@ -19,10 +19,10 @@ package meshdns
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/miekg/dns"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"

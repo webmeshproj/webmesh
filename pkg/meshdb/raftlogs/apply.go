@@ -21,10 +21,10 @@ package raftlogs
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"

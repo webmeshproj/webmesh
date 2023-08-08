@@ -17,13 +17,13 @@ limitations under the License.
 package node
 
 import (
+	"log/slog"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"

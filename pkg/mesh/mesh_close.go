@@ -19,9 +19,9 @@ package mesh
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slog"
 )
 
 // Close closes the store.
