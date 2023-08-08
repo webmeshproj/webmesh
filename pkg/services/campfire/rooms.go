@@ -182,7 +182,7 @@ func (r *RoomManager) HandleMessage(srcaddr net.Addr, msg *Message) {
 		}
 		r.log.Debug("got message", "from", msg.From, "room", msg.Room, "to", to)
 		key := path.Join(RoomsPrefix, msg.Room, "messages", msg.From, to, time.Now().UTC().Format(time.RFC3339Nano))
-		err := r.mesh.Storage().Put(ctx, key, msg.Body, time.Minute*5)
+		err := r.mesh.Storage().Put(ctx, key, msg.Body, time.Minute)
 		if err != nil {
 			r.log.Error("failed to store message", "error", err)
 			r.sendError(srcaddr, err)

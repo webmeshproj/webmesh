@@ -289,5 +289,10 @@ func (s *Server) Watch(_ *healthpb.HealthCheckRequest, srv healthpb.Health_Watch
 }
 
 func (s *Server) currentStatus() healthpb.HealthCheckResponse_ServingStatus {
+	_, err := s.store.Leader()
+	if err != nil {
+		s.log.Error("failed to get leader", "error", err)
+		return healthpb.HealthCheckResponse_NOT_SERVING
+	}
 	return healthpb.HealthCheckResponse_SERVING
 }
