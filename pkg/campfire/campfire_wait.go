@@ -24,6 +24,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -98,7 +99,7 @@ func (o *offlineCampFire) handlePeerConnections() {
 		Certificates: o.certs,
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{o.loc.TURNServer},
+				URLs:       []string{strings.Replace(o.loc.TURNServer, "turn", "stun", 1)},
 				Username:   "-",
 				Credential: "-",
 			},
@@ -116,12 +117,6 @@ func (o *offlineCampFire) handlePeerConnections() {
 		case webrtc.ICEConnectionStateFailed:
 			o.errc <- fmt.Errorf("ice connection failed")
 		}
-	})
-	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
-			return
-		}
-		o.log.Debug("ICE candidate", "candidate", c.String())
 	})
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
 		o.log.Debug("Data channel opened", "label", dc.Label())
@@ -225,7 +220,7 @@ func loadCertificate() ([]webrtc.Certificate, *x509.Certificate, error) {
 			return
 		}
 		offlineX509Cert = cert
-		key, err := x509.ParseECPrivateKey(keyPem.Bytes)
+		key, err := x509.ParsePKCS8PrivateKey(keyPem.Bytes)
 		if err != nil {
 			offlineCertsErr = fmt.Errorf("parse key: %w", err)
 			return
@@ -241,7 +236,7 @@ s=-
 t=0 0
 a=group:BUNDLE 0
 a=msid-semantic: WMS
-m=application 9 UDP/DTLS/SCTP {{ .Secret }}
+m=application 9 UDP/DTLS/SCTP webrtc-datachannel
 c=IN IP4 0.0.0.0
 a=ice-ufrag:{{ .Username }}
 a=ice-pwd:{{ .Secret }}

@@ -50,12 +50,11 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	}
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
-	s.SetICECredentials(CampfireUFrag, loc.Secret)
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{loc.TURNServer},
+				URLs:       []string{strings.Replace(loc.TURNServer, "turn", "stun", 1)},
 				Username:   "-",
 				Credential: "-",
 			},
@@ -65,6 +64,38 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		return nil, fmt.Errorf("create peer connection: %w", err)
 	}
 	errs := make(chan error, 1)
+	pc.OnNegotiationNeeded(func() {
+		offer, err := pc.CreateOffer(nil)
+		if err != nil {
+			errs <- fmt.Errorf("create offer: %w", err)
+		}
+		offer.SDP = ufragRegex.ReplaceAllString(offer.SDP, "a=ice-ufrag:"+CampfireUFrag)
+		offer.SDP = pwdRegex.ReplaceAllString(offer.SDP, "a=ice-pwd:"+loc.Secret)
+		err = pc.SetLocalDescription(offer)
+		if err != nil {
+			errs <- fmt.Errorf("set local description: %w", err)
+		}
+		fingerprint, err := fingerprint.Fingerprint(cert, crypto.SHA256)
+		if err != nil {
+			errs <- fmt.Errorf("fingerprint certificate: %w", err)
+		}
+		var answer bytes.Buffer
+		err = joinerRemoteTemplate.Execute(&answer, map[string]string{
+			"Username":    CampfireUFrag,
+			"Secret":      loc.Secret,
+			"Fingerprint": strings.ToUpper(fingerprint),
+		})
+		if err != nil {
+			errs <- fmt.Errorf("execute remote template: %w", err)
+		}
+		err = pc.SetRemoteDescription(webrtc.SessionDescription{
+			Type: webrtc.SDPTypeAnswer,
+			SDP:  answer.String(),
+		})
+		if err != nil {
+			errs <- fmt.Errorf("set remote description: %w", err)
+		}
+	})
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		log.Debug("ICE connection state changed", "state", state.String())
 		switch state {
@@ -78,6 +109,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	}
 	acceptc := make(chan datachannel.ReadWriteCloser, 1)
 	dc.OnOpen(func() {
+		log.Info("data channel opened")
 		rw, err := dc.Detach()
 		if err != nil {
 			errs <- fmt.Errorf("detach data channel: %w", err)
@@ -85,37 +117,6 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		}
 		acceptc <- campfireConn{ReadWriteCloser: rw, pc: pc}
 	})
-	offer, err := pc.CreateOffer(nil)
-	if err != nil {
-		return nil, fmt.Errorf("create offer: %w", err)
-	}
-	offer.SDP = ufragRegex.ReplaceAllString(offer.SDP, "a=ice-ufrag:"+CampfireUFrag)
-	offer.SDP = pwdRegex.ReplaceAllString(offer.SDP, "a=ice-pwd:"+loc.Secret)
-	err = pc.SetLocalDescription(offer)
-	if err != nil {
-		return nil, fmt.Errorf("set local description: %w", err)
-	}
-	fingerprint, err := fingerprint.Fingerprint(cert, crypto.SHA256)
-	if err != nil {
-		return nil, fmt.Errorf("fingerprint certificate: %w", err)
-	}
-	fmt.Println(fingerprint)
-	var answer bytes.Buffer
-	err = joinerRemoteTemplate.Execute(&answer, map[string]string{
-		"Username":    CampfireUFrag,
-		"Secret":      loc.Secret,
-		"Fingerprint": strings.ToUpper(fingerprint),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("execute remote template: %w", err)
-	}
-	err = pc.SetRemoteDescription(webrtc.SessionDescription{
-		Type: webrtc.SDPTypeOffer,
-		SDP:  answer.String(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("set remote description: %w", err)
-	}
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -143,7 +144,7 @@ c=IN IP4 0.0.0.0
 a=setup:active
 a=mid:0
 a=sendrecv
-a=sctpmap:5000 {{ .Secret }} 1024
+a=sctpmap:5000 webrtc-datachannel 1024
 a=ice-ufrag:{{ .Username }}
 a=ice-pwd:{{ .Secret }}
 `))
