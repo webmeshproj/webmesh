@@ -17,15 +17,17 @@ limitations under the License.
 package campfire
 
 import (
+	"bytes"
 	"crypto/x509"
 	_ "embed"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"log/slog"
 	"sync"
+	"text/template"
 
 	"github.com/pion/datachannel"
-	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -43,14 +45,19 @@ type offlineCampFire struct {
 }
 
 var (
+	// CampfireUFrag is the username fragment used by campfire.
+	CampfireUFrag = base64.StdEncoding.EncodeToString([]byte("campfire"))
+
 	//go:embed zcampfire.crt
 	campfireCert []byte
 	//go:embed zcampfire.key
 	campfireKey []byte
 )
 
-func Join(ctx context.Context, opts Options) (CampFire, error) {
-	certs, err := loadCertificate()
+// Wait waits for a peer to join the camp fire and dispatches a connections
+// and errors to the appropriate channels.
+func Wait(ctx context.Context, opts Options) (CampFire, error) {
+	certs, _, err := loadCertificate()
 	if err != nil {
 		return nil, fmt.Errorf("load certificate: %w", err)
 	}
@@ -60,15 +67,8 @@ func Join(ctx context.Context, opts Options) (CampFire, error) {
 	}
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
-	s.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
-	// s.SetMulticastDNSHostName(fmt.Sprintf("%s.local", loc.Secret))
-	// s.SetMulticastDNSHostName("offline-browser-communication.local")
 	s.DisableCertificateFingerprintVerification(true)
-	s.SetICECredentials(string(opts.PSK), loc.Secret)
-	// err = s.SetEphemeralUDPPortRange(5000, 5005)
-	if err != nil {
-		return nil, fmt.Errorf("set ephemeral udp port range: %w", err)
-	}
+	s.SetICECredentials(CampfireUFrag, loc.Secret)
 	cf := offlineCampFire{
 		api:     webrtc.NewAPI(webrtc.WithSettingEngine(s)),
 		certs:   certs,
@@ -85,13 +85,22 @@ func Join(ctx context.Context, opts Options) (CampFire, error) {
 
 func (o *offlineCampFire) handlePeerConnections() {
 	defer close(o.readyc)
+	var remoteDescription bytes.Buffer
+	err := waiterRemoteTemplate.Execute(&remoteDescription, map[string]string{
+		"Username": CampfireUFrag,
+		"Secret":   o.loc.Secret,
+	})
+	if err != nil {
+		o.errc <- fmt.Errorf("execute remote template: %w", err)
+		return
+	}
 	pc, err := o.api.NewPeerConnection(webrtc.Configuration{
 		Certificates: o.certs,
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs:       []string{o.loc.TURNServer},
 				Username:   "-",
-				Credential: o.loc.Secret,
+				Credential: "-",
 			},
 		},
 	})
@@ -113,17 +122,13 @@ func (o *offlineCampFire) handlePeerConnections() {
 			return
 		}
 		o.log.Debug("ICE candidate", "candidate", c.String())
-		err := pc.AddICECandidate(c.ToJSON())
-		if err != nil {
-			o.log.Warn("add ice candidate", "error", err.Error())
-		}
 	})
-	dc, err := pc.CreateDataChannel(o.loc.Secret, nil)
-	if err != nil {
-		o.errc <- fmt.Errorf("create data channel: %w", err)
-		return
-	}
-	dc.OnOpen(func() {
+	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
+		o.log.Debug("Data channel opened", "label", dc.Label())
+		if dc.Label() != o.loc.Secret {
+			o.errc <- fmt.Errorf("unexpected data channel label: %q", dc.Label())
+			return
+		}
 		rw, err := dc.Detach()
 		if err != nil {
 			o.errc <- fmt.Errorf("detach data channel: %w", err)
@@ -133,7 +138,7 @@ func (o *offlineCampFire) handlePeerConnections() {
 	})
 	err = pc.SetRemoteDescription(webrtc.SessionDescription{
 		Type: webrtc.SDPTypeOffer,
-		SDP:  remoteDescriptionTemplate,
+		SDP:  remoteDescription.String(),
 	})
 	if err != nil {
 		o.errc <- fmt.Errorf("set remote description: %w", err)
@@ -188,12 +193,13 @@ func (o *offlineCampFire) Ready() <-chan struct{} {
 }
 
 var (
+	offlineX509Cert  *x509.Certificate
 	offlineCerts     []webrtc.Certificate
 	offlineCertsErr  error
 	offlineCertsOnce sync.Once
 )
 
-func loadCertificate() ([]webrtc.Certificate, error) {
+func loadCertificate() ([]webrtc.Certificate, *x509.Certificate, error) {
 	offlineCertsOnce.Do(func() {
 		certPem, extra := pem.Decode(campfireCert)
 		if len(extra) > 0 {
@@ -218,6 +224,7 @@ func loadCertificate() ([]webrtc.Certificate, error) {
 			offlineCertsErr = fmt.Errorf("parse certificate: %w", err)
 			return
 		}
+		offlineX509Cert = cert
 		key, err := x509.ParseECPrivateKey(keyPem.Bytes)
 		if err != nil {
 			offlineCertsErr = fmt.Errorf("parse key: %w", err)
@@ -225,21 +232,21 @@ func loadCertificate() ([]webrtc.Certificate, error) {
 		}
 		offlineCerts = []webrtc.Certificate{webrtc.CertificateFromX509(key, cert)}
 	})
-	return offlineCerts, offlineCertsErr
+	return offlineCerts, offlineX509Cert, offlineCertsErr
 }
 
-const remoteDescriptionTemplate = `v=0
+var waiterRemoteTemplate = template.Must(template.New("srv-remote-desc").Parse(`v=0
 o=- 6920920643910646739 2 IN IP4 127.0.0.1
 s=-
 t=0 0
 a=group:BUNDLE 0
 a=msid-semantic: WMS
-m=application 9 UDP/DTLS/SCTP webrtc-datachannel
+m=application 9 UDP/DTLS/SCTP {{ .Secret }}
 c=IN IP4 0.0.0.0
-a=ice-ufrag:V6j+
-a=ice-pwd:OEKutPgoHVk/99FfqPOf444w
+a=ice-ufrag:{{ .Username }}
+a=ice-pwd:{{ .Secret }}
 a=fingerprint:sha-256 invalidFingerprint
 a=setup:actpass
 a=mid:0
 a=sctp-port:5000
-`
+`))
