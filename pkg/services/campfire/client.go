@@ -68,6 +68,11 @@ func NewClientWithID(addr, id string) (*Client, error) {
 	return cl, nil
 }
 
+// ID returns the client id.
+func (c *Client) ID() string {
+	return c.id
+}
+
 // Join joins the room with the given name.
 func (c *Client) Join(ctx context.Context, name string) error {
 	c.mu.Lock()

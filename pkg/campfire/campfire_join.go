@@ -19,6 +19,7 @@ package campfire
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/webrtc/v3"
@@ -49,8 +50,7 @@ type Options struct {
 
 // Join joins a camp fire with the given pre-shared key on the list of turn
 // servers.
-func Join(ctx context.Context, opts Options) (*CampFire, error) {
-	var err error
+func Join(ctx context.Context, room WaitingRoom) *CampFire {
 	cf := CampFire{
 		errc:    make(chan error, 3),
 		readyc:  make(chan struct{}),
@@ -58,10 +58,7 @@ func Join(ctx context.Context, opts Options) (*CampFire, error) {
 		closec:  make(chan struct{}),
 	}
 	cf.log = context.LoggerFrom(ctx).With("protocol", "campfire")
-	cf.room, err = NewKadWaitingRoom(ctx, opts)
-	if err != nil {
-		return nil, fmt.Errorf("new waiting room: %w", err)
-	}
+	cf.room = room
 	go func() {
 		for {
 			select {
@@ -76,7 +73,7 @@ func Join(ctx context.Context, opts Options) (*CampFire, error) {
 			}
 		}
 	}()
-	return &cf, nil
+	return &cf
 }
 
 func (cf *CampFire) Accept() (datachannel.ReadWriteCloser, error) {
@@ -193,6 +190,9 @@ func (cf *CampFire) onNewPeerConnection(ctx context.Context, stream Stream) {
 		for {
 			msg, err := stream.Receive()
 			if err != nil {
+				if err == io.EOF {
+					return
+				}
 				cf.errc <- fmt.Errorf("receive message: %w", err)
 				return
 			}
@@ -300,6 +300,9 @@ func (cf *CampFire) onNewIncomingStream(ctx context.Context, stream Stream) {
 		for {
 			msg, err := stream.Receive()
 			if err != nil {
+				if err == io.EOF {
+					return
+				}
 				cf.errc <- fmt.Errorf("receive message: %w", err)
 				return
 			}

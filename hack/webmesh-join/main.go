@@ -15,6 +15,7 @@ import (
 
 func main() {
 	psk := flag.String("psk", "", "pre-shared key")
+	server := flag.String("server", "127.0.0.1:4095", "server address")
 	logLevel := flag.String("log-level", "info", "log level")
 	flag.Parse()
 	if *psk == "" {
@@ -41,7 +42,7 @@ func main() {
 	}))
 	slog.SetDefault(log)
 	ctx := context.Background()
-	room, err := campfire.NewKadWaitingRoom(ctx, campfire.Options{
+	room, err := campfire.NewWebmeshWaitingRoom(ctx, *server, campfire.Options{
 		PSK: []byte(*psk),
 	})
 	if err != nil {

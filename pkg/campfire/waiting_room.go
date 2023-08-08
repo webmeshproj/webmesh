@@ -53,8 +53,6 @@ type Stream interface {
 	// SendOffer sends an SDP offer on the stream.
 	// This is a convenience method for sending an SDP message.
 	SendOffer(offer webrtc.SessionDescription) error
-	// Send sends a message on the stream.
-	Send(Message) error
 	// Receive receives a message from the stream.
 	Receive() (Message, error)
 	// Close closes the stream.
