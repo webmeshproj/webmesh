@@ -37,10 +37,6 @@ func main() {
 	}))
 	slog.SetDefault(log)
 	cf, err := campfire.NewClient(*addr)
-	// cf, err := campfire.NewWebmeshWaitingRoom(ctx, campfire.Options{
-	// 	PSK:         []byte(*psk),
-	// 	TURNServers: []string{*addr},
-	// })
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err.Error())
 		os.Exit(1)
@@ -119,6 +115,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "  join <room>")
 			fmt.Fprintln(os.Stderr, "  leave <room>")
 			fmt.Fprintln(os.Stderr, "  msg <room> <message>")
+			fmt.Fprintln(os.Stderr, "  send <room> <to> <message>")
 			fmt.Fprintln(os.Stderr, "  list <room>")
 			fmt.Fprintln(os.Stderr, "  exit")
 		case "exit":
