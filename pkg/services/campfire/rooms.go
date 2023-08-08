@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,19 +39,85 @@ const (
 
 // RoomManager is the room manager.
 type RoomManager struct {
-	pkt  net.PacketConn
-	mesh meshdb.Store
-	mu   sync.Mutex
-	log  *slog.Logger
+	pkt        net.PacketConn
+	mesh       meshdb.Store
+	log        *slog.Logger
+	cancelSubs func()
+	mu         sync.Mutex
 }
 
 // NewRoomManager returns a new room manager.
-func NewRoomManager(mesh meshdb.Store, c net.PacketConn) *RoomManager {
-	return &RoomManager{
+func NewRoomManager(mesh meshdb.Store, c net.PacketConn) (*RoomManager, error) {
+	rm := &RoomManager{
 		pkt:  c,
 		mesh: mesh,
 		log:  slog.Default().With("service", "campfire"),
 	}
+	cancel, err := mesh.Storage().Subscribe(context.Background(), RoomsPrefix, rm.handleSubscription)
+	if err != nil {
+		return nil, fmt.Errorf("subscribe to rooms: %w", err)
+	}
+	rm.cancelSubs = cancel
+	return rm, nil
+}
+
+func (r *RoomManager) handleSubscription(key, value string) {
+	key = strings.TrimPrefix(key, RoomsPrefix+"/")
+	parts := strings.Split(key, "/")
+	if len(parts) < 2 {
+		return
+	}
+	room := parts[0]
+	if parts[1] == "messages" {
+		if len(parts) < 5 {
+			return
+		}
+		from, to, recvAt := parts[2], parts[3], parts[4]
+		r.log.Debug("dispatching message", "room", room, "from", from, "to", to, "recvAt", recvAt)
+		var members []string
+		if to == room {
+			var err error
+			members, err = r.mesh.Storage().List(context.Background(), path.Join(RoomsPrefix, room, "members"))
+			if err != nil {
+				r.log.Error("failed to list members", "error", err)
+				return
+			}
+		} else {
+			members = []string{to}
+		}
+		for _, member := range members {
+			memberID := path.Base(member)
+			if memberID == from {
+				continue
+			}
+			addr, err := r.mesh.Storage().Get(context.Background(), path.Join(RoomsPrefix, room, "members", memberID))
+			if err != nil {
+				r.log.Error("failed to get member", "error", err)
+				continue
+			}
+			uaddr, err := net.ResolveUDPAddr("udp", addr)
+			if err != nil {
+				r.log.Error("failed to resolve udp addr", "error", err)
+				continue
+			}
+			msg := Message{
+				Type: MessageTypeMessage,
+				Room: room,
+				From: from,
+				To:   to,
+				Body: value,
+			}
+			err = r.sendToMember(uaddr, &msg)
+			if err != nil {
+				r.log.Error("failed to send message", "error", err)
+			}
+		}
+	}
+}
+
+// Close closes the room manager.
+func (r *RoomManager) Close() {
+	r.cancelSubs()
 }
 
 // HandleMessage handles a campfire message.

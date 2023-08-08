@@ -61,7 +61,10 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		return err
 	}
 	defer pkt.Close()
-	s.rooms = NewRoomManager(s.mesh, pkt)
+	s.rooms, err = NewRoomManager(s.mesh, pkt)
+	if err != nil {
+		return err
+	}
 	go s.handlePktRead(pkt)
 	select {
 	case <-ctx.Done():
@@ -73,6 +76,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 // Shutdown shuts down the campfire service.
 func (s *Server) Shutdown(ctx context.Context) error {
+	s.rooms.Close()
 	close(s.closec)
 	return nil
 }
