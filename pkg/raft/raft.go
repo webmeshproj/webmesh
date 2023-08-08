@@ -18,7 +18,6 @@ limitations under the License.
 package raft
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -187,17 +186,17 @@ func newRaftNode(opts *Options, dialer LeaderDialer) *raftNode {
 
 // Start starts the Raft node.
 func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.started.Load() {
 		return ErrStarted
 	}
+	r.mu.Lock()
 	r.nodeID = raft.ServerID(opts.NodeID)
 	// Ensure the data directories exist if not in-memory
 	if !r.opts.InMemory {
 		for _, dir := range []string{r.opts.StorePath(), r.opts.DataStoragePath()} {
 			err := os.MkdirAll(dir, 0755)
 			if err != nil {
+				r.mu.Unlock()
 				return fmt.Errorf("raft mkdir %q: %w", dir, err)
 			}
 		}
@@ -206,6 +205,7 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	r.log.Debug("creating raft network transport")
 	sl, err := NewStreamLayer(r.opts.ListenAddress)
 	if err != nil {
+		r.mu.Unlock()
 		return fmt.Errorf("new raft stream layer: %w", err)
 	}
 	r.listenPort = sl.ListenPort()
@@ -218,6 +218,7 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	r.log.Debug("creating raft stores")
 	err = r.createDataStores(ctx)
 	if err != nil {
+		r.mu.Unlock()
 		defer r.raftTransport.Close()
 		return fmt.Errorf("create data stores: %w", err)
 	}
@@ -228,37 +229,10 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 		defer r.closeDataStores(ctx)
 		return cause
 	}
-	// Check for any existing snapshots
-	snapshots, err := r.raftSnapshots.List()
-	if err != nil {
-		return handleErr(fmt.Errorf("list snapshots: %w", err))
-	}
-	if len(snapshots) > 0 {
-		latest := snapshots[0]
-		r.log.Info("restoring from snapshot",
-			slog.String("id", latest.ID),
-			slog.Int("term", int(latest.Term)),
-			slog.Int("index", int(latest.Index)))
-		meta, reader, err := r.raftSnapshots.Open(latest.ID)
-		if err != nil {
-			return handleErr(fmt.Errorf("open snapshot: %w", err))
-		}
-		defer reader.Close()
-		var buf bytes.Buffer
-		tee := io.TeeReader(reader, &buf)
-		// Restore to the database.
-		if err = r.snapshotter.Restore(ctx, io.NopCloser(tee)); err != nil {
-			return handleErr(fmt.Errorf("restore snapshot: %w", err))
-		}
-		// Call snapshot restore hooks
-		if r.opts.OnSnapshotRestore != nil {
-			r.opts.OnSnapshotRestore(ctx, meta, io.NopCloser(&buf))
-		}
-		r.currentTerm.Store(latest.Term)
-		r.lastAppliedIndex.Store(latest.Index)
-	}
 	// Create the raft instance.
 	r.log.Info("starting raft instance", slog.String("listen-addr", string(r.raftTransport.LocalAddr())))
+	// We unlock here so raft can call back into the Apply/RestoreSnapshot methods if needed.
+	r.mu.Unlock()
 	r.raft, err = raft.NewRaft(
 		r.opts.RaftConfig(opts.NodeID),
 		r,
