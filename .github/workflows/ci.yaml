@@ -11,7 +11,7 @@ env:
   DISTROLESS_IMAGE_NAME: ghcr.io/webmeshproj/node-distroless
   GO_VERSION: ^1.21
   NODE_VERSION: 18
-  GOLANGCI_LINT_VERSION: v1.53.2
+  GOLANGCI_LINT_VERSION: v1.54.0
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   BUILD_PARALLELISM: 4
 
@@ -36,8 +36,11 @@ jobs:
         run: go mod download -x
 
       - name: Run Linting
-        shell: bash
-        run: make lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: --timeout 10m
+          skip-pkg-cache: true
 
   tests:
     name: Unit Tests
