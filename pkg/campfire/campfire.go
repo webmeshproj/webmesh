@@ -22,6 +22,9 @@ import (
 	"net"
 )
 
+// Protocol is the protocol name.
+const Protocol = "/webmesh/campfire/1.0.0"
+
 // CampFire is a connection to one or more peers sharing the same pre-shared
 // key.
 type CampFire interface {

@@ -23,9 +23,6 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-// Protocol is the campfire protocol.
-const Protocol = "/webmesh/campfire/1.0.0"
-
 // WaitingRoom is an interface for a waiting for others to join
 // the campfire.
 type WaitingRoom interface {
