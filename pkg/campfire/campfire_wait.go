@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"crypto/x509"
 	_ "embed"
-	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"log/slog"
@@ -36,9 +35,6 @@ import (
 )
 
 var (
-	// CampfireUFrag is the username fragment used by campfire.
-	CampfireUFrag = base64.StdEncoding.EncodeToString([]byte("campfire"))
-
 	//go:embed zcampfire.crt
 	campfireCert []byte
 	//go:embed zcampfire.key
@@ -107,8 +103,8 @@ func (o *offlineCampFire) handlePeerConnections() {
 		return
 	}
 	pc, err := o.api.NewPeerConnection(webrtc.Configuration{
-		Certificates: o.certs,
-		// ICETransportPolicy: webrtc.ICETransportPolicyRelay,
+		Certificates:       o.certs,
+		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs:       []string{o.location.TURNServer},
@@ -262,5 +258,5 @@ a=fingerprint:sha-256 invalidFingerprint
 a=setup:actpass
 a=mid:0
 a=sctp-port:5000
-a=candidate:1 1 UDP 911414143 {{ .TURNServer }} 50000 typ relay 127.0.0.1 50000
+a=candidate:1 1 UDP 1 {{ .TURNServer }} 50000 typ relay 127.0.0.1 50000
 `))

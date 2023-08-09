@@ -85,6 +85,12 @@ func (l *Location) SessionID() int {
 	return sessionID
 }
 
+// TURNSessionID returns the TURN session ID.
+func (l *Location) TURNSessionID() string {
+	data := base64.StdEncoding.EncodeToString([]byte(l.RemoteSecret))
+	return data[0:15]
+}
+
 // LocalUfrag returns the local ufrag.
 func (l *Location) LocalUfrag() string {
 	data := base64.StdEncoding.EncodeToString([]byte(l.LocalSecret))

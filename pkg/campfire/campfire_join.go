@@ -52,7 +52,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	s.SetICECredentials(location.LocalUfrag(), location.LocalPwd())
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
-		// ICETransportPolicy: webrtc.ICETransportPolicyRelay,
+		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs:       []string{location.TURNServer},
@@ -154,5 +154,5 @@ a=sendrecv
 a=sctpmap:5000 webrtc-datachannel 1024
 a=ice-ufrag:{{ .Username }}
 a=ice-pwd:{{ .Secret }}
-a=candidate:1 1 UDP 911414143 {{ .TURNServer }} 50000 typ relay 127.0.0.1 50000
+a=candidate:1 1 UDP 1 {{ .TURNServer }} 50000 typ relay 127.0.0.1 50000
 `))
