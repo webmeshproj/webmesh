@@ -42,30 +42,19 @@ func FuzzFind(f *testing.F) {
 		f.Add([]byte(tc))
 	}
 	f.Fuzz(func(t *testing.T, psk []byte) {
-		resp1, err := Find(psk, nil, true)
+		resp1, err := Find(psk, nil)
 		if err != nil {
 			t.Skip(err)
 		}
-		resp2, err := Find(psk, nil, true)
+		resp2, err := Find(psk, nil)
 		if err != nil {
 			t.Skip(err)
 		}
-		if resp1.Secret != resp2.Secret {
-			t.Fatalf("expected %q, got %q", resp1.Secret, resp2.Secret)
+		if resp1.LocalSecret != resp2.LocalSecret {
+			t.Fatalf("expected %q, got %q", resp1.LocalSecret, resp2.LocalSecret)
 		}
-		if resp1.TURNServer != resp2.TURNServer {
-			t.Fatalf("expected %q, got %q", resp1.TURNServer, resp2.TURNServer)
-		}
-		resp1, err = Find(psk, nil, false)
-		if err != nil {
-			t.Skip(err)
-		}
-		resp2, err = Find(psk, nil, false)
-		if err != nil {
-			t.Skip(err)
-		}
-		if resp1.Secret != resp2.Secret {
-			t.Fatalf("expected %q, got %q", resp1.Secret, resp2.Secret)
+		if resp1.RemoteSecret != resp2.RemoteSecret {
+			t.Fatalf("expected %q, got %q", resp1.RemoteSecret, resp2.RemoteSecret)
 		}
 		if resp1.TURNServer != resp2.TURNServer {
 			t.Fatalf("expected %q, got %q", resp1.TURNServer, resp2.TURNServer)

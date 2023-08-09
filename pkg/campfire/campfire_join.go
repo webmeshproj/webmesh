@@ -19,7 +19,6 @@ package campfire
 import (
 	"bytes"
 	"crypto"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -40,30 +39,23 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load certificate: %w", err)
 	}
-	localKey, err := Find(opts.PSK, opts.TURNServers, true)
+	location, err := Find(opts.PSK, opts.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
-	remoteKey, err := Find(opts.PSK, opts.TURNServers, false)
-	if err != nil {
-		return nil, fmt.Errorf("find campfire: %w", err)
-	}
-	turnHost, err := net.ResolveUDPAddr("udp", strings.TrimPrefix(localKey.TURNServer, "turn:"))
+	turnHost, err := net.ResolveUDPAddr("udp", strings.TrimPrefix(location.TURNServer, "turn:"))
 	if err != nil {
 		return nil, fmt.Errorf("resolve turn server: %w", err)
 	}
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
-	data := base64.StdEncoding.EncodeToString([]byte(localKey.Secret))
-	ufrag := data[15:19]
-	pwd := data[19:]
-	s.SetICECredentials(ufrag, pwd)
+	s.SetICECredentials(location.LocalUfrag(), location.LocalPwd())
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
-		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
+		// ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{localKey.TURNServer},
+				URLs:       []string{location.TURNServer},
 				Username:   "-",
 				Credential: "-",
 			},
@@ -92,15 +84,11 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		if err != nil {
 			errs <- fmt.Errorf("fingerprint certificate: %w", err)
 		}
-		data = base64.StdEncoding.EncodeToString([]byte(remoteKey.Secret))
-		sessionID := numericSession(data[0:15])
-		ufrag = data[15:19]
-		pwd = data[19:]
 		var answer bytes.Buffer
 		err = joinerRemoteTemplate.Execute(&answer, map[string]any{
-			"SessionID":   sessionID,
-			"Username":    ufrag,
-			"Secret":      pwd,
+			"SessionID":   location.SessionID(),
+			"Username":    location.RemoteUfrag(),
+			"Secret":      location.RemotePwd(),
 			"Fingerprint": strings.ToUpper(fingerprint),
 			"TURNServer":  turnHost.AddrPort().Addr().String(),
 		})

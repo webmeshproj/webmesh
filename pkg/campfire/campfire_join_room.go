@@ -96,11 +96,11 @@ func (cf *roomCampFire) onNewPeerConnection(ctx context.Context, stream Stream) 
 			{
 				URLs:           []string{loc.TURNServer},
 				Username:       "-",
-				Credential:     loc.Secret,
+				Credential:     loc.LocalSecret,
 				CredentialType: webrtc.ICECredentialTypePassword,
 			},
 		},
-		PeerIdentity: loc.Secret,
+		PeerIdentity: loc.LocalSecret,
 		// ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 	})
 	if err != nil {
@@ -133,7 +133,7 @@ func (cf *roomCampFire) onNewPeerConnection(ctx context.Context, stream Stream) 
 			}
 		}
 	})
-	dc, err := conn.CreateDataChannel(cf.room.Location().Secret, &webrtc.DataChannelInit{
+	dc, err := conn.CreateDataChannel(cf.room.Location().LocalSecret, &webrtc.DataChannelInit{
 		ID:         util.Pointer(uint16(0)),
 		Ordered:    util.Pointer(true),
 		Negotiated: util.Pointer(true),
@@ -222,11 +222,11 @@ func (cf *roomCampFire) onNewIncomingStream(ctx context.Context, stream Stream) 
 			{
 				URLs:           []string{loc.TURNServer},
 				Username:       "-",
-				Credential:     loc.Secret,
+				Credential:     loc.LocalSecret,
 				CredentialType: webrtc.ICECredentialTypePassword,
 			},
 		},
-		PeerIdentity: loc.Secret,
+		PeerIdentity: loc.LocalSecret,
 		// ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 	})
 	if err != nil {
@@ -260,7 +260,7 @@ func (cf *roomCampFire) onNewIncomingStream(ctx context.Context, stream Stream) 
 			}
 		}
 	})
-	dc, err := conn.CreateDataChannel(loc.Secret, &webrtc.DataChannelInit{
+	dc, err := conn.CreateDataChannel(loc.LocalSecret, &webrtc.DataChannelInit{
 		ID:         util.Pointer(uint16(0)),
 		Ordered:    util.Pointer(true),
 		Negotiated: util.Pointer(true),

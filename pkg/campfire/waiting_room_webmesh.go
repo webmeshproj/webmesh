@@ -44,7 +44,7 @@ type webmeshWaitingRoom struct {
 
 func NewWebmeshWaitingRoom(ctx context.Context, campfireServer string, opts Options) (WaitingRoom, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire", "component", "waiting-room", "type", "webmesh")
-	loc, err := Find(opts.PSK, opts.TURNServers, true)
+	loc, err := Find(opts.PSK, opts.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find campfire: %w", err)
 	}
@@ -53,7 +53,7 @@ func NewWebmeshWaitingRoom(ctx context.Context, campfireServer string, opts Opti
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial turn server: %w", err)
 	}
-	err = conn.Join(ctx, loc.Secret)
+	err = conn.Join(ctx, loc.LocalSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to join campfire: %w", err)
 	}
@@ -127,7 +127,7 @@ func (wm *webmeshWaitingRoom) handleClient() {
 			stream.msgc <- m
 			wm.mu.Unlock()
 		case <-t.C:
-			peers, err := wm.cli.List(context.Background(), wm.loc.Secret)
+			peers, err := wm.cli.List(context.Background(), wm.loc.LocalSecret)
 			if err != nil {
 				wm.errc <- fmt.Errorf("failed to list peers: %w", err)
 				continue
@@ -137,7 +137,7 @@ func (wm *webmeshWaitingRoom) handleClient() {
 				if _, ok := wm.streams[peer]; ok {
 					continue
 				}
-				err := wm.cli.Send(context.Background(), wm.loc.Secret, peer, "START STREAM")
+				err := wm.cli.Send(context.Background(), wm.loc.LocalSecret, peer, "START STREAM")
 				if err != nil {
 					wm.errc <- fmt.Errorf("failed to send start stream message: %w", err)
 					continue
@@ -210,7 +210,7 @@ func (w *webmeshCampfireStream) SendCandidate(candidate string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal candidate message: %w", err)
 	}
-	err = w.room.cli.Send(context.Background(), w.room.loc.Secret, w.peerID, string(b))
+	err = w.room.cli.Send(context.Background(), w.room.loc.LocalSecret, w.peerID, string(b))
 	if err != nil {
 		return fmt.Errorf("failed to send candidate message: %w", err)
 	}
@@ -233,7 +233,7 @@ func (w *webmeshCampfireStream) SendOffer(offer webrtc.SessionDescription) error
 	if err != nil {
 		return fmt.Errorf("failed to marshal SDP message: %w", err)
 	}
-	err = w.room.cli.Send(context.Background(), w.room.loc.Secret, w.peerID, string(b))
+	err = w.room.cli.Send(context.Background(), w.room.loc.LocalSecret, w.peerID, string(b))
 	if err != nil {
 		return fmt.Errorf("failed to send SDP message: %w", err)
 	}
@@ -252,7 +252,7 @@ func (w *webmeshCampfireStream) Receive() (Message, error) {
 
 // Close closes the stream.
 func (w *webmeshCampfireStream) Close() error {
-	err := w.room.cli.Send(context.Background(), w.room.loc.Secret, w.peerID, "END STREAM")
+	err := w.room.cli.Send(context.Background(), w.room.loc.LocalSecret, w.peerID, "END STREAM")
 	if err != nil {
 		return fmt.Errorf("failed to send end stream message: %w", err)
 	}
