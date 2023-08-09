@@ -18,16 +18,15 @@ limitations under the License.
 package campfire
 
 import (
+	"io"
 	"net"
-
-	"github.com/pion/datachannel"
 )
 
 // CampFire is a connection to one or more peers sharing the same pre-shared
 // key.
 type CampFire interface {
 	// Accept returns a connection to a peer.
-	Accept() (datachannel.ReadWriteCloser, error)
+	Accept() (io.ReadWriteCloser, error)
 	// Close closes the camp fire.
 	Close() error
 	// Errors returns a channel of errors.

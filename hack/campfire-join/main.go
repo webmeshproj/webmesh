@@ -41,7 +41,7 @@ func main() {
 	slog.SetDefault(log)
 	ctx := context.Background()
 
-	conn, err := campfire.Join(ctx, campfire.Options{
+	conn, err := campfire.JoinICE(ctx, campfire.Options{
 		PSK: []byte(*psk),
 	})
 	if err != nil {

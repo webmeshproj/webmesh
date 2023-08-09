@@ -64,7 +64,7 @@ func JoinViaRoom(ctx context.Context, room WaitingRoom) CampFire {
 	return &cf
 }
 
-func (cf *roomCampFire) Accept() (datachannel.ReadWriteCloser, error) {
+func (cf *roomCampFire) Accept() (io.ReadWriteCloser, error) {
 	select {
 	case <-cf.closec:
 		return nil, ErrClosed

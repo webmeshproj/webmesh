@@ -22,6 +22,7 @@ import (
 	_ "embed"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"strings"
@@ -166,7 +167,7 @@ func (o *offlineCampFire) handlePeerConnections() {
 }
 
 // Accept returns a connection to a peer.
-func (o *offlineCampFire) Accept() (datachannel.ReadWriteCloser, error) {
+func (o *offlineCampFire) Accept() (io.ReadWriteCloser, error) {
 	select {
 	case <-o.closec:
 		return nil, ErrClosed

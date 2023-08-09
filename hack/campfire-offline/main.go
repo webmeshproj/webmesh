@@ -41,7 +41,7 @@ func main() {
 	slog.SetDefault(log)
 	ctx := context.Background()
 
-	cf, err := campfire.Wait(ctx, campfire.Options{
+	cf, err := campfire.WaitICE(ctx, campfire.Options{
 		PSK: []byte(*psk),
 	})
 	if err != nil {
