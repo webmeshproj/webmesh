@@ -44,7 +44,7 @@ type webmeshWaitingRoom struct {
 
 func NewWebmeshWaitingRoom(ctx context.Context, campfireServer string, opts Options) (WaitingRoom, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire", "component", "waiting-room", "type", "webmesh")
-	loc, err := Find(opts.PSK, opts.TURNServers)
+	loc, err := Find(opts.PSK, opts.TURNServers, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find campfire: %w", err)
 	}

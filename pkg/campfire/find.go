@@ -20,6 +20,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -53,7 +54,7 @@ func (l *Location) Expired() <-chan struct{} {
 // Find finds a campfire using the given PSK and TURN servers.
 // If turnServers is empty, a default list will be fetched from
 // always-online-stun.
-func Find(psk []byte, turnServers []string) (*Location, error) {
+func Find(psk []byte, turnServers []string, isLocal bool) (*Location, error) {
 	if len(psk) == 0 {
 		return nil, fmt.Errorf("PSK must not be empty")
 	} else if len(psk) != PSKSize {
@@ -63,7 +64,7 @@ func Find(psk []byte, turnServers []string) (*Location, error) {
 		turnServers = GetDefaultTURNServers()
 	}
 	t := Now().UTC().Truncate(time.Hour)
-	secret, err := computeSecret(t, psk)
+	secret, err := computeSecret(t, psk, isLocal)
 	if err != nil {
 		return nil, fmt.Errorf("compute secret: %w", err)
 	}
@@ -79,7 +80,7 @@ func Find(psk []byte, turnServers []string) (*Location, error) {
 	}, nil
 }
 
-func computeSecret(time time.Time, psk []byte) ([]byte, error) {
+func computeSecret(time time.Time, psk []byte, isLocal bool) ([]byte, error) {
 	plaintext := make([]byte, aes.BlockSize+len(psk))
 	timeStr := time.Format("2006-01-02 15:00:00")
 	copy(plaintext, timeStr)
@@ -87,8 +88,29 @@ func computeSecret(time time.Time, psk []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create cipher: %w", err)
 	}
-	aescbc := cipher.NewCBCEncrypter(block, make([]byte, aes.BlockSize))
+	iv := make([]byte, aes.BlockSize)
+	iv[0] = byte(func() byte {
+		if isLocal {
+			return 1
+		}
+		return 0
+	}())
+	aescbc := cipher.NewCBCEncrypter(block, iv)
 	out := make([]byte, len(plaintext))
 	aescbc.CryptBlocks(out, plaintext)
 	return out, nil
+}
+
+func numericSession(inputString string) int {
+	maxDigit := 9
+	numericString := ""
+
+	for i := 0; i < len(inputString); i++ {
+		charCode := int(inputString[i])
+		digit := charCode % (maxDigit + 1) // Ensure digit is between 0 and 9
+		numericString += fmt.Sprintf("%d", digit)
+	}
+
+	result, _ := strconv.Atoi(numericString)
+	return result
 }

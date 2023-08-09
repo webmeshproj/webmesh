@@ -24,6 +24,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
+	"net"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -32,17 +34,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
-
-type offlineCampFire struct {
-	api     *webrtc.API
-	certs   []webrtc.Certificate
-	loc     *Location
-	errc    chan error
-	readyc  chan struct{}
-	acceptc chan datachannel.ReadWriteCloser
-	closec  chan struct{}
-	log     *slog.Logger
-}
 
 var (
 	// CampfireUFrag is the username fragment used by campfire.
@@ -61,44 +52,78 @@ func Wait(ctx context.Context, opts Options) (CampFire, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load certificate: %w", err)
 	}
-	loc, err := Find(opts.PSK, opts.TURNServers)
+	localKey, err := Find(opts.PSK, opts.TURNServers, true)
+	if err != nil {
+		return nil, fmt.Errorf("find campfire: %w", err)
+	}
+	remoteKey, err := Find(opts.PSK, opts.TURNServers, false)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	s.DisableCertificateFingerprintVerification(true)
-	s.SetICECredentials(CampfireUFrag, loc.Secret)
+	data := base64.StdEncoding.EncodeToString([]byte(remoteKey.Secret))
+	ufrag := data[15:19]
+	pwd := data[19:]
+	s.SetICECredentials(ufrag, pwd)
 	cf := offlineCampFire{
-		api:     webrtc.NewAPI(webrtc.WithSettingEngine(s)),
-		certs:   certs,
-		loc:     loc,
-		errc:    make(chan error, 3),
-		readyc:  make(chan struct{}),
-		acceptc: make(chan datachannel.ReadWriteCloser, 1),
-		closec:  make(chan struct{}),
-		log:     context.LoggerFrom(ctx).With("protocol", "campfire"),
+		api:       webrtc.NewAPI(webrtc.WithSettingEngine(s)),
+		certs:     certs,
+		psk:       string(opts.PSK),
+		localKey:  localKey,
+		remoteKey: remoteKey,
+		errc:      make(chan error, 3),
+		readyc:    make(chan struct{}),
+		acceptc:   make(chan datachannel.ReadWriteCloser, 1),
+		closec:    make(chan struct{}),
+		log:       context.LoggerFrom(ctx).With("protocol", "campfire"),
 	}
 	go cf.handlePeerConnections()
 	return &cf, nil
 }
 
+type offlineCampFire struct {
+	api                 *webrtc.API
+	certs               []webrtc.Certificate
+	localKey, remoteKey *Location
+	psk                 string
+	errc                chan error
+	readyc              chan struct{}
+	acceptc             chan datachannel.ReadWriteCloser
+	closec              chan struct{}
+	log                 *slog.Logger
+}
+
 func (o *offlineCampFire) handlePeerConnections() {
 	defer close(o.readyc)
+	host, err := net.ResolveUDPAddr("udp", strings.TrimPrefix(o.localKey.TURNServer, "turn:"))
+	if err != nil {
+		o.errc <- fmt.Errorf("split host port: %w", err)
+		return
+	}
 	var remoteDescription bytes.Buffer
-	err := waiterRemoteTemplate.Execute(&remoteDescription, map[string]string{
-		"Username": CampfireUFrag,
-		"Secret":   o.loc.Secret,
+	data := base64.StdEncoding.EncodeToString([]byte(o.localKey.Secret))
+	sessionID := numericSession(data[0:15])
+	ufrag := data[15:19]
+	pwd := data[19:]
+	turnAddr := host.AddrPort().Addr().String()
+	err = waiterRemoteTemplate.Execute(&remoteDescription, map[string]any{
+		"SessionID":  sessionID,
+		"Username":   ufrag,
+		"Secret":     pwd,
+		"TURNServer": turnAddr,
 	})
 	if err != nil {
 		o.errc <- fmt.Errorf("execute remote template: %w", err)
 		return
 	}
 	pc, err := o.api.NewPeerConnection(webrtc.Configuration{
-		Certificates: o.certs,
+		Certificates:       o.certs,
+		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{o.loc.TURNServer},
+				URLs:       []string{o.localKey.TURNServer},
 				Username:   "-",
 				Credential: "-",
 			},
@@ -108,6 +133,12 @@ func (o *offlineCampFire) handlePeerConnections() {
 		o.errc <- fmt.Errorf("new peer connection: %w", err)
 		return
 	}
+	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c == nil {
+			return
+		}
+		o.log.Debug("ICE candidate", "candidate", c.String())
+	})
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		o.log.Debug("ICE connection state changed", "state", state.String())
 		switch state {
@@ -119,7 +150,7 @@ func (o *offlineCampFire) handlePeerConnections() {
 	})
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
 		o.log.Debug("Data channel opened", "label", dc.Label())
-		if dc.Label() != o.loc.Secret {
+		if dc.Label() != o.psk {
 			o.errc <- fmt.Errorf("unexpected data channel label: %q", dc.Label())
 			return
 		}
@@ -230,7 +261,7 @@ func loadCertificate() ([]webrtc.Certificate, *x509.Certificate, error) {
 }
 
 var waiterRemoteTemplate = template.Must(template.New("srv-remote-desc").Parse(`v=0
-o=- 6920920643910646739 2 IN IP4 127.0.0.1
+o=- {{ .SessionID }} 2 IN IP4 127.0.0.1
 s=-
 t=0 0
 a=group:BUNDLE 0
@@ -243,4 +274,5 @@ a=fingerprint:sha-256 invalidFingerprint
 a=setup:actpass
 a=mid:0
 a=sctp-port:5000
+a=candidate:1 1 UDP 911414143 {{ .TURNServer }} 50000 typ relay 127.0.0.1 50000
 `))

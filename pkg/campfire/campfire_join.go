@@ -19,9 +19,10 @@ package campfire
 import (
 	"bytes"
 	"crypto"
+	"encoding/base64"
 	"fmt"
 	"io"
-	"regexp"
+	"net"
 	"strings"
 	"text/template"
 
@@ -32,11 +33,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
-var (
-	ufragRegex = regexp.MustCompile("^a=ice-ufrag:(.*)$")
-	pwdRegex   = regexp.MustCompile("^a=ice-pwd:(.*)$")
-)
-
 // Join will attempt to join the peer waiting at the given location.
 func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
@@ -44,17 +40,30 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load certificate: %w", err)
 	}
-	loc, err := Find(opts.PSK, opts.TURNServers)
+	localKey, err := Find(opts.PSK, opts.TURNServers, true)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
+	remoteKey, err := Find(opts.PSK, opts.TURNServers, false)
+	if err != nil {
+		return nil, fmt.Errorf("find campfire: %w", err)
+	}
+	turnHost, err := net.ResolveUDPAddr("udp", strings.TrimPrefix(localKey.TURNServer, "turn:"))
+	if err != nil {
+		return nil, fmt.Errorf("resolve turn server: %w", err)
+	}
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
+	data := base64.StdEncoding.EncodeToString([]byte(localKey.Secret))
+	ufrag := data[15:19]
+	pwd := data[19:]
+	s.SetICECredentials(ufrag, pwd)
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
+		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{loc.TURNServer},
+				URLs:       []string{localKey.TURNServer},
 				Username:   "-",
 				Credential: "-",
 			},
@@ -64,13 +73,17 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		return nil, fmt.Errorf("create peer connection: %w", err)
 	}
 	errs := make(chan error, 1)
+	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c == nil {
+			return
+		}
+		log.Debug("ICE candidate", "candidate", c.String())
+	})
 	pc.OnNegotiationNeeded(func() {
 		offer, err := pc.CreateOffer(nil)
 		if err != nil {
 			errs <- fmt.Errorf("create offer: %w", err)
 		}
-		offer.SDP = ufragRegex.ReplaceAllString(offer.SDP, "a=ice-ufrag:"+CampfireUFrag)
-		offer.SDP = pwdRegex.ReplaceAllString(offer.SDP, "a=ice-pwd:"+loc.Secret)
 		err = pc.SetLocalDescription(offer)
 		if err != nil {
 			errs <- fmt.Errorf("set local description: %w", err)
@@ -79,11 +92,17 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		if err != nil {
 			errs <- fmt.Errorf("fingerprint certificate: %w", err)
 		}
+		data = base64.StdEncoding.EncodeToString([]byte(remoteKey.Secret))
+		sessionID := numericSession(data[0:15])
+		ufrag = data[15:19]
+		pwd = data[19:]
 		var answer bytes.Buffer
-		err = joinerRemoteTemplate.Execute(&answer, map[string]string{
-			"Username":    CampfireUFrag,
-			"Secret":      loc.Secret,
+		err = joinerRemoteTemplate.Execute(&answer, map[string]any{
+			"SessionID":   sessionID,
+			"Username":    ufrag,
+			"Secret":      pwd,
 			"Fingerprint": strings.ToUpper(fingerprint),
+			"TURNServer":  turnHost.AddrPort().Addr().String(),
 		})
 		if err != nil {
 			errs <- fmt.Errorf("execute remote template: %w", err)
@@ -103,7 +122,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 			errs <- fmt.Errorf("ice connection failed")
 		}
 	})
-	dc, err := pc.CreateDataChannel(loc.Secret, nil)
+	dc, err := pc.CreateDataChannel(string(opts.PSK), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
@@ -133,7 +152,7 @@ type campfireConn struct {
 }
 
 var joinerRemoteTemplate = template.Must(template.New("cli-remote-desc").Parse(`v=0
-o=- 521628857 1575883112 IN IP4 0.0.0.0
+o=- {{ .SessionID }} 2 IN IP4 0.0.0.0
 s=-
 t=0 0
 a=fingerprint:sha-256 {{ .Fingerprint }}
@@ -147,4 +166,5 @@ a=sendrecv
 a=sctpmap:5000 webrtc-datachannel 1024
 a=ice-ufrag:{{ .Username }}
 a=ice-pwd:{{ .Secret }}
+a=candidate:1 1 UDP 911414143 {{ .TURNServer }} 50000 typ relay 127.0.0.1 50000
 `))
