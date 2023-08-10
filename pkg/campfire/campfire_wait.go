@@ -87,7 +87,6 @@ type offlineCampFire struct {
 }
 
 func (o *offlineCampFire) handlePeerConnections() {
-	defer close(o.readyc)
 	host, err := net.ResolveUDPAddr("udp", strings.TrimPrefix(o.location.TURNServer, "turn:"))
 	if err != nil {
 		o.errc <- fmt.Errorf("split host port: %w", err)

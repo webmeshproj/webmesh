@@ -34,6 +34,8 @@ var Now = time.Now
 
 // Location is the secret and location of a campfire.
 type Location struct {
+	// PSK is the pre-shared key.
+	PSK []byte
 	// LocalSecret is the computed local secret from the PSK.
 	LocalSecret string
 	// RemoteSecret is the computed remote secret from the PSK.
@@ -71,6 +73,7 @@ func Find(psk []byte, turnServers []string) (*Location, error) {
 		turnServer = "turn:" + turnServer
 	}
 	return &Location{
+		PSK:          psk,
 		LocalSecret:  fmt.Sprintf("%x", localsecret),
 		RemoteSecret: fmt.Sprintf("%x", remotesecret),
 		TURNServer:   turnServer,
