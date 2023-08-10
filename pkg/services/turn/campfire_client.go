@@ -80,9 +80,9 @@ func NewCampfireClient(opts CampfireClientOptions) (*CampfireClient, error) {
 	cli := &CampfireClient{
 		opts:       opts,
 		conn:       conn,
-		offers:     make(chan CampfireOffer, 1),
-		answers:    make(chan CampfireAnswer, 1),
-		candidates: make(chan CampfireCandidate, 1),
+		offers:     make(chan CampfireOffer, 10),
+		answers:    make(chan CampfireAnswer, 10),
+		candidates: make(chan CampfireCandidate, 10),
 		errc:       make(chan error, 1),
 		closec:     make(chan struct{}),
 	}

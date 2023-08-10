@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -69,9 +68,6 @@ func Find(psk []byte, turnServers []string) (*Location, error) {
 	}
 	mod := len(turnServers)
 	turnServer := turnServers[localsecret[0]%byte(mod)]
-	if !strings.HasPrefix(turnServer, "turn:") {
-		turnServer = "turn:" + turnServer
-	}
 	return &Location{
 		PSK:          psk,
 		LocalSecret:  fmt.Sprintf("%x", localsecret),

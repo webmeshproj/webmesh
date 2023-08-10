@@ -1,50 +1,86 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"flag"
+	"fmt"
 	"os"
 
 	"github.com/webmeshproj/webmesh/hack/common"
 	"github.com/webmeshproj/webmesh/pkg/campfire"
-	"github.com/webmeshproj/webmesh/pkg/services/turn"
 )
 
 func main() {
 	psk := flag.String("psk", "", "pre-shared key")
-	turnServer := flag.String("turn", "127.0.0.1:3478", "TURN server")
+	turnServer := flag.String("turn-server", "stun:127.0.0.1:3478", "turn server")
 	log := common.ParseFlagsAndSetupLogger()
-
 	if *psk == "" {
-		log.Error("PSK must not be empty")
+		fmt.Fprintln(os.Stderr, "psk is required")
 		os.Exit(1)
 	}
-	if *turnServer == "" {
-		log.Error("TURN server must not be empty")
-		os.Exit(1)
-	}
-	loc, err := campfire.Find([]byte(*psk), []string{*turnServer})
-	if err != nil {
-		log.Error(err.Error())
-		os.Exit(1)
-	}
-	cli, err := turn.NewCampfireClient(turn.CampfireClientOptions{
-		Addr:  loc.TURNServer,
-		Ufrag: loc.LocalUfrag(),
-		Pwd:   loc.LocalPwd(),
+	ctx := context.Background()
+
+	cf, err := campfire.WaitTURN(ctx, campfire.Options{
+		PSK:         []byte(*psk),
+		TURNServers: []string{*turnServer},
 	})
 	if err != nil {
-		log.Error(err.Error())
+		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	defer cli.Close()
+	defer cf.Close()
 
-	err = cli.Announce(loc.RemoteUfrag(), loc.RemotePwd())
-	if err != nil {
-		log.Error(err.Error())
-		os.Exit(1)
+	select {
+	case <-ctx.Done():
+		log.Error("error", "error", ctx.Err().Error())
+		return
+	case err := <-cf.Errors():
+		log.Error("error", "error", err.Error())
+		return
+	case <-cf.Ready():
 	}
 
-	for offer := range cli.Offers() {
-		log.Info("Received offer", "offer", offer)
+	go func() {
+		for err := range cf.Errors() {
+			log.Error("error", "error", err.Error())
+		}
+	}()
+
+	for {
+		log.Info("waiting for connection")
+		conn, err := cf.Accept()
+		if err != nil {
+			log.Error("error", "error", err.Error())
+			return
+		}
+		log.Info("got connection")
+		go func() {
+			defer conn.Close()
+			buf := make([]byte, 1024)
+			for {
+				n, err := conn.Read(buf)
+				if err != nil {
+					log.Error("error", "error", err.Error())
+					return
+				}
+				fmt.Println(string(buf[:n]))
+				fmt.Print(">")
+			}
+		}()
+		in := bufio.NewReader(os.Stdin)
+		for {
+			fmt.Print("> ")
+			line, err := in.ReadBytes('\n')
+			if err != nil {
+				log.Error("error", "error", err.Error())
+				return
+			}
+			_, err = conn.Write(line)
+			if err != nil {
+				log.Error("error", "error", err.Error())
+				return
+			}
+		}
 	}
 }
