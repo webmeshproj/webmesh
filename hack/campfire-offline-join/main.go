@@ -20,7 +20,7 @@ func main() {
 	}
 	ctx := context.Background()
 
-	conn, err := campfire.JoinICE(ctx, campfire.Options{
+	conn, err := campfire.Join(ctx, campfire.Options{
 		PSK: []byte(*psk),
 	})
 	if err != nil {

@@ -27,6 +27,7 @@ import (
 
 	"github.com/pion/datachannel"
 	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
+	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -50,6 +51,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	s.SetICECredentials(location.LocalUfrag(), location.LocalPwd())
+	s.SetIncludeLoopbackCandidate(true)
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
 		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
@@ -75,14 +77,17 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		offer, err := pc.CreateOffer(nil)
 		if err != nil {
 			errs <- fmt.Errorf("create offer: %w", err)
+			return
 		}
 		err = pc.SetLocalDescription(offer)
 		if err != nil {
 			errs <- fmt.Errorf("set local description: %w", err)
+			return
 		}
 		fingerprint, err := fingerprint.Fingerprint(cert, crypto.SHA256)
 		if err != nil {
 			errs <- fmt.Errorf("fingerprint certificate: %w", err)
+			return
 		}
 		var answer bytes.Buffer
 		err = joinerRemoteTemplate.Execute(&answer, map[string]any{
@@ -91,9 +96,11 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 			"Secret":      location.RemotePwd(),
 			"Fingerprint": strings.ToUpper(fingerprint),
 			"TURNServer":  turnHost.AddrPort().Addr().String(),
+			"TURNPort":    turnHost.Port,
 		})
 		if err != nil {
 			errs <- fmt.Errorf("execute remote template: %w", err)
+			return
 		}
 		err = pc.SetRemoteDescription(webrtc.SessionDescription{
 			Type: webrtc.SDPTypeAnswer,
@@ -101,6 +108,23 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		})
 		if err != nil {
 			errs <- fmt.Errorf("set remote description: %w", err)
+			return
+		}
+		turnCandidate, err := ice.NewCandidateRelay(&ice.CandidateRelayConfig{
+			Network: "udp",
+			Address: turnHost.AddrPort().Addr().String(),
+			Port:    turnHost.Port,
+		})
+		if err != nil {
+			errs <- fmt.Errorf("new turn candidate: %w", err)
+			return
+		}
+		err = pc.AddICECandidate(webrtc.ICECandidateInit{
+			Candidate: turnCandidate.Marshal(),
+		})
+		if err != nil {
+			errs <- fmt.Errorf("add turn candidate: %w", err)
+			return
 		}
 	})
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
@@ -110,7 +134,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 			errs <- fmt.Errorf("ice connection failed")
 		}
 	})
-	dc, err := pc.CreateDataChannel(string(opts.PSK), nil)
+	dc, err := pc.CreateDataChannel("webrtc-datachannel", nil)
 	if err != nil {
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
@@ -154,5 +178,5 @@ a=sendrecv
 a=sctpmap:5000 webrtc-datachannel 1024
 a=ice-ufrag:{{ .Username }}
 a=ice-pwd:{{ .Secret }}
-a=candidate:1 1 UDP 1 {{ .TURNServer }} 50000 typ relay 127.0.0.1 50000
+a=candidate:1 1 UDP 99999 {{ .TURNServer }} {{ .TURNPort }} typ relay 127.0.0.1 50000
 `))

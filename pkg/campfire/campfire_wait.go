@@ -30,6 +30,7 @@ import (
 	"text/template"
 
 	"github.com/pion/datachannel"
+	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -57,6 +58,7 @@ func Wait(ctx context.Context, opts Options) (CampFire, error) {
 	s.DetachDataChannels()
 	s.DisableCertificateFingerprintVerification(true)
 	s.SetICECredentials(location.RemoteUfrag(), location.RemotePwd())
+	s.SetIncludeLoopbackCandidate(true)
 	cf := offlineCampFire{
 		api:      webrtc.NewAPI(webrtc.WithSettingEngine(s)),
 		certs:    certs,
@@ -98,6 +100,7 @@ func (o *offlineCampFire) handlePeerConnections() {
 		"Username":   o.location.LocalUfrag(),
 		"Secret":     o.location.LocalPwd(),
 		"TURNServer": turnAddr,
+		"TURNPort":   host.Port,
 	})
 	if err != nil {
 		o.errc <- fmt.Errorf("execute remote template: %w", err)
@@ -152,6 +155,22 @@ func (o *offlineCampFire) handlePeerConnections() {
 	})
 	if err != nil {
 		o.errc <- fmt.Errorf("set remote description: %w", err)
+		return
+	}
+	turnCandidate, err := ice.NewCandidateRelay(&ice.CandidateRelayConfig{
+		Network: "udp",
+		Address: turnAddr,
+		Port:    host.Port,
+	})
+	if err != nil {
+		o.errc <- fmt.Errorf("new turn candidate: %w", err)
+		return
+	}
+	err = pc.AddICECandidate(webrtc.ICECandidateInit{
+		Candidate: turnCandidate.Marshal(),
+	})
+	if err != nil {
+		o.errc <- fmt.Errorf("add turn candidate: %w", err)
 		return
 	}
 	answer, err := pc.CreateAnswer(nil)
@@ -246,7 +265,7 @@ func loadCertificate() ([]webrtc.Certificate, *x509.Certificate, error) {
 }
 
 var waiterRemoteTemplate = template.Must(template.New("srv-remote-desc").Parse(`v=0
-o=- {{ .SessionID }} 2 IN IP4 127.0.0.1
+o=- {{ .SessionID }} 2 IN IP4 0.0.0.0
 s=-
 t=0 0
 a=group:BUNDLE 0
@@ -259,5 +278,5 @@ a=fingerprint:sha-256 invalidFingerprint
 a=setup:actpass
 a=mid:0
 a=sctp-port:5000
-a=candidate:1 1 UDP 1 {{ .TURNServer }} 50000 typ relay 127.0.0.1 50000
+a=candidate:1 1 UDP 99999 {{ .TURNServer }} {{ .TURNPort }} typ relay 127.0.0.1 50000
 `))

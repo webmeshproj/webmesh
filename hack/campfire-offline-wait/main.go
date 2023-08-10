@@ -20,7 +20,7 @@ func main() {
 	}
 	ctx := context.Background()
 
-	cf, err := campfire.WaitICE(ctx, campfire.Options{
+	cf, err := campfire.Wait(ctx, campfire.Options{
 		PSK: []byte(*psk),
 	})
 	if err != nil {
