@@ -88,7 +88,6 @@ builds:
       - '386'
       - ppc64le
       - s390x
-      - riscv64
 
 # upx:
 #   - enabled: true
