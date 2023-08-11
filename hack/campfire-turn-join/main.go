@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -52,7 +53,7 @@ func main() {
 			log.Error("error", "error", err.Error())
 			return
 		}
-		_, err = conn.Write(line)
+		_, err = conn.Write(bytes.TrimSpace(line))
 		if err != nil {
 			log.Error("error", "error", err.Error())
 			return

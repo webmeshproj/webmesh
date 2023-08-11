@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -44,43 +45,42 @@ func main() {
 	go func() {
 		for err := range cf.Errors() {
 			log.Error("error", "error", err.Error())
+			os.Exit(1)
 		}
 	}()
 
+	log.Info("waiting for connection")
+	conn, err := cf.Accept()
+	if err != nil {
+		log.Error("error", "error", err.Error())
+		return
+	}
+	log.Info("got connection")
+	go func() {
+		defer conn.Close()
+		buf := make([]byte, 1024)
+		for {
+			n, err := conn.Read(buf)
+			if err != nil {
+				log.Error("error", "error", err.Error())
+				return
+			}
+			fmt.Println(string(buf[:n]))
+			fmt.Print(">")
+		}
+	}()
+	in := bufio.NewReader(os.Stdin)
 	for {
-		log.Info("waiting for connection")
-		conn, err := cf.Accept()
+		fmt.Print("> ")
+		line, err := in.ReadBytes('\n')
 		if err != nil {
 			log.Error("error", "error", err.Error())
 			return
 		}
-		log.Info("got connection")
-		go func() {
-			defer conn.Close()
-			buf := make([]byte, 1024)
-			for {
-				n, err := conn.Read(buf)
-				if err != nil {
-					log.Error("error", "error", err.Error())
-					return
-				}
-				fmt.Println(string(buf[:n]))
-				fmt.Print(">")
-			}
-		}()
-		in := bufio.NewReader(os.Stdin)
-		for {
-			fmt.Print("> ")
-			line, err := in.ReadBytes('\n')
-			if err != nil {
-				log.Error("error", "error", err.Error())
-				return
-			}
-			_, err = conn.Write(line)
-			if err != nil {
-				log.Error("error", "error", err.Error())
-				return
-			}
+		_, err = conn.Write(bytes.TrimSpace(line))
+		if err != nil {
+			log.Error("error", "error", err.Error())
+			return
 		}
 	}
 }
