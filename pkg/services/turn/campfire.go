@@ -18,7 +18,7 @@ package turn
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/gob"
 	"errors"
 	"log/slog"
 	"net"
@@ -27,6 +27,8 @@ import (
 
 	"github.com/pion/stun"
 )
+
+const campfireMessagePrefix = "CAMPFIRE\n"
 
 type campFireManager struct {
 	net.PacketConn
@@ -264,16 +266,17 @@ type campfireMessage struct {
 }
 
 func (c *campfireMessage) encode() ([]byte, error) {
-	data, err := json.Marshal(c)
+	var buf bytes.Buffer
+	err := gob.NewEncoder(&buf).Encode(c)
 	if err != nil {
 		return nil, err
 	}
-	return append([]byte("CAMPFIRE "), data...), nil
+	return append([]byte(campfireMessagePrefix), buf.Bytes()...), nil
 }
 
 func (c *campfireMessage) decode(p []byte) error {
-	data := bytes.TrimPrefix(p, []byte("CAMPFIRE "))
-	err := json.NewDecoder(bytes.NewReader(data)).Decode(c)
+	data := bytes.TrimPrefix(p, []byte(campfireMessagePrefix))
+	err := gob.NewDecoder(bytes.NewReader(data)).Decode(c)
 	c.expires = time.Now().UTC().Truncate(time.Hour).Add(time.Hour).Unix()
 	return err
 }
@@ -295,5 +298,5 @@ func validateMessage(msg *campfireMessage) error {
 }
 
 func isCampFireMessage(p []byte) bool {
-	return bytes.HasPrefix(p, []byte("CAMPFIRE "))
+	return bytes.HasPrefix(p, []byte(campfireMessagePrefix))
 }
