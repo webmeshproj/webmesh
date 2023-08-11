@@ -76,12 +76,13 @@ func NewManager(ctx context.Context, opts *Options) (Manager, error) {
 		}
 		// Configure the plugin.
 		if cfg.Config == nil {
-			cfg.Config = make(map[string]interface{})
+			cfg.Config = make(map[string]any)
 		}
 		pcfg, err := structpb.NewStruct(cfg.Config)
 		if err != nil {
 			return nil, fmt.Errorf("convert config: %w", err)
 		}
+		log.Debug("configuring plugin", "name", name, "config", cfg.Config, "marshaled", pcfg)
 		_, err = plugin.Configure(ctx, &v1.PluginConfiguration{
 			Config: pcfg,
 		})

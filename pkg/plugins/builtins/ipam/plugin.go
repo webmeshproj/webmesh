@@ -24,6 +24,7 @@ import (
 	"net/netip"
 	"sync"
 
+	"github.com/mitchellh/mapstructure"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -40,9 +41,18 @@ type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedIPAMPluginServer
 
+	config  Config
 	data    storage.Storage
 	datamux sync.Mutex
 	closec  chan struct{}
+}
+
+// Config contains static address assignments for nodes.
+type Config struct {
+	// StaticIPv4 is a map of node names to IPv4 addresses.
+	StaticIPv4 map[string]string `mapstructure:"static-ipv4,omitempty"`
+	// StaticIPv6 is a map of node names to IPv6 addresses.
+	StaticIPv6 map[string]string `mapstructure:"static-ipv6,omitempty"`
 }
 
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {
@@ -59,6 +69,16 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 
 func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*emptypb.Empty, error) {
 	p.closec = make(chan struct{})
+	var config Config
+	conf := req.Config.AsMap()
+	if len(conf) > 0 {
+		err := mapstructure.Decode(conf, &config)
+		if err != nil {
+			return nil, fmt.Errorf("decode config: %w", err)
+		}
+		context.LoggerFrom(ctx).Debug("loaded static assignments map", "config", config)
+	}
+	p.config = config
 	return &emptypb.Empty{}, nil
 }
 
@@ -91,8 +111,18 @@ func (p *Plugin) Allocate(ctx context.Context, r *v1.AllocateIPRequest) (*v1.All
 	}
 	switch r.GetVersion() {
 	case v1.AllocateIPRequest_IP_VERSION_4:
+		if addr, ok := p.config.StaticIPv4[r.GetNodeId()]; ok {
+			return &v1.AllocatedIP{
+				Ip: addr,
+			}, nil
+		}
 		return p.allocateV4(ctx, r)
 	case v1.AllocateIPRequest_IP_VERSION_6:
+		if addr, ok := p.config.StaticIPv6[r.GetNodeId()]; ok {
+			return &v1.AllocatedIP{
+				Ip: addr,
+			}, nil
+		}
 		return p.allocateV6(ctx, r)
 	default:
 		return nil, fmt.Errorf("unsupported IP version: %v", r.GetVersion())
@@ -129,13 +159,33 @@ func (p *Plugin) allocateV6(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	if err != nil {
 		return nil, fmt.Errorf("parse subnet: %w", err)
 	}
-	prefix, err := util.Random64(globalPrefix)
+	nodes, err := peers.New(p.data).List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("random IPv6: %w", err)
+		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	return &v1.AllocatedIP{
-		Ip: prefix.String(),
-	}, nil
+	allocated := make(map[netip.Prefix]struct{}, len(nodes))
+	for _, node := range nodes {
+		n := node
+		if n.PrivateIPv6.IsValid() {
+			allocated[n.PrivateIPv6] = struct{}{}
+		}
+	}
+	var tries int
+	maxTries := 100
+	for tries < maxTries {
+		prefix, err := util.Random64(globalPrefix)
+		if err != nil {
+			return nil, fmt.Errorf("random IPv6: %w", err)
+		}
+		if _, ok := allocated[prefix]; !ok {
+			return &v1.AllocatedIP{
+				Ip: prefix.String(),
+			}, nil
+		}
+		// Collision, try again
+		tries++
+	}
+	return nil, fmt.Errorf("failed to find available IPv6 after %d tries", maxTries)
 }
 
 // TODO: Release is not implemented server-side yet either.

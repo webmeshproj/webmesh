@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -70,6 +71,56 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	}
 
 	// Built-in plugins
+
+	fs.Func(p+"plugins.ipam.static-ipv4", `Adds the given static IPv4 address(es) to the IPAM plugin.
+In the format of <node_id>=<cidr_prefix>`, func(s string) error {
+		if o.Plugins["ipam"] == nil {
+			o.Plugins["ipam"] = &Config{
+				Config: map[string]any{
+					"static-ipv4": map[string]any{},
+					"static-ipv6": map[string]any{},
+				},
+			}
+		}
+		parts := strings.Split(s, ",")
+		for _, part := range parts {
+			fields := strings.Split(part, "=")
+			if len(fields) != 2 {
+				return fmt.Errorf("invalid static-ipv4 value: %s", s)
+			}
+			_, err := netip.ParsePrefix(fields[1])
+			if err != nil {
+				return fmt.Errorf("invalid static-ipv4 value: %s", s)
+			}
+			o.Plugins["ipam"].Config["static-ipv4"].(map[string]any)[fields[0]] = fields[1]
+		}
+		return nil
+	})
+
+	fs.Func(p+"plugins.ipam.static-ipv6", `Adds the given static IPv6 address(es) to the IPAM plugin
+In the format of <node-_id>=<cidr_prefix>`, func(s string) error {
+		if o.Plugins["ipam"] == nil {
+			o.Plugins["ipam"] = &Config{
+				Config: map[string]any{
+					"static-ipv4": map[string]any{},
+					"static-ipv6": map[string]any{},
+				},
+			}
+		}
+		parts := strings.Split(s, ",")
+		for _, part := range parts {
+			fields := strings.Split(part, "=")
+			if len(fields) != 2 {
+				return fmt.Errorf("invalid static-ipv6 value: %s", s)
+			}
+			_, err := netip.ParsePrefix(fields[1])
+			if err != nil {
+				return fmt.Errorf("invalid static-ipv6 value: %s", s)
+			}
+			o.Plugins["ipam"].Config["static-ipv6"].(map[string]any)[fields[0]] = fields[1]
+		}
+		return nil
+	})
 
 	fs.Func(p+"plugins.mtls.ca-file", "Enables the mTLS plugin with the path to a CA for verifying certificates", func(s string) error {
 		o.Plugins["mtls"] = &Config{
