@@ -41,7 +41,7 @@ func main() {
 				log.Error("error", "error", err.Error())
 				return
 			}
-			fmt.Println(string(buf[:n]))
+			fmt.Println("remote:", string(buf[:n]))
 			fmt.Print("> ")
 		}
 	}()

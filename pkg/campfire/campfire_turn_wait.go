@@ -38,6 +38,7 @@ func WaitTURN(ctx context.Context, opts Options) (CampFire, error) {
 		Addr:  location.TURNServer,
 		Ufrag: location.LocalUfrag(),
 		Pwd:   location.LocalPwd(),
+		PSK:   opts.PSK,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new campfire client: %w", err)

@@ -17,7 +17,13 @@ limitations under the License.
 package turn
 
 import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
@@ -29,19 +35,28 @@ import (
 // supporting campfire.
 type CampfireClient struct {
 	opts       CampfireClientOptions
+	crypter    cipher.BlockMode
+	decrypter  cipher.BlockMode
 	conn       *net.UDPConn
 	offers     chan CampfireOffer
 	answers    chan CampfireAnswer
 	candidates chan CampfireCandidate
 	errc       chan error
 	closec     chan struct{}
+	log        *slog.Logger
 }
 
 // CampfireClientOptions represents options for a CampfireClient.
 type CampfireClientOptions struct {
-	Addr  string
+	// Addr is the address of the STUN/TURN server.
+	Addr string
+	// Ufrag is the username fragment to use when communicating with the server.
 	Ufrag string
-	Pwd   string
+	// Pwd is the password to use when communicating with the server.
+	Pwd string
+	// PSK is the pre-shared key used for encrypting/decrypting the data in sent/received
+	// messages.
+	PSK []byte
 }
 
 // CampfireOffer represents an offer that was received from a peer.
@@ -69,6 +84,10 @@ type CampfireCandidate struct {
 func NewCampfireClient(opts CampfireClientOptions) (*CampfireClient, error) {
 	addr := strings.TrimPrefix(opts.Addr, "turn:")
 	addr = strings.TrimPrefix(addr, "stun:")
+	block, err := aes.NewCipher(opts.PSK)
+	if err != nil {
+		return nil, err
+	}
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
 		return nil, err
@@ -79,12 +98,15 @@ func NewCampfireClient(opts CampfireClientOptions) (*CampfireClient, error) {
 	}
 	cli := &CampfireClient{
 		opts:       opts,
+		crypter:    cipher.NewCBCEncrypter(block, opts.PSK[:aes.BlockSize]),
+		decrypter:  cipher.NewCBCDecrypter(block, opts.PSK[:aes.BlockSize]),
 		conn:       conn,
 		offers:     make(chan CampfireOffer, 10),
 		answers:    make(chan CampfireAnswer, 10),
 		candidates: make(chan CampfireCandidate, 10),
 		errc:       make(chan error, 1),
 		closec:     make(chan struct{}),
+		log:        slog.Default().With("component", "campfire-client"),
 	}
 	go cli.handleIncoming()
 	return cli, nil
@@ -147,7 +169,7 @@ func (c *CampfireClient) SendOffer(ufrag, pwd string, offer webrtc.SessionDescri
 		RUfrag: ufrag,
 		RPwd:   pwd,
 		Type:   campfireMessageOffer,
-		Data:   string(sdp),
+		Data:   c.encryptData(sdp),
 	}
 	data, err := msg.encode()
 	if err != nil {
@@ -172,7 +194,7 @@ func (c *CampfireClient) SendAnswer(ufrag, pwd string, answer webrtc.SessionDesc
 		RUfrag: ufrag,
 		RPwd:   pwd,
 		Type:   campfireMessageAnswer,
-		Data:   string(sdp),
+		Data:   c.encryptData(sdp),
 	}
 	data, err := msg.encode()
 	if err != nil {
@@ -200,7 +222,7 @@ func (c *CampfireClient) SendCandidate(ufrag, pwd string, candidate *webrtc.ICEC
 		RUfrag: ufrag,
 		RPwd:   pwd,
 		Type:   campfireMessageICE,
-		Data:   string(cand),
+		Data:   c.encryptData(cand),
 	}
 	data, err := msg.encode()
 	if err != nil {
@@ -242,10 +264,15 @@ func (c *CampfireClient) handleIncoming() {
 		}
 		switch msg.Type {
 		case campfireMessageOffer:
-			var offer webrtc.SessionDescription
-			err = json.Unmarshal([]byte(msg.Data), &offer)
+			data, err := c.decryptData(msg.Data)
 			if err != nil {
-				c.errc <- err
+				c.log.Warn("failed to decrypt offer", "err", err)
+				continue
+			}
+			var offer webrtc.SessionDescription
+			err = json.Unmarshal(data, &offer)
+			if err != nil {
+				c.errc <- fmt.Errorf("failed to unmarshal offer: %w", err)
 				return
 			}
 			c.offers <- CampfireOffer{
@@ -254,10 +281,15 @@ func (c *CampfireClient) handleIncoming() {
 				SDP:   offer,
 			}
 		case campfireMessageAnswer:
-			var answer webrtc.SessionDescription
-			err = json.Unmarshal([]byte(msg.Data), &answer)
+			data, err := c.decryptData(msg.Data)
 			if err != nil {
-				c.errc <- err
+				c.log.Warn("failed to decrypt answer", "err", err)
+				continue
+			}
+			var answer webrtc.SessionDescription
+			err = json.Unmarshal(data, &answer)
+			if err != nil {
+				c.errc <- fmt.Errorf("failed to unmarshal answer: %w", err)
 				return
 			}
 			c.answers <- CampfireAnswer{
@@ -266,10 +298,15 @@ func (c *CampfireClient) handleIncoming() {
 				SDP:   answer,
 			}
 		case campfireMessageICE:
-			var candidate webrtc.ICECandidateInit
-			err = json.Unmarshal([]byte(msg.Data), &candidate)
+			data, err := c.decryptData(msg.Data)
 			if err != nil {
-				c.errc <- err
+				c.log.Warn("failed to decrypt candidate", "err", err)
+				continue
+			}
+			var candidate webrtc.ICECandidateInit
+			err = json.Unmarshal(data, &candidate)
+			if err != nil {
+				c.errc <- fmt.Errorf("failed to unmarshal candidate: %w", err)
 				return
 			}
 			c.candidates <- CampfireCandidate{
@@ -279,4 +316,27 @@ func (c *CampfireClient) handleIncoming() {
 			}
 		}
 	}
+}
+
+func (c *CampfireClient) encryptData(data []byte) []byte {
+	// Pad data to block size
+	bs := c.crypter.BlockSize()
+	if len(data)%bs != 0 {
+		pad := bs - (len(data) % bs)
+		data = append(data, bytes.Repeat([]byte{0}, pad)...)
+	}
+	out := make([]byte, len(data))
+	c.crypter.CryptBlocks(out, data)
+	return out
+}
+
+func (c *CampfireClient) decryptData(data []byte) ([]byte, error) {
+	bs := c.decrypter.BlockSize()
+	if len(data)%bs != 0 {
+		return nil, errors.New("invalid data length")
+	}
+	plaintext := make([]byte, len(data))
+	c.decrypter.CryptBlocks(plaintext, data)
+	plaintext = bytes.TrimRight(plaintext, "\x00")
+	return plaintext, nil
 }

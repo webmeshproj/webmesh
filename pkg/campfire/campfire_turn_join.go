@@ -37,6 +37,7 @@ func JoinTURN(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		Addr:  location.TURNServer,
 		Ufrag: location.RemoteUfrag(),
 		Pwd:   location.RemotePwd(),
+		PSK:   opts.PSK,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new campfire client: %w", err)

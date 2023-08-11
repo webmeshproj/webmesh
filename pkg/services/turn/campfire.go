@@ -258,7 +258,7 @@ type campfireMessage struct {
 	RUfrag string
 	RPwd   string
 	Type   messageType
-	Data   string
+	Data   []byte
 
 	expires int64
 }
