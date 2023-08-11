@@ -42,7 +42,7 @@ func main() {
 				return
 			}
 			fmt.Println(string(buf[:n]))
-			fmt.Print(">")
+			fmt.Print("> ")
 		}
 	}()
 	in := bufio.NewReader(os.Stdin)
