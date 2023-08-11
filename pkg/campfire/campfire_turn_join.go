@@ -142,6 +142,8 @@ func JoinTURN(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
+	case err := <-fireconn.Errors():
+		return nil, err
 	case err := <-errs:
 		return nil, err
 	case rw := <-acceptc:

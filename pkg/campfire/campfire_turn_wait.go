@@ -78,6 +78,9 @@ func (t *turnWait) handleIncomingOffers() {
 		select {
 		case <-t.closec:
 			return
+		case err := <-t.fireconn.Errors():
+			t.errc <- fmt.Errorf("campfire client: %w", err)
+			return
 		case offer := <-offers:
 			if offer.Ufrag != t.location.RemoteUfrag() || offer.Pwd != t.location.RemotePwd() {
 				t.log.Warn("received offer with unexpected ufrag/pwd", "ufrag", offer.Ufrag, "pwd", offer.Pwd)

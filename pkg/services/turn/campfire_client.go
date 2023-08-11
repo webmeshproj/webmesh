@@ -130,6 +130,11 @@ func (c *CampfireClient) Candidates() <-chan CampfireCandidate {
 	return c.candidates
 }
 
+// Errors returns a channel of errors.
+func (c *CampfireClient) Errors() <-chan error {
+	return c.errc
+}
+
 // SendOffer sends an offer to the peer with the given ufrag and pwd.
 func (c *CampfireClient) SendOffer(ufrag, pwd string, offer webrtc.SessionDescription) error {
 	sdp, err := json.Marshal(offer)
