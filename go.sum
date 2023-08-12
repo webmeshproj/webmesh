@@ -521,10 +521,6 @@ github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYp
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1YX8=
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
-github.com/webmeshproj/api v0.2.2-0.20230807180518-13dc50ba34c9 h1:uHjWHa9dVhRdIFP5VbSNlCmIEpNb0Yh7vMcOJfDK+VQ=
-github.com/webmeshproj/api v0.2.2-0.20230807180518-13dc50ba34c9/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
-github.com/webmeshproj/api v0.2.2-0.20230812174155-928346dbd506 h1:+Uyfh9HVmGvgyQDakd7syM8GK9BPvqRuUlZl6loFIdc=
-github.com/webmeshproj/api v0.2.2-0.20230812174155-928346dbd506/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.2.2-0.20230812194529-cfe40c7550ee h1:z48rqCiZumzOIrdDM69yKFx+3SLgl+uFbVVFj/WhKBQ=
 github.com/webmeshproj/api v0.2.2-0.20230812194529-cfe40c7550ee/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944 h1:Pau7Sfvy35ulRodLsBUwdnAckYvgoNZb9wPk7ubRlZ8=

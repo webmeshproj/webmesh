@@ -29,8 +29,9 @@ BUILD_ARGS ?= --snapshot --clean
 build: fmt vet ## Build node and wmctl binary for the local platform.
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl
 
+PARALLEL := $(shell nproc)
 dist: fmt vet ## Build distribution binaries and packages for all platforms.
-	$(GORELEASER) release --skip-sign $(BUILD_ARGS)
+	$(GORELEASER) release --skip-sign $(BUILD_ARGS) --parallelism=$(PARALLEL)
 
 DOCKER ?= docker
 
@@ -51,7 +52,7 @@ docker-build-distroless: docker-build-bin ## Build the distroless node docker im
 		-t $(DISTROLESS_IMAGE) .
 
 docker-build-bin:
-	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux
+	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux --parallelism=$(PARALLEL)
 
 docker-push: docker-build ## Push the node docker image
 	$(DOCKER) push $(IMAGE)

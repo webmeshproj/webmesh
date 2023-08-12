@@ -27,7 +27,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -92,32 +91,16 @@ func Execute() error {
 		flagset.Usage()
 		return err
 	}
-	log = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: func() slog.Level {
-			switch strings.ToLower(opts.Global.LogLevel) {
-			case "debug":
-				return slog.LevelDebug
-			case "info":
-				return slog.LevelInfo
-			case "warn":
-				return slog.LevelWarn
-			case "error":
-				return slog.LevelError
-			default:
-				return slog.LevelInfo
-			}
-		}(),
-	}))
-	slog.SetDefault(log)
+	log := util.SetupLogging(opts.Global.LogLevel)
 
-	log.Info("starting webmesh node",
+	log.Info("Starting webmesh node",
 		slog.String("version", version.Version),
 		slog.String("commit", version.Commit),
 		slog.String("buildDate", version.BuildDate),
 	)
 
 	// Log all options at debug level
-	log.Debug("current configuration", slog.Any("options", opts))
+	log.Debug("Current configuration", slog.Any("options", opts))
 
 	ctx := context.Background()
 	if *startTimeout > 0 {
@@ -156,7 +139,7 @@ func executeSingleMesh(ctx context.Context) error {
 		}
 		return fmt.Errorf("failed to start mesh node: %w", cause)
 	}
-	log.Info("mesh connection is ready, starting services")
+	log.Info("Mesh connection is ready, starting services")
 
 	// Start the mesh services
 	srv, err := services.NewServer(st, opts.Services)
@@ -178,14 +161,14 @@ func executeSingleMesh(ctx context.Context) error {
 
 	// Shutdown the mesh connection last
 	defer func() {
-		log.Info("shutting down mesh connection")
+		log.Info("Shutting down mesh connection")
 		if err = st.Close(); err != nil {
 			log.Error("failed to shutdown mesh connection", slog.String("error", err.Error()))
 		}
 	}()
 
 	// Stop the gRPC server
-	log.Info("shutting down gRPC server")
+	log.Info("Shutting down gRPC server")
 	srv.Stop()
 	return nil
 }

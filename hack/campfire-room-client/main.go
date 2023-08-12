@@ -8,13 +8,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/hack/common"
 	"github.com/webmeshproj/webmesh/pkg/services/campfire"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:4095", "address to connect to")
-	common.ParseFlagsAndSetupLogger()
+	logLevel := flag.String("log-level", "info", "log level")
+	flag.Parse()
+	util.SetupLogging(*logLevel)
 	cf, err := campfire.NewClient(*addr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err.Error())

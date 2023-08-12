@@ -157,11 +157,11 @@ func (s *Server) ListenAndServe() error {
 		var err error
 		s.log.Info(fmt.Sprintf("Starting TURN server on %s:%d", s.opts.TURN.ListenAddress, s.opts.TURN.ListenPort))
 		s.turn, err = turn.NewServer(&turn.Options{
-			PublicIP:         s.opts.TURN.PublicIP,
-			ListenAddressUDP: s.opts.TURN.ListenAddress,
-			ListenPortUDP:    s.opts.TURN.ListenPort,
-			Realm:            s.opts.TURN.ServerRealm,
-			PortRange:        s.opts.TURN.STUNPortRange,
+			PublicIP:        s.opts.TURN.PublicIP,
+			RelayAddressUDP: s.opts.TURN.ListenAddress,
+			ListenUDP:       fmt.Sprintf(":%d", s.opts.TURN.ListenPort),
+			Realm:           s.opts.TURN.ServerRealm,
+			PortRange:       s.opts.TURN.STUNPortRange,
 		})
 		if err != nil {
 			s.mu.Unlock()

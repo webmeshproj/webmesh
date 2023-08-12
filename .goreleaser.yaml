@@ -7,7 +7,7 @@ before:
 
 builds:
   - id: node
-    main: cmd/node/main.go
+    main: cmd/webmesh-node/main.go
     binary: webmesh-node
     env:
       - CGO_ENABLED=0
@@ -66,8 +66,38 @@ builds:
       - mips
       - riscv64
 
+  - id: turn
+    main: cmd/webmesh-turn/main.go
+    binary: webmesh-turn
+    env:
+      - CGO_ENABLED=0
+    tags:
+      - osusergo
+      - netgo
+    ldflags:
+      - -s -w 
+      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - '386'
+      - ppc64le
+      - s390x
+      - mips64le
+      - mips64
+      - mipsle
+      - mips
+      - riscv64
+
   - id: node-docker-linux
-    main: cmd/node/main.go
+    main: cmd/webmesh-node/main.go
     binary: webmesh-node
     env:
       - CGO_ENABLED=0
@@ -89,37 +119,6 @@ builds:
       - ppc64le
       - s390x
 
-# upx:
-#   - enabled: true
-#     compress: best
-#     lzma: true
-#     goos: 
-#       - linux
-#     goarch:
-#       - amd64
-#       - arm64
-#       - arm
-#       - '386'
-#       - ppc64le
-#       - mips
-#       - mipsle
-#     ids:
-#       - node
-#       - wmctl
-#       - node-docker-linux
-
-#   - enabled: true
-#     compress: best
-#     lzma: true
-#     goos: 
-#       - windows
-#     goarch:
-#       - amd64
-#       - '386'
-#     ids:
-#       - node
-#       - wmctl
-
 checksum:
   name_template: 'checksums.txt'
 
@@ -132,6 +131,7 @@ archives:
     builds:
       - node
       - wmctl
+      - turn
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -152,6 +152,7 @@ nfpms:
     builds:
       - node
       - wmctl
+      - turn
     formats:
       - deb
       - rpm
@@ -185,6 +186,14 @@ brews:
       name: Avi Zimmerman
       email: avi.zimmerman@gmail.com
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    install: |
+      bin.install "webmesh-node"
+      bin.install "wmctl"
+      bin.install "webmesh-turn"
+      system "#{bin}/wmctl completion bash > #{bash_completion}/wmctl"
+      system "#{bin}/wmctl completion zsh > #{zsh_completion}/_wmctl"
+      system "#{bin}/wmctl completion fish > #{fish_completion}/wmctl.fish"
+      bash_completion.install "#{bash_completion}/wmctl" => "wmctl"
     test: |
       system "#{bin}/webmesh-node --version"
       system "#{bin}/wmctl --version"

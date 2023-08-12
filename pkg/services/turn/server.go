@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"strconv"
 
 	"github.com/pion/turn/v2"
 
@@ -30,14 +29,13 @@ import (
 
 // Options contains the options for the TURN server.
 type Options struct {
-	// PublicIP is the public IP address of the TURN server.
+	// PublicIP is the public IP address of the TURN server. This is used for relaying.
 	PublicIP string
-	// ListenAddressUDP is the address the TURN server uses for request
-	// handling and STUN relays.
+	// RelayAddressUDP is the binding address the TURN server uses for request handling and STUN relays.
 	// Defaults to 0.0.0.0.
-	ListenAddressUDP string
-	// ListenPortUDP is the port the TURN server listens on for UDP requests.
-	ListenPortUDP int
+	RelayAddressUDP string
+	// ListenUDP is the address the TURN server listens on for UDP requests.
+	ListenUDP string
 	// Realm is the realm used for authentication.
 	Realm string
 	// PortRange is the range of ports the TURN server will use for relaying.
@@ -57,19 +55,18 @@ func NewServer(o *Options) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse port range: %w", err)
 	}
-	if o.ListenPortUDP == 0 {
+	if o.ListenUDP == "" {
 		return nil, fmt.Errorf("listen port UDP must be set")
 	}
-	if o.ListenAddressUDP == "" {
-		o.ListenAddressUDP = "0.0.0.0"
+	if o.RelayAddressUDP == "" {
+		o.RelayAddressUDP = "0.0.0.0"
 	}
-	udpListenAddr := net.JoinHostPort(o.ListenAddressUDP, strconv.Itoa(o.ListenPortUDP))
-	udpConn, err := net.ListenPacket("udp4", udpListenAddr)
+	udpConn, err := net.ListenPacket("udp4", o.ListenUDP)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on UDP: %w", err)
 	}
 	log := slog.Default().With("component", "turn-server")
-	log.Info("Listening for STUN requests", slog.String("listen-addr", udpListenAddr))
+	log.Info("Listening for STUN requests", slog.String("listen-addr", o.ListenUDP))
 	var pktConn net.PacketConn
 	pktConn = &stunLogger{
 		PacketConn: udpConn,
@@ -94,7 +91,7 @@ func NewServer(o *Options) (*Server, error) {
 				PacketConn: pktConn,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorPortRange{
 					RelayAddress: net.ParseIP(o.PublicIP),
-					Address:      o.ListenAddressUDP,
+					Address:      o.RelayAddressUDP,
 					MinPort:      uint16(startPort),
 					MaxPort:      uint16(endPort),
 				},

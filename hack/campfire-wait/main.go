@@ -8,14 +8,16 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/webmeshproj/webmesh/hack/common"
 	"github.com/webmeshproj/webmesh/pkg/campfire"
+	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 func main() {
 	psk := flag.String("psk", "", "pre-shared key")
 	turnServer := flag.String("turn-server", "stun:127.0.0.1:3478", "turn server")
-	log := common.ParseFlagsAndSetupLogger()
+	logLevel := flag.String("log-level", "info", "log level")
+	flag.Parse()
+	log := util.SetupLogging(*logLevel)
 	if *psk == "" {
 		fmt.Fprintln(os.Stderr, "psk is required")
 		os.Exit(1)
@@ -43,13 +45,13 @@ func main() {
 		}
 	}()
 
-	log.Info("waiting for connection")
+	log.Info(">>> Waiting for connections")
 	conn, err := cf.Accept()
 	if err != nil {
 		log.Error("error", "error", err.Error())
 		return
 	}
-	log.Info("got connection")
+	log.Info(">>> New peer connection")
 	go func() {
 		defer conn.Close()
 		buf := make([]byte, 1024)
