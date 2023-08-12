@@ -85,7 +85,6 @@ func JoinTURN(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("send offer: %w", err)
 	}
-	log.Debug("negotiation needed")
 	connectedc := make(chan struct{})
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
@@ -96,7 +95,7 @@ func JoinTURN(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 			return
 		default:
 		}
-		log.Debug("sending ICE candidate", "candidate", c.String())
+		log.Debug("sending local ICE candidate", "candidate", c.String())
 		err = fireconn.SendCandidate(location.LocalUfrag(), location.LocalPwd(), c)
 		if err != nil {
 			errs <- fmt.Errorf("send ice candidate: %w", err)
@@ -131,7 +130,7 @@ func JoinTURN(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 			case <-connectedc:
 				return
 			case cand := <-fireconn.Candidates():
-				log.Debug("received ICE candidate", "candidate", cand.Cand)
+				log.Debug("received remote ICE candidate", "candidate", cand.Cand)
 				err = pc.AddICECandidate(cand.Cand)
 				if err != nil {
 					errs <- fmt.Errorf("add ice candidate: %w", err)

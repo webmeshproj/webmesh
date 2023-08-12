@@ -56,7 +56,7 @@ func WaitTURN(ctx context.Context, opts Options) (CampFire, error) {
 		fireconn: fireconn,
 		acceptc:  make(chan io.ReadWriteCloser, 1),
 		closec:   make(chan struct{}),
-		errc:     make(chan error, 1),
+		errc:     make(chan error, 10),
 		log:      log,
 	}
 	go tw.handleIncomingOffers()
@@ -110,13 +110,12 @@ func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 		if c == nil {
 			return
 		}
-		t.log.Debug("sending ice candidate", "candidate", c)
+		t.log.Debug("sending local ice candidate", "candidate", c)
 		err := t.fireconn.SendCandidate(t.location.RemoteUfrag(), t.location.RemotePwd(), c)
 		if err != nil {
 			t.log.Warn("failed to send ice candidate", "err", err)
 		}
 	})
-	candidatec := t.fireconn.Candidates()
 	connectedc := make(chan struct{})
 	go func() {
 		for {
@@ -125,9 +124,13 @@ func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 				return
 			case <-connectedc:
 				return
-			case candidate := <-candidatec:
-				t.log.Debug("received ice candidate", "candidate", candidate)
+			case candidate := <-t.fireconn.Candidates():
+				t.log.Debug("received remote ice candidate", "candidate", candidate)
 				err = pc.AddICECandidate(candidate.Cand)
+				if err != nil {
+					t.errc <- fmt.Errorf("add ice candidate: %w", err)
+					return
+				}
 			}
 		}
 	}()
@@ -194,6 +197,7 @@ func (t *turnWait) Close() error {
 func (t *turnWait) Errors() <-chan error { return t.errc }
 
 // Ready returns a channel that is closed when the camp fire is ready.
+// In this implementation, the camp fire is ready immediately.
 func (t *turnWait) Ready() <-chan struct{} {
 	ch := make(chan struct{})
 	close(ch)
