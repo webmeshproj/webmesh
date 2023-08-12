@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/pion/webrtc/v3"
+	v1 "github.com/webmeshproj/api/v1"
 )
 
 // CampfireClient represents a client that can communicate with a TURN server
@@ -119,14 +120,13 @@ func (c *CampfireClient) Close() error {
 
 // Announce announces interest in offers containing the given ufrag and pwd.
 func (c *CampfireClient) Announce(ufrag, pwd string) error {
-	msg := CampfireMessage{
-		LUfrag: c.opts.Ufrag,
-		LPwd:   c.opts.Pwd,
-		RUfrag: ufrag,
-		RPwd:   pwd,
-		Type:   CampfireMessageAnnounce,
-	}
-	data, err := msg.Encode()
+	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
+		Lufrag: c.opts.Ufrag,
+		Lpwd:   c.opts.Pwd,
+		Rufrag: ufrag,
+		Rpwd:   pwd,
+		Type:   v1.CampfireMessage_ANNOUNCE,
+	})
 	if err != nil {
 		return err
 	}
@@ -163,15 +163,14 @@ func (c *CampfireClient) SendOffer(ufrag, pwd string, offer webrtc.SessionDescri
 	if err != nil {
 		return err
 	}
-	msg := CampfireMessage{
-		LUfrag: c.opts.Ufrag,
-		LPwd:   c.opts.Pwd,
-		RUfrag: ufrag,
-		RPwd:   pwd,
-		Type:   CampfireMessageOffer,
+	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
+		Lufrag: c.opts.Ufrag,
+		Lpwd:   c.opts.Pwd,
+		Rufrag: ufrag,
+		Rpwd:   pwd,
+		Type:   v1.CampfireMessage_OFFER,
 		Data:   c.encryptData(sdp),
-	}
-	data, err := msg.Encode()
+	})
 	if err != nil {
 		return err
 	}
@@ -188,15 +187,14 @@ func (c *CampfireClient) SendAnswer(ufrag, pwd string, answer webrtc.SessionDesc
 	if err != nil {
 		return err
 	}
-	msg := CampfireMessage{
-		LUfrag: c.opts.Ufrag,
-		LPwd:   c.opts.Pwd,
-		RUfrag: ufrag,
-		RPwd:   pwd,
-		Type:   CampfireMessageAnswer,
+	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
+		Lufrag: c.opts.Ufrag,
+		Lpwd:   c.opts.Pwd,
+		Rufrag: ufrag,
+		Rpwd:   pwd,
+		Type:   v1.CampfireMessage_ANSWER,
 		Data:   c.encryptData(sdp),
-	}
-	data, err := msg.Encode()
+	})
 	if err != nil {
 		return err
 	}
@@ -216,15 +214,14 @@ func (c *CampfireClient) SendCandidate(ufrag, pwd string, candidate *webrtc.ICEC
 	if err != nil {
 		return err
 	}
-	msg := CampfireMessage{
-		LUfrag: c.opts.Ufrag,
-		LPwd:   c.opts.Pwd,
-		RUfrag: ufrag,
-		RPwd:   pwd,
-		Type:   CampfireMessageICE,
+	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
+		Lufrag: c.opts.Ufrag,
+		Lpwd:   c.opts.Pwd,
+		Rufrag: ufrag,
+		Rpwd:   pwd,
+		Type:   v1.CampfireMessage_CANDIDATE,
 		Data:   c.encryptData(cand),
-	}
-	data, err := msg.Encode()
+	})
 	if err != nil {
 		return err
 	}
@@ -258,14 +255,13 @@ func (c *CampfireClient) handleIncoming() {
 			c.errc <- err
 			return
 		}
-		var msg CampfireMessage
-		err = msg.Decode(data[:n])
+		msg, err := DecodeCampfireMessage(data[:n])
 		if err != nil {
 			c.errc <- err
 			return
 		}
 		switch msg.Type {
-		case CampfireMessageOffer:
+		case v1.CampfireMessage_OFFER:
 			data, err := c.decryptData(msg.Data)
 			if err != nil {
 				c.log.Warn("failed to decrypt offer", "err", err)
@@ -278,11 +274,11 @@ func (c *CampfireClient) handleIncoming() {
 				return
 			}
 			c.offers <- CampfireOffer{
-				Ufrag: msg.LUfrag,
-				Pwd:   msg.LPwd,
+				Ufrag: msg.Lufrag,
+				Pwd:   msg.Lpwd,
 				SDP:   offer,
 			}
-		case CampfireMessageAnswer:
+		case v1.CampfireMessage_ANSWER:
 			data, err := c.decryptData(msg.Data)
 			if err != nil {
 				c.log.Warn("failed to decrypt answer", "err", err)
@@ -295,11 +291,11 @@ func (c *CampfireClient) handleIncoming() {
 				return
 			}
 			c.answers <- CampfireAnswer{
-				Ufrag: msg.LUfrag,
-				Pwd:   msg.LPwd,
+				Ufrag: msg.Lufrag,
+				Pwd:   msg.Lpwd,
 				SDP:   answer,
 			}
-		case CampfireMessageICE:
+		case v1.CampfireMessage_CANDIDATE:
 			data, err := c.decryptData(msg.Data)
 			if err != nil {
 				c.log.Warn("failed to decrypt candidate", "err", err)
@@ -312,8 +308,8 @@ func (c *CampfireClient) handleIncoming() {
 				return
 			}
 			c.candidates <- CampfireCandidate{
-				Ufrag: msg.LUfrag,
-				Pwd:   msg.LPwd,
+				Ufrag: msg.Lufrag,
+				Pwd:   msg.Lpwd,
 				Cand:  candidate,
 			}
 		}
