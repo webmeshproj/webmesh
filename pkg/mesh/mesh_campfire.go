@@ -89,7 +89,7 @@ func (s *meshStore) handleIncomingCampfireConn(log *slog.Logger, conn io.ReadWri
 	// In this context we are a proxy for the connection. No authentication is handled
 	// on the campfire protocol yet, but we will add the leaderproxy metadata to the
 	// request so that the leader can authenticate the request in the future.
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) // TODO: Make this configurable
 	defer cancel()
 	c, err := s.DialLeader(ctx)
 	if err != nil {

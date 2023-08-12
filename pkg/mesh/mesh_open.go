@@ -128,6 +128,12 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
+	} else if s.opts.Mesh.JoinCampfirePSK != "" {
+		// Attempt to join the cluster by campfire.
+		err = s.joinByCampfire(ctx, features, s.opts.Mesh.MaxJoinRetries)
+		if err != nil {
+			return handleErr(fmt.Errorf("join by campfire: %w", err))
+		}
 	} else {
 		// We neither had the bootstrap flag nor the join flag set.
 		// This means we are possibly a single node cluster.

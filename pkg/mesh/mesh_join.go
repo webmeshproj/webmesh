@@ -25,6 +25,7 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -39,7 +40,7 @@ var (
 func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Feature) error {
 	log := s.log.With(slog.String("peer-discovery-addrs", strings.Join(s.opts.Mesh.PeerDiscoveryAddresses, ",")))
 	ctx = context.WithLogger(ctx, log)
-	log.Info("discovering joinable peers")
+	log.Info("Joining mesh via peer discovery")
 	var err error
 	for _, addr := range s.opts.Mesh.PeerDiscoveryAddresses {
 		var c *grpc.ClientConn
@@ -48,7 +49,7 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Fea
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			log.Error("failed to dial peer discovery address", slog.String("error", err.Error()))
+			log.Error("Failed to dial peer discovery address", slog.String("error", err.Error()))
 			continue
 		}
 		defer c.Close()
@@ -59,10 +60,10 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Fea
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			log.Error("failed to list peers", slog.String("error", err.Error()))
+			log.Error("Failed to list peers", slog.String("error", err.Error()))
 			continue
 		}
-		log.Info("discovered joinable peers", slog.Any("peers", resp.Peers))
+		log.Info("Discovered joinable peers", slog.Any("peers", resp.Peers))
 	Peers:
 		for _, peer := range resp.Peers {
 			err = s.join(ctx, features, peer.Address, s.opts.Mesh.MaxJoinRetries)
@@ -84,15 +85,19 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Fea
 	return nil
 }
 
+func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature, maxRetries int) error {
+	return errors.New("not implemented")
+}
+
 func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr string, maxRetries int) error {
 	log := s.log.With(slog.String("join-addr", joinAddr))
 	ctx = context.WithLogger(ctx, log)
-	log.Info("joining mesh")
+	log.Info("Joining mesh via gRPC")
 	var tries int
 	var err error
 	for tries <= maxRetries {
 		if tries > 0 {
-			log.Info("retrying join request", slog.Int("tries", tries))
+			log.Info("Retrying join request", slog.Int("tries", tries))
 		}
 		var conn *grpc.ClientConn
 		conn, err = s.newGRPCConn(ctx, joinAddr)
@@ -118,7 +123,7 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 				return ctx.Err()
 			}
 			err = fmt.Errorf("join node: %w", err)
-			log.Error("join failed", slog.String("error", err.Error()))
+			log.Error("Join request failed", slog.String("error", err.Error()))
 			if tries >= maxRetries {
 				return err
 			}
@@ -133,7 +138,6 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 
 func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, features []v1.Feature) error {
 	log := context.LoggerFrom(ctx)
-	client := v1.NewNodeClient(c)
 	defer c.Close()
 	if s.opts.Mesh.GRPCAdvertisePort == 0 {
 		// Assume the default port.
@@ -143,28 +147,13 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 	if err != nil {
 		return fmt.Errorf("load wireguard key: %w", err)
 	}
-	req := &v1.JoinRequest{
-		Id:                 s.ID(),
-		PublicKey:          key.PublicKey().String(),
-		RaftPort:           int32(s.raft.ListenPort()),
-		GrpcPort:           int32(s.opts.Mesh.GRPCAdvertisePort),
-		MeshdnsPort:        int32(s.opts.Mesh.MeshDNSAdvertisePort),
-		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
-		WireguardEndpoints: s.opts.WireGuard.Endpoints,
-		ZoneAwarenessId:    s.opts.Mesh.ZoneAwarenessID,
-		AssignIpv4:         !s.opts.Mesh.NoIPv4,
-		PreferRaftIpv6:     s.opts.Raft.PreferIPv6,
-		AsVoter:            s.opts.Mesh.JoinAsVoter,
-		Routes:             s.opts.Mesh.Routes,
-		DirectPeers:        s.opts.Mesh.DirectPeers,
-		Features:           features,
-	}
-	log.Debug("sending join request to node", slog.Any("req", req))
-	resp, err := client.Join(ctx, req)
+	req := s.newJoinRequest(features, key)
+	log.Debug("Sending join request to node", slog.Any("req", req))
+	resp, err := s.doJoinGRPC(ctx, c, req)
 	if err != nil {
 		return fmt.Errorf("join request: %w", err)
 	}
-	log.Debug("received join response", slog.Any("resp", resp))
+	log.Debug("Received join response", slog.Any("resp", resp))
 	s.meshDomain = resp.GetMeshDomain()
 	if !strings.HasSuffix(s.meshDomain, ".") {
 		s.meshDomain += "."
@@ -196,13 +185,13 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		NetworkV4: networkv4,
 		NetworkV6: networkv6,
 	}
-	log.Debug("starting network manager", slog.Any("opts", opts))
+	log.Debug("Starting network manager", slog.Any("opts", opts))
 	err = s.nw.Start(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("%w starting network manager: %w", errFatalJoin, err)
 	}
 	for _, peer := range resp.GetPeers() {
-		log.Info("adding peer", slog.Any("peer", peer))
+		log.Debug("Adding peer", slog.Any("peer", peer))
 		err = s.nw.AddPeer(ctx, peer, resp.GetIceServers())
 		if err != nil {
 			return fmt.Errorf("%w adding peer: %w", errFatalJoin, err)
@@ -232,4 +221,34 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 		}
 	}
 	return nil
+}
+
+func (s *meshStore) doJoinGRPC(ctx context.Context, c *grpc.ClientConn, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+	client := v1.NewNodeClient(c)
+	context.LoggerFrom(ctx).Debug("Sending join request to node over gRPC", slog.Any("req", req))
+	return client.Join(ctx, req)
+}
+
+func (s *meshStore) newJoinRequest(features []v1.Feature, key wgtypes.Key) *v1.JoinRequest {
+	if s.opts.Mesh.GRPCAdvertisePort <= 0 {
+		// Assume the default port.
+		s.opts.Mesh.GRPCAdvertisePort = DefaultGRPCPort
+	}
+	req := &v1.JoinRequest{
+		Id:                 s.ID(),
+		PublicKey:          key.PublicKey().String(),
+		RaftPort:           int32(s.raft.ListenPort()),
+		GrpcPort:           int32(s.opts.Mesh.GRPCAdvertisePort),
+		MeshdnsPort:        int32(s.opts.Mesh.MeshDNSAdvertisePort),
+		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
+		WireguardEndpoints: s.opts.WireGuard.Endpoints,
+		ZoneAwarenessId:    s.opts.Mesh.ZoneAwarenessID,
+		AssignIpv4:         !s.opts.Mesh.NoIPv4,
+		PreferRaftIpv6:     s.opts.Raft.PreferIPv6,
+		AsVoter:            s.opts.Mesh.JoinAsVoter,
+		Routes:             s.opts.Mesh.Routes,
+		DirectPeers:        s.opts.Mesh.DirectPeers,
+		Features:           features,
+	}
+	return req
 }

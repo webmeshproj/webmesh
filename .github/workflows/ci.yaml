@@ -241,4 +241,4 @@ jobs:
         run: |
           cosign sign --yes --recursive ${ALPINE_IMAGE_NAME}@${{ steps.alpine-build.outputs.digest }}
           cosign sign --yes --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.distroless-build.outputs.digest }}
-          cosign sign --yes --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.turn-build.outputs.digest }}
+          cosign sign --yes --recursive ${TURN_IMAGE_NAME}@${{ steps.turn-build.outputs.digest }}
