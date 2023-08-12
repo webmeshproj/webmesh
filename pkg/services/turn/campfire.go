@@ -17,9 +17,6 @@ limitations under the License.
 package turn
 
 import (
-	"bytes"
-	"encoding/gob"
-	"errors"
 	"log/slog"
 	"net"
 	"sync"
@@ -27,8 +24,6 @@ import (
 
 	"github.com/pion/stun"
 )
-
-const campfireMessagePrefix = "CAMPFIRE\n"
 
 type campFireManager struct {
 	net.PacketConn
@@ -61,14 +56,18 @@ func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if n, addr, err = s.PacketConn.ReadFrom(p); err == nil && !stun.IsMessage(p) {
 		data := p[:n]
 		s.log.Debug("out-of-band inbound message", slog.Any("msg", string(data)))
-		if isCampFireMessage(data) {
+		if IsCampfireMessage(data) {
 			s.log.Debug("handling inbound campfire message", slog.Any("msg", string(data)))
-			var msg campfireMessage
-			if derr := msg.decode(data); err != nil {
-				s.log.Warn("failed to decode campfire message", slog.String("error", derr.Error()))
+			msg, derr := DecodeCampfireMessage(data)
+			if derr != nil {
+				s.log.Warn("failed to decode campfire message", slog.String("error", err.Error()))
 				return
 			}
-			s.handleCampFireMessage(&msg, addr)
+			if verr := msg.Validate(); verr != nil {
+				s.log.Warn("invalid campfire message", slog.String("error", verr.Error()))
+				return
+			}
+			s.handleCampFireMessage(msg, addr)
 		}
 	}
 	return
@@ -79,28 +78,23 @@ func (s *campFireManager) Close() error {
 	return s.PacketConn.Close()
 }
 
-func (s *campFireManager) handleCampFireMessage(msg *campfireMessage, saddr net.Addr) {
+func (s *campFireManager) handleCampFireMessage(msg *CampfireMessage, saddr net.Addr) {
 	s.log.Debug("handling campfire message", slog.Any("msg", msg))
-	err := validateMessage(msg)
-	if err != nil {
-		s.log.Warn("invalid campfire message", slog.String("error", err.Error()))
-		return
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	switch msg.Type {
-	case campfireMessageAnnounce:
+	case CampfireMessageAnnounce:
 		s.handleAnnounce(msg, saddr)
-	case campfireMessageOffer:
+	case CampfireMessageOffer:
 		s.handleOffer(msg, saddr)
-	case campfireMessageAnswer:
+	case CampfireMessageAnswer:
 		s.handleAnswer(msg, saddr)
-	case campfireMessageICE:
+	case CampfireMessageICE:
 		s.handleICE(msg, saddr)
 	}
 }
 
-func (s *campFireManager) handleAnnounce(msg *campfireMessage, saddr net.Addr) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *campFireManager) handleAnnounce(msg *CampfireMessage, saddr net.Addr) {
 	peer := peer{
 		ufrag:       msg.LUfrag,
 		pwd:         msg.LPwd,
@@ -111,9 +105,7 @@ func (s *campFireManager) handleAnnounce(msg *campfireMessage, saddr net.Addr) {
 	s.peers[peer] = saddr
 }
 
-func (s *campFireManager) handleOffer(msg *campfireMessage, saddr net.Addr) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *campFireManager) handleOffer(msg *CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
 		ufrag:       msg.LUfrag,
 		pwd:         msg.LPwd,
@@ -135,7 +127,7 @@ func (s *campFireManager) handleOffer(msg *campfireMessage, saddr net.Addr) {
 		return
 	}
 	s.log.Debug("sending offer to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
-	encoded, err := msg.encode()
+	encoded, err := msg.Encode()
 	if err != nil {
 		s.log.Warn("failed to encode offer", slog.String("error", err.Error()))
 		return
@@ -147,9 +139,7 @@ func (s *campFireManager) handleOffer(msg *campfireMessage, saddr net.Addr) {
 	}
 }
 
-func (s *campFireManager) handleAnswer(msg *campfireMessage, saddr net.Addr) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *campFireManager) handleAnswer(msg *CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
 		ufrag:       msg.LUfrag,
 		pwd:         msg.LPwd,
@@ -171,7 +161,7 @@ func (s *campFireManager) handleAnswer(msg *campfireMessage, saddr net.Addr) {
 		return
 	}
 	s.log.Debug("sending answer to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
-	encoded, err := msg.encode()
+	encoded, err := msg.Encode()
 	if err != nil {
 		s.log.Warn("failed to encode answer", slog.String("error", err.Error()))
 		return
@@ -183,9 +173,7 @@ func (s *campFireManager) handleAnswer(msg *campfireMessage, saddr net.Addr) {
 	}
 }
 
-func (s *campFireManager) handleICE(msg *campfireMessage, saddr net.Addr) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *campFireManager) handleICE(msg *CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
 		ufrag:       msg.LUfrag,
 		pwd:         msg.LPwd,
@@ -207,7 +195,7 @@ func (s *campFireManager) handleICE(msg *campfireMessage, saddr net.Addr) {
 		return
 	}
 	s.log.Debug("sending ICE to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
-	encoded, err := msg.encode()
+	encoded, err := msg.Encode()
 	if err != nil {
 		s.log.Warn("failed to encode ICE candidate", slog.String("error", err.Error()))
 		return
@@ -228,7 +216,7 @@ func (s *campFireManager) runPeerGC() {
 			return
 		case <-t.C:
 			s.mu.Lock()
-			now := time.Now().UTC().Truncate(time.Hour).Unix()
+			now := time.Now().Truncate(time.Hour).Unix()
 			for peer, addr := range s.peers {
 				if now > peer.expires {
 					delete(s.peers, peer)
@@ -238,65 +226,4 @@ func (s *campFireManager) runPeerGC() {
 			s.mu.Unlock()
 		}
 	}
-
-}
-
-type messageType int
-
-const (
-	// campfireMessageAnnounce is a message type announcing presence
-	campfireMessageAnnounce messageType = iota + 1
-	// campfireMessageOffer is a message type for an offer
-	campfireMessageOffer
-	// campfireMessageAnswer is a message type for an answer
-	campfireMessageAnswer
-	// campfireMessageICE is a message type for an ICE candidate
-	campfireMessageICE
-)
-
-type campfireMessage struct {
-	LUfrag string
-	LPwd   string
-	RUfrag string
-	RPwd   string
-	Type   messageType
-	Data   []byte
-
-	expires int64
-}
-
-func (c *campfireMessage) encode() ([]byte, error) {
-	var buf bytes.Buffer
-	err := gob.NewEncoder(&buf).Encode(c)
-	if err != nil {
-		return nil, err
-	}
-	return append([]byte(campfireMessagePrefix), buf.Bytes()...), nil
-}
-
-func (c *campfireMessage) decode(p []byte) error {
-	data := bytes.TrimPrefix(p, []byte(campfireMessagePrefix))
-	err := gob.NewDecoder(bytes.NewReader(data)).Decode(c)
-	c.expires = time.Now().UTC().Truncate(time.Hour).Add(time.Hour).Unix()
-	return err
-}
-
-func validateMessage(msg *campfireMessage) error {
-	if msg.LUfrag == "" {
-		return errors.New("missing lufrag")
-	}
-	if msg.LPwd == "" {
-		return errors.New("missing lpwd")
-	}
-	if msg.RUfrag == "" {
-		return errors.New("missing rufrag")
-	}
-	if msg.RPwd == "" {
-		return errors.New("missing rpwd")
-	}
-	return nil
-}
-
-func isCampFireMessage(p []byte) bool {
-	return bytes.HasPrefix(p, []byte(campfireMessagePrefix))
 }

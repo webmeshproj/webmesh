@@ -119,14 +119,14 @@ func (c *CampfireClient) Close() error {
 
 // Announce announces interest in offers containing the given ufrag and pwd.
 func (c *CampfireClient) Announce(ufrag, pwd string) error {
-	msg := campfireMessage{
+	msg := CampfireMessage{
 		LUfrag: c.opts.Ufrag,
 		LPwd:   c.opts.Pwd,
 		RUfrag: ufrag,
 		RPwd:   pwd,
-		Type:   campfireMessageAnnounce,
+		Type:   CampfireMessageAnnounce,
 	}
-	data, err := msg.encode()
+	data, err := msg.Encode()
 	if err != nil {
 		return err
 	}
@@ -163,15 +163,15 @@ func (c *CampfireClient) SendOffer(ufrag, pwd string, offer webrtc.SessionDescri
 	if err != nil {
 		return err
 	}
-	msg := campfireMessage{
+	msg := CampfireMessage{
 		LUfrag: c.opts.Ufrag,
 		LPwd:   c.opts.Pwd,
 		RUfrag: ufrag,
 		RPwd:   pwd,
-		Type:   campfireMessageOffer,
+		Type:   CampfireMessageOffer,
 		Data:   c.encryptData(sdp),
 	}
-	data, err := msg.encode()
+	data, err := msg.Encode()
 	if err != nil {
 		return err
 	}
@@ -188,15 +188,15 @@ func (c *CampfireClient) SendAnswer(ufrag, pwd string, answer webrtc.SessionDesc
 	if err != nil {
 		return err
 	}
-	msg := campfireMessage{
+	msg := CampfireMessage{
 		LUfrag: c.opts.Ufrag,
 		LPwd:   c.opts.Pwd,
 		RUfrag: ufrag,
 		RPwd:   pwd,
-		Type:   campfireMessageAnswer,
+		Type:   CampfireMessageAnswer,
 		Data:   c.encryptData(sdp),
 	}
-	data, err := msg.encode()
+	data, err := msg.Encode()
 	if err != nil {
 		return err
 	}
@@ -216,15 +216,15 @@ func (c *CampfireClient) SendCandidate(ufrag, pwd string, candidate *webrtc.ICEC
 	if err != nil {
 		return err
 	}
-	msg := campfireMessage{
+	msg := CampfireMessage{
 		LUfrag: c.opts.Ufrag,
 		LPwd:   c.opts.Pwd,
 		RUfrag: ufrag,
 		RPwd:   pwd,
-		Type:   campfireMessageICE,
+		Type:   CampfireMessageICE,
 		Data:   c.encryptData(cand),
 	}
-	data, err := msg.encode()
+	data, err := msg.Encode()
 	if err != nil {
 		return err
 	}
@@ -256,14 +256,14 @@ func (c *CampfireClient) handleIncoming() {
 			c.errc <- err
 			return
 		}
-		var msg campfireMessage
-		err = msg.decode(data[:n])
+		var msg CampfireMessage
+		err = msg.Decode(data[:n])
 		if err != nil {
 			c.errc <- err
 			return
 		}
 		switch msg.Type {
-		case campfireMessageOffer:
+		case CampfireMessageOffer:
 			data, err := c.decryptData(msg.Data)
 			if err != nil {
 				c.log.Warn("failed to decrypt offer", "err", err)
@@ -280,7 +280,7 @@ func (c *CampfireClient) handleIncoming() {
 				Pwd:   msg.LPwd,
 				SDP:   offer,
 			}
-		case campfireMessageAnswer:
+		case CampfireMessageAnswer:
 			data, err := c.decryptData(msg.Data)
 			if err != nil {
 				c.log.Warn("failed to decrypt answer", "err", err)
@@ -297,7 +297,7 @@ func (c *CampfireClient) handleIncoming() {
 				Pwd:   msg.LPwd,
 				SDP:   answer,
 			}
-		case campfireMessageICE:
+		case CampfireMessageICE:
 			data, err := c.decryptData(msg.Data)
 			if err != nil {
 				c.log.Warn("failed to decrypt candidate", "err", err)
