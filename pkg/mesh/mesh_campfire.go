@@ -44,7 +44,7 @@ func (s *meshStore) waitByCampfire() {
 		return
 	}
 	defer cf.Close()
-	log.Info("Campfire connection established")
+	log.Info("Announced ourselves at the campfire")
 	go func() {
 		for {
 			conn, err := cf.Accept()

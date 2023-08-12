@@ -162,6 +162,7 @@ func (s *Server) ListenAndServe() error {
 			ListenUDP:       fmt.Sprintf(":%d", s.opts.TURN.ListenPort),
 			Realm:           s.opts.TURN.ServerRealm,
 			PortRange:       s.opts.TURN.STUNPortRange,
+			EnableCampfire:  s.opts.TURN.CampfireEnabled,
 		})
 		if err != nil {
 			s.mu.Unlock()

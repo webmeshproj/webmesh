@@ -50,34 +50,34 @@ services:
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
-  # site-1-peer:
-  #   image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-  #   networks:
-  #     public-net:
-  #     site-1:
-  #   hostname: site-1-peer
-  #   entrypoint:
-  #     - /webmesh-node
-  #     - --global.insecure
-  #     - --global.no-ipv6
-  #     - --raft.in-memory
-  #     - --mesh.join-address=10.30.0.1:8443
-  #     - --mesh.direct-peers=site-2-peer
-  #   restart: on-failure
-  #   cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+  site-1-peer:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    networks:
+      public-net:
+      site-1:
+    hostname: site-1-peer
+    entrypoint:
+      - /webmesh-node
+      - --global.insecure
+      - --global.no-ipv6
+      - --raft.in-memory
+      - --mesh.join-address=10.30.0.1:8443
+      - --mesh.direct-peers=site-2-peer
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
-  # site-2-peer:
-  #   image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-  #   networks:
-  #     public-net:
-  #     site-2:
-  #   hostname: site-2-peer
-  #   entrypoint:
-  #     - /webmesh-node
-  #     - --global.insecure
-  #     - --global.no-ipv6
-  #     - --raft.in-memory
-  #     - --mesh.join-address=10.30.0.1:8443
-  #     - --mesh.direct-peers=site-1-peer
-  #   restart: on-failure
-  #   cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+  site-2-peer:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    networks:
+      public-net:
+      site-2:
+    hostname: site-2-peer
+    entrypoint:
+      - /webmesh-node
+      - --global.insecure
+      - --global.no-ipv6
+      - --raft.in-memory
+      - --mesh.join-address=10.30.0.1:8443
+      - --mesh.direct-peers=site-1-peer
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

@@ -1,0 +1,79 @@
+version: "3"
+
+networks:
+  public-net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.30.0.0/24
+          gateway: 10.30.0.100
+  site-1:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.0.0/24
+  site-2:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.20.0.0/24
+
+services:
+  # TURN server
+
+  turn-server:
+    image: ghcr.io/webmeshproj/turn:latest
+    networks:
+      public-net:
+        ipv4_address: 10.30.0.1
+    entrypoint:
+      - /webmesh-turn
+      - --public-ip=10.30.0.1
+      - --enable-campfire=true
+      - --log-level=debug
+    restart: on-failure
+
+  bootstrap-node:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      public-net:
+    hostname: bootstrap-node
+    entrypoint:
+      - /webmesh-node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --global.detect-endpoints
+      - --global.detect-private-endpoints
+      - --bootstrap.enabled
+      - --bootstrap.default-network-policy=accept
+      - --raft.in-memory
+      - --mesh.wait-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
+      - --mesh.wait-campfire-turn-servers=turn:10.30.0.1:3478
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    depends_on:
+      - turn-server
+
+  site-1-peer:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    networks:
+      public-net:
+      site-1:
+    hostname: site-1-peer
+    entrypoint:
+      - /webmesh-node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --raft.in-memory
+      - --mesh.join-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
+      - --mesh.join-campfire-turn-servers=turn:10.30.0.1:3478
+      - --mesh.direct-peers=bootstrap-node
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    depends_on:
+      - turn-server
+      - bootstrap-node

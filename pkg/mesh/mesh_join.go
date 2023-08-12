@@ -93,7 +93,11 @@ func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) e
 	log.Info("Joining mesh via campfire")
 	var tries int
 	for tries <= s.opts.Mesh.MaxJoinRetries {
-		conn, err := campfire.Join(ctx, campfire.Options{
+		// The initial connection should be fast, if it isn't,
+		// the most likely cause is that no one is waiting for us.
+		joinCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+		defer cancel()
+		conn, err := campfire.Join(joinCtx, campfire.Options{
 			PSK:         []byte(s.opts.Mesh.JoinCampfirePSK),
 			TURNServers: s.opts.Mesh.JoinCampfireTURNServers,
 		})

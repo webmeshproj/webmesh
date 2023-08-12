@@ -73,6 +73,7 @@ func NewServer(o *Options) (*Server, error) {
 		log:        log.With("channel", "stun"),
 	}
 	if o.EnableCampfire {
+		log.Info("Enabling campfire protocol extensions")
 		pktConn = NewCampFireManager(pktConn, log.With("channel", "campfire"))
 	}
 	s, err := turn.NewServer(turn.ServerConfig{

@@ -36,7 +36,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level (debug, info, warn, error)")
 	flag.Parse()
 
-	util.SetupLogging(logLevel)
+	log := util.SetupLogging(logLevel)
 
 	if detectPublicIP {
 		endpoints, err := endpoints.Detect(context.Background(), endpoints.DetectOpts{
@@ -59,7 +59,7 @@ func main() {
 		PortRange:       portRange,
 		EnableCampfire:  enableCampfire,
 	}
-	slog.Default().Info("Starting TURN server",
+	log.Info("Starting TURN server",
 		slog.Any("opts", opts),
 		slog.String("version", version.Version),
 		slog.String("commit", version.Commit),
@@ -74,7 +74,7 @@ func main() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 
-	slog.Default().Info("Shutting down...")
+	log.Info("Shutting down...")
 	if err := server.Close(); err != nil {
 		fatal(err)
 	}
