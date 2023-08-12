@@ -27,8 +27,10 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 )
@@ -66,7 +68,7 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Fea
 		log.Info("Discovered joinable peers", slog.Any("peers", resp.Peers))
 	Peers:
 		for _, peer := range resp.Peers {
-			err = s.join(ctx, features, peer.Address, s.opts.Mesh.MaxJoinRetries)
+			err = s.join(ctx, features, peer.Address)
 			if err != nil {
 				if ctx.Err() != nil {
 					return ctx.Err()
@@ -85,17 +87,84 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Fea
 	return nil
 }
 
-func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature, maxRetries int) error {
-	return errors.New("not implemented")
+func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) error {
+	log := s.log.With(slog.String("join-method", "campfire"))
+	ctx = context.WithLogger(ctx, log)
+	log.Info("Joining mesh via campfire")
+	var tries int
+	for tries <= s.opts.Mesh.MaxJoinRetries {
+		conn, err := campfire.Join(ctx, campfire.Options{
+			PSK:         []byte(s.opts.Mesh.JoinCampfirePSK),
+			TURNServers: s.opts.Mesh.JoinCampfireTURNServers,
+		})
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			err = fmt.Errorf("join campfire: %w", err)
+			log.Error("Join campfire failed", slog.String("error", err.Error()))
+			if tries >= s.opts.Mesh.MaxJoinRetries {
+				return err
+			}
+			tries++
+			time.Sleep(time.Second)
+			continue
+		}
+		defer conn.Close()
+		log.Info("Established campfire connection, joining mesh")
+		key, err := s.loadWireGuardKey(ctx)
+		if err != nil {
+			return fmt.Errorf("load wireguard key: %w", err)
+		}
+		req := s.newJoinRequest(features, key)
+		log.Debug("Sending join request over campfire", slog.Any("req", req))
+		data, err := proto.Marshal(req)
+		if err != nil {
+			// This should never happen
+			return fmt.Errorf("marshal join request: %w", err)
+		}
+		_, err = conn.Write(data)
+		if err != nil {
+			log.Error("Failed to send join request over campfire", slog.String("error", err.Error()))
+			// We'll retry
+			continue
+		}
+		buf := make([]byte, 4096)
+		n, err := conn.Read(buf)
+		if err != nil {
+			log.Error("Failed to read join response over campfire", slog.String("error", err.Error()))
+			// We'll retry
+			continue
+		}
+		var resp v1.JoinResponse
+		err = proto.Unmarshal(buf[:n], &resp)
+		if err != nil {
+			// This could mean an actual error from the join server
+			log.Error("Failed to unmarshal join response over campfire", slog.String("error", err.Error()))
+			return fmt.Errorf("campfire join error: %s", string(buf[:n]))
+		}
+		log.Info("Received join response over campfire", slog.Any("resp", &resp))
+		err = s.handleJoinResponse(ctx, &resp, key)
+		if err != nil {
+			if errors.Is(err, errFatalJoin) {
+				return err
+			}
+			// We'll retry
+			log.Error("Failed to handle join response", slog.String("error", err.Error()))
+			continue
+		}
+		return nil
+	}
+	return errFatalJoin
 }
 
-func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr string, maxRetries int) error {
+func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr string) error {
 	log := s.log.With(slog.String("join-addr", joinAddr))
 	ctx = context.WithLogger(ctx, log)
 	log.Info("Joining mesh via gRPC")
 	var tries int
 	var err error
-	for tries <= maxRetries {
+	for tries <= s.opts.Mesh.MaxJoinRetries {
 		if tries > 0 {
 			log.Info("Retrying join request", slog.Int("tries", tries))
 		}
@@ -107,7 +176,7 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 			}
 			err = fmt.Errorf("dial join node: %w", err)
 			log.Error("gRPC dial failed", slog.String("error", err.Error()))
-			if tries >= maxRetries {
+			if tries >= s.opts.Mesh.MaxJoinRetries {
 				return err
 			}
 			tries++
@@ -124,7 +193,7 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 			}
 			err = fmt.Errorf("join node: %w", err)
 			log.Error("Join request failed", slog.String("error", err.Error()))
-			if tries >= maxRetries {
+			if tries >= s.opts.Mesh.MaxJoinRetries {
 				return err
 			}
 			tries++
@@ -139,10 +208,6 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, features []v1.Feature) error {
 	log := context.LoggerFrom(ctx)
 	defer c.Close()
-	if s.opts.Mesh.GRPCAdvertisePort == 0 {
-		// Assume the default port.
-		s.opts.Mesh.GRPCAdvertisePort = 8443
-	}
 	key, err := s.loadWireGuardKey(ctx)
 	if err != nil {
 		return fmt.Errorf("load wireguard key: %w", err)
@@ -153,12 +218,18 @@ func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, featur
 	if err != nil {
 		return fmt.Errorf("join request: %w", err)
 	}
+	return s.handleJoinResponse(ctx, resp, key)
+}
+
+func (s *meshStore) handleJoinResponse(ctx context.Context, resp *v1.JoinResponse, key wgtypes.Key) error {
+	log := context.LoggerFrom(ctx)
 	log.Debug("Received join response", slog.Any("resp", resp))
 	s.meshDomain = resp.GetMeshDomain()
 	if !strings.HasSuffix(s.meshDomain, ".") {
 		s.meshDomain += "."
 	}
 	var addressv4, addressv6, networkv4, networkv6 netip.Prefix
+	var err error
 	// We always parse addresses and let the net manager decide what to use
 	if resp.AddressIpv4 != "" {
 		addressv4, err = netip.ParsePrefix(resp.AddressIpv4)

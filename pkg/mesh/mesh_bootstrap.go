@@ -451,7 +451,7 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1
 	joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
 	s.opts.Mesh.JoinAsVoter = true
 	time.Sleep(3 * time.Second)
-	return s.join(ctx, features, joinAddr, 5)
+	return s.join(ctx, features, joinAddr)
 }
 
 func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Feature) error {
@@ -474,7 +474,7 @@ func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Fea
 			grpcPort = s.opts.Mesh.GRPCAdvertisePort
 		}
 		joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
-		if err = s.join(ctx, features, joinAddr, 5); err != nil {
+		if err = s.join(ctx, features, joinAddr); err != nil {
 			s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
 			continue
 		}

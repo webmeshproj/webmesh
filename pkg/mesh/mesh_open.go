@@ -123,14 +123,14 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		if len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
 			err = s.joinWithPeerDiscovery(ctx, features)
 		} else {
-			err = s.join(ctx, features, s.opts.Mesh.JoinAddress, s.opts.Mesh.MaxJoinRetries)
+			err = s.join(ctx, features, s.opts.Mesh.JoinAddress)
 		}
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
 	} else if s.opts.Mesh.JoinCampfirePSK != "" {
 		// Attempt to join the cluster by campfire.
-		err = s.joinByCampfire(ctx, features, s.opts.Mesh.MaxJoinRetries)
+		err = s.joinByCampfire(ctx, features)
 		if err != nil {
 			return handleErr(fmt.Errorf("join by campfire: %w", err))
 		}
