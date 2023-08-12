@@ -255,6 +255,9 @@ func (c *CampfireClient) handleIncoming() {
 			c.errc <- err
 			return
 		}
+		if !IsCampfireMessage(data[:n]) {
+			continue
+		}
 		msg, err := DecodeCampfireMessage(data[:n])
 		if err != nil {
 			c.errc <- err

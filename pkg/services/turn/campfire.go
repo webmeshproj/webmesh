@@ -60,8 +60,7 @@ func NewCampFireManager(pc net.PacketConn, log *slog.Logger) *campFireManager {
 
 // IsCampfireMessage returns true if the given packet is a campfire message.
 func IsCampfireMessage(p []byte) bool {
-	var msg v1.CampfireMessage
-	err := proto.Unmarshal(p, &msg)
+	_, err := DecodeCampfireMessage(p)
 	return err == nil
 }
 
