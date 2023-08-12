@@ -36,7 +36,7 @@ func (s *stunLogger) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		if err = msg.Decode(); err != nil {
 			return
 		}
-		s.log.Debug("Outbound STUN", slog.Any("msg", msg))
+		s.log.Debug("Handling outbund STUN packet", slog.Any("msg", msg))
 	}
 	return
 }
@@ -47,7 +47,7 @@ func (s *stunLogger) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		if err = msg.Decode(); err != nil {
 			return
 		}
-		s.log.Debug("Inbound STUN", slog.Any("msg", msg))
+		s.log.Debug("Handling inbound STUN packet", slog.Any("msg", msg))
 	}
 	return
 }

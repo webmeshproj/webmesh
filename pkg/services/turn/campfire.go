@@ -100,7 +100,7 @@ func ValidateCampfireMessage(msg *v1.CampfireMessage) error {
 
 func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, rerr error) {
 	if n, addr, rerr = s.PacketConn.ReadFrom(p); rerr == nil && IsCampfireMessage(p[:n]) {
-		s.log.Debug("handling campfire message", "saddr", addr.String())
+		s.log.Debug("Handling CAMPFIRE packet", "saddr", addr.String(), "len", n)
 		msg, err := DecodeCampfireMessage(p[:n])
 		if err != nil {
 			s.log.Warn("failed to decode campfire message", slog.String("error", err.Error()))
@@ -110,7 +110,7 @@ func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, rerr error) 
 			s.log.Warn("invalid campfire message", slog.String("error", err.Error()))
 			return
 		}
-		s.log.Debug("dispatching campfire message",
+		s.log.Debug("Dispatching CAMPFIRE packet",
 			slog.String("lufrag", msg.Lufrag),
 			slog.String("lpwd", msg.Lpwd),
 			slog.String("rufrag", msg.Rufrag),
@@ -171,13 +171,13 @@ func (s *campFireManager) handleOffer(pkt []byte, msg *v1.CampfireMessage, saddr
 	}
 	addr, ok := s.peers[rpeer]
 	if !ok {
-		s.log.Warn("no peer found for offer", slog.Any("peer", rpeer))
+		s.log.Warn("No peer found for offer", slog.Any("peer", rpeer))
 		return
 	}
-	s.log.Debug("sending offer to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
+	s.log.Debug("Sending offer to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
 	_, err := s.WriteTo(pkt, addr)
 	if err != nil {
-		s.log.Warn("failed to send offer", slog.String("error", err.Error()))
+		s.log.Warn("Error sending offer", slog.String("error", err.Error()))
 		return
 	}
 }
@@ -200,13 +200,13 @@ func (s *campFireManager) handleAnswer(pkt []byte, msg *v1.CampfireMessage, sadd
 	}
 	addr, ok := s.peers[rpeer]
 	if !ok {
-		s.log.Warn("no peer found for answer", slog.Any("peer", rpeer))
+		s.log.Warn("No peer found for answer", slog.Any("peer", rpeer))
 		return
 	}
-	s.log.Debug("sending answer to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
+	s.log.Debug("Sending answer to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
 	_, err := s.WriteTo(pkt, addr)
 	if err != nil {
-		s.log.Warn("failed to send answer", slog.String("error", err.Error()))
+		s.log.Warn("Error sending answer", slog.String("error", err.Error()))
 		return
 	}
 }
@@ -229,13 +229,13 @@ func (s *campFireManager) handleICE(pkt []byte, msg *v1.CampfireMessage, saddr n
 	}
 	addr, ok := s.peers[rpeer]
 	if !ok {
-		s.log.Warn("no peer found for ICE candidate", slog.Any("peer", rpeer))
+		s.log.Warn("No peer found for ICE candidate", slog.Any("peer", rpeer))
 		return
 	}
-	s.log.Debug("sending ICE to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
+	s.log.Debug("Sending ICE candidate to peer", slog.Any("peer", rpeer), slog.Any("addr", addr))
 	_, err := s.WriteTo(pkt, addr)
 	if err != nil {
-		s.log.Warn("failed to send ICE candidate", slog.String("error", err.Error()))
+		s.log.Warn("Error sending ICE candidate", slog.String("error", err.Error()))
 		return
 	}
 }
@@ -253,7 +253,7 @@ func (s *campFireManager) runPeerGC() {
 			for peer, addr := range s.peers {
 				if now > peer.expires {
 					delete(s.peers, peer)
-					s.log.Debug("removed expired peer", slog.Any("peer", peer), slog.Any("addr", addr))
+					s.log.Debug("Removed expired peer", slog.Any("peer", peer), slog.Any("addr", addr))
 				}
 			}
 			s.mu.Unlock()
