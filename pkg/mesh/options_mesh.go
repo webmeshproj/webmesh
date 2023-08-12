@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
@@ -29,6 +30,10 @@ const (
 	NodeIDEnvVar                  = "MESH_NODE_ID"
 	ZoneAwarenessIDEnvVar         = "MESH_ZONE_AWARENESS_ID"
 	JoinAddressEnvVar             = "MESH_JOIN_ADDRESS"
+	JoinCampfirePSKEnvVar         = "MESH_JOIN_CAMPFIRE_PSK"
+	JoinCampfireTURNServersEnvVar = "MESH_JOIN_CAMPFIRE_TURN_SERVERS"
+	WaitCampfirePSKEnvVar         = "MESH_WAIT_CAMPFIRE_PSK"
+	WaitCampfireTURNServersEnvVar = "MESH_WAIT_CAMPFIRE_TURN_SERVERS"
 	PeerDiscoveryAddressesEnvVar  = "MESH_PEER_DISCOVERY_ADDRESSES"
 	JoinAsVoterEnvVar             = "MESH_JOIN_AS_VOTER"
 	MaxJoinRetriesEnvVar          = "MESH_MAX_JOIN_RETRIES"
@@ -52,6 +57,14 @@ type MeshOptions struct {
 	ZoneAwarenessID string `json:"zone-awareness-id,omitempty" yaml:"zone-awareness-id,omitempty" toml:"zone-awareness-id,omitempty"`
 	// JoinAddress is the address of a node to join.
 	JoinAddress string `json:"join-address,omitempty" yaml:"join-address,omitempty" toml:"join-address,omitempty"`
+	// JoinCampfirePSK is the PSK to use for joining via the campfire protocol.
+	JoinCampfirePSK string `json:"join-campfire-psk,omitempty" yaml:"join-campfire-psk,omitempty" toml:"join-campfire-psk,omitempty"`
+	// JoinCampfireTURNServers is the TURN servers to use for joining via the campfire protocol.
+	JoinCampfireTURNServers []string `json:"join-campfire-turn-servers,omitempty" yaml:"join-campfire-turn-servers,omitempty" toml:"join-campfire-turn-servers,omitempty"`
+	// WaitCampfirePSK is the PSK for offering others to join via the campfire protocol.
+	WaitCampfirePSK string `json:"wait-campfire-psk,omitempty" yaml:"wait-campfire-psk,omitempty" toml:"wait-campfire-psk,omitempty"`
+	// WaitCampfireTURNServers is the TURN servers for offering others to join via the campfire protocol.
+	WaitCampfireTURNServers []string `json:"wait-campfire-turn-servers,omitempty" yaml:"wait-campfire-turn-servers,omitempty" toml:"wait-campfire-turn-servers,omitempty"`
 	// PeerDiscoveryAddresses are the addresses to use for peer discovery.
 	PeerDiscoveryAddresses []string `json:"peer-discovery-addresses,omitempty" yaml:"peer-discovery-addresses,omitempty" toml:"peer-discovery-addresses,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
@@ -105,6 +118,18 @@ func NewMeshOptions(grpcPort int) *MeshOptions {
 			}
 			return nil
 		}(),
+		JoinCampfireTURNServers: func() []string {
+			if val, ok := os.LookupEnv(JoinCampfireTURNServersEnvVar); ok {
+				return strings.Split(val, ",")
+			}
+			return nil
+		}(),
+		WaitCampfireTURNServers: func() []string {
+			if val, ok := os.LookupEnv(WaitCampfireTURNServersEnvVar); ok {
+				return strings.Split(val, ",")
+			}
+			return nil
+		}(),
 		MaxJoinRetries:    10,
 		GRPCAdvertisePort: grpcPort,
 	}
@@ -128,7 +153,19 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
 	fl.StringVar(&o.JoinAddress, p+"mesh.join-address", util.GetEnvDefault(JoinAddressEnvVar, ""),
 		"Address of a node to join.")
 	fl.Func(p+"mesh.peer-discovery-addresses", "Addresses to use for peer discovery.", func(val string) error {
-		o.PeerDiscoveryAddresses = strings.Split(val, ",")
+		o.PeerDiscoveryAddresses = append(o.PeerDiscoveryAddresses, strings.Split(val, ",")...)
+		return nil
+	})
+	fl.StringVar(&o.JoinCampfirePSK, p+"mesh.join-campfire-psk", util.GetEnvDefault(JoinCampfirePSKEnvVar, ""),
+		"Campfire PSK to use for joining.")
+	fl.Func(p+"mesh.join-campfire-turn-servers", "Campfire TURN servers to use for joining.", func(val string) error {
+		o.JoinCampfireTURNServers = append(o.JoinCampfireTURNServers, strings.Split(val, ",")...)
+		return nil
+	})
+	fl.StringVar(&o.WaitCampfirePSK, p+"mesh.wait-campfire-psk", util.GetEnvDefault(WaitCampfirePSKEnvVar, ""),
+		"Campfire PSK to use for waiting.")
+	fl.Func(p+"mesh.wait-campfire-turn-servers", "Campfire TURN servers to use for waiting.", func(val string) error {
+		o.WaitCampfireTURNServers = append(o.WaitCampfireTURNServers, strings.Split(val, ",")...)
 		return nil
 	})
 	fl.IntVar(&o.MaxJoinRetries, p+"mesh.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
@@ -147,12 +184,12 @@ This is only necessary if the node intends on being publicly accessible.`)
 	fl.Func(p+"mesh.routes", `Comma separated list of additional routes to advertise to the mesh.
 	These routes are advertised to all peers. If the node is not allowed
 	to put routes in the mesh, the node will be unable to join.`, func(s string) error {
-		o.Routes = strings.Split(s, ",")
+		o.Routes = append(o.Routes, strings.Split(s, ",")...)
 		return nil
 	})
 	fl.Func(p+"mesh.direct-peers", `Comma separated list of peers to request direct edges to.
 	If the node is not allowed to create edges and data channels, the node will be unable to join.`, func(s string) error {
-		o.DirectPeers = strings.Split(s, ",")
+		o.DirectPeers = append(o.DirectPeers, strings.Split(s, ",")...)
 		return nil
 	})
 	fl.IntVar(&o.HeartbeatPurgeThreshold, p+"mesh.heartbeat-purge-threshold", util.GetEnvIntDefault(HeartbeatPurgeThresholdEnvVar, 0),
@@ -170,6 +207,12 @@ func (o *MeshOptions) Validate() error {
 	}
 	if o.NoIPv4 && o.NoIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
+	}
+	if o.JoinCampfirePSK != "" && len(o.JoinCampfirePSK) != campfire.PSKSize {
+		return fmt.Errorf("invalid campfire PSK size")
+	}
+	if o.WaitCampfirePSK != "" && len(o.WaitCampfirePSK) != campfire.PSKSize {
+		return fmt.Errorf("invalid campfire PSK size")
 	}
 	return nil
 }

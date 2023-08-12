@@ -121,6 +121,7 @@ func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 		dnsUpdateGroup:   &dnsUpdateGroup,
 		log:              log.With(slog.String("node-id", string(nodeID))),
 		kvSubCancel:      func() {},
+		closec:           make(chan struct{}),
 	}
 	return st, nil
 }
@@ -178,6 +179,7 @@ type meshStore struct {
 	dnsUpdateGroup   *errgroup.Group
 	meshDomain       string
 	open             atomic.Bool
+	closec           chan struct{}
 	// a flag set on test stores to indicate skipping certain operations
 	testStore bool
 }

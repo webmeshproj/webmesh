@@ -21,11 +21,12 @@ package meshdb
 import (
 	"context"
 
+	"google.golang.org/grpc"
+
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"google.golang.org/grpc"
 )
 
 // Store is the interface for interacting with the mesh database and network.
@@ -48,4 +49,6 @@ type Store interface {
 	Network() net.Manager
 	// Dial opens a new gRPC connection to the given node.
 	Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error)
+	// DialLeader opens a new gRPC connection to the current Raft leader.
+	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
 }

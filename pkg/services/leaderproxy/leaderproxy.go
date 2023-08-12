@@ -29,16 +29,16 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshdb"
 )
 
 // Interceptor is the leaderproxy interceptor.
 type Interceptor struct {
-	store mesh.Mesh
+	store meshdb.Store
 }
 
 // New returns a new leader proxy interceptor.
-func New(store mesh.Mesh) *Interceptor {
+func New(store meshdb.Store) *Interceptor {
 	return &Interceptor{
 		store: store,
 	}

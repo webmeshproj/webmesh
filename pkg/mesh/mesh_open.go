@@ -141,5 +141,8 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	if err != nil {
 		return handleErr(fmt.Errorf("subscribe: %w", err))
 	}
+	if s.opts.Mesh.WaitCampfirePSK != "" {
+		go s.waitByCampfire()
+	}
 	return nil
 }

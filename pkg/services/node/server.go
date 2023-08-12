@@ -26,6 +26,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
@@ -37,7 +38,7 @@ import (
 type Server struct {
 	v1.UnimplementedNodeServer
 
-	store      mesh.Mesh
+	store      meshdb.Store
 	peers      peers.Peers
 	meshstate  state.State
 	rbac       rbacdb.RBAC

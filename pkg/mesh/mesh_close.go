@@ -31,6 +31,7 @@ func (s *meshStore) Close() error {
 	}
 	ctx := context.Background()
 	defer s.open.Store(false)
+	defer close(s.closec)
 	s.kvSubCancel()
 	if s.nw != nil {
 		// Do this last so that we don't lose connectivity to the network
