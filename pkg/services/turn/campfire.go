@@ -27,9 +27,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Now is a variable for mocking time in tests.
-var Now = time.Now
-
 type campFireManager struct {
 	net.PacketConn
 	log    *slog.Logger
@@ -39,6 +36,7 @@ type campFireManager struct {
 }
 
 type peer struct {
+	id          string
 	ufrag       string
 	pwd         string
 	acceptUfrag string
@@ -78,6 +76,9 @@ func DecodeCampfireMessage(p []byte) (*v1.CampfireMessage, error) {
 
 // ValidateCampfireMessage validates a campfire message.
 func ValidateCampfireMessage(msg *v1.CampfireMessage) error {
+	if msg.Id == "" && msg.Type != v1.CampfireMessage_ANNOUNCE {
+		return errors.New("missing id")
+	}
 	if msg.Lufrag == "" {
 		return errors.New("missing lufrag")
 	}
@@ -111,6 +112,7 @@ func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, rerr error) 
 			return
 		}
 		s.log.Debug("Dispatching CAMPFIRE packet",
+			slog.String("id", msg.Id),
 			slog.String("lufrag", msg.Lufrag),
 			slog.String("lpwd", msg.Lpwd),
 			slog.String("rufrag", msg.Rufrag),
@@ -155,6 +157,7 @@ func (s *campFireManager) handleAnnounce(msg *v1.CampfireMessage, saddr net.Addr
 
 func (s *campFireManager) handleOffer(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
+		id:          msg.Id,
 		ufrag:       msg.Lufrag,
 		pwd:         msg.Lpwd,
 		acceptUfrag: msg.Rufrag,
@@ -180,10 +183,14 @@ func (s *campFireManager) handleOffer(pkt []byte, msg *v1.CampfireMessage, saddr
 		s.log.Warn("Error sending offer", slog.String("error", err.Error()))
 		return
 	}
+	// Create a unique peer for the answer
+	rpeer.id = msg.Id
+	s.peers[rpeer] = saddr
 }
 
 func (s *campFireManager) handleAnswer(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
+		id:          msg.Id,
 		ufrag:       msg.Lufrag,
 		pwd:         msg.Lpwd,
 		acceptUfrag: msg.Rufrag,
@@ -192,6 +199,7 @@ func (s *campFireManager) handleAnswer(pkt []byte, msg *v1.CampfireMessage, sadd
 	}
 	s.peers[lpeer] = saddr
 	rpeer := peer{
+		id:          msg.Id,
 		ufrag:       msg.Rufrag,
 		pwd:         msg.Rpwd,
 		acceptUfrag: msg.Lufrag,
@@ -213,6 +221,7 @@ func (s *campFireManager) handleAnswer(pkt []byte, msg *v1.CampfireMessage, sadd
 
 func (s *campFireManager) handleICE(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
+		id:          msg.Id,
 		ufrag:       msg.Lufrag,
 		pwd:         msg.Lpwd,
 		acceptUfrag: msg.Rufrag,
@@ -221,6 +230,7 @@ func (s *campFireManager) handleICE(pkt []byte, msg *v1.CampfireMessage, saddr n
 	}
 	s.peers[lpeer] = saddr
 	rpeer := peer{
+		id:          msg.Id,
 		ufrag:       msg.Rufrag,
 		pwd:         msg.Rpwd,
 		acceptUfrag: msg.Lufrag,
@@ -261,6 +271,9 @@ func (s *campFireManager) runPeerGC() {
 	}
 }
 
+// now is a variable for mocking time in tests.
+var now = time.Now
+
 func nextExpiry() int64 {
-	return Now().Truncate(time.Hour).Add(time.Hour).Unix()
+	return now().Truncate(time.Hour).Add(time.Hour).Unix()
 }

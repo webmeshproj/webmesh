@@ -42,6 +42,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("new campfire client: %w", err)
 	}
+	defer fireconn.Close()
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	s.SetIncludeLoopbackCandidate(true)
@@ -65,7 +66,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
 	dc.OnOpen(func() {
-		log.Debug("data channel open")
+		log.Debug("Data channel opened")
 		rw, err := dc.Detach()
 		if err != nil {
 			errs <- fmt.Errorf("detach data channel: %w", err)
@@ -81,9 +82,24 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("set local description: %w", err)
 	}
+	log.Debug("Sending offer", "offer", offer.SDP)
 	err = fireconn.SendOffer(location.LocalUfrag(), location.LocalPwd(), offer)
 	if err != nil {
 		return nil, fmt.Errorf("send offer: %w", err)
+	}
+	log.Debug("Waiting for answer")
+	var answer turn.CampfireAnswer
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case err := <-errs:
+		return nil, err
+	case answer = <-fireconn.Answers():
+	}
+	log.Debug("Received answer", "answer", answer.SDP)
+	err = pc.SetRemoteDescription(answer.SDP)
+	if err != nil {
+		return nil, fmt.Errorf("set remote description: %w", err)
 	}
 	connectedc := make(chan struct{})
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -95,26 +111,15 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 			return
 		default:
 		}
-		log.Debug("sending local ICE candidate", "candidate", c.String())
-		err = fireconn.SendCandidate(location.LocalUfrag(), location.LocalPwd(), c)
+		log.Debug("Sending local ICE candidate", "candidate", c.String())
+		err = fireconn.SendCandidate("", location.LocalUfrag(), location.LocalPwd(), c)
 		if err != nil {
 			errs <- fmt.Errorf("send ice candidate: %w", err)
 			return
 		}
 	})
-	var answer turn.CampfireAnswer
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case answer = <-fireconn.Answers():
-	}
-	log.Debug("received answer", "answer", answer.SDP)
-	err = pc.SetRemoteDescription(answer.SDP)
-	if err != nil {
-		return nil, fmt.Errorf("set remote description: %w", err)
-	}
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		log.Debug("peer connection state change", "state", state.String())
+		log.Debug("Peer connection state change", "state", state.String())
 		if state == webrtc.PeerConnectionStateConnected {
 			close(connectedc)
 		}
@@ -130,7 +135,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 			case <-connectedc:
 				return
 			case cand := <-fireconn.Candidates():
-				log.Debug("received remote ICE candidate", "candidate", cand.Cand)
+				log.Debug("Received remote ICE candidate", "candidate", cand.Cand)
 				err = pc.AddICECandidate(cand.Cand)
 				if err != nil {
 					errs <- fmt.Errorf("add ice candidate: %w", err)

@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
 )
@@ -35,6 +36,7 @@ import (
 // CampfireClient represents a client that can communicate with a TURN server
 // supporting campfire.
 type CampfireClient struct {
+	id         string
 	opts       CampfireClientOptions
 	crypter    cipher.BlockMode
 	decrypter  cipher.BlockMode
@@ -49,6 +51,9 @@ type CampfireClient struct {
 
 // CampfireClientOptions represents options for a CampfireClient.
 type CampfireClientOptions struct {
+	// ID is a unique identifier for the client. If left unset, a random ID will be
+	// generated.
+	ID string
 	// Addr is the address of the STUN/TURN server.
 	Addr string
 	// Ufrag is the username fragment to use when communicating with the server.
@@ -62,42 +67,65 @@ type CampfireClientOptions struct {
 
 // CampfireOffer represents an offer that was received from a peer.
 type CampfireOffer struct {
+	// ID contains the ID of the peer that sent the offer.
+	ID string
+	// Ufrag contains the username fragment of the peer that sent the offer.
 	Ufrag string
-	Pwd   string
-	SDP   webrtc.SessionDescription
+	// Pwd contains the password of the peer that sent the offer.
+	Pwd string
+	// SDP contains the SDP of the offer.
+	SDP webrtc.SessionDescription
 }
 
 // CampfireAnswer represents an answer that was received from a peer.
 type CampfireAnswer struct {
+	// ID contains the ID of the negotiation. This will always be the same as the client ID.
+	ID string
+	// Ufrag contains the username fragment of the peer that sent the answer.
 	Ufrag string
-	Pwd   string
-	SDP   webrtc.SessionDescription
+	// Pwd contains the password of the peer that sent the answer.
+	Pwd string
+	// SDP contains the SDP of the answer.
+	SDP webrtc.SessionDescription
 }
 
 // CampfireCandidate represents a candidate that was received from a peer.
 type CampfireCandidate struct {
+	// ID contains the ID of the peer that initiated the negotiation.
+	ID string
+	// Ufrag contains the username fragment of the peer that sent the candidate.
 	Ufrag string
-	Pwd   string
-	Cand  webrtc.ICECandidateInit
+	// Pwd contains the password of the peer that sent the candidate.
+	Pwd string
+	// Cand contains the candidate.
+	Cand webrtc.ICECandidateInit
 }
 
 // NewCampfireClient creates a new CampfireClient.
 func NewCampfireClient(opts CampfireClientOptions) (*CampfireClient, error) {
 	addr := strings.TrimPrefix(opts.Addr, "turn:")
 	addr = strings.TrimPrefix(addr, "stun:")
+	if opts.ID == "" {
+		id, err := uuid.NewRandom()
+		if err != nil {
+			return nil, fmt.Errorf("generate random ID: %w", err)
+		}
+		opts.ID = id.String()
+	}
 	block, err := aes.NewCipher(opts.PSK)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create cipher: %w", err)
 	}
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("resolve UDP address: %w", err)
 	}
 	conn, err := net.DialUDP("udp", nil, udpAddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dial UDP: %w", err)
 	}
 	cli := &CampfireClient{
+		id:         opts.ID,
 		opts:       opts,
 		crypter:    cipher.NewCBCEncrypter(block, opts.PSK[:aes.BlockSize]),
 		decrypter:  cipher.NewCBCDecrypter(block, opts.PSK[:aes.BlockSize]),
@@ -111,30 +139,6 @@ func NewCampfireClient(opts CampfireClientOptions) (*CampfireClient, error) {
 	}
 	go cli.handleIncoming()
 	return cli, nil
-}
-
-// Close closes the client.
-func (c *CampfireClient) Close() error {
-	return c.conn.Close()
-}
-
-// Announce announces interest in offers containing the given ufrag and pwd.
-func (c *CampfireClient) Announce(ufrag, pwd string) error {
-	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
-		Lufrag: c.opts.Ufrag,
-		Lpwd:   c.opts.Pwd,
-		Rufrag: ufrag,
-		Rpwd:   pwd,
-		Type:   v1.CampfireMessage_ANNOUNCE,
-	})
-	if err != nil {
-		return err
-	}
-	_, err = c.conn.Write(data)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // Offers returns a channel of offers received from peers.
@@ -157,6 +161,31 @@ func (c *CampfireClient) Errors() <-chan error {
 	return c.errc
 }
 
+// Close closes the client.
+func (c *CampfireClient) Close() error {
+	return c.conn.Close()
+}
+
+// Announce announces interest in offers containing the given ufrag and pwd.
+func (c *CampfireClient) Announce(ufrag, pwd string) error {
+	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
+		Id:     c.id,
+		Lufrag: c.opts.Ufrag,
+		Lpwd:   c.opts.Pwd,
+		Rufrag: ufrag,
+		Rpwd:   pwd,
+		Type:   v1.CampfireMessage_ANNOUNCE,
+	})
+	if err != nil {
+		return fmt.Errorf("encode announce message: %w", err)
+	}
+	_, err = c.conn.Write(data)
+	if err != nil {
+		return fmt.Errorf("write announce message: %w", err)
+	}
+	return nil
+}
+
 // SendOffer sends an offer to the peer with the given ufrag and pwd.
 func (c *CampfireClient) SendOffer(ufrag, pwd string, offer webrtc.SessionDescription) error {
 	sdp, err := json.Marshal(offer)
@@ -164,6 +193,7 @@ func (c *CampfireClient) SendOffer(ufrag, pwd string, offer webrtc.SessionDescri
 		return err
 	}
 	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
+		Id:     c.id,
 		Lufrag: c.opts.Ufrag,
 		Lpwd:   c.opts.Pwd,
 		Rufrag: ufrag,
@@ -182,12 +212,13 @@ func (c *CampfireClient) SendOffer(ufrag, pwd string, offer webrtc.SessionDescri
 }
 
 // SendAnswer sends an answer to the peer with the given ufrag and pwd.
-func (c *CampfireClient) SendAnswer(ufrag, pwd string, answer webrtc.SessionDescription) error {
+func (c *CampfireClient) SendAnswer(offerID, ufrag, pwd string, answer webrtc.SessionDescription) error {
 	sdp, err := json.Marshal(answer)
 	if err != nil {
 		return err
 	}
 	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
+		Id:     offerID,
 		Lufrag: c.opts.Ufrag,
 		Lpwd:   c.opts.Pwd,
 		Rufrag: ufrag,
@@ -206,7 +237,8 @@ func (c *CampfireClient) SendAnswer(ufrag, pwd string, answer webrtc.SessionDesc
 }
 
 // SendCandidate sends a candidate to the peer with the given ufrag and pwd.
-func (c *CampfireClient) SendCandidate(ufrag, pwd string, candidate *webrtc.ICECandidate) error {
+// If offerID is empty, the local ID is used.
+func (c *CampfireClient) SendCandidate(offerID, ufrag, pwd string, candidate *webrtc.ICECandidate) error {
 	if candidate == nil {
 		return nil
 	}
@@ -214,7 +246,11 @@ func (c *CampfireClient) SendCandidate(ufrag, pwd string, candidate *webrtc.ICEC
 	if err != nil {
 		return err
 	}
+	if offerID == "" {
+		offerID = c.id
+	}
 	data, err := EncodeCampfireMessage(&v1.CampfireMessage{
+		Id:     offerID,
 		Lufrag: c.opts.Ufrag,
 		Lpwd:   c.opts.Pwd,
 		Rufrag: ufrag,
@@ -277,6 +313,7 @@ func (c *CampfireClient) handleIncoming() {
 				return
 			}
 			c.offers <- CampfireOffer{
+				ID:    msg.Id,
 				Ufrag: msg.Lufrag,
 				Pwd:   msg.Lpwd,
 				SDP:   offer,
@@ -294,6 +331,7 @@ func (c *CampfireClient) handleIncoming() {
 				return
 			}
 			c.answers <- CampfireAnswer{
+				ID:    msg.Id,
 				Ufrag: msg.Lufrag,
 				Pwd:   msg.Lpwd,
 				SDP:   answer,
@@ -311,6 +349,7 @@ func (c *CampfireClient) handleIncoming() {
 				return
 			}
 			c.candidates <- CampfireCandidate{
+				ID:    msg.Id,
 				Ufrag: msg.Lufrag,
 				Pwd:   msg.Lpwd,
 				Cand:  candidate,
