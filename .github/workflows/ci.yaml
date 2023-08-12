@@ -9,10 +9,12 @@ on:
 env:
   ALPINE_IMAGE_NAME: ghcr.io/webmeshproj/node
   DISTROLESS_IMAGE_NAME: ghcr.io/webmeshproj/node-distroless
+  TURN_IMAGE_NAME: ghcr.io/webmeshproj/turn
   GO_VERSION: ^1.21
   NODE_VERSION: 18
   GOLANGCI_LINT_VERSION: v1.54.0
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
+  DISTROLESS_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x,linux/riscv64
   BUILD_PARALLELISM: 4
 
 jobs:
@@ -167,26 +169,29 @@ jobs:
         run: |
           ALPINE_IMAGES="${ALPINE_IMAGE_NAME}:latest,${ALPINE_IMAGE_NAME}:${{ github.sha }}"
           DISTROLESS_IMAGES="${DISTROLESS_IMAGE_NAME}:latest,${DISTROLESS_IMAGE_NAME}:${{ github.sha }}"
+          TURN_IMAGES="${TURN_IMAGE_NAME}:latest,${TURN_IMAGE_NAME}:${{ github.sha }}"
           if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
               ALPINE_IMAGES+=",${ALPINE_IMAGE_NAME}:${{ github.ref_name }}"
               DISTROLESS_IMAGES+=",${DISTROLESS_IMAGE_NAME}:${{ github.ref_name }}"
+              TURN_IMAGES+=",${TURN_IMAGE_NAME}:${{ github.ref_name }}"
           fi
           echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
           echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
+          echo "turn-images=${TURN_IMAGES}" >> "${GITHUB_OUTPUT}"
 
       - name: Run Snapshot Build
         uses: goreleaser/goreleaser-action@v4
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         with:
           version: latest
-          args: build --snapshot --clean --id node-docker-linux --parallelism=${{ env.BUILD_PARALLELISM }}
+          args: build --snapshot --clean --id node-docker-linux --id turn-docker-linux --parallelism=${{ env.BUILD_PARALLELISM }}
 
       - name: Run Build
         uses: goreleaser/goreleaser-action@v4
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         with:
           version: latest
-          args: build --clean --id node-docker-linux --parallelism=${{ env.BUILD_PARALLELISM }}
+          args: build --clean --id node-docker-linux --id turn-docker-linux --parallelism=${{ env.BUILD_PARALLELISM }}
 
       - name: Login to GHCR
         uses: docker/login-action@v2
@@ -214,8 +219,19 @@ jobs:
           file: Dockerfile.distroless
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.image-tags.outputs.distroless-images }}
-          platforms: ${{ env.DOCKER_PLATFORMS }}
+          platforms: ${{ env.DISTROLESS_PLATFORMS }}
           build-args: PREFIX=node-docker-linux
+
+      - name: Build Webmesh TURN Container Images
+        uses: docker/build-push-action@v4
+        id: turn-build
+        with:
+          context: .
+          file: Dockerfile.turn
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image-tags.outputs.turn-images }}
+          platforms: ${{ env.DISTROLESS_PLATFORMS }}
+          build-args: PREFIX=turn-docker-linux
 
       - name: Sign Container Images
         shell: bash
@@ -225,3 +241,4 @@ jobs:
         run: |
           cosign sign --yes --recursive ${ALPINE_IMAGE_NAME}@${{ steps.alpine-build.outputs.digest }}
           cosign sign --yes --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.distroless-build.outputs.digest }}
+          cosign sign --yes --recursive ${DISTROLESS_IMAGE_NAME}@${{ steps.turn-build.outputs.digest }}
