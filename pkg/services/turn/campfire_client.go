@@ -252,6 +252,8 @@ func (c *CampfireClient) handleIncoming() {
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				continue
+			} else if errors.Is(err, net.ErrClosed) {
+				return
 			}
 			c.errc <- err
 			return
