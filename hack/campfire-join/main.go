@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 
 func main() {
 	psk := flag.String("psk", "", "pre-shared key")
+	turnServer := flag.String("turn-server", "stun:127.0.0.1:3478", "turn server")
 	log := common.ParseFlagsAndSetupLogger()
 	if *psk == "" {
 		fmt.Fprintln(os.Stderr, "psk is required")
@@ -21,7 +23,8 @@ func main() {
 	ctx := context.Background()
 
 	conn, err := campfire.Join(ctx, campfire.Options{
-		PSK: []byte(*psk),
+		PSK:         []byte(*psk),
+		TURNServers: []string{*turnServer},
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -38,8 +41,8 @@ func main() {
 				log.Error("error", "error", err.Error())
 				return
 			}
-			fmt.Println(string(buf[:n]))
-			fmt.Print(">")
+			fmt.Println("remote:", string(buf[:n]))
+			fmt.Print("> ")
 		}
 	}()
 	in := bufio.NewReader(os.Stdin)
@@ -50,7 +53,7 @@ func main() {
 			log.Error("error", "error", err.Error())
 			return
 		}
-		_, err = conn.Write(line)
+		_, err = conn.Write(bytes.TrimSpace(line))
 		if err != nil {
 			log.Error("error", "error", err.Error())
 			return

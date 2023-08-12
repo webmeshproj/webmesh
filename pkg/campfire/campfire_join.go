@@ -17,44 +17,36 @@ limitations under the License.
 package campfire
 
 import (
-	"bytes"
-	"crypto"
 	"fmt"
 	"io"
-	"net"
-	"strings"
-	"text/template"
 
-	"github.com/pion/datachannel"
-	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
-	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/services/turn"
 )
 
 // Join will attempt to join the peer waiting at the given location.
 func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
-	_, cert, err := loadCertificate()
-	if err != nil {
-		return nil, fmt.Errorf("load certificate: %w", err)
-	}
 	location, err := Find(opts.PSK, opts.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
-	turnHost, err := net.ResolveUDPAddr("udp", strings.TrimPrefix(location.TURNServer, "turn:"))
+	fireconn, err := turn.NewCampfireClient(turn.CampfireClientOptions{
+		Addr:  location.TURNServer,
+		Ufrag: location.RemoteUfrag(),
+		Pwd:   location.RemotePwd(),
+		PSK:   opts.PSK,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("resolve turn server: %w", err)
+		return nil, fmt.Errorf("new campfire client: %w", err)
 	}
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
-	s.SetICECredentials(location.LocalUfrag(), location.LocalPwd())
 	s.SetIncludeLoopbackCandidate(true)
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
-		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs:       []string{location.TURNServer},
@@ -67,116 +59,94 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		return nil, fmt.Errorf("create peer connection: %w", err)
 	}
 	errs := make(chan error, 1)
-	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
-			return
-		}
-		log.Debug("ICE candidate", "candidate", c.String())
-	})
-	pc.OnNegotiationNeeded(func() {
-		offer, err := pc.CreateOffer(nil)
-		if err != nil {
-			errs <- fmt.Errorf("create offer: %w", err)
-			return
-		}
-		err = pc.SetLocalDescription(offer)
-		if err != nil {
-			errs <- fmt.Errorf("set local description: %w", err)
-			return
-		}
-		fingerprint, err := fingerprint.Fingerprint(cert, crypto.SHA256)
-		if err != nil {
-			errs <- fmt.Errorf("fingerprint certificate: %w", err)
-			return
-		}
-		var answer bytes.Buffer
-		err = joinerRemoteTemplate.Execute(&answer, map[string]any{
-			"SessionID":   location.SessionID(),
-			"Username":    location.RemoteUfrag(),
-			"Secret":      location.RemotePwd(),
-			"Fingerprint": strings.ToUpper(fingerprint),
-			"TURNServer":  turnHost.AddrPort().Addr().String(),
-			"TURNPort":    turnHost.Port,
-		})
-		if err != nil {
-			errs <- fmt.Errorf("execute remote template: %w", err)
-			return
-		}
-		err = pc.SetRemoteDescription(webrtc.SessionDescription{
-			Type: webrtc.SDPTypeAnswer,
-			SDP:  answer.String(),
-		})
-		if err != nil {
-			errs <- fmt.Errorf("set remote description: %w", err)
-			return
-		}
-		turnCandidate, err := ice.NewCandidateRelay(&ice.CandidateRelayConfig{
-			Network: "udp",
-			Address: turnHost.AddrPort().Addr().String(),
-			Port:    turnHost.Port,
-		})
-		if err != nil {
-			errs <- fmt.Errorf("new turn candidate: %w", err)
-			return
-		}
-		err = pc.AddICECandidate(webrtc.ICECandidateInit{
-			Candidate: turnCandidate.Marshal(),
-		})
-		if err != nil {
-			errs <- fmt.Errorf("add turn candidate: %w", err)
-			return
-		}
-	})
-	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		log.Debug("ICE connection state changed", "state", state.String())
-		switch state {
-		case webrtc.ICEConnectionStateFailed:
-			errs <- fmt.Errorf("ice connection failed")
-		}
-	})
-	dc, err := pc.CreateDataChannel("webrtc-datachannel", nil)
+	acceptc := make(chan io.ReadWriteCloser)
+	dc, err := pc.CreateDataChannel(string(location.PSK), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
-	acceptc := make(chan datachannel.ReadWriteCloser, 1)
 	dc.OnOpen(func() {
-		log.Info("data channel opened")
+		log.Debug("data channel open")
 		rw, err := dc.Detach()
 		if err != nil {
 			errs <- fmt.Errorf("detach data channel: %w", err)
 			return
 		}
-		acceptc <- campfireConn{ReadWriteCloser: rw, pc: pc}
+		acceptc <- rw
 	})
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		return nil, fmt.Errorf("create offer: %w", err)
+	}
+	err = pc.SetLocalDescription(offer)
+	if err != nil {
+		return nil, fmt.Errorf("set local description: %w", err)
+	}
+	err = fireconn.SendOffer(location.LocalUfrag(), location.LocalPwd(), offer)
+	if err != nil {
+		return nil, fmt.Errorf("send offer: %w", err)
+	}
+	connectedc := make(chan struct{})
+	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c == nil {
+			return
+		}
+		select {
+		case <-connectedc:
+			return
+		default:
+		}
+		log.Debug("sending local ICE candidate", "candidate", c.String())
+		err = fireconn.SendCandidate(location.LocalUfrag(), location.LocalPwd(), c)
+		if err != nil {
+			errs <- fmt.Errorf("send ice candidate: %w", err)
+			return
+		}
+	})
+	var answer turn.CampfireAnswer
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
+	case answer = <-fireconn.Answers():
+	}
+	log.Debug("received answer", "answer", answer.SDP)
+	err = pc.SetRemoteDescription(answer.SDP)
+	if err != nil {
+		return nil, fmt.Errorf("set remote description: %w", err)
+	}
+	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		log.Debug("peer connection state change", "state", state.String())
+		if state == webrtc.PeerConnectionStateConnected {
+			close(connectedc)
+		}
+		if state == webrtc.PeerConnectionStateDisconnected || state == webrtc.PeerConnectionStateFailed {
+			errs <- fmt.Errorf("peer connection state: %s", state.String())
+		}
+	})
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-connectedc:
+				return
+			case cand := <-fireconn.Candidates():
+				log.Debug("received remote ICE candidate", "candidate", cand.Cand)
+				err = pc.AddICECandidate(cand.Cand)
+				if err != nil {
+					errs <- fmt.Errorf("add ice candidate: %w", err)
+					return
+				}
+			}
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case err := <-fireconn.Errors():
+		return nil, err
 	case err := <-errs:
 		return nil, err
 	case rw := <-acceptc:
 		return rw, nil
 	}
 }
-
-type campfireConn struct {
-	datachannel.ReadWriteCloser
-	pc *webrtc.PeerConnection
-}
-
-var joinerRemoteTemplate = template.Must(template.New("cli-remote-desc").Parse(`v=0
-o=- {{ .SessionID }} 2 IN IP4 0.0.0.0
-s=-
-t=0 0
-a=fingerprint:sha-256 {{ .Fingerprint }}
-a=group:BUNDLE 0
-a=ice-lite
-m=application 9 DTLS/SCTP 5000
-c=IN IP4 0.0.0.0
-a=setup:active
-a=mid:0
-a=sendrecv
-a=sctpmap:5000 webrtc-datachannel 1024
-a=ice-ufrag:{{ .Username }}
-a=ice-pwd:{{ .Secret }}
-a=candidate:1 1 UDP 99999 {{ .TURNServer }} {{ .TURNPort }} typ relay 127.0.0.1 50000
-`))

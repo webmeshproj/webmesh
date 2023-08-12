@@ -34,8 +34,8 @@ type CampFire interface {
 	Close() error
 	// Errors returns a channel of errors.
 	Errors() <-chan error
-	// Ready returns a channel that is closed when the camp fire is ready.
-	Ready() <-chan struct{}
+	// Expired returns a channel that is closed when the camp fire expires.
+	Expired() <-chan struct{}
 }
 
 // Options are options for creating or joining a new camp fire.

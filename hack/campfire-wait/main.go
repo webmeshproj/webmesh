@@ -22,7 +22,7 @@ func main() {
 	}
 	ctx := context.Background()
 
-	conn, err := campfire.JoinTURN(ctx, campfire.Options{
+	cf, err := campfire.Wait(ctx, campfire.Options{
 		PSK:         []byte(*psk),
 		TURNServers: []string{*turnServer},
 	})
@@ -30,7 +30,25 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer cf.Close()
+
+	go func() {
+		select {
+		case err := <-cf.Errors():
+			log.Error("error", "error", err.Error())
+			os.Exit(1)
+		case <-cf.Expired():
+			log.Info("campfire expired")
+			os.Exit(0)
+		}
+	}()
+
+	log.Info("waiting for connection")
+	conn, err := cf.Accept()
+	if err != nil {
+		log.Error("error", "error", err.Error())
+		return
+	}
 	log.Info("got connection")
 	go func() {
 		defer conn.Close()

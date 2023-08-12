@@ -57,12 +57,12 @@ func Find(psk []byte, turnServers []string) (*Location, error) {
 	if len(turnServers) == 0 {
 		turnServers = GetDefaultTURNServers()
 	}
-	t := Now().UTC().Truncate(time.Hour)
-	localsecret, err := computeSecret(t, psk, true)
+	t := Now().Truncate(time.Hour)
+	localsecret, err := computeSecret(t.UTC(), psk, true)
 	if err != nil {
 		return nil, fmt.Errorf("compute local secret: %w", err)
 	}
-	remotesecret, err := computeSecret(t, psk, false)
+	remotesecret, err := computeSecret(t.UTC(), psk, false)
 	if err != nil {
 		return nil, fmt.Errorf("compute remote secret: %w", err)
 	}
@@ -148,13 +148,11 @@ func computeSecret(time time.Time, psk []byte, isLocal bool) ([]byte, error) {
 func numericSession(inputString string) int {
 	maxDigit := 9
 	numericString := ""
-
 	for i := 0; i < len(inputString); i++ {
 		charCode := int(inputString[i])
 		digit := charCode % (maxDigit + 1) // Ensure digit is between 0 and 9
 		numericString += fmt.Sprintf("%d", digit)
 	}
-
 	result, _ := strconv.Atoi(numericString)
 	return result
 }

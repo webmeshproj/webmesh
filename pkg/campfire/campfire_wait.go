@@ -17,265 +17,195 @@ limitations under the License.
 package campfire
 
 import (
-	"bytes"
-	"crypto/x509"
-	_ "embed"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
-	"strings"
-	"sync"
-	"text/template"
+	"time"
 
-	"github.com/pion/datachannel"
-	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/services/turn"
 )
 
-var (
-	//go:embed zcampfire.crt
-	campfireCert []byte
-	//go:embed zcampfire.key
-	campfireKey []byte
-)
-
-// Wait waits for a peer to join the camp fire and dispatches a connections
-// and errors to the appropriate channels.
+// Wait will wait for peers to join at the given location.
 func Wait(ctx context.Context, opts Options) (CampFire, error) {
-	certs, _, err := loadCertificate()
-	if err != nil {
-		return nil, fmt.Errorf("load certificate: %w", err)
-	}
+	log := context.LoggerFrom(ctx).With("protocol", "campfire")
 	location, err := Find(opts.PSK, opts.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
+	fireconn, err := turn.NewCampfireClient(turn.CampfireClientOptions{
+		Addr:  location.TURNServer,
+		Ufrag: location.LocalUfrag(),
+		Pwd:   location.LocalPwd(),
+		PSK:   opts.PSK,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("new campfire client: %w", err)
+	}
+	err = fireconn.Announce(location.RemoteUfrag(), location.RemotePwd())
+	if err != nil {
+		return nil, fmt.Errorf("announce: %w", err)
+	}
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
-	s.DisableCertificateFingerprintVerification(true)
-	s.SetICECredentials(location.RemoteUfrag(), location.RemotePwd())
 	s.SetIncludeLoopbackCandidate(true)
-	cf := offlineCampFire{
+	tw := &turnWait{
 		api:      webrtc.NewAPI(webrtc.WithSettingEngine(s)),
-		certs:    certs,
-		psk:      string(opts.PSK),
 		location: location,
-		errc:     make(chan error, 3),
-		readyc:   make(chan struct{}),
-		acceptc:  make(chan datachannel.ReadWriteCloser, 1),
+		fireconn: fireconn,
+		acceptc:  make(chan io.ReadWriteCloser, 1),
 		closec:   make(chan struct{}),
-		log:      context.LoggerFrom(ctx).With("protocol", "campfire"),
+		errc:     make(chan error, 10),
+		log:      log,
 	}
-	go cf.handlePeerConnections()
-	return &cf, nil
+	go tw.handleIncomingOffers()
+	return tw, nil
 }
 
-type offlineCampFire struct {
+type turnWait struct {
 	api      *webrtc.API
-	certs    []webrtc.Certificate
 	location *Location
-	psk      string
-	errc     chan error
-	readyc   chan struct{}
-	acceptc  chan datachannel.ReadWriteCloser
+	fireconn *turn.CampfireClient
+	acceptc  chan io.ReadWriteCloser
 	closec   chan struct{}
+	errc     chan error
 	log      *slog.Logger
 }
 
-func (o *offlineCampFire) handlePeerConnections() {
-	host, err := net.ResolveUDPAddr("udp", strings.TrimPrefix(o.location.TURNServer, "turn:"))
-	if err != nil {
-		o.errc <- fmt.Errorf("split host port: %w", err)
-		return
+// Accept returns a connection to a peer.
+func (t *turnWait) Accept() (io.ReadWriteCloser, error) {
+	select {
+	case <-t.closec:
+		return nil, ErrClosed
+	case conn := <-t.acceptc:
+		return conn, nil
 	}
-	var remoteDescription bytes.Buffer
-	turnAddr := host.AddrPort().Addr().String()
-	err = waiterRemoteTemplate.Execute(&remoteDescription, map[string]any{
-		"SessionID":  o.location.SessionID(),
-		"Username":   o.location.LocalUfrag(),
-		"Secret":     o.location.LocalPwd(),
-		"TURNServer": turnAddr,
-		"TURNPort":   host.Port,
-	})
-	if err != nil {
-		o.errc <- fmt.Errorf("execute remote template: %w", err)
-		return
+}
+
+// Close closes the camp fire.
+func (t *turnWait) Close() error {
+	close(t.closec)
+	return t.fireconn.Close()
+}
+
+// Errors returns a channel of errors.
+func (t *turnWait) Errors() <-chan error { return t.errc }
+
+// Expired returns a channel that is closed when the camp fire expires.
+func (t *turnWait) Expired() <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		defer close(ch)
+		select {
+		case <-t.closec:
+		case <-time.After(time.Until(t.location.ExpiresAt)):
+		}
+	}()
+	return ch
+}
+
+func (t *turnWait) handleIncomingOffers() {
+	offers := t.fireconn.Offers()
+	for {
+		select {
+		case <-t.closec:
+			return
+		case err := <-t.fireconn.Errors():
+			t.errc <- fmt.Errorf("campfire client: %w", err)
+			return
+		case offer := <-offers:
+			if offer.Ufrag != t.location.RemoteUfrag() || offer.Pwd != t.location.RemotePwd() {
+				t.log.Warn("received offer with unexpected ufrag/pwd", "ufrag", offer.Ufrag, "pwd", offer.Pwd)
+				continue
+			}
+			t.handleNewPeerConnection(&offer)
+		}
 	}
-	pc, err := o.api.NewPeerConnection(webrtc.Configuration{
-		Certificates:       o.certs,
-		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
+}
+
+func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
+	pc, err := t.api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{o.location.TURNServer},
+				URLs:       []string{t.location.TURNServer},
 				Username:   "-",
 				Credential: "-",
 			},
 		},
 	})
 	if err != nil {
-		o.errc <- fmt.Errorf("new peer connection: %w", err)
+		t.errc <- fmt.Errorf("new peer connection: %w", err)
 		return
 	}
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
 			return
 		}
-		o.log.Debug("ICE candidate", "candidate", c.String())
+		t.log.Debug("sending local ice candidate", "candidate", c)
+		err := t.fireconn.SendCandidate(t.location.RemoteUfrag(), t.location.RemotePwd(), c)
+		if err != nil {
+			t.log.Warn("failed to send ice candidate", "err", err)
+		}
 	})
+	connectedc := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-t.closec:
+				return
+			case <-connectedc:
+				return
+			case candidate := <-t.fireconn.Candidates():
+				t.log.Debug("received remote ice candidate", "candidate", candidate)
+				err = pc.AddICECandidate(candidate.Cand)
+				if err != nil {
+					t.errc <- fmt.Errorf("add ice candidate: %w", err)
+					return
+				}
+			}
+		}
+	}()
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		o.log.Debug("ICE connection state changed", "state", state.String())
-		switch state {
-		case webrtc.ICEConnectionStateConnected:
-			close(o.readyc)
-		case webrtc.ICEConnectionStateFailed:
-			o.errc <- fmt.Errorf("ice connection failed")
+		t.log.Debug("ice connection state changed", "state", state)
+		if state == webrtc.ICEConnectionStateConnected || state == webrtc.ICEConnectionStateCompleted {
+			close(connectedc)
 		}
 	})
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
-		o.log.Debug("Data channel opened", "label", dc.Label())
-		if dc.Label() != o.psk {
-			o.errc <- fmt.Errorf("unexpected data channel label: %q", dc.Label())
+		t.log.Debug("received data channel", "label", dc.Label())
+		if dc.Label() != string(t.location.PSK) {
+			t.log.Warn("received data channel with unexpected label", "label", dc.Label())
 			return
 		}
-		rw, err := dc.Detach()
-		if err != nil {
-			o.errc <- fmt.Errorf("detach data channel: %w", err)
-			return
-		}
-		o.acceptc <- rw
+		dc.OnOpen(func() {
+			rw, err := dc.Detach()
+			if err != nil {
+				t.errc <- fmt.Errorf("detach data channel: %w", err)
+				return
+			}
+			t.acceptc <- rw
+		})
 	})
-	err = pc.SetRemoteDescription(webrtc.SessionDescription{
-		Type: webrtc.SDPTypeOffer,
-		SDP:  remoteDescription.String(),
-	})
+	err = pc.SetRemoteDescription(offer.SDP)
 	if err != nil {
-		o.errc <- fmt.Errorf("set remote description: %w", err)
-		return
-	}
-	turnCandidate, err := ice.NewCandidateRelay(&ice.CandidateRelayConfig{
-		Network: "udp",
-		Address: turnAddr,
-		Port:    host.Port,
-	})
-	if err != nil {
-		o.errc <- fmt.Errorf("new turn candidate: %w", err)
-		return
-	}
-	err = pc.AddICECandidate(webrtc.ICECandidateInit{
-		Candidate: turnCandidate.Marshal(),
-	})
-	if err != nil {
-		o.errc <- fmt.Errorf("add turn candidate: %w", err)
+		t.errc <- fmt.Errorf("set remote description: %w", err)
 		return
 	}
 	answer, err := pc.CreateAnswer(nil)
 	if err != nil {
-		o.errc <- fmt.Errorf("create answer: %w", err)
+		t.errc <- fmt.Errorf("create answer: %w", err)
 		return
 	}
 	err = pc.SetLocalDescription(answer)
 	if err != nil {
-		o.errc <- fmt.Errorf("set local description: %w", err)
+		t.errc <- fmt.Errorf("set local description: %w", err)
+		return
+	}
+	err = t.fireconn.SendAnswer(t.location.RemoteUfrag(), t.location.RemotePwd(), answer)
+	if err != nil {
+		t.errc <- fmt.Errorf("send answer: %w", err)
 		return
 	}
 }
-
-// Accept returns a connection to a peer.
-func (o *offlineCampFire) Accept() (io.ReadWriteCloser, error) {
-	select {
-	case <-o.closec:
-		return nil, ErrClosed
-	case <-o.readyc:
-	}
-	select {
-	case <-o.closec:
-		return nil, ErrClosed
-	case conn := <-o.acceptc:
-		return conn, nil
-	}
-}
-
-// Close closes the camp fire.
-func (o *offlineCampFire) Close() error {
-	select {
-	case <-o.closec:
-		return ErrClosed
-	default:
-		close(o.closec)
-	}
-	return nil
-}
-
-// Errors returns a channel of errors.
-func (o *offlineCampFire) Errors() <-chan error {
-	return o.errc
-}
-
-// Ready returns a channel that is closed when the camp fire is ready.
-func (o *offlineCampFire) Ready() <-chan struct{} {
-	return o.readyc
-}
-
-var (
-	offlineX509Cert  *x509.Certificate
-	offlineCerts     []webrtc.Certificate
-	offlineCertsErr  error
-	offlineCertsOnce sync.Once
-)
-
-func loadCertificate() ([]webrtc.Certificate, *x509.Certificate, error) {
-	offlineCertsOnce.Do(func() {
-		certPem, extra := pem.Decode(campfireCert)
-		if len(extra) > 0 {
-			offlineCertsErr = fmt.Errorf("extra data after certificate")
-			return
-		}
-		if certPem == nil {
-			offlineCertsErr = fmt.Errorf("failed to decode certificate")
-			return
-		}
-		keyPem, extra := pem.Decode(campfireKey)
-		if len(extra) > 0 {
-			offlineCertsErr = fmt.Errorf("extra data after key")
-			return
-		}
-		if keyPem == nil {
-			offlineCertsErr = fmt.Errorf("failed to decode key")
-			return
-		}
-		cert, err := x509.ParseCertificate(certPem.Bytes)
-		if err != nil {
-			offlineCertsErr = fmt.Errorf("parse certificate: %w", err)
-			return
-		}
-		offlineX509Cert = cert
-		key, err := x509.ParsePKCS8PrivateKey(keyPem.Bytes)
-		if err != nil {
-			offlineCertsErr = fmt.Errorf("parse key: %w", err)
-			return
-		}
-		offlineCerts = []webrtc.Certificate{webrtc.CertificateFromX509(key, cert)}
-	})
-	return offlineCerts, offlineX509Cert, offlineCertsErr
-}
-
-var waiterRemoteTemplate = template.Must(template.New("srv-remote-desc").Parse(`v=0
-o=- {{ .SessionID }} 2 IN IP4 0.0.0.0
-s=-
-t=0 0
-a=group:BUNDLE 0
-a=msid-semantic: WMS
-m=application 9 UDP/DTLS/SCTP webrtc-datachannel
-c=IN IP4 0.0.0.0
-a=ice-ufrag:{{ .Username }}
-a=ice-pwd:{{ .Secret }}
-a=fingerprint:sha-256 invalidFingerprint
-a=setup:actpass
-a=mid:0
-a=sctp-port:5000
-a=candidate:1 1 UDP 99999 {{ .TURNServer }} {{ .TURNPort }} typ relay 127.0.0.1 50000
-`))
