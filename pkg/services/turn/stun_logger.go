@@ -23,8 +23,6 @@ import (
 	"github.com/pion/stun"
 )
 
-// stunLogger wraps a PacketConn and prints incoming/outgoing STUN packets
-// This pattern could be used to capture/inspect/modify data as well
 type stunLogger struct {
 	net.PacketConn
 	log *slog.Logger

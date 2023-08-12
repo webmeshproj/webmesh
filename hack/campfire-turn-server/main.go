@@ -13,6 +13,7 @@ func main() {
 		ListenPortUDP:    3478,
 		PortRange:        "50000-60000",
 		Realm:            "webmesh",
+		EnableCampfire:   true,
 	})
 	if err != nil {
 		panic(err)

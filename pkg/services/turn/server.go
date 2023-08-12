@@ -42,6 +42,8 @@ type Options struct {
 	Realm string
 	// PortRange is the range of ports the TURN server will use for relaying.
 	PortRange string
+	// EnableCampfire enables relaying campfire packets.
+	EnableCampfire bool
 }
 
 // Server is a TURN server.
@@ -68,9 +70,13 @@ func NewServer(o *Options) (*Server, error) {
 	}
 	log := slog.Default().With("component", "turn-server")
 	log.Info("Listening for STUN requests", slog.String("listen-addr", udpListenAddr))
-	logWrapper := &stunLogger{
+	var pktConn net.PacketConn
+	pktConn = &stunLogger{
 		PacketConn: udpConn,
 		log:        log.With("channel", "stun"),
+	}
+	if o.EnableCampfire {
+		pktConn = NewCampFireManager(pktConn, log.With("channel", "campfire"))
 	}
 	s, err := turn.NewServer(turn.ServerConfig{
 		Realm:         o.Realm,
@@ -85,8 +91,7 @@ func NewServer(o *Options) (*Server, error) {
 		// PacketConnConfigs is a list of UDP Listeners and the configuration around them
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
-				// TODO: Make campfire opt-in
-				PacketConn: NewCampFireManager(logWrapper, log.With("channel", "relay")),
+				PacketConn: pktConn,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorPortRange{
 					RelayAddress: net.ParseIP(o.PublicIP),
 					Address:      o.ListenAddressUDP,
