@@ -45,6 +45,22 @@ func (c CampfireMessageType) IsValid() bool {
 	return c >= CampfireMessageAnnounce && c <= CampfireMessageICE
 }
 
+// String returns the string representation of the message type.
+func (c CampfireMessageType) String() string {
+	switch c {
+	case CampfireMessageAnnounce:
+		return "announce"
+	case CampfireMessageOffer:
+		return "offer"
+	case CampfireMessageAnswer:
+		return "answer"
+	case CampfireMessageICE:
+		return "ice"
+	default:
+		return "unknown"
+	}
+}
+
 // CampfireMessage is a message sent over campfire.
 type CampfireMessage struct {
 	LUfrag string

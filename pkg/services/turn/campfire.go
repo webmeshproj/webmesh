@@ -21,8 +21,6 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	"github.com/pion/stun"
 )
 
 type campFireManager struct {
@@ -52,23 +50,26 @@ func newCampFireManager(pc net.PacketConn, log *slog.Logger) *campFireManager {
 	return cm
 }
 
-func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	if n, addr, err = s.PacketConn.ReadFrom(p); err == nil && !stun.IsMessage(p) {
-		data := p[:n]
-		s.log.Debug("out-of-band inbound message", slog.Any("msg", string(data)))
-		if IsCampfireMessage(data) {
-			s.log.Debug("handling inbound campfire message", slog.Any("msg", string(data)))
-			msg, derr := DecodeCampfireMessage(data)
-			if derr != nil {
-				s.log.Warn("failed to decode campfire message", slog.String("error", err.Error()))
-				return
-			}
-			if verr := msg.Validate(); verr != nil {
-				s.log.Warn("invalid campfire message", slog.String("error", verr.Error()))
-				return
-			}
-			s.handleCampFireMessage(msg, addr)
+func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, rerr error) {
+	if n, addr, rerr = s.PacketConn.ReadFrom(p); rerr == nil && IsCampfireMessage(p) {
+		s.log.Debug("handling campfire message", "saddr", addr.String())
+		msg, err := DecodeCampfireMessage(p[:n])
+		if err != nil {
+			s.log.Warn("failed to decode campfire message", slog.String("error", err.Error()))
+			return
 		}
+		if err := msg.Validate(); err != nil {
+			s.log.Warn("invalid campfire message", slog.String("error", err.Error()))
+			return
+		}
+		s.log.Debug("dispatching campfire message",
+			slog.String("lufrag", msg.LUfrag),
+			slog.String("lpwd", msg.LPwd),
+			slog.String("rufrag", msg.RUfrag),
+			slog.String("rpwd", msg.RPwd),
+			slog.String("type", msg.Type.String()),
+		)
+		s.handleCampFireMessage(msg, addr)
 	}
 	return
 }
@@ -79,7 +80,6 @@ func (s *campFireManager) Close() error {
 }
 
 func (s *campFireManager) handleCampFireMessage(msg *CampfireMessage, saddr net.Addr) {
-	s.log.Debug("handling campfire message", slog.Any("msg", msg))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch msg.Type {

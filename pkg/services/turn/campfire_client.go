@@ -247,7 +247,7 @@ func (c *CampfireClient) handleIncoming() {
 			c.errc <- err
 			return
 		}
-		data := make([]byte, 1024)
+		data := make([]byte, 4096)
 		n, _, err := c.conn.ReadFromUDP(data)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
