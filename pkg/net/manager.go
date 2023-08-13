@@ -465,7 +465,12 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	}
 	endpoint, err := m.determinePeerEndpoint(ctx, peer, iceServers)
 	if err != nil {
-		return fmt.Errorf("determine peer endpoint: %w", err)
+		if !peer.GetIce() {
+			return fmt.Errorf("determine peer endpoint: %w", err)
+		}
+		// If this is an ICE peer, we'll entertain that they might be able
+		// to connect to us.
+		log.Warn("error determining ICE endpoint, will wait for incoming connection", "error", err.Error())
 	}
 	allowedIPs := make([]netip.Prefix, 0)
 	for _, ip := range peer.GetAllowedIps() {
@@ -634,7 +639,7 @@ func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, 
 		defer func() {
 			// This is a hacky way to attempt to reconnect to the peer if
 			// the ICE connection is closed and they are still in the store.
-			if err := m.RefreshPeers(ctx); err != nil {
+			if err := m.RefreshPeers(context.Background()); err != nil {
 				log.Error("error refreshing peers after ICE connection closed", slog.String("error", err.Error()))
 			}
 		}()

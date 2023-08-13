@@ -23,6 +23,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/pion/webrtc/v3"
@@ -62,14 +63,26 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 		closec:         make(chan struct{}),
 	}
 	log := context.LoggerFrom(ctx)
+	readyc := make(chan struct{})
+	var mu sync.Mutex
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
 			return
 		}
 		log.Debug("Received ICE candidate", slog.Any("candidate", c))
+		mu.Lock()
+		select {
+		case <-readyc:
+			return
+		case <-pc.closec:
+		default:
+		}
 		pc.candidatec <- c.ToJSON().Candidate
+		mu.Unlock()
 	})
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		mu.Lock()
+		defer mu.Unlock()
 		if state == webrtc.ICEConnectionStateConnected {
 			candidatePair, err := pc.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 			if err != nil {
@@ -77,7 +90,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 				return
 			}
 			log.Debug("ICE connection established", slog.Any("local", candidatePair.Local), slog.Any("remote", candidatePair.Remote))
-			close(pc.candidatec)
+			close(readyc)
 		}
 		if state == webrtc.ICEConnectionStateCompleted || state == webrtc.ICEConnectionStateFailed {
 			log.Info("ICE connection has closed", "reason", state.String())
@@ -92,6 +105,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 	}
 	dc.OnOpen(func() {
 		log.Info("Server side datachannel opened")
+		close(pc.candidatec)
 		rw, err := dc.Detach()
 		if err != nil {
 			log.Error("Failed to detach data channel", slog.String("error", err.Error()))
@@ -420,6 +434,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 					break
 				}
 				errs <- fmt.Errorf("failed to receive ICE candidate: %w", err)
+				break
 			}
 			candidate := webrtc.ICECandidateInit{
 				Candidate: msg.GetCandidate(),
@@ -432,7 +447,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 	select {
 	case err := <-errs:
 		return nil, err
-	case <-time.After(10 * time.Second):
+	case <-time.After(15 * time.Second):
 		return nil, fmt.Errorf("timed out waiting for data channel to open")
 	case <-pc.readyc:
 	}

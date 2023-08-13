@@ -148,7 +148,7 @@ func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) e
 			return fmt.Errorf("campfire join error: %s", string(buf[:n]))
 		}
 		log.Info("Received join response over campfire", slog.Any("resp", &resp))
-		err = s.handleJoinResponse(ctx, &resp, key)
+		err = s.handleJoinResponse(context.WithLogger(context.Background(), log), &resp, key)
 		if err != nil {
 			if errors.Is(err, errFatalJoin) {
 				return err
