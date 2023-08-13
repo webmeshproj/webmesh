@@ -52,45 +52,45 @@ const (
 // MeshOptions are the options for participating in a mesh.
 type MeshOptions struct {
 	// NodeID is the node ID.
-	NodeID string `json:"node-id,omitempty" yaml:"node-id,omitempty" toml:"node-id,omitempty"`
+	NodeID string `json:"node-id,omitempty" yaml:"node-id,omitempty" toml:"node-id,omitempty" mapstructure:"node-id,omitempty"`
 	// ZoneAwarenessID is the zone awareness ID.
-	ZoneAwarenessID string `json:"zone-awareness-id,omitempty" yaml:"zone-awareness-id,omitempty" toml:"zone-awareness-id,omitempty"`
+	ZoneAwarenessID string `json:"zone-awareness-id,omitempty" yaml:"zone-awareness-id,omitempty" toml:"zone-awareness-id,omitempty" mapstructure:"zone-awareness-id,omitempty"`
 	// JoinAddress is the address of a node to join.
-	JoinAddress string `json:"join-address,omitempty" yaml:"join-address,omitempty" toml:"join-address,omitempty"`
+	JoinAddress string `json:"join-address,omitempty" yaml:"join-address,omitempty" toml:"join-address,omitempty" mapstructure:"join-address,omitempty"`
 	// JoinCampfirePSK is the PSK to use for joining via the campfire protocol.
-	JoinCampfirePSK string `json:"join-campfire-psk,omitempty" yaml:"join-campfire-psk,omitempty" toml:"join-campfire-psk,omitempty"`
+	JoinCampfirePSK string `json:"join-campfire-psk,omitempty" yaml:"join-campfire-psk,omitempty" toml:"join-campfire-psk,omitempty" mapstructure:"join-campfire-psk,omitempty"`
 	// JoinCampfireTURNServers is the TURN servers to use for joining via the campfire protocol.
-	JoinCampfireTURNServers []string `json:"join-campfire-turn-servers,omitempty" yaml:"join-campfire-turn-servers,omitempty" toml:"join-campfire-turn-servers,omitempty"`
+	JoinCampfireTURNServers []string `json:"join-campfire-turn-servers,omitempty" yaml:"join-campfire-turn-servers,omitempty" toml:"join-campfire-turn-servers,omitempty" mapstructure:"join-campfire-turn-servers,omitempty"`
 	// WaitCampfirePSK is the PSK for offering others to join via the campfire protocol.
-	WaitCampfirePSK string `json:"wait-campfire-psk,omitempty" yaml:"wait-campfire-psk,omitempty" toml:"wait-campfire-psk,omitempty"`
+	WaitCampfirePSK string `json:"wait-campfire-psk,omitempty" yaml:"wait-campfire-psk,omitempty" toml:"wait-campfire-psk,omitempty" mapstructure:"wait-campfire-psk,omitempty"`
 	// WaitCampfireTURNServers is the TURN servers for offering others to join via the campfire protocol.
-	WaitCampfireTURNServers []string `json:"wait-campfire-turn-servers,omitempty" yaml:"wait-campfire-turn-servers,omitempty" toml:"wait-campfire-turn-servers,omitempty"`
+	WaitCampfireTURNServers []string `json:"wait-campfire-turn-servers,omitempty" yaml:"wait-campfire-turn-servers,omitempty" toml:"wait-campfire-turn-servers,omitempty" mapstructure:"wait-campfire-turn-servers,omitempty"`
 	// PeerDiscoveryAddresses are the addresses to use for peer discovery.
-	PeerDiscoveryAddresses []string `json:"peer-discovery-addresses,omitempty" yaml:"peer-discovery-addresses,omitempty" toml:"peer-discovery-addresses,omitempty"`
+	PeerDiscoveryAddresses []string `json:"peer-discovery-addresses,omitempty" yaml:"peer-discovery-addresses,omitempty" toml:"peer-discovery-addresses,omitempty" mapstructure:"peer-discovery-addresses,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
-	MaxJoinRetries int `json:"max-join-retries,omitempty" yaml:"max-join-retries,omitempty" toml:"max-join-retries,omitempty"`
+	MaxJoinRetries int `json:"max-join-retries,omitempty" yaml:"max-join-retries,omitempty" toml:"max-join-retries,omitempty" mapstructure:"max-join-retries,omitempty"`
 	// Voter is true if the node should be a voter.
-	JoinAsVoter bool `json:"voter,omitempty" yaml:"voter,omitempty" toml:"voter,omitempty"`
+	JoinAsVoter bool `json:"join-as-voter,omitempty" yaml:"join-as-voter,omitempty" toml:"join-as-voter,omitempty" mapstructure:"join-as-voter,omitempty"`
 	// PrimaryEndpoint is the primary endpoint to advertise when joining.
-	PrimaryEndpoint string `json:"primary-endpoint,omitempty" yaml:"primary-endpoint,omitempty" toml:"primary-endpoint,omitempty"`
+	PrimaryEndpoint string `json:"primary-endpoint,omitempty" yaml:"primary-endpoint,omitempty" toml:"primary-endpoint,omitempty" mapstructure:"primary-endpoint,omitempty"`
 	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
 	// If the node is not allowed to put routes in the mesh, the node will be unable to join.
-	Routes []string `json:"routes,omitempty" yaml:"routes,omitempty" toml:"routes,omitempty"`
+	Routes []string `json:"routes,omitempty" yaml:"routes,omitempty" toml:"routes,omitempty" mapstructure:"routes,omitempty"`
 	// DirectPeers are peers to request direct edges to. If the node is not allowed to create edges
 	// and data channels, the node will be unable to join.
-	DirectPeers []string `json:"direct-peers,omitempty" yaml:"direct-peers,omitempty" toml:"direct-peers,omitempty"`
+	DirectPeers []string `json:"direct-peers,omitempty" yaml:"direct-peers,omitempty" toml:"direct-peers,omitempty" mapstructure:"direct-peers,omitempty"`
 	// GRPCAdvertisePort is the port to advertise for gRPC.
-	GRPCAdvertisePort int `json:"grpc-advertise-port,omitempty" yaml:"grpc-advertise-port,omitempty" toml:"grpc-advertise-port,omitempty"`
+	GRPCAdvertisePort int `json:"grpc-advertise-port,omitempty" yaml:"grpc-advertise-port,omitempty" toml:"grpc-advertise-port,omitempty" mapstructure:"grpc-advertise-port,omitempty"`
 	// MeshDNSAdvertisePort is the port to advertise for DNS.
-	MeshDNSAdvertisePort int `json:"meshdns-advertise-port,omitempty" yaml:"meshdns-advertise-port,omitempty" toml:"meshdns-advertise-port,omitempty"`
+	MeshDNSAdvertisePort int `json:"meshdns-advertise-port,omitempty" yaml:"meshdns-advertise-port,omitempty" toml:"meshdns-advertise-port,omitempty" mapstructure:"meshdns-advertise-port,omitempty"`
 	// UseMeshDNS indicates whether to set mesh DNS servers in the system configuration.
-	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty"`
+	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty" mapstructure:"use-meshdns,omitempty"`
 	// HeartbeatPurgeThreshold is the threshold of failed heartbeats for purging a peer.
-	HeartbeatPurgeThreshold int `json:"heartbeat-purge-threshold,omitempty" yaml:"heartbeat-purge-threshold,omitempty" toml:"heartbeat-purge-threshold,omitempty"`
+	HeartbeatPurgeThreshold int `json:"heartbeat-purge-threshold,omitempty" yaml:"heartbeat-purge-threshold,omitempty" toml:"heartbeat-purge-threshold,omitempty" mapstructure:"heartbeat-purge-threshold,omitempty"`
 	// NoIPv4 disables IPv4 usage.
-	NoIPv4 bool `json:"no-ipv4,omitempty" yaml:"no-ipv4,omitempty" toml:"no-ipv4,omitempty"`
+	NoIPv4 bool `json:"no-ipv4,omitempty" yaml:"no-ipv4,omitempty" toml:"no-ipv4,omitempty" mapstructure:"no-ipv4,omitempty"`
 	// NoIPv6 disables IPv6 usage.
-	NoIPv6 bool `json:"no-ipv6,omitempty" yaml:"no-ipv6,omitempty" toml:"no-ipv6,omitempty"`
+	NoIPv6 bool `json:"no-ipv6,omitempty" yaml:"no-ipv6,omitempty" toml:"no-ipv6,omitempty" mapstructure:"no-ipv6,omitempty"`
 }
 
 // NewMeshOptions creates a new MeshOptions with default values. If the grpcPort

@@ -38,21 +38,21 @@ const (
 // TURNOptions are the TURN Server options.
 type TURNOptions struct {
 	// Enabled enables the TURN server.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty" mapstructure:"enabled,omitempty"`
 	// Endpoint is the endpoint to advertise for the TURN server. If empty, the public IP and listen port is used.
-	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty" toml:"endpoint,omitempty"`
+	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty" toml:"endpoint,omitempty" mapstructure:"endpoint,omitempty"`
 	// PublicIP is the address advertised for STUN requests.
-	PublicIP string `json:"public-ip,omitempty" yaml:"public-ip,omitempty" toml:"public-ip,omitempty"`
+	PublicIP string `json:"public-ip,omitempty" yaml:"public-ip,omitempty" toml:"public-ip,omitempty" mapstructure:"public-ip,omitempty"`
 	// ListenAddress is the address to listen on for TURN connections.
-	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty"`
+	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty" mapstructure:"listen-address,omitempty"`
 	// ListenPort is the port to listen on for TURN connections.
-	ListenPort int `json:"listen-port,omitempty" yaml:"listen-port,omitempty" toml:"listen-port,omitempty"`
+	ListenPort int `json:"listen-port,omitempty" yaml:"listen-port,omitempty" toml:"listen-port,omitempty" mapstructure:"listen-port,omitempty"`
 	// ServerRealm is the realm used for TURN server authentication.
-	ServerRealm string `json:"realm,omitempty" yaml:"realm,omitempty" toml:"realm,omitempty"`
+	ServerRealm string `json:"realm,omitempty" yaml:"realm,omitempty" toml:"realm,omitempty" mapstructure:"realm,omitempty"`
 	// STUNPortRange is the port range to use for STUN.
-	STUNPortRange string `json:"stun-port-range,omitempty" yaml:"stun-port-range,omitempty" toml:"stun-port-range,omitempty"`
+	STUNPortRange string `json:"stun-port-range,omitempty" yaml:"stun-port-range,omitempty" toml:"stun-port-range,omitempty" mapstructure:"stun-port-range,omitempty"`
 	// CampfireEnabled enables handling campfire packets on the TURN server.
-	CampfireEnabled bool `json:"campfire-enabled,omitempty" yaml:"campfire-enabled,omitempty" toml:"campfire-enabled,omitempty"`
+	CampfireEnabled bool `json:"campfire-enabled,omitempty" yaml:"campfire-enabled,omitempty" toml:"campfire-enabled,omitempty" mapstructure:"campfire-enabled,omitempty"`
 }
 
 // NewTURNOptions creates a new TURNOptions with default values.

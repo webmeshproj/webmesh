@@ -49,37 +49,37 @@ const (
 // WireGuardOptions are options for configuring the WireGuard interface.
 type WireGuardOptions struct {
 	// ListenPort is the port to listen on.
-	ListenPort int `yaml:"listen-port,omitempty" json:"listen-port,omitempty" toml:"listen-port,omitempty"`
+	ListenPort int `yaml:"listen-port,omitempty" json:"listen-port,omitempty" toml:"listen-port,omitempty" mapstructure:"listen-port,omitempty"`
 	// InterfaceName is the name of the interface.
-	InterfaceName string `yaml:"interface-name,omitempty" json:"interface-name,omitempty" toml:"interface-name,omitempty"`
+	InterfaceName string `yaml:"interface-name,omitempty" json:"interface-name,omitempty" toml:"interface-name,omitempty" mapstructure:"interface-name,omitempty"`
 	// ForceInterfaceName forces the use of the given name by deleting
 	// any pre-existing interface with the same name.
-	ForceInterfaceName bool `yaml:"force-interface-name,omitempty" json:"force-interface-name,omitempty" toml:"force-interface-name,omitempty"`
+	ForceInterfaceName bool `yaml:"force-interface-name,omitempty" json:"force-interface-name,omitempty" toml:"force-interface-name,omitempty" mapstructure:"force-interface-name,omitempty"`
 	// ForceTUN forces the use of a TUN interface.
-	ForceTUN bool `yaml:"force-tun,omitempty" json:"force-tun,omitempty" toml:"force-tun,omitempty"`
+	ForceTUN bool `yaml:"force-tun,omitempty" json:"force-tun,omitempty" toml:"force-tun,omitempty" mapstructure:"force-tun,omitempty"`
 	// Modprobe attempts to probe the wireguard module.
-	Modprobe bool `yaml:"modprobe,omitempty" json:"modprobe,omitempty" toml:"modprobe,omitempty"`
+	Modprobe bool `yaml:"modprobe,omitempty" json:"modprobe,omitempty" toml:"modprobe,omitempty" mapstructure:"modprobe,omitempty"`
 	// Masquerade enables masquerading of traffic from the wireguard interface.
-	Masquerade bool `yaml:"masquerade,omitempty" json:"masquerade,omitempty" toml:"masquerade,omitempty"`
+	Masquerade bool `yaml:"masquerade,omitempty" json:"masquerade,omitempty" toml:"masquerade,omitempty" mapstructure:"masquerade,omitempty"`
 	// PersistentKeepAlive is the interval at which to send keepalive packets
 	// to peers. If unset, keepalive packets will automatically be sent to publicly
 	// accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
 	// packets are sent.
-	PersistentKeepAlive time.Duration `yaml:"persistent-keepalive,omitempty" json:"persistent-keepalive,omitempty" toml:"persistent-keepalive,omitempty"`
+	PersistentKeepAlive time.Duration `yaml:"persistent-keepalive,omitempty" json:"persistent-keepalive,omitempty" toml:"persistent-keepalive,omitempty" mapstructure:"persistent-keepalive,omitempty"`
 	// MTU is the MTU to use for the interface.
-	MTU int `yaml:"mtu,omitempty" json:"mtu,omitempty" toml:"mtu,omitempty"`
+	MTU int `yaml:"mtu,omitempty" json:"mtu,omitempty" toml:"mtu,omitempty" mapstructure:"mtu,omitempty"`
 	// Endpoints are additional WireGuard endpoints to broadcast when joining.
-	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty" toml:"endpoints,omitempty"`
+	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty" toml:"endpoints,omitempty" mapstructure:"endpoints,omitempty"`
 	// KeyFile is the path to the WireGuard private key. If it does not exist it will be created.
-	KeyFile string `json:"key-file,omitempty" yaml:"key-file,omitempty" toml:"key-file,omitempty"`
+	KeyFile string `json:"key-file,omitempty" yaml:"key-file,omitempty" toml:"key-file,omitempty" mapstructure:"key-file,omitempty"`
 	// KeyRotationInterval is the interval to rotate wireguard keys.
 	// Set this to 0 to disable key rotation.
-	KeyRotationInterval time.Duration `json:"key-rotation-interval,omitempty" yaml:"key-rotation-interval,omitempty" toml:"key-rotation-interval,omitempty"`
+	KeyRotationInterval time.Duration `json:"key-rotation-interval,omitempty" yaml:"key-rotation-interval,omitempty" toml:"key-rotation-interval,omitempty" mapstructure:"key-rotation-interval,omitempty"`
 	// RecordMetrics enables recording of WireGuard metrics. These are only exposed if the
 	// metrics server is enabled.
-	RecordMetrics bool `json:"record-metrics,omitempty" yaml:"record-metrics,omitempty" toml:"record-metrics,omitempty"`
+	RecordMetrics bool `json:"record-metrics,omitempty" yaml:"record-metrics,omitempty" toml:"record-metrics,omitempty" mapstructure:"record-metrics,omitempty"`
 	// RecordMetricsInterval is the interval at which to update WireGuard metrics.
-	RecordMetricsInterval time.Duration `json:"record-metrics-interval,omitempty" yaml:"record-metrics-interval,omitempty" toml:"record-metrics-interval,omitempty"`
+	RecordMetricsInterval time.Duration `json:"record-metrics-interval,omitempty" yaml:"record-metrics-interval,omitempty" toml:"record-metrics-interval,omitempty" mapstructure:"record-metrics-interval,omitempty"`
 }
 
 // WireGuardOptions returns a new WireGuardOptions with sensible defaults.

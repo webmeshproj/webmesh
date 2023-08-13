@@ -38,19 +38,19 @@ const (
 // Options are the options for the store.
 type Options struct {
 	// Auth are options for authentication to the mesh.
-	Auth *AuthOptions `json:"auth,omitempty" yaml:"auth,omitempty" toml:"auth,omitempty"`
+	Auth *AuthOptions `json:"auth,omitempty" yaml:"auth,omitempty" toml:"auth,omitempty" mapstructure:"auth,omitempty"`
 	// Mesh are options for participating in an existing mesh.
-	Mesh *MeshOptions `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty"`
+	Mesh *MeshOptions `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty" mapstructure:"mesh,omitempty"`
 	// Bootstrap are options for bootstrapping the store.
-	Bootstrap *BootstrapOptions `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty" toml:"bootstrap,omitempty"`
+	Bootstrap *BootstrapOptions `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty" toml:"bootstrap,omitempty" mapstructure:"bootstrap,omitempty"`
 	// Raft are options for the raft store.
-	Raft *raft.Options `json:"raft,omitempty" yaml:"raft,omitempty" toml:"raft,omitempty"`
+	Raft *raft.Options `json:"raft,omitempty" yaml:"raft,omitempty" toml:"raft,omitempty" mapstructure:"raft,omitempty"`
 	// TLS are options for TLS.
-	TLS *TLSOptions `json:"tls,omitempty" yaml:"tls,omitempty" toml:"tls,omitempty"`
+	TLS *TLSOptions `json:"tls,omitempty" yaml:"tls,omitempty" toml:"tls,omitempty" mapstructure:"tls,omitempty"`
 	// WireGuard are options for WireGuard.
-	WireGuard *WireGuardOptions `json:"wireguard,omitempty" yaml:"wireguard,omitempty" toml:"wireguard,omitempty"`
+	WireGuard *WireGuardOptions `json:"wireguard,omitempty" yaml:"wireguard,omitempty" toml:"wireguard,omitempty" mapstructure:"wireguard,omitempty"`
 	// Plugins are options for plugins.
-	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
+	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty" mapstructure:"plugins,omitempty"`
 }
 
 // NewOptions returns new options with sensible defaults. If any of the options

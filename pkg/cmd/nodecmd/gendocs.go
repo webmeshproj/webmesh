@@ -103,12 +103,12 @@ FENCE
 // GenBridgeMarkdownDoc generates the markdown documentation for the bridge commands.
 func GenBridgeMarkdownDoc(title string, weight int, outfile string) error {
 	var sb strings.Builder
-	opts.Bridge.Meshes = make(map[string]*meshbridge.MeshOptions)
-	opts.Bridge.Meshes["<mesh-id>"] = &meshbridge.MeshOptions{
+	config.Bridge.Meshes = make(map[string]*meshbridge.MeshOptions)
+	config.Bridge.Meshes["<mesh-id>"] = &meshbridge.MeshOptions{
 		Mesh:     mesh.NewDefaultOptions(),
 		Services: services.NewOptions(0),
 	}
-	opts.Bridge.Meshes["<mesh-id>"].BindFlags(flagset, "<iface-name>", "bridge", "<mesh-id>")
+	config.Bridge.Meshes["<mesh-id>"].BindFlags(flagset, "<iface-name>", "bridge", "<mesh-id>")
 	// Doc header
 	sb.WriteString(fmt.Sprintf(`---
 title: %s

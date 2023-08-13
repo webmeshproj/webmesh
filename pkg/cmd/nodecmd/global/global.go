@@ -59,46 +59,46 @@ const (
 // Options are the global options.
 type Options struct {
 	// LogLevel is the log level.
-	LogLevel string `yaml:"log-level,omitempty" json:"log-level,omitempty" toml:"log-level,omitempty"`
+	LogLevel string `yaml:"log-level,omitempty" json:"log-level,omitempty" toml:"log-level,omitempty" mapstructure:"log-level"`
 	// TLSCertFile is the TLS certificate file.
-	TLSCertFile string `yaml:"tls-cert-file,omitempty" json:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty"`
+	TLSCertFile string `yaml:"tls-cert-file,omitempty" json:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty" mapstructure:"tls-cert-file"`
 	// TLSKeyFile is the TLS key file.
-	TLSKeyFile string `yaml:"tls-key-file,omitempty" json:"tls-key-file,omitempty" toml:"tls-key-file,omitempty"`
+	TLSKeyFile string `yaml:"tls-key-file,omitempty" json:"tls-key-file,omitempty" toml:"tls-key-file,omitempty" mapstructure:"tls-key-file"`
 	// TLACAFile is the TLS CA file.
-	TLSCAFile string `yaml:"tls-ca-file,omitempty" json:"tls-ca-file,omitempty" toml:"tls-ca-file,omitempty"`
+	TLSCAFile string `yaml:"tls-ca-file,omitempty" json:"tls-ca-file,omitempty" toml:"tls-ca-file,omitempty" mapstructure:"tls-ca-file"`
 	// TLSClientCAFile is the path to the TLS client CA file.
 	// If empty, either TLSCAFile or the system CA pool is used.
-	TLSClientCAFile string `yaml:"tls-client-ca-file,omitempty" json:"tls-client-ca-file,omitempty" toml:"tls-client-ca-file,omitempty"`
+	TLSClientCAFile string `yaml:"tls-client-ca-file,omitempty" json:"tls-client-ca-file,omitempty" toml:"tls-client-ca-file,omitempty" mapstructure:"tls-client-ca-file"`
 	// MTLS is true if mutual TLS is enabled.
-	MTLS bool `yaml:"mtls,omitempty" json:"mtls,omitempty" toml:"mtls,omitempty"`
+	MTLS bool `yaml:"mtls,omitempty" json:"mtls,omitempty" toml:"mtls,omitempty" mapstructure:"mtls"`
 	// VerifyChainOnly is true if only the chain should be verified.
-	VerifyChainOnly bool `yaml:"verify-chain-only,omitempty" json:"verify-chain-only,omitempty" toml:"verify-chain-only,omitempty"`
+	VerifyChainOnly bool `yaml:"verify-chain-only,omitempty" json:"verify-chain-only,omitempty" toml:"verify-chain-only,omitempty" mapstructure:"verify-chain-only"`
 	// Insecure is true if TLS should be disabled.
-	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty" toml:"insecure,omitempty"`
+	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty" toml:"insecure,omitempty" mapstructure:"insecure"`
 	// NoIPv4 is true if IPv4 should be disabled.
-	NoIPv4 bool `yaml:"no-ipv4,omitempty" json:"no-ipv4,omitempty" toml:"no-ipv4,omitempty"`
+	NoIPv4 bool `yaml:"no-ipv4,omitempty" json:"no-ipv4,omitempty" toml:"no-ipv4,omitempty" mapstructure:"no-ipv4"`
 	// NoIPv6 is true if IPv6 should be disabled.
-	NoIPv6 bool `yaml:"no-ipv6,omitempty" json:"no-ipv6,omitempty" toml:"no-ipv6,omitempty"`
+	NoIPv6 bool `yaml:"no-ipv6,omitempty" json:"no-ipv6,omitempty" toml:"no-ipv6,omitempty" mapstructure:"no-ipv6"`
 	// PrimaryEndpoint is the preferred publicly routable address of this node.
 	// Setting this value will override the store advertise address with its
 	// configured listen port.
-	PrimaryEndpoint string `yaml:"primary-endpoint,omitempty" json:"endpoint,omitempty" toml:"endpoint,omitempty"`
+	PrimaryEndpoint string `yaml:"primary-endpoint,omitempty" json:"endpoint,omitempty" toml:"endpoint,omitempty" mapstructure:"endpoint"`
 	// Endpoints are the additional publicly routable addresses of this node.
 	// If PrimaryEndpoint is not set, it will be set to the first endpoint.
 	// Setting this value will override the store advertise with its configured
 	// listen port.
-	Endpoints []string `yaml:"endpoints,omitempty" json:"endpoints,omitempty" toml:"endpoints,omitempty"`
+	Endpoints []string `yaml:"endpoints,omitempty" json:"endpoints,omitempty" toml:"endpoints,omitempty" mapstructure:"endpoints"`
 	// DetectEndpoints is true if the endpoints should be detected.
-	DetectEndpoints bool `yaml:"detect-endpoints,omitempty" json:"detect-endpoints,omitempty" toml:"detect-endpoints,omitempty"`
+	DetectEndpoints bool `yaml:"detect-endpoints,omitempty" json:"detect-endpoints,omitempty" toml:"detect-endpoints,omitempty" mapstructure:"detect-endpoints"`
 	// DetectPrivateEndpoints is true if private IP addresses should be included in detection.
 	// This automatically enables DetectEndpoints.
-	DetectPrivateEndpoints bool `yaml:"detect-private-endpoints,omitempty" json:"detect-private-endpoints,omitempty" toml:"detect-private-endpoints,omitempty"`
+	DetectPrivateEndpoints bool `yaml:"detect-private-endpoints,omitempty" json:"detect-private-endpoints,omitempty" toml:"detect-private-endpoints,omitempty" mapstructure:"detect-private-endpoints"`
 	// AllowRemoteDetection is true if remote detection is allowed.
-	AllowRemoteDetection bool `yaml:"allow-remote-detection,omitempty" json:"allow-remote-detection,omitempty" toml:"allow-remote-detection,omitempty"`
+	AllowRemoteDetection bool `yaml:"allow-remote-detection,omitempty" json:"allow-remote-detection,omitempty" toml:"allow-remote-detection,omitempty" mapstructure:"allow-remote-detection"`
 	// DetectIPv6 is true if IPv6 addresses should be included in detection.
-	DetectIPv6 bool `yaml:"detect-ipv6,omitempty" json:"detect-ipv6,omitempty" toml:"detect-ipv6,omitempty"`
+	DetectIPv6 bool `yaml:"detect-ipv6,omitempty" json:"detect-ipv6,omitempty" toml:"detect-ipv6,omitempty" mapstructure:"detect-ipv6"`
 	// DisableFeatureAdvertisement is true if feature advertisement should be disabled.
-	DisableFeatureAdvertisement bool `yaml:"disable-feature-advertisement,omitempty" json:"disable-feature-advertisement,omitempty" toml:"disable-feature-advertisement,omitempty"`
+	DisableFeatureAdvertisement bool `yaml:"disable-feature-advertisement,omitempty" json:"disable-feature-advertisement,omitempty" toml:"disable-feature-advertisement,omitempty" mapstructure:"disable-feature-advertisement"`
 }
 
 // NewOptions creates new options.

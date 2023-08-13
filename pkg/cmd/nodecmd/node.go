@@ -44,12 +44,12 @@ var (
 	configFlag   = flagset.String("config", "", "Path to a configuration file")
 	printConfig  = flagset.Bool("print-config", false, "Print the configuration and exit")
 	startTimeout = flagset.Duration("start-timeout", 0, "Timeout for starting the node (default: no timeout)")
-	opts         = NewOptions().BindFlags(flagset)
-
-	log = slog.Default()
+	appDaemon    = flagset.Bool("app-daemon", false, "Run the node as an application daemon (default: false)")
 )
 
 func Execute() error {
+	// Parse flags and read in configurations
+
 	flagset.Usage = usage
 	err := flagset.Parse(os.Args[1:])
 	if err != nil {
@@ -70,28 +70,37 @@ func Execute() error {
 		if err != nil {
 			return fmt.Errorf("failed to open config file: %w", err)
 		}
-		err = util.DecodeOptions(f, filepath.Ext(*configFlag), opts)
+		err = util.DecodeOptions(f, filepath.Ext(*configFlag), config)
 		if err != nil {
 			return fmt.Errorf("failed to decode config file: %w", err)
 		}
 	}
-	err = opts.Global.Overlay(opts.Mesh, opts.Services, opts.Bridge)
+	err = config.Global.Overlay(config.Mesh, config.Services, config.Bridge)
 	if err != nil {
 		return err
 	}
 	if *printConfig {
-		out, err := json.MarshalIndent(opts, "", "  ")
+		// Dump the config and exit
+		out, err := json.MarshalIndent(config, "", "  ")
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(out))
 		return nil
 	}
-	if err := opts.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		flagset.Usage()
 		return err
 	}
-	log := util.SetupLogging(opts.Global.LogLevel)
+
+	// Time to get going
+
+	log := util.SetupLogging(config.Global.LogLevel)
+	ctx := context.Background()
+
+	if *appDaemon {
+		return RunAppDaemon(ctx, config)
+	}
 
 	log.Info("Starting webmesh node",
 		slog.String("version", version.Version),
@@ -100,34 +109,34 @@ func Execute() error {
 	)
 
 	// Log all options at debug level
-	log.Debug("Current configuration", slog.Any("options", opts))
+	log.Debug("Current configuration", slog.Any("options", config))
 
-	ctx := context.Background()
 	if *startTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *startTimeout)
 		defer cancel()
 	}
 
-	if len(opts.Bridge.Meshes) > 0 {
-		return executeBridgedMesh(ctx)
+	if len(config.Bridge.Meshes) > 0 {
+		return executeBridgedMesh(ctx, config)
 	}
-	return executeSingleMesh(ctx)
+	return executeSingleMesh(ctx, config)
 }
 
-func executeSingleMesh(ctx context.Context) error {
-	if (opts.Global.NoIPv4 && opts.Global.NoIPv6) || (opts.Mesh.Mesh.NoIPv4 && opts.Mesh.Mesh.NoIPv6) {
+func executeSingleMesh(ctx context.Context, config *Options) error {
+	if (config.Global.NoIPv4 && config.Global.NoIPv6) || (config.Mesh.Mesh.NoIPv4 && config.Mesh.Mesh.NoIPv6) {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
+	log := slog.Default()
 
 	// Connect to the mesh
-	st, err := mesh.New(opts.Mesh)
+	st, err := mesh.New(config.Mesh)
 	if err != nil {
 		return fmt.Errorf("failed to create mesh connection: %w", err)
 	}
 	var features []v1.Feature
-	if !opts.Global.DisableFeatureAdvertisement {
-		features = opts.Services.ToFeatureSet()
+	if !config.Global.DisableFeatureAdvertisement {
+		features = config.Services.ToFeatureSet()
 	}
 	err = st.Open(ctx, features)
 	if err != nil {
@@ -142,7 +151,7 @@ func executeSingleMesh(ctx context.Context) error {
 	log.Info("Mesh connection is ready, starting services")
 
 	// Start the mesh services
-	srv, err := services.NewServer(st, opts.Services)
+	srv, err := services.NewServer(st, config.Services)
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 	}
@@ -173,8 +182,9 @@ func executeSingleMesh(ctx context.Context) error {
 	return nil
 }
 
-func executeBridgedMesh(ctx context.Context) error {
-	br, err := meshbridge.New(opts.Bridge)
+func executeBridgedMesh(ctx context.Context, config *Options) error {
+	log := slog.Default()
+	br, err := meshbridge.New(config.Bridge)
 	if err != nil {
 		return fmt.Errorf("failed to create mesh bridge: %w", err)
 	}

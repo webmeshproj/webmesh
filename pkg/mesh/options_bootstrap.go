@@ -46,33 +46,33 @@ const (
 type BootstrapOptions struct {
 	// Enabled is the flag to attempt bootstrapping. If true, the node will only bootstrap a new cluster
 	// if no data is found. To force a bootstrap, set Force to true.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty" mapstructure:"enabled,omitempty"`
 	// AdvertiseAddress is the initial address to advertise for raft consensus.
-	AdvertiseAddress string `json:"advertise-address,omitempty" yaml:"advertise-address,omitempty" toml:"advertise-address,omitempty"`
+	AdvertiseAddress string `json:"advertise-address,omitempty" yaml:"advertise-address,omitempty" toml:"advertise-address,omitempty" mapstructure:"advertise-address,omitempty"`
 	// Servers is a map of node IDs to addresses to bootstrap with. If empty, the node will use the advertise
 	// address as the bootstrap server. If not empty, all nodes in the map should be started with the same
 	// list configurations. If any are different then the first node to become leader will pick them. This
 	// can cause bootstrap to fail when using ACLs. Servers should be in the form of <node-id>=<address>.
-	Servers map[string]string `json:"servers,omitempty" yaml:"servers,omitempty" toml:"servers,omitempty"`
+	Servers map[string]string `json:"servers,omitempty" yaml:"servers,omitempty" toml:"servers,omitempty" mapstructure:"servers,omitempty"`
 	// ServersGRPCPorts is a map of node IDs to gRPC ports to bootstrap with. If empty, the node will use the
 	// advertise address and locally configured gRPC port for every node in bootstrap-servers. Ports should
 	// be in the form of <node-id>=<port>.
-	ServersGRPCPorts map[string]int `json:"servers-grpc-ports,omitempty" yaml:"servers-grpc-ports,omitempty" toml:"servers-grpc-ports,omitempty"`
+	ServersGRPCPorts map[string]int `json:"servers-grpc-ports,omitempty" yaml:"servers-grpc-ports,omitempty" toml:"servers-grpc-ports,omitempty" mapstructure:"servers-grpc-ports,omitempty"`
 	// IPv4Network is the IPv4 network of the mesh to write to the database when bootstraping a new cluster.
-	IPv4Network string `json:"ipv4-network,omitempty" yaml:"ipv4-network,omitempty" toml:"ipv4-network,omitempty"`
+	IPv4Network string `json:"ipv4-network,omitempty" yaml:"ipv4-network,omitempty" toml:"ipv4-network,omitempty" mapstructure:"ipv4-network,omitempty"`
 	// MeshDomain is the domain of the mesh to write to the database when bootstraping a new cluster.
-	MeshDomain string `json:"mesh-domain,omitempty" yaml:"mesh-domain,omitempty" toml:"mesh-domain,omitempty"`
+	MeshDomain string `json:"mesh-domain,omitempty" yaml:"mesh-domain,omitempty" toml:"mesh-domain,omitempty" mapstructure:"mesh-domain,omitempty"`
 	// Admin is the user and/or node name to assign administrator privileges to when bootstraping a new cluster.
-	Admin string `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty"`
+	Admin string `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty" mapstructure:"admin,omitempty"`
 	// Voters is a comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster.
 	// BootstrapServers are automatically added to this list.
-	Voters string `json:"voters,omitempty" yaml:"voters,omitempty" toml:"voters,omitempty"`
+	Voters string `json:"voters,omitempty" yaml:"voters,omitempty" toml:"voters,omitempty" mapstructure:"voters,omitempty"`
 	// DefaultNetworkPolicy is the default network policy to apply to the mesh when bootstraping a new cluster.
-	DefaultNetworkPolicy string `json:"default-network-policy,omitempty" yaml:"default-network-policy,omitempty" toml:"default-network-policy,omitempty"`
+	DefaultNetworkPolicy string `json:"default-network-policy,omitempty" yaml:"default-network-policy,omitempty" toml:"default-network-policy,omitempty" mapstructure:"default-network-policy,omitempty"`
 	// RestoreSnapshot is the path to a snapshot to restore from when bootstrapping a new cluster.
-	RestoreSnapshot string `json:"restore-snapshot,omitempty" yaml:"restore-snapshot,omitempty" toml:"restore-snapshot,omitempty"`
+	RestoreSnapshot string `json:"restore-snapshot,omitempty" yaml:"restore-snapshot,omitempty" toml:"restore-snapshot,omitempty" mapstructure:"restore-snapshot,omitempty"`
 	// Force is the force new bootstrap flag.
-	Force bool `json:"force,omitempty" yaml:"force,omitempty" toml:"force,omitempty"`
+	Force bool `json:"force,omitempty" yaml:"force,omitempty" toml:"force,omitempty" mapstructure:"force,omitempty"`
 }
 
 // NetworkPolicy is a type of network policy.

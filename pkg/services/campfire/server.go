@@ -41,9 +41,9 @@ const (
 // Options are options for the campfire service.
 type Options struct {
 	// Enabled is whether the campfire service is enabled.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty" mapstructure:"enabled,omitempty"`
 	// ListenUDP is the UDP address to listen on.
-	ListenUDP string `json:"listen-udp,omitempty" yaml:"listen-udp,omitempty" toml:"listen-udp,omitempty"`
+	ListenUDP string `json:"listen-udp,omitempty" yaml:"listen-udp,omitempty" toml:"listen-udp,omitempty" mapstructure:"listen-udp,omitempty"`
 }
 
 // NewOptions returns new campfire service options.

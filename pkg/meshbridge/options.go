@@ -34,11 +34,11 @@ import (
 // Options are options for the bridge.
 type Options struct {
 	// Meshes are the meshes to bridge.
-	Meshes map[string]*MeshOptions `json:",inline" yaml:",inline" toml:",inline"`
+	Meshes map[string]*MeshOptions `json:",inline" yaml:",inline" toml:",inline" mapstructure:",squash"`
 	// MeshDNS are options for running a meshdns server bridging all meshes.
-	MeshDNS *services.MeshDNSOptions `json:"meshdns,omitempty" yaml:"meshdns,omitempty" toml:"meshdns,omitempty"`
+	MeshDNS *services.MeshDNSOptions `json:"meshdns,omitempty" yaml:"meshdns,omitempty" toml:"meshdns,omitempty" mapstructure:"meshdns,omitempty"`
 	// UseMeshDNS is true if the bridge should use the meshdns server.
-	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty"`
+	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty" mapstructure:"use-meshdns,omitempty"`
 }
 
 // NewOptions returns new options.

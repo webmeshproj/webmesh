@@ -53,25 +53,25 @@ const (
 // Options contains the configuration for the gRPC server.
 type Options struct {
 	// ListenAddress is the address to listen on.
-	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty"`
+	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty" mapstructure:"listen-address,omitempty"`
 	// TLSCertFile is the path to the TLS certificate file.
-	TLSCertFile string `json:"tls-cert-file,omitempty" yaml:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty"`
+	TLSCertFile string `json:"tls-cert-file,omitempty" yaml:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty" mapstructure:"tls-cert-file,omitempty"`
 	// TLSKeyFile is the path to the TLS key file.
-	TLSKeyFile string `json:"tls-key-file,omitempty" yaml:"tls-key-file,omitempty" toml:"tls-key-file,omitempty"`
+	TLSKeyFile string `json:"tls-key-file,omitempty" yaml:"tls-key-file,omitempty" toml:"tls-key-file,omitempty" mapstructure:"tls-key-file,omitempty"`
 	// Insecure is true if the transport is insecure.
-	Insecure bool `json:"insecure,omitempty" yaml:"insecure,omitempty" toml:"insecure,omitempty"`
+	Insecure bool `json:"insecure,omitempty" yaml:"insecure,omitempty" toml:"insecure,omitempty" mapstructure:"insecure,omitempty"`
 	// API options
-	API *APIOptions `json:"api,omitempty" yaml:"api,omitempty" toml:"api,omitempty"`
+	API *APIOptions `json:"api,omitempty" yaml:"api,omitempty" toml:"api,omitempty" mapstructure:"api,omitempty"`
 	// MeshDNS options
-	MeshDNS *MeshDNSOptions `json:"mesh-dns,omitempty" yaml:"mesh-dns,omitempty" toml:"mesh-dns,omitempty"`
+	MeshDNS *MeshDNSOptions `json:"mesh-dns,omitempty" yaml:"mesh-dns,omitempty" toml:"mesh-dns,omitempty" mapstructure:"mesh-dns,omitempty"`
 	// TURN options
-	TURN *TURNOptions `json:"turn,omitempty" yaml:"turn,omitempty" toml:"turn,omitempty"`
+	TURN *TURNOptions `json:"turn,omitempty" yaml:"turn,omitempty" toml:"turn,omitempty" mapstructure:"turn,omitempty"`
 	// Metrics options
-	Metrics *MetricsOptions `json:"metrics,omitempty" yaml:"metrics,omitempty" toml:"metrics,omitempty"`
+	Metrics *MetricsOptions `json:"metrics,omitempty" yaml:"metrics,omitempty" toml:"metrics,omitempty" mapstructure:"metrics,omitempty"`
 	// Dashboard options
-	Dashboard *dashboard.Options `json:"dashboard,omitempty" yaml:"dashboard,omitempty" toml:"dashboard,omitempty"`
+	Dashboard *dashboard.Options `json:"dashboard,omitempty" yaml:"dashboard,omitempty" toml:"dashboard,omitempty" mapstructure:"dashboard,omitempty"`
 	// Campfire options
-	Campfire *campfire.Options `json:"campfire,omitempty" yaml:"campfire,omitempty" toml:"campfire,omitempty"`
+	Campfire *campfire.Options `json:"campfire,omitempty" yaml:"campfire,omitempty" toml:"campfire,omitempty" mapstructure:"campfire,omitempty"`
 }
 
 // NewOptions returns new Options with sensible defaults. If grpcPort is 0
