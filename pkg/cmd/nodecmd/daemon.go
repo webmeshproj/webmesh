@@ -30,17 +30,37 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
+	"github.com/mitchellh/mapstructure"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
+
+var (
+	// ErrNotConnected is returned when the node is not connected to the mesh.
+	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected")
+	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
+	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected")
+)
+
+// DefaultDaemonSocket returns the default daemon socket path.
+func DefaultDaemonSocket() string {
+	if runtime.GOOS == "windows" {
+		return "\\\\.\\pipe\\webmesh.sock"
+	}
+	return "/var/run/webmesh/webmesh.sock"
+}
 
 // RunAppDaemon runs the app daemon.
 func RunAppDaemon(ctx context.Context, config *Options) error {
@@ -56,7 +76,7 @@ func RunAppDaemon(ctx context.Context, config *Options) error {
 
 	// Setup the server
 
-	srv := &AppDaemon{config: config}
+	srv := &AppDaemon{config: config, log: log.With("component", "app-daemon")}
 	unarymiddlewares := []grpc.UnaryServerInterceptor{
 		context.LogInjectUnaryServerInterceptor(log),
 		logging.UnaryServerInterceptor(services.InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
@@ -121,6 +141,114 @@ func RunAppDaemon(ctx context.Context, config *Options) error {
 	return grpcServer.Serve(listener)
 }
 
+// AppDaemon is the app daemon RPC server.
+type AppDaemon struct {
+	v1.UnimplementedAppDaemonServer
+	config *Options
+	mesh   mesh.Mesh
+	svcs   *services.Server
+	mu     sync.Mutex
+	log    *slog.Logger
+}
+
+func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh != nil {
+		return nil, ErrAlreadyConnected
+	}
+	cfg := app.config.DeepCopy()
+	overrides := req.GetConfig().AsMap()
+	if len(overrides) > 0 {
+		err := mapstructure.Decode(cfg, overrides)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "error decoding config overrides: %v", err)
+		}
+	}
+	err := cfg.Validate()
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid config: %v", err)
+	}
+	conn, err := mesh.New(cfg.Mesh)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error creating mesh: %v", err)
+	}
+	err = conn.Open(ctx, cfg.Services.ToFeatureSet())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error opening mesh: %v", err)
+	}
+	app.mesh = conn
+	app.svcs, err = services.NewServer(conn, cfg.Services)
+	if err != nil {
+		cerr := conn.Close()
+		app.mesh = nil
+		app.svcs = nil
+		if cerr != nil {
+			return nil, status.Errorf(codes.Internal, "error creating services: %v (error closing mesh: %v)", err, cerr)
+		}
+		return nil, status.Errorf(codes.Internal, "error creating services: %v", err)
+	}
+	go func() {
+		err := app.svcs.ListenAndServe()
+		if err != nil {
+			app.log.Error("Error serving services", "err", err.Error())
+			// TODO: Dispatch to the client.
+		}
+	}()
+	return &v1.ConnectResponse{}, nil
+}
+
+func (app *AppDaemon) Disconnect(ctx context.Context, _ *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh == nil {
+		return nil, ErrNotConnected
+	}
+	app.svcs.Stop()
+	app.svcs = nil
+	err := app.mesh.Close()
+	app.mesh = nil
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error while disconnecting from mesh: %v", err)
+	}
+	return &v1.DisconnectResponse{}, nil
+}
+
+func (app *AppDaemon) Metrics(ctx context.Context, _ *v1.MetricsRequest) (*v1.MetricsResponse, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh == nil {
+		return nil, ErrNotConnected
+	}
+	metrics, err := app.mesh.Network().WireGuard().Metrics()
+	if err != nil {
+		return nil, err
+	}
+	return &v1.MetricsResponse{
+		Interfaces: map[string]*v1.InterfaceMetrics{
+			metrics.DeviceName: metrics,
+		},
+	}, nil
+}
+
+func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServer) error {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh == nil {
+		return ErrNotConnected
+	}
+	return nil
+}
+
+func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRequest) (*v1.StartCampfireResponse, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh == nil {
+		return nil, ErrNotConnected
+	}
+	return nil, nil
+}
+
 func newListener() (net.Listener, error) {
 	bindAddr := *appDaemonBind
 	if bindAddr == "" {
@@ -139,41 +267,6 @@ func newListener() (net.Listener, error) {
 	default:
 		return nil, fmt.Errorf("invalid bind address: %s", bindAddr)
 	}
-}
-
-// AppDaemon is the app daemon RPC server.
-type AppDaemon struct {
-	v1.UnimplementedAppDaemonServer
-	config *Options
-}
-
-func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
-
-	return nil, nil
-}
-
-func (app *AppDaemon) Disconnect(ctx context.Context, _ *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
-	return nil, nil
-}
-
-func (app *AppDaemon) Metrics(ctx context.Context, _ *v1.MetricsRequest) (*v1.MetricsResponse, error) {
-	return nil, nil
-}
-
-func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServer) error {
-	return nil
-}
-
-func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRequest) (*v1.StartCampfireResponse, error) {
-	return nil, nil
-}
-
-// DefaultDaemonSocket returns the default daemon socket path.
-func DefaultDaemonSocket() string {
-	if runtime.GOOS == "windows" {
-		return "\\\\.\\pipe\\webmesh.sock"
-	}
-	return "/var/run/webmesh/webmesh.sock"
 }
 
 func newUnixSocket(socketPath string, insecure bool) (net.Listener, error) {
