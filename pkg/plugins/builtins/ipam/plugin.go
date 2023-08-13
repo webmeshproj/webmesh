@@ -145,7 +145,7 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 			allocated[n.PrivateIPv4] = struct{}{}
 		}
 	}
-	prefix, err := next32(globalPrefix, allocated)
+	prefix, err := p.next32(globalPrefix, allocated)
 	if err != nil {
 		return nil, fmt.Errorf("find next available IPv4: %w", err)
 	}
@@ -177,7 +177,7 @@ func (p *Plugin) allocateV6(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 		if err != nil {
 			return nil, fmt.Errorf("random IPv6: %w", err)
 		}
-		if _, ok := allocated[prefix]; !ok {
+		if _, ok := allocated[prefix]; !ok && !p.isStaticAllocation(prefix) {
 			return &v1.AllocatedIP{
 				Ip: prefix.String(),
 			}, nil
@@ -194,14 +194,31 @@ func (p *Plugin) Release(context.Context, *v1.ReleaseIPRequest) (*emptypb.Empty,
 	return &emptypb.Empty{}, nil
 }
 
-func next32(cidr netip.Prefix, set map[netip.Prefix]struct{}) (netip.Prefix, error) {
+func (p *Plugin) next32(cidr netip.Prefix, set map[netip.Prefix]struct{}) (netip.Prefix, error) {
 	ip := cidr.Addr().Next()
 	for cidr.Contains(ip) {
 		prefix := netip.PrefixFrom(ip, 32)
-		if _, ok := set[prefix]; !ok {
+		if _, ok := set[prefix]; !ok && !p.isStaticAllocation(prefix) {
 			return prefix, nil
 		}
 		ip = ip.Next()
 	}
 	return netip.Prefix{}, fmt.Errorf("no more addresses in %s", cidr)
+}
+
+func (p *Plugin) isStaticAllocation(ip netip.Prefix) bool {
+	if ip.Addr().Is4() {
+		for _, addr := range p.config.StaticIPv4 {
+			if addr == ip.String() {
+				return true
+			}
+		}
+		return false
+	}
+	for _, addr := range p.config.StaticIPv6 {
+		if addr == ip.String() {
+			return true
+		}
+	}
+	return false
 }
