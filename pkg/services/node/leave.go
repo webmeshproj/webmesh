@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"log/slog"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -54,17 +53,12 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 			}
 		}
 	}
+
+	// Send a barrier afterwards to sync the cluster
 	defer func() {
-		s.log.Debug("sending barrier to raft cluster")
-		timeout := time.Second * 10 // TODO: Make this configurable
-		err := s.store.Raft().Raft().Barrier(timeout).Error()
-		if err != nil {
-			s.log.Error("failed to send barrier", slog.String("error", err.Error()))
-			return
-		}
-		s.log.Debug("barrier complete, update published to all nodes")
+		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
 	}()
-	s.log.Info("removing mesh node", "id", req.GetId())
+	s.log.Info("Removing mesh node", "id", req.GetId())
 	err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)

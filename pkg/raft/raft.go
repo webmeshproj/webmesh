@@ -18,7 +18,6 @@ limitations under the License.
 package raft
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -31,6 +30,7 @@ import (
 	"github.com/hashicorp/raft"
 	"google.golang.org/grpc"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util"
@@ -122,6 +122,8 @@ type Raft interface {
 	RemoveServer(ctx context.Context, id string, wait bool) error
 	// Restore restores the Raft node from a snapshot.
 	Restore(rdr io.ReadCloser) error
+	// Barrier issues a barrier request to the cluster. This is a no-op if the node is not the leader.
+	Barrier(ctx context.Context, timeout time.Duration) (took time.Duration, err error)
 	// Stop stops the Raft node.
 	Stop(ctx context.Context) error
 }
@@ -371,6 +373,25 @@ func (r *raftNode) IsVoter() bool {
 // Storage returns the storage.
 func (r *raftNode) Storage() storage.Storage {
 	return r.raftDB
+}
+
+// Barrier issues a barrier request to the cluster. If the node is not leader
+// then ErrNotLeader is returned.
+func (r *raftNode) Barrier(ctx context.Context, timeout time.Duration) (took time.Duration, err error) {
+	if !r.IsLeader() {
+		return 0, ErrNotLeader
+	}
+	start := time.Now()
+	log := context.LoggerFrom(ctx)
+	log.Debug("Sending barrier to raft cluster", slog.Duration("timeout", timeout))
+	err = r.Raft().Barrier(timeout).Error()
+	took = time.Since(start)
+	if err == nil {
+		log.Debug("Barrier request succeeded", slog.Duration("took", took))
+		return took, nil
+	}
+	log.Error("Barrier request failed", slog.String("error", err.Error()), slog.Duration("took", took))
+	return took, err
 }
 
 // Stop stops the Raft node.

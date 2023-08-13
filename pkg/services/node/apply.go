@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"log/slog"
 	"net"
 	"strings"
 	"time"
@@ -61,30 +60,23 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !found {
 		return nil, status.Errorf(codes.FailedPrecondition, "peer not found in configuration")
 	}
-	s.log.Debug("sending barrier to raft cluster")
-	timeout := time.Second * 10 // TODO: Make this configurable
-	err := s.store.Raft().Raft().Barrier(timeout).Error()
+	// Issue a barrier to the raft cluster to ensure all nodes are
+	// fully caught up before we make changes
+	// TODO: Make timeout configurable
+	_, err := s.store.Raft().Barrier(ctx, time.Second*15)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
-	s.log.Debug("barrier complete, all nodes caught up")
 	// Send another barrier after we're done to ensure all nodes are
 	// fully caught up before we return
 	defer func() {
-		s.log.Debug("sending barrier to raft cluster")
-		timeout := time.Second * 10 // TODO: Make this configurable
-		err := s.store.Raft().Raft().Barrier(timeout).Error()
-		if err != nil {
-			s.log.Error("failed to send barrier", slog.String("error", err.Error()))
-			return
-		}
-		s.log.Debug("barrier complete, update published to all nodes")
+		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
 	}()
 	data, err := meshraft.MarshalLogEntry(log)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "marshal log entry: %v", err)
 	}
-	timeout = time.Second * 15
+	timeout := time.Second * 15
 	err = s.store.Raft().Raft().Apply(data, timeout).Error()
 	return &v1.RaftApplyResponse{
 		Time: time.Since(start).String(),

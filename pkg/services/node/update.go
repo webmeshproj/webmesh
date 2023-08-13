@@ -44,7 +44,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	log := s.log.With("op", "update", "id", req.GetId())
 	ctx = context.WithLogger(ctx, log)
 
-	log.Info("update request received", slog.Any("request", req))
+	log.Debug("Update request received", slog.Any("request", req))
 	// Check if we haven't loaded the mesh domain and prefixes into memory yet
 	err := s.loadMeshState(ctx)
 	if err != nil {
@@ -106,25 +106,16 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 
 	// Issue a barrier to the raft cluster to ensure all nodes are
 	// fully caught up before we make changes
-	log.Debug("sending barrier to raft cluster")
-	timeout := time.Second * 10 // TODO: Make this configurable
-	err = s.store.Raft().Raft().Barrier(timeout).Error()
+	// TODO: Make timeout configurable
+	_, err = s.store.Raft().Barrier(ctx, time.Second*15)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
-	log.Debug("barrier complete, all nodes caught up")
 
 	// Send another barrier after we're done to ensure all nodes are
 	// fully caught up before we return
 	defer func() {
-		log.Debug("sending barrier to raft cluster")
-		timeout := time.Second * 10 // TODO: Make this configurable
-		err = s.store.Raft().Raft().Barrier(timeout).Error()
-		if err != nil {
-			log.Error("failed to send barrier", slog.String("error", err.Error()))
-			return
-		}
-		log.Debug("barrier complete, update published to all nodes")
+		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
 	}()
 
 	// Lookup the peer's current state

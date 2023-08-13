@@ -45,7 +45,7 @@ Routes:
 			Node:             nodeID,
 			DestinationCidrs: routes,
 		}
-		context.LoggerFrom(ctx).Debug("adding new route for node", "node", nodeID, "route", &rt)
+		context.LoggerFrom(ctx).Debug("Adding new route for node", "node", nodeID, "route", &rt)
 		err = s.networking.PutRoute(ctx, &rt)
 		if err != nil {
 			return true, fmt.Errorf("put route for node %q: %w", nodeID, err)
@@ -62,21 +62,21 @@ func nodeAutoRoute(nodeID string) string {
 func (s *Server) loadMeshState(ctx context.Context) error {
 	var err error
 	if !s.ipv6Prefix.IsValid() {
-		context.LoggerFrom(ctx).Debug("looking up mesh IPv6 prefix")
+		context.LoggerFrom(ctx).Debug("Looking up mesh IPv6 prefix")
 		s.ipv6Prefix, err = s.meshstate.GetIPv6Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("lookup mesh IPv6 prefix: %w", err)
 		}
 	}
 	if !s.ipv4Prefix.IsValid() {
-		context.LoggerFrom(ctx).Debug("looking up mesh IPv4 prefix")
+		context.LoggerFrom(ctx).Debug("Looking up mesh IPv4 prefix")
 		s.ipv4Prefix, err = s.meshstate.GetIPv4Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("lookup mesh IPv4 prefix: %w", err)
 		}
 	}
 	if s.meshDomain == "" {
-		context.LoggerFrom(ctx).Debug("looking up mesh domain")
+		context.LoggerFrom(ctx).Debug("Looking up mesh domain")
 		s.meshDomain, err = s.meshstate.GetMeshDomain(ctx)
 		if err != nil {
 			return fmt.Errorf("lookup mesh domain: %w", err)
