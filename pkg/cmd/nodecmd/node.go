@@ -39,12 +39,15 @@ import (
 )
 
 var (
-	flagset      = flag.NewFlagSet("webmesh-node", flag.ContinueOnError)
-	versionFlag  = flagset.Bool("version", false, "Print version information and exit")
-	configFlag   = flagset.String("config", "", "Path to a configuration file")
-	printConfig  = flagset.Bool("print-config", false, "Print the configuration and exit")
-	startTimeout = flagset.Duration("start-timeout", 0, "Timeout for starting the node (default: no timeout)")
-	appDaemon    = flagset.Bool("app-daemon", false, "Run the node as an application daemon (default: false)")
+	flagset                 = flag.NewFlagSet("webmesh-node", flag.ContinueOnError)
+	versionFlag             = flagset.Bool("version", false, "Print version information and exit")
+	configFlag              = flagset.String("config", "", "Path to a configuration file")
+	printConfig             = flagset.Bool("print-config", false, "Print the configuration and exit")
+	startTimeout            = flagset.Duration("start-timeout", 0, "Timeout for starting the node (default: no timeout)")
+	appDaemon               = flagset.Bool("app-daemon", false, "Run the node as an application daemon (default: false)")
+	appDaemonBind           = flagset.String("app-daemon-bind", "", "Address to bind the application daemon to (default: unix:///var/run/webmesh-node.sock)")
+	appDaemonGrpcWeb        = flagset.Bool("app-daemon-grpc-web", false, "Use gRPC-Web for the application daemon (default: false)")
+	appDaemonInsecureSocket = flagset.Bool("app-daemon-insecure-socket", false, "Leave default ownership on the Unix socket (default: false)")
 )
 
 func Execute() error {
@@ -88,10 +91,6 @@ func Execute() error {
 		fmt.Println(string(out))
 		return nil
 	}
-	if err := config.Validate(); err != nil {
-		flagset.Usage()
-		return err
-	}
 
 	// Time to get going
 
@@ -100,6 +99,11 @@ func Execute() error {
 
 	if *appDaemon {
 		return RunAppDaemon(ctx, config)
+	}
+
+	if err := config.Validate(); err != nil {
+		flagset.Usage()
+		return err
 	}
 
 	log.Info("Starting webmesh node",
