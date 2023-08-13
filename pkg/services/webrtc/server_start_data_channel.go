@@ -141,7 +141,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 		<-conn.Closed()
 		log.Info("WebRTC connection closed")
 	}()
-	log.Info("Sending offer to client")
+	log.Debug("Sending offer to client", slog.String("offer", conn.Offer()))
 	err = stream.Send(&v1.DataChannelOffer{
 		Offer:       conn.Offer(),
 		StunServers: s.stunServers,
@@ -149,7 +149,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to send offer to client: %s", err.Error())
 	}
-	log.Info("Waiting for answer from client")
+	log.Debug("Waiting for answer from client")
 	ctx, cancel := context.WithTimeout(stream.Context(), 10*time.Second)
 	errs := make(chan error, 1)
 	req := make(chan *v1.StartDataChannelRequest, 1)
@@ -174,12 +174,12 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	if r.GetAnswer() == "" {
 		return status.Error(codes.InvalidArgument, "answer must be provided in request")
 	}
-	log.Info("Received answer from client")
+	log.Debug("Received answer from client", slog.String("answer", r.GetAnswer()))
 	err = conn.AnswerOffer(r.GetAnswer())
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to answer offer from client: %s", err.Error())
 	}
-	log.Info("Starting ICE negotiation")
+	log.Debug("Starting ICE negotiation")
 	go func() {
 		for candidate := range conn.Candidates() {
 			if candidate == "" {
@@ -255,7 +255,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	if resp.GetOffer() == "" {
 		return status.Error(codes.FailedPrecondition, "peer did not send an offer")
 	}
-	log.Info("Received offer from peer", slog.String("offer", resp.GetOffer()))
+	log.Debug("Received offer from peer", slog.String("offer", resp.GetOffer()))
 	// Forward the offer to the client
 	err = clientStream.Send(&v1.DataChannelOffer{
 		Offer:       resp.GetOffer(),
@@ -290,7 +290,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 		return status.Error(codes.InvalidArgument, "client did not send an answer")
 	}
 	// Send the answer to the peer
-	log.Info("Sending answer to peer", slog.String("answer", r.GetAnswer()))
+	log.Debug("Sending answer to peer", slog.String("answer", r.GetAnswer()))
 	err = negotiateStream.Send(&v1.DataChannelNegotiation{
 		Answer: r.GetAnswer(),
 	})

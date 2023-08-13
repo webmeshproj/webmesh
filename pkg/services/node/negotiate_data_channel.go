@@ -83,7 +83,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 		log.Debug("WebRTC connection closed")
 	}()
 	// Send the offer back to the other node
-	log.Info("Sending offer to other node")
+	log.Debug("Sending offer to other node", slog.String("offer", conn.Offer()))
 	err = stream.Send(&v1.DataChannelNegotiation{
 		Offer: conn.Offer(),
 	})
@@ -97,7 +97,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 		defer conn.Close()
 		return err
 	}
-	log.Info("Answering offer from other node")
+	log.Debug("Answering offer from other node", slog.String("answer", resp.GetAnswer()))
 	err = conn.AnswerOffer(resp.GetAnswer())
 	if err != nil {
 		defer conn.Close()
