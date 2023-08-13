@@ -91,6 +91,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 	pc.conn.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		mu.Lock()
 		defer mu.Unlock()
+		log.Debug("ICE connection state changed", slog.String("state", state.String()))
 		if state == webrtc.ICEConnectionStateConnected {
 			candidatePair, err := pc.conn.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 			if err != nil {
@@ -100,9 +101,6 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			log.Debug("ICE connection established", slog.Any("local", candidatePair.Local), slog.Any("remote", candidatePair.Remote))
 			close(readyc)
 		}
-		if state == webrtc.ICEConnectionStateCompleted || state == webrtc.ICEConnectionStateFailed {
-			log.Info("ICE connection has closed", "reason", state.String())
-		}
 	})
 	dc, err := pc.conn.CreateDataChannel("wireguard-proxy", &webrtc.DataChannelInit{
 		ID:         util.Pointer(uint16(0)),
@@ -111,8 +109,12 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 	if err != nil {
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
+	dc.OnClose(func() {
+		log.Debug("Server side WireGuard datachannel closed")
+		close(pc.closec)
+	})
 	dc.OnOpen(func() {
-		log.Info("Server side datachannel opened")
+		log.Debug("Server side datachannel opened")
 		close(pc.candidatec)
 		rw, err := dc.Detach()
 		if err != nil {
@@ -128,9 +130,9 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			log.Error("Failed to dial UDP", slog.String("error", err.Error()))
 			return
 		}
-		log.Info("Starting WireGuard proxy")
+		log.Debug("WireGuard proxy from local to datachannel started")
 		go func() {
-			defer log.Info("WireGuard proxy from local to datachannel stopped")
+			defer log.Debug("WireGuard proxy from local to datachannel stopped")
 			defer wgiface.Close()
 			_, err := io.CopyBuffer(rw, wgiface, make([]byte, pc.bufferSize))
 			if err != nil {
@@ -140,7 +142,8 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 				log.Error("Failed to copy from WireGuard to datachannel", slog.String("error", err.Error()))
 			}
 		}()
-		defer log.Info("WireGuard proxy from datachannel to local stopped")
+		log.Debug("WireGuard proxy from datachannel to local started")
+		defer log.Debug("WireGuard proxy from datachannel to local stopped")
 		defer pc.conn.Close()
 		_, err = io.CopyBuffer(wgiface, rw, make([]byte, pc.bufferSize))
 		if err != nil {
@@ -149,10 +152,6 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			}
 			log.Error("Failed to copy from datachannel to WireGuard", slog.String("error", err.Error()))
 		}
-	})
-	dc.OnClose(func() {
-		log.Info("Data channel closed")
-		close(pc.closec)
 	})
 	offer, err := pc.conn.CreateOffer(nil)
 	if err != nil {
@@ -274,8 +273,11 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 		select {
 		case <-pc.readyc:
 			return
+		case <-pc.closec:
+			return
 		default:
 		}
+		log.Debug("Sending ICE candidate", "candidate", c.ToJSON().Candidate)
 		err := neg.Send(&v1.StartDataChannelRequest{
 			Candidate: c.ToJSON().Candidate,
 		})
@@ -285,6 +287,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 		}
 	})
 	pc.conn.OnICEConnectionStateChange(func(s webrtc.ICEConnectionState) {
+		log.Debug("ICE connection state changed", "state", s.String())
 		if s == webrtc.ICEConnectionStateConnected {
 			closeNeg()
 			close(pc.readyc)
@@ -316,6 +319,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 	}
 	pc.localAddr = wgiface.LocalAddr().(*net.UDPAddr)
 	dc.OnClose(func() {
+		log.Debug("Client side WireGuard datachannel closed")
 		close(pc.closec)
 	})
 	dc.OnOpen(func() {
@@ -326,8 +330,9 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 			log.Error("Failed to detach data channel", slog.String("error", err.Error()))
 			return
 		}
+		log.Debug("WireGuard proxy from local to datachannel started")
 		go func() {
-			defer log.Info("WireGuard proxy from local to datachannel stopped")
+			defer log.Debug("WireGuard proxy from local to datachannel stopped")
 			defer wgiface.Close()
 			_, err := io.CopyBuffer(rw, wgiface, make([]byte, pc.bufferSize))
 			if err != nil {
@@ -337,6 +342,8 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 				log.Error("Failed to copy from WireGuard to datachannel", slog.String("error", err.Error()))
 			}
 		}()
+		log.Debug("WireGuard proxy from datachannel to local started")
+		defer log.Debug("WireGuard proxy from datachannel to local stopped")
 		defer pc.conn.Close()
 		_, err = io.CopyBuffer(wgiface, rw, make([]byte, pc.bufferSize))
 		if err != nil {
@@ -386,6 +393,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 			candidate := webrtc.ICECandidateInit{
 				Candidate: msg.GetCandidate(),
 			}
+			log.Debug("Received ICE candidate", "candidate", candidate.Candidate)
 			if err := pc.conn.AddICECandidate(candidate); err != nil {
 				errs <- fmt.Errorf("failed to add ICE candidate: %w", err)
 			}
