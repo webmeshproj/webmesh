@@ -269,7 +269,7 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, resp *v1.JoinRespons
 		log.Debug("Adding peer", slog.Any("peer", peer))
 		err = s.nw.AddPeer(ctx, peer, resp.GetIceServers())
 		if err != nil {
-			return fmt.Errorf("%w adding peer: %w", errFatalJoin, err)
+			log.Error("Failed to add peer", slog.String("error", err.Error()))
 		}
 	}
 	if s.opts.Mesh.UseMeshDNS {
@@ -292,7 +292,7 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, resp *v1.JoinRespons
 		}
 		err = s.nw.AddDNSServers(ctx, servers)
 		if err != nil {
-			return fmt.Errorf("%w adding dns servers: %w", errFatalJoin, err)
+			log.Error("Failed to add dns servers", slog.String("error", err.Error()))
 		}
 	}
 	return nil
