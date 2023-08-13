@@ -67,6 +67,7 @@ func (s *meshStore) waitByCampfire() {
 			log.Info("Campfire connection expired, reconnecting")
 			time.Sleep(3 * time.Second)
 			go s.waitByCampfire()
+			return
 		}
 	}
 }

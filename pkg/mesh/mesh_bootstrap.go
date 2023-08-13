@@ -282,7 +282,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	// We need to officially "join" ourselves to the cluster with a wireguard
 	// address. This is done by creating a new node in the database and then
 	// readding it to the cluster as a voter with the acquired address.
-	s.log.Info("registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
+	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 	p := peers.New(s.Storage())
 	self := peers.Node{
 		ID:                 s.ID(),
@@ -294,7 +294,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		Features:           features,
 	}
 	// Go ahead and generate our private key.
-	s.log.Info("generating wireguard key for ourselves")
+	s.log.Info("Generating wireguard key for ourselves")
 	wireguardKey, err := s.loadWireGuardKey(ctx)
 	if err != nil {
 		return fmt.Errorf("generate private key: %w", err)
@@ -323,7 +323,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		return fmt.Errorf("allocate IPv4 address: %w", err)
 	}
 	self.PrivateIPv6 = privatev6
-	s.log.Debug("creating ourself in the database", slog.Any("params", self))
+	s.log.Debug("Creating ourself in the database", slog.Any("params", self))
 	err = p.Put(ctx, self)
 	if err != nil {
 		return fmt.Errorf("create node: %w", err)
@@ -371,6 +371,28 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 			}
 		}
 	}
+	// If we have direct-peerings, add them to the db
+	if len(s.opts.Mesh.DirectPeers) > 0 {
+		for _, peer := range s.opts.Mesh.DirectPeers {
+			err = p.Put(ctx, peers.Node{
+				ID: peer,
+			})
+			if err != nil {
+				return fmt.Errorf("create direct peerings: %w", err)
+			}
+			err = p.PutEdge(ctx, peers.Edge{
+				From:   s.ID(),
+				To:     peer,
+				Weight: 0,
+				Attrs: map[string]string{
+					v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String(): "true",
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("create direct peerings: %w", err)
+			}
+		}
+	}
 	// Determine what our raft address will be
 	var raftAddr string
 	if !s.opts.Mesh.NoIPv4 && !s.opts.Raft.PreferIPv6 {
@@ -383,7 +405,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		return nil
 	}
 	// Start network resources
-	s.log.Info("starting network manager")
+	s.log.Info("Starting network manager")
 	opts := &meshnet.StartOptions{
 		Key:       wireguardKey,
 		AddressV4: privatev4,

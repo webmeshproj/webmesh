@@ -57,8 +57,6 @@ func isRouteChangeKey(key string) bool {
 }
 
 func (s *meshStore) queueRouteUpdate() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	// TODO: this is a hack, we should be able to wait for the raft index to catch up
 	// for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
 	// 	if ctx.Err() != nil {
@@ -66,7 +64,9 @@ func (s *meshStore) queueRouteUpdate() {
 	// 		return
 	// 	}
 	// }
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
 	s.routeUpdateGroup.TryGo(func() error {
 		nw := networking.New(s.Storage())
 		routes, err := nw.GetRoutesByNode(ctx, s.ID())
@@ -86,8 +86,6 @@ func (s *meshStore) queueRouteUpdate() {
 }
 
 func (s *meshStore) queuePeersUpdate() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	// TODO: this is a hack, we should be able to wait for the raft index to catch up
 	// for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
 	// 	if ctx.Err() != nil {
@@ -95,7 +93,9 @@ func (s *meshStore) queuePeersUpdate() {
 	// 		return
 	// 	}
 	// }
-	time.Sleep(time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	time.Sleep(time.Second * 2)
 	s.peerUpdateGroup.TryGo(func() error {
 		s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
 		if err := s.nw.RefreshPeers(ctx); err != nil {
@@ -106,8 +106,6 @@ func (s *meshStore) queuePeersUpdate() {
 }
 
 func (s *meshStore) queueMeshDNSUpdate() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	// TODO: this is a hack, we should be able to wait for the raft index to catch up
 	// for s.raft.LastAppliedIndex() != s.raft.Raft().AppliedIndex() {
 	// 	if ctx.Err() != nil {
@@ -116,7 +114,9 @@ func (s *meshStore) queueMeshDNSUpdate() {
 	// 	}
 	// 	time.Sleep(time.Second)
 	// }
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	s.dnsUpdateGroup.TryGo(func() error {
 		s.log.Debug("applied batch with possible DNS changes, refreshing servers")
 		if err := s.nw.RefreshDNSServers(ctx); err != nil {

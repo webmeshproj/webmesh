@@ -45,13 +45,13 @@ func main() {
 		}
 	}()
 
-	log.Info(">>> Waiting for connections")
+	fmt.Println(">>> Waiting for connections")
 	conn, err := cf.Accept()
 	if err != nil {
 		log.Error("error", "error", err.Error())
 		return
 	}
-	log.Info(">>> New peer connection")
+	fmt.Println(">>> New peer connection")
 	go func() {
 		defer conn.Close()
 		buf := make([]byte, 1024)

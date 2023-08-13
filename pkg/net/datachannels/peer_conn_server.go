@@ -75,7 +75,11 @@ func NewServerPeerConnection(opts *OfferOptions) (*ServerPeerConnection, error) 
 	if opts.Proto == "" {
 		opts.Proto = "tcp"
 	}
-	conn, err := WebRTC.NewPeerConnection(webrtc.Configuration{
+	s := webrtc.SettingEngine{}
+	s.DetachDataChannels()
+	s.SetIncludeLoopbackCandidate(true)
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
+	conn, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{URLs: opts.STUNServers},
 		},

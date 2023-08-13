@@ -17,7 +17,6 @@ limitations under the License.
 package turn
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/json"
@@ -133,7 +132,7 @@ func NewCampfireClient(opts CampfireClientOptions) (*CampfireClient, error) {
 		offers:     make(chan CampfireOffer, 10),
 		answers:    make(chan CampfireAnswer, 10),
 		candidates: make(chan CampfireCandidate, 10),
-		errc:       make(chan error, 1),
+		errc:       make(chan error, 10),
 		closec:     make(chan struct{}),
 		log:        slog.Default().With("component", "campfire-client"),
 	}
@@ -199,7 +198,7 @@ func (c *CampfireClient) SendOffer(ufrag, pwd string, offer webrtc.SessionDescri
 		Rufrag: ufrag,
 		Rpwd:   pwd,
 		Type:   v1.CampfireMessage_OFFER,
-		Data:   c.encryptData(sdp),
+		Data:   sdp,
 	})
 	if err != nil {
 		return err
@@ -224,7 +223,7 @@ func (c *CampfireClient) SendAnswer(offerID, ufrag, pwd string, answer webrtc.Se
 		Rufrag: ufrag,
 		Rpwd:   pwd,
 		Type:   v1.CampfireMessage_ANSWER,
-		Data:   c.encryptData(sdp),
+		Data:   sdp,
 	})
 	if err != nil {
 		return err
@@ -256,7 +255,7 @@ func (c *CampfireClient) SendCandidate(offerID, ufrag, pwd string, candidate *we
 		Rufrag: ufrag,
 		Rpwd:   pwd,
 		Type:   v1.CampfireMessage_CANDIDATE,
-		Data:   c.encryptData(cand),
+		Data:   cand,
 	})
 	if err != nil {
 		return err
@@ -297,20 +296,21 @@ func (c *CampfireClient) handleIncoming() {
 		msg, err := DecodeCampfireMessage(data[:n])
 		if err != nil {
 			c.errc <- err
-			return
+			continue
 		}
 		switch msg.Type {
 		case v1.CampfireMessage_OFFER:
-			data, err := c.decryptData(msg.Data)
-			if err != nil {
-				c.log.Warn("failed to decrypt offer", "err", err)
-				continue
-			}
+			// data, err := c.decryptData(msg.Data)
+			// if err != nil {
+			// 	c.log.Warn("failed to decrypt offer", "err", err)
+			// 	continue
+			// }
+			data := msg.Data
 			var offer webrtc.SessionDescription
 			err = json.Unmarshal(data, &offer)
 			if err != nil {
 				c.errc <- fmt.Errorf("failed to unmarshal offer: %w", err)
-				return
+				continue
 			}
 			c.offers <- CampfireOffer{
 				ID:    msg.Id,
@@ -319,16 +319,17 @@ func (c *CampfireClient) handleIncoming() {
 				SDP:   offer,
 			}
 		case v1.CampfireMessage_ANSWER:
-			data, err := c.decryptData(msg.Data)
-			if err != nil {
-				c.log.Warn("failed to decrypt answer", "err", err)
-				continue
-			}
+			// data, err := c.decryptData(msg.Data)
+			// if err != nil {
+			// 	c.log.Warn("failed to decrypt answer", "err", err)
+			// 	continue
+			// }
+			data := msg.Data
 			var answer webrtc.SessionDescription
 			err = json.Unmarshal(data, &answer)
 			if err != nil {
 				c.errc <- fmt.Errorf("failed to unmarshal answer: %w", err)
-				return
+				continue
 			}
 			c.answers <- CampfireAnswer{
 				ID:    msg.Id,
@@ -337,16 +338,17 @@ func (c *CampfireClient) handleIncoming() {
 				SDP:   answer,
 			}
 		case v1.CampfireMessage_CANDIDATE:
-			data, err := c.decryptData(msg.Data)
-			if err != nil {
-				c.log.Warn("failed to decrypt candidate", "err", err)
-				continue
-			}
+			// data, err := c.decryptData(msg.Data)
+			// if err != nil {
+			// 	c.log.Warn("failed to decrypt candidate", "err", err)
+			// 	continue
+			// }
+			data := msg.Data
 			var candidate webrtc.ICECandidateInit
 			err = json.Unmarshal(data, &candidate)
 			if err != nil {
 				c.errc <- fmt.Errorf("failed to unmarshal candidate: %w", err)
-				return
+				continue
 			}
 			c.candidates <- CampfireCandidate{
 				ID:    msg.Id,
@@ -358,25 +360,25 @@ func (c *CampfireClient) handleIncoming() {
 	}
 }
 
-func (c *CampfireClient) encryptData(data []byte) []byte {
-	// Pad data to block size
-	bs := c.crypter.BlockSize()
-	if len(data)%bs != 0 {
-		pad := bs - (len(data) % bs)
-		data = append(data, bytes.Repeat([]byte{0}, pad)...)
-	}
-	out := make([]byte, len(data))
-	c.crypter.CryptBlocks(out, data)
-	return out
-}
+// func (c *CampfireClient) encryptData(data []byte) []byte {
+// 	// Pad data to block size
+// 	bs := c.crypter.BlockSize()
+// 	if len(data)%bs != 0 {
+// 		pad := bs - (len(data) % bs)
+// 		data = append(data, bytes.Repeat([]byte{0}, pad)...)
+// 	}
+// 	out := make([]byte, len(data))
+// 	c.crypter.CryptBlocks(out, data)
+// 	return out
+// }
 
-func (c *CampfireClient) decryptData(data []byte) ([]byte, error) {
-	bs := c.decrypter.BlockSize()
-	if len(data)%bs != 0 {
-		return nil, errors.New("invalid data length")
-	}
-	plaintext := make([]byte, len(data))
-	c.decrypter.CryptBlocks(plaintext, data)
-	plaintext = bytes.TrimRight(plaintext, "\x00")
-	return plaintext, nil
-}
+// func (c *CampfireClient) decryptData(data []byte) ([]byte, error) {
+// 	bs := c.decrypter.BlockSize()
+// 	if len(data)%bs != 0 {
+// 		return nil, errors.New("invalid data length")
+// 	}
+// 	plaintext := make([]byte, len(data))
+// 	c.decrypter.CryptBlocks(plaintext, data)
+// 	plaintext = bytes.TrimRight(plaintext, "\x00")
+// 	return plaintext, nil
+// }

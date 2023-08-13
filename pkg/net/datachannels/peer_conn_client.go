@@ -104,7 +104,11 @@ func NewClientPeerConnection(ctx context.Context, opts *ClientOptions) (*ClientP
 		defer closeNeg()
 		return nil, fmt.Errorf("failed to unmarshal SDP: %w", err)
 	}
-	p, err := WebRTC.NewPeerConnection(webrtc.Configuration{
+	s := webrtc.SettingEngine{}
+	s.DetachDataChannels()
+	s.SetIncludeLoopbackCandidate(true)
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
+	p, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{{URLs: resp.StunServers}},
 	})
 	if err != nil {

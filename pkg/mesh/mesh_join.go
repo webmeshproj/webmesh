@@ -144,7 +144,7 @@ func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) e
 		err = proto.Unmarshal(buf[:n], &resp)
 		if err != nil {
 			// This could mean an actual error from the join server
-			log.Error("Failed to unmarshal join response over campfire", slog.String("error", err.Error()))
+			log.Warn("Failed to unmarshal join response over campfire", slog.String("error", err.Error()))
 			return fmt.Errorf("campfire join error: %s", string(buf[:n]))
 		}
 		log.Info("Received join response over campfire", slog.Any("resp", &resp))

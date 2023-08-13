@@ -54,6 +54,7 @@ services:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       public-net:
+        ipv4_address: 10.30.0.2
       site-1:
     hostname: site-1-peer
     entrypoint:
@@ -70,6 +71,7 @@ services:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       public-net:
+        ipv4_address: 10.30.0.3
       site-2:
     hostname: site-2-peer
     entrypoint:

@@ -36,6 +36,7 @@ func Wait(ctx context.Context, opts Options) (CampFire, error) {
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
+	log.Debug("Found campfire location", "location", location.TURNServer)
 	fireconn, err := turn.NewCampfireClient(turn.CampfireClientOptions{
 		Addr:  location.TURNServer,
 		Ufrag: location.LocalUfrag(),
@@ -49,6 +50,7 @@ func Wait(ctx context.Context, opts Options) (CampFire, error) {
 	if err != nil {
 		return nil, fmt.Errorf("announce: %w", err)
 	}
+	log.Debug("Announced campfire location", "location", location.TURNServer)
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	s.SetIncludeLoopbackCandidate(true)
@@ -155,6 +157,7 @@ func (t *turnWait) handleIncomingCandidates() {
 
 func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 	t.mu.Lock()
+	t.log.Debug("Creating new peer connection", "offer", offer)
 	pc, err := t.api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{

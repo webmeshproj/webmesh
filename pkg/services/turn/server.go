@@ -61,7 +61,7 @@ func NewServer(o *Options) (*Server, error) {
 	if o.RelayAddressUDP == "" {
 		o.RelayAddressUDP = "0.0.0.0"
 	}
-	udpConn, err := net.ListenPacket("udp4", o.ListenUDP)
+	udpConn, err := net.ListenPacket("udp", o.ListenUDP)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on UDP: %w", err)
 	}

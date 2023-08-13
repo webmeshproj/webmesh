@@ -17,19 +17,6 @@ limitations under the License.
 // Package datachannels provides a WebRTC data channel API for port forwarding.
 package datachannels
 
-import (
-	"github.com/pion/webrtc/v3"
-)
-
-// WebRTC is the WebRTC API.
-var WebRTC *webrtc.API
-
-func init() {
-	s := webrtc.SettingEngine{}
-	s.DetachDataChannels()
-	WebRTC = webrtc.NewAPI(webrtc.WithSettingEngine(s))
-}
-
 // ServerChannel is a server-side data channel.
 type ServerChannel interface {
 	// Offer returns the offer for the data channel.

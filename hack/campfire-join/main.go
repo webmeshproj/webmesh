@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer conn.Close()
-	log.Info(">>> Connected to peer")
+	fmt.Println(">>> Connected to peer")
 	go func() {
 		defer conn.Close()
 		buf := make([]byte, 1024)

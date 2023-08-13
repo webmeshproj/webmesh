@@ -51,8 +51,19 @@ docker-build-distroless: docker-build-bin ## Build the distroless node docker im
 		--build-arg TARGETARCH=$(ARCH) \
 		-t $(DISTROLESS_IMAGE) .
 
+docker-build-turn: docker-build-turn-bin ## Build the turn docker image for the current architecture.
+	$(DOCKER) build \
+		-f Dockerfile.turn \
+		--build-arg PREFIX=turn-docker-linux \
+		--build-arg TARGETOS=linux \
+		--build-arg TARGETARCH=$(ARCH) \
+		-t $(REPO)/turn:latest .
+
 docker-build-bin:
-	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux --parallelism=$(PARALLEL)
+	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux --single-target
+
+docker-build-turn-bin:
+	$(GORELEASER) build $(BUILD_ARGS) --id turn-docker-linux --single-target
 
 docker-push: docker-build ## Push the node docker image
 	$(DOCKER) push $(IMAGE)

@@ -19,8 +19,6 @@ networks:
         - subnet: 10.20.0.0/24
 
 services:
-  # TURN server
-
   turn-server:
     image: ghcr.io/webmeshproj/turn:latest
     networks:
@@ -53,6 +51,7 @@ services:
       - --raft.in-memory
       - --mesh.wait-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.wait-campfire-turn-servers=turn:10.30.0.1:3478
+      - --services.api.webrtc=true
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     depends_on:
       - turn-server
@@ -71,7 +70,28 @@ services:
       - --raft.in-memory
       - --mesh.join-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.join-campfire-turn-servers=turn:10.30.0.1:3478
-      - --mesh.direct-peers=bootstrap-node
+      - --mesh.direct-peers=site-2-peer
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    depends_on:
+      - turn-server
+      - bootstrap-node
+
+  site-2-peer:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    networks:
+      public-net:
+      site-2:
+    hostname: site-2-peer
+    entrypoint:
+      - /webmesh-node
+      - --global.log-level=debug
+      - --global.insecure
+      - --global.no-ipv6
+      - --raft.in-memory
+      - --mesh.join-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
+      - --mesh.join-campfire-turn-servers=turn:10.30.0.1:3478
+      - --mesh.direct-peers=site-1-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     depends_on:
