@@ -219,7 +219,6 @@ brews:
       system "#{bin}/wmctl completion bash > #{bash_completion}/wmctl"
       system "#{bin}/wmctl completion zsh > #{zsh_completion}/_wmctl"
       system "#{bin}/wmctl completion fish > #{fish_completion}/wmctl.fish"
-      bash_completion.install "#{bash_completion}/wmctl" => "wmctl"
     test: |
       system "#{bin}/webmesh-node --version"
       system "#{bin}/wmctl --version"
