@@ -33,7 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
-const wgBufferSize = 1500
+const wgBufferSize = 65535
 
 type WireGuardProxyServer struct {
 	*webrtc.PeerConnection
@@ -145,7 +145,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 						return
 					}
 					log.Error("Failed to read from interface", slog.String("error", err.Error()))
-					return
+					continue
 				}
 				_, err = rw.Write(buf[:n])
 				if err != nil {
@@ -177,7 +177,6 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			_, err = wgiface.Write(buf[:n])
 			if err != nil {
 				log.Error("Failed to write to interface", slog.String("error", err.Error()))
-				return
 			}
 		}
 	})
@@ -330,6 +329,13 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 	if err != nil {
 		return nil, fmt.Errorf("listen: %w", err)
 	}
+	wgiface, err := net.DialUDP("udp", nil, &net.UDPAddr{
+		IP:   net.IPv4zero,
+		Port: int(targetPort),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("dial: %w", err)
+	}
 	pc.localAddr = l.LocalAddr().(*net.UDPAddr)
 	dc.OnClose(func() {
 		close(pc.closec)
@@ -364,7 +370,6 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 						return
 					}
 					log.Error("Failed to read from proxy listener", slog.String("error", err.Error()))
-					return
 				}
 				_, err = rw.Write(buf[:n])
 				if err != nil {
@@ -389,13 +394,9 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 				log.Error("Failed to read from data channel", slog.String("error", err.Error()))
 				return
 			}
-			_, err = l.WriteTo(buf[:n], &net.UDPAddr{
-				IP:   net.IPv4zero,
-				Port: targetPort,
-			})
+			_, err = wgiface.Write(buf[:n])
 			if err != nil {
 				log.Error("Failed to write to interface", slog.String("error", err.Error()))
-				return
 			}
 		}
 	})
