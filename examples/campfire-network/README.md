@@ -26,7 +26,7 @@ As with the other examples, you can start the `compose` file with:
 docker-compose up
 ```
 
-After a few seconds, and a lot of random WARNINGS, you should all the nodes connect to each other.
+After a few seconds, and a lot of random WARNINGS, you should see all the nodes connect to each other.
 This can be confirmed by executing into any of the nodes and running `wg`:
 
 ```bash
