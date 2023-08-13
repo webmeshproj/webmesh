@@ -3,7 +3,7 @@
 This example shows a fully peer-to-peer network negotiated over the Campfire protocol.
 The Campfire protocol was originally conceived by [TheRook](https://github.com/therook) as a way to allow peers to discover each other without the need for a central server.
 
-The protocol is still in its infancy, but a rought draft implementation is included in Webmesh as a proof of concept.
+The protocol is still in its infancy, but a rough draft implementation is included in Webmesh as a proof of concept.
 The idea is that peers using a pre-shared key and shared list of TURN servers can discover each other and establish a peer-to-peer connection.
 Hashes of the pre-shared key are used to generate unique identifiers for each peer and to pick a constant TURN server to "camp" on.
 
