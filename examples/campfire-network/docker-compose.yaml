@@ -55,6 +55,9 @@ services:
       - --mesh.wait-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.wait-campfire-turn-servers=turn:10.1.0.1:3478
       - --services.api.webrtc=true
+      - --services.api.mesh=true
+    ports:
+      - 8443:8443
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     depends_on:
       - turn-server
