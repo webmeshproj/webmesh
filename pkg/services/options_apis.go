@@ -86,3 +86,13 @@ func (o *APIOptions) Validate() error {
 	}
 	return nil
 }
+
+// DeepCopy returns a deep copy of the options.
+func (o *APIOptions) DeepCopy() *APIOptions {
+	if o == nil {
+		return nil
+	}
+	no := &APIOptions{}
+	*no = *o
+	return no
+}

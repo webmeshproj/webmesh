@@ -68,6 +68,16 @@ func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	return o
 }
 
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	return &Options{
+		Global:   o.Global.DeepCopy(),
+		Mesh:     o.Mesh.DeepCopy(),
+		Bridge:   o.Bridge.DeepCopy(),
+		Services: o.Services.DeepCopy(),
+	}
+}
+
 // Validate runs all the validation checks.
 func (o *Options) Validate() error {
 	if len(o.Bridge.Meshes) > 0 {

@@ -170,3 +170,25 @@ func (o *WireGuardOptions) Validate() error {
 	}
 	return nil
 }
+
+// DeepCopy returns a deep copy of the options.
+func (o *WireGuardOptions) DeepCopy() *WireGuardOptions {
+	if o == nil {
+		return nil
+	}
+	return &WireGuardOptions{
+		ListenPort:            o.ListenPort,
+		InterfaceName:         o.InterfaceName,
+		ForceInterfaceName:    o.ForceInterfaceName,
+		ForceTUN:              o.ForceTUN,
+		Modprobe:              o.Modprobe,
+		Masquerade:            o.Masquerade,
+		PersistentKeepAlive:   o.PersistentKeepAlive,
+		MTU:                   o.MTU,
+		Endpoints:             append([]string(nil), o.Endpoints...),
+		KeyFile:               o.KeyFile,
+		KeyRotationInterval:   o.KeyRotationInterval,
+		RecordMetrics:         o.RecordMetrics,
+		RecordMetricsInterval: o.RecordMetricsInterval,
+	}
+}

@@ -82,6 +82,16 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 		"The path prefix to use for the dashboard.")
 }
 
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	no := &Options{}
+	*no = *o
+	return no
+}
+
 // NewOptions creates a new Options with default values.
 func NewOptions() *Options {
 	return &Options{

@@ -216,3 +216,17 @@ func (o *MeshOptions) Validate() error {
 	}
 	return nil
 }
+
+// DeepCopy returns a deep copy.
+func (o *MeshOptions) DeepCopy() *MeshOptions {
+	if o == nil {
+		return nil
+	}
+	other := *o
+	other.PeerDiscoveryAddresses = append([]string(nil), o.PeerDiscoveryAddresses...)
+	other.JoinCampfireTURNServers = append([]string(nil), o.JoinCampfireTURNServers...)
+	other.WaitCampfireTURNServers = append([]string(nil), o.WaitCampfireTURNServers...)
+	other.Routes = append([]string(nil), o.Routes...)
+	other.DirectPeers = append([]string(nil), o.DirectPeers...)
+	return &other
+}

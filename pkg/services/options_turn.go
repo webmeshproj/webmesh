@@ -108,3 +108,12 @@ func (o *TURNOptions) Validate() error {
 	}
 	return nil
 }
+
+// DeepCopy returns a deep copy.
+func (o *TURNOptions) DeepCopy() *TURNOptions {
+	if o == nil {
+		return nil
+	}
+	n := *o
+	return &n
+}

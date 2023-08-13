@@ -127,3 +127,14 @@ func (o *MeshDNSOptions) Validate() error {
 	}
 	return nil
 }
+
+// DeepCopy copies the mesh DNS options.
+func (o *MeshDNSOptions) DeepCopy() *MeshDNSOptions {
+	if o == nil {
+		return nil
+	}
+	no := *o
+	no.Forwarders = make([]string, len(o.Forwarders))
+	copy(no.Forwarders, o.Forwarders)
+	return &no
+}

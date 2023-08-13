@@ -151,6 +151,14 @@ When detect-endpoints is true, this value will be the first address detected.`)
 		"Do not advertise features to the rest of the mesh.")
 }
 
+// DeepCopy copies the options.
+func (o *Options) DeepCopy() *Options {
+	opts := *o
+	opts.Endpoints = make([]string, len(o.Endpoints))
+	copy(opts.Endpoints, o.Endpoints)
+	return &opts
+}
+
 // Overlay overlays the global options onto the given option sets.
 func (o *Options) Overlay(opts ...any) error {
 	var primaryEndpoint netip.Addr

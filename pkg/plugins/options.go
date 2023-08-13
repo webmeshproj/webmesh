@@ -31,29 +31,29 @@ import (
 // Options are the options for loading plugins.
 type Options struct {
 	// Plugins is a map of plugin names to plugin configs.
-	Plugins map[string]*Config `yaml:",inline" json:",inline" toml:",inline"`
+	Plugins map[string]*Config `yaml:",inline" json:",inline" toml:",inline" mapstructure:",squash"`
 }
 
 // Config is the configuration for a plugin.
 type Config struct {
 	// Plugin is an inline plugin implementation.
-	Plugin v1.PluginServer `yaml:"-" json:"-" toml:"-"`
+	Plugin v1.PluginServer `yaml:"-" json:"-" toml:"-" mapstructure:"-"`
 	// Path is the path to an executable for the plugin.
-	Path string `yaml:"path,omitempty" json:"path,omitempty" toml:"path,omitempty"`
+	Path string `yaml:"path,omitempty" json:"path,omitempty" toml:"path,omitempty" mapstructure:"path,omitempty"`
 	// Server is the address of a server for the plugin.
-	Server string `yaml:"server,omitempty" json:"server,omitempty" toml:"server,omitempty"`
+	Server string `yaml:"server,omitempty" json:"server,omitempty" toml:"server,omitempty" mapstructure:"server,omitempty"`
 	// Insecure is whether to use an insecure connection to the plugin server.
-	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty" toml:"insecure,omitempty"`
+	Insecure bool `yaml:"insecure,omitempty" json:"insecure,omitempty" toml:"insecure,omitempty" mapstructure:"insecure,omitempty"`
 	// TLSCAFile is the path to a CA for verifying certificates.
-	TLSCAFile string `yaml:"tls-ca-file,omitempty" json:"tls-ca-file,omitempty" toml:"tls-ca-file,omitempty"`
+	TLSCAFile string `yaml:"tls-ca-file,omitempty" json:"tls-ca-file,omitempty" toml:"tls-ca-file,omitempty" mapstructure:"tls-ca-file,omitempty"`
 	// TLSCertFile is the path to a certificate for authenticating to the plugin server.
-	TLSCertFile string `yaml:"tls-cert-file,omitempty" json:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty"`
+	TLSCertFile string `yaml:"tls-cert-file,omitempty" json:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty" mapstructure:"tls-cert-file,omitempty"`
 	// TLSKeyFile is the path to a key for authenticating to the plugin server.
-	TLSKeyFile string `yaml:"tls-key-file,omitempty" json:"tls-key-file,omitempty" toml:"tls-key-file,omitempty"`
+	TLSKeyFile string `yaml:"tls-key-file,omitempty" json:"tls-key-file,omitempty" toml:"tls-key-file,omitempty" mapstructure:"tls-key-file,omitempty"`
 	// TLSSkipVerify is whether to skip verifying the plugin server's certificate.
-	TLSSkipVerify bool `yaml:"tls-skip-verify,omitempty" json:"tls-skip-verify,omitempty" toml:"tls-skip-verify,omitempty"`
+	TLSSkipVerify bool `yaml:"tls-skip-verify,omitempty" json:"tls-skip-verify,omitempty" toml:"tls-skip-verify,omitempty" mapstructure:"tls-skip-verify,omitempty"`
 	// Config is the configuration for the plugin.
-	Config map[string]any `yaml:"config,omitempty" json:"config,omitempty" toml:"config,omitempty"`
+	Config map[string]any `yaml:"config,omitempty" json:"config,omitempty" toml:"config,omitempty" mapstructure:"config,omitempty"`
 }
 
 // NewOptions creates new options.
@@ -417,4 +417,39 @@ but with the addition of server configurations in the format of:
 		o.Plugins[cfg.Server] = &cfg
 		return nil
 	})
+}
+
+// DeepCopy returns a deep copy of the object.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	no := &Options{
+		Plugins: map[string]*Config{},
+	}
+	for k, v := range o.Plugins {
+		no.Plugins[k] = v.DeepCopy()
+	}
+	return no
+}
+
+// DeepCopy returns a deep copy of the object.
+func (c *Config) DeepCopy() *Config {
+	if c == nil {
+		return nil
+	}
+	nc := &Config{
+		Config: map[string]any{},
+	}
+	for k, v := range c.Config {
+		nc.Config[k] = v
+	}
+	nc.Path = c.Path
+	nc.Server = c.Server
+	nc.Insecure = c.Insecure
+	nc.TLSCAFile = c.TLSCAFile
+	nc.TLSKeyFile = c.TLSKeyFile
+	nc.TLSCertFile = c.TLSCertFile
+	nc.TLSSkipVerify = c.TLSSkipVerify
+	return nc
 }

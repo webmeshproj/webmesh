@@ -41,6 +41,34 @@ type AuthOptions struct {
 	LDAP *LDAPAuthOptions `json:"ldap,omitempty" yaml:"ldap,omitempty" toml:"ldap,omitempty" mapstructure:"ldap,omitempty"`
 }
 
+func (o *AuthOptions) DeepCopy() *AuthOptions {
+	if o == nil {
+		return nil
+	}
+	no := &AuthOptions{}
+	if o.Basic != nil {
+		no.Basic = &BasicAuthOptions{
+			Username: o.Basic.Username,
+			Password: o.Basic.Password,
+		}
+	}
+	if o.MTLS != nil {
+		no.MTLS = &MTLSOptions{
+			CertFile: o.MTLS.CertFile,
+			CertData: o.MTLS.CertData,
+			KeyFile:  o.MTLS.KeyFile,
+			KeyData:  o.MTLS.KeyData,
+		}
+	}
+	if o.LDAP != nil {
+		no.LDAP = &LDAPAuthOptions{
+			Username: o.LDAP.Username,
+			Password: o.LDAP.Password,
+		}
+	}
+	return no
+}
+
 // MTLSOptions are options for mutual TLS.
 type MTLSOptions struct {
 	// CertFile is the path to a TLS certificate file to present when joining. Either this

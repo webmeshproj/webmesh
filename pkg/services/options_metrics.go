@@ -61,3 +61,12 @@ func (o *MetricsOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	fs.StringVar(&o.Path, p+"services.metrics.path", util.GetEnvDefault(MetricsPathEnvVar, "/metrics"),
 		"gRPC metrics path.")
 }
+
+// DeepCopy returns a deep copy.
+func (o *MetricsOptions) DeepCopy() *MetricsOptions {
+	if o == nil {
+		return nil
+	}
+	other := *o
+	return &other
+}

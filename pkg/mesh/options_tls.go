@@ -64,3 +64,17 @@ func (o *TLSOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
 	fl.BoolVar(&o.Insecure, p+"tls.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Don't use TLS for peer communication.")
 }
+
+// DeepCopy returns a deep copy of the TLSOptions.
+func (o *TLSOptions) DeepCopy() *TLSOptions {
+	if o == nil {
+		return nil
+	}
+	return &TLSOptions{
+		CAFile:             o.CAFile,
+		CAData:             o.CAData,
+		VerifyChainOnly:    o.VerifyChainOnly,
+		InsecureSkipVerify: o.InsecureSkipVerify,
+		Insecure:           o.Insecure,
+	}
+}

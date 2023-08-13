@@ -81,6 +81,16 @@ func (o *Options) Validate() error {
 	return nil
 }
 
+// DeepCopy returns a deep copy of the campfire service options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	no := &Options{}
+	*no = *o
+	return no
+}
+
 // Server is the campfire service.
 type Server struct {
 	opts   Options

@@ -91,6 +91,22 @@ func (o *Options) BindFlags(fl *flag.FlagSet, ifaceName string, prefix ...string
 	o.Plugins.BindFlags(fl, prefix...)
 }
 
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	return &Options{
+		Auth:      o.Auth.DeepCopy(),
+		Mesh:      o.Mesh.DeepCopy(),
+		Bootstrap: o.Bootstrap.DeepCopy(),
+		Raft:      o.Raft.DeepCopy(),
+		TLS:       o.TLS.DeepCopy(),
+		WireGuard: o.WireGuard.DeepCopy(),
+		Plugins:   o.Plugins.DeepCopy(),
+	}
+}
+
 // Validate validates the options.
 func (o *Options) Validate() error {
 	if o == nil {

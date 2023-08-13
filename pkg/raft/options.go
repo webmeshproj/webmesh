@@ -68,46 +68,46 @@ const (
 // Options are the raft options.
 type Options struct {
 	// ListenAddress is the address to listen on for raft.
-	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty"`
+	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty" mapstructure:"listen-address,omitempty"`
 	// DataDir is the directory to store data in.
-	DataDir string `json:"data-dir,omitempty" yaml:"data-dir,omitempty" toml:"data-dir,omitempty"`
+	DataDir string `json:"data-dir,omitempty" yaml:"data-dir,omitempty" toml:"data-dir,omitempty" mapstructure:"data-dir,omitempty"`
 	// InMemory is if the store should be in memory. This should only be used for testing and ephemeral nodes.
-	InMemory bool `json:"in-memory,omitempty" yaml:"in-memory,omitempty" toml:"in-memory,omitempty"`
+	InMemory bool `json:"in-memory,omitempty" yaml:"in-memory,omitempty" toml:"in-memory,omitempty" mapstructure:"in-memory,omitempty"`
 	// ConnectionPoolCount is the number of connections to pool. If 0, no connection pooling is used.
-	ConnectionPoolCount int `json:"connection-pool-count,omitempty" yaml:"connection-pool-count,omitempty" toml:"connection-pool-count,omitempty"`
+	ConnectionPoolCount int `json:"connection-pool-count,omitempty" yaml:"connection-pool-count,omitempty" toml:"connection-pool-count,omitempty" mapstructure:"connection-pool-count,omitempty"`
 	// ConnectionTimeout is the timeout for connections.
-	ConnectionTimeout time.Duration `json:"connection-timeout,omitempty" yaml:"connection-timeout,omitempty" toml:"connection-timeout,omitempty"`
+	ConnectionTimeout time.Duration `json:"connection-timeout,omitempty" yaml:"connection-timeout,omitempty" toml:"connection-timeout,omitempty" mapstructure:"connection-timeout,omitempty"`
 	// HeartbeatTimeout is the timeout for heartbeats.
-	HeartbeatTimeout time.Duration `json:"heartbeat-timeout,omitempty" yaml:"heartbeat-timeout,omitempty" toml:"heartbeat-timeout,omitempty"`
+	HeartbeatTimeout time.Duration `json:"heartbeat-timeout,omitempty" yaml:"heartbeat-timeout,omitempty" toml:"heartbeat-timeout,omitempty" mapstructure:"heartbeat-timeout,omitempty"`
 	// ElectionTimeout is the timeout for elections.
-	ElectionTimeout time.Duration `json:"election-timeout,omitempty" yaml:"election-timeout,omitempty" toml:"election-timeout,omitempty"`
+	ElectionTimeout time.Duration `json:"election-timeout,omitempty" yaml:"election-timeout,omitempty" toml:"election-timeout,omitempty" mapstructure:"election-timeout,omitempty"`
 	// ApplyTimeout is the timeout for applying.
-	ApplyTimeout time.Duration `json:"apply-timeout,omitempty" yaml:"apply-timeout,omitempty" toml:"apply-timeout,omitempty"`
+	ApplyTimeout time.Duration `json:"apply-timeout,omitempty" yaml:"apply-timeout,omitempty" toml:"apply-timeout,omitempty" mapstructure:"apply-timeout,omitempty"`
 	// CommitTimeout is the timeout for committing.
-	CommitTimeout time.Duration `json:"commit-timeout,omitempty" yaml:"commit-timeout,omitempty" toml:"commit-timeout,omitempty"`
+	CommitTimeout time.Duration `json:"commit-timeout,omitempty" yaml:"commit-timeout,omitempty" toml:"commit-timeout,omitempty" mapstructure:"commit-timeout,omitempty"`
 	// MaxAppendEntries is the maximum number of append entries.
-	MaxAppendEntries int `json:"max-append-entries,omitempty" yaml:"max-append-entries,omitempty" toml:"max-append-entries,omitempty"`
+	MaxAppendEntries int `json:"max-append-entries,omitempty" yaml:"max-append-entries,omitempty" toml:"max-append-entries,omitempty" mapstructure:"max-append-entries,omitempty"`
 	// LeaderLeaseTimeout is the timeout for leader leases.
-	LeaderLeaseTimeout time.Duration `json:"leader-lease-timeout,omitempty" yaml:"leader-lease-timeout,omitempty" toml:"leader-lease-timeout,omitempty"`
+	LeaderLeaseTimeout time.Duration `json:"leader-lease-timeout,omitempty" yaml:"leader-lease-timeout,omitempty" toml:"leader-lease-timeout,omitempty" mapstructure:"leader-lease-timeout,omitempty"`
 	// SnapshotInterval is the interval to take snapshots.
-	SnapshotInterval time.Duration `json:"snapshot-interval,omitempty" yaml:"snapshot-interval,omitempty" toml:"snapshot-interval,omitempty"`
+	SnapshotInterval time.Duration `json:"snapshot-interval,omitempty" yaml:"snapshot-interval,omitempty" toml:"snapshot-interval,omitempty" mapstructure:"snapshot-interval,omitempty"`
 	// SnapshotThreshold is the threshold to take snapshots.
-	SnapshotThreshold uint64 `json:"snapshot-threshold,omitempty" yaml:"snapshot-threshold,omitempty" toml:"snapshot-threshold,omitempty"`
+	SnapshotThreshold uint64 `json:"snapshot-threshold,omitempty" yaml:"snapshot-threshold,omitempty" toml:"snapshot-threshold,omitempty" mapstructure:"snapshot-threshold,omitempty"`
 	// SnapshotRetention is the number of snapshots to retain.
-	SnapshotRetention uint64 `json:"snapshot-retention,omitempty" yaml:"snapshot-retention,omitempty" toml:"snapshot-retention,omitempty"`
+	SnapshotRetention uint64 `json:"snapshot-retention,omitempty" yaml:"snapshot-retention,omitempty" toml:"snapshot-retention,omitempty" mapstructure:"snapshot-retention,omitempty"`
 	// ObserverChanBuffer is the buffer size for the observer channel.
-	ObserverChanBuffer int `json:"observer-chan-buffer,omitempty" yaml:"observer-chan-buffer,omitempty" toml:"observer-chan-buffer,omitempty"`
+	ObserverChanBuffer int `json:"observer-chan-buffer,omitempty" yaml:"observer-chan-buffer,omitempty" toml:"observer-chan-buffer,omitempty" mapstructure:"observer-chan-buffer,omitempty"`
 	// LogLevel is the log level for the raft backend.
-	LogLevel string `json:"log-level,omitempty" yaml:"log-level,omitempty" toml:"log-level,omitempty"`
+	LogLevel string `json:"log-level,omitempty" yaml:"log-level,omitempty" toml:"log-level,omitempty" mapstructure:"log-level,omitempty"`
 	// PreferIPv6 is the prefer IPv6 flag.
-	PreferIPv6 bool `json:"prefer-ipv6,omitempty" yaml:"prefer-ipv6,omitempty" toml:"prefer-ipv6,omitempty"`
+	PreferIPv6 bool `json:"prefer-ipv6,omitempty" yaml:"prefer-ipv6,omitempty" toml:"prefer-ipv6,omitempty" mapstructure:"prefer-ipv6,omitempty"`
 	// LeaveOnShutdown is the leave on shutdown flag.
-	LeaveOnShutdown bool `json:"leave-on-shutdown,omitempty" yaml:"leave-on-shutdown,omitempty" toml:"leave-on-shutdown,omitempty"`
+	LeaveOnShutdown bool `json:"leave-on-shutdown,omitempty" yaml:"leave-on-shutdown,omitempty" toml:"leave-on-shutdown,omitempty" mapstructure:"leave-on-shutdown,omitempty"`
 
 	// Below are callbacks used internally or by external packages.
-	OnApplyLog        func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) `json:"-" yaml:"-" toml:"-"`
-	OnSnapshotRestore func(ctx context.Context, meta *SnapshotMeta, data io.ReadCloser)   `json:"-" yaml:"-" toml:"-"`
-	OnObservation     func(ev Observation)                                                `json:"-" yaml:"-" toml:"-"`
+	OnApplyLog        func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) `json:"-" yaml:"-" toml:"-" mapstructure:"-"`
+	OnSnapshotRestore func(ctx context.Context, meta *SnapshotMeta, data io.ReadCloser)   `json:"-" yaml:"-" toml:"-" mapstructure:"-"`
+	OnObservation     func(ev Observation)                                                `json:"-" yaml:"-" toml:"-" mapstructure:"-"`
 }
 
 // NewOptions returns new raft options with the default values and given listen port.
@@ -264,4 +264,13 @@ func (o *Options) StorePath() string {
 // DataStoragePath returns the data directory.
 func (o *Options) DataStoragePath() string {
 	return filepath.Join(o.DataDir, DataStoragePath)
+}
+
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	other := *o
+	return &other
 }

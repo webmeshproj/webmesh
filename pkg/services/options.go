@@ -259,6 +259,33 @@ func (o *Options) ToFeatureSet() []v1.Feature {
 	return features
 }
 
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	deepCopy := *o
+	if o.API != nil {
+		deepCopy.API = o.API.DeepCopy()
+	}
+	if o.Metrics != nil {
+		deepCopy.Metrics = o.Metrics.DeepCopy()
+	}
+	if o.MeshDNS != nil {
+		deepCopy.MeshDNS = o.MeshDNS.DeepCopy()
+	}
+	if o.TURN != nil {
+		deepCopy.TURN = o.TURN.DeepCopy()
+	}
+	if o.Campfire != nil {
+		deepCopy.Campfire = o.Campfire.DeepCopy()
+	}
+	if o.Dashboard != nil {
+		deepCopy.Dashboard = o.Dashboard.DeepCopy()
+	}
+	return &deepCopy
+}
+
 // InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.
 func InterceptorLogger() logging.Logger {
 	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {

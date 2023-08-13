@@ -224,3 +224,30 @@ Ports should be in the form of <node-id>=<port>.`,
 	fl.BoolVar(&o.Force, p+"bootstrap.force", util.GetEnvDefault(ForceBootstrapClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
 }
+
+// DeepCopy returns a deep copy of the bootstrap options.
+func (o *BootstrapOptions) DeepCopy() *BootstrapOptions {
+	if o == nil {
+		return nil
+	}
+	out := &BootstrapOptions{
+		Enabled:              o.Enabled,
+		AdvertiseAddress:     o.AdvertiseAddress,
+		Servers:              make(map[string]string),
+		ServersGRPCPorts:     make(map[string]int),
+		IPv4Network:          o.IPv4Network,
+		MeshDomain:           o.MeshDomain,
+		Admin:                o.Admin,
+		Voters:               o.Voters,
+		DefaultNetworkPolicy: o.DefaultNetworkPolicy,
+		RestoreSnapshot:      o.RestoreSnapshot,
+		Force:                o.Force,
+	}
+	for k, v := range o.Servers {
+		out.Servers[k] = v
+	}
+	for k, v := range o.ServersGRPCPorts {
+		out.ServersGRPCPorts[k] = v
+	}
+	return out
+}
