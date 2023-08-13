@@ -215,6 +215,7 @@ brews:
       bin.install "webmesh-node"
       bin.install "wmctl"
       bin.install "webmesh-turn"
+      system "mkdir -p #{bash_completion} #{zsh_completion} #{fish_completion}"
       system "#{bin}/wmctl completion bash > #{bash_completion}/wmctl"
       system "#{bin}/wmctl completion zsh > #{zsh_completion}/_wmctl"
       system "#{bin}/wmctl completion fish > #{fish_completion}/wmctl.fish"
@@ -222,6 +223,22 @@ brews:
     test: |
       system "#{bin}/webmesh-node --version"
       system "#{bin}/wmctl --version"
+    caveats: |
+      Completions have been installed to:
+        #{bash_completion}/wmctl
+        #{zsh_completion}/_wmctl
+        #{fish_completion}/wmctl.fish
+
+      To enable bash completion, add the following to your ~/.bashrc or ~/.bash_profile:
+        source $(brew --prefix)/etc/bash_completion
+        source #{bash_completion}/wmctl
+
+      To enable zsh completion, add the following to your ~/.zshrc:
+        fpath=(#{zsh_completion} $fpath)
+        autoload -Uz compinit && compinit
+
+      To enable fish completion, add the following to your ~/.config/fish/config.fish:
+        source #{fish_completion}/wmctl.fish
 
 signs:
   - cmd: cosign
