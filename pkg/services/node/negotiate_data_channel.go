@@ -56,7 +56,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 	// some errors by doing some extra validation first.
 	var conn datachannels.ServerChannel
 	if req.GetPort() == 0 && req.GetProto() == "udp" {
-		log.Info("creating WireGuard proxy connection")
+		log.Info("Creating WireGuard proxy connection")
 		// Lookup our WireGuard port.
 		port, err := s.store.Network().WireGuard().ListenPort()
 		if err != nil {
@@ -67,7 +67,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 			return err
 		}
 	} else {
-		log.Info("creating standard webrtc peer connection")
+		log.Info("Creating standard webrtc peer connection")
 		conn, err = datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
 			Proto:       req.GetProto(),
 			SrcAddress:  req.GetSrc(),
@@ -80,10 +80,10 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 	}
 	go func() {
 		<-conn.Closed()
-		log.Info("webrtc connection closed")
+		log.Debug("WebRTC connection closed")
 	}()
 	// Send the offer back to the other node
-	log.Info("sending offer to other node")
+	log.Info("Sending offer to other node")
 	err = stream.Send(&v1.DataChannelNegotiation{
 		Offer: conn.Offer(),
 	})
@@ -97,7 +97,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 		defer conn.Close()
 		return err
 	}
-	log.Info("answering offer from other node")
+	log.Info("Answering offer from other node")
 	err = conn.AnswerOffer(resp.GetAnswer())
 	if err != nil {
 		defer conn.Close()
@@ -109,7 +109,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 			if candidate == "" {
 				continue
 			}
-			log.Info("sending ICE candidate", slog.String("candidate", candidate))
+			log.Debug("Sending ICE candidate", slog.String("candidate", candidate))
 			err := stream.Send(&v1.DataChannelNegotiation{
 				Candidate: candidate,
 			})
@@ -128,16 +128,16 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 			if err == io.EOF {
 				return nil
 			}
-			log.Error("error receiving ICE candidate", slog.String("error", err.Error()))
+			log.Error("Error receiving ICE candidate", slog.String("error", err.Error()))
 			return err
 		}
 		if candidate.GetCandidate() == "" {
 			continue
 		}
-		log.Info("received ICE candidate", slog.String("candidate", candidate.GetCandidate()))
+		log.Debug("Received ICE candidate", slog.String("candidate", candidate.GetCandidate()))
 		err = conn.AddCandidate(candidate.GetCandidate())
 		if err != nil {
-			log.Error("error adding ICE candidate", slog.String("error", err.Error()))
+			log.Error("Error adding ICE candidate", slog.String("error", err.Error()))
 			return err
 		}
 	}

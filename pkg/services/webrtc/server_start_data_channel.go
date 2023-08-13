@@ -75,9 +75,9 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 	case r = <-req:
 	}
 	log = log.With(slog.Any("request", r))
-	log.Info("received data channel request")
+	log.Info("Received data channel request")
 	if r.GetNodeId() == "" {
-		log.Error("request has empty node ID")
+		log.Error("Request has empty node ID")
 		return status.Error(codes.InvalidArgument, "node ID must be provided in request")
 	}
 	allowed, err := s.rbacEval.Evaluate(stream.Context(), canNegDataChannelAction.For(r.GetNodeId()))
@@ -96,11 +96,11 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 		r.Proto = "tcp"
 	}
 	if r.GetPort() > 65535 {
-		log.Error("request has invalid port")
+		log.Error("Request has invalid port")
 		return status.Error(codes.InvalidArgument, "invalid port provided in request")
 	}
 	if r.GetPort() == 0 && r.GetProto() != "udp" {
-		log.Error("request has invalid port")
+		log.Error("Request has invalid port")
 		return status.Error(codes.InvalidArgument, "invalid port provided in request")
 	}
 	if r.GetNodeId() == string(s.store.ID()) {
@@ -111,11 +111,11 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 }
 
 func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_StartDataChannelServer, r *v1.StartDataChannelRequest, remoteAddr string) error {
-	log.Info("handling negotiation locally")
+	log.Info("Handling negotiation locally")
 	var conn datachannels.ServerChannel
 	var err error
 	if r.GetProto() == "udp" && r.GetPort() == 0 {
-		log.Info("negotiating WireGuard proxy connection")
+		log.Info("Negotiating WireGuard proxy connection")
 		// Lookup our WireGuard port.
 		port, err := s.store.Network().WireGuard().ListenPort()
 		if err != nil {
@@ -126,7 +126,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 			return err
 		}
 	} else {
-		log.Info("negotiating standard WebRTC connection")
+		log.Info("Negotiating standard WebRTC connection")
 		conn, err = datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
 			Proto:       r.GetProto(),
 			SrcAddress:  remoteAddr,
@@ -139,9 +139,9 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	}
 	go func() {
 		<-conn.Closed()
-		log.Info("webrtc connection closed")
+		log.Info("WebRTC connection closed")
 	}()
-	log.Info("sending offer to client")
+	log.Info("Sending offer to client")
 	err = stream.Send(&v1.DataChannelOffer{
 		Offer:       conn.Offer(),
 		StunServers: s.stunServers,
@@ -149,7 +149,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to send offer to client: %s", err.Error())
 	}
-	log.Info("waiting for answer from client")
+	log.Info("Waiting for answer from client")
 	ctx, cancel := context.WithTimeout(stream.Context(), 10*time.Second)
 	errs := make(chan error, 1)
 	req := make(chan *v1.StartDataChannelRequest, 1)
@@ -174,18 +174,18 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	if r.GetAnswer() == "" {
 		return status.Error(codes.InvalidArgument, "answer must be provided in request")
 	}
-	log.Info("received answer from client")
+	log.Info("Received answer from client")
 	err = conn.AnswerOffer(r.GetAnswer())
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to answer offer from client: %s", err.Error())
 	}
-	log.Info("starting ICE negotiation")
+	log.Info("Starting ICE negotiation")
 	go func() {
 		for candidate := range conn.Candidates() {
 			if candidate == "" {
 				continue
 			}
-			log.Info("sending ICE candidate", slog.String("candidate", candidate))
+			log.Debug("Sending ICE candidate", slog.String("candidate", candidate))
 			err := stream.Send(&v1.DataChannelOffer{
 				Candidate: candidate,
 			})
@@ -204,13 +204,13 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 			if err == io.EOF {
 				return nil
 			}
-			log.Error("error receiving ICE candidate", slog.String("error", err.Error()))
+			log.Error("Error receiving ICE candidate", slog.String("error", err.Error()))
 			return err
 		}
 		if candidate.GetCandidate() == "" {
 			continue
 		}
-		log.Info("received ICE candidate", slog.String("candidate", candidate.GetCandidate()))
+		log.Debug("Received ICE candidate", slog.String("candidate", candidate.GetCandidate()))
 		err = conn.AddCandidate(candidate.GetCandidate())
 		if err != nil {
 			log.Error("error adding ICE candidate", slog.String("error", err.Error()))
@@ -221,7 +221,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 
 func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRTC_StartDataChannelServer, r *v1.StartDataChannelRequest, remoteAddr string) error {
 	// Start a negotiation with the peer.
-	log.Info("negotiating data channel with remote peer")
+	log.Info("Negotiating data channel with remote peer")
 	conn, err := s.store.Dial(clientStream.Context(), r.GetNodeId())
 	if err != nil {
 		return err
@@ -255,7 +255,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	if resp.GetOffer() == "" {
 		return status.Error(codes.FailedPrecondition, "peer did not send an offer")
 	}
-	log.Info("received offer from peer", slog.String("offer", resp.GetOffer()))
+	log.Info("Received offer from peer", slog.String("offer", resp.GetOffer()))
 	// Forward the offer to the client
 	err = clientStream.Send(&v1.DataChannelOffer{
 		Offer:       resp.GetOffer(),
@@ -290,7 +290,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 		return status.Error(codes.InvalidArgument, "client did not send an answer")
 	}
 	// Send the answer to the peer
-	log.Info("sending answer to peer", slog.String("answer", r.GetAnswer()))
+	log.Info("Sending answer to peer", slog.String("answer", r.GetAnswer()))
 	err = negotiateStream.Send(&v1.DataChannelNegotiation{
 		Answer: r.GetAnswer(),
 	})
@@ -310,7 +310,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 			log.Error("received empty candidate from node")
 			return
 		}
-		log.Info("received candidate from node", slog.String("candidate", nodeCandidate.GetCandidate()))
+		log.Debug("Received ICE candidate from node", slog.String("candidate", nodeCandidate.GetCandidate()))
 		err = clientStream.Send(&v1.DataChannelOffer{
 			Candidate: nodeCandidate.GetCandidate(),
 		})
@@ -325,22 +325,22 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 		clientCandidate, err := clientStream.Recv()
 		if err != nil {
 			if err != io.EOF {
-				log.Error("failed to receive candidate from client", slog.String("error", err.Error()))
+				log.Error("Failed to receive candidate from client", slog.String("error", err.Error()))
 				return status.Errorf(codes.Internal, "failed to receive candidate from client: %s", err.Error())
 			}
 			return nil
 		}
 		if clientCandidate.GetCandidate() == "" {
-			log.Error("received empty candidate from client")
+			log.Error("Received empty candidate from client")
 			return status.Error(codes.InvalidArgument, "received empty candidate from client")
 		}
-		log.Info("received candidate from client", slog.String("candidate", clientCandidate.GetCandidate()))
+		log.Debug("Received ICE candidate from client", slog.String("candidate", clientCandidate.GetCandidate()))
 		err = negotiateStream.Send(&v1.DataChannelNegotiation{
 			Candidate: clientCandidate.GetCandidate(),
 		})
 		if err != nil {
 			if status.Code(err) != codes.Canceled {
-				log.Error("failed to send candidate to node", slog.String("error", err.Error()))
+				log.Error("Failed to ICE send candidate to node", slog.String("error", err.Error()))
 				return status.Errorf(codes.Internal, "failed to send candidate to node: %s", err.Error())
 			}
 			return nil
