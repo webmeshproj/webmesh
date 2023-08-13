@@ -325,10 +325,6 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 	if err != nil {
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
-	l, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
-	if err != nil {
-		return nil, fmt.Errorf("listen: %w", err)
-	}
 	wgiface, err := net.DialUDP("udp", nil, &net.UDPAddr{
 		IP:   net.IPv4zero,
 		Port: int(targetPort),
@@ -336,7 +332,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 	if err != nil {
 		return nil, fmt.Errorf("dial: %w", err)
 	}
-	pc.localAddr = l.LocalAddr().(*net.UDPAddr)
+	pc.localAddr = wgiface.LocalAddr().(*net.UDPAddr)
 	dc.OnClose(func() {
 		close(pc.closec)
 	})
@@ -349,7 +345,7 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 			return
 		}
 		go func() {
-			defer l.Close()
+			defer wgiface.Close()
 			buf := make([]byte, wgBufferSize)
 			for {
 				select {
@@ -357,12 +353,12 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 					return
 				default:
 				}
-				err := l.SetReadDeadline(time.Now().Add(time.Second * 3))
+				err := wgiface.SetReadDeadline(time.Now().Add(time.Second * 3))
 				if err != nil {
 					log.Error("Failed to set read deadline", slog.String("error", err.Error()))
 					return
 				}
-				n, err := l.Read(buf[0:])
+				n, err := wgiface.Read(buf[0:])
 				if err != nil {
 					if e, ok := err.(net.Error); ok && e.Timeout() {
 						continue
