@@ -42,11 +42,11 @@ func FuzzFind(f *testing.F) {
 		f.Add([]byte(tc))
 	}
 	f.Fuzz(func(t *testing.T, psk []byte) {
-		resp1, err := Find(psk, nil)
+		resp1, err := Find(psk, []string{"turn:turn.example.com:3478"})
 		if err != nil {
 			t.Skip(err)
 		}
-		resp2, err := Find(psk, nil)
+		resp2, err := Find(psk, []string{"turn:turn.example.com:3478"})
 		if err != nil {
 			t.Skip(err)
 		}
