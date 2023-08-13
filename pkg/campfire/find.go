@@ -55,7 +55,7 @@ func Find(psk []byte, turnServers []string) (*Location, error) {
 		return nil, fmt.Errorf("PSK must be %d bytes", PSKSize)
 	}
 	if len(turnServers) == 0 {
-		turnServers = GetDefaultTURNServers()
+		return nil, fmt.Errorf("turnServers must not be empty")
 	}
 	t := Now().Truncate(time.Hour)
 	localsecret, err := computeSecret(t.UTC(), psk, true)

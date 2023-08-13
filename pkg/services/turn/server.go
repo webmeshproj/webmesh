@@ -47,10 +47,14 @@ type Options struct {
 // Server is a TURN server.
 type Server struct {
 	*turn.Server
+	conn net.PacketConn
 }
 
 // NewServer creates and starts a new TURN server.
 func NewServer(o *Options) (*Server, error) {
+	if o.PortRange == "" {
+		o.PortRange = "49152-65535"
+	}
 	startPort, endPort, err := util.ParsePortRange(o.PortRange)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse port range: %w", err)
@@ -102,5 +106,10 @@ func NewServer(o *Options) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TURN server: %w", err)
 	}
-	return &Server{s}, nil
+	return &Server{Server: s, conn: pktConn}, nil
+}
+
+// ListenPort returns the port the TURN server is listening on.
+func (s *Server) ListenPort() int {
+	return s.conn.LocalAddr().(*net.UDPAddr).Port
 }
