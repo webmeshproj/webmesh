@@ -18,6 +18,7 @@ limitations under the License.
 package nodecmd
 
 import (
+	"log"
 	"log/slog"
 	"strconv"
 	"sync"
@@ -27,10 +28,12 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
@@ -74,6 +77,18 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "error decoding config overrides: %v", err)
 		}
+	}
+	if req.GetDisableBootstrap() || req.GetCampfireUri() != "" {
+		app.curConfig.Mesh.Bootstrap.Enabled = false
+	}
+	if req.GetCampfireUri() != "" {
+		uri, err := campfire.ParseCampfireURI(req.GetCampfireUri())
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid campfire URI: %v", err)
+		}
+		app.curConfig.Mesh.Mesh.JoinAddress = ""
+		app.curConfig.Mesh.Mesh.JoinCampfirePSK = string(uri.PSK)
+		app.curConfig.Mesh.Mesh.JoinCampfireTURNServers = uri.TURNServers
 	}
 	err := app.curConfig.Validate()
 	if err != nil {
@@ -287,4 +302,42 @@ func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.Stat
 		ConnectionStatus: status,
 		Node:             p.Proto(raftStatus),
 	}, nil
+}
+
+func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*emptypb.Empty, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh == nil {
+		return nil, ErrNotConnected
+	}
+	if meshdb.IsReservedPrefix(req.GetKey()) {
+		return nil, status.Errorf(codes.InvalidArgument, "key %q is reserved", req.GetKey())
+	}
+	err := app.mesh.Storage().Put(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error publishing: %v", err)
+	}
+	return &emptypb.Empty{}, nil
+}
+func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
+	if app.mesh == nil {
+		return ErrNotConnected
+	}
+	app.mu.Lock()
+	cancel, err := app.mesh.Storage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
+		err := srv.Send(&v1.SubscriptionEvent{
+			Key:   key,
+			Value: value,
+		})
+		if err != nil {
+			log.Printf("error sending subscription event: %v", err)
+		}
+	})
+	app.mu.Unlock()
+	if err != nil {
+		return status.Errorf(codes.Internal, "error subscribing: %v", err)
+	}
+	defer cancel()
+	<-srv.Context().Done()
+	return nil
 }
