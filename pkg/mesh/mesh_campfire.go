@@ -17,8 +17,8 @@ limitations under the License.
 package mesh
 
 import (
+	"fmt"
 	"io"
-	"log/slog"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -30,19 +30,63 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
-func (s *meshStore) waitByCampfire() {
+// CampfireConnHandler is a function that handles a campfire connection.
+type CampfireConnHandler func(context.Context, io.ReadWriteCloser)
+
+// StartCampfire starts a campfire listener with the given function handler.
+func (s *meshStore) StartCampfire(ctx context.Context, opts campfire.Options, hdlr CampfireConnHandler) error {
+	if hdlr == nil {
+		return fmt.Errorf("campfire handler cannot be nil")
+	}
+	s.campfiremu.Lock()
+	defer s.campfiremu.Unlock()
+	if _, ok := s.campfires[string(opts.PSK)]; ok {
+		return fmt.Errorf("campfire already started with psk %s", opts.PSK)
+	}
+	s.campfires[string(opts.PSK)] = nil
+	go s.waitByCampfire(opts, hdlr)
+	return nil
+}
+
+// LeaveCampfire closes a campfire connection with the given PSK.
+func (s *meshStore) LeaveCampfire(ctx context.Context, psk string) error {
+	s.campfiremu.Lock()
+	defer s.campfiremu.Unlock()
+	var err error
+	if cf, ok := s.campfires[psk]; ok {
+		err = cf.Close()
+		if err != nil {
+			s.log.Error("Failed to close campfire", "error", err.Error())
+		}
+		delete(s.campfires, psk)
+	}
+	return err
+}
+
+func (s *meshStore) waitByCampfire(opts campfire.Options, hdlr CampfireConnHandler) {
+	s.campfiremu.Lock()
+	if cf, ok := s.campfires[string(opts.PSK)]; !ok {
+		// This campfire has been deleted
+		s.campfiremu.Unlock()
+		return
+	} else if cf != nil && cf.Opened() {
+		// This campfire is already open
+		s.campfiremu.Unlock()
+		return
+	}
 	log := s.log.With("protocol", "campfire")
-	cf, err := campfire.Wait(context.Background(), campfire.Options{
-		PSK:         []byte(s.opts.Mesh.WaitCampfirePSK),
-		TURNServers: s.opts.Mesh.WaitCampfireTURNServers,
-	})
+	ctx := context.WithLogger(context.Background(), log)
+	cf, err := campfire.Wait(ctx, opts)
 	if err != nil {
+		s.campfiremu.Unlock()
 		log.Error("Failed to wait by campfire, will try again in 15 seconds", "error", err.Error())
 		// TODO: Make this configurable
 		time.Sleep(15 * time.Second)
-		go s.waitByCampfire()
+		go s.waitByCampfire(opts, hdlr)
 		return
 	}
+	s.campfires[string(opts.PSK)] = cf
+	s.campfiremu.Unlock()
 	defer cf.Close()
 	log.Info("Announced ourselves at the campfire")
 	go func() {
@@ -54,7 +98,7 @@ func (s *meshStore) waitByCampfire() {
 				}
 				log.Error("Failed to accept campfire connection", "error", err.Error())
 			}
-			go s.handleIncomingCampfireConn(log, conn)
+			go hdlr(ctx, conn)
 		}
 	}()
 	for {
@@ -66,14 +110,15 @@ func (s *meshStore) waitByCampfire() {
 		case <-cf.Expired():
 			log.Info("Campfire connection expired, reconnecting")
 			time.Sleep(3 * time.Second)
-			go s.waitByCampfire()
+			go s.waitByCampfire(opts, hdlr)
 			return
 		}
 	}
 }
 
-func (s *meshStore) handleIncomingCampfireConn(log *slog.Logger, conn io.ReadWriteCloser) {
+func (s *meshStore) handleCampfirePeering(ctx context.Context, conn io.ReadWriteCloser) {
 	defer conn.Close()
+	log := context.LoggerFrom(ctx)
 	log.Info("Handling incoming campfire connection")
 	// Read a join request off the wire
 	var req v1.JoinRequest

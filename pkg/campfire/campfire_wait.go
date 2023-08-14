@@ -30,7 +30,7 @@ import (
 )
 
 // Wait will wait for peers to join at the given location.
-func Wait(ctx context.Context, opts Options) (CampFire, error) {
+func Wait(ctx context.Context, opts Options) (Campfire, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
 	location, err := Find(opts.PSK, opts.TURNServers)
 	if err != nil {
@@ -95,6 +95,16 @@ func (t *turnWait) Accept() (io.ReadWriteCloser, error) {
 func (t *turnWait) Close() error {
 	close(t.closec)
 	return t.fireconn.Close()
+}
+
+// Opened returns true if the camp fire is opened.
+func (t *turnWait) Opened() bool {
+	select {
+	case <-t.closec:
+		return false
+	default:
+		return true
+	}
 }
 
 // Errors returns a channel of errors.

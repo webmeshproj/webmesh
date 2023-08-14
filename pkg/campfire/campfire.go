@@ -25,9 +25,9 @@ import (
 // Protocol is the protocol name.
 const Protocol = "/webmesh/campfire/1.0.0"
 
-// CampFire is a connection to one or more peers sharing the same pre-shared
-// key.
-type CampFire interface {
+// Campfire handles incoming connections from peers sharing the same
+// pre-shared key and TURN servers.
+type Campfire interface {
 	// Accept returns a connection to a peer.
 	Accept() (io.ReadWriteCloser, error)
 	// Close closes the camp fire.
@@ -36,6 +36,8 @@ type CampFire interface {
 	Errors() <-chan error
 	// Expired returns a channel that is closed when the camp fire expires.
 	Expired() <-chan struct{}
+	// Opened returns true if the camp fire is open.
+	Opened() bool
 }
 
 // Options are options for creating or joining a new camp fire.
