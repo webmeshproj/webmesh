@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +36,9 @@ func Wait(ctx context.Context, camp *CampfireURI) (CampfireChannel, error) {
 	location, err := Find(camp.PSK, camp.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
+	}
+	if !strings.HasPrefix(location.TURNServer, "turn:") {
+		location.TURNServer = "turn:" + location.TURNServer
 	}
 	log.Debug("Found campfire location", "location", location.TURNServer)
 	fireconn, err := turn.NewCampfireClient(turn.CampfireClientOptions{

@@ -19,6 +19,7 @@ package campfire
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/pion/webrtc/v3"
 
@@ -33,6 +34,10 @@ func Join(ctx context.Context, campfire *CampfireURI) (io.ReadWriteCloser, error
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
+	if !strings.HasPrefix(location.TURNServer, "turn:") {
+		location.TURNServer = "turn:" + location.TURNServer
+	}
+	// Parse the selected turn server
 	fireconn, err := turn.NewCampfireClient(turn.CampfireClientOptions{
 		Addr:  location.TURNServer,
 		Ufrag: location.RemoteUfrag(),
@@ -50,9 +55,19 @@ func Join(ctx context.Context, campfire *CampfireURI) (io.ReadWriteCloser, error
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{location.TURNServer},
-				Username:   "-",
-				Credential: "-",
+				URLs: []string{location.TURNServer},
+				Username: func() string {
+					if campfire.TURNUsername != "" {
+						return campfire.TURNUsername
+					}
+					return "-"
+				}(),
+				Credential: func() string {
+					if campfire.TURNPassword != "" {
+						return campfire.TURNPassword
+					}
+					return "-"
+				}(),
 			},
 		},
 	})

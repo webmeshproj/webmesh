@@ -30,15 +30,17 @@ const (
 	defaultTurnCred = "hLxK4U49l6fcZLH0"
 )
 
-// Campfire represents the components parsed from the camp URL.
+// CampfireURI represents the components parsed from a camp URL.
 type CampfireURI struct {
-	TURNServers []string // Username for TURN authentication
-	StunHosts   []string // List of STUN server hosts
-	StunPorts   []string // List of STUN server ports
-	RemoteHosts []string // List of remote hosts
-	RemotePorts []string // List of remote ports
-	Fingerprint string   // Raw query string, representing fingerprint
-	PSK         []byte   // Pre-shared key
+	TURNServers  []string // Username for TURN authentication
+	TURNUsername string   // Username for TURN authentication
+	TURNPassword string   // Password for TURN authentication
+	StunHosts    []string // List of STUN server hosts
+	StunPorts    []string // List of STUN server ports
+	RemoteHosts  []string // List of remote hosts
+	RemotePorts  []string // List of remote ports
+	Fingerprint  string   // Raw query string, representing fingerprint
+	PSK          []byte   // Pre-shared key
 }
 
 // ParseURL parses the given rawURL and returns a CampURL struct.
@@ -48,29 +50,31 @@ func ParseCampfireURI(rawURL string) (*CampfireURI, error) {
 		return nil, err
 	}
 
+	var out CampfireURI
+	out.PSK = []byte(parsedURL.Fragment)
+	out.Fingerprint = parsedURL.RawQuery
+
 	// Split the path segments using "/"
 	pathSegments := strings.Split(parsedURL.Path, "/")
 
-	TURNServers := make([]string, 0)
-	stunHosts := make([]string, 0)
-	stunPorts := make([]string, 0)
-	remoteHosts := make([]string, 0)
-	remotePorts := make([]string, 0)
-
 	// The user:pass@host is intact in the input:
-	splitURL := strings.Split(rawURL, "/")
-	TURNServers = append(TURNServers, splitURL[2])
+	out.TURNServers = append(out.TURNServers, parsedURL.Host)
+	if parsedURL.User != nil {
+		out.TURNUsername = parsedURL.User.Username()
+		if pwd, ok := parsedURL.User.Password(); ok {
+			out.TURNPassword = pwd
+		}
+	}
 
 	for _, segment := range pathSegments {
 		if segment == "" {
 			continue // Skip empty segments
 		}
-
 		// Split the segment into stun and remote parts using "-"
 		parts := strings.Split(segment, "-")
 		if len(parts) != 2 {
 			// If there is no destination - then its a TURN server.
-			TURNServers = append(TURNServers, segment)
+			out.TURNServers = append(out.TURNServers, segment)
 		} else {
 			// check for STUN parts:
 			stunPart := parts[0]
@@ -81,27 +85,18 @@ func ParseCampfireURI(rawURL string) (*CampfireURI, error) {
 			if len(stunHostPort) != 2 {
 				stunHostPort = []string{defaultStunHost, defaultStunPort} // Use default STUN info
 			}
-			stunHosts = append(stunHosts, stunHostPort[0])
-			stunPorts = append(stunPorts, stunHostPort[1])
+			out.StunHosts = append(out.StunHosts, stunHostPort[0])
+			out.StunHosts = append(out.StunHosts, stunHostPort[1])
 
 			// Split remotePart into host and port
 			remoteHostPort := strings.Split(remotePart, ":")
 			if len(remoteHostPort) != 2 {
 				continue // Skip invalid remote parts
 			}
-			remoteHosts = append(remoteHosts, remoteHostPort[0])
-			remotePorts = append(remotePorts, remoteHostPort[1])
+			out.RemoteHosts = append(out.RemoteHosts, remoteHostPort[0])
+			out.RemotePorts = append(out.RemotePorts, remoteHostPort[1])
 		}
 	}
-	campURL := &CampfireURI{
-		TURNServers: TURNServers,
-		StunHosts:   stunHosts,
-		StunPorts:   stunPorts,
-		RemoteHosts: remoteHosts,
-		RemotePorts: remotePorts,
-		Fingerprint: parsedURL.RawQuery,
-		PSK:         []byte(parsedURL.Fragment),
-	}
 
-	return campURL, nil
+	return &out, nil
 }
