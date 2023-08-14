@@ -42,6 +42,7 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -287,7 +288,17 @@ func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRe
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	return nil, nil
+	err := app.mesh.StartCampfire(ctx, campfire.Options{
+		PSK:         []byte(req.GetPsk()),
+		TURNServers: req.GetTurnServers(),
+	}, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error starting campfire: %v", err)
+	}
+	return &v1.StartCampfireResponse{
+		Psk:         req.GetPsk(),
+		TurnServers: req.GetTurnServers(),
+	}, nil
 }
 
 func (app *AppDaemon) LeaveCampfire(ctx context.Context, req *v1.LeaveCampfireRequest) (*v1.LeaveCampfireResponse, error) {
@@ -296,7 +307,11 @@ func (app *AppDaemon) LeaveCampfire(ctx context.Context, req *v1.LeaveCampfireRe
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	return nil, nil
+	err := app.mesh.LeaveCampfire(ctx, req.GetPsk())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error leaving campfire: %v", err)
+	}
+	return &v1.LeaveCampfireResponse{}, nil
 }
 
 func newListener() (net.Listener, error) {

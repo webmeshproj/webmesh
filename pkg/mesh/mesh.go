@@ -83,8 +83,12 @@ type Mesh interface {
 	Network() net.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
-	// StartCampfire starts a new campfire with the given connection handler
+	// StartCampfire starts a new campfire with the given connection handler.
+	// If the handler is nil, the default behavior is to facilitate a full join
+	// into the mesh.
 	StartCampfire(ctx context.Context, opts campfire.Options, hdlr CampfireConnHandler) error
+	// LeaveCampfire leaves the campfire with the given ID.
+	LeaveCampfire(ctx context.Context, id string) error
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh

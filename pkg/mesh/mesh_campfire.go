@@ -36,7 +36,7 @@ type CampfireConnHandler func(context.Context, io.ReadWriteCloser)
 // StartCampfire starts a campfire listener with the given function handler.
 func (s *meshStore) StartCampfire(ctx context.Context, opts campfire.Options, hdlr CampfireConnHandler) error {
 	if hdlr == nil {
-		return fmt.Errorf("campfire handler cannot be nil")
+		hdlr = s.handleCampfirePeering
 	}
 	s.campfiremu.Lock()
 	defer s.campfiremu.Unlock()
