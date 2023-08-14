@@ -100,3 +100,36 @@ func ParseCampfireURI(rawURL string) (*CampfireURI, error) {
 
 	return &out, nil
 }
+
+// EncodeURI encodes the CampfireURI into a string.
+func (c *CampfireURI) EncodeURI() string {
+	var sb strings.Builder
+	sb.WriteString("camp://")
+	if c.TURNUsername != "" {
+		sb.WriteString(c.TURNUsername)
+		if c.TURNPassword != "" {
+			sb.WriteString(":")
+			sb.WriteString(c.TURNPassword)
+		}
+		sb.WriteString("@")
+	}
+	for _, turnServer := range c.TURNServers {
+		sb.WriteString(turnServer)
+		sb.WriteString("/")
+	}
+	for i := 0; i < len(c.StunHosts); i++ {
+		sb.WriteString(c.StunHosts[i])
+		sb.WriteString(":")
+		sb.WriteString(c.StunPorts[i])
+		sb.WriteString("-")
+		sb.WriteString(c.RemoteHosts[i])
+		sb.WriteString(":")
+		sb.WriteString(c.RemotePorts[i])
+		sb.WriteString("/")
+	}
+	sb.WriteString("?")
+	sb.WriteString(c.Fingerprint)
+	sb.WriteString("#")
+	sb.Write(c.PSK)
+	return sb.String()
+}

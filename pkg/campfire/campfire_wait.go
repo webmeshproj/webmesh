@@ -60,6 +60,7 @@ func Wait(ctx context.Context, camp *CampfireURI) (CampfireChannel, error) {
 	s.SetIncludeLoopbackCandidate(true)
 	tw := &turnWait{
 		api:        webrtc.NewAPI(webrtc.WithSettingEngine(s)),
+		camp:       camp,
 		location:   location,
 		fireconn:   fireconn,
 		acceptc:    make(chan io.ReadWriteCloser, 1),
@@ -75,6 +76,7 @@ func Wait(ctx context.Context, camp *CampfireURI) (CampfireChannel, error) {
 
 type turnWait struct {
 	api        *webrtc.API
+	camp       *CampfireURI
 	location   *Location
 	fireconn   *turn.CampfireClient
 	acceptc    chan io.ReadWriteCloser
@@ -175,9 +177,19 @@ func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 	pc, err := t.api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{t.location.TURNServer},
-				Username:   "-",
-				Credential: "-",
+				URLs: []string{t.location.TURNServer},
+				Username: func() string {
+					if t.camp.TURNUsername != "" {
+						return t.camp.TURNUsername
+					}
+					return "-"
+				}(),
+				Credential: func() string {
+					if t.camp.TURNPassword != "" {
+						return t.camp.TURNPassword
+					}
+					return "-"
+				}(),
 			},
 		},
 	})
