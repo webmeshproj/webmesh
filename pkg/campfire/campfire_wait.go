@@ -30,9 +30,9 @@ import (
 )
 
 // Wait will wait for peers to join at the given location.
-func Wait(ctx context.Context, opts Options) (CampFire, error) {
+func Wait(ctx context.Context, campfire *Campfire) (CampFire, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
-	location, err := Find(opts.PSK, opts.TURNServers)
+	location, err := Find(campfire.PSK, campfire.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
@@ -41,7 +41,7 @@ func Wait(ctx context.Context, opts Options) (CampFire, error) {
 		Addr:  location.TURNServer,
 		Ufrag: location.LocalUfrag(),
 		Pwd:   location.LocalPwd(),
-		PSK:   opts.PSK,
+		PSK:   campfire.PSK,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new campfire client: %w", err)
