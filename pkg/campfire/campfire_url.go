@@ -31,7 +31,7 @@ const (
 )
 
 // Campfire represents the components parsed from the camp URL.
-type Campfire struct {
+type CampfireURI struct {
 	TURNServers []string // Username for TURN authentication
 	StunHosts   []string // List of STUN server hosts
 	StunPorts   []string // List of STUN server ports
@@ -42,7 +42,7 @@ type Campfire struct {
 }
 
 // ParseURL parses the given rawURL and returns a CampURL struct.
-func ParseCampfireURI(rawURL string) (*Campfire, error) {
+func ParseCampfireURI(rawURL string) (*CampfireURI, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func ParseCampfireURI(rawURL string) (*Campfire, error) {
 			remotePorts = append(remotePorts, remoteHostPort[1])
 		}
 	}
-	campURL := &Campfire{
+	campURL := &CampfireURI{
 		TURNServers: TURNServers,
 		StunHosts:   stunHosts,
 		StunPorts:   stunPorts,
