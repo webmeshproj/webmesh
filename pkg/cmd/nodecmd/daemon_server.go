@@ -47,11 +47,23 @@ type AppDaemon struct {
 	log        *slog.Logger
 }
 
+var (
+	// ErrNotConnected is returned when the node is not connected to the mesh.
+	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected")
+	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
+	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected")
+	// ErrAlreadyConnecting is returned when the node is already connecting to the mesh.
+	ErrAlreadyConnecting = status.Errorf(codes.FailedPrecondition, "already connecting")
+)
+
 func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
 	if app.mesh != nil {
 		return nil, ErrAlreadyConnected
+	} else if app.connecting.Load() {
+		// The lock should keep this from ever happening, but just in case.
+		return nil, ErrAlreadyConnecting
 	}
 	app.connecting.Store(true)
 	defer app.connecting.Store(false)
@@ -241,20 +253,24 @@ func (app *AppDaemon) LeaveCampfire(ctx context.Context, req *v1.LeaveCampfireRe
 func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.StatusResponse, error) {
 	var status v1.StatusResponse_ConnectionStatus
 	if app.mesh == nil {
-		status = v1.StatusResponse_DISCONNECTED
-	} else if app.connecting.Load() {
-		status = v1.StatusResponse_CONNECTING
-	} else {
-		status = v1.StatusResponse_CONNECTED
-	}
-	if status != v1.StatusResponse_CONNECTED {
 		return &v1.StatusResponse{
-			ConnectionStatus: status,
-			Node:             &v1.MeshNode{},
+			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
 		}, nil
 	}
+	if app.connecting.Load() {
+		return &v1.StatusResponse{
+			ConnectionStatus: v1.StatusResponse_CONNECTING,
+		}, nil
+	}
+	// We are connected
 	app.mu.Lock()
 	defer app.mu.Unlock()
+	// Check if we got disconnected before we hit this point
+	if app.mesh == nil {
+		return &v1.StatusResponse{
+			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
+		}, nil
+	}
 	var raftStatus v1.ClusterStatus
 	if app.mesh.Raft().IsLeader() {
 		raftStatus = v1.ClusterStatus_CLUSTER_LEADER

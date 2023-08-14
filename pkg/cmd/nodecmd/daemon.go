@@ -36,19 +36,10 @@ import (
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services"
-)
-
-var (
-	// ErrNotConnected is returned when the node is not connected to the mesh.
-	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected")
-	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
-	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected")
 )
 
 // DefaultDaemonSocket returns the default daemon socket path.
