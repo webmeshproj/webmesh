@@ -32,7 +32,7 @@ import (
 
 func (s *meshStore) waitByCampfire() {
 	log := s.log.With("protocol", "campfire")
-	ourcamp := campfire.Campfire{PSK: []byte(s.opts.Mesh.WaitCampfirePSK),
+	ourcamp := campfire.CampfireURI{PSK: []byte(s.opts.Mesh.WaitCampfirePSK),
 		TURNServers: s.opts.Mesh.WaitCampfireTURNServers}
 	cf, err := campfire.Wait(context.Background(), &ourcamp)
 	if err != nil {
