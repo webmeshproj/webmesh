@@ -235,6 +235,7 @@ func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRe
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "error parsing campfire URI: %v", err)
 	}
+	app.log.Info("Starting campfire", "servers", parsed.TURNServers)
 	err = app.mesh.StartCampfire(ctx, campfire.Options{
 		PSK:         parsed.PSK,
 		TURNServers: parsed.TURNServers,
