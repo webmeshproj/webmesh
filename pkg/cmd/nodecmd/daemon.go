@@ -30,21 +30,17 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	"github.com/mitchellh/mapstructure"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
 
@@ -156,201 +152,6 @@ func RunAppDaemon(ctx context.Context, config *Options) error {
 
 	log.Info("Serving gRPC app daemon", "bind-addr", listener.Addr())
 	return grpcServer.Serve(listener)
-}
-
-// AppDaemon is the app daemon RPC server.
-type AppDaemon struct {
-	v1.UnimplementedAppDaemonServer
-	config    *Options
-	curConfig *Options
-	mesh      mesh.Mesh
-	svcs      *services.Server
-	mu        sync.Mutex
-	log       *slog.Logger
-}
-
-func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh != nil {
-		return nil, ErrAlreadyConnected
-	}
-	app.curConfig = app.config.DeepCopy()
-	overrides := req.GetConfig().AsMap()
-	if len(overrides) > 0 {
-		err := mapstructure.Decode(app.curConfig, overrides)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "error decoding config overrides: %v", err)
-		}
-	}
-	err := app.curConfig.Validate()
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid config: %v", err)
-	}
-	conn, err := mesh.New(app.curConfig.Mesh)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error creating mesh: %v", err)
-	}
-	err = conn.Open(ctx, app.curConfig.Services.ToFeatureSet())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error opening mesh: %v", err)
-	}
-	app.mesh = conn
-	app.svcs, err = services.NewServer(conn, app.curConfig.Services)
-	if err != nil {
-		cerr := conn.Close()
-		app.mesh = nil
-		app.svcs = nil
-		if cerr != nil {
-			return nil, status.Errorf(codes.Internal, "error creating services: %v (error closing mesh: %v)", err, cerr)
-		}
-		return nil, status.Errorf(codes.Internal, "error creating services: %v", err)
-	}
-	go func() {
-		err := app.svcs.ListenAndServe()
-		if err != nil {
-			app.log.Error("Error serving services", "err", err.Error())
-			// TODO: Dispatch to the client.
-		}
-	}()
-	return &v1.ConnectResponse{}, nil
-}
-
-func (app *AppDaemon) Disconnect(ctx context.Context, _ *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	app.svcs.Stop()
-	app.svcs = nil
-	err := app.mesh.Close()
-	app.mesh = nil
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error while disconnecting from mesh: %v", err)
-	}
-	return &v1.DisconnectResponse{}, nil
-}
-
-func (app *AppDaemon) Metrics(ctx context.Context, _ *v1.MetricsRequest) (*v1.MetricsResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	metrics, err := app.mesh.Network().WireGuard().Metrics()
-	if err != nil {
-		return nil, err
-	}
-	return &v1.MetricsResponse{
-		Interfaces: map[string]*v1.InterfaceMetrics{
-			metrics.DeviceName: metrics,
-		},
-	}, nil
-}
-
-func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServer) error {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return ErrNotConnected
-	}
-	switch req.GetCommand() {
-	case v1.QueryRequest_GET:
-		var result v1.QueryResponse
-		result.Key = req.GetQuery()
-		val, err := app.mesh.Storage().Get(stream.Context(), req.GetQuery())
-		if err != nil {
-			result.Error = err.Error()
-		} else {
-			result.Value = []string{val}
-		}
-		err = stream.Send(&result)
-		if err != nil {
-			return err
-		}
-	case v1.QueryRequest_LIST:
-		var result v1.QueryResponse
-		result.Key = req.GetQuery()
-		vals, err := app.mesh.Storage().List(stream.Context(), req.GetQuery())
-		if err != nil {
-			result.Error = err.Error()
-		} else {
-			result.Value = vals
-		}
-		err = stream.Send(&result)
-		if err != nil {
-			return err
-		}
-	case v1.QueryRequest_ITER:
-		err := app.mesh.Storage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
-			var result v1.QueryResponse
-			result.Key = key
-			result.Value = []string{value}
-			return stream.Send(&result)
-		})
-		if err != nil {
-			return err
-		}
-		var result v1.QueryResponse
-		result.Error = "EOF"
-		return stream.Send(&result)
-	}
-	return status.Errorf(codes.Unimplemented, "unknown query command: %v", req.GetCommand())
-}
-
-func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRequest) (*v1.StartCampfireResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	if req.GetCampUrl() == "" {
-		if !app.curConfig.Services.TURN.Enabled && !app.curConfig.Services.TURN.CampfireEnabled {
-			return nil, status.Error(codes.InvalidArgument, "Campfire TURN is not enabled on this node")
-		}
-		turnServer := "turn:" + app.curConfig.Services.TURN.PublicIP + ":" + strconv.Itoa(app.curConfig.Services.TURN.ListenPort)
-		psk, err := campfire.GeneratePSK()
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "error generating PSK: %v", err)
-		}
-		uri := &campfire.CampfireURI{
-			PSK:         psk,
-			TURNServers: []string{turnServer},
-		}
-		req.CampUrl = uri.EncodeURI()
-	}
-	parsed, err := campfire.ParseCampfireURI(req.GetCampUrl())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "error parsing campfire URI: %v", err)
-	}
-	err = app.mesh.StartCampfire(ctx, campfire.Options{
-		PSK:         parsed.PSK,
-		TURNServers: parsed.TURNServers,
-	}, nil)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error starting campfire: %v", err)
-	}
-	return &v1.StartCampfireResponse{
-		CampUrl: req.GetCampUrl(),
-	}, nil
-}
-
-func (app *AppDaemon) LeaveCampfire(ctx context.Context, req *v1.LeaveCampfireRequest) (*v1.LeaveCampfireResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	parsed, err := campfire.ParseCampfireURI(req.GetCampUrl())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "error parsing campfire URI: %v", err)
-	}
-	err = app.mesh.LeaveCampfire(ctx, string(parsed.PSK))
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error leaving campfire: %v", err)
-	}
-	return &v1.LeaveCampfireResponse{}, nil
 }
 
 func newListener() (net.Listener, error) {
