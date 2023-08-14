@@ -43,7 +43,7 @@ type CampfireURI struct {
 	PSK          []byte   // Pre-shared key
 }
 
-// ParseURL parses the given rawURL and returns a CampURL struct.
+// ParseCampfireURI parses the given rawURL and returns a CampfireURI struct.
 func ParseCampfireURI(rawURL string) (*CampfireURI, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
