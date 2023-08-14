@@ -70,7 +70,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	app.curConfig = app.config.DeepCopy()
 	overrides := req.GetConfig().AsMap()
 	if len(overrides) > 0 {
-		err := mapstructure.Decode(app.curConfig, overrides)
+		err := mapstructure.Decode(overrides, app.curConfig)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "error decoding config overrides: %v", err)
 		}
