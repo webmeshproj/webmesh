@@ -18,7 +18,6 @@ limitations under the License.
 package nodecmd
 
 import (
-	"log"
 	"log/slog"
 	"strconv"
 	"sync"
@@ -331,7 +330,7 @@ func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_Subsc
 			Value: value,
 		})
 		if err != nil {
-			log.Printf("error sending subscription event: %v", err)
+			app.log.Error("error sending subscription event", "error", err.Error())
 		}
 	})
 	app.mu.Unlock()
