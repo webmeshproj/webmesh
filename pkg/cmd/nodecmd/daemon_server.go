@@ -320,10 +320,11 @@ func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*emp
 	return &emptypb.Empty{}, nil
 }
 func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
+	app.mu.Lock()
 	if app.mesh == nil {
+		app.mu.Unlock()
 		return ErrNotConnected
 	}
-	app.mu.Lock()
 	cancel, err := app.mesh.Storage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
 		err := srv.Send(&v1.SubscriptionEvent{
 			Key:   key,
