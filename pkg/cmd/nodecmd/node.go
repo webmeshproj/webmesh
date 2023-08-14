@@ -97,13 +97,11 @@ func Execute() error {
 	log := util.SetupLogging(config.Global.LogLevel)
 	ctx := context.Background()
 
-	if *appDaemon {
-		return RunAppDaemon(ctx, config)
-	}
-
-	if err := config.Validate(); err != nil {
-		flagset.Usage()
-		return err
+	if !*appDaemon {
+		if err := config.Validate(); err != nil {
+			flagset.Usage()
+			return err
+		}
 	}
 
 	log.Info("Starting webmesh node",
@@ -113,7 +111,20 @@ func Execute() error {
 	)
 
 	// Log all options at debug level
-	log.Debug("Current configuration", slog.Any("options", config))
+	dump, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	out := map[string]interface{}{}
+	err = json.Unmarshal(dump, &out)
+	if err != nil {
+		return err
+	}
+	log.Debug("Current configuration", slog.Any("options", out))
+
+	if *appDaemon {
+		return RunAppDaemon(ctx, config)
+	}
 
 	if *startTimeout > 0 {
 		var cancel context.CancelFunc

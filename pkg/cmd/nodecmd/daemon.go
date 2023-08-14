@@ -145,11 +145,12 @@ func RunAppDaemon(ctx context.Context, config *Options) error {
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
-	config *Options
-	mesh   mesh.Mesh
-	svcs   *services.Server
-	mu     sync.Mutex
-	log    *slog.Logger
+	config    *Options
+	curConfig *Options
+	mesh      mesh.Mesh
+	svcs      *services.Server
+	mu        sync.Mutex
+	log       *slog.Logger
 }
 
 func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
@@ -158,28 +159,28 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if app.mesh != nil {
 		return nil, ErrAlreadyConnected
 	}
-	cfg := app.config.DeepCopy()
+	app.curConfig = app.config.DeepCopy()
 	overrides := req.GetConfig().AsMap()
 	if len(overrides) > 0 {
-		err := mapstructure.Decode(cfg, overrides)
+		err := mapstructure.Decode(app.curConfig, overrides)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "error decoding config overrides: %v", err)
 		}
 	}
-	err := cfg.Validate()
+	err := app.curConfig.Validate()
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid config: %v", err)
 	}
-	conn, err := mesh.New(cfg.Mesh)
+	conn, err := mesh.New(app.curConfig.Mesh)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error creating mesh: %v", err)
 	}
-	err = conn.Open(ctx, cfg.Services.ToFeatureSet())
+	err = conn.Open(ctx, app.curConfig.Services.ToFeatureSet())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error opening mesh: %v", err)
 	}
 	app.mesh = conn
-	app.svcs, err = services.NewServer(conn, cfg.Services)
+	app.svcs, err = services.NewServer(conn, app.curConfig.Services)
 	if err != nil {
 		cerr := conn.Close()
 		app.mesh = nil
@@ -288,16 +289,34 @@ func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRe
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	err := app.mesh.StartCampfire(ctx, campfire.Options{
-		PSK:         []byte(req.GetPsk()),
-		TURNServers: req.GetTurnServers(),
+	if req.GetCampUrl() == "" {
+		if !app.curConfig.Services.TURN.Enabled && !app.curConfig.Services.TURN.CampfireEnabled {
+			return nil, status.Error(codes.InvalidArgument, "Campfire TURN is not enabled on this node")
+		}
+		turnServer := "turn:" + app.curConfig.Services.TURN.PublicIP + ":" + strconv.Itoa(app.curConfig.Services.TURN.ListenPort)
+		psk, err := campfire.GeneratePSK()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "error generating PSK: %v", err)
+		}
+		uri := &campfire.CampfireURI{
+			PSK:         psk,
+			TURNServers: []string{turnServer},
+		}
+		req.CampUrl = uri.EncodeURI()
+	}
+	parsed, err := campfire.ParseCampfireURI(req.GetCampUrl())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "error parsing campfire URI: %v", err)
+	}
+	err = app.mesh.StartCampfire(ctx, campfire.Options{
+		PSK:         parsed.PSK,
+		TURNServers: parsed.TURNServers,
 	}, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error starting campfire: %v", err)
 	}
 	return &v1.StartCampfireResponse{
-		Psk:         req.GetPsk(),
-		TurnServers: req.GetTurnServers(),
+		CampUrl: req.GetCampUrl(),
 	}, nil
 }
 
@@ -307,7 +326,11 @@ func (app *AppDaemon) LeaveCampfire(ctx context.Context, req *v1.LeaveCampfireRe
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	err := app.mesh.LeaveCampfire(ctx, req.GetPsk())
+	parsed, err := campfire.ParseCampfireURI(req.GetCampUrl())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "error parsing campfire URI: %v", err)
+	}
+	err = app.mesh.LeaveCampfire(ctx, string(parsed.PSK))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error leaving campfire: %v", err)
 	}
@@ -330,7 +353,8 @@ func newListener() (net.Listener, error) {
 		// TCP socket
 		return net.Listen("tcp", bindAddr[6:])
 	default:
-		return nil, fmt.Errorf("invalid bind address: %s", bindAddr)
+		// Default to TCP socket
+		return net.Listen("tcp", bindAddr)
 	}
 }
 
