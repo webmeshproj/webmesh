@@ -32,10 +32,9 @@ import (
 
 func (s *meshStore) waitByCampfire() {
 	log := s.log.With("protocol", "campfire")
-	cf, err := campfire.Wait(context.Background(), campfire.Options{
-		PSK:         []byte(s.opts.Mesh.WaitCampfirePSK),
-		TURNServers: s.opts.Mesh.WaitCampfireTURNServers,
-	})
+	ourcamp := campfire.Campfire{PSK: []byte(s.opts.Mesh.WaitCampfirePSK),
+		TURNServers: s.opts.Mesh.WaitCampfireTURNServers}
+	cf, err := campfire.Wait(context.Background(), &ourcamp)
 	if err != nil {
 		log.Error("Failed to wait by campfire, will try again in 15 seconds", "error", err.Error())
 		// TODO: Make this configurable
