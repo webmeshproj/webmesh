@@ -97,6 +97,16 @@ func (t *turnWait) Close() error {
 	return t.fireconn.Close()
 }
 
+// Opened returns true if the camp fire is opened.
+func (t *turnWait) Opened() bool {
+	select {
+	case <-t.closec:
+		return false
+	default:
+		return true
+	}
+}
+
 // Errors returns a channel of errors.
 func (t *turnWait) Errors() <-chan error { return t.errc }
 

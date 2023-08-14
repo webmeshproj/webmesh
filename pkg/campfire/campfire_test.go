@@ -30,6 +30,9 @@ func TestCampfire(t *testing.T) {
 	ctx := context.Background()
 	campURI := "camp://9d4e8faba9a93ef397554dc4:hLxK4U49l6fcZLH0@a.relay.metered.ca/?fingerprint#abcdefghijklmnopqrstuvwx12345678"
 	ourcamp, err := ParseCampfireURI(campURI)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cf, err := Wait(ctx, ourcamp)
 	if err != nil {

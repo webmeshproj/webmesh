@@ -42,6 +42,7 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -237,7 +238,48 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 	if app.mesh == nil {
 		return ErrNotConnected
 	}
-	return nil
+	switch req.GetCommand() {
+	case v1.QueryRequest_GET:
+		var result v1.QueryResponse
+		result.Key = req.GetQuery()
+		val, err := app.mesh.Storage().Get(stream.Context(), req.GetQuery())
+		if err != nil {
+			result.Error = err.Error()
+		} else {
+			result.Value = []string{val}
+		}
+		err = stream.Send(&result)
+		if err != nil {
+			return err
+		}
+	case v1.QueryRequest_LIST:
+		var result v1.QueryResponse
+		result.Key = req.GetQuery()
+		vals, err := app.mesh.Storage().List(stream.Context(), req.GetQuery())
+		if err != nil {
+			result.Error = err.Error()
+		} else {
+			result.Value = vals
+		}
+		err = stream.Send(&result)
+		if err != nil {
+			return err
+		}
+	case v1.QueryRequest_ITER:
+		err := app.mesh.Storage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
+			var result v1.QueryResponse
+			result.Key = key
+			result.Value = []string{value}
+			return stream.Send(&result)
+		})
+		if err != nil {
+			return err
+		}
+		var result v1.QueryResponse
+		result.Error = "EOF"
+		return stream.Send(&result)
+	}
+	return status.Errorf(codes.Unimplemented, "unknown query command: %v", req.GetCommand())
 }
 
 func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRequest) (*v1.StartCampfireResponse, error) {
@@ -246,7 +288,30 @@ func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRe
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	return nil, nil
+	err := app.mesh.StartCampfire(ctx, campfire.Options{
+		PSK:         []byte(req.GetPsk()),
+		TURNServers: req.GetTurnServers(),
+	}, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error starting campfire: %v", err)
+	}
+	return &v1.StartCampfireResponse{
+		Psk:         req.GetPsk(),
+		TurnServers: req.GetTurnServers(),
+	}, nil
+}
+
+func (app *AppDaemon) LeaveCampfire(ctx context.Context, req *v1.LeaveCampfireRequest) (*v1.LeaveCampfireResponse, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh == nil {
+		return nil, ErrNotConnected
+	}
+	err := app.mesh.LeaveCampfire(ctx, req.GetPsk())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error leaving campfire: %v", err)
+	}
+	return &v1.LeaveCampfireResponse{}, nil
 }
 
 func newListener() (net.Listener, error) {

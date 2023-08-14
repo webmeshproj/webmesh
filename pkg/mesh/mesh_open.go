@@ -25,6 +25,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -148,7 +149,14 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		return handleErr(fmt.Errorf("subscribe: %w", err))
 	}
 	if s.opts.Mesh.WaitCampfirePSK != "" {
-		go s.waitByCampfire()
+		err := s.StartCampfire(ctx, campfire.Options{
+			PSK:         []byte(s.opts.Mesh.WaitCampfirePSK),
+			TURNServers: s.opts.Mesh.WaitCampfireTURNServers,
+		}, s.handleCampfirePeering)
+		if err != nil {
+			// This should never happen
+			return handleErr(fmt.Errorf("start campfire: %w", err))
+		}
 	}
 	return nil
 }
