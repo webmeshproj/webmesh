@@ -116,6 +116,14 @@ func RunAppDaemon(ctx context.Context, config *Options) error {
 			case <-sig:
 			}
 			log.Info("Shutting down gRPC-Web app daemon")
+			srv.mu.Lock()
+			defer srv.mu.Unlock()
+			if srv.mesh != nil {
+				err := srv.mesh.Close()
+				if err != nil {
+					log.Error("Error disconnecting from the mesh", "err", err)
+				}
+			}
 			err := httpSrv.Shutdown(context.Background())
 			if err != nil {
 				log.Error("Error shutting down gRPC-Web app daemon", "err", err)
@@ -135,6 +143,14 @@ func RunAppDaemon(ctx context.Context, config *Options) error {
 		case <-sig:
 		}
 		log.Info("Shutting down gRPC app daemon")
+		srv.mu.Lock()
+		defer srv.mu.Unlock()
+		if srv.mesh != nil {
+			err := srv.mesh.Close()
+			if err != nil {
+				log.Error("Error disconnecting from the mesh", "err", err)
+			}
+		}
 		grpcServer.GracefulStop()
 	}()
 
