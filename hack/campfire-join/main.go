@@ -18,8 +18,11 @@ func main() {
 	flag.Parse()
 	log := util.SetupLogging(*logLevel)
 	ourcamp, err := campfire.ParseCampfireURI(*campURI)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 	ctx := context.Background()
-
 	conn, err := campfire.Join(ctx, ourcamp)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
