@@ -25,9 +25,9 @@ import (
 // Protocol is the protocol name.
 const Protocol = "/webmesh/campfire/1.0.0"
 
-// Campfire handles incoming connections from peers sharing the same
-// pre-shared key and TURN servers.
-type Campfire interface {
+// CampfireChannel is a connection to one or more peers sharing the same pre-shared
+// key.
+type CampfireChannel interface {
 	// Accept returns a connection to a peer.
 	Accept() (io.ReadWriteCloser, error)
 	// Close closes the camp fire.

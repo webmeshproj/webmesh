@@ -27,9 +27,9 @@ import (
 )
 
 // Join will attempt to join the peer waiting at the given location.
-func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
+func Join(ctx context.Context, campfire *CampfireURI) (io.ReadWriteCloser, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
-	location, err := Find(opts.PSK, opts.TURNServers)
+	location, err := Find(campfire.PSK, campfire.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
@@ -37,7 +37,7 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 		Addr:  location.TURNServer,
 		Ufrag: location.RemoteUfrag(),
 		Pwd:   location.RemotePwd(),
-		PSK:   opts.PSK,
+		PSK:   campfire.PSK,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new campfire client: %w", err)

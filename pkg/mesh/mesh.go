@@ -130,7 +130,7 @@ func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 		log:              log.With(slog.String("node-id", string(nodeID))),
 		kvSubCancel:      func() {},
 		closec:           make(chan struct{}),
-		campfires:        make(map[string]campfire.Campfire),
+		campfires:        make(map[string]campfire.CampfireChannel),
 	}
 	return st, nil
 }
@@ -187,7 +187,7 @@ type meshStore struct {
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
 	meshDomain       string
-	campfires        map[string]campfire.Campfire
+	campfires        map[string]campfire.CampfireChannel
 	campfiremu       sync.Mutex
 	open             atomic.Bool
 	closec           chan struct{}
