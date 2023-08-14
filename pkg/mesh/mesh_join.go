@@ -97,9 +97,10 @@ func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) e
 		// the most likely cause is that no one is waiting for us.
 		joinCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
-		ourcamp := campfire.CampfireURI{PSK: []byte(s.opts.Mesh.WaitCampfirePSK),
-			TURNServers: s.opts.Mesh.WaitCampfireTURNServers}
-		conn, err := campfire.Join(joinCtx, &ourcamp)
+		conn, err := campfire.Join(joinCtx, &campfire.CampfireURI{
+			PSK:         []byte(s.opts.Mesh.JoinCampfirePSK),
+			TURNServers: s.opts.Mesh.JoinCampfireTURNServers,
+		})
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()

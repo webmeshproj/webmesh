@@ -75,10 +75,11 @@ func (s *meshStore) waitByCampfire(opts campfire.Options, hdlr CampfireConnHandl
 		return
 	}
 	log := s.log.With("protocol", "campfire")
-	ourcamp := campfire.CampfireURI{PSK: []byte(s.opts.Mesh.WaitCampfirePSK),
-		TURNServers: s.opts.Mesh.WaitCampfireTURNServers}
 	ctx := context.WithLogger(context.Background(), log)
-	cf, err := campfire.Wait(context.Background(), &ourcamp)
+	cf, err := campfire.Wait(context.Background(), &campfire.CampfireURI{
+		PSK:         opts.PSK,
+		TURNServers: opts.TURNServers,
+	})
 	if err != nil {
 		s.campfiremu.Unlock()
 		log.Error("Failed to wait by campfire, will try again in 15 seconds", "error", err.Error())
