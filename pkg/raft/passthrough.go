@@ -35,7 +35,11 @@ var ErrNotRaftMember = errors.New("not a raft member")
 // NewPassthrough creates a new raft instance that is a no-op for most methods
 // and uses the given Dialer for storage connections.
 func NewPassthrough(dialer NodeDialer) Raft {
-	return &passthroughRaft{dialer: dialer, log: slog.Default().With("component", "passthrough-raft")}
+	return &passthroughRaft{
+		dialer: dialer,
+		closec: make(chan struct{}),
+		log:    slog.Default().With("component", "passthrough-raft"),
+	}
 }
 
 // passthroughRaft implements the raft interface, but is a no-op for most methods.
@@ -45,6 +49,7 @@ func NewPassthrough(dialer NodeDialer) Raft {
 type passthroughRaft struct {
 	dialer NodeDialer
 	nodeID string
+	closec chan struct{}
 	log    *slog.Logger
 }
 
@@ -172,6 +177,7 @@ func (p *passthroughRaft) Barrier(ctx context.Context, timeout time.Duration) (t
 }
 
 func (p *passthroughRaft) Stop(ctx context.Context) error {
+	close(p.closec)
 	return nil
 }
 
@@ -292,15 +298,74 @@ func (p *passthroughStorage) Restore(ctx context.Context, r io.Reader) error {
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (func(), error) {
-	return nil, ErrNotRaftMember
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		for {
+			select {
+			case <-p.raft.closec:
+				return
+			case <-ctx.Done():
+				return
+			default:
+			}
+			err := p.doSubscribe(ctx, prefix, fn)
+			if err != nil {
+				p.raft.log.Error("error in storage subscription, retrying in 3 seconds", "error", err.Error())
+				select {
+				case <-p.raft.closec:
+					return
+				case <-ctx.Done():
+					return
+				case <-time.After(3 * time.Second):
+				}
+				continue
+			}
+			return
+		}
+	}()
+	return cancel, nil
 }
 
-// Close closes the storage.
+func (p *passthroughStorage) doSubscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) error {
+	cli, close, err := p.newNodeClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer close()
+	stream, err := cli.Subscribe(ctx, &v1.SubscribeRequest{
+		Prefix: prefix,
+	})
+	if err != nil {
+		return err
+	}
+	defer p.checkErr(stream.CloseSend)
+	for {
+		select {
+		case <-p.raft.closec:
+			return nil
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		res, err := stream.Recv()
+		if err != nil {
+			return err
+		}
+		fn(res.GetKey(), string(res.GetValue()[0]))
+	}
+}
+
+// Close closes the storage. This is a no-op and is handled by the passthroughRaft.
 func (p *passthroughStorage) Close() error {
 	return nil
 }
 
 func (p *passthroughStorage) newNodeClient(ctx context.Context) (v1.NodeClient, func(), error) {
+	select {
+	case <-p.raft.closec:
+		return nil, nil, ErrClosed
+	default:
+	}
 	c, err := p.raft.dialer.Dial(ctx, "")
 	if err != nil {
 		return nil, nil, err
