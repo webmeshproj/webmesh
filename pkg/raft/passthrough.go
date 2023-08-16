@@ -214,7 +214,7 @@ func (p *passthroughStorage) Get(ctx context.Context, key string) (string, error
 
 // Put sets the value of a key. TTL is optional and can be set to 0.
 func (p *passthroughStorage) Put(ctx context.Context, key, value string, ttl time.Duration) error {
-	// We pass this through to the publish API. Should only be called by non-nodes wanting to publish
+	// We pass this through to the publish API. Should only be called by non-raft nodes wanting to publish
 	// non-internal values. The server will enforce permissions and other restrictions.
 	cli, close, err := p.newNodeClient(ctx)
 	if err != nil {

@@ -34,9 +34,9 @@ var canPublishAction = rbac.Actions{
 }
 
 func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
-	if !s.store.Raft().IsVoter() {
+	if !s.store.Raft().IsVoter() && !s.store.Raft().IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
-		return nil, status.Error(codes.Unavailable, "current node not available to publish")
+		return nil, status.Error(codes.Unavailable, "node not available to publish")
 	}
 	allowed, err := s.rbacEval.Evaluate(ctx, canPublishAction.For(req.GetKey()))
 	if err != nil {

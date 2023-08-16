@@ -33,7 +33,7 @@ var canSubscribeAction = rbac.Actions{
 }
 
 func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Node_SubscribeServer) error {
-	if !s.store.Raft().IsVoter() || !s.store.Raft().IsObserver() {
+	if !s.store.Raft().IsVoter() && !s.store.Raft().IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "current node not available to subscribe")
 	}

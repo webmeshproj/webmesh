@@ -23,7 +23,7 @@ import (
 )
 
 func (s *Server) Query(req *v1.QueryRequest, stream v1.Node_QueryServer) error {
-	if !s.store.Raft().IsVoter() || !s.store.Raft().IsObserver() {
+	if !s.store.Raft().IsVoter() && !s.store.Raft().IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "node not available to query")
 	}
