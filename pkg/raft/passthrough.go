@@ -313,6 +313,7 @@ func (p *passthroughStorage) Restore(ctx context.Context, r io.Reader) error {
 func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (func(), error) {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
+		var started bool
 		for {
 			select {
 			case <-p.raft.closec:
@@ -320,6 +321,27 @@ func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn st
 			case <-ctx.Done():
 				return
 			default:
+			}
+			if !started {
+				// Start with a full iteration of the prefix, then switch to a subscription.
+				// This is a hack to work around the fact that this method is used to receive
+				// peer updates still very early in the startup process.
+				err := p.IterPrefix(ctx, prefix, func(key, value string) error {
+					fn(key, value)
+					return nil
+				})
+				if err != nil {
+					p.raft.log.Error("error in storage subscription, retrying in 3 seconds", "error", err.Error())
+					select {
+					case <-p.raft.closec:
+						return
+					case <-ctx.Done():
+						return
+					case <-time.After(3 * time.Second):
+					}
+					continue
+				}
+				started = true
 			}
 			err := p.doSubscribe(ctx, prefix, fn)
 			if err != nil {

@@ -547,7 +547,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 		}
 		err = util.Ping(ctx, addr.Addr())
 		if err != nil {
-			log.Warn("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
+			log.Debug("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
 			return
 		}
 		log.Debug("successfully pinged descendant", slog.String("descendant", peer.Id))
