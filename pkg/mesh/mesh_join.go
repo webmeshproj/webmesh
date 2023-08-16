@@ -320,6 +320,7 @@ func (s *meshStore) newJoinRequest(features []v1.Feature, key wgtypes.Key) *v1.J
 		AssignIpv4:         !s.opts.Mesh.NoIPv4,
 		PreferRaftIpv6:     s.opts.Raft.PreferIPv6,
 		AsVoter:            s.opts.Mesh.JoinAsVoter,
+		AsObserver:         s.opts.Mesh.JoinAsObserver,
 		Routes:             s.opts.Mesh.Routes,
 		DirectPeers:        s.opts.Mesh.DirectPeers,
 		Features:           features,
