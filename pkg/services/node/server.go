@@ -19,18 +19,11 @@ package node
 
 import (
 	"log/slog"
-	"net/netip"
-	"sync"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
@@ -38,29 +31,19 @@ import (
 type Server struct {
 	v1.UnimplementedNodeServer
 
-	store      meshdb.Store
-	peers      peers.Peers
-	meshstate  state.State
-	rbac       rbacdb.RBAC
-	rbacEval   rbac.Evaluator
-	networking networking.Networking
-
-	ipv4Prefix netip.Prefix
-	ipv6Prefix netip.Prefix
-	meshDomain string
-	features   []v1.Feature
-	startedAt  time.Time
-	log        *slog.Logger
+	store     meshdb.Store
+	rbacEval  rbac.Evaluator
+	features  []v1.Feature
+	startedAt time.Time
 	// insecure flags that no authentication plugins are enabled.
 	insecure bool
-	// lock taken during the join/update process to prevent concurrent node changes.
-	mu sync.Mutex
+	log      *slog.Logger
 }
 
 // NewServer returns a new Server. Features are used for returning what features are enabled.
 // It is the callers responsibility to ensure those servers are registered on the node.
 // Insecure is used to disable authorization.
-func NewServer(store mesh.Mesh, features []v1.Feature, insecure bool) *Server {
+func NewServer(store meshdb.Store, features []v1.Feature, insecure bool) *Server {
 	var rbaceval rbac.Evaluator
 	if insecure {
 		rbaceval = rbac.NewNoopEvaluator()
@@ -68,15 +51,11 @@ func NewServer(store mesh.Mesh, features []v1.Feature, insecure bool) *Server {
 		rbaceval = rbac.NewStoreEvaluator(store)
 	}
 	return &Server{
-		store:      store,
-		peers:      peers.New(store.Storage()),
-		meshstate:  state.New(store.Storage()),
-		rbac:       rbacdb.New(store.Storage()),
-		rbacEval:   rbaceval,
-		networking: networking.New(store.Storage()),
-		features:   features,
-		startedAt:  time.Now(),
-		insecure:   insecure,
-		log:        slog.Default().With("component", "node-server"),
+		store:     store,
+		rbacEval:  rbaceval,
+		features:  features,
+		startedAt: time.Now(),
+		insecure:  insecure,
+		log:       slog.Default().With("component", "node-server"),
 	}
 }

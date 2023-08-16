@@ -37,6 +37,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/admin"
 	"github.com/webmeshproj/webmesh/pkg/services/campfire"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
+	"github.com/webmeshproj/webmesh/pkg/services/membership"
 	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/services/node"
@@ -128,8 +129,13 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		log.Debug("registering campfire service")
 		server.campfire = campfire.NewServer(store, o.Campfire)
 	}
+	// Register the membership API if we are a raft member
+	if store.Raft().IsVoter() || store.Raft().IsObserver() {
+		log.Debug("registering membership service")
+		v1.RegisterMembershipServer(server, membership.NewServer(store, insecureServices))
+	}
 	// Always register the node server
-	log.Debug("registering node server")
+	log.Debug("registering node service")
 	v1.RegisterNodeServer(server, node.NewServer(store, o.ToFeatureSet(), insecureServices))
 	// Register the health service
 	log.Debug("registering health service")

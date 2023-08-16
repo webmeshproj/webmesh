@@ -110,17 +110,21 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
 	switch info.FullMethod {
+	// Membership API
+	case v1.Membership_Join_FullMethodName:
+		return v1.NewMembershipClient(conn).Join(ctx, req.(*v1.JoinRequest))
+	case v1.Membership_Update_FullMethodName:
+		return v1.NewMembershipClient(conn).Update(ctx, req.(*v1.UpdateRequest))
+	case v1.Membership_Leave_FullMethodName:
+		return v1.NewMembershipClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
+	case v1.Membership_Apply_FullMethodName:
+		return v1.NewMembershipClient(conn).Apply(ctx, req.(*v1.RaftLogEntry))
+
 	// Node API
-	case v1.Node_Join_FullMethodName:
-		return v1.NewNodeClient(conn).Join(ctx, req.(*v1.JoinRequest))
-	case v1.Node_Update_FullMethodName:
-		return v1.NewNodeClient(conn).Update(ctx, req.(*v1.UpdateRequest))
-	case v1.Node_Leave_FullMethodName:
-		return v1.NewNodeClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
-	case v1.Node_Apply_FullMethodName:
-		return v1.NewNodeClient(conn).Apply(ctx, req.(*v1.RaftLogEntry))
-	case v1.Node_Snapshot_FullMethodName:
-		return v1.NewNodeClient(conn).Snapshot(ctx, req.(*v1.SnapshotRequest))
+	case v1.Node_Query_FullMethodName:
+		return v1.NewNodeClient(conn).Query(ctx, req.(*v1.QueryRequest))
+	case v1.Node_Publish_FullMethodName:
+		return v1.NewNodeClient(conn).Publish(ctx, req.(*v1.PublishRequest))
 	case v1.Node_GetStatus_FullMethodName:
 		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*v1.GetStatusRequest))
 

@@ -20,7 +20,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
@@ -34,7 +33,7 @@ var canPublishAction = rbac.Actions{
 	},
 }
 
-func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*emptypb.Empty, error) {
+func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
 	if !s.store.Raft().IsVoter() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return nil, status.Error(codes.Unavailable, "current node not available to publish")
@@ -55,5 +54,5 @@ func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*emptypb.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error publishing: %v", err)
 	}
-	return &emptypb.Empty{}, nil
+	return &v1.PublishResponse{}, nil
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package membership
 
 import (
 	"errors"
@@ -122,7 +122,8 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	var currentSuffrage raft.ServerSuffrage = -1
 	var currentAddress raft.ServerAddress = ""
 	cfg := s.store.Raft().Configuration()
-	peer, err := s.peers.Get(ctx, req.GetId())
+	p := peers.New(s.store.Storage())
+	peer, err := p.Get(ctx, req.GetId())
 	if err != nil {
 		if errors.Is(err, peers.ErrNodeNotFound) {
 			return nil, status.Errorf(codes.Internal, "failed to lookup peer: %v", err)
@@ -195,7 +196,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	// Apply any node changes
 	if hasChanges {
 		log.Debug("updating peer", slog.Any("peer", toUpdate))
-		err = s.peers.Put(ctx, *toUpdate)
+		err = p.Put(ctx, *toUpdate)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
 		}

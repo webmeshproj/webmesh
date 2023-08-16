@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package membership
 
 import (
 	"log/slog"
@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
@@ -116,7 +117,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if len(req.GetDirectPeers()) > 0 {
 			for _, peer := range req.GetDirectPeers() {
 				actions = append(actions, canPutEdgeAction.For(peer))
-				actions = append(actions, canNegDataChannelAction.For(peer)...)
 			}
 		}
 		if len(actions) > 0 {
@@ -163,7 +163,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err))
 		} else if created {
 			cleanFuncs = append(cleanFuncs, func() {
-				err := s.networking.DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
+				err := networking.New(s.store.Storage()).DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
 				if err != nil {
 					log.Warn("Failed to delete route", slog.String("error", err.Error()))
 				}
@@ -200,7 +200,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Debug("Assigned IPv4 address to peer", slog.String("ipv4", leasev4.String()))
 	}
 	// Write the peer to the database
-	err = s.peers.Put(ctx, peers.Node{
+	p := peers.New(s.store.Storage())
+	err = p.Put(ctx, peers.Node{
 		ID:                 req.GetId(),
 		PublicKey:          publicKey,
 		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
@@ -217,7 +218,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to raft log: %v", err))
 	}
 	cleanFuncs = append(cleanFuncs, func() {
-		err := s.peers.Delete(ctx, req.GetId())
+		err := p.Delete(ctx, req.GetId())
 		if err != nil {
 			log.Warn("failed to delete peer", slog.String("error", err.Error()))
 		}
@@ -229,7 +230,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		joiningServer = proxiedFrom
 	}
 	log.Debug("adding edge between caller and joining server", slog.String("joining_server", joiningServer))
-	err = s.peers.PutEdge(ctx, peers.Edge{
+	err = p.PutEdge(ctx, peers.Edge{
 		From:   joiningServer,
 		To:     req.GetId(),
 		Weight: 1,
@@ -240,14 +241,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if req.GetPrimaryEndpoint() != "" {
 		// Add an edge between the caller and all other nodes with public endpoints
 		// TODO: This should be done according to network policy and batched
-		allPeers, err := s.peers.ListPublicNodes(ctx)
+		allPeers, err := p.ListPublicNodes(ctx)
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
 		for _, peer := range allPeers {
 			if peer.ID != req.GetId() && peer.PrimaryEndpoint != "" {
 				log.Debug("adding edge from public peer to public caller", slog.String("peer", peer.ID))
-				err = s.peers.PutEdge(ctx, peers.Edge{
+				err = p.PutEdge(ctx, peers.Edge{
 					From:   peer.ID,
 					To:     req.GetId(),
 					Weight: 99,
@@ -262,7 +263,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Add an edge between the caller and all other nodes in the same zone
 		// with public endpoints.
 		// TODO: Same as above - this should be done according to network policy and batched
-		zonePeers, err := s.peers.ListByZoneID(ctx, req.GetZoneAwarenessId())
+		zonePeers, err := p.ListByZoneID(ctx, req.GetZoneAwarenessId())
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
@@ -272,7 +273,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 			log.Debug("Adding edges to peer in the same zone", slog.String("peer", peer.ID))
 			if peer.ID != req.GetId() {
-				err = s.peers.PutEdge(ctx, peers.Edge{
+				err = p.PutEdge(ctx, peers.Edge{
 					From:   peer.ID,
 					To:     req.GetId(),
 					Weight: 1,
@@ -288,14 +289,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Put an ICE edge between the caller and all direct peers
 		for _, peer := range req.GetDirectPeers() {
 			// Check if the peer exists
-			_, err := s.peers.Get(ctx, peer)
+			_, err := p.Get(ctx, peer)
 			if err != nil {
 				if err != peers.ErrNodeNotFound {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to get peer: %v", err))
 				}
 				// The peer doesn't exist, so create a placeholder for it
 				log.Debug("Registering empty peer", slog.String("peer", peer))
-				err = s.peers.Put(ctx, peers.Node{
+				err = p.Put(ctx, peers.Node{
 					ID: peer,
 				})
 				if err != nil {
@@ -303,7 +304,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 			}
 			log.Debug("Adding ICE edge to peer", slog.String("peer", peer))
-			err = s.peers.PutEdge(ctx, peers.Edge{
+			err = p.PutEdge(ctx, peers.Edge{
 				From:   peer,
 				To:     req.GetId(),
 				Weight: 1,
@@ -362,7 +363,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return ""
 		}(),
 	}
-	dnsServers, err := s.peers.ListByFeature(ctx, v1.Feature_MESH_DNS)
+	dnsServers, err := p.ListByFeature(ctx, v1.Feature_MESH_DNS)
 	if err != nil {
 		log.Warn("could not lookup DNS servers", slog.String("error", err.Error()))
 	} else {
@@ -394,7 +395,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// If the caller needs ICE servers, find all the eligible peers and return them
 	if requiresICE {
-		peers, err := s.peers.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
+		peers, err := p.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers by ICE feature: %v", err))
 		}

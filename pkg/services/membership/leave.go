@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package membership
 
 import (
 	"time"
@@ -22,13 +22,13 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
-func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empty, error) {
+func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResponse, error) {
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
@@ -76,9 +76,9 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 		}
 	}
 	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
-	err := s.peers.Delete(ctx, req.GetId())
+	err := peers.New(s.store.Storage()).Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}
-	return &emptypb.Empty{}, nil
+	return &v1.LeaveResponse{}, nil
 }

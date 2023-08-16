@@ -529,6 +529,8 @@ github.com/webmeshproj/api v0.2.2-0.20230816142911-2ebb9e043b38 h1:Barj1wM9Gp3DR
 github.com/webmeshproj/api v0.2.2-0.20230816142911-2ebb9e043b38/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.2.2-0.20230816143017-0ccc451f6c00 h1:9wd57TVWeH0vk4Cr/QNrhwxwBt+qlNQTP7hIIfhHr/8=
 github.com/webmeshproj/api v0.2.2-0.20230816143017-0ccc451f6c00/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.2.2-0.20230816165758-dc9753a57642 h1:3sFTKk/4CqSCRphjizjSbGNQ4AhtmfZ7oUEN/R3dBh4=
+github.com/webmeshproj/api v0.2.2-0.20230816165758-dc9753a57642/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944 h1:Pau7Sfvy35ulRodLsBUwdnAckYvgoNZb9wPk7ubRlZ8=
 github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944/go.mod h1:eHhYsRLIRd0yXTBtJI7qb9IbDGas8DNs08Ba1NUDmDM=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=

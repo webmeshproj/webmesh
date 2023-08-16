@@ -150,7 +150,7 @@ func (s *meshStore) handleCampfirePeering(ctx context.Context, conn io.ReadWrite
 	// Here is where we'd authenticate the request for the leader
 	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedForMeta, req.GetId())
 	// Send the join request to the leader
-	resp, err := v1.NewNodeClient(c).Join(ctx, &req)
+	resp, err := v1.NewMembershipClient(c).Join(ctx, &req)
 	// We are writing either the response or the error to the connection
 	if err != nil {
 		log.Warn("Failed to proxy join to leader", "error", err.Error())

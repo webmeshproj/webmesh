@@ -74,7 +74,7 @@ func (s *meshStore) leaveCluster(ctx context.Context) error {
 		return fmt.Errorf("dial leader: %w", err)
 	}
 	defer conn.Close()
-	client := v1.NewNodeClient(conn)
+	client := v1.NewMembershipClient(conn)
 	_, err = client.Leave(ctx, &v1.LeaveRequest{
 		Id: s.ID(),
 	})

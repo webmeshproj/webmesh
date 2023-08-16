@@ -299,9 +299,8 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, resp *v1.JoinRespons
 }
 
 func (s *meshStore) doJoinGRPC(ctx context.Context, c *grpc.ClientConn, req *v1.JoinRequest) (*v1.JoinResponse, error) {
-	client := v1.NewNodeClient(c)
 	context.LoggerFrom(ctx).Debug("Sending join request to node over gRPC", slog.Any("req", req))
-	return client.Join(ctx, req)
+	return v1.NewMembershipClient(c).Join(ctx, req)
 }
 
 func (s *meshStore) newJoinRequest(features []v1.Feature, key wgtypes.Key) *v1.JoinRequest {
