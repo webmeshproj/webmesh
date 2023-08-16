@@ -36,6 +36,7 @@ const (
 	WaitCampfireTURNServersEnvVar = "MESH_WAIT_CAMPFIRE_TURN_SERVERS"
 	PeerDiscoveryAddressesEnvVar  = "MESH_PEER_DISCOVERY_ADDRESSES"
 	JoinAsVoterEnvVar             = "MESH_JOIN_AS_VOTER"
+	JoinAsObserverEnvVar          = "MESH_JOIN_AS_OBSERVER"
 	MaxJoinRetriesEnvVar          = "MESH_MAX_JOIN_RETRIES"
 	JoinTimeoutEnvVar             = "MESH_JOIN_TIMEOUT"
 	GRPCAdvertisePortEnvVar       = "MESH_GRPC_ADVERTISE_PORT"
@@ -69,8 +70,10 @@ type MeshOptions struct {
 	PeerDiscoveryAddresses []string `json:"peer-discovery-addresses,omitempty" yaml:"peer-discovery-addresses,omitempty" toml:"peer-discovery-addresses,omitempty" mapstructure:"peer-discovery-addresses,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int `json:"max-join-retries,omitempty" yaml:"max-join-retries,omitempty" toml:"max-join-retries,omitempty" mapstructure:"max-join-retries,omitempty"`
-	// Voter is true if the node should be a voter.
+	// JoinAsVoter is true if the node should be a raft voter.
 	JoinAsVoter bool `json:"join-as-voter,omitempty" yaml:"join-as-voter,omitempty" toml:"join-as-voter,omitempty" mapstructure:"join-as-voter,omitempty"`
+	// JoinAsObserver is true if the node should be a raft observer.
+	JoinAsObserver bool `json:"join-as-observer,omitempty" yaml:"join-as-observer,omitempty" toml:"join-as-observer,omitempty" mapstructure:"join-as-observer,omitempty"`
 	// PrimaryEndpoint is the primary endpoint to advertise when joining.
 	PrimaryEndpoint string `json:"primary-endpoint,omitempty" yaml:"primary-endpoint,omitempty" toml:"primary-endpoint,omitempty" mapstructure:"primary-endpoint,omitempty"`
 	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
@@ -171,7 +174,9 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
 	fl.IntVar(&o.MaxJoinRetries, p+"mesh.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
 		"Maximum number of join retries.")
 	fl.BoolVar(&o.JoinAsVoter, p+"mesh.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
-		"Join the cluster as a voter. Default behavior is to join as an observer.")
+		"Join the cluster as a raft voter.")
+	fl.BoolVar(&o.JoinAsObserver, p+"mesh.join-as-observer", util.GetEnvDefault(JoinAsObserverEnvVar, "false") == "true",
+		"Join the cluster as a raft observer.")
 	fl.IntVar(&o.GRPCAdvertisePort, p+"mesh.grpc-advertise-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
 		"GRPC advertise port.")
 	fl.IntVar(&o.MeshDNSAdvertisePort, p+"mesh.meshdns-advertise-port", util.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),

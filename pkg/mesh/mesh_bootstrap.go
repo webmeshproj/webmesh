@@ -97,7 +97,11 @@ func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error 
 }
 
 func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Feature) error {
-	cfg := s.raft.Configuration()
+	cfg, err := s.raft.Configuration()
+	if err != nil {
+		// Should never happen
+		return fmt.Errorf("get raft configuration: %w", err)
+	}
 
 	// Set initial cluster configurations to the raft log
 	meshnetworkv4, err := netip.ParsePrefix(s.opts.Bootstrap.IPv4Network)

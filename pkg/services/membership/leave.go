@@ -56,9 +56,13 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 
 	// Send a barrier afterwards to sync the cluster
 	// Check if they were a raft member
-	config := s.store.Raft().Configuration()
+	cfg, err := s.store.Raft().Configuration()
+	if err != nil {
+		// Should never happen
+		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
+	}
 	var raftMember bool
-	for _, srv := range config.Servers {
+	for _, srv := range cfg.Servers {
 		if string(srv.ID) == req.GetId() {
 			// They were a raft member, so remove them
 			raftMember = true
@@ -76,7 +80,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 		}
 	}
 	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
-	err := peers.New(s.store.Storage()).Delete(ctx, req.GetId())
+	err = peers.New(s.store.Storage()).Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}

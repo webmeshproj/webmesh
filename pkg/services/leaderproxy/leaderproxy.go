@@ -119,6 +119,8 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewMembershipClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
 	case v1.Membership_Apply_FullMethodName:
 		return v1.NewMembershipClient(conn).Apply(ctx, req.(*v1.RaftLogEntry))
+	case v1.Membership_GetRaftConfiguration_FullMethodName:
+		return v1.NewMembershipClient(conn).GetRaftConfiguration(ctx, req.(*v1.RaftConfigurationRequest))
 
 	// Node API
 	case v1.Node_Query_FullMethodName:

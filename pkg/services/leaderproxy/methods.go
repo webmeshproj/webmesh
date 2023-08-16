@@ -35,10 +35,11 @@ const (
 // MethodPolicyMap is a map of method names to their MethodPolicy.
 var MethodPolicyMap = map[string]MethodPolicy{
 	// Membership API
-	v1.Membership_Join_FullMethodName:   RequireLeader,
-	v1.Membership_Update_FullMethodName: RequireLeader,
-	v1.Membership_Leave_FullMethodName:  RequireLeader,
-	v1.Membership_Apply_FullMethodName:  RequireLeader,
+	v1.Membership_Join_FullMethodName:                 RequireLeader,
+	v1.Membership_Update_FullMethodName:               RequireLeader,
+	v1.Membership_Leave_FullMethodName:                RequireLeader,
+	v1.Membership_Apply_FullMethodName:                RequireLeader,
+	v1.Membership_GetRaftConfiguration_FullMethodName: AllowNonLeader,
 
 	// Node API
 	v1.Node_Query_FullMethodName:                AllowNonLeader,

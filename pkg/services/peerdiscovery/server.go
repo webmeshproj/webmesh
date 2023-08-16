@@ -54,7 +54,10 @@ func (s *Server) ListPeers(ctx context.Context, _ *emptypb.Empty) (*v1.ListRaftP
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get leader: %v", err)
 	}
-	config := s.store.Raft().Configuration()
+	config, err := s.store.Raft().Configuration()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
+	}
 	out := make([]*v1.RaftPeer, 0)
 	for id, addr := range peers {
 		out = append(out, &v1.RaftPeer{

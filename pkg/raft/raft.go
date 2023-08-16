@@ -78,7 +78,7 @@ func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, err
 // NodeDialer is an interface for dialing an arbitrary node. The node ID
 // is optional and if empty, implementations can choose the node to dial.
 type NodeDialer interface {
-	DialNode(ctx context.Context, id string) (*grpc.ClientConn, error)
+	Dial(ctx context.Context, id string) (*grpc.ClientConn, error)
 }
 
 // NodeDialerFunc is the function signature for dialing an arbitrary node.
@@ -86,7 +86,7 @@ type NodeDialer interface {
 // alternative to the NodeDialer interface.
 type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, error)
 
-func (f NodeDialerFunc) DialNode(ctx context.Context, id string) (*grpc.ClientConn, error) {
+func (f NodeDialerFunc) Dial(ctx context.Context, id string) (*grpc.ClientConn, error) {
 	return f(ctx, id)
 }
 
@@ -117,7 +117,7 @@ type Raft interface {
 	// Storage returns the storage. This is only valid after Start is called.
 	Storage() storage.Storage
 	// Configuration returns the current raft configuration.
-	Configuration() raft.Configuration
+	Configuration() (raft.Configuration, error)
 	// LastIndex returns the last index sent to the Raft instance.
 	LastIndex() uint64
 	// LastAppliedIndex returns the last applied index.
@@ -360,11 +360,11 @@ func (r *raftNode) Raft() *raft.Raft {
 }
 
 // Configuration returns the current raft configuration.
-func (r *raftNode) Configuration() raft.Configuration {
+func (r *raftNode) Configuration() (raft.Configuration, error) {
 	if r.raft == nil {
-		return raft.Configuration{}
+		return raft.Configuration{}, ErrClosed
 	}
-	return r.raft.GetConfiguration().Configuration()
+	return r.raft.GetConfiguration().Configuration(), nil
 }
 
 // ListenPort returns the listen port.
@@ -397,7 +397,10 @@ func (r *raftNode) IsLeader() bool {
 
 // IsVoter returns true if the Raft node is a voter.
 func (r *raftNode) IsVoter() bool {
-	config := r.Configuration()
+	config, err := r.Configuration()
+	if err != nil {
+		return false
+	}
 	for _, server := range config.Servers {
 		if server.ID == r.nodeID {
 			return server.Suffrage == raft.Voter
@@ -408,7 +411,10 @@ func (r *raftNode) IsVoter() bool {
 
 // IsObserver returns true if the Raft node is an observer.
 func (r *raftNode) IsObserver() bool {
-	config := r.Configuration()
+	config, err := r.Configuration()
+	if err != nil {
+		return false
+	}
 	for _, server := range config.Servers {
 		if server.ID == r.nodeID {
 			return server.Suffrage == raft.Nonvoter

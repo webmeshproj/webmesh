@@ -35,10 +35,16 @@ import (
 type Peer struct {
 	// ID is the ID of the peer.
 	ID string `json:"id"`
+	// GRPCPort is the gRPC port of the peer.
+	GRPCPort int `json:"grpcPort"`
 	// PublicKey is the public key of the peer.
 	PublicKey wgtypes.Key `json:"publicKey"`
 	// Endpoint is the endpoint of this peer, if applicable.
 	Endpoint netip.AddrPort `json:"endpoint"`
+	// PrivateIPv4 is the private IPv4 address of this peer, if applicable.
+	PrivateIPv4 netip.Prefix `json:"privateIPv4"`
+	// PrivateIPv6 is the private IPv6 address of this peer, if applicable.
+	PrivateIPv6 netip.Prefix `json:"privateIPv6"`
 	// AllowedIPs is the list of allowed IPs for this peer.
 	AllowedIPs []netip.Prefix `json:"allowedIPs"`
 	// AllowedRoutes is the list of allowed routes for this peer.
@@ -188,17 +194,17 @@ func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
 func (w *wginterface) registerPeer(key wgtypes.Key, peer *Peer) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
-	w.peers[peer.ID] = key
+	w.peers[peer.ID] = *peer
 }
 
 // popPeerKey removes a peer from the peer map and returns the key.
 func (w *wginterface) popPeerKey(id string) (wgtypes.Key, bool) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
-	for peerID, peerKey := range w.peers {
+	for peerID, peer := range w.peers {
 		if peerID == id {
 			delete(w.peers, id)
-			return peerKey, true
+			return peer.PublicKey, true
 		}
 	}
 	return wgtypes.Key{}, false
@@ -208,8 +214,8 @@ func (w *wginterface) popPeerKey(id string) (wgtypes.Key, bool) {
 func (w *wginterface) peerByPublicKey(lookup string) (string, bool) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
-	for peerID, key := range w.peers {
-		if key.String() == lookup {
+	for peerID, peer := range w.peers {
+		if peer.PublicKey.String() == lookup {
 			return peerID, true
 		}
 	}
@@ -220,8 +226,8 @@ func (w *wginterface) peerByPublicKey(lookup string) (string, bool) {
 func (w *wginterface) peerKeyByID(id string) (wgtypes.Key, bool) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
-	key, ok := w.peers[id]
-	return key, ok
+	peer, ok := w.peers[id]
+	return peer.PublicKey, ok
 }
 
 type peerConfigMarshaler struct {

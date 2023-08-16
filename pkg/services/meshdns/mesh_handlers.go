@@ -119,7 +119,12 @@ func (s *meshLookupMux) handleVotersLookup(ctx context.Context, w dns.ResponseWr
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
-	config := mesh.Raft().Configuration()
+	config, err := mesh.Raft().Configuration()
+	if err != nil {
+		s.log.Error("failed to get configuration", slog.String("error", err.Error()))
+		s.writeMsg(w, r, m, dns.RcodeServerFailure)
+		return
+	}
 	for _, server := range config.Servers {
 		if server.Suffrage == raft.Voter {
 			m.Answer = append(m.Answer, &dns.CNAME{
@@ -144,7 +149,12 @@ func (s *meshLookupMux) handleObserversLookup(ctx context.Context, w dns.Respons
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
-	config := mesh.Raft().Configuration()
+	config, err := mesh.Raft().Configuration()
+	if err != nil {
+		s.log.Error("failed to get configuration", slog.String("error", err.Error()))
+		s.writeMsg(w, r, m, dns.RcodeServerFailure)
+		return
+	}
 	for _, server := range config.Servers {
 		if server.Suffrage == raft.Nonvoter {
 			m.Answer = append(m.Answer, &dns.CNAME{

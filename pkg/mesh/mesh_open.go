@@ -70,7 +70,11 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 			s.log.Error("failed to apply log to plugins", slog.String("error", err.Error()))
 		}
 	}
-	s.raft = raft.New(s.opts.Raft, s)
+	if s.opts.IsRaftMember() {
+		s.raft = raft.New(s.opts.Raft, s)
+	} else {
+		s.raft = raft.NewPassthrough(s)
+	}
 	err = s.raft.Start(ctx, &raft.StartOptions{
 		NodeID: s.ID(),
 	})

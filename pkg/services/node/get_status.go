@@ -21,7 +21,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -53,19 +52,12 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 		ClusterStatus: func() v1.ClusterStatus {
 			if s.store.Raft().IsLeader() {
 				return v1.ClusterStatus_CLUSTER_LEADER
+			} else if s.store.Raft().IsVoter() {
+				return v1.ClusterStatus_CLUSTER_VOTER
+			} else if s.store.Raft().IsObserver() {
+				return v1.ClusterStatus_CLUSTER_NON_VOTER
 			}
-			config := s.store.Raft().Configuration()
-			for _, srv := range config.Servers {
-				if string(srv.ID) == s.store.ID() {
-					switch srv.Suffrage {
-					case raft.Voter:
-						return v1.ClusterStatus_CLUSTER_VOTER
-					case raft.Nonvoter:
-						return v1.ClusterStatus_CLUSTER_NON_VOTER
-					}
-				}
-			}
-			return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
+			return v1.ClusterStatus_CLUSTER_NODE
 		}(),
 		CurrentLeader:    leader,
 		LastLogIndex:     s.store.Raft().LastIndex(),

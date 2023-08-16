@@ -121,7 +121,11 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	// Lookup the peer's current state
 	var currentSuffrage raft.ServerSuffrage = -1
 	var currentAddress raft.ServerAddress = ""
-	cfg := s.store.Raft().Configuration()
+	cfg, err := s.store.Raft().Configuration()
+	if err != nil {
+		// Should never happen
+		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
+	}
 	p := peers.New(s.store.Storage())
 	peer, err := p.Get(ctx, req.GetId())
 	if err != nil {

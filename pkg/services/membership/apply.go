@@ -40,7 +40,11 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !ok {
 		return nil, status.Errorf(codes.FailedPrecondition, "no peer")
 	}
-	cfg := s.store.Raft().Configuration()
+	cfg, err := s.store.Raft().Configuration()
+	if err != nil {
+		// Should never happen
+		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
+	}
 	var found bool
 	for _, server := range cfg.Servers {
 		host, _, err := net.SplitHostPort(peer.Addr.String())
@@ -61,7 +65,7 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	// Issue a barrier to the raft cluster to ensure all nodes are
 	// fully caught up before we make changes
 	// TODO: Make timeout configurable
-	_, err := s.store.Raft().Barrier(ctx, time.Second*15)
+	_, err = s.store.Raft().Barrier(ctx, time.Second*15)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
