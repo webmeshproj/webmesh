@@ -386,7 +386,7 @@ func (p *passthroughStorage) doSubscribe(ctx context.Context, prefix string, fn 
 		if err != nil {
 			return err
 		}
-		fn(res.GetKey(), string(res.GetValue()[0]))
+		fn(res.GetKey(), res.GetValue())
 	}
 }
 
