@@ -24,6 +24,7 @@ import (
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -213,7 +214,19 @@ func (p *passthroughStorage) Get(ctx context.Context, key string) (string, error
 
 // Put sets the value of a key. TTL is optional and can be set to 0.
 func (p *passthroughStorage) Put(ctx context.Context, key, value string, ttl time.Duration) error {
-	return ErrNotRaftMember
+	// We pass this through to the publish API. Should only be called by non-nodes wanting to publish
+	// non-internal values. The server will enforce permissions and other restrictions.
+	cli, close, err := p.newNodeClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer close()
+	_, err = cli.Publish(ctx, &v1.PublishRequest{
+		Key:   key,
+		Value: value,
+		Ttl:   durationpb.New(ttl),
+	})
+	return err
 }
 
 // Delete removes a key.
