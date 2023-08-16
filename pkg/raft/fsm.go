@@ -29,27 +29,33 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/raftlogs"
 )
 
+var _ raft.FSM = &raftNodeFSM{}
+
+type raftNodeFSM struct {
+	raftNode *raftNode
+}
+
 // Snapshot returns a Raft snapshot.
-func (r *raftNode) Snapshot() (raft.FSMSnapshot, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *raftNodeFSM) Snapshot() (raft.FSMSnapshot, error) {
+	r.raftNode.mu.Lock()
+	defer r.raftNode.mu.Unlock()
 	// TODO: Set a timeout on this.
-	return r.snapshotter.Snapshot(context.Background())
+	return r.raftNode.snapshotter.Snapshot(context.Background())
 }
 
 // Restore restores a Raft snapshot.
-func (r *raftNode) Restore(rdr io.ReadCloser) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *raftNodeFSM) Restore(rdr io.ReadCloser) error {
+	r.raftNode.mu.Lock()
+	defer r.raftNode.mu.Unlock()
 	// TODO: Set a timeout on this.
-	return r.snapshotter.Restore(context.Background(), rdr)
+	return r.raftNode.snapshotter.Restore(context.Background(), rdr)
 }
 
 // ApplyBatch implements the raft.BatchingFSM interface.
-func (r *raftNode) ApplyBatch(logs []*raft.Log) []any {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.log.Debug("applying batch", slog.Int("count", len(logs)))
+func (r *raftNodeFSM) ApplyBatch(logs []*raft.Log) []any {
+	r.raftNode.mu.Lock()
+	defer r.raftNode.mu.Unlock()
+	r.raftNode.log.Debug("applying batch", slog.Int("count", len(logs)))
 	res := make([]any, len(logs))
 	for i, l := range logs {
 		res[i] = r.applyLog(l)
@@ -58,25 +64,25 @@ func (r *raftNode) ApplyBatch(logs []*raft.Log) []any {
 }
 
 // Apply applies a Raft log entry to the store.
-func (r *raftNode) Apply(l *raft.Log) any {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *raftNodeFSM) Apply(l *raft.Log) any {
+	r.raftNode.mu.Lock()
+	defer r.raftNode.mu.Unlock()
 	return r.applyLog(l)
 }
 
-func (r *raftNode) applyLog(l *raft.Log) (res any) {
-	log := r.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
+func (r *raftNodeFSM) applyLog(l *raft.Log) (res any) {
+	log := r.raftNode.log.With(slog.Int("index", int(l.Index)), slog.Int("term", int(l.Term)))
 	log.Debug("applying log", "type", l.Type.String())
 	start := time.Now()
 	defer func() {
 		log.Debug("finished applying log", slog.String("took", time.Since(start).String()))
 	}()
-	defer r.lastAppliedIndex.Store(l.Index)
-	defer r.currentTerm.Store(l.Term)
+	defer r.raftNode.lastAppliedIndex.Store(l.Index)
+	defer r.raftNode.currentTerm.Store(l.Term)
 
 	// Validate the term/index of the log entry.
-	dbTerm := r.currentTerm.Load()
-	dbIndex := r.lastAppliedIndex.Load()
+	dbTerm := r.raftNode.currentTerm.Load()
+	dbIndex := r.raftNode.lastAppliedIndex.Load()
 	log.Debug("last applied index",
 		slog.Int("last-term", int(dbTerm)),
 		slog.Int("last-index", int(dbIndex)))
@@ -114,18 +120,18 @@ func (r *raftNode) applyLog(l *raft.Log) (res any) {
 
 	var ctx context.Context
 	var cancel context.CancelFunc
-	if r.opts.ApplyTimeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), r.opts.ApplyTimeout)
+	if r.raftNode.opts.ApplyTimeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), r.raftNode.opts.ApplyTimeout)
 	} else {
 		ctx, cancel = context.WithCancel(context.Background())
 	}
 	defer cancel()
 	ctx = context.WithLogger(ctx, log)
 
-	if r.opts.OnApplyLog != nil {
+	if r.raftNode.opts.OnApplyLog != nil {
 		// Call the OnApplyLog callback in a goroutine to not block the local storage.
-		go r.opts.OnApplyLog(ctx, l.Term, l.Index, cmd)
+		go r.raftNode.opts.OnApplyLog(ctx, l.Term, l.Index, cmd)
 	}
 	// Apply the log entry to the database.
-	return raftlogs.Apply(ctx, r.dataDB, cmd)
+	return raftlogs.Apply(ctx, r.raftNode.dataDB, cmd)
 }

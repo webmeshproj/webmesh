@@ -55,15 +55,28 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 	}
 
 	// Send a barrier afterwards to sync the cluster
-	defer func() {
-		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
-	}()
-	s.log.Info("Removing mesh node", "id", req.GetId())
-	err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)
+	// Check if they were a raft member
+	config := s.store.Raft().Configuration()
+	var raftMember bool
+	for _, srv := range config.Servers {
+		if string(srv.ID) == req.GetId() {
+			// They were a raft member, so remove them
+			raftMember = true
+			break
+		}
 	}
-	err = s.peers.Delete(ctx, req.GetId())
+	if raftMember {
+		defer func() {
+			_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
+		}()
+		s.log.Info("Removing mesh node from raft", "id", req.GetId())
+		err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to remove raft member: %v", err)
+		}
+	}
+	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
+	err := s.peers.Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}

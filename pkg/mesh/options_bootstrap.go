@@ -38,7 +38,6 @@ const (
 	BootstrapAdminEnvVar                = "BOOTSTRAP_ADMIN"
 	BootstrapVotersEnvVar               = "BOOTSTRAP_VOTERS"
 	BootstrapDefaultNetworkPolicyEnvVar = "BOOTSTRAP_DEFAULT_NETWORK_POLICY"
-	BootstrapRestoreSnapshotEnvVar      = "BOOTSTRAP_RESTORE_SNAPSHOT"
 	ForceBootstrapClusterEnvVar         = "BOOTSTRAP_FORCE"
 )
 
@@ -69,8 +68,6 @@ type BootstrapOptions struct {
 	Voters string `json:"voters,omitempty" yaml:"voters,omitempty" toml:"voters,omitempty" mapstructure:"voters,omitempty"`
 	// DefaultNetworkPolicy is the default network policy to apply to the mesh when bootstraping a new cluster.
 	DefaultNetworkPolicy string `json:"default-network-policy,omitempty" yaml:"default-network-policy,omitempty" toml:"default-network-policy,omitempty" mapstructure:"default-network-policy,omitempty"`
-	// RestoreSnapshot is the path to a snapshot to restore from when bootstrapping a new cluster.
-	RestoreSnapshot string `json:"restore-snapshot,omitempty" yaml:"restore-snapshot,omitempty" toml:"restore-snapshot,omitempty" mapstructure:"restore-snapshot,omitempty"`
 	// Force is the force new bootstrap flag.
 	Force bool `json:"force,omitempty" yaml:"force,omitempty" toml:"force,omitempty" mapstructure:"force,omitempty"`
 }
@@ -219,8 +216,6 @@ Ports should be in the form of <node-id>=<port>.`,
 		"Comma separated list of voters to bootstrap the cluster with. bootstrap-servers are already included in this list.")
 	fl.StringVar(&o.DefaultNetworkPolicy, p+"bootstrap.default-network-policy", util.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
 		"Default network policy to bootstrap the cluster with.")
-	fl.StringVar(&o.RestoreSnapshot, p+"bootstrap.restore-snapshot", util.GetEnvDefault(BootstrapRestoreSnapshotEnvVar, ""),
-		"Path to a snapshot to restore from when bootstrapping a new cluster.")
 	fl.BoolVar(&o.Force, p+"bootstrap.force", util.GetEnvDefault(ForceBootstrapClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
 }
@@ -240,7 +235,6 @@ func (o *BootstrapOptions) DeepCopy() *BootstrapOptions {
 		Admin:                o.Admin,
 		Voters:               o.Voters,
 		DefaultNetworkPolicy: o.DefaultNetworkPolicy,
-		RestoreSnapshot:      o.RestoreSnapshot,
 		Force:                o.Force,
 	}
 	for k, v := range o.Servers {

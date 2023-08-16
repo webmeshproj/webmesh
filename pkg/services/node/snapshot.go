@@ -28,11 +28,7 @@ import (
 )
 
 func (s *Server) Snapshot(ctx context.Context, req *v1.SnapshotRequest) (*v1.SnapshotResponse, error) {
-	f := s.store.Raft().Raft().Snapshot()
-	if err := f.Error(); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create snapshot: %v", err)
-	}
-	meta, r, err := f.Open()
+	meta, r, err := s.store.Raft().Snapshot()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to open snapshot: %v", err)
 	}

@@ -298,11 +298,7 @@ func (s *meshStore) Leader() (string, error) {
 	if s.raft == nil || !s.open.Load() {
 		return "", ErrNotOpen
 	}
-	_, id := s.raft.Raft().LeaderWithID()
-	if id == "" {
-		return "", ErrNoLeader
-	}
-	return string(id), nil
+	return s.raft.LeaderID()
 }
 
 func (s *meshStore) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {

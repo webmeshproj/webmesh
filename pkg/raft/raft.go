@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
+	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -74,6 +75,21 @@ func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, err
 	return f(ctx)
 }
 
+// NodeDialer is an interface for dialing an arbitrary node. The node ID
+// is optional and if empty, implementations can choose the node to dial.
+type NodeDialer interface {
+	DialNode(ctx context.Context, id string) (*grpc.ClientConn, error)
+}
+
+// NodeDialerFunc is the function signature for dialing an arbitrary node.
+// It is supplied by the mesh during startup. It can be used as an
+// alternative to the NodeDialer interface.
+type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, error)
+
+func (f NodeDialerFunc) DialNode(ctx context.Context, id string) (*grpc.ClientConn, error) {
+	return f(ctx, id)
+}
+
 // Raft states.
 const (
 	Follower  = raft.Follower
@@ -100,18 +116,22 @@ type Raft interface {
 	Bootstrap(ctx context.Context, opts *BootstrapOptions) error
 	// Storage returns the storage. This is only valid after Start is called.
 	Storage() storage.Storage
-	// Raft returns the Raft instance. This is only valid after Start is called.
-	Raft() *raft.Raft
 	// Configuration returns the current raft configuration.
 	Configuration() raft.Configuration
+	// LastIndex returns the last index sent to the Raft instance.
+	LastIndex() uint64
 	// LastAppliedIndex returns the last applied index.
 	LastAppliedIndex() uint64
 	// ListenPort returns the listen port.
 	ListenPort() int
+	// LeaderID returns the leader ID.
+	LeaderID() (string, error)
 	// IsLeader returns true if the Raft node is the leader.
 	IsLeader() bool
 	// IsVoter returns true if the Raft node is a voter.
 	IsVoter() bool
+	// IsObserver returns true if the Raft node is an observer.
+	IsObserver() bool
 	// AddNonVoter adds a non-voting node to the cluster with timeout enforced by the context.
 	AddNonVoter(ctx context.Context, id string, addr string) error
 	// AddVoter adds a voting node to the cluster with timeout enforced by the context.
@@ -120,8 +140,11 @@ type Raft interface {
 	DemoteVoter(ctx context.Context, id string) error
 	// RemoveServer removes a peer from the cluster with timeout enforced by the context.
 	RemoveServer(ctx context.Context, id string, wait bool) error
-	// Restore restores the Raft node from a snapshot.
-	Restore(rdr io.ReadCloser) error
+	// Apply applies a raft log entry.
+	Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error)
+	// Snapshot requests a raft snapshot. It returns a reader containing the contents
+	// and metadata about the snapshot.
+	Snapshot() (*raft.SnapshotMeta, io.ReadCloser, error)
 	// Barrier issues a barrier request to the cluster. This is a no-op if the node is not the leader.
 	Barrier(ctx context.Context, timeout time.Duration) (took time.Duration, err error)
 	// Stop stops the Raft node.
@@ -237,7 +260,7 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	r.mu.Unlock()
 	r.raft, err = raft.NewRaft(
 		r.opts.RaftConfig(opts.NodeID),
-		r,
+		&raftNodeFSM{r},
 		&MonotonicLogStore{r.logDB},
 		r.stableDB,
 		r.raftSnapshots,
@@ -349,9 +372,22 @@ func (r *raftNode) ListenPort() int {
 	return r.listenPort
 }
 
+// LastIndex returns the last index sent to the Raft instance.
+func (r *raftNode) LastIndex() uint64 {
+	return r.raft.LastIndex()
+}
+
 // LastAppliedIndex returns the last applied index.
 func (r *raftNode) LastAppliedIndex() uint64 {
 	return r.lastAppliedIndex.Load()
+}
+
+func (r *raftNode) LeaderID() (string, error) {
+	_, id := r.raft.LeaderWithID()
+	if id == "" {
+		return "", ErrNotLeader
+	}
+	return string(id), nil
 }
 
 // IsLeader returns true if the Raft node is the leader.
@@ -370,9 +406,52 @@ func (r *raftNode) IsVoter() bool {
 	return false
 }
 
+// IsObserver returns true if the Raft node is an observer.
+func (r *raftNode) IsObserver() bool {
+	config := r.Configuration()
+	for _, server := range config.Servers {
+		if server.ID == r.nodeID {
+			return server.Suffrage == raft.Nonvoter
+		}
+	}
+	return false
+}
+
 // Storage returns the storage.
 func (r *raftNode) Storage() storage.Storage {
 	return r.raftDB
+}
+
+// Apply applies a raft log entry.
+func (r *raftNode) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
+	var timeout time.Duration
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout = time.Until(deadline)
+	}
+	data, err := MarshalLogEntry(log)
+	if err != nil {
+		return nil, fmt.Errorf("marshal log entry: %w", err)
+	}
+	f := r.raft.Apply(data, timeout)
+	err = f.Error()
+	if err != nil {
+		return nil, fmt.Errorf("apply: %w", err)
+	}
+	resp, ok := f.Response().(*v1.RaftApplyResponse)
+	if !ok {
+		return nil, fmt.Errorf("apply: invalid response type")
+	}
+	return resp, nil
+}
+
+// Snapshot requests a raft snapshot. It returns a reader containing the contents
+// and metadata about the snapshot.
+func (r *raftNode) Snapshot() (*raft.SnapshotMeta, io.ReadCloser, error) {
+	f := r.raft.Snapshot()
+	if err := f.Error(); err != nil {
+		return nil, nil, err
+	}
+	return f.Open()
 }
 
 // Barrier issues a barrier request to the cluster. If the node is not leader

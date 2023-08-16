@@ -28,7 +28,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
 )
 
 func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
@@ -37,7 +36,6 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	start := time.Now()
 	peer, ok := peer.FromContext(ctx)
 	if !ok {
 		return nil, status.Errorf(codes.FailedPrecondition, "no peer")
@@ -72,19 +70,5 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	defer func() {
 		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
 	}()
-	data, err := meshraft.MarshalLogEntry(log)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "marshal log entry: %v", err)
-	}
-	timeout := time.Second * 15
-	err = s.store.Raft().Raft().Apply(data, timeout).Error()
-	return &v1.RaftApplyResponse{
-		Time: time.Since(start).String(),
-		Error: func() string {
-			if err == nil {
-				return ""
-			}
-			return err.Error()
-		}(),
-	}, nil
+	return s.store.Raft().Apply(ctx, log)
 }

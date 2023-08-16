@@ -19,7 +19,6 @@ package node
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -38,14 +37,6 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 	leader, err = s.store.Leader()
 	if err != nil {
 		s.log.Error("failed to lookup current leader", slog.String("error", err.Error()))
-	}
-	stats := s.store.Raft().Raft().Stats()
-	var term uint64
-	if termStr, ok := stats["term"]; ok {
-		term, err = strconv.ParseUint(termStr, 10, 64)
-		if err != nil {
-			return nil, err
-		}
 	}
 	ifaceMetrics, err := s.store.Network().WireGuard().Metrics()
 	if err != nil {
@@ -77,9 +68,8 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 			return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
 		}(),
 		CurrentLeader:    leader,
-		CurrentTerm:      term,
-		LastLogIndex:     s.store.Raft().Raft().LastIndex(),
-		LastApplied:      s.store.Raft().Raft().AppliedIndex(),
+		LastLogIndex:     s.store.Raft().LastIndex(),
+		LastApplied:      s.store.Raft().LastAppliedIndex(),
 		InterfaceMetrics: ifaceMetrics,
 	}, nil
 }

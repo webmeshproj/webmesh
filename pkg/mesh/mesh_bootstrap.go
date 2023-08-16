@@ -24,7 +24,6 @@ import (
 	"math"
 	"net"
 	"net/netip"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -65,19 +64,6 @@ func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error 
 		}
 		// Try to rejoin one of the bootstrap servers
 		return s.rejoinBootstrapServer(ctx, features)
-	}
-	if s.opts.Bootstrap.RestoreSnapshot != "" {
-		s.log.Info("restoring snapshot from file", slog.String("file", s.opts.Bootstrap.RestoreSnapshot))
-		f, err := os.Open(s.opts.Bootstrap.RestoreSnapshot)
-		if err != nil {
-			return fmt.Errorf("open snapshot file: %w", err)
-		}
-		defer f.Close()
-		if err := s.raft.Restore(f); err != nil {
-			return fmt.Errorf("restore snapshot: %w", err)
-		}
-		// We're done here, but restore procedure needs to be documented
-		return s.recoverWireguard(ctx)
 	}
 	var bootstrapOpts raft.BootstrapOptions
 	bootstrapOpts.Servers = s.opts.Bootstrap.Servers
@@ -429,7 +415,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		}
 	}
 	// Make sure everyone is aware of the bootstrap data
-	err = s.raft.Raft().Barrier(time.Second * 5).Error()
+	_, err = s.raft.Barrier(ctx, time.Second*5)
 	if err != nil {
 		return fmt.Errorf("barrier: %w", err)
 	}

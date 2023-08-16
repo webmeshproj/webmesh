@@ -40,6 +40,11 @@ var canVoteAction = &rbac.Action{
 	Resource: v1.RuleResource_RESOURCE_VOTES,
 }
 
+var canObserveAction = &rbac.Action{
+	Verb:     v1.RuleVerb_VERB_PUT,
+	Resource: v1.RuleResource_RESOURCE_OBSERVERS,
+}
+
 var canPutRouteAction = &rbac.Action{
 	Verb:     v1.RuleVerb_VERB_PUT,
 	Resource: v1.RuleResource_RESOURCE_ROUTES,
@@ -99,6 +104,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		var actions rbac.Actions
 		if req.GetAsVoter() {
 			actions = append(actions, canVoteAction)
+		}
+		if req.GetAsObserver() {
+			// Technically, voters are also observers, but we check it for now
+			// for consistency.
+			actions = append(actions, canObserveAction)
 		}
 		if len(req.GetRoutes()) > 0 {
 			actions = append(actions, canPutRouteAction)
@@ -307,38 +317,38 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
-	// Add peer to the raft cluster
-	var raftAddress string
-	if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
-		// Prefer IPv4 for raft
-		raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
-	} else {
-		// Use IPv6
-		// TODO: Doesn't work when we are IPv4 only. Need to fix this.
-		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
-		// We may as well use IPv4 for everything in that case. Leave it for now,
-		// but need to document these requirements fully for dual-stack setups.
-		// Another option is to create another role of being neither an observer or voter,
-		// in which case another subscription method needs to be exposed for receiving updates.
-		raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+	// Add the node to Raft if requested
+	// The node will otherwise need to subscribe to cluster events manually with
+	// the Subscribe RPC.
+	if req.GetAsVoter() || req.GetAsObserver() {
+		// Add peer to the raft cluster
+		var raftAddress string
+		if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
+			// Prefer IPv4 for raft
+			raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+		} else {
+			// Use IPv6 for raft
+			raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+		}
+		if req.GetAsVoter() {
+			log.Info("Adding voter to cluster", slog.String("raft_address", raftAddress))
+			if err := s.store.Raft().AddVoter(ctx, req.GetId(), raftAddress); err != nil {
+				return nil, handleErr(status.Errorf(codes.Internal, "failed to add voter: %v", err))
+			}
+		} else if req.GetAsObserver() {
+			log.Info("Adding observer to cluster", slog.String("raft_address", raftAddress))
+			if err := s.store.Raft().AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
+				return nil, handleErr(status.Errorf(codes.Internal, "failed to add non-voter: %v", err))
+			}
+		}
+		cleanFuncs = append(cleanFuncs, func() {
+			err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
+			if err != nil {
+				log.Warn("Failed to remove voter", slog.String("error", err.Error()))
+			}
+		})
 	}
-	if req.GetAsVoter() {
-		log.Info("Adding candidate to cluster", slog.String("raft_address", raftAddress))
-		if err := s.store.Raft().AddVoter(ctx, req.GetId(), raftAddress); err != nil {
-			return nil, handleErr(status.Errorf(codes.Internal, "failed to add voter: %v", err))
-		}
-	} else {
-		log.Info("Adding non-voter to cluster", slog.String("raft_address", raftAddress))
-		if err := s.store.Raft().AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
-			return nil, handleErr(status.Errorf(codes.Internal, "failed to add non-voter: %v", err))
-		}
-	}
-	cleanFuncs = append(cleanFuncs, func() {
-		err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
-		if err != nil {
-			log.Warn("Failed to remove voter", slog.String("error", err.Error()))
-		}
-	})
+
 	// Start building the response
 	resp := &v1.JoinResponse{
 		MeshDomain:  s.meshDomain,
