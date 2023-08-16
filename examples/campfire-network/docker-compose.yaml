@@ -71,7 +71,6 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
-      - --raft.in-memory
       - --mesh.join-campfire-uri=camp://turn:10.1.0.1:3478/?#R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.direct-peers=site-2-peer,site-3-peer
     restart: on-failure
@@ -90,7 +89,6 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
-      - --raft.in-memory
       - --mesh.join-campfire-uri=camp://turn:10.1.0.1:3478/?#R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.direct-peers=site-1-peer,site-3-peer
     restart: on-failure
@@ -109,7 +107,6 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
-      - --raft.in-memory
       - --mesh.join-campfire-uri=camp://turn:10.1.0.1:3478/?#R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.direct-peers=site-1-peer,site-2-peer
     restart: on-failure
