@@ -81,13 +81,12 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		app.curConfig.Mesh.Bootstrap.Enabled = false
 	}
 	if req.GetCampfireUri() != "" {
-		uri, err := campfire.ParseCampfireURI(req.GetCampfireUri())
+		_, err := campfire.ParseCampfireURI(req.GetCampfireUri())
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid campfire URI: %v", err)
 		}
 		app.curConfig.Mesh.Mesh.JoinAddress = ""
-		app.curConfig.Mesh.Mesh.JoinCampfirePSK = string(uri.PSK)
-		app.curConfig.Mesh.Mesh.JoinCampfireTURNServers = uri.TURNServers
+		app.curConfig.Mesh.Mesh.JoinCampfireURI = req.GetCampfireUri()
 	}
 	err := app.curConfig.Validate()
 	if err != nil {
@@ -236,10 +235,7 @@ func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRe
 		return nil, status.Errorf(codes.InvalidArgument, "error parsing campfire URI: %v", err)
 	}
 	app.log.Info("Starting campfire", "servers", parsed.TURNServers)
-	err = app.mesh.StartCampfire(ctx, campfire.Options{
-		PSK:         parsed.PSK,
-		TURNServers: parsed.TURNServers,
-	}, nil)
+	err = app.mesh.StartCampfire(ctx, parsed, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error starting campfire: %v", err)
 	}

@@ -40,14 +40,6 @@ type CampfireChannel interface {
 	Opened() bool
 }
 
-// Options are options for creating or joining a new camp fire.
-type Options struct {
-	// PSK is the pre-shared key.
-	PSK []byte
-	// TURNServers is an optional list of turn servers to use.
-	TURNServers []string
-}
-
 var (
 	// ErrClosed is returned when the camp fire is closed.
 	ErrClosed = net.ErrClosed

@@ -89,6 +89,10 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Fea
 
 func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) error {
 	log := s.log.With(slog.String("join-method", "campfire"))
+	uri, err := campfire.ParseCampfireURI(s.opts.Mesh.JoinCampfireURI)
+	if err != nil {
+		return fmt.Errorf("parse campfire uri: %w", err)
+	}
 	ctx = context.WithLogger(ctx, log)
 	log.Info("Joining mesh via campfire")
 	var tries int
@@ -97,10 +101,7 @@ func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) e
 		// the most likely cause is that no one is waiting for us.
 		joinCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
-		conn, err := campfire.Join(joinCtx, &campfire.CampfireURI{
-			PSK:         []byte(s.opts.Mesh.JoinCampfirePSK),
-			TURNServers: s.opts.Mesh.JoinCampfireTURNServers,
-		})
+		conn, err := campfire.Join(joinCtx, uri)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()

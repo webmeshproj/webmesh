@@ -133,7 +133,7 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
-	} else if s.opts.Mesh.JoinCampfirePSK != "" {
+	} else if s.opts.Mesh.JoinCampfireURI != "" {
 		// Attempt to join the cluster by campfire.
 		err = s.joinByCampfire(ctx, features)
 		if err != nil {
@@ -152,11 +152,12 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	if err != nil {
 		return handleErr(fmt.Errorf("subscribe: %w", err))
 	}
-	if s.opts.Mesh.WaitCampfirePSK != "" {
-		err := s.StartCampfire(ctx, campfire.Options{
-			PSK:         []byte(s.opts.Mesh.WaitCampfirePSK),
-			TURNServers: s.opts.Mesh.WaitCampfireTURNServers,
-		}, s.handleCampfirePeering)
+	if s.opts.Mesh.WaitCampfireURI != "" {
+		uri, err := campfire.ParseCampfireURI(s.opts.Mesh.WaitCampfireURI)
+		if err != nil {
+			return handleErr(fmt.Errorf("parse campfire uri: %w", err))
+		}
+		err = s.StartCampfire(ctx, uri, s.handleCampfirePeering)
 		if err != nil {
 			// This should never happen
 			return handleErr(fmt.Errorf("start campfire: %w", err))

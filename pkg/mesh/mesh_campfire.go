@@ -34,17 +34,17 @@ import (
 type CampfireConnHandler func(context.Context, io.ReadWriteCloser)
 
 // StartCampfire starts a campfire listener with the given function handler.
-func (s *meshStore) StartCampfire(ctx context.Context, opts campfire.Options, hdlr CampfireConnHandler) error {
+func (s *meshStore) StartCampfire(ctx context.Context, uri *campfire.CampfireURI, hdlr CampfireConnHandler) error {
 	if hdlr == nil {
 		hdlr = s.handleCampfirePeering
 	}
 	s.campfiremu.Lock()
 	defer s.campfiremu.Unlock()
-	if _, ok := s.campfires[string(opts.PSK)]; ok {
-		return fmt.Errorf("campfire already started with psk %s", opts.PSK)
+	if _, ok := s.campfires[string(uri.PSK)]; ok {
+		return fmt.Errorf("campfire already started with psk %s", uri.PSK)
 	}
-	s.campfires[string(opts.PSK)] = nil
-	go s.waitByCampfire(opts, hdlr)
+	s.campfires[string(uri.PSK)] = nil
+	go s.waitByCampfire(uri, hdlr)
 	return nil
 }
 
@@ -63,9 +63,9 @@ func (s *meshStore) LeaveCampfire(ctx context.Context, psk string) error {
 	return err
 }
 
-func (s *meshStore) waitByCampfire(opts campfire.Options, hdlr CampfireConnHandler) {
+func (s *meshStore) waitByCampfire(uri *campfire.CampfireURI, hdlr CampfireConnHandler) {
 	s.campfiremu.Lock()
-	if cf, ok := s.campfires[string(opts.PSK)]; !ok {
+	if cf, ok := s.campfires[string(uri.PSK)]; !ok {
 		// This campfire has been deleted
 		s.campfiremu.Unlock()
 		return
@@ -76,19 +76,16 @@ func (s *meshStore) waitByCampfire(opts campfire.Options, hdlr CampfireConnHandl
 	}
 	log := s.log.With("protocol", "campfire")
 	ctx := context.WithLogger(context.Background(), log)
-	cf, err := campfire.Wait(context.Background(), &campfire.CampfireURI{
-		PSK:         opts.PSK,
-		TURNServers: opts.TURNServers,
-	})
+	cf, err := campfire.Wait(context.Background(), uri)
 	if err != nil {
 		s.campfiremu.Unlock()
 		log.Error("Failed to wait by campfire, will try again in 15 seconds", "error", err.Error())
 		// TODO: Make this configurable
 		time.Sleep(15 * time.Second)
-		go s.waitByCampfire(opts, hdlr)
+		go s.waitByCampfire(uri, hdlr)
 		return
 	}
-	s.campfires[string(opts.PSK)] = cf
+	s.campfires[string(uri.PSK)] = cf
 	s.campfiremu.Unlock()
 	defer cf.Close()
 	log.Info("Announced ourselves at the campfire")
@@ -113,7 +110,7 @@ func (s *meshStore) waitByCampfire(opts campfire.Options, hdlr CampfireConnHandl
 		case <-cf.Expired():
 			log.Info("Campfire connection expired, reconnecting")
 			time.Sleep(3 * time.Second)
-			go s.waitByCampfire(opts, hdlr)
+			go s.waitByCampfire(uri, hdlr)
 			return
 		}
 	}
