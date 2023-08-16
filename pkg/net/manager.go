@@ -516,6 +516,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	wgpeer := wireguard.Peer{
 		ID:            peer.GetId(),
 		GRPCPort:      int(peer.GetGrpcPort()),
+		RaftMember:    peer.GetRaftMember(),
 		PublicKey:     key,
 		Endpoint:      endpoint,
 		PrivateIPv4:   priv4,

@@ -94,6 +94,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
+	if req.GetGrpcPort() <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "grpc port required")
+	}
+	if req.GetAsVoter() || req.GetAsObserver() {
+		if req.GetRaftPort() <= 0 {
+			return nil, status.Error(codes.InvalidArgument, "raft port required")
+		}
+	}
 
 	// Check that the node is indeed who they say they are
 	if !s.insecure {

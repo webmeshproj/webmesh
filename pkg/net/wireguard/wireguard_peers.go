@@ -37,6 +37,8 @@ type Peer struct {
 	ID string `json:"id"`
 	// GRPCPort is the gRPC port of the peer.
 	GRPCPort int `json:"grpcPort"`
+	// RaftMember indicates if the peer is a raft member.
+	RaftMember bool `json:"raftMember"`
 	// PublicKey is the public key of the peer.
 	PublicKey wgtypes.Key `json:"publicKey"`
 	// Endpoint is the endpoint of this peer, if applicable.

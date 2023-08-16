@@ -311,6 +311,11 @@ func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (
 	}
 	var toDial *wireguard.Peer
 	for id, peer := range peers {
+		if !peer.RaftMember {
+			// This method is only used for raft requests, so skip non-raft peers.
+			// This may change in the future.
+			continue
+		}
 		// An empty node ID means any peer is acceptable, but this should be more controlled
 		// so retries can ensure a connection to a different peer.
 		if nodeID == "" || id == nodeID {
