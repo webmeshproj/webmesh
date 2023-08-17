@@ -18,6 +18,7 @@ limitations under the License.
 package turn
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net"
@@ -49,6 +50,10 @@ type Options struct {
 	// EnableCampfireWebsockets enables relaying campfire packets over websockets.
 	// If ListenTCP is not set, ListenUDP will be used.
 	EnableCampfireWebsockets bool
+	// TLSCertFile is the path to the TLS certificate file when serving the TURN server over TLS.
+	TLSCertFile string
+	// TLSKeyFile is the path to the TLS key file when serving the TURN server over TLS.
+	TLSKeyFile string
 }
 
 // Server is a TURN server.
@@ -126,11 +131,22 @@ func NewServer(o *Options) (*Server, error) {
 	server := &Server{Server: s, conn: pktConn}
 	if o.EnableCampfireWebsockets {
 		// Create the websocket server
+		var tlsConfig *tls.Config
+		if o.TLSCertFile != "" && o.TLSKeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(o.TLSCertFile, o.TLSKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load TLS key pair: %w", err)
+			}
+			tlsConfig = &tls.Config{
+				Certificates: []tls.Certificate{cert},
+			}
+		}
 		ln, err := net.Listen("tcp", o.ListenTCP)
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on TCP: %w", err)
 		}
 		server.http = &http.Server{
+			TLSConfig: tlsConfig,
 			Handler: &websocket.Server{
 				Handler: websocket.Handler(cfManager.handleWebsocket),
 			},
