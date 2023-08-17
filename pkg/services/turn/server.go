@@ -153,9 +153,16 @@ func NewServer(o *Options) (*Server, error) {
 		}
 		go func() {
 			defer ln.Close()
-			log.Info("Listening for campfire websocket requests", slog.String("listen-addr", o.ListenTCP))
-			if err := server.http.Serve(ln); err != nil && err != http.ErrServerClosed {
-				log.Error("Failed to serve campfire requests", slog.String("error", err.Error()))
+			var err error
+			if tlsConfig != nil {
+				log.Info("Listening for campfire websocket requests over TLS", slog.String("listen-addr", o.ListenTCP))
+				err = server.http.ServeTLS(ln, "", "")
+			} else {
+				log.Info("Listening for campfire websocket requests", slog.String("listen-addr", o.ListenTCP))
+				err = server.http.Serve(ln)
+			}
+			if err != nil && err != http.ErrServerClosed {
+				log.Error("Failed to serve campfire websockets", slog.String("error", err.Error()))
 			}
 		}()
 	}
