@@ -145,11 +145,12 @@ func NewServer(o *Options) (*Server, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen on TCP: %w", err)
 		}
+		wssrv := &websocket.Server{
+			Handler: websocket.Handler(cfManager.handleWebsocket),
+		}
 		server.http = &http.Server{
 			TLSConfig: tlsConfig,
-			Handler: &websocket.Server{
-				Handler: websocket.Handler(cfManager.handleWebsocket),
-			},
+			Handler:   handleCORSPreflight(wssrv.ServeHTTP),
 		}
 		go func() {
 			defer ln.Close()
@@ -181,4 +182,18 @@ func (s *Server) Close() error {
 		}
 	}
 	return s.Server.Close()
+}
+
+func handleCORSPreflight(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			// TODO: Allow user to restrict to specific origins
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next(w, r)
+	}
 }
