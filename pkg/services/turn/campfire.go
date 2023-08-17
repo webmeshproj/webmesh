@@ -90,6 +90,7 @@ func (s *campfireManager) Close() error {
 }
 
 func (s *campfireManager) handleWebsocket(c *websocket.Conn) {
+	s.log.Debug("Handling CAMPFIRE websocket connection")
 	defer c.Close()
 	for {
 		buf := make([]byte, 4096)

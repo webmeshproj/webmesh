@@ -150,7 +150,7 @@ func NewServer(o *Options) (*Server, error) {
 		}
 		server.http = &http.Server{
 			TLSConfig: tlsConfig,
-			Handler:   handleCORSPreflight(wssrv.ServeHTTP),
+			Handler:   handleCORSPreflight(log, wssrv.ServeHTTP),
 		}
 		go func() {
 			defer ln.Close()
@@ -184,9 +184,10 @@ func (s *Server) Close() error {
 	return s.Server.Close()
 }
 
-func handleCORSPreflight(next http.HandlerFunc) http.HandlerFunc {
+func handleCORSPreflight(log *slog.Logger, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
+			log.Debug("Handling CORS preflight request")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			// TODO: Allow user to restrict to specific origins
