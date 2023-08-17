@@ -17,17 +17,16 @@ limitations under the License.
 package turn
 
 import (
-	"errors"
 	"log/slog"
 	"net"
 	"sync"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/protobuf/proto"
+	"golang.org/x/net/websocket"
 )
 
-type campFireManager struct {
+type campfireManager struct {
 	net.PacketConn
 	log    *slog.Logger
 	peers  map[peer]net.Addr
@@ -44,9 +43,9 @@ type peer struct {
 	expires     int64
 }
 
-// NewCampFireManager creates a new campfire manager.
-func NewCampFireManager(pc net.PacketConn, log *slog.Logger) *campFireManager {
-	cm := &campFireManager{
+// NewCampfireManager creates a new campfire manager.
+func NewCampfireManager(pc net.PacketConn, log *slog.Logger) *campfireManager {
+	cm := &campfireManager{
 		PacketConn: pc,
 		log:        log,
 		peers:      make(map[peer]net.Addr),
@@ -56,50 +55,7 @@ func NewCampFireManager(pc net.PacketConn, log *slog.Logger) *campFireManager {
 	return cm
 }
 
-// IsCampfireMessage returns true if the given packet is a campfire message.
-func IsCampfireMessage(p []byte) bool {
-	_, err := DecodeCampfireMessage(p)
-	return err == nil
-}
-
-// EncodeCampfireMessage encodes a campfire message.
-func EncodeCampfireMessage(msg *v1.CampfireMessage) ([]byte, error) {
-	return proto.Marshal(msg)
-}
-
-// DecodeCampfireMessage decodes a campfire message.
-func DecodeCampfireMessage(p []byte) (*v1.CampfireMessage, error) {
-	var msg v1.CampfireMessage
-	err := proto.Unmarshal(p, &msg)
-	return &msg, err
-}
-
-// ValidateCampfireMessage validates a campfire message.
-func ValidateCampfireMessage(msg *v1.CampfireMessage) error {
-	if msg.Id == "" && msg.Type != v1.CampfireMessage_ANNOUNCE {
-		return errors.New("missing id")
-	}
-	if msg.Lufrag == "" {
-		return errors.New("missing lufrag")
-	}
-	if msg.Lpwd == "" {
-		return errors.New("missing lpwd")
-	}
-	if msg.Rufrag == "" {
-		return errors.New("missing rufrag")
-	}
-	if msg.Rpwd == "" {
-		return errors.New("missing rpwd")
-	}
-	if _, ok := v1.CampfireMessage_MessageType_name[int32(msg.Type)]; !ok {
-		return errors.New("invalid message type")
-	} else if msg.Type == v1.CampfireMessage_UNKNOWN {
-		return errors.New("unknown message type")
-	}
-	return nil
-}
-
-func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, rerr error) {
+func (s *campfireManager) ReadFrom(p []byte) (n int, addr net.Addr, rerr error) {
 	if n, addr, rerr = s.PacketConn.ReadFrom(p); rerr == nil && IsCampfireMessage(p[:n]) {
 		s.log.Debug("Handling CAMPFIRE packet", "saddr", addr.String(), "len", n)
 		msg, err := DecodeCampfireMessage(p[:n])
@@ -124,12 +80,14 @@ func (s *campFireManager) ReadFrom(p []byte) (n int, addr net.Addr, rerr error) 
 	return
 }
 
-func (s *campFireManager) Close() error {
+func (s *campfireManager) Close() error {
 	close(s.closec)
 	return s.PacketConn.Close()
 }
 
-func (s *campFireManager) handleCampFireMessage(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleWebsocket(c *websocket.Conn) {}
+
+func (s *campfireManager) handleCampFireMessage(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch msg.Type {
@@ -144,7 +102,7 @@ func (s *campFireManager) handleCampFireMessage(pkt []byte, msg *v1.CampfireMess
 	}
 }
 
-func (s *campFireManager) handleAnnounce(msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleAnnounce(msg *v1.CampfireMessage, saddr net.Addr) {
 	peer := peer{
 		ufrag:       msg.Lufrag,
 		pwd:         msg.Lpwd,
@@ -155,7 +113,7 @@ func (s *campFireManager) handleAnnounce(msg *v1.CampfireMessage, saddr net.Addr
 	s.peers[peer] = saddr
 }
 
-func (s *campFireManager) handleOffer(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleOffer(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
 		id:          msg.Id,
 		ufrag:       msg.Lufrag,
@@ -188,7 +146,7 @@ func (s *campFireManager) handleOffer(pkt []byte, msg *v1.CampfireMessage, saddr
 	s.peers[rpeer] = saddr
 }
 
-func (s *campFireManager) handleAnswer(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleAnswer(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
 		id:          msg.Id,
 		ufrag:       msg.Lufrag,
@@ -219,7 +177,7 @@ func (s *campFireManager) handleAnswer(pkt []byte, msg *v1.CampfireMessage, sadd
 	}
 }
 
-func (s *campFireManager) handleICE(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleICE(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
 	lpeer := peer{
 		id:          msg.Id,
 		ufrag:       msg.Lufrag,
@@ -250,7 +208,7 @@ func (s *campFireManager) handleICE(pkt []byte, msg *v1.CampfireMessage, saddr n
 	}
 }
 
-func (s *campFireManager) runPeerGC() {
+func (s *campfireManager) runPeerGC() {
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
 	for {
