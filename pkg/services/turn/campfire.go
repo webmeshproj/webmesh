@@ -30,7 +30,7 @@ import (
 type campfireManager struct {
 	net.PacketConn
 	log    *slog.Logger
-	peers  map[peer]io.WriteCloser
+	peers  map[peer]io.Writer
 	closec chan struct{}
 	mu     sync.Mutex
 }
@@ -49,7 +49,7 @@ func NewCampfireManager(pc net.PacketConn, log *slog.Logger) *campfireManager {
 	cm := &campfireManager{
 		PacketConn: pc,
 		log:        log,
-		peers:      make(map[peer]io.WriteCloser),
+		peers:      make(map[peer]io.Writer),
 		closec:     make(chan struct{}),
 	}
 	go cm.runPeerGC()
@@ -76,7 +76,10 @@ func (s *campfireManager) ReadFrom(p []byte) (n int, addr net.Addr, rerr error) 
 			slog.String("rpwd", msg.Rpwd),
 			slog.String("type", msg.Type.String()),
 		)
-		s.handleCampFireMessage(p[:n], msg, addr)
+		s.handleCampfirePacket(p[:n], msg, &pktWriter{
+			conn:  s.PacketConn,
+			saddr: addr,
+		})
 	}
 	return
 }
@@ -86,24 +89,56 @@ func (s *campfireManager) Close() error {
 	return s.PacketConn.Close()
 }
 
-func (s *campfireManager) handleWebsocket(c *websocket.Conn) {}
+func (s *campfireManager) handleWebsocket(c *websocket.Conn) {
+	defer c.Close()
+	for {
+		buf := make([]byte, 4096)
+		n, err := c.Read(buf)
+		if err != nil {
+			if err == io.EOF || err == net.ErrClosed {
+				return
+			}
+			s.log.Warn("Error reading from websocket", slog.String("error", err.Error()))
+			return
+		}
+		s.log.Debug("Handling CAMPFIRE websocket packet", slog.Int("len", n))
+		msg, err := DecodeCampfireMessage(buf[:n])
+		if err != nil {
+			s.log.Warn("failed to decode campfire message", slog.String("error", err.Error()))
+			return
+		}
+		if err := ValidateCampfireMessage(msg); err != nil {
+			s.log.Warn("invalid campfire message", slog.String("error", err.Error()))
+			return
+		}
+		s.log.Debug("Dispatching CAMPFIRE websocket packet",
+			slog.String("id", msg.Id),
+			slog.String("lufrag", msg.Lufrag),
+			slog.String("lpwd", msg.Lpwd),
+			slog.String("rufrag", msg.Rufrag),
+			slog.String("rpwd", msg.Rpwd),
+			slog.String("type", msg.Type.String()),
+		)
+		s.handleCampfirePacket(buf[:n], msg, &wsWriter{conn: c})
+	}
+}
 
-func (s *campfireManager) handleCampFireMessage(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleCampfirePacket(pkt []byte, msg *v1.CampfireMessage, rwriter io.Writer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch msg.Type {
 	case v1.CampfireMessage_ANNOUNCE:
-		s.handleAnnouncePacket(msg, saddr)
+		s.handleAnnouncePacket(msg, rwriter)
 	case v1.CampfireMessage_OFFER:
-		s.handleOfferPacket(pkt, msg, saddr)
+		s.handleOfferPacket(pkt, msg, rwriter)
 	case v1.CampfireMessage_ANSWER:
-		s.handleAnswerPacket(pkt, msg, saddr)
+		s.handleAnswerPacket(pkt, msg, rwriter)
 	case v1.CampfireMessage_CANDIDATE:
-		s.handleICEPacket(pkt, msg, saddr)
+		s.handleICEPacket(pkt, msg, rwriter)
 	}
 }
 
-func (s *campfireManager) handleAnnouncePacket(msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleAnnouncePacket(msg *v1.CampfireMessage, rwriter io.Writer) {
 	peer := peer{
 		ufrag:       msg.Lufrag,
 		pwd:         msg.Lpwd,
@@ -111,13 +146,10 @@ func (s *campfireManager) handleAnnouncePacket(msg *v1.CampfireMessage, saddr ne
 		acceptPwd:   msg.Rpwd,
 		expires:     nextExpiry(),
 	}
-	s.peers[peer] = &pktWriter{
-		conn:  s.PacketConn,
-		saddr: saddr,
-	}
+	s.peers[peer] = rwriter
 }
 
-func (s *campfireManager) handleOfferPacket(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleOfferPacket(pkt []byte, msg *v1.CampfireMessage, rwriter io.Writer) {
 	lpeer := peer{
 		id:          msg.Id,
 		ufrag:       msg.Lufrag,
@@ -126,10 +158,7 @@ func (s *campfireManager) handleOfferPacket(pkt []byte, msg *v1.CampfireMessage,
 		acceptPwd:   msg.Rpwd,
 		expires:     nextExpiry(),
 	}
-	s.peers[lpeer] = &pktWriter{
-		conn:  s.PacketConn,
-		saddr: saddr,
-	}
+	s.peers[lpeer] = rwriter
 	rpeer := peer{
 		ufrag:       msg.Rufrag,
 		pwd:         msg.Rpwd,
@@ -150,13 +179,10 @@ func (s *campfireManager) handleOfferPacket(pkt []byte, msg *v1.CampfireMessage,
 	}
 	// Create a unique peer for the answer
 	rpeer.id = msg.Id
-	s.peers[rpeer] = &pktWriter{
-		conn:  s.PacketConn,
-		saddr: saddr,
-	}
+	s.peers[rpeer] = rwriter
 }
 
-func (s *campfireManager) handleAnswerPacket(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleAnswerPacket(pkt []byte, msg *v1.CampfireMessage, rwriter io.Writer) {
 	lpeer := peer{
 		id:          msg.Id,
 		ufrag:       msg.Lufrag,
@@ -165,10 +191,7 @@ func (s *campfireManager) handleAnswerPacket(pkt []byte, msg *v1.CampfireMessage
 		acceptPwd:   msg.Rpwd,
 		expires:     nextExpiry(),
 	}
-	s.peers[lpeer] = &pktWriter{
-		conn:  s.PacketConn,
-		saddr: saddr,
-	}
+	s.peers[lpeer] = rwriter
 	rpeer := peer{
 		id:          msg.Id,
 		ufrag:       msg.Rufrag,
@@ -190,7 +213,7 @@ func (s *campfireManager) handleAnswerPacket(pkt []byte, msg *v1.CampfireMessage
 	}
 }
 
-func (s *campfireManager) handleICEPacket(pkt []byte, msg *v1.CampfireMessage, saddr net.Addr) {
+func (s *campfireManager) handleICEPacket(pkt []byte, msg *v1.CampfireMessage, rwriter io.Writer) {
 	lpeer := peer{
 		id:          msg.Id,
 		ufrag:       msg.Lufrag,
@@ -199,10 +222,7 @@ func (s *campfireManager) handleICEPacket(pkt []byte, msg *v1.CampfireMessage, s
 		acceptPwd:   msg.Rpwd,
 		expires:     nextExpiry(),
 	}
-	s.peers[lpeer] = &pktWriter{
-		conn:  s.PacketConn,
-		saddr: saddr,
-	}
+	s.peers[lpeer] = rwriter
 	rpeer := peer{
 		id:          msg.Id,
 		ufrag:       msg.Rufrag,
@@ -261,6 +281,10 @@ func (p *pktWriter) Write(b []byte) (int, error) {
 	return p.conn.WriteTo(b, p.saddr)
 }
 
-func (p *pktWriter) Close() error {
-	return nil
+type wsWriter struct {
+	conn *websocket.Conn
+}
+
+func (w *wsWriter) Write(b []byte) (int, error) {
+	return w.conn.Write(b)
 }
