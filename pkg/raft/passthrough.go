@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -37,9 +38,10 @@ var ErrNotRaftMember = errors.New("not a raft member")
 // and uses the given Dialer for storage connections.
 func NewPassthrough(dialer NodeDialer) Raft {
 	return &passthroughRaft{
-		dialer: dialer,
-		closec: make(chan struct{}),
-		log:    slog.Default().With("component", "passthrough-raft"),
+		dialer:     dialer,
+		subCancels: []func(){},
+		closec:     make(chan struct{}),
+		log:        slog.Default().With("component", "passthrough-raft"),
 	}
 }
 
@@ -48,10 +50,12 @@ func NewPassthrough(dialer NodeDialer) Raft {
 // It should later be removed in favor of less coupling between the connection
 // and raft interfaces.
 type passthroughRaft struct {
-	dialer NodeDialer
-	nodeID string
-	closec chan struct{}
-	log    *slog.Logger
+	dialer     NodeDialer
+	nodeID     string
+	subCancels []func()
+	closec     chan struct{}
+	log        *slog.Logger
+	mu         sync.Mutex
 }
 
 func (p *passthroughRaft) Start(ctx context.Context, opts *StartOptions) error {
@@ -134,7 +138,7 @@ func (p *passthroughRaft) LeaderID() (string, error) {
 		}
 	}
 	// Should return a better error
-	return "", ErrNotRaftMember
+	return "", ErrNoLeader
 }
 
 func (p *passthroughRaft) IsLeader() bool {
@@ -178,7 +182,10 @@ func (p *passthroughRaft) Barrier(ctx context.Context, timeout time.Duration) (t
 }
 
 func (p *passthroughRaft) Stop(ctx context.Context) error {
-	close(p.closec)
+	defer close(p.closec)
+	for _, cancel := range p.subCancels {
+		cancel()
+	}
 	return nil
 }
 
@@ -312,6 +319,9 @@ func (p *passthroughStorage) Restore(ctx context.Context, r io.Reader) error {
 // The returned function can be called to unsubscribe.
 func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (func(), error) {
 	ctx, cancel := context.WithCancel(ctx)
+	p.raft.mu.Lock()
+	p.raft.subCancels = append(p.raft.subCancels, cancel)
+	p.raft.mu.Unlock()
 	go func() {
 		var started bool
 		for {
@@ -331,6 +341,9 @@ func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn st
 					return nil
 				})
 				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
 					p.raft.log.Error("error in storage subscription, retrying in 3 seconds", "error", err.Error())
 					select {
 					case <-p.raft.closec:
@@ -345,6 +358,9 @@ func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn st
 			}
 			err := p.doSubscribe(ctx, prefix, fn)
 			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
 				p.raft.log.Error("error in storage subscription, retrying in 3 seconds", "error", err.Error())
 				select {
 				case <-p.raft.closec:

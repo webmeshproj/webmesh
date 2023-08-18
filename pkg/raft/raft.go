@@ -42,6 +42,8 @@ var (
 	ErrStarted = errors.New("raft node already started")
 	// ErrClosed is returned when the Raft node is already closed.
 	ErrClosed = errors.New("raft node is closed")
+	// ErrNoLeader is returned when there is no leader.
+	ErrNoLeader = errors.New("no leader")
 	// ErrAlreadyBootstrapped is returned when the Raft node is already bootstrapped.
 	ErrAlreadyBootstrapped = raft.ErrCantBootstrap
 	// ErrNotLeader is returned when the Raft node is not the leader.
@@ -385,7 +387,7 @@ func (r *raftNode) LastAppliedIndex() uint64 {
 func (r *raftNode) LeaderID() (string, error) {
 	_, id := r.raft.LeaderWithID()
 	if id == "" {
-		return "", ErrNotLeader
+		return "", ErrNoLeader
 	}
 	return string(id), nil
 }
