@@ -223,6 +223,14 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		return fmt.Errorf("create voters role binding: %w", err)
 	}
 
+	// We initialized rbac, but if the caller wants, we'll go ahead and disable it.
+	if s.opts.Bootstrap.DisableRBAC {
+		err = rb.Disable(ctx)
+		if err != nil {
+			return fmt.Errorf("disable rbac: %w", err)
+		}
+	}
+
 	// Initialize the Networking system.
 	nw := networking.New(s.Storage())
 

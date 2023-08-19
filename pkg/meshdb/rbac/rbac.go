@@ -42,6 +42,7 @@ const (
 	rolesPrefix        = "/registry/roles"
 	rolebindingsPrefix = "/registry/rolebindings"
 	groupsPrefix       = "/registry/groups"
+	rbacDisabledKey    = "/registry/rbac-disabled"
 )
 
 // IsSystemRole returns true if the role is a system role.
@@ -79,6 +80,13 @@ var ErrIsSystemGroup = fmt.Errorf("cannot modify system group")
 
 // RBAC is the interface to the database models for RBAC.
 type RBAC interface {
+	// Enable enables RBAC.
+	Enable(ctx context.Context) error
+	// Disable disables RBAC.
+	Disable(ctx context.Context) error
+	// IsDisabled returns true if RBAC is disabled.
+	IsDisabled(ctx context.Context) (bool, error)
+
 	// PutRole creates or updates a role.
 	PutRole(ctx context.Context, role *v1.Role) error
 	// GetRole returns a role by name.
@@ -119,6 +127,36 @@ func New(st storage.Storage) RBAC {
 
 type rbac struct {
 	storage.Storage
+}
+
+// Disable disables RBAC.
+func (r *rbac) Disable(ctx context.Context) error {
+	err := r.Put(ctx, rbacDisabledKey, "true", 0)
+	if err != nil {
+		return fmt.Errorf("put rbac disabled: %w", err)
+	}
+	return nil
+}
+
+// IsDisabled returns true if RBAC is disabled.
+func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
+	_, err := r.Get(ctx, rbacDisabledKey)
+	if err != nil {
+		if err == storage.ErrKeyNotFound {
+			return false, nil
+		}
+		return false, fmt.Errorf("get rbac disabled: %w", err)
+	}
+	return true, nil
+}
+
+// Enable enables RBAC.
+func (r *rbac) Enable(ctx context.Context) error {
+	err := r.Delete(ctx, rbacDisabledKey)
+	if err != nil {
+		return fmt.Errorf("delete rbac disabled: %w", err)
+	}
+	return nil
 }
 
 // PutRole creates or updates a role.

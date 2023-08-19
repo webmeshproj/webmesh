@@ -34,6 +34,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/services/admin"
 	"github.com/webmeshproj/webmesh/pkg/services/campfire"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
@@ -75,9 +76,13 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		store: store,
 		log:   log,
 	}
-	insecureServices := !store.Plugins().HasAuth()
+	rbacDisabled, err := rbac.New(store.Storage()).IsDisabled(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("check rbac disabled: %w", err)
+	}
+	insecureServices := !store.Plugins().HasAuth() || rbacDisabled
 	if insecureServices {
-		log.Warn("running services without authentication")
+		log.Warn("running services without authorization")
 	}
 	if o.API != nil {
 		if o.API.Admin {

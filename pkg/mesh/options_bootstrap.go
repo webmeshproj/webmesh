@@ -38,6 +38,7 @@ const (
 	BootstrapAdminEnvVar                = "BOOTSTRAP_ADMIN"
 	BootstrapVotersEnvVar               = "BOOTSTRAP_VOTERS"
 	BootstrapDefaultNetworkPolicyEnvVar = "BOOTSTRAP_DEFAULT_NETWORK_POLICY"
+	BootstrapDisableRBACEnvVar          = "BOOTSTRAP_DISABLE_RBAC"
 	ForceBootstrapClusterEnvVar         = "BOOTSTRAP_FORCE"
 )
 
@@ -68,6 +69,8 @@ type BootstrapOptions struct {
 	Voters string `json:"voters,omitempty" yaml:"voters,omitempty" toml:"voters,omitempty" mapstructure:"voters,omitempty"`
 	// DefaultNetworkPolicy is the default network policy to apply to the mesh when bootstraping a new cluster.
 	DefaultNetworkPolicy string `json:"default-network-policy,omitempty" yaml:"default-network-policy,omitempty" toml:"default-network-policy,omitempty" mapstructure:"default-network-policy,omitempty"`
+	// DisableRBAC is the flag to disable RBAC when bootstrapping a new cluster.
+	DisableRBAC bool `json:"disable-rbac,omitempty" yaml:"disable-rbac,omitempty" toml:"disable-rbac,omitempty" mapstructure:"disable-rbac,omitempty"`
 	// Force is the force new bootstrap flag.
 	Force bool `json:"force,omitempty" yaml:"force,omitempty" toml:"force,omitempty" mapstructure:"force,omitempty"`
 }
@@ -216,6 +219,8 @@ Ports should be in the form of <node-id>=<port>.`,
 		"Comma separated list of voters to bootstrap the cluster with. bootstrap-servers are already included in this list.")
 	fl.StringVar(&o.DefaultNetworkPolicy, p+"bootstrap.default-network-policy", util.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
 		"Default network policy to bootstrap the cluster with.")
+	fl.BoolVar(&o.DisableRBAC, p+"bootstrap.disable-rbac", util.GetEnvDefault(BootstrapDisableRBACEnvVar, "false") == "true",
+		"Disable RBAC when bootstrapping a new cluster.")
 	fl.BoolVar(&o.Force, p+"bootstrap.force", util.GetEnvDefault(ForceBootstrapClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
 }
