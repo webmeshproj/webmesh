@@ -19,6 +19,7 @@ package campfire
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/pion/webrtc/v3"
 
@@ -27,17 +28,21 @@ import (
 )
 
 // Join will attempt to join the peer waiting at the given location.
-func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
+func Join(ctx context.Context, campfire *CampfireURI) (io.ReadWriteCloser, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
-	location, err := Find(opts.PSK, opts.TURNServers)
+	location, err := Find(campfire.PSK, campfire.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
+	if !strings.HasPrefix(location.TURNServer, "turn:") {
+		location.TURNServer = "turn:" + location.TURNServer
+	}
+	// Parse the selected turn server
 	fireconn, err := turn.NewCampfireClient(turn.CampfireClientOptions{
 		Addr:  location.TURNServer,
 		Ufrag: location.RemoteUfrag(),
 		Pwd:   location.RemotePwd(),
-		PSK:   opts.PSK,
+		PSK:   campfire.PSK,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new campfire client: %w", err)
@@ -50,9 +55,19 @@ func Join(ctx context.Context, opts Options) (io.ReadWriteCloser, error) {
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{location.TURNServer},
-				Username:   "-",
-				Credential: "-",
+				URLs: []string{location.TURNServer},
+				Username: func() string {
+					if campfire.TURNUsername != "" {
+						return campfire.TURNUsername
+					}
+					return "-"
+				}(),
+				Credential: func() string {
+					if campfire.TURNPassword != "" {
+						return campfire.TURNPassword
+					}
+					return "-"
+				}(),
 			},
 		},
 	})

@@ -65,7 +65,7 @@ type Interface interface {
 	// DeletePeer removes a peer from the wireguard configuration.
 	DeletePeer(ctx context.Context, id string) error
 	// Peers returns the list of peers in the wireguard configuration.
-	Peers() []string
+	Peers() map[string]Peer
 	// Metrics returns the metrics for the wireguard interface and the host.
 	Metrics() (*v1.InterfaceMetrics, error)
 	// Close closes the wireguard interface and all client connections.
@@ -113,7 +113,7 @@ type wginterface struct {
 	opts           *Options
 	cli            *wgctrl.Client
 	log            *slog.Logger
-	peers          map[string]wgtypes.Key
+	peers          map[string]Peer
 	peersMux       sync.Mutex
 	recorderCancel context.CancelFunc
 }
@@ -180,7 +180,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		defaultGateway: gw,
 		opts:           opts,
 		cli:            cli,
-		peers:          make(map[string]wgtypes.Key),
+		peers:          make(map[string]Peer),
 		log:            log,
 	}
 	if opts.Metrics {
@@ -205,12 +205,14 @@ func (w *wginterface) ListenPort() (int, error) {
 }
 
 // Peers returns the peers of the wireguard interface.
-func (w *wginterface) Peers() []string {
+func (w *wginterface) Peers() map[string]Peer {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
-	out := make([]string, 0)
-	for id := range w.peers {
-		out = append(out, id)
+	// Copy the map
+	out := make(map[string]Peer)
+	for id, peer := range w.peers {
+		p := peer
+		out[id] = p
 	}
 	return out
 }

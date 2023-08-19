@@ -28,12 +28,14 @@ func TestCampfire(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	opts := Options{
-		PSK:         []byte("E7gonE7TmwXJTaSzEkLqQx0Vcpimv0a0"),
-		TURNServers: []string{setupTest(t)},
+	turnAddr := setupTest(t)
+	campURI := fmt.Sprintf("camp://9d4e8faba9a93ef397554dc4:hLxK4U49l6fcZLH0@%s/?fingerprint#abcdefghijklmnopqrstuvwx12345678", turnAddr)
+	ourcamp, err := ParseCampfireURI(campURI)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	cf, err := Wait(ctx, opts)
+	cf, err := Wait(ctx, ourcamp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +66,7 @@ func TestCampfire(t *testing.T) {
 		}
 	}()
 
-	conn, err := Join(ctx, opts)
+	conn, err := Join(ctx, ourcamp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,5 +102,5 @@ func setupTest(t *testing.T) (turnServer string) {
 	t.Cleanup(func() {
 		server.Close()
 	})
-	return fmt.Sprintf("turn:127.0.0.1:%d", server.ListenPort())
+	return fmt.Sprintf("127.0.0.1:%d", server.ListenPort())
 }

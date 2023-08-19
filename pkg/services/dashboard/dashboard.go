@@ -53,15 +53,15 @@ const (
 // Options contains the options for the dashboard service.
 type Options struct {
 	// Enabled is whether the dashboard is enabled.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty" mapstructure:"enabled,omitempty"`
 	// ListenAddress is the address to listen on.
-	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty"`
+	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty" mapstructure:"listen-address,omitempty"`
 	// TLSCertFile is the path to a certificate file to use for TLS.
-	TLSCertFile string `json:"tls-cert-file,omitempty" yaml:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty"`
+	TLSCertFile string `json:"tls-cert-file,omitempty" yaml:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty" mapstructure:"tls-cert-file,omitempty"`
 	// TLSKeyFile is the path to a key file to use for TLS.
-	TLSKeyFile string `json:"tls-key-file,omitempty" yaml:"tls-key-file,omitempty" toml:"tls-key-file,omitempty"`
+	TLSKeyFile string `json:"tls-key-file,omitempty" yaml:"tls-key-file,omitempty" toml:"tls-key-file,omitempty" mapstructure:"tls-key-file,omitempty"`
 	// Prefix is the prefix to use for the dashboard.
-	Prefix string `json:"prefix,omitempty" yaml:"prefix,omitempty" toml:"prefix,omitempty"`
+	Prefix string `json:"prefix,omitempty" yaml:"prefix,omitempty" toml:"prefix,omitempty" mapstructure:"prefix,omitempty"`
 }
 
 // BindFlags binds the options to a flag set.
@@ -80,6 +80,16 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 		"The path to a key file to use for TLS.")
 	fs.StringVar(&o.Prefix, p+"services.dashboard.prefix", util.GetEnvDefault(DashboardPrefixEnvVar, ""),
 		"The path prefix to use for the dashboard.")
+}
+
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	no := &Options{}
+	*no = *o
+	return no
 }
 
 // NewOptions creates a new Options with default values.

@@ -34,41 +34,69 @@ const (
 // AuthOptions are options for authentication.
 type AuthOptions struct {
 	// Basic are options for basic authentication.
-	Basic *BasicAuthOptions `json:"basic,omitempty" yaml:"basic,omitempty" toml:"basic,omitempty"`
+	Basic *BasicAuthOptions `json:"basic,omitempty" yaml:"basic,omitempty" toml:"basic,omitempty" mapstructure:"basic,omitempty"`
 	// MTLS are options for mutual TLS.
-	MTLS *MTLSOptions `json:"mtls,omitempty" yaml:"mtls,omitempty" toml:"mtls,omitempty"`
+	MTLS *MTLSOptions `json:"mtls,omitempty" yaml:"mtls,omitempty" toml:"mtls,omitempty" mapstructure:"mtls,omitempty"`
 	// LDAP are options for LDAP authentication.
-	LDAP *LDAPAuthOptions `json:"ldap,omitempty" yaml:"ldap,omitempty" toml:"ldap,omitempty"`
+	LDAP *LDAPAuthOptions `json:"ldap,omitempty" yaml:"ldap,omitempty" toml:"ldap,omitempty" mapstructure:"ldap,omitempty"`
+}
+
+func (o *AuthOptions) DeepCopy() *AuthOptions {
+	if o == nil {
+		return nil
+	}
+	no := &AuthOptions{}
+	if o.Basic != nil {
+		no.Basic = &BasicAuthOptions{
+			Username: o.Basic.Username,
+			Password: o.Basic.Password,
+		}
+	}
+	if o.MTLS != nil {
+		no.MTLS = &MTLSOptions{
+			CertFile: o.MTLS.CertFile,
+			CertData: o.MTLS.CertData,
+			KeyFile:  o.MTLS.KeyFile,
+			KeyData:  o.MTLS.KeyData,
+		}
+	}
+	if o.LDAP != nil {
+		no.LDAP = &LDAPAuthOptions{
+			Username: o.LDAP.Username,
+			Password: o.LDAP.Password,
+		}
+	}
+	return no
 }
 
 // MTLSOptions are options for mutual TLS.
 type MTLSOptions struct {
 	// CertFile is the path to a TLS certificate file to present when joining. Either this
 	// or CertData must be set.
-	CertFile string `yaml:"cert-file,omitempty" json:"cert-file,omitempty" toml:"cert-file,omitempty"`
+	CertFile string `yaml:"cert-file,omitempty" json:"cert-file,omitempty" toml:"cert-file,omitempty" mapstructure:"cert-file,omitempty"`
 	// CertData is the base64 encoded TLS certificate data to present when joining. Either this
 	// or CertFile must be set.
-	CertData string `yaml:"cert-data,omitempty" json:"cert-data,omitempty" toml:"cert-data,omitempty"`
+	CertData string `yaml:"cert-data,omitempty" json:"cert-data,omitempty" toml:"cert-data,omitempty" mapstructure:"cert-data,omitempty"`
 	// KeyFile is the path to a TLS key file for the certificate. Either this or KeyData must be set.
-	KeyFile string `yaml:"key-file,omitempty" json:"key-file,omitempty" toml:"tls-file,omitempty"`
+	KeyFile string `yaml:"key-file,omitempty" json:"key-file,omitempty" toml:"tls-file,omitempty" mapstructure:"tls-file,omitempty"`
 	// KeyData is the base64 encoded TLS key data for the certificate. Either this or KeyFile must be set.
-	KeyData string `yaml:"key-data,omitempty" json:"key-data,omitempty" toml:"tls-data,omitempty"`
+	KeyData string `yaml:"key-data,omitempty" json:"key-data,omitempty" toml:"tls-data,omitempty" mapstructure:"tls-data,omitempty"`
 }
 
 // BasicAuthOptions are options for basic authentication.
 type BasicAuthOptions struct {
 	// Username is the username.
-	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty"`
+	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty" mapstructure:"username,omitempty"`
 	// Password is the password.
-	Password string `json:"password,omitempty" yaml:"password,omitempty" toml:"password,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty" toml:"password,omitempty" mapstructure:"password,omitempty"`
 }
 
 // LDAPAuthOptions are options for LDAP authentication.
 type LDAPAuthOptions struct {
 	// Username is the username.
-	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty"`
+	Username string `json:"username,omitempty" yaml:"username,omitempty" toml:"username,omitempty" mapstructure:"username,omitempty"`
 	// Password is the password.
-	Password string `json:"password,omitempty" yaml:"password,omitempty" toml:"password,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty" toml:"password,omitempty" mapstructure:"password,omitempty"`
 }
 
 // NewAuthOptions creates a new AuthOptions.

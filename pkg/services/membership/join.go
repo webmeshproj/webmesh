@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package membership
 
 import (
 	"log/slog"
@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
@@ -38,6 +39,11 @@ import (
 var canVoteAction = &rbac.Action{
 	Verb:     v1.RuleVerb_VERB_PUT,
 	Resource: v1.RuleResource_RESOURCE_VOTES,
+}
+
+var canObserveAction = &rbac.Action{
+	Verb:     v1.RuleVerb_VERB_PUT,
+	Resource: v1.RuleResource_RESOURCE_OBSERVERS,
 }
 
 var canPutRouteAction = &rbac.Action{
@@ -88,6 +94,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
+	if req.GetGrpcPort() <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "grpc port required")
+	}
+	if req.GetAsVoter() || req.GetAsObserver() {
+		if req.GetRaftPort() <= 0 {
+			return nil, status.Error(codes.InvalidArgument, "raft port required")
+		}
+	}
 
 	// Check that the node is indeed who they say they are
 	if !s.insecure {
@@ -100,13 +114,17 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		if req.GetAsVoter() {
 			actions = append(actions, canVoteAction)
 		}
+		if req.GetAsObserver() {
+			// Technically, voters are also observers, but we check it for now
+			// for consistency.
+			actions = append(actions, canObserveAction)
+		}
 		if len(req.GetRoutes()) > 0 {
 			actions = append(actions, canPutRouteAction)
 		}
 		if len(req.GetDirectPeers()) > 0 {
 			for _, peer := range req.GetDirectPeers() {
 				actions = append(actions, canPutEdgeAction.For(peer))
-				actions = append(actions, canNegDataChannelAction.For(peer)...)
 			}
 		}
 		if len(actions) > 0 {
@@ -153,7 +171,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err))
 		} else if created {
 			cleanFuncs = append(cleanFuncs, func() {
-				err := s.networking.DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
+				err := networking.New(s.store.Storage()).DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
 				if err != nil {
 					log.Warn("Failed to delete route", slog.String("error", err.Error()))
 				}
@@ -190,7 +208,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Debug("Assigned IPv4 address to peer", slog.String("ipv4", leasev4.String()))
 	}
 	// Write the peer to the database
-	err = s.peers.Put(ctx, peers.Node{
+	p := peers.New(s.store.Storage())
+	err = p.Put(ctx, peers.Node{
 		ID:                 req.GetId(),
 		PublicKey:          publicKey,
 		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
@@ -207,7 +226,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to raft log: %v", err))
 	}
 	cleanFuncs = append(cleanFuncs, func() {
-		err := s.peers.Delete(ctx, req.GetId())
+		err := p.Delete(ctx, req.GetId())
 		if err != nil {
 			log.Warn("failed to delete peer", slog.String("error", err.Error()))
 		}
@@ -219,7 +238,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		joiningServer = proxiedFrom
 	}
 	log.Debug("adding edge between caller and joining server", slog.String("joining_server", joiningServer))
-	err = s.peers.PutEdge(ctx, peers.Edge{
+	err = p.PutEdge(ctx, peers.Edge{
 		From:   joiningServer,
 		To:     req.GetId(),
 		Weight: 1,
@@ -230,14 +249,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if req.GetPrimaryEndpoint() != "" {
 		// Add an edge between the caller and all other nodes with public endpoints
 		// TODO: This should be done according to network policy and batched
-		allPeers, err := s.peers.ListPublicNodes(ctx)
+		allPeers, err := p.ListPublicNodes(ctx)
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
 		for _, peer := range allPeers {
 			if peer.ID != req.GetId() && peer.PrimaryEndpoint != "" {
 				log.Debug("adding edge from public peer to public caller", slog.String("peer", peer.ID))
-				err = s.peers.PutEdge(ctx, peers.Edge{
+				err = p.PutEdge(ctx, peers.Edge{
 					From:   peer.ID,
 					To:     req.GetId(),
 					Weight: 99,
@@ -252,7 +271,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Add an edge between the caller and all other nodes in the same zone
 		// with public endpoints.
 		// TODO: Same as above - this should be done according to network policy and batched
-		zonePeers, err := s.peers.ListByZoneID(ctx, req.GetZoneAwarenessId())
+		zonePeers, err := p.ListByZoneID(ctx, req.GetZoneAwarenessId())
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
@@ -262,7 +281,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 			log.Debug("Adding edges to peer in the same zone", slog.String("peer", peer.ID))
 			if peer.ID != req.GetId() {
-				err = s.peers.PutEdge(ctx, peers.Edge{
+				err = p.PutEdge(ctx, peers.Edge{
 					From:   peer.ID,
 					To:     req.GetId(),
 					Weight: 1,
@@ -278,14 +297,14 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Put an ICE edge between the caller and all direct peers
 		for _, peer := range req.GetDirectPeers() {
 			// Check if the peer exists
-			_, err := s.peers.Get(ctx, peer)
+			_, err := p.Get(ctx, peer)
 			if err != nil {
 				if err != peers.ErrNodeNotFound {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to get peer: %v", err))
 				}
 				// The peer doesn't exist, so create a placeholder for it
 				log.Debug("Registering empty peer", slog.String("peer", peer))
-				err = s.peers.Put(ctx, peers.Node{
+				err = p.Put(ctx, peers.Node{
 					ID: peer,
 				})
 				if err != nil {
@@ -293,7 +312,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 			}
 			log.Debug("Adding ICE edge to peer", slog.String("peer", peer))
-			err = s.peers.PutEdge(ctx, peers.Edge{
+			err = p.PutEdge(ctx, peers.Edge{
 				From:   peer,
 				To:     req.GetId(),
 				Weight: 1,
@@ -307,38 +326,38 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
-	// Add peer to the raft cluster
-	var raftAddress string
-	if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
-		// Prefer IPv4 for raft
-		raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
-	} else {
-		// Use IPv6
-		// TODO: Doesn't work when we are IPv4 only. Need to fix this.
-		// Basically if a single node is IPv4 only, we need to use IPv4 for raft.
-		// We may as well use IPv4 for everything in that case. Leave it for now,
-		// but need to document these requirements fully for dual-stack setups.
-		// Another option is to create another role of being neither an observer or voter,
-		// in which case another subscription method needs to be exposed for receiving updates.
-		raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+	// Add the node to Raft if requested
+	// The node will otherwise need to subscribe to cluster events manually with
+	// the Subscribe RPC.
+	if req.GetAsVoter() || req.GetAsObserver() {
+		// Add peer to the raft cluster
+		var raftAddress string
+		if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
+			// Prefer IPv4 for raft
+			raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+		} else {
+			// Use IPv6 for raft
+			raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+		}
+		if req.GetAsVoter() {
+			log.Info("Adding voter to cluster", slog.String("raft_address", raftAddress))
+			if err := s.store.Raft().AddVoter(ctx, req.GetId(), raftAddress); err != nil {
+				return nil, handleErr(status.Errorf(codes.Internal, "failed to add voter: %v", err))
+			}
+		} else if req.GetAsObserver() {
+			log.Info("Adding observer to cluster", slog.String("raft_address", raftAddress))
+			if err := s.store.Raft().AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
+				return nil, handleErr(status.Errorf(codes.Internal, "failed to add non-voter: %v", err))
+			}
+		}
+		cleanFuncs = append(cleanFuncs, func() {
+			err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
+			if err != nil {
+				log.Warn("Failed to remove voter", slog.String("error", err.Error()))
+			}
+		})
 	}
-	if req.GetAsVoter() {
-		log.Info("Adding candidate to cluster", slog.String("raft_address", raftAddress))
-		if err := s.store.Raft().AddVoter(ctx, req.GetId(), raftAddress); err != nil {
-			return nil, handleErr(status.Errorf(codes.Internal, "failed to add voter: %v", err))
-		}
-	} else {
-		log.Info("Adding non-voter to cluster", slog.String("raft_address", raftAddress))
-		if err := s.store.Raft().AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
-			return nil, handleErr(status.Errorf(codes.Internal, "failed to add non-voter: %v", err))
-		}
-	}
-	cleanFuncs = append(cleanFuncs, func() {
-		err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
-		if err != nil {
-			log.Warn("Failed to remove voter", slog.String("error", err.Error()))
-		}
-	})
+
 	// Start building the response
 	resp := &v1.JoinResponse{
 		MeshDomain:  s.meshDomain,
@@ -352,7 +371,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return ""
 		}(),
 	}
-	dnsServers, err := s.peers.ListByFeature(ctx, v1.Feature_MESH_DNS)
+	dnsServers, err := p.ListByFeature(ctx, v1.Feature_MESH_DNS)
 	if err != nil {
 		log.Warn("could not lookup DNS servers", slog.String("error", err.Error()))
 	} else {
@@ -384,7 +403,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// If the caller needs ICE servers, find all the eligible peers and return them
 	if requiresICE {
-		peers, err := s.peers.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
+		peers, err := p.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers by ICE feature: %v", err))
 		}

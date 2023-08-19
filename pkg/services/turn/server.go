@@ -18,11 +18,14 @@ limitations under the License.
 package turn
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 
 	"github.com/pion/turn/v2"
+	"golang.org/x/net/websocket"
 
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
@@ -36,24 +39,37 @@ type Options struct {
 	RelayAddressUDP string
 	// ListenUDP is the address the TURN server listens on for UDP requests.
 	ListenUDP string
+	// ListenTCP is the address the TURN server listens on for TCP requests.
+	ListenTCP string
 	// Realm is the realm used for authentication.
 	Realm string
 	// PortRange is the range of ports the TURN server will use for relaying.
 	PortRange string
 	// EnableCampfire enables relaying campfire packets.
 	EnableCampfire bool
+	// EnableCampfireWebsockets enables relaying campfire packets over websockets.
+	// If ListenTCP is not set, ListenUDP will be used.
+	EnableCampfireWebsockets bool
+	// TLSCertFile is the path to the TLS certificate file when serving the TURN server over TLS.
+	TLSCertFile string
+	// TLSKeyFile is the path to the TLS key file when serving the TURN server over TLS.
+	TLSKeyFile string
 }
 
 // Server is a TURN server.
 type Server struct {
 	*turn.Server
 	conn net.PacketConn
+	http *http.Server
 }
 
 // NewServer creates and starts a new TURN server.
 func NewServer(o *Options) (*Server, error) {
 	if o.PortRange == "" {
 		o.PortRange = "49152-65535"
+	}
+	if o.RelayAddressUDP == "" {
+		o.RelayAddressUDP = "0.0.0.0"
 	}
 	startPort, endPort, err := util.ParsePortRange(o.PortRange)
 	if err != nil {
@@ -62,8 +78,11 @@ func NewServer(o *Options) (*Server, error) {
 	if o.ListenUDP == "" {
 		return nil, fmt.Errorf("listen port UDP must be set")
 	}
-	if o.RelayAddressUDP == "" {
-		o.RelayAddressUDP = "0.0.0.0"
+	if o.EnableCampfireWebsockets && !o.EnableCampfire {
+		return nil, fmt.Errorf("campfire websockets cannot be enabled without campfire")
+	}
+	if o.EnableCampfireWebsockets && o.ListenTCP == "" {
+		o.ListenTCP = o.ListenUDP
 	}
 	udpConn, err := net.ListenPacket("udp", o.ListenUDP)
 	if err != nil {
@@ -76,10 +95,13 @@ func NewServer(o *Options) (*Server, error) {
 		PacketConn: udpConn,
 		log:        log.With("channel", "stun"),
 	}
+	var cfManager *campfireManager
 	if o.EnableCampfire {
 		log.Info("Enabling campfire protocol extensions")
-		pktConn = NewCampFireManager(pktConn, log.With("channel", "campfire"))
+		cfManager = NewCampfireManager(pktConn, log.With("channel", "campfire"))
+		pktConn = cfManager
 	}
+	// Create the turn server
 	s, err := turn.NewServer(turn.ServerConfig{
 		Realm:         o.Realm,
 		LoggerFactory: util.NewSTUNLoggerFactory(log.With("server", "turn")),
@@ -106,10 +128,73 @@ func NewServer(o *Options) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TURN server: %w", err)
 	}
-	return &Server{Server: s, conn: pktConn}, nil
+	server := &Server{Server: s, conn: pktConn}
+	if o.EnableCampfireWebsockets {
+		// Create the websocket server
+		var tlsConfig *tls.Config
+		if o.TLSCertFile != "" && o.TLSKeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(o.TLSCertFile, o.TLSKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load TLS key pair: %w", err)
+			}
+			tlsConfig = &tls.Config{
+				Certificates: []tls.Certificate{cert},
+			}
+		}
+		ln, err := net.Listen("tcp", o.ListenTCP)
+		if err != nil {
+			return nil, fmt.Errorf("failed to listen on TCP: %w", err)
+		}
+		wssrv := &websocket.Server{
+			Handler: websocket.Handler(cfManager.handleWebsocket),
+		}
+		server.http = &http.Server{
+			TLSConfig: tlsConfig,
+			Handler:   handleCORSPreflight(log, wssrv.ServeHTTP),
+		}
+		go func() {
+			defer ln.Close()
+			var err error
+			if tlsConfig != nil {
+				log.Info("Listening for campfire websocket requests over TLS", slog.String("listen-addr", o.ListenTCP))
+				err = server.http.ServeTLS(ln, "", "")
+			} else {
+				log.Info("Listening for campfire websocket requests", slog.String("listen-addr", o.ListenTCP))
+				err = server.http.Serve(ln)
+			}
+			if err != nil && err != http.ErrServerClosed {
+				log.Error("Failed to serve campfire websockets", slog.String("error", err.Error()))
+			}
+		}()
+	}
+	return server, nil
 }
 
-// ListenPort returns the port the TURN server is listening on.
+// ListenPort returns the UDP port the TURN server is listening on.
 func (s *Server) ListenPort() int {
 	return s.conn.LocalAddr().(*net.UDPAddr).Port
+}
+
+func (s *Server) Close() error {
+	if s.http != nil {
+		if err := s.http.Close(); err != nil {
+			slog.Default().Error("failed to close campfire websocket server", slog.String("error", err.Error()))
+		}
+	}
+	return s.Server.Close()
+}
+
+func handleCORSPreflight(log *slog.Logger, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			log.Debug("Handling CORS preflight request")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			// TODO: Allow user to restrict to specific origins
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next(w, r)
+	}
 }

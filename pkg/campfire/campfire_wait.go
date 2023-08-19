@@ -25,6 +25,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,18 +35,21 @@ import (
 )
 
 // Wait will wait for peers to join at the given location.
-func Wait(ctx context.Context, opts Options) (CampFire, error) {
+func Wait(ctx context.Context, camp *CampfireURI) (CampfireChannel, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
-	location, err := Find(opts.PSK, opts.TURNServers)
+	location, err := Find(camp.PSK, camp.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
+	}
+	if !strings.HasPrefix(location.TURNServer, "turn:") {
+		location.TURNServer = "turn:" + location.TURNServer
 	}
 	log.Debug("Found campfire location", "location", location.TURNServer)
 	fireconn, err := turn.NewCampfireClient(turn.CampfireClientOptions{
 		Addr:  location.TURNServer,
 		Ufrag: location.LocalUfrag(),
 		Pwd:   location.LocalPwd(),
-		PSK:   opts.PSK,
+		PSK:   camp.PSK,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new campfire client: %w", err)
@@ -60,6 +64,7 @@ func Wait(ctx context.Context, opts Options) (CampFire, error) {
 	s.SetIncludeLoopbackCandidate(true)
 	tw := &turnWait{
 		api:        webrtc.NewAPI(webrtc.WithSettingEngine(s)),
+		camp:       camp,
 		location:   location,
 		fireconn:   fireconn,
 		acceptc:    make(chan io.ReadWriteCloser, 1),
@@ -79,6 +84,7 @@ func Wait(ctx context.Context, opts Options) (CampFire, error) {
 
 type turnWait struct {
 	api          *webrtc.API
+	camp         *CampfireURI
 	location     *Location
 	fireconn     *turn.CampfireClient
 	acceptc      chan io.ReadWriteCloser
@@ -104,6 +110,16 @@ func (t *turnWait) Accept() (io.ReadWriteCloser, error) {
 func (t *turnWait) Close() error {
 	close(t.closec)
 	return t.fireconn.Close()
+}
+
+// Opened returns true if the camp fire is opened.
+func (t *turnWait) Opened() bool {
+	select {
+	case <-t.closec:
+		return false
+	default:
+		return true
+	}
 }
 
 // Errors returns a channel of errors.
@@ -204,9 +220,19 @@ func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 	pc, err := t.api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs:       []string{t.location.TURNServer},
-				Username:   "-",
-				Credential: "-",
+				URLs: []string{t.location.TURNServer},
+				Username: func() string {
+					if t.camp.TURNUsername != "" {
+						return t.camp.TURNUsername
+					}
+					return "-"
+				}(),
+				Credential: func() string {
+					if t.camp.TURNPassword != "" {
+						return t.camp.TURNPassword
+					}
+					return "-"
+				}(),
 			},
 		},
 		Certificates: t.certificates,

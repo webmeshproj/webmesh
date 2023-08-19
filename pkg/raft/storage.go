@@ -224,7 +224,7 @@ func (rs *raftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLog
 		return fmt.Errorf("dial leader: %w", err)
 	}
 	defer c.Close()
-	cli := v1.NewNodeClient(c)
+	cli := v1.NewMembershipClient(c)
 	resp, err := cli.Apply(ctx, logEntry)
 	if err != nil {
 		return fmt.Errorf("apply log entry: %w", err)

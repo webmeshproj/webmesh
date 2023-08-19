@@ -35,13 +35,17 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
+var (
+	config = NewOptions().BindFlags(flagset)
+)
+
 // Options are the node options.
 type Options struct {
-	Global *global.Options `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty"`
+	Global *global.Options `yaml:"global,omitempty" json:"global,omitempty" toml:"global,omitempty" mapstructure:"global,omitempty"`
 
-	Mesh     *mesh.Options       `yaml:",inline" json:",inline" toml:",inline"`
-	Bridge   *meshbridge.Options `yaml:"bridge,omitempty" json:"bridge,omitempty" toml:"bridge,omitempty"`
-	Services *services.Options   `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
+	Mesh     *mesh.Options       `yaml:",inline" json:",inline" toml:",inline" mapstructure:",squash"`
+	Bridge   *meshbridge.Options `yaml:"bridge,omitempty" json:"bridge,omitempty" toml:"bridge,omitempty" mapstructure:"bridge,omitempty"`
+	Services *services.Options   `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty" mapstructure:"services,omitempty"`
 }
 
 // NewOptions creates new options.
@@ -62,6 +66,16 @@ func (o *Options) BindFlags(fs *flag.FlagSet) *Options {
 	o.Services.BindFlags(fs)
 	o.Bridge.BindFlags(fs)
 	return o
+}
+
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	return &Options{
+		Global:   o.Global.DeepCopy(),
+		Mesh:     o.Mesh.DeepCopy(),
+		Bridge:   o.Bridge.DeepCopy(),
+		Services: o.Services.DeepCopy(),
+	}
 }
 
 // Validate runs all the validation checks.

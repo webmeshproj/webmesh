@@ -89,6 +89,10 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Fea
 
 func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) error {
 	log := s.log.With(slog.String("join-method", "campfire"))
+	uri, err := campfire.ParseCampfireURI(s.opts.Mesh.JoinCampfireURI)
+	if err != nil {
+		return fmt.Errorf("parse campfire uri: %w", err)
+	}
 	ctx = context.WithLogger(ctx, log)
 	log.Info("Joining mesh via campfire")
 	var tries int
@@ -97,10 +101,7 @@ func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) e
 		// the most likely cause is that no one is waiting for us.
 		joinCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
-		conn, err := campfire.Join(joinCtx, campfire.Options{
-			PSK:         []byte(s.opts.Mesh.JoinCampfirePSK),
-			TURNServers: s.opts.Mesh.JoinCampfireTURNServers,
-		})
+		conn, err := campfire.Join(joinCtx, uri)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -299,9 +300,8 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, resp *v1.JoinRespons
 }
 
 func (s *meshStore) doJoinGRPC(ctx context.Context, c *grpc.ClientConn, req *v1.JoinRequest) (*v1.JoinResponse, error) {
-	client := v1.NewNodeClient(c)
 	context.LoggerFrom(ctx).Debug("Sending join request to node over gRPC", slog.Any("req", req))
-	return client.Join(ctx, req)
+	return v1.NewMembershipClient(c).Join(ctx, req)
 }
 
 func (s *meshStore) newJoinRequest(features []v1.Feature, key wgtypes.Key) *v1.JoinRequest {
@@ -321,6 +321,7 @@ func (s *meshStore) newJoinRequest(features []v1.Feature, key wgtypes.Key) *v1.J
 		AssignIpv4:         !s.opts.Mesh.NoIPv4,
 		PreferRaftIpv6:     s.opts.Raft.PreferIPv6,
 		AsVoter:            s.opts.Mesh.JoinAsVoter,
+		AsObserver:         s.opts.Mesh.JoinAsObserver,
 		Routes:             s.opts.Mesh.Routes,
 		DirectPeers:        s.opts.Mesh.DirectPeers,
 		Features:           features,

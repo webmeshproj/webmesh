@@ -43,27 +43,27 @@ const (
 // MeshDNSOptions are the mesh DNS options.
 type MeshDNSOptions struct {
 	// Enabled enables mesh DNS.
-	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty" toml:"enabled,omitempty"`
+	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty" toml:"enabled,omitempty" mapstructure:"enabled,omitempty"`
 	// ListenUDP is the UDP address to listen on.
-	ListenUDP string `yaml:"listen-udp,omitempty" json:"listen-udp,omitempty" toml:"listen-udp,omitempty"`
+	ListenUDP string `yaml:"listen-udp,omitempty" json:"listen-udp,omitempty" toml:"listen-udp,omitempty" mapstructure:"listen-udp,omitempty"`
 	// ListenTCP is the address to listen on for TCP DNS requests.
-	ListenTCP string `json:"listen-tcp,omitempty" yaml:"listen-tcp,omitempty" toml:"listen-tcp,omitempty"`
+	ListenTCP string `json:"listen-tcp,omitempty" yaml:"listen-tcp,omitempty" toml:"listen-tcp,omitempty" mapstructure:"listen-tcp,omitempty"`
 	// ReusePort sets the number of listeners to start on each port.
 	// This is only supported on Linux.
-	ReusePort int `json:"reuse-port,omitempty" yaml:"reuse-port,omitempty" toml:"reuse-port,omitempty"`
+	ReusePort int `json:"reuse-port,omitempty" yaml:"reuse-port,omitempty" toml:"reuse-port,omitempty" mapstructure:"reuse-port,omitempty"`
 	// EnableCompression is true if DNS compression should be enabled.
-	EnableCompression bool `json:"compression,omitempty" yaml:"compression,omitempty" toml:"compression,omitempty"`
+	EnableCompression bool `json:"compression,omitempty" yaml:"compression,omitempty" toml:"compression,omitempty" mapstructure:"compression,omitempty"`
 	// RequestTimeout is the timeout for DNS requests.
-	RequestTimeout time.Duration `json:"request-timeout,omitempty" yaml:"request-timeout,omitempty" toml:"request-timeout,omitempty"`
+	RequestTimeout time.Duration `json:"request-timeout,omitempty" yaml:"request-timeout,omitempty" toml:"request-timeout,omitempty" mapstructure:"request-timeout,omitempty"`
 	// Forwarders are the DNS forwarders to use. If empty, the system DNS servers will be used.
 	Forwarders []string `json:"forwarders,omitempty" yaml:"forwarders,omitempty" toml:"forwarders,omitempty"`
 	// SubscribeForwarders will subscribe to new nodes that are able to forward requests for other meshes.
 	// These forwarders will be placed at the bottom of the forwarders list.
-	SubscribeForwarders bool `json:"subscribe-forwarders,omitempty" yaml:"subscribe-forwarders,omitempty" toml:"subscribe-forwarders,omitempty"`
+	SubscribeForwarders bool `json:"subscribe-forwarders,omitempty" yaml:"subscribe-forwarders,omitempty" toml:"subscribe-forwarders,omitempty" mapstructure:"subscribe-forwarders,omitempty"`
 	// DisableForwarding disables forwarding requests entirely.
-	DisableForwarding bool `json:"disable-forwarding,omitempty" yaml:"disable-forwarding,omitempty" toml:"disable-forwarding,omitempty"`
+	DisableForwarding bool `json:"disable-forwarding,omitempty" yaml:"disable-forwarding,omitempty" toml:"disable-forwarding,omitempty" mapstructure:"disable-forwarding,omitempty"`
 	// CacheSize is the size of the remote DNS cache.
-	CacheSize int `json:"cache-size,omitempty" yaml:"cache-size,omitempty" toml:"cache-size,omitempty"`
+	CacheSize int `json:"cache-size,omitempty" yaml:"cache-size,omitempty" toml:"cache-size,omitempty" mapstructure:"cache-size,omitempty"`
 }
 
 // NewMeshDNSOptions creates a new set of mesh DNS options.
@@ -126,4 +126,15 @@ func (o *MeshDNSOptions) Validate() error {
 		}
 	}
 	return nil
+}
+
+// DeepCopy copies the mesh DNS options.
+func (o *MeshDNSOptions) DeepCopy() *MeshDNSOptions {
+	if o == nil {
+		return nil
+	}
+	no := *o
+	no.Forwarders = make([]string, len(o.Forwarders))
+	copy(no.Forwarders, o.Forwarders)
+	return &no
 }

@@ -103,6 +103,14 @@ type CampfireCandidate struct {
 func NewCampfireClient(opts CampfireClientOptions) (*CampfireClient, error) {
 	addr := strings.TrimPrefix(opts.Addr, "turn:")
 	addr = strings.TrimPrefix(addr, "stun:")
+	parts := strings.Split(addr, "@")
+	if len(parts) == 2 {
+		addr = parts[1]
+	}
+	if !strings.Contains(addr, ":") {
+		// Add default port if missing.
+		addr = addr + ":443"
+	}
 	if opts.ID == "" {
 		id, err := uuid.NewRandom()
 		if err != nil {

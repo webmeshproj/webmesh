@@ -38,7 +38,7 @@ const (
 	BootstrapAdminEnvVar                = "BOOTSTRAP_ADMIN"
 	BootstrapVotersEnvVar               = "BOOTSTRAP_VOTERS"
 	BootstrapDefaultNetworkPolicyEnvVar = "BOOTSTRAP_DEFAULT_NETWORK_POLICY"
-	BootstrapRestoreSnapshotEnvVar      = "BOOTSTRAP_RESTORE_SNAPSHOT"
+	BootstrapDisableRBACEnvVar          = "BOOTSTRAP_DISABLE_RBAC"
 	ForceBootstrapClusterEnvVar         = "BOOTSTRAP_FORCE"
 )
 
@@ -46,33 +46,33 @@ const (
 type BootstrapOptions struct {
 	// Enabled is the flag to attempt bootstrapping. If true, the node will only bootstrap a new cluster
 	// if no data is found. To force a bootstrap, set Force to true.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty" mapstructure:"enabled,omitempty"`
 	// AdvertiseAddress is the initial address to advertise for raft consensus.
-	AdvertiseAddress string `json:"advertise-address,omitempty" yaml:"advertise-address,omitempty" toml:"advertise-address,omitempty"`
+	AdvertiseAddress string `json:"advertise-address,omitempty" yaml:"advertise-address,omitempty" toml:"advertise-address,omitempty" mapstructure:"advertise-address,omitempty"`
 	// Servers is a map of node IDs to addresses to bootstrap with. If empty, the node will use the advertise
 	// address as the bootstrap server. If not empty, all nodes in the map should be started with the same
 	// list configurations. If any are different then the first node to become leader will pick them. This
 	// can cause bootstrap to fail when using ACLs. Servers should be in the form of <node-id>=<address>.
-	Servers map[string]string `json:"servers,omitempty" yaml:"servers,omitempty" toml:"servers,omitempty"`
+	Servers map[string]string `json:"servers,omitempty" yaml:"servers,omitempty" toml:"servers,omitempty" mapstructure:"servers,omitempty"`
 	// ServersGRPCPorts is a map of node IDs to gRPC ports to bootstrap with. If empty, the node will use the
 	// advertise address and locally configured gRPC port for every node in bootstrap-servers. Ports should
 	// be in the form of <node-id>=<port>.
-	ServersGRPCPorts map[string]int `json:"servers-grpc-ports,omitempty" yaml:"servers-grpc-ports,omitempty" toml:"servers-grpc-ports,omitempty"`
+	ServersGRPCPorts map[string]int `json:"servers-grpc-ports,omitempty" yaml:"servers-grpc-ports,omitempty" toml:"servers-grpc-ports,omitempty" mapstructure:"servers-grpc-ports,omitempty"`
 	// IPv4Network is the IPv4 network of the mesh to write to the database when bootstraping a new cluster.
-	IPv4Network string `json:"ipv4-network,omitempty" yaml:"ipv4-network,omitempty" toml:"ipv4-network,omitempty"`
+	IPv4Network string `json:"ipv4-network,omitempty" yaml:"ipv4-network,omitempty" toml:"ipv4-network,omitempty" mapstructure:"ipv4-network,omitempty"`
 	// MeshDomain is the domain of the mesh to write to the database when bootstraping a new cluster.
-	MeshDomain string `json:"mesh-domain,omitempty" yaml:"mesh-domain,omitempty" toml:"mesh-domain,omitempty"`
+	MeshDomain string `json:"mesh-domain,omitempty" yaml:"mesh-domain,omitempty" toml:"mesh-domain,omitempty" mapstructure:"mesh-domain,omitempty"`
 	// Admin is the user and/or node name to assign administrator privileges to when bootstraping a new cluster.
-	Admin string `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty"`
+	Admin string `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty" mapstructure:"admin,omitempty"`
 	// Voters is a comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster.
 	// BootstrapServers are automatically added to this list.
-	Voters string `json:"voters,omitempty" yaml:"voters,omitempty" toml:"voters,omitempty"`
+	Voters string `json:"voters,omitempty" yaml:"voters,omitempty" toml:"voters,omitempty" mapstructure:"voters,omitempty"`
 	// DefaultNetworkPolicy is the default network policy to apply to the mesh when bootstraping a new cluster.
-	DefaultNetworkPolicy string `json:"default-network-policy,omitempty" yaml:"default-network-policy,omitempty" toml:"default-network-policy,omitempty"`
-	// RestoreSnapshot is the path to a snapshot to restore from when bootstrapping a new cluster.
-	RestoreSnapshot string `json:"restore-snapshot,omitempty" yaml:"restore-snapshot,omitempty" toml:"restore-snapshot,omitempty"`
+	DefaultNetworkPolicy string `json:"default-network-policy,omitempty" yaml:"default-network-policy,omitempty" toml:"default-network-policy,omitempty" mapstructure:"default-network-policy,omitempty"`
+	// DisableRBAC is the flag to disable RBAC when bootstrapping a new cluster.
+	DisableRBAC bool `json:"disable-rbac,omitempty" yaml:"disable-rbac,omitempty" toml:"disable-rbac,omitempty" mapstructure:"disable-rbac,omitempty"`
 	// Force is the force new bootstrap flag.
-	Force bool `json:"force,omitempty" yaml:"force,omitempty" toml:"force,omitempty"`
+	Force bool `json:"force,omitempty" yaml:"force,omitempty" toml:"force,omitempty" mapstructure:"force,omitempty"`
 }
 
 // NetworkPolicy is a type of network policy.
@@ -219,8 +219,34 @@ Ports should be in the form of <node-id>=<port>.`,
 		"Comma separated list of voters to bootstrap the cluster with. bootstrap-servers are already included in this list.")
 	fl.StringVar(&o.DefaultNetworkPolicy, p+"bootstrap.default-network-policy", util.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
 		"Default network policy to bootstrap the cluster with.")
-	fl.StringVar(&o.RestoreSnapshot, p+"bootstrap.restore-snapshot", util.GetEnvDefault(BootstrapRestoreSnapshotEnvVar, ""),
-		"Path to a snapshot to restore from when bootstrapping a new cluster.")
+	fl.BoolVar(&o.DisableRBAC, p+"bootstrap.disable-rbac", util.GetEnvDefault(BootstrapDisableRBACEnvVar, "false") == "true",
+		"Disable RBAC when bootstrapping a new cluster.")
 	fl.BoolVar(&o.Force, p+"bootstrap.force", util.GetEnvDefault(ForceBootstrapClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
+}
+
+// DeepCopy returns a deep copy of the bootstrap options.
+func (o *BootstrapOptions) DeepCopy() *BootstrapOptions {
+	if o == nil {
+		return nil
+	}
+	out := &BootstrapOptions{
+		Enabled:              o.Enabled,
+		AdvertiseAddress:     o.AdvertiseAddress,
+		Servers:              make(map[string]string),
+		ServersGRPCPorts:     make(map[string]int),
+		IPv4Network:          o.IPv4Network,
+		MeshDomain:           o.MeshDomain,
+		Admin:                o.Admin,
+		Voters:               o.Voters,
+		DefaultNetworkPolicy: o.DefaultNetworkPolicy,
+		Force:                o.Force,
+	}
+	for k, v := range o.Servers {
+		out.Servers[k] = v
+	}
+	for k, v := range o.ServersGRPCPorts {
+		out.ServersGRPCPorts[k] = v
+	}
+	return out
 }

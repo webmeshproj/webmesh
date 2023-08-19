@@ -52,8 +52,7 @@ services:
       - --bootstrap.enabled
       - --bootstrap.default-network-policy=accept
       - --raft.in-memory
-      - --mesh.wait-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
-      - --mesh.wait-campfire-turn-servers=turn:10.1.0.1:3478
+      - --mesh.wait-campfire-uri=camp://turn:10.1.0.1:3478/?#R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --services.api.webrtc=true
       - --services.api.mesh=true
     ports:
@@ -72,9 +71,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
-      - --mesh.join-campfire-turn-servers=turn:10.1.0.1:3478
+      - --mesh.join-campfire-uri=camp://turn:10.1.0.1:3478/?#R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.direct-peers=site-2-peer,site-3-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -92,9 +89,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
-      - --mesh.join-campfire-turn-servers=turn:10.1.0.1:3478
+      - --mesh.join-campfire-uri=camp://turn:10.1.0.1:3478/?#R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.direct-peers=site-1-peer,site-3-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -112,9 +107,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.no-ipv6
-      - --raft.in-memory
-      - --mesh.join-campfire-psk=R0kITeF6rXzNd9tqavra6szH9cRcJbGp
-      - --mesh.join-campfire-turn-servers=turn:10.1.0.1:3478
+      - --mesh.join-campfire-uri=camp://turn:10.1.0.1:3478/?#R0kITeF6rXzNd9tqavra6szH9cRcJbGp
       - --mesh.direct-peers=site-1-peer,site-2-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

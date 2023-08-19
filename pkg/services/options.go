@@ -35,7 +35,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
-	"github.com/webmeshproj/webmesh/pkg/services/campfire"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/util"
@@ -53,25 +52,23 @@ const (
 // Options contains the configuration for the gRPC server.
 type Options struct {
 	// ListenAddress is the address to listen on.
-	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty"`
+	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty" mapstructure:"listen-address,omitempty"`
 	// TLSCertFile is the path to the TLS certificate file.
-	TLSCertFile string `json:"tls-cert-file,omitempty" yaml:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty"`
+	TLSCertFile string `json:"tls-cert-file,omitempty" yaml:"tls-cert-file,omitempty" toml:"tls-cert-file,omitempty" mapstructure:"tls-cert-file,omitempty"`
 	// TLSKeyFile is the path to the TLS key file.
-	TLSKeyFile string `json:"tls-key-file,omitempty" yaml:"tls-key-file,omitempty" toml:"tls-key-file,omitempty"`
+	TLSKeyFile string `json:"tls-key-file,omitempty" yaml:"tls-key-file,omitempty" toml:"tls-key-file,omitempty" mapstructure:"tls-key-file,omitempty"`
 	// Insecure is true if the transport is insecure.
-	Insecure bool `json:"insecure,omitempty" yaml:"insecure,omitempty" toml:"insecure,omitempty"`
+	Insecure bool `json:"insecure,omitempty" yaml:"insecure,omitempty" toml:"insecure,omitempty" mapstructure:"insecure,omitempty"`
 	// API options
-	API *APIOptions `json:"api,omitempty" yaml:"api,omitempty" toml:"api,omitempty"`
+	API *APIOptions `json:"api,omitempty" yaml:"api,omitempty" toml:"api,omitempty" mapstructure:"api,omitempty"`
 	// MeshDNS options
-	MeshDNS *MeshDNSOptions `json:"mesh-dns,omitempty" yaml:"mesh-dns,omitempty" toml:"mesh-dns,omitempty"`
+	MeshDNS *MeshDNSOptions `json:"mesh-dns,omitempty" yaml:"mesh-dns,omitempty" toml:"mesh-dns,omitempty" mapstructure:"mesh-dns,omitempty"`
 	// TURN options
-	TURN *TURNOptions `json:"turn,omitempty" yaml:"turn,omitempty" toml:"turn,omitempty"`
+	TURN *TURNOptions `json:"turn,omitempty" yaml:"turn,omitempty" toml:"turn,omitempty" mapstructure:"turn,omitempty"`
 	// Metrics options
-	Metrics *MetricsOptions `json:"metrics,omitempty" yaml:"metrics,omitempty" toml:"metrics,omitempty"`
+	Metrics *MetricsOptions `json:"metrics,omitempty" yaml:"metrics,omitempty" toml:"metrics,omitempty" mapstructure:"metrics,omitempty"`
 	// Dashboard options
-	Dashboard *dashboard.Options `json:"dashboard,omitempty" yaml:"dashboard,omitempty" toml:"dashboard,omitempty"`
-	// Campfire options
-	Campfire *campfire.Options `json:"campfire,omitempty" yaml:"campfire,omitempty" toml:"campfire,omitempty"`
+	Dashboard *dashboard.Options `json:"dashboard,omitempty" yaml:"dashboard,omitempty" toml:"dashboard,omitempty" mapstructure:"dashboard,omitempty"`
 }
 
 // NewOptions returns new Options with sensible defaults. If grpcPort is 0
@@ -87,7 +84,6 @@ func NewOptions(grpcPort int) *Options {
 		TURN:          NewTURNOptions(),
 		Metrics:       NewMetricsOptions(),
 		Dashboard:     dashboard.NewOptions(),
-		Campfire:      campfire.NewOptions(),
 	}
 }
 
@@ -111,7 +107,6 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	o.TURN.BindFlags(fs, prefix...)
 	o.Metrics.BindFlags(fs, prefix...)
 	o.Dashboard.BindFlags(fs, prefix...)
-	o.Campfire.BindFlags(fs, prefix...)
 }
 
 // Validate validates the options.
@@ -141,9 +136,6 @@ func (o *Options) Validate() error {
 		return err
 	}
 	if err := o.TURN.Validate(); err != nil {
-		return err
-	}
-	if err := o.Campfire.Validate(); err != nil {
 		return err
 	}
 	return nil
@@ -257,6 +249,30 @@ func (o *Options) ToFeatureSet() []v1.Feature {
 		features = append(features, v1.Feature_MESH_DNS)
 	}
 	return features
+}
+
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	deepCopy := *o
+	if o.API != nil {
+		deepCopy.API = o.API.DeepCopy()
+	}
+	if o.Metrics != nil {
+		deepCopy.Metrics = o.Metrics.DeepCopy()
+	}
+	if o.MeshDNS != nil {
+		deepCopy.MeshDNS = o.MeshDNS.DeepCopy()
+	}
+	if o.TURN != nil {
+		deepCopy.TURN = o.TURN.DeepCopy()
+	}
+	if o.Dashboard != nil {
+		deepCopy.Dashboard = o.Dashboard.DeepCopy()
+	}
+	return &deepCopy
 }
 
 // InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.

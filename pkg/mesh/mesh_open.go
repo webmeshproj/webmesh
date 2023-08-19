@@ -25,6 +25,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -69,7 +70,11 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 			s.log.Error("failed to apply log to plugins", slog.String("error", err.Error()))
 		}
 	}
-	s.raft = raft.New(s.opts.Raft, s)
+	if s.opts.IsRaftMember() {
+		s.raft = raft.New(s.opts.Raft, s)
+	} else {
+		s.raft = raft.NewPassthrough(s)
+	}
 	err = s.raft.Start(ctx, &raft.StartOptions{
 		NodeID: s.ID(),
 	})
@@ -128,7 +133,7 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
-	} else if s.opts.Mesh.JoinCampfirePSK != "" {
+	} else if s.opts.Mesh.JoinCampfireURI != "" {
 		// Attempt to join the cluster by campfire.
 		err = s.joinByCampfire(ctx, features)
 		if err != nil {
@@ -147,8 +152,16 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	if err != nil {
 		return handleErr(fmt.Errorf("subscribe: %w", err))
 	}
-	if s.opts.Mesh.WaitCampfirePSK != "" {
-		go s.waitByCampfire()
+	if s.opts.Mesh.WaitCampfireURI != "" {
+		uri, err := campfire.ParseCampfireURI(s.opts.Mesh.WaitCampfireURI)
+		if err != nil {
+			return handleErr(fmt.Errorf("parse campfire uri: %w", err))
+		}
+		err = s.StartCampfire(ctx, uri, s.handleCampfirePeering)
+		if err != nil {
+			// This should never happen
+			return handleErr(fmt.Errorf("start campfire: %w", err))
+		}
 	}
 	return nil
 }

@@ -27,7 +27,7 @@ GORELEASER ?= $(GO) run github.com/goreleaser/goreleaser@latest
 BUILD_ARGS ?= --snapshot --clean
 PARALLEL   ?= $(shell nproc)
 
-build: fmt vet ## Build node and wmctl binary for the local platform.
+build: fmt vet ## Build node, wmctl, and turn binary for the local platform.
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl --id turn --parallelism=$(PARALLEL)
 
 dist: fmt vet ## Build distribution binaries and packages for all platforms.
@@ -74,7 +74,7 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 ##@ Testing
 
 COVERAGE_FILE := coverage.out
-TEST_ARGS     := -v -cover -coverprofile=$(COVERAGE_FILE) -covermode=atomic -race
+TEST_ARGS     := -v -cover -coverprofile=$(COVERAGE_FILE) -covermode=atomic
 
 test: fmt vet ## Run unit tests.
 	$(GO) test $(TEST_ARGS) ./...

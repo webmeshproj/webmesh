@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package membership
 
 import (
 	"net"
@@ -28,7 +28,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	meshraft "github.com/webmeshproj/webmesh/pkg/raft"
 )
 
 func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
@@ -37,12 +36,15 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	start := time.Now()
 	peer, ok := peer.FromContext(ctx)
 	if !ok {
 		return nil, status.Errorf(codes.FailedPrecondition, "no peer")
 	}
-	cfg := s.store.Raft().Configuration()
+	cfg, err := s.store.Raft().Configuration()
+	if err != nil {
+		// Should never happen
+		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
+	}
 	var found bool
 	for _, server := range cfg.Servers {
 		host, _, err := net.SplitHostPort(peer.Addr.String())
@@ -63,7 +65,7 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	// Issue a barrier to the raft cluster to ensure all nodes are
 	// fully caught up before we make changes
 	// TODO: Make timeout configurable
-	_, err := s.store.Raft().Barrier(ctx, time.Second*15)
+	_, err = s.store.Raft().Barrier(ctx, time.Second*15)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
@@ -72,19 +74,5 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	defer func() {
 		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
 	}()
-	data, err := meshraft.MarshalLogEntry(log)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "marshal log entry: %v", err)
-	}
-	timeout := time.Second * 15
-	err = s.store.Raft().Raft().Apply(data, timeout).Error()
-	return &v1.RaftApplyResponse{
-		Time: time.Since(start).String(),
-		Error: func() string {
-			if err == nil {
-				return ""
-			}
-			return err.Error()
-		}(),
-	}, nil
+	return s.store.Raft().Apply(ctx, log)
 }

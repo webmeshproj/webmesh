@@ -437,7 +437,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 		}
 	}
 	// Remove any peers that are no longer in the store
-	for _, peer := range currentPeers {
+	for peer := range currentPeers {
 		if _, ok := seenPeers[peer]; !ok {
 			log.Debug("removing peer", slog.String("peer_id", peer))
 			m.pcmu.Lock()
@@ -462,6 +462,19 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	key, err := wgtypes.ParseKey(peer.GetPublicKey())
 	if err != nil {
 		return fmt.Errorf("parse peer key: %w", err)
+	}
+	var priv4, priv6 netip.Prefix
+	if peer.AddressIpv4 != "" {
+		priv4, err = netip.ParsePrefix(peer.AddressIpv4)
+		if err != nil {
+			return fmt.Errorf("parse peer ipv4: %w", err)
+		}
+	}
+	if peer.AddressIpv6 != "" {
+		priv6, err = netip.ParsePrefix(peer.AddressIpv6)
+		if err != nil {
+			return fmt.Errorf("parse peer ipv6: %w", err)
+		}
 	}
 	endpoint, err := m.determinePeerEndpoint(ctx, peer, iceServers)
 	if err != nil {
@@ -502,8 +515,12 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	}
 	wgpeer := wireguard.Peer{
 		ID:            peer.GetId(),
+		GRPCPort:      int(peer.GetGrpcPort()),
+		RaftMember:    peer.GetRaftMember(),
 		PublicKey:     key,
 		Endpoint:      endpoint,
+		PrivateIPv4:   priv4,
+		PrivateIPv6:   priv6,
 		AllowedIPs:    allowedIPs,
 		AllowedRoutes: allowedRoutes,
 	}
@@ -530,7 +547,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 		}
 		err = util.Ping(ctx, addr.Addr())
 		if err != nil {
-			log.Warn("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
+			log.Debug("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
 			return
 		}
 		log.Debug("successfully pinged descendant", slog.String("descendant", peer.Id))

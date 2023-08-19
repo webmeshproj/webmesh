@@ -19,10 +19,8 @@ package node
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"time"
 
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -39,14 +37,6 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 	if err != nil {
 		s.log.Error("failed to lookup current leader", slog.String("error", err.Error()))
 	}
-	stats := s.store.Raft().Raft().Stats()
-	var term uint64
-	if termStr, ok := stats["term"]; ok {
-		term, err = strconv.ParseUint(termStr, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-	}
 	ifaceMetrics, err := s.store.Network().WireGuard().Metrics()
 	if err != nil {
 		return nil, err
@@ -62,24 +52,16 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 		ClusterStatus: func() v1.ClusterStatus {
 			if s.store.Raft().IsLeader() {
 				return v1.ClusterStatus_CLUSTER_LEADER
+			} else if s.store.Raft().IsVoter() {
+				return v1.ClusterStatus_CLUSTER_VOTER
+			} else if s.store.Raft().IsObserver() {
+				return v1.ClusterStatus_CLUSTER_NON_VOTER
 			}
-			config := s.store.Raft().Configuration()
-			for _, srv := range config.Servers {
-				if string(srv.ID) == s.store.ID() {
-					switch srv.Suffrage {
-					case raft.Voter:
-						return v1.ClusterStatus_CLUSTER_VOTER
-					case raft.Nonvoter:
-						return v1.ClusterStatus_CLUSTER_NON_VOTER
-					}
-				}
-			}
-			return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
+			return v1.ClusterStatus_CLUSTER_NODE
 		}(),
 		CurrentLeader:    leader,
-		CurrentTerm:      term,
-		LastLogIndex:     s.store.Raft().Raft().LastIndex(),
-		LastApplied:      s.store.Raft().Raft().AppliedIndex(),
+		LastLogIndex:     s.store.Raft().LastIndex(),
+		LastApplied:      s.store.Raft().LastAppliedIndex(),
 		InterfaceMetrics: ifaceMetrics,
 	}, nil
 }

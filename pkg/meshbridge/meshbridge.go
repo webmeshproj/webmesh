@@ -281,7 +281,7 @@ func (m *meshBridge) broadcastRoutesAndFeatures(ctx context.Context, mesh mesh.M
 		return fmt.Errorf("dial leader: %w", err)
 	}
 	defer conn.Close()
-	_, err = v1.NewNodeClient(conn).Update(ctx, req)
+	_, err = v1.NewMembershipClient(conn).Update(ctx, req)
 	if err != nil {
 		return fmt.Errorf("broadcast updates: %w", err)
 	}

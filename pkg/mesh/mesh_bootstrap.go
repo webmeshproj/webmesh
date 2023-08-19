@@ -24,7 +24,6 @@ import (
 	"math"
 	"net"
 	"net/netip"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -66,19 +65,6 @@ func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error 
 		// Try to rejoin one of the bootstrap servers
 		return s.rejoinBootstrapServer(ctx, features)
 	}
-	if s.opts.Bootstrap.RestoreSnapshot != "" {
-		s.log.Info("restoring snapshot from file", slog.String("file", s.opts.Bootstrap.RestoreSnapshot))
-		f, err := os.Open(s.opts.Bootstrap.RestoreSnapshot)
-		if err != nil {
-			return fmt.Errorf("open snapshot file: %w", err)
-		}
-		defer f.Close()
-		if err := s.raft.Restore(f); err != nil {
-			return fmt.Errorf("restore snapshot: %w", err)
-		}
-		// We're done here, but restore procedure needs to be documented
-		return s.recoverWireguard(ctx)
-	}
 	var bootstrapOpts raft.BootstrapOptions
 	bootstrapOpts.Servers = s.opts.Bootstrap.Servers
 	bootstrapOpts.AdvertiseAddress = s.opts.Bootstrap.AdvertiseAddress
@@ -111,7 +97,11 @@ func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error 
 }
 
 func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Feature) error {
-	cfg := s.raft.Configuration()
+	cfg, err := s.raft.Configuration()
+	if err != nil {
+		// Should never happen
+		return fmt.Errorf("get raft configuration: %w", err)
+	}
 
 	// Set initial cluster configurations to the raft log
 	meshnetworkv4, err := netip.ParsePrefix(s.opts.Bootstrap.IPv4Network)
@@ -231,6 +221,14 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	})
 	if err != nil {
 		return fmt.Errorf("create voters role binding: %w", err)
+	}
+
+	// We initialized rbac, but if the caller wants, we'll go ahead and disable it.
+	if s.opts.Bootstrap.DisableRBAC {
+		err = rb.Disable(ctx)
+		if err != nil {
+			return fmt.Errorf("disable rbac: %w", err)
+		}
 	}
 
 	// Initialize the Networking system.
@@ -429,7 +427,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		}
 	}
 	// Make sure everyone is aware of the bootstrap data
-	err = s.raft.Raft().Barrier(time.Second * 5).Error()
+	_, err = s.raft.Barrier(ctx, time.Second*5)
 	if err != nil {
 		return fmt.Errorf("barrier: %w", err)
 	}

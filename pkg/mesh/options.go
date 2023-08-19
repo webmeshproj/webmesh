@@ -38,19 +38,19 @@ const (
 // Options are the options for the store.
 type Options struct {
 	// Auth are options for authentication to the mesh.
-	Auth *AuthOptions `json:"auth,omitempty" yaml:"auth,omitempty" toml:"auth,omitempty"`
+	Auth *AuthOptions `json:"auth,omitempty" yaml:"auth,omitempty" toml:"auth,omitempty" mapstructure:"auth,omitempty"`
 	// Mesh are options for participating in an existing mesh.
-	Mesh *MeshOptions `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty"`
+	Mesh *MeshOptions `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty" mapstructure:"mesh,omitempty"`
 	// Bootstrap are options for bootstrapping the store.
-	Bootstrap *BootstrapOptions `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty" toml:"bootstrap,omitempty"`
+	Bootstrap *BootstrapOptions `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty" toml:"bootstrap,omitempty" mapstructure:"bootstrap,omitempty"`
 	// Raft are options for the raft store.
-	Raft *raft.Options `json:"raft,omitempty" yaml:"raft,omitempty" toml:"raft,omitempty"`
+	Raft *raft.Options `json:"raft,omitempty" yaml:"raft,omitempty" toml:"raft,omitempty" mapstructure:"raft,omitempty"`
 	// TLS are options for TLS.
-	TLS *TLSOptions `json:"tls,omitempty" yaml:"tls,omitempty" toml:"tls,omitempty"`
+	TLS *TLSOptions `json:"tls,omitempty" yaml:"tls,omitempty" toml:"tls,omitempty" mapstructure:"tls,omitempty"`
 	// WireGuard are options for WireGuard.
-	WireGuard *WireGuardOptions `json:"wireguard,omitempty" yaml:"wireguard,omitempty" toml:"wireguard,omitempty"`
+	WireGuard *WireGuardOptions `json:"wireguard,omitempty" yaml:"wireguard,omitempty" toml:"wireguard,omitempty" mapstructure:"wireguard,omitempty"`
 	// Plugins are options for plugins.
-	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty"`
+	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty" mapstructure:"plugins,omitempty"`
 }
 
 // NewOptions returns new options with sensible defaults. If any of the options
@@ -91,14 +91,30 @@ func (o *Options) BindFlags(fl *flag.FlagSet, ifaceName string, prefix ...string
 	o.Plugins.BindFlags(fl, prefix...)
 }
 
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	return &Options{
+		Auth:      o.Auth.DeepCopy(),
+		Mesh:      o.Mesh.DeepCopy(),
+		Bootstrap: o.Bootstrap.DeepCopy(),
+		Raft:      o.Raft.DeepCopy(),
+		TLS:       o.TLS.DeepCopy(),
+		WireGuard: o.WireGuard.DeepCopy(),
+		Plugins:   o.Plugins.DeepCopy(),
+	}
+}
+
 // Validate validates the options.
 func (o *Options) Validate() error {
 	if o == nil {
 		return fmt.Errorf("options are nil")
 	}
 	if o.Bootstrap == nil || !o.Bootstrap.Enabled {
-		if o.Mesh.JoinAddress == "" && len(o.Mesh.PeerDiscoveryAddresses) == 0 && o.Mesh.JoinCampfirePSK == "" {
-			return fmt.Errorf("must specify either bootstrap.enabled, mesh.join-address, mesh.peer-discovery-addresses, or mesh.join-campfire-psk")
+		if o.Mesh.JoinAddress == "" && len(o.Mesh.PeerDiscoveryAddresses) == 0 && o.Mesh.JoinCampfireURI == "" {
+			return fmt.Errorf("must specify either bootstrap.enabled, mesh.join-address, mesh.peer-discovery-addresses, or mesh.join-campfire-uri")
 		}
 	}
 	if err := o.Auth.Validate(); err != nil {
@@ -107,8 +123,10 @@ func (o *Options) Validate() error {
 	if err := o.Mesh.Validate(); err != nil {
 		return err
 	}
-	if err := o.Raft.Validate(); err != nil {
-		return err
+	if o.IsRaftMember() {
+		if err := o.Raft.Validate(); err != nil {
+			return err
+		}
 	}
 	if err := o.Bootstrap.Validate(); err != nil {
 		return err
@@ -117,6 +135,11 @@ func (o *Options) Validate() error {
 		return err
 	}
 	return nil
+}
+
+// IsRaftMember returns if these options designate becoming a raft member.
+func (o *Options) IsRaftMember() bool {
+	return (o.Bootstrap != nil && o.Bootstrap.Enabled) || (o.Mesh != nil && (o.Mesh.JoinAsVoter || o.Mesh.JoinAsObserver))
 }
 
 // TLSConfig returns the TLS configuration.

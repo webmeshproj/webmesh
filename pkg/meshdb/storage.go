@@ -20,6 +20,7 @@ package meshdb
 
 import (
 	"context"
+	"strings"
 
 	"google.golang.org/grpc"
 
@@ -51,4 +52,18 @@ type Store interface {
 	Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error)
 	// DialLeader opens a new gRPC connection to the current Raft leader.
 	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
+}
+
+var reservedPrefixes = []string{
+	"/registry/",
+}
+
+// IsReservedPrefix returns true if the given key is reserved.
+func IsReservedPrefix(key string) bool {
+	for _, prefix := range reservedPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }

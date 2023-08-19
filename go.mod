@@ -31,9 +31,10 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.1.0
-	github.com/webmeshproj/api v0.2.2-0.20230812194529-cfe40c7550ee
+	github.com/webmeshproj/api v0.2.2-0.20230816202252-1fce8e40c04c
 	github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944
 	golang.org/x/crypto v0.12.0
+	golang.org/x/net v0.14.0
 	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.11.0
 	golang.zx2c4.com/wireguard v0.0.0-20230704135630-469159ecf7d1
@@ -100,7 +101,6 @@ require (
 	github.com/vishvananda/netns v0.0.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.12.0 // indirect

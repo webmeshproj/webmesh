@@ -25,9 +25,9 @@ import (
 // Protocol is the protocol name.
 const Protocol = "/webmesh/campfire/1.0.0"
 
-// CampFire is a connection to one or more peers sharing the same pre-shared
+// CampfireChannel is a connection to one or more peers sharing the same pre-shared
 // key.
-type CampFire interface {
+type CampfireChannel interface {
 	// Accept returns a connection to a peer.
 	Accept() (io.ReadWriteCloser, error)
 	// Close closes the camp fire.
@@ -46,6 +46,8 @@ type Options struct {
 	TURNServers []string
 	// path to the PEM file for this client.
 	PEMFile string
+	// Opened returns true if the camp fire is open.
+	Opened() bool
 }
 
 var (

@@ -85,6 +85,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.Storage, peerID string) (
 			ZoneAwarenessId:    node.ZoneAwarenessID,
 			PrimaryEndpoint:    primaryEndpoint,
 			WireguardEndpoints: node.WireGuardEndpoints,
+			GrpcPort:           int32(node.GRPCPort),
 			AddressIpv4: func() string {
 				if node.PrivateIPv4.IsValid() {
 					return node.PrivateIPv4.String()
@@ -97,6 +98,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.Storage, peerID string) (
 				}
 				return ""
 			}(),
+			RaftMember: node.RaftPort > 0,
 		}
 		if edge.Properties.Attributes != nil {
 			// Check if the ICE attribute is set

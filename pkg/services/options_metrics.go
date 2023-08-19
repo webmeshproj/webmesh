@@ -32,11 +32,11 @@ const (
 // Metrics are options for exposing metrics.
 type MetricsOptions struct {
 	// Enabled is true if metrics should be enabled.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty" mapstructure:"enabled,omitempty"`
 	// MetricsListenAddress is the address to listen on for metrics.
-	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty"`
+	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty" mapstructure:"listen-address,omitempty"`
 	// MetricsPath is the path to serve metrics on.
-	Path string `json:"path,omitempty" yaml:"path,omitempty" toml:"path,omitempty"`
+	Path string `json:"path,omitempty" yaml:"path,omitempty" toml:"path,omitempty" mapstructure:"path,omitempty"`
 }
 
 // NewMetricsOptions creates a new MetricsOptions with default values.
@@ -60,4 +60,13 @@ func (o *MetricsOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 		"gRPC metrics listen address.")
 	fs.StringVar(&o.Path, p+"services.metrics.path", util.GetEnvDefault(MetricsPathEnvVar, "/metrics"),
 		"gRPC metrics path.")
+}
+
+// DeepCopy returns a deep copy.
+func (o *MetricsOptions) DeepCopy() *MetricsOptions {
+	if o == nil {
+		return nil
+	}
+	other := *o
+	return &other
 }

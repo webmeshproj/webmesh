@@ -13,21 +13,17 @@ import (
 )
 
 func main() {
-	psk := flag.String("psk", "", "pre-shared key")
-	turnServer := flag.String("turn-server", "stun:127.0.0.1:3478", "turn server")
+	campURI := flag.String("camp", "camp://turn?fingerprint#psk", "camp URI")
 	logLevel := flag.String("log-level", "info", "log level")
 	flag.Parse()
 	log := util.SetupLogging(*logLevel)
-	if *psk == "" {
-		fmt.Fprintln(os.Stderr, "psk is required")
+	ourcamp, err := campfire.ParseCampfireURI(*campURI)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 	ctx := context.Background()
-
-	conn, err := campfire.Join(ctx, campfire.Options{
-		PSK:         []byte(*psk),
-		TURNServers: []string{*turnServer},
-	})
+	conn, err := campfire.Join(ctx, ourcamp)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)

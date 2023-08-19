@@ -34,11 +34,11 @@ import (
 // Options are options for the bridge.
 type Options struct {
 	// Meshes are the meshes to bridge.
-	Meshes map[string]*MeshOptions `json:",inline" yaml:",inline" toml:",inline"`
+	Meshes map[string]*MeshOptions `json:",inline" yaml:",inline" toml:",inline" mapstructure:",squash"`
 	// MeshDNS are options for running a meshdns server bridging all meshes.
-	MeshDNS *services.MeshDNSOptions `json:"meshdns,omitempty" yaml:"meshdns,omitempty" toml:"meshdns,omitempty"`
+	MeshDNS *services.MeshDNSOptions `json:"meshdns,omitempty" yaml:"meshdns,omitempty" toml:"meshdns,omitempty" mapstructure:"meshdns,omitempty"`
 	// UseMeshDNS is true if the bridge should use the meshdns server.
-	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty"`
+	UseMeshDNS bool `json:"use-meshdns,omitempty" yaml:"use-meshdns,omitempty" toml:"use-meshdns,omitempty" mapstructure:"use-meshdns,omitempty"`
 }
 
 // NewOptions returns new options.
@@ -47,6 +47,20 @@ func NewOptions() *Options {
 		Meshes:  map[string]*MeshOptions{},
 		MeshDNS: services.NewMeshDNSOptions(),
 	}
+}
+
+// DeepCopy returns a deep copy of the options.
+func (o *Options) DeepCopy() *Options {
+	if o == nil {
+		return nil
+	}
+	out := NewOptions()
+	out.MeshDNS = o.MeshDNS.DeepCopy()
+	out.UseMeshDNS = o.UseMeshDNS
+	for name, opts := range o.Meshes {
+		out.Meshes[name] = opts.DeepCopy()
+	}
+	return out
 }
 
 // BindFlags binds the options to the given flagset.
@@ -128,15 +142,27 @@ func (o *Options) Validate() error {
 // MeshOptions are options for a mesh connection.
 type MeshOptions struct {
 	// Mesh are the options for the mesh to connect to.
-	Mesh *mesh.Options `json:",inline" yaml:",inline" toml:",inline"`
+	Mesh *mesh.Options `json:",inline" yaml:",inline" toml:",inline" mapstructure:",squash"`
 	// Services are the options for services to run and/or advertise.
-	Services *services.Options `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty"`
+	Services *services.Options `yaml:"services,omitempty" json:"services,omitempty" toml:"services,omitempty" mapstructure:"services,omitempty"`
 }
 
 // BindFlags binds the options to the given flagset.
 func (o *MeshOptions) BindFlags(fs *flag.FlagSet, ifaceName string, prefix ...string) {
 	o.Mesh.BindFlags(fs, ifaceName, prefix...)
 	o.Services.BindFlags(fs, prefix...)
+}
+
+// DeepCopy returns a deep copy of the options.
+func (o *MeshOptions) DeepCopy() *MeshOptions {
+	if o == nil {
+		return nil
+	}
+	out := &MeshOptions{
+		Mesh:     o.Mesh.DeepCopy(),
+		Services: o.Services.DeepCopy(),
+	}
+	return out
 }
 
 // Validate validates the options.

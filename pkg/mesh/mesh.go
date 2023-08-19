@@ -22,7 +22,9 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -33,9 +35,11 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
@@ -81,6 +85,12 @@ type Mesh interface {
 	Network() net.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
+	// StartCampfire starts a new campfire with the given connection handler.
+	// If the handler is nil, the default behavior is to facilitate a full join
+	// into the mesh.
+	StartCampfire(ctx context.Context, uri *campfire.CampfireURI, hdlr CampfireConnHandler) error
+	// LeaveCampfire leaves the campfire with the given ID.
+	LeaveCampfire(ctx context.Context, id string) error
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh
@@ -122,6 +132,7 @@ func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 		log:              log.With(slog.String("node-id", string(nodeID))),
 		kvSubCancel:      func() {},
 		closec:           make(chan struct{}),
+		campfires:        make(map[string]campfire.CampfireChannel),
 	}
 	return st, nil
 }
@@ -178,6 +189,8 @@ type meshStore struct {
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
 	meshDomain       string
+	campfires        map[string]campfire.CampfireChannel
+	campfiremu       sync.Mutex
 	open             atomic.Bool
 	closec           chan struct{}
 	// a flag set on test stores to indicate skipping certain operations
@@ -257,6 +270,15 @@ func (s *meshStore) Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, 
 	if s.raft == nil || !s.open.Load() {
 		return nil, ErrNotOpen
 	}
+	if !s.raft.IsVoter() && !s.raft.IsObserver() {
+		// We are not a raft node and don't have a local copy of the DB.
+		// A call to storage would cause a recursive call to this method.
+		return s.dialWithWireguardPeers(ctx, nodeID)
+	}
+	return s.dialWithLocalStorage(ctx, nodeID)
+}
+
+func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
 	node, err := peers.New(s.Storage()).Get(ctx, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("get node private rpc address: %w", err)
@@ -282,16 +304,51 @@ func (s *meshStore) Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, 
 	return s.newGRPCConn(ctx, node.PrivateRPCAddrV4().String())
 }
 
+func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
+	peers := s.Network().WireGuard().Peers()
+	if len(peers) == 0 {
+		return nil, fmt.Errorf("no wireguard peers")
+	}
+	var toDial *wireguard.Peer
+	for id, peer := range peers {
+		if !peer.RaftMember {
+			// This method is only used for raft requests, so skip non-raft peers.
+			// This may change in the future.
+			continue
+		}
+		// An empty node ID means any peer is acceptable, but this should be more controlled
+		// so retries can ensure a connection to a different peer.
+		if nodeID == "" || id == nodeID {
+			toDial = &peer
+			break
+		}
+	}
+	if toDial == nil {
+		return nil, fmt.Errorf("no wireguard peer found for node %q", nodeID)
+	}
+	if s.opts.Mesh.NoIPv4 && toDial.PrivateIPv6.IsValid() {
+		addr := netip.AddrPortFrom(toDial.PrivateIPv6.Addr(), uint16(toDial.GRPCPort))
+		return s.newGRPCConn(ctx, addr.String())
+	}
+	if s.opts.Mesh.NoIPv6 && toDial.PrivateIPv4.IsValid() {
+		addr := netip.AddrPortFrom(toDial.PrivateIPv4.Addr(), uint16(toDial.GRPCPort))
+		return s.newGRPCConn(ctx, addr.String())
+	}
+	// Fallback to whichever is valid if both are present (preferring IPv6)
+	if toDial.PrivateIPv6.IsValid() {
+		addr := netip.AddrPortFrom(toDial.PrivateIPv6.Addr(), uint16(toDial.GRPCPort))
+		return s.newGRPCConn(ctx, addr.String())
+	}
+	addr := netip.AddrPortFrom(toDial.PrivateIPv4.Addr(), uint16(toDial.GRPCPort))
+	return s.newGRPCConn(ctx, addr.String())
+}
+
 // Leader returns the current Raft leader.
 func (s *meshStore) Leader() (string, error) {
 	if s.raft == nil || !s.open.Load() {
 		return "", ErrNotOpen
 	}
-	_, id := s.raft.Raft().LeaderWithID()
-	if id == "" {
-		return "", ErrNoLeader
-	}
-	return string(id), nil
+	return s.raft.LeaderID()
 }
 
 func (s *meshStore) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {

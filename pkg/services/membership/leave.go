@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package membership
 
 import (
 	"time"
@@ -22,13 +22,13 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
-func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empty, error) {
+func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResponse, error) {
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
@@ -55,17 +55,34 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*emptypb.Empt
 	}
 
 	// Send a barrier afterwards to sync the cluster
-	defer func() {
-		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
-	}()
-	s.log.Info("Removing mesh node", "id", req.GetId())
-	err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
+	// Check if they were a raft member
+	cfg, err := s.store.Raft().Configuration()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to remove voter: %v", err)
+		// Should never happen
+		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
 	}
-	err = s.peers.Delete(ctx, req.GetId())
+	var raftMember bool
+	for _, srv := range cfg.Servers {
+		if string(srv.ID) == req.GetId() {
+			// They were a raft member, so remove them
+			raftMember = true
+			break
+		}
+	}
+	if raftMember {
+		defer func() {
+			_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
+		}()
+		s.log.Info("Removing mesh node from raft", "id", req.GetId())
+		err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to remove raft member: %v", err)
+		}
+	}
+	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
+	err = peers.New(s.store.Storage()).Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}
-	return &emptypb.Empty{}, nil
+	return &v1.LeaveResponse{}, nil
 }

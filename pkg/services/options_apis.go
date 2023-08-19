@@ -36,17 +36,17 @@ const (
 // APIOptions are the options for which APIs to register and expose.
 type APIOptions struct {
 	// DisableLeaderProxy is true if the leader proxy should be disabled.
-	DisableLeaderProxy bool `json:"disable-leader-proxy,omitempty" yaml:"disable-leader-proxy,omitempty" toml:"disable-leader-proxy,omitempty"`
+	DisableLeaderProxy bool `json:"disable-leader-proxy,omitempty" yaml:"disable-leader-proxy,omitempty" toml:"disable-leader-proxy,omitempty" mapstructure:"disable-leader-proxy,omitempty"`
 	// Mesh is true if the mesh API should be registered.
-	Mesh bool `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty"`
+	Mesh bool `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty" mapstructure:"mesh,omitempty"`
 	// Admin is true if the admin API should be registered.
-	Admin bool `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty"`
+	Admin bool `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty" mapstructure:"admin,omitempty"`
 	// PeerDiscovery is true if the peer discovery API should be registered.
-	PeerDiscovery bool `json:"peer-discovery,omitempty" yaml:"peer-discovery,omitempty" toml:"peer-discovery,omitempty"`
+	PeerDiscovery bool `json:"peer-discovery,omitempty" yaml:"peer-discovery,omitempty" toml:"peer-discovery,omitempty" mapstructure:"peer-discovery,omitempty"`
 	// WebRTC is true if the WebRTC API should be registered.
-	WebRTC bool `json:"webrtc,omitempty" yaml:"webrtc,omitempty" toml:"webrtc,omitempty"`
+	WebRTC bool `json:"webrtc,omitempty" yaml:"webrtc,omitempty" toml:"webrtc,omitempty" mapstructure:"webrtc,omitempty"`
 	// STUNServers is a comma separated list of STUN servers to use if the WebRTC API is enabled.
-	STUNServers string `json:"stun-servers,omitempty" yaml:"stun-servers,omitempty" toml:"stun-servers,omitempty"`
+	STUNServers string `json:"stun-servers,omitempty" yaml:"stun-servers,omitempty" toml:"stun-servers,omitempty" mapstructure:"stun-servers,omitempty"`
 }
 
 // NewAPIOptions creates a new APIOptions with default values.
@@ -85,4 +85,14 @@ func (o *APIOptions) Validate() error {
 		return errors.New("STUN servers must be specified if the WebRTC API is enabled")
 	}
 	return nil
+}
+
+// DeepCopy returns a deep copy of the options.
+func (o *APIOptions) DeepCopy() *APIOptions {
+	if o == nil {
+		return nil
+	}
+	no := &APIOptions{}
+	*no = *o
+	return no
 }
