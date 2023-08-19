@@ -68,7 +68,7 @@ func init() {
 		return []string{"get", "put", "delete", "*"}, cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(putRoleCmd.RegisterFlagCompletionFunc("resource", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"votes", "roles", "rolebindings", "groups", "networkacls", "datachannels", "pubsub", "observers", "*"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"votes", "roles", "rolebindings", "groups", "networkacls", "datachannels", "pubsub", "observers", "routes", "edges", "*"}, cobra.ShellCompDirectiveNoFileComp
 	}))
 
 	putRoleBindingFlags := putRoleBindingCmd.Flags()
@@ -158,12 +158,16 @@ var putRoleCmd = &cobra.Command{
 								resources[i] = v1.RuleResource_RESOURCE_GROUPS
 							case "networkacls":
 								resources[i] = v1.RuleResource_RESOURCE_NETWORK_ACLS
+							case "routes":
+								resources[i] = v1.RuleResource_RESOURCE_ROUTES
 							case "datachannels":
 								resources[i] = v1.RuleResource_RESOURCE_DATA_CHANNELS
 							case "pubsub":
 								resources[i] = v1.RuleResource_RESOURCE_PUBSUB
 							case "observers":
 								resources[i] = v1.RuleResource_RESOURCE_OBSERVERS
+							case "edges":
+								resources[i] = v1.RuleResource_RESOURCE_EDGES
 							case "*":
 								resources[i] = v1.RuleResource_RESOURCE_ALL
 							}
