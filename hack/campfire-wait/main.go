@@ -27,11 +27,14 @@ func main() {
 	cf, err := campfire.Wait(ctx, campfire.Options{
 		PSK:         []byte(*psk),
 		TURNServers: []string{*turnServer},
+		PEMFile:     "key.pem",
 	})
+
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
+
 	defer cf.Close()
 
 	go func() {

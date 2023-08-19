@@ -17,14 +17,18 @@ limitations under the License.
 package campfire
 
 import (
+	"crypto"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/pion/webrtc/v3"
-
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 )
@@ -64,21 +68,26 @@ func Wait(ctx context.Context, opts Options) (CampFire, error) {
 		inProgress: make(map[string]*webrtc.PeerConnection),
 		log:        log,
 	}
+	// Check if we are using a static certificate:
+	if opts.PEMFile != "" {
+		tw.LoadCertificateFromPEMFile(opts.PEMFile)
+	}
 	go tw.handleIncomingOffers()
 	go tw.handleIncomingCandidates()
 	return tw, nil
 }
 
 type turnWait struct {
-	api        *webrtc.API
-	location   *Location
-	fireconn   *turn.CampfireClient
-	acceptc    chan io.ReadWriteCloser
-	closec     chan struct{}
-	errc       chan error
-	inProgress map[string]*webrtc.PeerConnection
-	log        *slog.Logger
-	mu         sync.Mutex
+	api          *webrtc.API
+	location     *Location
+	fireconn     *turn.CampfireClient
+	acceptc      chan io.ReadWriteCloser
+	closec       chan struct{}
+	errc         chan error
+	inProgress   map[string]*webrtc.PeerConnection
+	log          *slog.Logger
+	mu           sync.Mutex
+	certificates []webrtc.Certificate
 }
 
 // Accept returns a connection to a peer.
@@ -131,6 +140,39 @@ func (t *turnWait) handleIncomingOffers() {
 	}
 }
 
+func (t *turnWait) LoadCertificateFromPEMFile(filePath string) error {
+	certPEM, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	// Decode PEM key
+	block, _ := pem.Decode(certPEM)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return errors.New("invalid certificate PEM block")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return err
+	}
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return err
+	}
+	// Lock to ensure thread-safe modification of certificates slice
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.SetCertificatefromX509(privateKey, cert)
+
+	return nil
+}
+
+func (t *turnWait) SetCertificatefromX509(privateKey crypto.PrivateKey, certificate *x509.Certificate) {
+	t.certificates = []webrtc.Certificate{webrtc.CertificateFromX509(privateKey, certificate)}
+}
+
 func (t *turnWait) handleIncomingCandidates() {
 	candidates := t.fireconn.Candidates()
 	for {
@@ -158,6 +200,7 @@ func (t *turnWait) handleIncomingCandidates() {
 func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 	t.mu.Lock()
 	t.log.Debug("Creating new peer connection", "offer", offer)
+
 	pc, err := t.api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
@@ -166,6 +209,7 @@ func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 				Credential: "-",
 			},
 		},
+		Certificates: t.certificates,
 	})
 	if err != nil {
 		t.mu.Unlock()

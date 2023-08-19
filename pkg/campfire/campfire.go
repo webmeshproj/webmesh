@@ -44,6 +44,8 @@ type Options struct {
 	PSK []byte
 	// TURNServers is an optional list of turn servers to use.
 	TURNServers []string
+	// path to the PEM file for this client.
+	PEMFile string
 }
 
 var (
