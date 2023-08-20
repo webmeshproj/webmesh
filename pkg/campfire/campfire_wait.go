@@ -77,7 +77,10 @@ func Wait(ctx context.Context, camp *CampfireURI, PEMFile string) (CampfireChann
 	}
 	// Check if we are using a static certificate:
 	if PEMFile != "" {
-		tw.LoadCertificateFromPEMFile(PEMFile)
+		err = tw.LoadCertificateFromPEMFile(PEMFile)
+		if err != nil {
+			return nil, fmt.Errorf("cert: %w", err)
+		}
 	}
 
 	go tw.handleIncomingOffers()
