@@ -71,7 +71,7 @@ func Wait(ctx context.Context, camp *CampfireURI, cert *webrtc.Certificate) (Cam
 		log:        log,
 	}
 	// Check if we are using a static certificate:
-	if cert == nil {
+	if cert != nil {
 		tw.SetCertificatefromX509(*cert)
 	}
 
