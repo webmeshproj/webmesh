@@ -9,8 +9,12 @@ It allows for easily creating a mesh network between multiple hosts, and provide
 It is designed to be easy to use, and to work well with existing network infrastructure.
 For a more detailed introduction and extended documentation, please see the [project website](https://webmeshproj.github.io).
 
-This repository contains the core functionality of the Webmesh Project.
-It implements the [Webmesh API](https://github.com/webmeshproj/api) in Go.
+Webmesh is not a VPN, but rather a mesh network.
+It is designed to be used in conjunction with existing network infrastructure, and not as a replacement for it.
+It is also not a replacement for WireGuard™, but rather a way to manage a WireGuard™ mesh network.
+It differs from other WireGuard™ management solutions in that it is designed to be distributed and extensible, relying on no single controller or database.
+A plugin API is provided for adding additional functionality, such as a distributed database for storing the mesh state or additional authentication mechanisms.
+An application API is also provided for interacting with the mesh network, and is used by the CLI and GUI applications.
 
 **This project is not yet ready for production use, but I hope to rapidly get there. For now, expect backwards-incompatible changes.**
 

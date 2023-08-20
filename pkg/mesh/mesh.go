@@ -253,6 +253,14 @@ func (s *meshStore) Ready() <-chan struct{} {
 	return ch
 }
 
+// Leader returns the current Raft leader.
+func (s *meshStore) Leader() (string, error) {
+	if s.raft == nil || !s.open.Load() {
+		return "", ErrNotOpen
+	}
+	return s.raft.LeaderID()
+}
+
 // DialLeader opens a new gRPC connection to the current Raft leader.
 func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 	if s.raft == nil || !s.open.Load() {
@@ -341,14 +349,6 @@ func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (
 	}
 	addr := netip.AddrPortFrom(toDial.PrivateIPv4.Addr(), uint16(toDial.GRPCPort))
 	return s.newGRPCConn(ctx, addr.String())
-}
-
-// Leader returns the current Raft leader.
-func (s *meshStore) Leader() (string, error) {
-	if s.raft == nil || !s.open.Load() {
-		return "", ErrNotOpen
-	}
-	return s.raft.LeaderID()
 }
 
 func (s *meshStore) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
