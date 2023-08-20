@@ -1,5 +1,5 @@
 <div style="display: flex; flex-direction: row; align-items: center; justify-content: left;">
-    <img src="web/webmesh.png" alt="logo" width="50" style="margin-right: 10px" />
+    <img src="web/webmesh.png" alt="logo" width="75" style="margin-right: 10px" />
     <h1>Webmesh</h1>
 </div>
 
