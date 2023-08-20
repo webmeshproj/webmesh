@@ -36,6 +36,8 @@ type CampfireChannel interface {
 	Errors() <-chan error
 	// Expired returns a channel that is closed when the camp fire expires.
 	Expired() <-chan struct{}
+	// Opened returns true if the camp fire is open.
+	Opened() bool
 }
 
 // Options are options for creating or joining a new camp fire.
@@ -44,10 +46,6 @@ type Options struct {
 	PSK []byte
 	// TURNServers is an optional list of turn servers to use.
 	TURNServers []string
-	// path to the PEM file for this client.
-	PEMFile string
-	// Opened returns true if the camp fire is open.
-	Opened() bool
 }
 
 var (

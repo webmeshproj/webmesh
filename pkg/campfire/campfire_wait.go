@@ -35,7 +35,7 @@ import (
 )
 
 // Wait will wait for peers to join at the given location.
-func Wait(ctx context.Context, camp *CampfireURI) (CampfireChannel, error) {
+func Wait(ctx context.Context, camp *CampfireURI, PEMFile string) (CampfireChannel, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
 	location, err := Find(camp.PSK, camp.TURNServers)
 	if err != nil {
@@ -60,6 +60,8 @@ func Wait(ctx context.Context, camp *CampfireURI) (CampfireChannel, error) {
 	}
 	log.Debug("Announced campfire location", "location", location.TURNServer)
 	s := webrtc.SettingEngine{}
+	// todo - I belive we need to diable this repaly protection:
+	s.DisableSRTCPReplayProtection(false)
 	s.DetachDataChannels()
 	s.SetIncludeLoopbackCandidate(true)
 	tw := &turnWait{
@@ -74,9 +76,10 @@ func Wait(ctx context.Context, camp *CampfireURI) (CampfireChannel, error) {
 		log:        log,
 	}
 	// Check if we are using a static certificate:
-	if opts.PEMFile != "" {
-		tw.LoadCertificateFromPEMFile(opts.PEMFile)
+	if PEMFile != "" {
+		tw.LoadCertificateFromPEMFile(PEMFile)
 	}
+
 	go tw.handleIncomingOffers()
 	go tw.handleIncomingCandidates()
 	return tw, nil
@@ -277,6 +280,7 @@ func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 			t.acceptc <- rw
 		})
 	})
+	t.log.Debug("remote SDP:", "sdp", offer.SDP.SDP)
 	err = pc.SetRemoteDescription(offer.SDP)
 	if err != nil {
 		t.errc <- fmt.Errorf("set remote description: %w", err)
@@ -287,6 +291,7 @@ func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 		t.errc <- fmt.Errorf("create answer: %w", err)
 		return
 	}
+	t.log.Debug("local SDP:", "sdp", answer.SDP)
 	err = pc.SetLocalDescription(answer)
 	if err != nil {
 		t.errc <- fmt.Errorf("set local description: %w", err)

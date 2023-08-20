@@ -18,6 +18,7 @@ func main() {
 	logLevel := flag.String("log-level", "info", "log level")
 	flag.Parse()
 	log := util.SetupLogging(*logLevel)
+
 	if *campURI == "" {
 		fmt.Fprintln(os.Stderr, "a Camp URL is required")
 		os.Exit(1)
@@ -29,13 +30,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "a Camp URL is required", err)
 		os.Exit(1)
 	}
-
 	//Wait at a specific campfire:
-	cf, err := campfire.Wait(ctx, campfire.Options{
-		PSK:         []byte(*psk),
-		TURNServers: []string{*turnServer},
-		PEMFile:     "key.pem",
-	})
+	cf, err := campfire.Wait(ctx, ourcamp, "key.pem")
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
