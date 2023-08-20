@@ -31,7 +31,7 @@ func TestCampfire(t *testing.T) {
 
 	ctx := context.Background()
 	turnAddr := setupTest(t)
-	campURI := fmt.Sprintf("camp://9d4e8faba9a93ef397554dc4:hLxK4U49l6fcZLH0@%s/?fingerprint#abcdefghijklmnopqrstuvwx12345678", turnAddr)
+	campURI := fmt.Sprintf("camp://fingerprint/?0=9d4e8faba9a93ef397554dc4:hLxK4U49l6fcZLH0@%s#abcdefghijklmnopqrstuvwx12345678", turnAddr)
 	ourcamp, err := ParseCampfireURI(campURI)
 	if err != nil {
 		t.Fatal(err)
