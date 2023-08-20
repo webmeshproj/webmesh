@@ -1,11 +1,11 @@
-<div style="display: flex; align-items: center; justify-content: left;">
-    <img src="web/webmesh.png" alt="logo" width="50" style="margin-right: 10px;"/>
+<div style="display: flex; flex-direction: row; align-items: center; justify-content: left;">
+    <img src="web/webmesh.png" alt="logo" width="50" style="margin-right: 10px" />
     <h1>Webmesh</h1>
 </div>
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/webmeshproj/webmesh)](https://goreportcard.com/report/github.com/webmeshproj/webmesh)
 ![Build and Tests](https://github.com/webmeshproj/webmesh/actions/workflows/ci.yaml/badge.svg)
-[!["Sponsor"](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/webmeshproj)
+[![Sponsor](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/webmeshproj)
 
 Webmesh is a simple, distributed, and zero-configuration WireGuard™ mesh solution for Linux, FreeBSD, macOS, and Windows.
 It allows for easily creating a mesh network between multiple hosts, and provides a simple API for managing the network.
