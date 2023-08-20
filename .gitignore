@@ -2,4 +2,6 @@ dist/
 bin/
 *.sqlite
 .vscode
+hack/campfire-join
+hack/campfire-wait
 coverage.out
