@@ -16,7 +16,7 @@ import (
 func main() {
 	var dtlsCert *webrtc.Certificate
 	fmt.Println(len(os.Args), os.Args)
-	campURI := flag.String("camp", "camp://turn?fingerprint#psk", "camp URI")
+	campURI := flag.String("camp", "camp://fingerprint?0=turn:12.34.56.78#psk", "camp URI")
 	logLevel := flag.String("log-level", "info", "log level")
 	certFile := flag.String("cert", "cert.pem", "x509 cert")
 	keyFile := flag.String("private", "key.pem", "private key")
