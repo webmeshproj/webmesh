@@ -1,4 +1,4 @@
-# Webmesh
+# <img src="web/webmesh.png" alt="logo" width="50"/> Webmesh
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/webmeshproj/webmesh)](https://goreportcard.com/report/github.com/webmeshproj/webmesh)
 ![Build and Tests](https://github.com/webmeshproj/webmesh/actions/workflows/ci.yaml/badge.svg)
