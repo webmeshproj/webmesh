@@ -132,9 +132,12 @@ func (parsed *CampfireURI) EncodeURI() string {
 	}
 
 	query := parsed.Arguments
+
+	// If it isn't empty we need to allow for more params:
 	if query != "" {
 		query += "&"
 	}
+	// Add the query Arguments:
 	query += queryParams.Encode()
 
 	u := url.URL{
@@ -149,22 +152,25 @@ func (parsed *CampfireURI) EncodeURI() string {
 }
 
 func parseTurnURL(turnURL string) (*webrtc.ICEServer, error) {
+	serverURL := turnURL
 	parts := strings.SplitN(turnURL, "@", 2)
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("Invalid TURN URL format")
+	user := "-"
+	pass := "-"
+	// Password is optional
+	if len(parts) == 2 {
+		credentials := strings.SplitN(parts[0], ":", 2)
+		if len(credentials) == 2 {
+			user = credentials[0]
+			pass = credentials[1]
+		}
+		// Remove the username and password from the connection string:
+		serverURL = "turn:" + parts[1]
 	}
-
-	credentials := strings.SplitN(parts[0], ":", 2)
-	if len(credentials) != 2 {
-		return nil, fmt.Errorf("Invalid TURN credentials format")
-	}
-
-	serverURL := "turn:" + parts[1]
 
 	iceServer := webrtc.ICEServer{
 		URLs:       []string{serverURL},
-		Username:   credentials[0],
-		Credential: credentials[1],
+		Username:   user,
+		Credential: pass,
 	}
 
 	return &iceServer, nil
