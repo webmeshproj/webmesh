@@ -72,8 +72,6 @@ func Join(ctx context.Context, campfire *CampfireURI) (io.ReadWriteCloser, error
 		},
 	})
 
-	log.Debug("Service Running:\n", pc.LocalDescription().SDP)
-
 	if err != nil {
 		return nil, fmt.Errorf("create peer connection: %w", err)
 	}

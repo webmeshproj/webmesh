@@ -35,7 +35,7 @@ func TestCampfire(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cf, err := Wait(ctx, ourcamp)
+	cf, err := Wait(ctx, ourcamp, "key.pem")
 	if err != nil {
 		t.Fatal(err)
 	}

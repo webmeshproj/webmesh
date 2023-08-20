@@ -76,7 +76,7 @@ func (s *meshStore) waitByCampfire(uri *campfire.CampfireURI, hdlr CampfireConnH
 	}
 	log := s.log.With("protocol", "campfire")
 	ctx := context.WithLogger(context.Background(), log)
-	cf, err := campfire.Wait(context.Background(), uri)
+	cf, err := campfire.Wait(context.Background(), uri, "")
 	if err != nil {
 		s.campfiremu.Unlock()
 		log.Error("Failed to wait by campfire, will try again in 15 seconds", "error", err.Error())
