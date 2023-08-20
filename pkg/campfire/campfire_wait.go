@@ -189,24 +189,12 @@ func (t *turnWait) handleNewPeerConnection(offer *turn.CampfireOffer) {
 	t.mu.Lock()
 	t.log.Debug("Creating new peer connection", "offer", offer)
 
+	iceList, err := t.camp.GetICEServers()
+	if err != nil {
+		t.log.Warn("failed to generate ice list", "err", err)
+	}
 	pc, err := t.api.NewPeerConnection(webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{
-				URLs: []string{t.location.TURNServer},
-				Username: func() string {
-					if t.camp.TURNUsername != "" {
-						return t.camp.TURNUsername
-					}
-					return "-"
-				}(),
-				Credential: func() string {
-					if t.camp.TURNPassword != "" {
-						return t.camp.TURNPassword
-					}
-					return "-"
-				}(),
-			},
-		},
+		ICEServers:   iceList,
 		Certificates: t.certificates,
 	})
 	if err != nil {

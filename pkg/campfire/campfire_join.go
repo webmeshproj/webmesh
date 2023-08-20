@@ -28,9 +28,9 @@ import (
 )
 
 // Join will attempt to join the peer waiting at the given location.
-func Join(ctx context.Context, campfire *CampfireURI) (io.ReadWriteCloser, error) {
+func Join(ctx context.Context, camp *CampfireURI) (io.ReadWriteCloser, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
-	location, err := Find(campfire.PSK, campfire.TURNServers)
+	location, err := Find(camp.PSK, camp.TURNServers)
 	if err != nil {
 		return nil, fmt.Errorf("find campfire: %w", err)
 	}
@@ -42,7 +42,7 @@ func Join(ctx context.Context, campfire *CampfireURI) (io.ReadWriteCloser, error
 		Addr:  location.TURNServer,
 		Ufrag: location.RemoteUfrag(),
 		Pwd:   location.RemotePwd(),
-		PSK:   campfire.PSK,
+		PSK:   camp.PSK,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new campfire client: %w", err)
@@ -52,24 +52,13 @@ func Join(ctx context.Context, campfire *CampfireURI) (io.ReadWriteCloser, error
 	s.DetachDataChannels()
 	s.SetIncludeLoopbackCandidate(true)
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
+
+	iceList, err := camp.GetICEServers()
+	if err != nil {
+		return nil, err
+	}
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{
-				URLs: []string{location.TURNServer},
-				Username: func() string {
-					if campfire.TURNUsername != "" {
-						return campfire.TURNUsername
-					}
-					return "-"
-				}(),
-				Credential: func() string {
-					if campfire.TURNPassword != "" {
-						return campfire.TURNPassword
-					}
-					return "-"
-				}(),
-			},
-		},
+		ICEServers: iceList,
 	})
 
 	if err != nil {

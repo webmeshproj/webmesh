@@ -17,8 +17,12 @@ limitations under the License.
 package campfire
 
 import (
+	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
+
+	"github.com/pion/webrtc/v3"
 )
 
 const (
@@ -32,104 +36,157 @@ const (
 
 // CampfireURI represents the components parsed from a camp URL.
 type CampfireURI struct {
-	TURNServers  []string // Username for TURN authentication
-	TURNUsername string   // Username for TURN authentication
-	TURNPassword string   // Password for TURN authentication
-	StunHosts    []string // List of STUN server hosts
-	StunPorts    []string // List of STUN server ports
-	RemoteHosts  []string // List of remote hosts
-	RemotePorts  []string // List of remote ports
-	Fingerprint  string   // Raw query string, representing fingerprint
-	PSK          []byte   // Pre-shared key
+	PublicKeyFingerprint string
+	FullPath             string
+	Arguments            string
+	TURNServers          []string
+	STUNServers          []string
+	WebsocketServers     []string
+	HTTPServers          []string
+	PSK                  []byte
 }
 
 // ParseCampfireURI parses the given rawURL and returns a CampfireURI struct.
 func ParseCampfireURI(rawURL string) (*CampfireURI, error) {
-	parsedURL, err := url.Parse(rawURL)
+	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
 	}
 
-	var out CampfireURI
-	out.PSK = []byte(parsedURL.Fragment)
-	out.Fingerprint = parsedURL.RawQuery
+	parsedURL := &CampfireURI{}
+	parts := strings.Split(u.Host, "/")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("Invalid URL format")
+	}
+	parsedURL.PublicKeyFingerprint = parts[0]
+	parsedURL.FullPath = "/" + strings.Join(parts[1:], "/")
 
-	// Split the path segments using "/"
-	pathSegments := strings.Split(parsedURL.Path, "/")
+	queryParams, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return nil, err
+	}
 
-	// The user:pass@host is intact in the input:
-	out.TURNServers = append(out.TURNServers, parsedURL.Host)
-	if parsedURL.User != nil {
-		out.TURNUsername = parsedURL.User.Username()
-		if pwd, ok := parsedURL.User.Password(); ok {
-			out.TURNPassword = pwd
+	for i := 0; ; i++ {
+		serverURL := queryParams.Get(strconv.Itoa(i))
+		if serverURL == "" {
+			break
+		}
+		// Delete the query param so we can keep track of the `Arguments`
+		queryParams.Del(strconv.Itoa(i))
+
+		decodedServerURL, err := url.QueryUnescape(serverURL)
+		if err != nil {
+			return nil, err
+		}
+		lowerServerURL := strings.ToLower(decodedServerURL)
+		switch {
+		case strings.HasPrefix(lowerServerURL, "turn:"):
+			// Fix a common typo  turn:// isn't a valid connection string.
+			decodedServerURL = strings.Replace(decodedServerURL, "turn://", "turn:", -1)
+			parsedURL.TURNServers = append(parsedURL.TURNServers, decodedServerURL)
+		case strings.HasPrefix(lowerServerURL, "stun:"):
+			decodedServerURL = strings.Replace(decodedServerURL, "stun://", "stun:", -1)
+			parsedURL.STUNServers = append(parsedURL.STUNServers, decodedServerURL)
+		case strings.HasPrefix(lowerServerURL, "wss:") || strings.HasPrefix(lowerServerURL, "ws://"):
+			parsedURL.WebsocketServers = append(parsedURL.WebsocketServers, decodedServerURL)
+		case strings.HasPrefix(lowerServerURL, "http:") || strings.HasPrefix(lowerServerURL, "https://"):
+			parsedURL.HTTPServers = append(parsedURL.HTTPServers, decodedServerURL)
 		}
 	}
 
-	for _, segment := range pathSegments {
-		if segment == "" {
-			continue // Skip empty segments
-		}
-		// Split the segment into stun and remote parts using "-"
-		parts := strings.Split(segment, "-")
-		if len(parts) != 2 {
-			// If there is no destination - then its a TURN server.
-			out.TURNServers = append(out.TURNServers, segment)
-		} else {
-			// check for STUN parts:
-			stunPart := parts[0]
-			remotePart := parts[1]
+	// Any query params that are not numeric are stored:
+	parsedURL.Arguments = queryParams.Encode()
 
-			// Split stunPart into host and port
-			stunHostPort := strings.Split(stunPart, ":")
-			if len(stunHostPort) != 2 {
-				stunHostPort = []string{defaultStunHost, defaultStunPort} // Use default STUN info
-			}
-			out.StunHosts = append(out.StunHosts, stunHostPort[0])
-			out.StunHosts = append(out.StunHosts, stunHostPort[1])
-
-			// Split remotePart into host and port
-			remoteHostPort := strings.Split(remotePart, ":")
-			if len(remoteHostPort) != 2 {
-				continue // Skip invalid remote parts
-			}
-			out.RemoteHosts = append(out.RemoteHosts, remoteHostPort[0])
-			out.RemotePorts = append(out.RemotePorts, remoteHostPort[1])
-		}
+	if len(u.Fragment) > 0 {
+		parsedURL.PSK = []byte(u.Fragment)
 	}
 
-	return &out, nil
+	return parsedURL, nil
 }
 
 // EncodeURI encodes the CampfireURI into a string.
-func (c *CampfireURI) EncodeURI() string {
-	var sb strings.Builder
-	sb.WriteString("camp://")
-	if c.TURNUsername != "" {
-		sb.WriteString(c.TURNUsername)
-		if c.TURNPassword != "" {
-			sb.WriteString(":")
-			sb.WriteString(c.TURNPassword)
+func (parsed *CampfireURI) EncodeURI() string {
+	queryParams := make(url.Values)
+	i := 0
+
+	for _, server := range parsed.TURNServers {
+		queryParams.Add(strconv.Itoa(i), server)
+		i++
+	}
+	for _, server := range parsed.STUNServers {
+		queryParams.Add(strconv.Itoa(i), server)
+		i++
+	}
+	for _, server := range parsed.WebsocketServers {
+		queryParams.Add(strconv.Itoa(i), server)
+		i++
+	}
+	for _, server := range parsed.HTTPServers {
+		queryParams.Add(strconv.Itoa(i), server)
+		i++
+	}
+
+	// We need atleast one connection canidate.
+	if i == 0 && defaultTurnHost != "" {
+		queryParams.Add(strconv.Itoa(i), "turn:"+defaultTurnUser+":"+defaultTurnCred+"@"+defaultTurnHost)
+	}
+
+	query := parsed.Arguments
+	if query != "" {
+		query += "&"
+	}
+	query += queryParams.Encode()
+
+	u := url.URL{
+		Scheme:   "camp",
+		Host:     parsed.PublicKeyFingerprint,
+		Path:     parsed.FullPath,
+		RawQuery: query,
+		Fragment: string(parsed.PSK),
+	}
+
+	return u.String()
+}
+
+func parseTurnURL(turnURL string) (*webrtc.ICEServer, error) {
+	parts := strings.SplitN(turnURL, "@", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("Invalid TURN URL format")
+	}
+
+	credentials := strings.SplitN(parts[0], ":", 2)
+	if len(credentials) != 2 {
+		return nil, fmt.Errorf("Invalid TURN credentials format")
+	}
+
+	serverURL := "turn:" + parts[1]
+
+	iceServer := webrtc.ICEServer{
+		URLs:       []string{serverURL},
+		Username:   credentials[0],
+		Credential: credentials[1],
+	}
+
+	return &iceServer, nil
+}
+
+// EncodeURI encodes the CampfireURI into a string.
+func (parsed *CampfireURI) GetICEServers() ([]webrtc.ICEServer, error) {
+	iceServers := []webrtc.ICEServer{}
+
+	for _, serverURL := range parsed.TURNServers {
+		turnServer, err := parseTurnURL(serverURL)
+		if err != nil {
+			return nil, err
 		}
-		sb.WriteString("@")
+		iceServers = append(iceServers, *turnServer)
 	}
-	for _, turnServer := range c.TURNServers {
-		sb.WriteString(turnServer)
-		sb.WriteString("/")
+
+	for _, serverURL := range parsed.STUNServers {
+		iceServers = append(iceServers, webrtc.ICEServer{
+			URLs: []string{serverURL},
+		})
 	}
-	for i := 0; i < len(c.StunHosts); i++ {
-		sb.WriteString(c.StunHosts[i])
-		sb.WriteString(":")
-		sb.WriteString(c.StunPorts[i])
-		sb.WriteString("-")
-		sb.WriteString(c.RemoteHosts[i])
-		sb.WriteString(":")
-		sb.WriteString(c.RemotePorts[i])
-		sb.WriteString("/")
-	}
-	sb.WriteString("?")
-	sb.WriteString(c.Fingerprint)
-	sb.WriteString("#")
-	sb.Write(c.PSK)
-	return sb.String()
+
+	return iceServers, nil
 }
