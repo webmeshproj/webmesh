@@ -8,14 +8,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pion/webrtc/v3"
 	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 func main() {
+	var dtlsCert *webrtc.Certificate
 	fmt.Println(len(os.Args), os.Args)
 	campURI := flag.String("camp", "camp://turn?fingerprint#psk", "camp URI")
 	logLevel := flag.String("log-level", "info", "log level")
+	certFile := flag.String("cert", "cert.pem", "x509 cert")
+	keyFile := flag.String("private", "key.pem", "private key")
 	flag.Parse()
 	log := util.SetupLogging(*logLevel)
 
@@ -30,8 +34,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, "a Camp URL is required", err)
 		os.Exit(1)
 	}
+
+	if certFile != nil && keyFile != nil {
+		waitCert, err := campfire.LoadCertificateFromPEMFile(*certFile, *keyFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Faild to load cert", err)
+			os.Exit(1)
+		}
+		dtlsCert = &waitCert
+	}
+
 	//Wait at a specific campfire:
-	cf, err := campfire.Wait(ctx, ourcamp, "key.pem")
+	cf, err := campfire.Wait(ctx, ourcamp, dtlsCert)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())

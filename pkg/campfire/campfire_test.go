@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/pion/webrtc/v3"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 )
 
 func TestCampfire(t *testing.T) {
+	var nilCert *webrtc.Certificate
 	t.Parallel()
 
 	ctx := context.Background()
@@ -35,7 +37,7 @@ func TestCampfire(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cf, err := Wait(ctx, ourcamp, "key.pem")
+	cf, err := Wait(ctx, ourcamp, nilCert)
 	if err != nil {
 		t.Fatal(err)
 	}

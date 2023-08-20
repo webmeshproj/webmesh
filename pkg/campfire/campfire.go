@@ -18,8 +18,14 @@ limitations under the License.
 package campfire
 
 import (
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"io"
 	"net"
+	"os"
+
+	"github.com/pion/webrtc/v3"
 )
 
 // Protocol is the protocol name.
@@ -52,3 +58,39 @@ var (
 	// ErrClosed is returned when the camp fire is closed.
 	ErrClosed = net.ErrClosed
 )
+
+func LoadCertificateFromPEMFile(certPath string, keyPath string) (webrtc.Certificate, error) {
+	var dtlsCert webrtc.Certificate
+	certPEM, err := os.ReadFile(certPath)
+	if err != nil {
+		return dtlsCert, err
+	}
+
+	keyPem, err := os.ReadFile(keyPath)
+	if err != nil {
+		return dtlsCert, err
+	}
+
+	// Decode PEM key
+	block, _ := pem.Decode(certPEM)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return dtlsCert, errors.New("invalid certificate PEM block")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return dtlsCert, err
+	}
+
+	keyBlock, _ := pem.Decode(keyPem)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return dtlsCert, errors.New("invalid certificate PEM block")
+	}
+
+	privateKey, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return dtlsCert, err
+	}
+	dtlsCert = webrtc.CertificateFromX509(privateKey, cert)
+	return dtlsCert, nil
+}

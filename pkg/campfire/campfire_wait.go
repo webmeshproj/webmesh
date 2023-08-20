@@ -17,14 +17,9 @@ limitations under the License.
 package campfire
 
 import (
-	"crypto"
-	"crypto/x509"
-	"encoding/pem"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +30,7 @@ import (
 )
 
 // Wait will wait for peers to join at the given location.
-func Wait(ctx context.Context, camp *CampfireURI, PEMFile string) (CampfireChannel, error) {
+func Wait(ctx context.Context, camp *CampfireURI, cert *webrtc.Certificate) (CampfireChannel, error) {
 	log := context.LoggerFrom(ctx).With("protocol", "campfire")
 	location, err := Find(camp.PSK, camp.TURNServers)
 	if err != nil {
@@ -76,11 +71,8 @@ func Wait(ctx context.Context, camp *CampfireURI, PEMFile string) (CampfireChann
 		log:        log,
 	}
 	// Check if we are using a static certificate:
-	if PEMFile != "" {
-		err = tw.LoadCertificateFromPEMFile(PEMFile)
-		if err != nil {
-			return nil, fmt.Errorf("cert: %w", err)
-		}
+	if cert == nil {
+		tw.SetCertificatefromX509(*cert)
 	}
 
 	go tw.handleIncomingOffers()
@@ -162,37 +154,11 @@ func (t *turnWait) handleIncomingOffers() {
 	}
 }
 
-func (t *turnWait) LoadCertificateFromPEMFile(filePath string) error {
-	certPEM, err := os.ReadFile(filePath)
-	if err != nil {
-		return err
-	}
-
-	// Decode PEM key
-	block, _ := pem.Decode(certPEM)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return errors.New("invalid certificate PEM block")
-	}
-
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return err
-	}
-	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return err
-	}
+func (t *turnWait) SetCertificatefromX509(cert webrtc.Certificate) {
 	// Lock to ensure thread-safe modification of certificates slice
 	t.mu.Lock()
+	t.certificates = []webrtc.Certificate{cert}
 	defer t.mu.Unlock()
-
-	t.SetCertificatefromX509(privateKey, cert)
-
-	return nil
-}
-
-func (t *turnWait) SetCertificatefromX509(privateKey crypto.PrivateKey, certificate *x509.Certificate) {
-	t.certificates = []webrtc.Certificate{webrtc.CertificateFromX509(privateKey, certificate)}
 }
 
 func (t *turnWait) handleIncomingCandidates() {

@@ -21,6 +21,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
@@ -76,7 +77,8 @@ func (s *meshStore) waitByCampfire(uri *campfire.CampfireURI, hdlr CampfireConnH
 	}
 	log := s.log.With("protocol", "campfire")
 	ctx := context.WithLogger(context.Background(), log)
-	cf, err := campfire.Wait(context.Background(), uri, "")
+	var nilCert *webrtc.Certificate
+	cf, err := campfire.Wait(context.Background(), uri, nilCert)
 	if err != nil {
 		s.campfiremu.Unlock()
 		log.Error("Failed to wait by campfire, will try again in 15 seconds", "error", err.Error())
