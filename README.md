@@ -1,7 +1,4 @@
-<div style="display: flex; flex-direction: row; align-items: center; justify-content: left;">
-    <img src="web/webmesh.png" alt="logo" width="75" style="margin-right: 10px" />
-    <h1>Webmesh</h1>
-</div>
+<h1 style="text-align: left"><img align="center" height="50" src="web/webmesh.png" style="margin-top: -7px;"> Webmesh</h1>
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/webmeshproj/webmesh)](https://goreportcard.com/report/github.com/webmeshproj/webmesh)
 ![Build and Tests](https://github.com/webmeshproj/webmesh/actions/workflows/ci.yaml/badge.svg)
