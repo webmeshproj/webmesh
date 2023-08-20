@@ -12,9 +12,11 @@ For a more detailed introduction and extended documentation, please see the [pro
 Webmesh is not a VPN, but rather a mesh network.
 It is designed to be used in conjunction with existing network infrastructure, and not as a replacement for it.
 It is also not a replacement for WireGuard™, but rather a way to manage a WireGuard™ mesh network.
-It differs from other WireGuard™ management solutions in that it is designed to be distributed and extensible, relying on no single controller or database.
-A plugin API is provided for adding additional functionality, such as a distributed database for storing the mesh state or additional authentication mechanisms.
-An application API is also provided for interacting with the mesh network, and is used by the CLI and GUI applications.
+It differs from other WireGuard™ management solutions in that:
+
+- It is designed to be distributed and extensible, relying on no single controller or database.
+- A plugin API is provided for adding additional functionality, such as a distributed database for storing the mesh state or additional authentication mechanisms.
+- An application API is also provided for interacting with the mesh network, and is used by the CLI and GUI applications.
 
 **This project is not yet ready for production use, but I hope to rapidly get there. For now, expect backwards-incompatible changes.**
 
