@@ -11,7 +11,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -44,7 +44,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level (debug, info, warn, error)")
 	flag.Parse()
 
-	log := util.SetupLogging(logLevel)
+	log := logutil.SetupLogging(logLevel)
 
 	if detectPublicIP {
 		endpoints, err := endpoints.Detect(context.Background(), endpoints.DetectOpts{

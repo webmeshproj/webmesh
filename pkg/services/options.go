@@ -37,7 +37,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 const (
@@ -93,13 +93,13 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fs.StringVar(&o.ListenAddress, p+"services.listen-address", util.GetEnvDefault(ListenAddressEnvVar, "[::]:8443"),
+	fs.StringVar(&o.ListenAddress, p+"services.listen-address", envutil.GetEnvDefault(ListenAddressEnvVar, "[::]:8443"),
 		"gRPC server listen address.")
-	fs.StringVar(&o.TLSCertFile, p+"services.tls-cert-file", util.GetEnvDefault(CertFileEnvVar, ""),
+	fs.StringVar(&o.TLSCertFile, p+"services.tls-cert-file", envutil.GetEnvDefault(CertFileEnvVar, ""),
 		"gRPC server TLS certificate file.")
-	fs.StringVar(&o.TLSKeyFile, p+"services.tls-key-file", util.GetEnvDefault(KeyFileEnvVar, ""),
+	fs.StringVar(&o.TLSKeyFile, p+"services.tls-key-file", envutil.GetEnvDefault(KeyFileEnvVar, ""),
 		"gRPC server TLS key file.")
-	fs.BoolVar(&o.Insecure, p+"services.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
+	fs.BoolVar(&o.Insecure, p+"services.insecure", envutil.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Don't use TLS for the gRPC server.")
 
 	o.API.BindFlags(fs, prefix...)

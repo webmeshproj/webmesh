@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/campfire"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 const (
@@ -128,36 +128,36 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fl.StringVar(&o.NodeID, p+"mesh.node-id", util.GetEnvDefault(NodeIDEnvVar, hostnameFlagDefault),
+	fl.StringVar(&o.NodeID, p+"mesh.node-id", envutil.GetEnvDefault(NodeIDEnvVar, hostnameFlagDefault),
 		`Store node ID. If not set, the ID comes from the following decision tree.
 1. If mTLS is enabled, the node ID is the CN of the client certificate.
 2. If mTLS is not enabled, the node ID is the hostname of the machine.
 3. If the hostname is not available, the node ID is a random UUID (should only be used for testing).`)
-	fl.StringVar(&o.ZoneAwarenessID, p+"mesh.zone-awareness-id", util.GetEnvDefault(ZoneAwarenessIDEnvVar, ""),
+	fl.StringVar(&o.ZoneAwarenessID, p+"mesh.zone-awareness-id", envutil.GetEnvDefault(ZoneAwarenessIDEnvVar, ""),
 		"Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.")
-	fl.StringVar(&o.JoinAddress, p+"mesh.join-address", util.GetEnvDefault(JoinAddressEnvVar, ""),
+	fl.StringVar(&o.JoinAddress, p+"mesh.join-address", envutil.GetEnvDefault(JoinAddressEnvVar, ""),
 		"Address of a node to join.")
 	fl.Func(p+"mesh.peer-discovery-addresses", "Addresses to use for peer discovery.", func(val string) error {
 		o.PeerDiscoveryAddresses = append(o.PeerDiscoveryAddresses, strings.Split(val, ",")...)
 		return nil
 	})
-	fl.StringVar(&o.JoinCampfireURI, p+"mesh.join-campfire-uri", util.GetEnvDefault(JoinCampfireURIEnvVar, ""),
+	fl.StringVar(&o.JoinCampfireURI, p+"mesh.join-campfire-uri", envutil.GetEnvDefault(JoinCampfireURIEnvVar, ""),
 		"Campfire URI to use for joining.")
-	fl.StringVar(&o.WaitCampfireURI, p+"mesh.wait-campfire-uri", util.GetEnvDefault(WaitCampfireURIEnvVar, ""),
+	fl.StringVar(&o.WaitCampfireURI, p+"mesh.wait-campfire-uri", envutil.GetEnvDefault(WaitCampfireURIEnvVar, ""),
 		"Campfire URI to allow others to join through.")
-	fl.IntVar(&o.MaxJoinRetries, p+"mesh.max-join-retries", util.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
+	fl.IntVar(&o.MaxJoinRetries, p+"mesh.max-join-retries", envutil.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
 		"Maximum number of join retries.")
-	fl.BoolVar(&o.JoinAsVoter, p+"mesh.join-as-voter", util.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
+	fl.BoolVar(&o.JoinAsVoter, p+"mesh.join-as-voter", envutil.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
 		"Join the cluster as a raft voter.")
-	fl.BoolVar(&o.JoinAsObserver, p+"mesh.join-as-observer", util.GetEnvDefault(JoinAsObserverEnvVar, "false") == "true",
+	fl.BoolVar(&o.JoinAsObserver, p+"mesh.join-as-observer", envutil.GetEnvDefault(JoinAsObserverEnvVar, "false") == "true",
 		"Join the cluster as a raft observer.")
-	fl.IntVar(&o.GRPCAdvertisePort, p+"mesh.grpc-advertise-port", util.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
+	fl.IntVar(&o.GRPCAdvertisePort, p+"mesh.grpc-advertise-port", envutil.GetEnvIntDefault(GRPCAdvertisePortEnvVar, 8443),
 		"GRPC advertise port.")
-	fl.IntVar(&o.MeshDNSAdvertisePort, p+"mesh.meshdns-advertise-port", util.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),
+	fl.IntVar(&o.MeshDNSAdvertisePort, p+"mesh.meshdns-advertise-port", envutil.GetEnvIntDefault(DNSAdvertisePortEnvVar, 0),
 		"DNS advertise port. This is set automatically when advertising is enabled and the mesh-dns server is running. Default is 0 (disabled).")
-	fl.BoolVar(&o.UseMeshDNS, p+"mesh.use-meshdns", util.GetEnvDefault(UseMeshDNSEnvVar, "false") == "true",
+	fl.BoolVar(&o.UseMeshDNS, p+"mesh.use-meshdns", envutil.GetEnvDefault(UseMeshDNSEnvVar, "false") == "true",
 		"Set mesh DNS servers to the system configuration. If a local server is running, this will use the local server.")
-	fl.StringVar(&o.PrimaryEndpoint, p+"mesh.primary-endpoint", util.GetEnvDefault(PrimaryEndpointEnvVar, ""),
+	fl.StringVar(&o.PrimaryEndpoint, p+"mesh.primary-endpoint", envutil.GetEnvDefault(PrimaryEndpointEnvVar, ""),
 		`The primary endpoint to broadcast when joining a cluster.
 This is only necessary if the node intends on being publicly accessible.`)
 	fl.Func(p+"mesh.routes", `Comma separated list of additional routes to advertise to the mesh.
@@ -171,11 +171,11 @@ This is only necessary if the node intends on being publicly accessible.`)
 		o.DirectPeers = append(o.DirectPeers, strings.Split(s, ",")...)
 		return nil
 	})
-	fl.IntVar(&o.HeartbeatPurgeThreshold, p+"mesh.heartbeat-purge-threshold", util.GetEnvIntDefault(HeartbeatPurgeThresholdEnvVar, 0),
+	fl.IntVar(&o.HeartbeatPurgeThreshold, p+"mesh.heartbeat-purge-threshold", envutil.GetEnvIntDefault(HeartbeatPurgeThresholdEnvVar, 0),
 		"Threshold of failed heartbeats for purging a peer. Default is 0 (disabled).")
-	fl.BoolVar(&o.NoIPv4, p+"mesh.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
+	fl.BoolVar(&o.NoIPv4, p+"mesh.no-ipv4", envutil.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Do not request IPv4 assignments when joining.")
-	fl.BoolVar(&o.NoIPv6, p+"mesh.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
+	fl.BoolVar(&o.NoIPv6, p+"mesh.no-ipv6", envutil.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
 		"Do not request IPv6 assignments when joining.")
 }
 

@@ -21,7 +21,7 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	envutil "github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 const (
@@ -72,21 +72,21 @@ func (o *TURNOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fs.BoolVar(&o.Enabled, p+"services.turn.enabled", util.GetEnvDefault(TURNEnabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.Enabled, p+"services.turn.enabled", envutil.GetEnvDefault(TURNEnabledEnvVar, "false") == "true",
 		"Enable the TURN server.")
-	fs.StringVar(&o.Endpoint, p+"services.turn.endpoint", util.GetEnvDefault(TURNServerEndpointEnvVar, ""),
+	fs.StringVar(&o.Endpoint, p+"services.turn.endpoint", envutil.GetEnvDefault(TURNServerEndpointEnvVar, ""),
 		"The TURN server endpoint. If empty, the public IP will be used.")
-	fs.StringVar(&o.PublicIP, p+"services.turn.public-ip", util.GetEnvDefault(TURNServerPublicIPEnvVar, ""),
+	fs.StringVar(&o.PublicIP, p+"services.turn.public-ip", envutil.GetEnvDefault(TURNServerPublicIPEnvVar, ""),
 		"The address advertised for STUN requests.")
-	fs.StringVar(&o.ListenAddress, p+"services.turn.listen-address", util.GetEnvDefault(TURNServerListenAddressEnvVar, "0.0.0.0"),
+	fs.StringVar(&o.ListenAddress, p+"services.turn.listen-address", envutil.GetEnvDefault(TURNServerListenAddressEnvVar, "0.0.0.0"),
 		"Address to listen on for TURN connections.")
-	fs.IntVar(&o.ListenPort, p+"services.turn.listen-port", util.GetEnvIntDefault(TURNServerPortEnvVar, 3478),
+	fs.IntVar(&o.ListenPort, p+"services.turn.listen-port", envutil.GetEnvIntDefault(TURNServerPortEnvVar, 3478),
 		"Port to listen on for TURN connections.")
-	fs.StringVar(&o.ServerRealm, p+"services.turn.server-realm", util.GetEnvDefault(TURNServerRealmEnvVar, "webmesh.io"),
+	fs.StringVar(&o.ServerRealm, p+"services.turn.server-realm", envutil.GetEnvDefault(TURNServerRealmEnvVar, "webmesh.io"),
 		"Realm used for TURN server authentication.")
-	fs.StringVar(&o.STUNPortRange, p+"services.turn.stun-port-range", util.GetEnvDefault(TURNSTUNPortRangeEnvVar, "49152-65535"),
+	fs.StringVar(&o.STUNPortRange, p+"services.turn.stun-port-range", envutil.GetEnvDefault(TURNSTUNPortRangeEnvVar, "49152-65535"),
 		"Port range to use for STUN.")
-	fs.BoolVar(&o.CampfireEnabled, p+"services.turn.campfire-enabled", util.GetEnvDefault(TURNCampfireEnabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.CampfireEnabled, p+"services.turn.campfire-enabled", envutil.GetEnvDefault(TURNCampfireEnabledEnvVar, "false") == "true",
 		"Enable handling campfire packets on the TURN server.")
 }
 

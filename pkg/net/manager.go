@@ -40,7 +40,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // Options are the options for the network manager.
@@ -545,7 +545,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 			log.Warn("could not parse address", slog.String("error", err.Error()))
 			return
 		}
-		err = util.Ping(ctx, addr.Addr())
+		err = netutil.Ping(ctx, addr.Addr())
 		if err != nil {
 			log.Debug("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
 			return

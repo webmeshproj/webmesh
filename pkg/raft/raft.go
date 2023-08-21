@@ -34,7 +34,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 var (
@@ -292,7 +292,7 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 	if opts.AdvertiseAddress == "" {
 		opts.AdvertiseAddress = fmt.Sprintf("localhost:%d", r.listenPort)
 	}
-	addr, err := util.ResolveTCPAddr(ctx, opts.AdvertiseAddress, 15)
+	addr, err := netutil.ResolveTCPAddr(ctx, opts.AdvertiseAddress, 15)
 	if err != nil {
 		r.mu.Unlock()
 		return fmt.Errorf("resolve advertise address: %w", err)
@@ -311,7 +311,7 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 			if nodeID == string(r.nodeID) {
 				continue
 			}
-			addr, err := util.ResolveTCPAddr(ctx, listenAddres, 15)
+			addr, err := netutil.ResolveTCPAddr(ctx, listenAddres, 15)
 			if err != nil {
 				r.mu.Unlock()
 				return fmt.Errorf("resolve server address: %w", err)

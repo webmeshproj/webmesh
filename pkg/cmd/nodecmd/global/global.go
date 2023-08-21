@@ -33,7 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 const (
@@ -109,45 +109,45 @@ func NewOptions() *Options {
 }
 
 func (o *Options) BindFlags(fs *flag.FlagSet) {
-	fs.StringVar(&o.TLSCertFile, "global.tls-cert-file", util.GetEnvDefault(TLSCertEnvVar, ""),
+	fs.StringVar(&o.TLSCertFile, "global.tls-cert-file", envutil.GetEnvDefault(TLSCertEnvVar, ""),
 		"The certificate file for TLS connections.")
-	fs.StringVar(&o.TLSKeyFile, "global.tls-key-file", util.GetEnvDefault(TLSKeyEnvVar, ""),
+	fs.StringVar(&o.TLSKeyFile, "global.tls-key-file", envutil.GetEnvDefault(TLSKeyEnvVar, ""),
 		"The key file for TLS connections.")
-	fs.StringVar(&o.TLSCAFile, "global.tls-ca-file", util.GetEnvDefault(TLACAEnvVar, ""),
+	fs.StringVar(&o.TLSCAFile, "global.tls-ca-file", envutil.GetEnvDefault(TLACAEnvVar, ""),
 		"The CA file for TLS connections.")
-	fs.StringVar(&o.TLSClientCAFile, "global.tls-client-ca-file", util.GetEnvDefault(TLSClientCAEnvVar, ""),
+	fs.StringVar(&o.TLSClientCAFile, "global.tls-client-ca-file", envutil.GetEnvDefault(TLSClientCAEnvVar, ""),
 		"The client CA file for TLS connections.")
-	fs.BoolVar(&o.MTLS, "global.mtls", util.GetEnvDefault(MTLSEnvVar, "false") == "true",
+	fs.BoolVar(&o.MTLS, "global.mtls", envutil.GetEnvDefault(MTLSEnvVar, "false") == "true",
 		"Enable mutual TLS for authentication.")
-	fs.BoolVar(&o.VerifyChainOnly, "global.verify-chain-only", util.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
+	fs.BoolVar(&o.VerifyChainOnly, "global.verify-chain-only", envutil.GetEnvDefault(VerifyChainOnlyEnvVar, "false") == "true",
 		"Only verify the TLS chain globally.")
-	fs.BoolVar(&o.Insecure, "global.insecure", util.GetEnvDefault(InsecureEnvVar, "false") == "true",
+	fs.BoolVar(&o.Insecure, "global.insecure", envutil.GetEnvDefault(InsecureEnvVar, "false") == "true",
 		"Disable use of TLS globally.")
-	fs.BoolVar(&o.NoIPv6, "global.no-ipv6", util.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
+	fs.BoolVar(&o.NoIPv6, "global.no-ipv6", envutil.GetEnvDefault(NoIPv6EnvVar, "false") == "true",
 		"Disable use of IPv6 globally.")
-	fs.BoolVar(&o.NoIPv4, "global.no-ipv4", util.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
+	fs.BoolVar(&o.NoIPv4, "global.no-ipv4", envutil.GetEnvDefault(NoIPv4EnvVar, "false") == "true",
 		"Disable use of IPv4 globally.")
-	fs.StringVar(&o.LogLevel, "global.log-level", util.GetEnvDefault(LogLevelEnvVar, "info"),
+	fs.StringVar(&o.LogLevel, "global.log-level", envutil.GetEnvDefault(LogLevelEnvVar, "info"),
 		"Log level (debug, info, warn, error)")
 
-	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", util.GetEnvDefault(PrimaryEndpointEnvVar, ""),
+	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", envutil.GetEnvDefault(PrimaryEndpointEnvVar, ""),
 		`The preferred publicly routable address of this node. Setting this
 value will override the address portion of the store advertise address. 
 When detect-endpoints is true, this value will be the first address detected.`)
 
-	fs.BoolVar(&o.DetectEndpoints, "global.detect-endpoints", util.GetEnvDefault(DetectEndpointsEnvVar, "false") == "true",
+	fs.BoolVar(&o.DetectEndpoints, "global.detect-endpoints", envutil.GetEnvDefault(DetectEndpointsEnvVar, "false") == "true",
 		"Detect potential endpoints from the local interfaces.")
 
-	fs.BoolVar(&o.DetectPrivateEndpoints, "global.detect-private-endpoints", util.GetEnvDefault(DetectPrivateEndpointsEnvVar, "false") == "true",
+	fs.BoolVar(&o.DetectPrivateEndpoints, "global.detect-private-endpoints", envutil.GetEnvDefault(DetectPrivateEndpointsEnvVar, "false") == "true",
 		"Include private IP addresses in detection.")
 
-	fs.BoolVar(&o.AllowRemoteDetection, "global.allow-remote-detection", util.GetEnvDefault(AllowRemoteDetectionEnvVar, "false") == "true",
+	fs.BoolVar(&o.AllowRemoteDetection, "global.allow-remote-detection", envutil.GetEnvDefault(AllowRemoteDetectionEnvVar, "false") == "true",
 		"Allow remote detection of endpoints.")
 
-	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", util.GetEnvDefault(DetectIPv6EnvVar, "false") == "true",
+	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", envutil.GetEnvDefault(DetectIPv6EnvVar, "false") == "true",
 		"Detect IPv6 addresses. Default is to only detect IPv4.")
 
-	fs.BoolVar(&o.DisableFeatureAdvertisement, "global.disable-feature-advertisement", util.GetEnvDefault(DisableFeatureAdvertisementEnvVar, "false") == "true",
+	fs.BoolVar(&o.DisableFeatureAdvertisement, "global.disable-feature-advertisement", envutil.GetEnvDefault(DisableFeatureAdvertisementEnvVar, "false") == "true",
 		"Do not advertise features to the rest of the mesh.")
 }
 

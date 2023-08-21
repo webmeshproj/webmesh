@@ -25,6 +25,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
+// Exec executes a command with context.
 func Exec(ctx context.Context, command string, args ...string) error {
 	log := context.LoggerFrom(ctx)
 	cmd := exec.CommandContext(ctx, command, args...)
@@ -35,6 +36,7 @@ func Exec(ctx context.Context, command string, args ...string) error {
 	return nil
 }
 
+// ExecOutput executes a command with context and returns the output.
 func ExecOutput(ctx context.Context, command string, args ...string) ([]byte, error) {
 	log := context.LoggerFrom(ctx)
 	cmd := exec.CommandContext(ctx, command, args...)

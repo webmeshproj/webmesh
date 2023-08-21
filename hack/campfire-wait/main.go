@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/webmeshproj/webmesh/pkg/campfire"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 func main() {
@@ -17,7 +17,7 @@ func main() {
 	campURI := flag.String("camp", "camp://turn?fingerprint#psk", "camp URI")
 	logLevel := flag.String("log-level", "info", "log level")
 	flag.Parse()
-	log := util.SetupLogging(*logLevel)
+	log := logutil.SetupLogging(*logLevel)
 	if *campURI == "" {
 		fmt.Fprintln(os.Stderr, "a Camp URL is required")
 		os.Exit(1)

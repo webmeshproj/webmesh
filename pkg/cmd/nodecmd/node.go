@@ -35,6 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -94,7 +95,7 @@ func Execute() error {
 
 	// Time to get going
 
-	log := util.SetupLogging(config.Global.LogLevel)
+	log := logutil.SetupLogging(config.Global.LogLevel)
 	ctx := context.Background()
 
 	if !*appDaemon {

@@ -9,14 +9,14 @@ import (
 	"os"
 
 	"github.com/webmeshproj/webmesh/pkg/campfire"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 func main() {
 	campURI := flag.String("camp", "camp://turn?fingerprint#psk", "camp URI")
 	logLevel := flag.String("log-level", "info", "log level")
 	flag.Parse()
-	log := util.SetupLogging(*logLevel)
+	log := logutil.SetupLogging(*logLevel)
 	ourcamp, err := campfire.ParseCampfireURI(*campURI)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())

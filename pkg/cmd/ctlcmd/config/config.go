@@ -38,7 +38,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 const (
@@ -339,7 +339,7 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 	config.InsecureSkipVerify = cluster.TLSSkipVerify
 	if cluster.TLSVerifyChainOnly {
 		config.InsecureSkipVerify = true
-		config.VerifyPeerCertificate = util.VerifyChainOnly
+		config.VerifyPeerCertificate = netutil.VerifyChainOnly
 	}
 	currentUser := c.GetCurrentUser()
 	var certs []tls.Certificate

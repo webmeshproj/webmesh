@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 const (
@@ -167,9 +167,9 @@ func (o *BootstrapOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fl.BoolVar(&o.Enabled, p+"bootstrap.enabled", util.GetEnvDefault(BootstrapEnabledEnvVar, "false") == "true",
+	fl.BoolVar(&o.Enabled, p+"bootstrap.enabled", envutil.GetEnvDefault(BootstrapEnabledEnvVar, "false") == "true",
 		"Bootstrap the cluster.")
-	fl.StringVar(&o.AdvertiseAddress, p+"bootstrap.advertise-address", util.GetEnvDefault(AdvertiseAddressEnvVar, ""),
+	fl.StringVar(&o.AdvertiseAddress, p+"bootstrap.advertise-address", envutil.GetEnvDefault(AdvertiseAddressEnvVar, ""),
 		`Raft advertise address. Required when bootstrapping a new cluster,
 but will be replaced with the WireGuard address after bootstrapping.`)
 	fl.Func(p+"bootstrap.servers", `Comma separated list of servers to bootstrap with. This is only used if bootstrap is true.
@@ -209,19 +209,19 @@ Ports should be in the form of <node-id>=<port>.`,
 			}
 			return nil
 		})
-	fl.StringVar(&o.IPv4Network, p+"bootstrap.ipv4-network", util.GetEnvDefault(BootstrapIPv4NetworkEnvVar, "172.16.0.0/12"),
+	fl.StringVar(&o.IPv4Network, p+"bootstrap.ipv4-network", envutil.GetEnvDefault(BootstrapIPv4NetworkEnvVar, "172.16.0.0/12"),
 		"IPv4 network of the mesh to write to the database when bootstraping a new cluster.")
-	fl.StringVar(&o.MeshDomain, p+"bootstrap.mesh-domain", util.GetEnvDefault(BootstrapMeshDomainEnvVar, "webmesh.internal"),
+	fl.StringVar(&o.MeshDomain, p+"bootstrap.mesh-domain", envutil.GetEnvDefault(BootstrapMeshDomainEnvVar, "webmesh.internal"),
 		"Domain of the mesh to write to the database when bootstraping a new cluster.")
-	fl.StringVar(&o.Admin, p+"bootstrap.admin", util.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
+	fl.StringVar(&o.Admin, p+"bootstrap.admin", envutil.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
 		"Admin username to bootstrap the cluster with.")
-	fl.StringVar(&o.Voters, p+"bootstrap.voters", util.GetEnvDefault(BootstrapVotersEnvVar, ""),
+	fl.StringVar(&o.Voters, p+"bootstrap.voters", envutil.GetEnvDefault(BootstrapVotersEnvVar, ""),
 		"Comma separated list of voters to bootstrap the cluster with. bootstrap-servers are already included in this list.")
-	fl.StringVar(&o.DefaultNetworkPolicy, p+"bootstrap.default-network-policy", util.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
+	fl.StringVar(&o.DefaultNetworkPolicy, p+"bootstrap.default-network-policy", envutil.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
 		"Default network policy to bootstrap the cluster with.")
-	fl.BoolVar(&o.DisableRBAC, p+"bootstrap.disable-rbac", util.GetEnvDefault(BootstrapDisableRBACEnvVar, "false") == "true",
+	fl.BoolVar(&o.DisableRBAC, p+"bootstrap.disable-rbac", envutil.GetEnvDefault(BootstrapDisableRBACEnvVar, "false") == "true",
 		"Disable RBAC when bootstrapping a new cluster.")
-	fl.BoolVar(&o.Force, p+"bootstrap.force", util.GetEnvDefault(ForceBootstrapClusterEnvVar, "false") == "true",
+	fl.BoolVar(&o.Force, p+"bootstrap.force", envutil.GetEnvDefault(ForceBootstrapClusterEnvVar, "false") == "true",
 		"Force bootstrapping a new cluster even if data is present.")
 }
 

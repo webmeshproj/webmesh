@@ -27,7 +27,8 @@ import (
 	"github.com/pion/turn/v2"
 	"golang.org/x/net/websocket"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/logutil"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // Options contains the options for the TURN server.
@@ -71,7 +72,7 @@ func NewServer(o *Options) (*Server, error) {
 	if o.RelayAddressUDP == "" {
 		o.RelayAddressUDP = "0.0.0.0"
 	}
-	startPort, endPort, err := util.ParsePortRange(o.PortRange)
+	startPort, endPort, err := netutil.ParsePortRange(o.PortRange)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse port range: %w", err)
 	}
@@ -104,7 +105,7 @@ func NewServer(o *Options) (*Server, error) {
 	// Create the turn server
 	s, err := turn.NewServer(turn.ServerConfig{
 		Realm:         o.Realm,
-		LoggerFactory: util.NewSTUNLoggerFactory(log.With("server", "turn")),
+		LoggerFactory: logutil.NewSTUNLoggerFactory(log.With("server", "turn")),
 		// Set AuthHandler callback
 		// This is called every time a user tries to authenticate with the TURN server
 		// Return the key for that user, or false when no user is found

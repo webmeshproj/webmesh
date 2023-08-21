@@ -33,7 +33,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 //go:generate bash ../../../web/dashboard/embed.sh
@@ -70,15 +70,15 @@ func (o *Options) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fs.BoolVar(&o.Enabled, p+"services.dashboard.enabled", util.GetEnvDefault(DashboardEnabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.Enabled, p+"services.dashboard.enabled", envutil.GetEnvDefault(DashboardEnabledEnvVar, "false") == "true",
 		"Enable the web dashboard.")
-	fs.StringVar(&o.ListenAddress, p+"services.dashboard.listen-address", util.GetEnvDefault(DashboardListenEnvVar, ":8080"),
+	fs.StringVar(&o.ListenAddress, p+"services.dashboard.listen-address", envutil.GetEnvDefault(DashboardListenEnvVar, ":8080"),
 		"The address for the dashboard to listen on.")
-	fs.StringVar(&o.TLSCertFile, p+"services.dashboard.tls-cert-file", util.GetEnvDefault(DashboardTLSCertEnvVar, ""),
+	fs.StringVar(&o.TLSCertFile, p+"services.dashboard.tls-cert-file", envutil.GetEnvDefault(DashboardTLSCertEnvVar, ""),
 		"The path to a certificate file to use for TLS.")
-	fs.StringVar(&o.TLSKeyFile, p+"services.dashboard.tls-key-file", util.GetEnvDefault(DashboardTLSKeyEnvVar, ""),
+	fs.StringVar(&o.TLSKeyFile, p+"services.dashboard.tls-key-file", envutil.GetEnvDefault(DashboardTLSKeyEnvVar, ""),
 		"The path to a key file to use for TLS.")
-	fs.StringVar(&o.Prefix, p+"services.dashboard.prefix", util.GetEnvDefault(DashboardPrefixEnvVar, ""),
+	fs.StringVar(&o.Prefix, p+"services.dashboard.prefix", envutil.GetEnvDefault(DashboardPrefixEnvVar, ""),
 		"The path prefix to use for the dashboard.")
 }
 

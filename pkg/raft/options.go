@@ -33,7 +33,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 const (
@@ -145,41 +145,41 @@ func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fl.StringVar(&o.ListenAddress, p+"raft.listen-address", util.GetEnvDefault(RaftListenAddressEnvVar, "[::]:9443"),
+	fl.StringVar(&o.ListenAddress, p+"raft.listen-address", envutil.GetEnvDefault(RaftListenAddressEnvVar, "[::]:9443"),
 		"Raft listen address.")
-	fl.StringVar(&o.DataDir, p+"raft.data-dir", util.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
+	fl.StringVar(&o.DataDir, p+"raft.data-dir", envutil.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
 		"Store data directory.")
-	fl.BoolVar(&o.InMemory, p+"raft.in-memory", util.GetEnvDefault(InMemoryEnvVar, "false") == "true",
+	fl.BoolVar(&o.InMemory, p+"raft.in-memory", envutil.GetEnvDefault(InMemoryEnvVar, "false") == "true",
 		"Store data in memory. This should only be used for testing and ephemeral nodes.")
-	fl.IntVar(&o.ConnectionPoolCount, p+"raft.connection-pool-count", util.GetEnvIntDefault(ConnectionPoolCountEnvVar, 0),
+	fl.IntVar(&o.ConnectionPoolCount, p+"raft.connection-pool-count", envutil.GetEnvIntDefault(ConnectionPoolCountEnvVar, 0),
 		"Raft connection pool count.")
-	fl.DurationVar(&o.ConnectionTimeout, p+"raft.connection-timeout", util.GetEnvDurationDefault(ConnectionTimeoutEnvVar, time.Second*3),
+	fl.DurationVar(&o.ConnectionTimeout, p+"raft.connection-timeout", envutil.GetEnvDurationDefault(ConnectionTimeoutEnvVar, time.Second*3),
 		"Raft connection timeout.")
-	fl.DurationVar(&o.HeartbeatTimeout, p+"raft.heartbeat-timeout", util.GetEnvDurationDefault(HeartbeatTimeoutEnvVar, time.Second*3),
+	fl.DurationVar(&o.HeartbeatTimeout, p+"raft.heartbeat-timeout", envutil.GetEnvDurationDefault(HeartbeatTimeoutEnvVar, time.Second*3),
 		"Raft heartbeat timeout.")
-	fl.DurationVar(&o.ElectionTimeout, p+"raft.election-timeout", util.GetEnvDurationDefault(ElectionTimeoutEnvVar, time.Second*3),
+	fl.DurationVar(&o.ElectionTimeout, p+"raft.election-timeout", envutil.GetEnvDurationDefault(ElectionTimeoutEnvVar, time.Second*3),
 		"Raft election timeout.")
-	fl.DurationVar(&o.ApplyTimeout, p+"raft.apply-timeout", util.GetEnvDurationDefault(ApplyTimeoutEnvVar, time.Second*15),
+	fl.DurationVar(&o.ApplyTimeout, p+"raft.apply-timeout", envutil.GetEnvDurationDefault(ApplyTimeoutEnvVar, time.Second*15),
 		"Raft apply timeout.")
-	fl.DurationVar(&o.CommitTimeout, p+"raft.commit-timeout", util.GetEnvDurationDefault(CommitTimeoutEnvVar, time.Second*15),
+	fl.DurationVar(&o.CommitTimeout, p+"raft.commit-timeout", envutil.GetEnvDurationDefault(CommitTimeoutEnvVar, time.Second*15),
 		"Raft commit timeout.")
-	fl.IntVar(&o.MaxAppendEntries, p+"raft.max-append-entries", util.GetEnvIntDefault(MaxAppendEntriesEnvVar, 15),
+	fl.IntVar(&o.MaxAppendEntries, p+"raft.max-append-entries", envutil.GetEnvIntDefault(MaxAppendEntriesEnvVar, 15),
 		"Raft max append entries.")
-	fl.DurationVar(&o.LeaderLeaseTimeout, p+"raft.leader-lease-timeout", util.GetEnvDurationDefault(LeaderLeaseTimeoutEnvVar, time.Second*3),
+	fl.DurationVar(&o.LeaderLeaseTimeout, p+"raft.leader-lease-timeout", envutil.GetEnvDurationDefault(LeaderLeaseTimeoutEnvVar, time.Second*3),
 		"Raft leader lease timeout.")
-	fl.DurationVar(&o.SnapshotInterval, p+"raft.snapshot-interval", util.GetEnvDurationDefault(SnapshotIntervalEnvVar, time.Minute*3),
+	fl.DurationVar(&o.SnapshotInterval, p+"raft.snapshot-interval", envutil.GetEnvDurationDefault(SnapshotIntervalEnvVar, time.Minute*3),
 		"Raft snapshot interval.")
-	fl.Uint64Var(&o.SnapshotThreshold, p+"raft.snapshot-threshold", uint64(util.GetEnvIntDefault(SnapshotThresholdEnvVar, 5)),
+	fl.Uint64Var(&o.SnapshotThreshold, p+"raft.snapshot-threshold", uint64(envutil.GetEnvIntDefault(SnapshotThresholdEnvVar, 5)),
 		"Raft snapshot threshold.")
-	fl.Uint64Var(&o.SnapshotRetention, p+"raft.snapshot-retention", uint64(util.GetEnvIntDefault(SnapshotRetentionEnvVar, 3)),
+	fl.Uint64Var(&o.SnapshotRetention, p+"raft.snapshot-retention", uint64(envutil.GetEnvIntDefault(SnapshotRetentionEnvVar, 3)),
 		"Raft snapshot retention.")
-	fl.StringVar(&o.LogLevel, p+"raft.log-level", util.GetEnvDefault(RaftLogLevelEnvVar, "info"),
+	fl.StringVar(&o.LogLevel, p+"raft.log-level", envutil.GetEnvDefault(RaftLogLevelEnvVar, "info"),
 		"Raft log level.")
-	fl.BoolVar(&o.PreferIPv6, p+"raft.prefer-ipv6", util.GetEnvDefault(RaftPreferIPv6EnvVar, "false") == "true",
+	fl.BoolVar(&o.PreferIPv6, p+"raft.prefer-ipv6", envutil.GetEnvDefault(RaftPreferIPv6EnvVar, "false") == "true",
 		"Prefer IPv6 when connecting to raft peers.")
-	fl.IntVar(&o.ObserverChanBuffer, p+"raft.observer-chan-buffer", util.GetEnvIntDefault(ObserverChanBufferEnvVar, 100),
+	fl.IntVar(&o.ObserverChanBuffer, p+"raft.observer-chan-buffer", envutil.GetEnvIntDefault(ObserverChanBufferEnvVar, 100),
 		"Raft observer channel buffer size.")
-	fl.BoolVar(&o.LeaveOnShutdown, p+"raft.leave-on-shutdown", util.GetEnvDefault(LeaveOnShutdownEnvVar, "false") == "true",
+	fl.BoolVar(&o.LeaveOnShutdown, p+"raft.leave-on-shutdown", envutil.GetEnvDefault(LeaveOnShutdownEnvVar, "false") == "true",
 		"Leave the cluster when the server shuts down.")
 }
 

@@ -37,7 +37,7 @@ import (
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error {
@@ -108,7 +108,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	if err != nil {
 		return fmt.Errorf("parse IPv4 network: %w", err)
 	}
-	meshnetworkv6, err := util.GenerateULA()
+	meshnetworkv6, err := netutil.GenerateULA()
 	if err != nil {
 		return fmt.Errorf("generate ULA: %w", err)
 	}
@@ -453,7 +453,7 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1
 	var advertiseAddress net.Addr
 	for id, addr := range s.opts.Bootstrap.Servers {
 		if id == leader {
-			advertiseAddress, err = util.ResolveTCPAddr(ctx, addr, 10)
+			advertiseAddress, err = netutil.ResolveTCPAddr(ctx, addr, 10)
 			if err != nil {
 				return fmt.Errorf("resolve advertise address: %w", err)
 			}
@@ -480,7 +480,7 @@ func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Fea
 		if id == s.ID() {
 			continue
 		}
-		advertiseAddress, err := util.ResolveTCPAddr(ctx, server, 10)
+		advertiseAddress, err := netutil.ResolveTCPAddr(ctx, server, 10)
 		if err != nil {
 			return fmt.Errorf("resolve advertise address: %w", err)
 		}

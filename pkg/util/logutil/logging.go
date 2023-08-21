@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package logutil
 
 import (
 	"log/slog"
@@ -22,6 +22,7 @@ import (
 	"strings"
 )
 
+// SetupLogging sets up logging for the application.
 func SetupLogging(logLevel string) *slog.Logger {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: func() slog.Level {

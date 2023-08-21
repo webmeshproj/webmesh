@@ -27,7 +27,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 const (
@@ -199,7 +199,7 @@ func (o *Options) TLSConfig() (*tls.Config, error) {
 	config.RootCAs = pool
 	if o.TLS.VerifyChainOnly {
 		config.InsecureSkipVerify = true
-		config.VerifyPeerCertificate = util.VerifyChainOnly
+		config.VerifyPeerCertificate = netutil.VerifyChainOnly
 	} else if o.TLS.InsecureSkipVerify {
 		config.InsecureSkipVerify = true
 	}

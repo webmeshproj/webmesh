@@ -26,7 +26,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 const (
@@ -113,36 +113,36 @@ func (o *WireGuardOptions) BindFlags(fl *flag.FlagSet, defaultIfaceName string, 
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fl.IntVar(&o.ListenPort, p+"wireguard.listen-port", util.GetEnvIntDefault(WireguardListenPortEnvVar, 51820),
+	fl.IntVar(&o.ListenPort, p+"wireguard.listen-port", envutil.GetEnvIntDefault(WireguardListenPortEnvVar, 51820),
 		"The WireGuard listen port.")
-	fl.StringVar(&o.InterfaceName, p+"wireguard.interface-name", util.GetEnvDefault(WireguardNameEnvVar, defaultIfaceName),
+	fl.StringVar(&o.InterfaceName, p+"wireguard.interface-name", envutil.GetEnvDefault(WireguardNameEnvVar, defaultIfaceName),
 		"The WireGuard interface name.")
-	fl.BoolVar(&o.ForceInterfaceName, p+"wireguard.force-interface-name", util.GetEnvDefault(WireguardForceNameEnvVar, "false") == "true",
+	fl.BoolVar(&o.ForceInterfaceName, p+"wireguard.force-interface-name", envutil.GetEnvDefault(WireguardForceNameEnvVar, "false") == "true",
 		"Force the use of the given name by deleting any pre-existing interface with the same name.")
-	fl.BoolVar(&o.ForceTUN, p+"wireguard.force-tun", util.GetEnvDefault(WireguardForceTUNEnvVar, "false") == "true",
+	fl.BoolVar(&o.ForceTUN, p+"wireguard.force-tun", envutil.GetEnvDefault(WireguardForceTUNEnvVar, "false") == "true",
 		"Force the use of a TUN interface.")
-	fl.BoolVar(&o.Modprobe, p+"wireguard.modprobe", util.GetEnvDefault(WireguardModprobeEnvVar, "false") == "true",
+	fl.BoolVar(&o.Modprobe, p+"wireguard.modprobe", envutil.GetEnvDefault(WireguardModprobeEnvVar, "false") == "true",
 		"Attempt to load the WireGuard kernel module.")
-	fl.BoolVar(&o.Masquerade, p+"wireguard.masquerade", util.GetEnvDefault(WireguardMasqueradeEnvVar, "false") == "true",
+	fl.BoolVar(&o.Masquerade, p+"wireguard.masquerade", envutil.GetEnvDefault(WireguardMasqueradeEnvVar, "false") == "true",
 		"Masquerade traffic from the WireGuard interface.")
-	fl.DurationVar(&o.PersistentKeepAlive, p+"wireguard.persistent-keepalive", util.GetEnvDurationDefault(WireguardPersistentKeepaliveEnvVar, 0),
+	fl.DurationVar(&o.PersistentKeepAlive, p+"wireguard.persistent-keepalive", envutil.GetEnvDurationDefault(WireguardPersistentKeepaliveEnvVar, 0),
 		`PersistentKeepAlive is the interval at which to send keepalive packets
 to peers. If unset, keepalive packets will automatically be sent to publicly
 accessible peers when this instance is behind a NAT. Otherwise, no keep-alive
 packets are sent.`)
-	fl.IntVar(&o.MTU, p+"wireguard.mtu", util.GetEnvIntDefault(WireguardMTUEnvVar, system.DefaultMTU),
+	fl.IntVar(&o.MTU, p+"wireguard.mtu", envutil.GetEnvIntDefault(WireguardMTUEnvVar, system.DefaultMTU),
 		"The MTU to use for the interface.")
 	fl.Func(p+"wireguard.endpoints", `Comma separated list of additional WireGuard endpoints to broadcast when joining a cluster.`, func(s string) error {
 		o.Endpoints = strings.Split(s, ",")
 		return nil
 	})
-	fl.StringVar(&o.KeyFile, p+"wireguard.key-file", util.GetEnvDefault(WireGuardKeyFileEnvVar, ""),
+	fl.StringVar(&o.KeyFile, p+"wireguard.key-file", envutil.GetEnvDefault(WireGuardKeyFileEnvVar, ""),
 		"The path to the WireGuard private key. If it does not exist it will be created.")
-	fl.DurationVar(&o.KeyRotationInterval, p+"wireguard.key-rotation-interval", util.GetEnvDurationDefault(WireGuardKeyRotationIntervalEnvVar, time.Hour*24*7),
+	fl.DurationVar(&o.KeyRotationInterval, p+"wireguard.key-rotation-interval", envutil.GetEnvDurationDefault(WireGuardKeyRotationIntervalEnvVar, time.Hour*24*7),
 		"Interval to rotate WireGuard keys. Set this to 0 to disable key rotation.")
-	fl.BoolVar(&o.RecordMetrics, p+"wireguard.record-metrics", util.GetEnvDefault(WireGuardRecordMetricsEnvVar, "false") == "true",
+	fl.BoolVar(&o.RecordMetrics, p+"wireguard.record-metrics", envutil.GetEnvDefault(WireGuardRecordMetricsEnvVar, "false") == "true",
 		"Publish WireGuard metrics.")
-	fl.DurationVar(&o.RecordMetricsInterval, p+"wireguard.record-metrics-interval", util.GetEnvDurationDefault(WireGuardRecordMetricsIntervalEnvVar, time.Second*15),
+	fl.DurationVar(&o.RecordMetricsInterval, p+"wireguard.record-metrics-interval", envutil.GetEnvDurationDefault(WireGuardRecordMetricsIntervalEnvVar, time.Second*15),
 		"Interval at which to update WireGuard metrics.")
 }
 

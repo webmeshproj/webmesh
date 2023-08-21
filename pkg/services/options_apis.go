@@ -21,7 +21,7 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
 const (
@@ -62,17 +62,17 @@ func (o *APIOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 	if len(prefix) > 0 {
 		p = strings.Join(prefix, ".") + "."
 	}
-	fs.BoolVar(&o.DisableLeaderProxy, p+"services.api.disable-leader-proxy", util.GetEnvDefault(LeaderProxyDisabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.DisableLeaderProxy, p+"services.api.disable-leader-proxy", envutil.GetEnvDefault(LeaderProxyDisabledEnvVar, "false") == "true",
 		"Disable the leader proxy.")
-	fs.BoolVar(&o.Admin, p+"services.api.admin", util.GetEnvDefault(AdminEnabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.Admin, p+"services.api.admin", envutil.GetEnvDefault(AdminEnabledEnvVar, "false") == "true",
 		"Enable the admin API.")
-	fs.BoolVar(&o.Mesh, p+"services.api.mesh", util.GetEnvDefault(MeshEnabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.Mesh, p+"services.api.mesh", envutil.GetEnvDefault(MeshEnabledEnvVar, "false") == "true",
 		"Enable the mesh API.")
-	fs.BoolVar(&o.PeerDiscovery, p+"services.api.peer-discovery", util.GetEnvDefault(PeerDiscoveryEnabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.PeerDiscovery, p+"services.api.peer-discovery", envutil.GetEnvDefault(PeerDiscoveryEnabledEnvVar, "false") == "true",
 		"Enable the peer discovery API.")
-	fs.BoolVar(&o.WebRTC, p+"services.api.webrtc", util.GetEnvDefault(WebRTCEnabledEnvVar, "false") == "true",
+	fs.BoolVar(&o.WebRTC, p+"services.api.webrtc", envutil.GetEnvDefault(WebRTCEnabledEnvVar, "false") == "true",
 		"Enable the WebRTC API.")
-	fs.StringVar(&o.STUNServers, p+"services.api.stun-servers", util.GetEnvDefault(WebRTCSTUNServersEnvVar, "stun:stun.l.google.com:19302"),
+	fs.StringVar(&o.STUNServers, p+"services.api.stun-servers", envutil.GetEnvDefault(WebRTCSTUNServersEnvVar, "stun:stun.l.google.com:19302"),
 		"STUN servers to use.")
 }
 

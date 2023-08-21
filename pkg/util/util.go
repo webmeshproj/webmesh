@@ -21,10 +21,12 @@ import (
 	"math"
 )
 
+// Pointer returns a pointer to the given value.
 func Pointer[T any](t T) *T {
 	return &t
 }
 
+// PrettyByteSize returns a human-readable string of the given byte size.
 func PrettyByteSize(b int64) string {
 	bf := float64(b)
 	for _, unit := range []string{"", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"} {
@@ -36,6 +38,7 @@ func PrettyByteSize(b int64) string {
 	return fmt.Sprintf("%.1fYiB", bf)
 }
 
+// AllUnique returns true if all elements in the given slice are unique.
 func AllUnique[T comparable](sl []T) bool {
 	seen := make(map[T]bool)
 	for _, v := range sl {

@@ -32,7 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -173,7 +173,7 @@ func (p *Plugin) allocateV6(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	var tries int
 	maxTries := 100
 	for tries < maxTries {
-		prefix, err := util.Random64(globalPrefix)
+		prefix, err := netutil.Random64(globalPrefix)
 		if err != nil {
 			return nil, fmt.Errorf("random IPv6: %w", err)
 		}
