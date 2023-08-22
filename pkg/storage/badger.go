@@ -80,6 +80,9 @@ func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
 		}
 		return nil
 	})
+	if err != nil && err == badger.ErrKeyNotFound {
+		return "", ErrKeyNotFound
+	}
 	return value, err
 }
 
