@@ -113,8 +113,8 @@ func (o *Options) Validate() error {
 		return fmt.Errorf("options are nil")
 	}
 	if o.Bootstrap == nil || !o.Bootstrap.Enabled {
-		if o.Mesh.JoinAddress == "" && len(o.Mesh.PeerDiscoveryAddresses) == 0 && o.Mesh.JoinCampfireURI == "" {
-			return fmt.Errorf("must specify either bootstrap.enabled, mesh.join-address, mesh.peer-discovery-addresses, or mesh.join-campfire-uri")
+		if o.Mesh.JoinAddress == "" && len(o.Mesh.PeerDiscoveryAddresses) == 0 {
+			return fmt.Errorf("must specify either bootstrap.enabled, mesh.join-address, or mesh.peer-discovery-addresses")
 		}
 	}
 	if err := o.Auth.Validate(); err != nil {

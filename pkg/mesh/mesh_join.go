@@ -27,10 +27,8 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 )
@@ -85,82 +83,6 @@ func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Fea
 		return fmt.Errorf("join with peer discovery: %w", err)
 	}
 	return nil
-}
-
-func (s *meshStore) joinByCampfire(ctx context.Context, features []v1.Feature) error {
-	log := s.log.With(slog.String("join-method", "campfire"))
-	uri, err := campfire.ParseCampfireURI(s.opts.Mesh.JoinCampfireURI)
-	if err != nil {
-		return fmt.Errorf("parse campfire uri: %w", err)
-	}
-	ctx = context.WithLogger(ctx, log)
-	log.Info("Joining mesh via campfire")
-	var tries int
-	for tries <= s.opts.Mesh.MaxJoinRetries {
-		// The initial connection should be fast, if it isn't,
-		// the most likely cause is that no one is waiting for us.
-		joinCtx, cancel := context.WithTimeout(ctx, time.Second*5)
-		defer cancel()
-		conn, err := campfire.Join(joinCtx, uri)
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			err = fmt.Errorf("join campfire: %w", err)
-			log.Error("Join campfire failed", slog.String("error", err.Error()))
-			if tries >= s.opts.Mesh.MaxJoinRetries {
-				return err
-			}
-			tries++
-			time.Sleep(time.Second)
-			continue
-		}
-		defer conn.Close()
-		log.Info("Established campfire connection, joining mesh")
-		key, err := s.loadWireGuardKey(ctx)
-		if err != nil {
-			return fmt.Errorf("load wireguard key: %w", err)
-		}
-		req := s.newJoinRequest(features, key)
-		log.Debug("Sending join request over campfire", slog.Any("req", req))
-		data, err := proto.Marshal(req)
-		if err != nil {
-			// This should never happen
-			return fmt.Errorf("marshal join request: %w", err)
-		}
-		_, err = conn.Write(data)
-		if err != nil {
-			log.Error("Failed to send join request over campfire", slog.String("error", err.Error()))
-			// We'll retry
-			continue
-		}
-		buf := make([]byte, 4096)
-		n, err := conn.Read(buf)
-		if err != nil {
-			log.Error("Failed to read join response over campfire", slog.String("error", err.Error()))
-			// We'll retry
-			continue
-		}
-		var resp v1.JoinResponse
-		err = proto.Unmarshal(buf[:n], &resp)
-		if err != nil {
-			// This could mean an actual error from the join server
-			log.Warn("Failed to unmarshal join response over campfire", slog.String("error", err.Error()))
-			return fmt.Errorf("campfire join error: %s", string(buf[:n]))
-		}
-		log.Info("Received join response over campfire", slog.Any("resp", &resp))
-		err = s.handleJoinResponse(context.WithLogger(context.Background(), log), &resp, key)
-		if err != nil {
-			if errors.Is(err, errFatalJoin) {
-				return err
-			}
-			// We'll retry
-			log.Error("Failed to handle join response", slog.String("error", err.Error()))
-			continue
-		}
-		return nil
-	}
-	return errFatalJoin
 }
 
 func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr string) error {

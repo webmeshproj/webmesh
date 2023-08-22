@@ -32,7 +32,6 @@ const (
 	TURNServerPortEnvVar          = "SERVICES_TURN_SERVER_PORT"
 	TURNServerRealmEnvVar         = "SERVICES_TURN_SERVER_REALM"
 	TURNSTUNPortRangeEnvVar       = "SERVICES_TURN_STUN_PORT_RANGE"
-	TURNCampfireEnabledEnvVar     = "SERVICES_TURN_CAMPFIRE_ENABLED"
 )
 
 // TURNOptions are the TURN Server options.
@@ -51,8 +50,6 @@ type TURNOptions struct {
 	ServerRealm string `json:"realm,omitempty" yaml:"realm,omitempty" toml:"realm,omitempty" mapstructure:"realm,omitempty"`
 	// STUNPortRange is the port range to use for STUN.
 	STUNPortRange string `json:"stun-port-range,omitempty" yaml:"stun-port-range,omitempty" toml:"stun-port-range,omitempty" mapstructure:"stun-port-range,omitempty"`
-	// CampfireEnabled enables handling campfire packets on the TURN server.
-	CampfireEnabled bool `json:"campfire-enabled,omitempty" yaml:"campfire-enabled,omitempty" toml:"campfire-enabled,omitempty" mapstructure:"campfire-enabled,omitempty"`
 }
 
 // NewTURNOptions creates a new TURNOptions with default values.
@@ -86,8 +83,6 @@ func (o *TURNOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 		"Realm used for TURN server authentication.")
 	fs.StringVar(&o.STUNPortRange, p+"services.turn.stun-port-range", envutil.GetEnvDefault(TURNSTUNPortRangeEnvVar, "49152-65535"),
 		"Port range to use for STUN.")
-	fs.BoolVar(&o.CampfireEnabled, p+"services.turn.campfire-enabled", envutil.GetEnvDefault(TURNCampfireEnabledEnvVar, "false") == "true",
-		"Enable handling campfire packets on the TURN server.")
 }
 
 // Validate validates the options.

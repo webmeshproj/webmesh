@@ -24,7 +24,6 @@ import (
 	"log/slog"
 	"net/netip"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -35,7 +34,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net"
@@ -85,12 +83,6 @@ type Mesh interface {
 	Network() net.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
-	// StartCampfire starts a new campfire with the given connection handler.
-	// If the handler is nil, the default behavior is to facilitate a full join
-	// into the mesh.
-	StartCampfire(ctx context.Context, uri *campfire.CampfireURI, hdlr CampfireConnHandler) error
-	// LeaveCampfire leaves the campfire with the given ID.
-	LeaveCampfire(ctx context.Context, id string) error
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh
@@ -132,7 +124,6 @@ func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 		log:              log.With(slog.String("node-id", string(nodeID))),
 		kvSubCancel:      func() {},
 		closec:           make(chan struct{}),
-		campfires:        make(map[string]campfire.CampfireChannel),
 	}
 	return st, nil
 }
@@ -189,8 +180,6 @@ type meshStore struct {
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
 	meshDomain       string
-	campfires        map[string]campfire.CampfireChannel
-	campfiremu       sync.Mutex
 	open             atomic.Bool
 	closec           chan struct{}
 	// a flag set on test stores to indicate skipping certain operations

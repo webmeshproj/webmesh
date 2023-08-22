@@ -19,7 +19,6 @@ package nodecmd
 
 import (
 	"log/slog"
-	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -29,7 +28,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
@@ -77,16 +75,8 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 			return nil, status.Errorf(codes.InvalidArgument, "error decoding config overrides: %v", err)
 		}
 	}
-	if req.GetDisableBootstrap() || req.GetCampfireUri() != "" {
+	if req.GetDisableBootstrap() {
 		app.curConfig.Mesh.Bootstrap.Enabled = false
-	}
-	if req.GetCampfireUri() != "" {
-		_, err := campfire.ParseCampfireURI(req.GetCampfireUri())
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid campfire URI: %v", err)
-		}
-		app.curConfig.Mesh.Mesh.JoinAddress = ""
-		app.curConfig.Mesh.Mesh.JoinCampfireURI = req.GetCampfireUri()
 	}
 	err := app.curConfig.Validate()
 	if err != nil {
@@ -207,58 +197,6 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 		return stream.Send(&result)
 	}
 	return status.Errorf(codes.Unimplemented, "unknown query command: %v", req.GetCommand())
-}
-
-func (app *AppDaemon) StartCampfire(ctx context.Context, req *v1.StartCampfireRequest) (*v1.StartCampfireResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	if req.GetCampUrl() == "" {
-		if !app.curConfig.Services.TURN.Enabled && !app.curConfig.Services.TURN.CampfireEnabled {
-			return nil, status.Error(codes.InvalidArgument, "Campfire TURN is not enabled on this node")
-		}
-		turnServer := "turn:" + app.curConfig.Services.TURN.PublicIP + ":" + strconv.Itoa(app.curConfig.Services.TURN.ListenPort)
-		psk, err := campfire.GeneratePSK()
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "error generating PSK: %v", err)
-		}
-		uri := &campfire.CampfireURI{
-			PSK:         psk,
-			TURNServers: []string{turnServer},
-		}
-		req.CampUrl = uri.EncodeURI()
-	}
-	parsed, err := campfire.ParseCampfireURI(req.GetCampUrl())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "error parsing campfire URI: %v", err)
-	}
-	app.log.Info("Starting campfire", "servers", parsed.TURNServers)
-	err = app.mesh.StartCampfire(ctx, parsed, nil)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error starting campfire: %v", err)
-	}
-	return &v1.StartCampfireResponse{
-		CampUrl: req.GetCampUrl(),
-	}, nil
-}
-
-func (app *AppDaemon) LeaveCampfire(ctx context.Context, req *v1.LeaveCampfireRequest) (*v1.LeaveCampfireResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	parsed, err := campfire.ParseCampfireURI(req.GetCampUrl())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "error parsing campfire URI: %v", err)
-	}
-	err = app.mesh.LeaveCampfire(ctx, string(parsed.PSK))
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error leaving campfire: %v", err)
-	}
-	return &v1.LeaveCampfireResponse{}, nil
 }
 
 func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.StatusResponse, error) {

@@ -25,7 +25,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -133,14 +132,8 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
-	} else if s.opts.Mesh.JoinCampfireURI != "" {
-		// Attempt to join the cluster by campfire.
-		err = s.joinByCampfire(ctx, features)
-		if err != nil {
-			return handleErr(fmt.Errorf("join by campfire: %w", err))
-		}
 	} else {
-		// We neither had the bootstrap flag nor the join flag set.
+		// We neither had the bootstrap flag nor any join flags set.
 		// This means we are possibly a single node cluster.
 		// Recover our previous wireguard configuration and start up.
 		if err := s.recoverWireguard(ctx); err != nil {
@@ -151,17 +144,6 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	s.kvSubCancel, err = s.raft.Storage().Subscribe(context.Background(), "", s.onDBUpdate)
 	if err != nil {
 		return handleErr(fmt.Errorf("subscribe: %w", err))
-	}
-	if s.opts.Mesh.WaitCampfireURI != "" {
-		uri, err := campfire.ParseCampfireURI(s.opts.Mesh.WaitCampfireURI)
-		if err != nil {
-			return handleErr(fmt.Errorf("parse campfire uri: %w", err))
-		}
-		err = s.StartCampfire(ctx, uri, s.handleCampfirePeering)
-		if err != nil {
-			// This should never happen
-			return handleErr(fmt.Errorf("start campfire: %w", err))
-		}
 	}
 	return nil
 }

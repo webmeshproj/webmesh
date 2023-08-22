@@ -521,8 +521,8 @@ github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYp
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1YX8=
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
-github.com/webmeshproj/api v0.2.2-0.20230816202252-1fce8e40c04c h1:/lwFy2TIe4kupgVqG6wVcMAuQf17IwtvWuieW05/e9w=
-github.com/webmeshproj/api v0.2.2-0.20230816202252-1fce8e40c04c/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.2.2 h1:rGxpd2VYZ/Q8xQSCq1OCZ0GOmbOhhEyXBsokMJmHmP0=
+github.com/webmeshproj/api v0.2.2/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944 h1:Pau7Sfvy35ulRodLsBUwdnAckYvgoNZb9wPk7ubRlZ8=
 github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944/go.mod h1:eHhYsRLIRd0yXTBtJI7qb9IbDGas8DNs08Ba1NUDmDM=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=

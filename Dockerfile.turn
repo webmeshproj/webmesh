@@ -1,5 +1,0 @@
-FROM scratch
-
-ARG TARGETOS TARGETARCH PREFIX=turn
-ADD dist/${PREFIX}_${TARGETOS}_${TARGETARCH}*/webmesh-turn /webmesh-turn
-ENTRYPOINT ["/webmesh-turn"]

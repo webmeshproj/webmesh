@@ -22,7 +22,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/campfire"
 	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
@@ -30,8 +29,6 @@ const (
 	NodeIDEnvVar                  = "MESH_NODE_ID"
 	ZoneAwarenessIDEnvVar         = "MESH_ZONE_AWARENESS_ID"
 	JoinAddressEnvVar             = "MESH_JOIN_ADDRESS"
-	JoinCampfireURIEnvVar         = "MESH_JOIN_CAMPFIRE_URI"
-	WaitCampfireURIEnvVar         = "MESH_WAIT_CAMPFIRE_URI"
 	PeerDiscoveryAddressesEnvVar  = "MESH_PEER_DISCOVERY_ADDRESSES"
 	JoinAsVoterEnvVar             = "MESH_JOIN_AS_VOTER"
 	JoinAsObserverEnvVar          = "MESH_JOIN_AS_OBSERVER"
@@ -56,10 +53,6 @@ type MeshOptions struct {
 	ZoneAwarenessID string `json:"zone-awareness-id,omitempty" yaml:"zone-awareness-id,omitempty" toml:"zone-awareness-id,omitempty" mapstructure:"zone-awareness-id,omitempty"`
 	// JoinAddress is the address of a node to join.
 	JoinAddress string `json:"join-address,omitempty" yaml:"join-address,omitempty" toml:"join-address,omitempty" mapstructure:"join-address,omitempty"`
-	// JoinCampfireURI is a camp URI to use for joining.
-	JoinCampfireURI string `json:"join-campfire-uri,omitempty" yaml:"join-campfire-uri,omitempty" toml:"join-campfire-uri,omitempty" mapstructure:"join-campfire-uri,omitempty"`
-	// WaitCampfireURI is a camp URI to allow people to join at.
-	WaitCampfireURI string `json:"wait-campfire-uri,omitempty" yaml:"wait-campfire-uri,omitempty" toml:"wait-campfire-uri,omitempty" mapstructure:"wait-campfire-uri,omitempty"`
 	// PeerDiscoveryAddresses are the addresses to use for peer discovery.
 	PeerDiscoveryAddresses []string `json:"peer-discovery-addresses,omitempty" yaml:"peer-discovery-addresses,omitempty" toml:"peer-discovery-addresses,omitempty" mapstructure:"peer-discovery-addresses,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
@@ -141,10 +134,6 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
 		o.PeerDiscoveryAddresses = append(o.PeerDiscoveryAddresses, strings.Split(val, ",")...)
 		return nil
 	})
-	fl.StringVar(&o.JoinCampfireURI, p+"mesh.join-campfire-uri", envutil.GetEnvDefault(JoinCampfireURIEnvVar, ""),
-		"Campfire URI to use for joining.")
-	fl.StringVar(&o.WaitCampfireURI, p+"mesh.wait-campfire-uri", envutil.GetEnvDefault(WaitCampfireURIEnvVar, ""),
-		"Campfire URI to allow others to join through.")
 	fl.IntVar(&o.MaxJoinRetries, p+"mesh.max-join-retries", envutil.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
 		"Maximum number of join retries.")
 	fl.BoolVar(&o.JoinAsVoter, p+"mesh.join-as-voter", envutil.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
@@ -186,18 +175,6 @@ func (o *MeshOptions) Validate() error {
 	}
 	if o.NoIPv4 && o.NoIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
-	}
-	if o.JoinCampfireURI != "" {
-		_, err := campfire.ParseCampfireURI(o.JoinCampfireURI)
-		if err != nil {
-			return fmt.Errorf("invalid join campfire URI: %w", err)
-		}
-	}
-	if o.WaitCampfireURI != "" {
-		_, err := campfire.ParseCampfireURI(o.WaitCampfireURI)
-		if err != nil {
-			return fmt.Errorf("invalid wait campfire URI: %w", err)
-		}
 	}
 	return nil
 }

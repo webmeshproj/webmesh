@@ -66,63 +66,9 @@ builds:
       - mips
       - riscv64
 
-  - id: turn
-    main: cmd/webmesh-turn/main.go
-    binary: webmesh-turn
-    env:
-      - CGO_ENABLED=0
-    tags:
-      - osusergo
-      - netgo
-    ldflags:
-      - -s -w 
-      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
-    goos:
-      - linux
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-      - arm
-      - '386'
-      - ppc64le
-      - s390x
-      - mips64le
-      - mips64
-      - mipsle
-      - mips
-      - riscv64
-
   - id: node-docker-linux
     main: cmd/webmesh-node/main.go
     binary: webmesh-node
-    env:
-      - CGO_ENABLED=0
-    tags:
-      - osusergo
-      - netgo
-    ldflags:
-      - -s -w 
-      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
-      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
-    goos:
-      - linux
-    goarch:
-      - amd64
-      - arm64
-      - arm
-      - '386'
-      - ppc64le
-      - s390x
-      - riscv64
-
-  - id: turn-docker-linux
-    main: cmd/webmesh-turn/main.go
-    binary: webmesh-turn
     env:
       - CGO_ENABLED=0
     tags:
@@ -156,7 +102,6 @@ archives:
     builds:
       - node
       - wmctl
-      - turn
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -177,7 +122,6 @@ nfpms:
     builds:
       - node
       - wmctl
-      - turn
     formats:
       - deb
       - rpm
