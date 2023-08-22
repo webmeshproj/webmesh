@@ -204,6 +204,9 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 
 	// Change to voter if requested and not already
 	if req.GetAsVoter() && currentSuffrage != raft.Voter {
+		if currentAddress == "" {
+			return nil, status.Errorf(codes.Internal, "failed to lookup peer address")
+		}
 		// Promote to voter
 		log.Info("promoting to voter", slog.String("raft_address", string(currentAddress)))
 		if err := s.store.Raft().AddVoter(ctx, peer.ID, string(currentAddress)); err != nil {
