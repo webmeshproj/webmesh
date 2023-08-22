@@ -53,9 +53,6 @@ var MethodPolicyMap = map[string]MethodPolicy{
 	v1.Mesh_ListNodes_FullMethodName:    AllowNonLeader,
 	v1.Mesh_GetMeshGraph_FullMethodName: AllowNonLeader,
 
-	// Peer Discovery API
-	v1.PeerDiscovery_ListPeers_FullMethodName: AllowNonLeader,
-
 	// WebRTC API
 	v1.WebRTC_StartDataChannel_FullMethodName: AllowNonLeader,
 

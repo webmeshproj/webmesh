@@ -41,7 +41,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/services/node"
-	"github.com/webmeshproj/webmesh/pkg/services/peerdiscovery"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
 )
@@ -90,10 +89,6 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		if o.API.Mesh {
 			log.Debug("registering mesh api")
 			v1.RegisterMeshServer(server, meshapi.NewServer(store))
-		}
-		if o.API.PeerDiscovery {
-			log.Debug("registering peer discovery api")
-			v1.RegisterPeerDiscoveryServer(server, peerdiscovery.NewServer(store))
 		}
 		if o.API.WebRTC {
 			log.Debug("registering webrtc api")

@@ -25,12 +25,11 @@ import (
 )
 
 const (
-	LeaderProxyDisabledEnvVar  = "SERVICES_API_DISABLE_LEADER_PROXY"
-	MeshEnabledEnvVar          = "SERVICES_API_MESH"
-	AdminEnabledEnvVar         = "SERVICES_API_ADMIN"
-	PeerDiscoveryEnabledEnvVar = "SERVICES_API_PEER_DISCOVERY"
-	WebRTCEnabledEnvVar        = "SERVICES_API_WEBRTC"
-	WebRTCSTUNServersEnvVar    = "SERVICES_API_STUN_SERVERS"
+	LeaderProxyDisabledEnvVar = "SERVICES_API_DISABLE_LEADER_PROXY"
+	MeshEnabledEnvVar         = "SERVICES_API_MESH"
+	AdminEnabledEnvVar        = "SERVICES_API_ADMIN"
+	WebRTCEnabledEnvVar       = "SERVICES_API_WEBRTC"
+	WebRTCSTUNServersEnvVar   = "SERVICES_API_STUN_SERVERS"
 )
 
 // APIOptions are the options for which APIs to register and expose.
@@ -41,8 +40,6 @@ type APIOptions struct {
 	Mesh bool `json:"mesh,omitempty" yaml:"mesh,omitempty" toml:"mesh,omitempty" mapstructure:"mesh,omitempty"`
 	// Admin is true if the admin API should be registered.
 	Admin bool `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty" mapstructure:"admin,omitempty"`
-	// PeerDiscovery is true if the peer discovery API should be registered.
-	PeerDiscovery bool `json:"peer-discovery,omitempty" yaml:"peer-discovery,omitempty" toml:"peer-discovery,omitempty" mapstructure:"peer-discovery,omitempty"`
 	// WebRTC is true if the WebRTC API should be registered.
 	WebRTC bool `json:"webrtc,omitempty" yaml:"webrtc,omitempty" toml:"webrtc,omitempty" mapstructure:"webrtc,omitempty"`
 	// STUNServers is a comma separated list of STUN servers to use if the WebRTC API is enabled.
@@ -68,8 +65,6 @@ func (o *APIOptions) BindFlags(fs *flag.FlagSet, prefix ...string) {
 		"Enable the admin API.")
 	fs.BoolVar(&o.Mesh, p+"services.api.mesh", envutil.GetEnvDefault(MeshEnabledEnvVar, "false") == "true",
 		"Enable the mesh API.")
-	fs.BoolVar(&o.PeerDiscovery, p+"services.api.peer-discovery", envutil.GetEnvDefault(PeerDiscoveryEnabledEnvVar, "false") == "true",
-		"Enable the peer discovery API.")
 	fs.BoolVar(&o.WebRTC, p+"services.api.webrtc", envutil.GetEnvDefault(WebRTCEnabledEnvVar, "false") == "true",
 		"Enable the WebRTC API.")
 	fs.StringVar(&o.STUNServers, p+"services.api.stun-servers", envutil.GetEnvDefault(WebRTCSTUNServersEnvVar, "stun:stun.l.google.com:19302"),

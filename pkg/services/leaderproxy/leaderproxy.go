@@ -138,10 +138,6 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 	case v1.Mesh_GetMeshGraph_FullMethodName:
 		return v1.NewMeshClient(conn).GetMeshGraph(ctx, req.(*emptypb.Empty))
 
-	// Peer Discovery API
-	case v1.PeerDiscovery_ListPeers_FullMethodName:
-		return v1.NewPeerDiscoveryClient(conn).ListPeers(ctx, req.(*emptypb.Empty))
-
 	// Admin API
 	case v1.Admin_PutRole_FullMethodName:
 		return v1.NewAdminClient(conn).PutRole(ctx, req.(*v1.Role))

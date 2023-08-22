@@ -27,7 +27,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
@@ -36,54 +35,6 @@ import (
 var (
 	errFatalJoin = fmt.Errorf("fatal join error")
 )
-
-func (s *meshStore) joinWithPeerDiscovery(ctx context.Context, features []v1.Feature) error {
-	log := s.log.With(slog.String("peer-discovery-addrs", strings.Join(s.opts.Mesh.PeerDiscoveryAddresses, ",")))
-	ctx = context.WithLogger(ctx, log)
-	log.Info("Joining mesh via peer discovery")
-	var err error
-	for _, addr := range s.opts.Mesh.PeerDiscoveryAddresses {
-		var c *grpc.ClientConn
-		c, err = s.newGRPCConn(ctx, addr)
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			log.Error("Failed to dial peer discovery address", slog.String("error", err.Error()))
-			continue
-		}
-		defer c.Close()
-		cli := v1.NewPeerDiscoveryClient(c)
-		var resp *v1.ListRaftPeersResponse
-		resp, err = cli.ListPeers(ctx, &emptypb.Empty{})
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			log.Error("Failed to list peers", slog.String("error", err.Error()))
-			continue
-		}
-		log.Info("Discovered joinable peers", slog.Any("peers", resp.Peers))
-	Peers:
-		for _, peer := range resp.Peers {
-			err = s.join(ctx, features, peer.Address)
-			if err != nil {
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-				log.Error("failed to join peer", slog.String("error", err.Error()))
-				continue Peers
-			}
-		}
-		// If we got this far, we aren't going to try another discovery server.
-		// They'll all have the same peers.
-		break
-	}
-	if err != nil {
-		return fmt.Errorf("join with peer discovery: %w", err)
-	}
-	return nil
-}
 
 func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr string) error {
 	log := s.log.With(slog.String("join-addr", joinAddr))

@@ -122,13 +122,9 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		if err = s.bootstrap(ctx, features); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
-	} else if s.opts.Mesh.JoinAddress != "" || len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
+	} else if s.opts.Mesh.JoinAddress != "" {
 		// Attempt to join the cluster.
-		if len(s.opts.Mesh.PeerDiscoveryAddresses) > 0 {
-			err = s.joinWithPeerDiscovery(ctx, features)
-		} else {
-			err = s.join(ctx, features, s.opts.Mesh.JoinAddress)
-		}
+		err = s.join(ctx, features, s.opts.Mesh.JoinAddress)
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}

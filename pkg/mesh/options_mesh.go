@@ -29,7 +29,6 @@ const (
 	NodeIDEnvVar                  = "MESH_NODE_ID"
 	ZoneAwarenessIDEnvVar         = "MESH_ZONE_AWARENESS_ID"
 	JoinAddressEnvVar             = "MESH_JOIN_ADDRESS"
-	PeerDiscoveryAddressesEnvVar  = "MESH_PEER_DISCOVERY_ADDRESSES"
 	JoinAsVoterEnvVar             = "MESH_JOIN_AS_VOTER"
 	JoinAsObserverEnvVar          = "MESH_JOIN_AS_OBSERVER"
 	MaxJoinRetriesEnvVar          = "MESH_MAX_JOIN_RETRIES"
@@ -53,8 +52,6 @@ type MeshOptions struct {
 	ZoneAwarenessID string `json:"zone-awareness-id,omitempty" yaml:"zone-awareness-id,omitempty" toml:"zone-awareness-id,omitempty" mapstructure:"zone-awareness-id,omitempty"`
 	// JoinAddress is the address of a node to join.
 	JoinAddress string `json:"join-address,omitempty" yaml:"join-address,omitempty" toml:"join-address,omitempty" mapstructure:"join-address,omitempty"`
-	// PeerDiscoveryAddresses are the addresses to use for peer discovery.
-	PeerDiscoveryAddresses []string `json:"peer-discovery-addresses,omitempty" yaml:"peer-discovery-addresses,omitempty" toml:"peer-discovery-addresses,omitempty" mapstructure:"peer-discovery-addresses,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int `json:"max-join-retries,omitempty" yaml:"max-join-retries,omitempty" toml:"max-join-retries,omitempty" mapstructure:"max-join-retries,omitempty"`
 	// JoinAsVoter is true if the node should be a raft voter.
@@ -90,12 +87,6 @@ func NewMeshOptions(grpcPort int) *MeshOptions {
 		grpcPort = DefaultGRPCPort
 	}
 	return &MeshOptions{
-		PeerDiscoveryAddresses: func() []string {
-			if val, ok := os.LookupEnv(PeerDiscoveryAddressesEnvVar); ok {
-				return strings.Split(val, ",")
-			}
-			return nil
-		}(),
 		Routes: func() []string {
 			if val, ok := os.LookupEnv(NodeRoutesEnvVar); ok {
 				return strings.Split(val, ",")
@@ -130,10 +121,6 @@ func (o *MeshOptions) BindFlags(fl *flag.FlagSet, prefix ...string) {
 		"Zone awareness ID. If set, the server will prioritize peer endpoints in the same zone.")
 	fl.StringVar(&o.JoinAddress, p+"mesh.join-address", envutil.GetEnvDefault(JoinAddressEnvVar, ""),
 		"Address of a node to join.")
-	fl.Func(p+"mesh.peer-discovery-addresses", "Addresses to use for peer discovery.", func(val string) error {
-		o.PeerDiscoveryAddresses = append(o.PeerDiscoveryAddresses, strings.Split(val, ",")...)
-		return nil
-	})
 	fl.IntVar(&o.MaxJoinRetries, p+"mesh.max-join-retries", envutil.GetEnvIntDefault(MaxJoinRetriesEnvVar, 10),
 		"Maximum number of join retries.")
 	fl.BoolVar(&o.JoinAsVoter, p+"mesh.join-as-voter", envutil.GetEnvDefault(JoinAsVoterEnvVar, "false") == "true",
@@ -185,7 +172,6 @@ func (o *MeshOptions) DeepCopy() *MeshOptions {
 		return nil
 	}
 	other := *o
-	other.PeerDiscoveryAddresses = append([]string(nil), o.PeerDiscoveryAddresses...)
 	other.Routes = append([]string(nil), o.Routes...)
 	other.DirectPeers = append([]string(nil), o.DirectPeers...)
 	return &other

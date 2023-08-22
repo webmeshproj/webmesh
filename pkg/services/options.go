@@ -232,9 +232,6 @@ func (o *Options) ToFeatureSet() []v1.Feature {
 		if o.API.Admin {
 			features = append(features, v1.Feature_ADMIN_API)
 		}
-		if o.API.PeerDiscovery {
-			features = append(features, v1.Feature_PEER_DISCOVERY)
-		}
 		if o.API.WebRTC {
 			features = append(features, v1.Feature_ICE_NEGOTIATION)
 		}
