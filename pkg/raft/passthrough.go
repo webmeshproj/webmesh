@@ -214,6 +214,9 @@ func (p *passthroughStorage) Get(ctx context.Context, key string) (string, error
 	}
 	if result.GetError() != "" {
 		// TODO: Should find a way to type assert this error
+		if result.GetError() == "key not found" {
+			return "", storage.ErrKeyNotFound
+		}
 		return "", errors.New(result.GetError())
 	}
 	return result.GetValue()[0], nil
