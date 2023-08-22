@@ -121,7 +121,7 @@ services:
       - --bridge.site-2.services.listen-address=:8444
       - --bridge.site-2.wireguard.listen-port=51822
       - --bridge.site-2.raft.listen-address=:9444
-      - --bridge.site-1.mesh.join-as-observer
+      - --bridge.site-2.mesh.join-as-observer
       # Bridged DNS Options. The DNS server will handle queries for both
       # site-1.internal and site-2.internal and act as a forwarder for each.
       - --bridge.services.meshdns.enabled
