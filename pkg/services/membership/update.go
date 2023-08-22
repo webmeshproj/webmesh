@@ -135,17 +135,19 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		// Peer doesn't exist, they need to call Join first
 		return nil, status.Errorf(codes.FailedPrecondition, "node %s not found", req.GetId())
 	}
-	// Determine the peer's current status
-	for _, server := range cfg.Servers {
-		if server.ID == raft.ServerID(peer.ID) {
-			currentSuffrage = server.Suffrage
-			currentAddress = server.Address
-			break
+	if !s.insecure {
+		// Determine the peer's current status
+		for _, server := range cfg.Servers {
+			if server.ID == raft.ServerID(peer.ID) {
+				currentSuffrage = server.Suffrage
+				currentAddress = server.Address
+				break
+			}
 		}
-	}
-	if currentSuffrage == -1 || currentAddress == "" {
-		// We weren't able to determine their suffrage...strange
-		return nil, status.Errorf(codes.Internal, "failed to determine peer suffrage")
+		if currentSuffrage == -1 || currentAddress == "" {
+			// We weren't able to determine their suffrage...strange
+			return nil, status.Errorf(codes.Internal, "failed to determine peer suffrage")
+		}
 	}
 	// Ensure any new routes
 	_, err = s.ensurePeerRoutes(ctx, peer.ID, req.GetRoutes())

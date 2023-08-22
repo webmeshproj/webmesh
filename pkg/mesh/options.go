@@ -139,7 +139,15 @@ func (o *Options) Validate() error {
 
 // IsRaftMember returns if these options designate becoming a raft member.
 func (o *Options) IsRaftMember() bool {
-	return (o.Bootstrap != nil && o.Bootstrap.Enabled) || (o.Mesh != nil && (o.Mesh.JoinAsVoter || o.Mesh.JoinAsObserver))
+	if o.Bootstrap != nil && o.Bootstrap.Enabled {
+		return true
+	}
+	if o.Mesh != nil {
+		if o.Mesh.JoinAsVoter || o.Mesh.JoinAsObserver {
+			return true
+		}
+	}
+	return false
 }
 
 // TLSConfig returns the TLS configuration.
