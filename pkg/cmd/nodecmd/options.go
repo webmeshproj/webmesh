@@ -163,6 +163,7 @@ be equivalent to the shown command line flag:
 	flagsUsage(flagset, "Raft Configurations:", "raft")
 	flagsUsage(flagset, "TLS Configurations:", "tls")
 	flagsUsage(flagset, "WireGuard Configurations:", "wireguard")
+	flagsUsage(flagset, "Discovery Configurations:", "discovery")
 	flagsUsage(flagset, "Service Configurations:", "services")
 	flagsUsage(flagset, "Plugin Configurations:", "plugins")
 
