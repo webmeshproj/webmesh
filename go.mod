@@ -22,6 +22,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.25.0
 	github.com/miekg/dns v1.1.55
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/multiformats/go-multiaddr v0.11.0
 	github.com/pelletier/go-toml/v2 v2.0.9
 	github.com/pion/datachannel v1.5.5
 	github.com/pion/logging v0.2.2
@@ -125,7 +126,6 @@ require (
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
-	github.com/multiformats/go-multiaddr v0.11.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.2.0 // indirect

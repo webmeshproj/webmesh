@@ -14,21 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package discovery contains facilities for discovering peers in order to join a mesh.
-package discovery
+package libp2p
 
 import (
-	"context"
-	"io"
+	"bufio"
+
+	"github.com/libp2p/go-libp2p/core/network"
 )
 
-// Discovery is the interface for discovering peers in order to join a mesh.
-// It is used both by peers announcing for others to join and by peers joining a mesh.
-type Discovery interface {
-	// Start starts the discovery service.
-	Start(context.Context) error
-	// Stop stops the discovery service.
-	Stop() error
-	// Accept returns a connection to a peer.
-	Accept() (io.ReadWriteCloser, error)
+// kadStream is a wrapper around a libp2p stream.
+type kadStream struct {
+	*bufio.ReadWriter
+	s network.Stream
 }
+
+// Close closes the stream.
+func (k *kadStream) Close() error { return k.s.Close() }

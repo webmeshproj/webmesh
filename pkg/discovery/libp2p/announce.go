@@ -14,49 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discovery
+package libp2p
 
 import (
 	"bufio"
 	"fmt"
 	"io"
-	"sync"
-	"time"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
-	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	meshdiscovery "github.com/webmeshproj/webmesh/pkg/discovery"
 )
 
-// JoinProtocol is the protocol used for joining a mesh.
-const JoinProtocol = protocol.ID("/webmesh/join/0.0.1")
-
-// KadDHTOptions are options for announcing the host or discovering peers
-// on the libp2p kademlia DHT.
-type KadDHTOptions struct {
-	// PSK is the pre-shared key to use as a rendezvous point for the DHT.
-	PSK string
-	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
-	// If empty or nil, the default bootstrap peers will be used.
-	BootstrapPeers []multiaddr.Multiaddr
-	// Options are options for configuring the libp2p host.
-	Options []libp2p.Option
-	// DiscoveryTTL is the TTL to use for the discovery service.
-	// This is only applicable when announcing the host.
-	DiscoveryTTL time.Duration
-}
-
 // NewKadDHTAnnouncer creates a new announcer for the libp2p kademlia DHT.
-func NewKadDHTAnnouncer(opts *KadDHTOptions) (Discovery, error) {
+func NewKadDHTAnnouncer(opts *KadDHTOptions) (meshdiscovery.Discovery, error) {
 	host, err := libp2p.New(opts.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)
@@ -91,32 +69,10 @@ func (kad *kadDHTAnnouncer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("libp2p new dht: %w", err)
 	}
-	err = kaddht.Bootstrap(ctx)
+	err = bootstrapDHT(ctx, kad.host, kaddht, kad.opts.BootstrapPeers)
 	if err != nil {
-		return fmt.Errorf("libp2p dht bootstrap: %w", err)
+		return fmt.Errorf("libp2p bootstrap dht: %w", err)
 	}
-	bootstrapPeers := kad.opts.BootstrapPeers
-	if len(bootstrapPeers) == 0 {
-		bootstrapPeers = dht.DefaultBootstrapPeers
-	}
-	var wg sync.WaitGroup
-	for _, peerAddr := range bootstrapPeers {
-		peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
-		if err != nil {
-			log.Warn("Failed to parse bootstrap peer address", "error", err.Error())
-			continue
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := kad.host.Connect(ctx, *peerinfo); err != nil {
-				log.Warn("Failed to connect to bootstrap peer", "error", err.Error())
-				return
-			}
-			log.Debug("Connection established with bootstrap node", "node", peerinfo.String())
-		}()
-	}
-	wg.Wait()
 	log.Debug("Announcing join protocol with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(kaddht)
 	announceCtx, cancel := context.WithCancel(context.Background())
@@ -145,10 +101,3 @@ func (kad *kadDHTAnnouncer) Accept() (io.ReadWriteCloser, error) {
 		return conn, nil
 	}
 }
-
-type kadStream struct {
-	*bufio.ReadWriter
-	s network.Stream
-}
-
-func (k *kadStream) Close() error { return k.s.Close() }
