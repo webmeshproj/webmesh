@@ -32,10 +32,20 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshdiscovery "github.com/webmeshproj/webmesh/pkg/discovery"
+	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 )
 
 // NewKadDHTAnnouncer creates a new announcer for the libp2p kademlia DHT.
-func NewKadDHTAnnouncer(opts *KadDHTOptions) (meshdiscovery.Discovery, error) {
+func NewKadDHTAnnouncer(ctx context.Context, opts *KadDHTOptions) (meshdiscovery.Discovery, error) {
+	log := context.LoggerFrom(ctx)
+	err := buffers.SetMaximumReadBuffer(2500000)
+	if err != nil {
+		log.Warn("Failed to set maximum read buffer", "error", err.Error())
+	}
+	err = buffers.SetMaximumWriteBuffer(2500000)
+	if err != nil {
+		log.Warn("Failed to set maximum write buffer", "error", err.Error())
+	}
 	host, err := libp2p.New(opts.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)

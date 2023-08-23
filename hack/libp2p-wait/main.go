@@ -19,6 +19,7 @@ import (
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 
+	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
@@ -37,6 +38,14 @@ func main() {
 
 	ctx := context.Background()
 	log = logutil.SetupLogging(*logLevel)
+	err := buffers.SetMaximumReadBuffer(2500000)
+	if err != nil {
+		log.Warn("Failed to set maximum read buffer", "error", err.Error())
+	}
+	err = buffers.SetMaximumWriteBuffer(2500000)
+	if err != nil {
+		log.Warn("Failed to set maximum write buffer", "error", err.Error())
+	}
 	host, err := libp2p.New()
 	if err != nil {
 		panic(err)
