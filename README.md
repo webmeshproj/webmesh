@@ -19,8 +19,6 @@ It differs from other WireGuard™ management solutions in that:
 - A plugin API is provided for adding additional functionality, such as a distributed database for storing the mesh state or additional authentication mechanisms.
 - An application API is also provided for interacting with the mesh network, and is used by the CLI and GUI applications.
 
-**This project is not yet ready for production use, but I hope to rapidly get there. For now, expect backwards-incompatible changes.**
-
 ## Getting Started
 
 Detailed instructions can be found in the [Getting Started](https://webmeshproj.github.io/documentation/getting-started/) guide on the project website.
