@@ -82,6 +82,14 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid config: %v", err)
 	}
+	if req.GetJoinPsk() != "" {
+		app.curConfig.Mesh.Bootstrap.Enabled = false
+		app.curConfig.Mesh.Mesh.JoinAddress = ""
+		app.curConfig.Mesh.Discovery = &mesh.DiscoveryOptions{
+			PSK:       req.GetJoinPsk(),
+			UseKadDHT: true,
+		}
+	}
 	conn, err := mesh.New(app.curConfig.Mesh)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error creating mesh: %v", err)
