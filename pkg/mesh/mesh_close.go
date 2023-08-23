@@ -33,6 +33,12 @@ func (s *meshStore) Close() error {
 	defer s.open.Store(false)
 	defer close(s.closec)
 	s.kvSubCancel()
+	if s.discovery != nil {
+		s.log.Debug("stopping discovery service")
+		if err := s.discovery.Stop(); err != nil {
+			s.log.Error("error stopping discovery service", slog.String("error", err.Error()))
+		}
+	}
 	if s.nw != nil {
 		// Do this last so that we don't lose connectivity to the network
 		defer func() {

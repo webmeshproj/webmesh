@@ -29,6 +29,7 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
@@ -40,7 +41,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
-func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error {
+func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
 	// Check if the mesh network is defined
 	_, err := s.Storage().Get(ctx, state.IPv6PrefixKey)
 	var firstBootstrap bool
@@ -63,16 +64,16 @@ func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error 
 			return s.recoverWireguard(ctx)
 		}
 		// Try to rejoin one of the bootstrap servers
-		return s.rejoinBootstrapServer(ctx, features)
+		return s.rejoinBootstrapServer(ctx, features, wireguardKey)
 	}
 	var bootstrapOpts raft.BootstrapOptions
 	bootstrapOpts.Servers = s.opts.Bootstrap.Servers
 	bootstrapOpts.AdvertiseAddress = s.opts.Bootstrap.AdvertiseAddress
 	bootstrapOpts.OnBootstrapped = func(isLeader bool) error {
 		if isLeader {
-			return s.initialBootstrapLeader(ctx, features)
+			return s.initialBootstrapLeader(ctx, features, wireguardKey)
 		}
-		return s.initialBootstrapNonLeader(ctx, features)
+		return s.initialBootstrapNonLeader(ctx, features, wireguardKey)
 	}
 	err = s.raft.Bootstrap(ctx, &bootstrapOpts)
 	if err != nil {
@@ -83,7 +84,7 @@ func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error 
 			if len(s.opts.Bootstrap.Servers) > 0 {
 				s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 				s.opts.Mesh.JoinAsVoter = true
-				return s.rejoinBootstrapServer(ctx, features)
+				return s.rejoinBootstrapServer(ctx, features, wireguardKey)
 			}
 			// We were the only bootstrap server, so we need to rejoin ourselves
 			// This is not foolproof, but it's the best we can do if the bootstrap
@@ -96,7 +97,7 @@ func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature) error 
 	return nil
 }
 
-func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Feature) error {
+func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
 	cfg, err := s.raft.Configuration()
 	if err != nil {
 		// Should never happen
@@ -284,6 +285,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	p := peers.New(s.Storage())
 	self := peers.Node{
 		ID:                 s.ID(),
+		PublicKey:          wireguardKey.PublicKey(),
 		GRPCPort:           s.opts.Mesh.GRPCAdvertisePort,
 		RaftPort:           s.raft.ListenPort(),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
@@ -291,13 +293,6 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		ZoneAwarenessID:    s.opts.Mesh.ZoneAwarenessID,
 		Features:           features,
 	}
-	// Go ahead and generate our private key.
-	s.log.Info("Generating wireguard key for ourselves")
-	wireguardKey, err := s.loadWireGuardKey(ctx)
-	if err != nil {
-		return fmt.Errorf("generate private key: %w", err)
-	}
-	self.PublicKey = wireguardKey.PublicKey()
 	// Allocate addresses
 	var privatev4 netip.Prefix
 	if !s.opts.Mesh.NoIPv4 {
@@ -441,7 +436,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	return nil
 }
 
-func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1.Feature) error {
+func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
 	if s.testStore {
 		return nil
 	}
@@ -471,10 +466,10 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1
 	joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
 	s.opts.Mesh.JoinAsVoter = true
 	time.Sleep(3 * time.Second)
-	return s.join(ctx, features, joinAddr)
+	return s.join(ctx, features, joinAddr, wireguardKey)
 }
 
-func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Feature) error {
+func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
 	s.opts.Mesh.JoinAsVoter = true
 	for id, server := range s.opts.Bootstrap.Servers {
 		if id == s.ID() {
@@ -494,7 +489,7 @@ func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Fea
 			grpcPort = s.opts.Mesh.GRPCAdvertisePort
 		}
 		joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
-		if err = s.join(ctx, features, joinAddr); err != nil {
+		if err = s.join(ctx, features, joinAddr, wireguardKey); err != nil {
 			s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
 			continue
 		}

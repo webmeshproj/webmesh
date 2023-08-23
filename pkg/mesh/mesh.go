@@ -35,6 +35,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/discovery"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
@@ -168,20 +169,21 @@ func determineNodeID(log *slog.Logger, tlsConfig *tls.Config, opts *Options) str
 }
 
 type meshStore struct {
+	open             atomic.Bool
+	nodeID           string
+	meshDomain       string
 	opts             *Options
 	raft             raft.Raft
-	log              *slog.Logger
-	nodeID           string
 	tlsConfig        *tls.Config
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
 	nw               net.Manager
+	discovery        discovery.Discovery
 	peerUpdateGroup  *errgroup.Group
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
-	meshDomain       string
-	open             atomic.Bool
 	closec           chan struct{}
+	log              *slog.Logger
 	// a flag set on test stores to indicate skipping certain operations
 	testStore bool
 }

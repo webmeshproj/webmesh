@@ -24,11 +24,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/discovery/libp2p"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 )
 
@@ -36,7 +39,7 @@ var (
 	errFatalJoin = fmt.Errorf("fatal join error")
 )
 
-func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr string) error {
+func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr string, key wgtypes.Key) error {
 	log := s.log.With(slog.String("join-addr", joinAddr))
 	ctx = context.WithLogger(ctx, log)
 	log.Info("Joining mesh via gRPC")
@@ -61,7 +64,7 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 			time.Sleep(time.Second)
 			continue
 		}
-		err = s.joinWithConn(ctx, conn, features)
+		err = s.joinWithConn(ctx, conn, features, key)
 		if err != nil {
 			if errors.Is(err, errFatalJoin) {
 				return err
@@ -83,13 +86,62 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 	return err
 }
 
-func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, features []v1.Feature) error {
+func (s *meshStore) joinWithKadDHT(ctx context.Context, features []v1.Feature, key wgtypes.Key) error {
+	var peers []multiaddr.Multiaddr
+	for _, p := range s.opts.Discovery.KadBootstrapServers {
+		mul, err := multiaddr.NewMultiaddr(p)
+		if err != nil {
+			return fmt.Errorf("new multiaddr: %w", err)
+		}
+		peers = append(peers, mul)
+	}
+	discover, err := libp2p.NewKadDHTJoiner(ctx, &libp2p.KadDHTOptions{
+		PSK:            s.opts.Discovery.PSK,
+		BootstrapPeers: peers,
+	})
+	if err != nil {
+		return fmt.Errorf("new kad dht joiner: %w", err)
+	}
+	if err := discover.Start(ctx); err != nil {
+		return fmt.Errorf("start peer discovery: %w", err)
+	}
+	defer func() {
+		err := discover.Stop()
+		if err != nil {
+			s.log.Error("error stopping discovery service", slog.String("error", err.Error()))
+		}
+	}()
+	conn, err := discover.Accept()
+	if err != nil {
+		return fmt.Errorf("accept peer stream: %w", err)
+	}
+	defer conn.Close()
+	// Send a join request to the peer
+	req := s.newJoinRequest(features, key)
+	data, err := proto.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("marshal join request: %w", err)
+	}
+	_, err = conn.Write(data)
+	if err != nil {
+		return fmt.Errorf("write join request: %w", err)
+	}
+	// Read a join response from the peer
+	var resp v1.JoinResponse
+	b := make([]byte, 4096)
+	n, err := conn.Read(b)
+	if err != nil {
+		return fmt.Errorf("read join response: %w", err)
+	}
+	if err := proto.Unmarshal(b[:n], &resp); err != nil {
+		return fmt.Errorf("unmarshal join response: %w", err)
+	}
+	return s.handleJoinResponse(ctx, &resp, key)
+}
+
+func (s *meshStore) joinWithConn(ctx context.Context, c *grpc.ClientConn, features []v1.Feature, key wgtypes.Key) error {
 	log := context.LoggerFrom(ctx)
 	defer c.Close()
-	key, err := s.loadWireGuardKey(ctx)
-	if err != nil {
-		return fmt.Errorf("load wireguard key: %w", err)
-	}
 	req := s.newJoinRequest(features, key)
 	log.Debug("Sending join request to node", slog.Any("req", req))
 	resp, err := s.doJoinGRPC(ctx, c, req)
