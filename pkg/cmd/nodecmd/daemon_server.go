@@ -78,10 +78,6 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if req.GetDisableBootstrap() {
 		app.curConfig.Mesh.Bootstrap.Enabled = false
 	}
-	err := app.curConfig.Validate()
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid config: %v", err)
-	}
 	if req.GetJoinPsk() != "" {
 		app.curConfig.Mesh.Bootstrap.Enabled = false
 		app.curConfig.Mesh.Mesh.JoinAddress = ""
@@ -89,6 +85,10 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 			PSK:       req.GetJoinPsk(),
 			UseKadDHT: true,
 		}
+	}
+	err := app.curConfig.Validate()
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid config: %v", err)
 	}
 	conn, err := mesh.New(app.curConfig.Mesh)
 	if err != nil {
