@@ -85,6 +85,9 @@ func main() {
 		if peer.ID == host.ID() {
 			continue
 		}
+		if len(peer.Addrs) == 0 {
+			continue
+		}
 		log.Info("Found peer to join", "peer", peer.ID)
 		jctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		s, err := host.NewStream(jctx, peer.ID, JoinProtocol)
