@@ -124,13 +124,14 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		}
 	}
 	// Register the membership API if we are a raft member
-	if store.Raft().IsVoter() || store.Raft().IsObserver() {
+	isRaftMember := store.Raft().IsVoter() || store.Raft().IsObserver()
+	if isRaftMember {
 		log.Debug("registering membership service")
 		v1.RegisterMembershipServer(server, membership.NewServer(store, insecureServices))
 	}
 	// Always register the node server
 	log.Debug("registering node service")
-	v1.RegisterNodeServer(server, node.NewServer(store, o.ToFeatureSet(), insecureServices))
+	v1.RegisterNodeServer(server, node.NewServer(store, o.ToFeatureSet(isRaftMember), insecureServices))
 	// Register the health service
 	log.Debug("registering health service")
 	healthpb.RegisterHealthServer(server, server)

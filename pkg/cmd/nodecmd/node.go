@@ -152,7 +152,16 @@ func executeSingleMesh(ctx context.Context, config *Options) error {
 	}
 	var features []v1.Feature
 	if !config.Global.DisableFeatureAdvertisement {
-		features = config.Services.ToFeatureSet()
+		isRaftMember := func() bool {
+			if config.Mesh.Bootstrap != nil && config.Mesh.Bootstrap.Enabled {
+				return true
+			}
+			if config.Mesh.Mesh != nil {
+				return config.Mesh.Mesh.JoinAsVoter || config.Mesh.Mesh.JoinAsObserver
+			}
+			return false
+		}()
+		features = config.Services.ToFeatureSet(isRaftMember)
 	}
 	err = st.Open(ctx, features)
 	if err != nil {

@@ -26,7 +26,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
@@ -86,7 +85,16 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error creating mesh: %v", err)
 	}
-	err = conn.Open(ctx, app.curConfig.Services.ToFeatureSet())
+	isRaftMember := func() bool {
+		if app.curConfig.Mesh.Bootstrap != nil && app.curConfig.Mesh.Bootstrap.Enabled {
+			return true
+		}
+		if app.curConfig.Mesh.Mesh != nil {
+			return app.curConfig.Mesh.Mesh.JoinAsVoter || app.curConfig.Mesh.Mesh.JoinAsObserver
+		}
+		return false
+	}()
+	err = conn.Open(ctx, app.curConfig.Services.ToFeatureSet(isRaftMember))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error opening mesh: %v", err)
 	}
@@ -238,7 +246,7 @@ func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.Stat
 	}, nil
 }
 
-func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*emptypb.Empty, error) {
+func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
 	if app.mesh == nil {
@@ -251,7 +259,7 @@ func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*emp
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error publishing: %v", err)
 	}
-	return &emptypb.Empty{}, nil
+	return &v1.PublishResponse{}, nil
 }
 func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
 	app.mu.Lock()

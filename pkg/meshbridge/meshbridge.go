@@ -137,7 +137,16 @@ func (m *meshBridge) Start(ctx context.Context) error {
 	// Start all the mesh connections
 	for id, meshOpts := range m.opts.Meshes {
 		meshID := id
-		features := meshOpts.Services.ToFeatureSet()
+		isRaftMember := func() bool {
+			if meshOpts.Mesh.Bootstrap != nil && meshOpts.Mesh.Bootstrap.Enabled {
+				return true
+			}
+			if meshOpts.Mesh.Mesh != nil {
+				return meshOpts.Mesh.Mesh.JoinAsVoter || meshOpts.Mesh.Mesh.JoinAsObserver
+			}
+			return false
+		}()
+		features := meshOpts.Services.ToFeatureSet(isRaftMember)
 		// Open the mesh connection
 		m.log.Info("opening mesh", slog.String("mesh-id", meshID))
 		mesh := m.Mesh(meshID)
@@ -246,7 +255,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		}
 		if m.opts.MeshDNS != nil && m.opts.MeshDNS.Enabled {
 			// Tell the leader we can do forwarded meshdns now also
-			currentFeats := m.opts.Meshes[meshID].Services.ToFeatureSet()
+			currentFeats := m.opts.Meshes[meshID].Services.ToFeatureSet(mesh.Raft().IsVoter() || mesh.Raft().IsObserver())
 			req.Features = append(currentFeats, v1.Feature_MESH_DNS, v1.Feature_FORWARD_MESH_DNS)
 			req.MeshdnsPort = int32(dnsport)
 		}
