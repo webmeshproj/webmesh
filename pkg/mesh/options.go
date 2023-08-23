@@ -49,6 +49,8 @@ type Options struct {
 	TLS *TLSOptions `json:"tls,omitempty" yaml:"tls,omitempty" toml:"tls,omitempty" mapstructure:"tls,omitempty"`
 	// WireGuard are options for WireGuard.
 	WireGuard *WireGuardOptions `json:"wireguard,omitempty" yaml:"wireguard,omitempty" toml:"wireguard,omitempty" mapstructure:"wireguard,omitempty"`
+	// Discovery are options for discovering peers.
+	Discovery *DiscoveryOptions `json:"discovery,omitempty" yaml:"discovery,omitempty" toml:"discovery,omitempty" mapstructure:"discovery,omitempty"`
 	// Plugins are options for plugins.
 	Plugins *plugins.Options `yaml:"plugins,omitempty" json:"plugins,omitempty" toml:"plugins,omitempty" mapstructure:"plugins,omitempty"`
 }
@@ -63,6 +65,7 @@ func NewOptions(interfaceName string, wireguardPort, grpcPort, raftPort int) *Op
 		Raft:      raft.NewOptions(raftPort),
 		TLS:       NewTLSOptions(),
 		WireGuard: NewWireGuardOptions(interfaceName, wireguardPort),
+		Discovery: NewDiscoveryOptions(),
 		Plugins:   plugins.NewOptions(),
 	}
 }
@@ -76,6 +79,7 @@ func NewDefaultOptions() *Options {
 		Raft:      raft.NewOptions(0),
 		TLS:       NewTLSOptions(),
 		WireGuard: NewWireGuardOptions("", 0),
+		Discovery: NewDiscoveryOptions(),
 		Plugins:   plugins.NewOptions(),
 	}
 }
@@ -88,6 +92,7 @@ func (o *Options) BindFlags(fl *flag.FlagSet, ifaceName string, prefix ...string
 	o.Raft.BindFlags(fl, prefix...)
 	o.TLS.BindFlags(fl, prefix...)
 	o.WireGuard.BindFlags(fl, ifaceName, prefix...)
+	o.Discovery.BindFlags(fl, prefix...)
 	o.Plugins.BindFlags(fl, prefix...)
 }
 
@@ -103,6 +108,7 @@ func (o *Options) DeepCopy() *Options {
 		Raft:      o.Raft.DeepCopy(),
 		TLS:       o.TLS.DeepCopy(),
 		WireGuard: o.WireGuard.DeepCopy(),
+		Discovery: o.Discovery.DeepCopy(),
 		Plugins:   o.Plugins.DeepCopy(),
 	}
 }
@@ -133,6 +139,11 @@ func (o *Options) Validate() error {
 	}
 	if err := o.WireGuard.Validate(); err != nil {
 		return err
+	}
+	if o.Discovery != nil {
+		if err := o.Discovery.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
