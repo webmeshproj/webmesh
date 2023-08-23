@@ -37,6 +37,7 @@ import (
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
+
 	config     *Options
 	curConfig  *Options
 	mesh       mesh.Mesh
@@ -261,6 +262,7 @@ func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.
 	}
 	return &v1.PublishResponse{}, nil
 }
+
 func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
 	app.mu.Lock()
 	if app.mesh == nil {
@@ -283,4 +285,33 @@ func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_Subsc
 	defer cancel()
 	<-srv.Context().Done()
 	return nil
+}
+
+func (app *AppDaemon) AnnounceDHT(ctx context.Context, req *v1.AnnounceDHTRequest) (*v1.AnnounceDHTResponse, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh == nil {
+		return nil, ErrNotConnected
+	}
+	err := app.mesh.AnnounceDHT(ctx, &mesh.DiscoveryOptions{
+		PSK:                 req.GetPsk(),
+		KadBootstrapServers: req.GetBootstrapServers(),
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error announcing: %v", err)
+	}
+	return &v1.AnnounceDHTResponse{}, nil
+}
+
+func (app *AppDaemon) LeaveDHT(ctx context.Context, req *v1.LeaveDHTRequest) (*v1.LeaveDHTResponse, error) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if app.mesh == nil {
+		return nil, ErrNotConnected
+	}
+	err := app.mesh.LeaveDHT(ctx, req.GetPsk())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error leaving: %v", err)
+	}
+	return &v1.LeaveDHTResponse{}, nil
 }

@@ -24,6 +24,7 @@ import (
 	"log/slog"
 	"net/netip"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -73,7 +74,7 @@ type Mesh interface {
 	// Dial opens a new gRPC connection to the given node.
 	Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error)
 	// DialLeader opens a new gRPC connection to the current Raft leader.
-	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
+	DialLeader(context.Context) (*grpc.ClientConn, error)
 	// Leader returns the current Raft leader ID.
 	Leader() (string, error)
 	// Storage returns a storage interface for use by the application.
@@ -84,6 +85,10 @@ type Mesh interface {
 	Network() net.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
+	// AnnounceDHT announces the peer discovery service via DHT.
+	AnnounceDHT(context.Context, *DiscoveryOptions) error
+	// LeaveDHT leaves the peer discovery service for the given PSK.
+	LeaveDHT(ctx context.Context, psk string) error
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh
@@ -124,6 +129,7 @@ func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 		dnsUpdateGroup:   &dnsUpdateGroup,
 		log:              log.With(slog.String("node-id", string(nodeID))),
 		kvSubCancel:      func() {},
+		discoveries:      make(map[string]discovery.Discovery),
 		closec:           make(chan struct{}),
 	}
 	return st, nil
@@ -178,10 +184,11 @@ type meshStore struct {
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
 	nw               net.Manager
-	discovery        discovery.Discovery
 	peerUpdateGroup  *errgroup.Group
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
+	discoveries      map[string]discovery.Discovery
+	discovermu       sync.Mutex
 	closec           chan struct{}
 	log              *slog.Logger
 	// a flag set on test stores to indicate skipping certain operations
