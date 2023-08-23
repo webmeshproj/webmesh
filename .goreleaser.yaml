@@ -34,7 +34,6 @@ builds:
       - mips64
       - mipsle
       - mips
-      - riscv64
 
   - id: wmctl
     main: cmd/wmctl/main.go
@@ -64,7 +63,6 @@ builds:
       - mips64
       - mipsle
       - mips
-      - riscv64
 
   - id: node-docker-linux
     main: cmd/webmesh-node/main.go
@@ -88,7 +86,6 @@ builds:
       - '386'
       - ppc64le
       - s390x
-      - riscv64
 
 checksum:
   name_template: 'checksums.txt'
