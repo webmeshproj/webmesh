@@ -132,14 +132,14 @@ func (s *meshStore) joinWithKadDHT(ctx context.Context, features []v1.Feature, k
 	}
 	// Read a join response from the peer
 	var resp v1.JoinResponse
-	b := make([]byte, 65536)
+	b := make([]byte, 8192)
 	n, err := conn.Read(b)
 	if err != nil {
 		if err != io.EOF && n == 0 {
 			return fmt.Errorf("read join response: %w", err)
 		}
 	}
-	if bytes.HasPrefix(b[:n], []byte("ERROR:")) {
+	if bytes.HasPrefix(b[:n], []byte("ERROR: ")) {
 		return fmt.Errorf("join error: %s", string(b[:n]))
 	}
 	if err := proto.Unmarshal(b[:n], &resp); err != nil {

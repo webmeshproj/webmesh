@@ -150,12 +150,10 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	if err != nil {
 		return handleErr(fmt.Errorf("subscribe: %w", err))
 	}
-	if s.opts.Discovery != nil {
-		if s.opts.Discovery.Announce {
-			err = s.AnnounceDHT(ctx, s.opts.Discovery)
-			if err != nil {
-				return handleErr(fmt.Errorf("announce dht: %w", err))
-			}
+	if s.opts.Discovery != nil && s.opts.Discovery.Announce {
+		err = s.AnnounceDHT(ctx, s.opts.Discovery)
+		if err != nil {
+			return handleErr(fmt.Errorf("announce dht: %w", err))
 		}
 	}
 	return nil

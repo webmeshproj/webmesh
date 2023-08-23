@@ -34,7 +34,7 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts *DiscoveryOptions) err
 	log := context.LoggerFrom(ctx)
 	log.Info("Announcing peer discovery service")
 	var peers []multiaddr.Multiaddr
-	for _, p := range s.opts.Discovery.KadBootstrapServers {
+	for _, p := range opts.KadBootstrapServers {
 		mul, err := multiaddr.NewMultiaddr(p)
 		if err != nil {
 			return fmt.Errorf("new multiaddr: %w", err)
@@ -42,7 +42,7 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts *DiscoveryOptions) err
 		peers = append(peers, mul)
 	}
 	discover, err := libp2p.NewKadDHTAnnouncer(ctx, &libp2p.KadDHTOptions{
-		PSK:            s.opts.Discovery.PSK,
+		PSK:            opts.PSK,
 		BootstrapPeers: peers,
 		DiscoveryTTL:   time.Minute, // TODO: Make this configurable
 	})
@@ -64,7 +64,7 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts *DiscoveryOptions) err
 		}
 	}()
 	s.discovermu.Lock()
-	s.discoveries[s.opts.Discovery.PSK] = discover
+	s.discoveries[opts.PSK] = discover
 	s.discovermu.Unlock()
 	return nil
 }
@@ -87,7 +87,7 @@ func (s *meshStore) handleIncomingDiscoveryPeer(conn io.ReadWriteCloser) {
 	defer cancel()
 	// Read a join request off the wire
 	var req v1.JoinRequest
-	b := make([]byte, 65536)
+	b := make([]byte, 8192)
 	n, err := conn.Read(b)
 	if err != nil {
 		s.log.Error("failed to read join request from discovered peer", slog.String("error", err.Error()))
@@ -95,12 +95,20 @@ func (s *meshStore) handleIncomingDiscoveryPeer(conn io.ReadWriteCloser) {
 	}
 	if err := proto.Unmarshal(b[:n], &req); err != nil {
 		s.log.Error("failed to unmarshal join request from discovered peer", slog.String("error", err.Error()))
+		b = []byte("ERROR: " + err.Error())
+		if _, err := conn.Write(b); err != nil {
+			s.log.Error("failed to write error to discovered peer", slog.String("error", err.Error()))
+		}
 		return
 	}
 	// Forward the request to the leader
 	c, err := s.DialLeader(ctx)
 	if err != nil {
 		s.log.Error("failed to dial leader", slog.String("error", err.Error()))
+		b = []byte("ERROR: " + err.Error())
+		if _, err := conn.Write(b); err != nil {
+			s.log.Error("failed to write error to discovered peer", slog.String("error", err.Error()))
+		}
 		return
 	}
 	defer c.Close()
@@ -118,6 +126,10 @@ func (s *meshStore) handleIncomingDiscoveryPeer(conn io.ReadWriteCloser) {
 	b, err = proto.Marshal(resp)
 	if err != nil {
 		s.log.Error("failed to marshal join response", slog.String("error", err.Error()))
+		b = []byte("ERROR: " + err.Error())
+		if _, err := conn.Write(b); err != nil {
+			s.log.Error("failed to write error to discovered peer", slog.String("error", err.Error()))
+		}
 		return
 	}
 	if _, err := conn.Write(b); err != nil {

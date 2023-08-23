@@ -73,9 +73,19 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		store: store,
 		log:   log,
 	}
-	rbacDisabled, err := rbac.New(store.Storage()).IsDisabled(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("check rbac disabled: %w", err)
+	var rbacDisabled bool
+	maxTries := 5
+	for i := 0; i < maxTries; i++ {
+		rbacDisabled, err = rbac.New(store.Storage()).IsDisabled(context.Background())
+		if err != nil {
+			log.Error("failed to check rbac status", "error", err.Error())
+			if i == maxTries-1 {
+				return nil, err
+			}
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		break
 	}
 	insecureServices := !store.Plugins().HasAuth() || rbacDisabled
 	if insecureServices {

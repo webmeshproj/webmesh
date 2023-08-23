@@ -367,6 +367,9 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	// If we have direct-peerings, add them to the db
 	if len(s.opts.Mesh.DirectPeers) > 0 {
 		for _, peer := range s.opts.Mesh.DirectPeers {
+			if peer == s.ID() {
+				continue
+			}
 			err = p.Put(ctx, peers.Node{
 				ID: peer,
 			})
