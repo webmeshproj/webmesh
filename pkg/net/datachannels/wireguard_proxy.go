@@ -101,6 +101,13 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			log.Debug("ICE connection established", slog.Any("local", candidatePair.Local), slog.Any("remote", candidatePair.Remote))
 			close(readyc)
 		}
+		if state == webrtc.ICEConnectionStateFailed || state == webrtc.ICEConnectionStateClosed || state == webrtc.ICEConnectionStateCompleted {
+			select {
+			case <-pc.closec:
+			default:
+				close(pc.closec)
+			}
+		}
 	})
 	dc, err := pc.conn.CreateDataChannel("wireguard-proxy", &webrtc.DataChannelInit{
 		ID:         util.Pointer(uint16(0)),
@@ -301,6 +308,11 @@ func NewWireGuardProxyClient(ctx context.Context, cli v1.WebRTCClient, targetNod
 		}
 		if s == webrtc.ICEConnectionStateFailed || s == webrtc.ICEConnectionStateClosed || s == webrtc.ICEConnectionStateCompleted {
 			log.Info("ICE connection has closed", "reason", s.String())
+			select {
+			case <-pc.closec:
+			default:
+				close(pc.closec)
+			}
 		}
 	})
 	dc, err := pc.conn.CreateDataChannel("wireguard-proxy", &webrtc.DataChannelInit{

@@ -17,7 +17,6 @@ limitations under the License.
 package libp2p
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -49,19 +48,21 @@ func NewKadDHTJoiner(ctx context.Context, opts *KadDHTOptions) (meshdiscovery.Di
 		return nil, fmt.Errorf("libp2p new host: %w", err)
 	}
 	return &kadDHTJoiner{
-		opts:    opts,
-		host:    host,
-		acceptc: make(chan io.ReadWriteCloser, 1),
-		closec:  make(chan struct{}),
+		opts:       opts,
+		host:       host,
+		triedPeers: map[string]struct{}{},
+		acceptc:    make(chan io.ReadWriteCloser, 1),
+		closec:     make(chan struct{}),
 	}, nil
 }
 
 // kadDHTJoiner is a joiner for the libp2p kademlia DHT.
 type kadDHTJoiner struct {
-	opts    *KadDHTOptions
-	host    host.Host
-	acceptc chan io.ReadWriteCloser
-	closec  chan struct{}
+	opts       *KadDHTOptions
+	host       host.Host
+	triedPeers map[string]struct{}
+	acceptc    chan io.ReadWriteCloser
+	closec     chan struct{}
 }
 
 func (kad *kadDHTJoiner) Start(ctx context.Context) error {
@@ -96,6 +97,11 @@ func (kad *kadDHTJoiner) waitForPeers(ctx context.Context, routingDiscovery *dro
 		if peer.ID == kad.host.ID() || len(peer.Addrs) == 0 {
 			continue
 		}
+		if _, ok := kad.triedPeers[peer.ID.String()]; ok {
+			log.Debug("Already tried peer", "peer", peer.ID)
+			continue
+		}
+		kad.triedPeers[peer.ID.String()] = struct{}{}
 		log.Debug("Found peer to join", "peer", peer.ID)
 		jctx, cancel := context.WithTimeout(ctx, 5*time.Second) // TODO: Make this configurable
 		s, err := kad.host.NewStream(jctx, peer.ID, JoinProtocol)
@@ -105,8 +111,7 @@ func (kad *kadDHTJoiner) waitForPeers(ctx context.Context, routingDiscovery *dro
 			continue
 		}
 		log.Debug("Connected to peer", "peer", peer.ID)
-		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-		kad.acceptc <- &kadStream{ReadWriter: rw, s: s}
+		kad.acceptc <- s
 	}
 	log.Debug("peer channel exhausted, retrying in 3 seconds")
 	select {

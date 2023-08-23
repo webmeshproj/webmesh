@@ -17,8 +17,10 @@ limitations under the License.
 package mesh
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/netip"
 	"strings"
@@ -87,6 +89,7 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 }
 
 func (s *meshStore) joinWithKadDHT(ctx context.Context, features []v1.Feature, key wgtypes.Key) error {
+	s.log.Info("Joining mesh via Kad DHT")
 	var peers []multiaddr.Multiaddr
 	for _, p := range s.opts.Discovery.KadBootstrapServers {
 		mul, err := multiaddr.NewMultiaddr(p)
@@ -116,6 +119,7 @@ func (s *meshStore) joinWithKadDHT(ctx context.Context, features []v1.Feature, k
 		return fmt.Errorf("accept peer stream: %w", err)
 	}
 	defer conn.Close()
+	s.log.Debug("Got connection to peer via Kad DHT")
 	// Send a join request to the peer
 	req := s.newJoinRequest(features, key)
 	data, err := proto.Marshal(req)
@@ -128,10 +132,15 @@ func (s *meshStore) joinWithKadDHT(ctx context.Context, features []v1.Feature, k
 	}
 	// Read a join response from the peer
 	var resp v1.JoinResponse
-	b := make([]byte, 4096)
+	b := make([]byte, 65536)
 	n, err := conn.Read(b)
 	if err != nil {
-		return fmt.Errorf("read join response: %w", err)
+		if err != io.EOF && n == 0 {
+			return fmt.Errorf("read join response: %w", err)
+		}
+	}
+	if bytes.HasPrefix(b[:n], []byte("ERROR:")) {
+		return fmt.Errorf("join error: %s", string(b[:n]))
 	}
 	if err := proto.Unmarshal(b[:n], &resp); err != nil {
 		return fmt.Errorf("unmarshal join response: %w", err)

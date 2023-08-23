@@ -17,7 +17,6 @@ limitations under the License.
 package libp2p
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -73,8 +72,7 @@ func (kad *kadDHTAnnouncer) Start(ctx context.Context) error {
 	log := context.LoggerFrom(ctx).With("id", kad.host.ID())
 	kad.host.SetStreamHandler(JoinProtocol, func(s network.Stream) {
 		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())
-		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-		kad.acceptc <- &kadStream{ReadWriter: rw, s: s}
+		kad.acceptc <- s
 	})
 	kaddht, err := dht.New(ctx, kad.host)
 	if err != nil {

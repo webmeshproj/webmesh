@@ -156,6 +156,7 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	}
 	if s.opts.Discovery != nil {
 		if s.opts.Discovery.Announce {
+			log.Info("Announcing peer discovery service")
 			var peers []multiaddr.Multiaddr
 			for _, p := range s.opts.Discovery.KadBootstrapServers {
 				mul, err := multiaddr.NewMultiaddr(p)
@@ -176,12 +177,15 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 				return handleErr(fmt.Errorf("start peer discovery: %w", err))
 			}
 			go func() {
-				conn, err := discover.Accept()
-				if err != nil {
-					log.Error("failed to accept peer connection from discovery service", slog.String("error", err.Error()))
-					return
+				for {
+					conn, err := discover.Accept()
+					if err != nil {
+						log.Error("failed to accept peer connection from discovery service", slog.String("error", err.Error()))
+						return
+					}
+					s.log.Debug("Got connection to peer via Kad DHT")
+					go s.handleIncomingDiscoveryPeer(conn)
 				}
-				go s.handleIncomingDiscoveryPeer(conn)
 			}()
 			s.discovery = discover
 		}
@@ -195,7 +199,7 @@ func (s *meshStore) handleIncomingDiscoveryPeer(conn io.ReadWriteCloser) {
 	defer cancel()
 	// Read a join request off the wire
 	var req v1.JoinRequest
-	b := make([]byte, 4096)
+	b := make([]byte, 65536)
 	n, err := conn.Read(b)
 	if err != nil {
 		s.log.Error("failed to read join request from discovered peer", slog.String("error", err.Error()))
