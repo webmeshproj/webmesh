@@ -48,7 +48,7 @@ Please see the [contributing](CONTRIBUTING.md) docs for more information.
 
 ## Community
 
-Join me in the [webmesh](https://gophers.slack.com/archives/C05L44ZFG80) channel on the Gophers Slack.
+Join me on [Discord](https://discord.gg/KA3M7x3qu) or in the [webmesh](https://gophers.slack.com/archives/C05L44ZFG80) channel on the Gophers Slack.
 
 ## Special Thanks
 
