@@ -24,7 +24,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
 // Server is the webmesh node service.
@@ -32,7 +31,6 @@ type Server struct {
 	v1.UnimplementedNodeServer
 
 	store     meshdb.Store
-	rbacEval  rbac.Evaluator
 	features  []v1.Feature
 	startedAt time.Time
 	log       *slog.Logger
@@ -41,16 +39,9 @@ type Server struct {
 // NewServer returns a new Server. Features are used for returning what features are enabled.
 // It is the callers responsibility to ensure those servers are registered on the node.
 // Insecure is used to disable authorization.
-func NewServer(store meshdb.Store, features []v1.Feature, insecure bool) *Server {
-	var rbaceval rbac.Evaluator
-	if insecure {
-		rbaceval = rbac.NewNoopEvaluator()
-	} else {
-		rbaceval = rbac.NewStoreEvaluator(store)
-	}
+func NewServer(store meshdb.Store, features []v1.Feature) *Server {
 	return &Server{
 		store:     store,
-		rbacEval:  rbaceval,
 		features:  features,
 		startedAt: time.Now(),
 		log:       slog.Default().With("component", "node-server"),

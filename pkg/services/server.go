@@ -59,6 +59,7 @@ type Server struct {
 }
 
 // NewServer returns a new Server.
+// TODO: We need to dynamically expose certain services only to the internal mesh.
 func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	log := slog.Default().With("component", "server")
 	if err := o.Validate(); err != nil {
@@ -145,7 +146,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	}
 	// Always register the node server
 	log.Debug("registering node service")
-	v1.RegisterNodeServer(server, node.NewServer(store, o.ToFeatureSet(isRaftMember), insecureServices))
+	v1.RegisterNodeServer(server, node.NewServer(store, o.ToFeatureSet(isRaftMember)))
 	// Register the health service
 	log.Debug("registering health service")
 	healthpb.RegisterHealthServer(server, server)
