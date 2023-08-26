@@ -34,7 +34,7 @@ import (
 
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
 // Peers are filtered by network ACLs.
-func WireGuardPeersFor(ctx context.Context, st storage.Storage, peerID string) ([]*v1.WireGuardPeer, error) {
+func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID string) ([]*v1.WireGuardPeer, error) {
 	graph := peers.New(st).Graph()
 	nw := networking.New(st)
 	adjacencyMap, err := nw.FilterGraph(ctx, graph, peerID)

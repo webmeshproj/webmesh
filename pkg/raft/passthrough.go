@@ -68,7 +68,7 @@ func (p *passthroughRaft) Bootstrap(ctx context.Context, opts *BootstrapOptions)
 	return ErrNotRaftMember
 }
 
-func (p *passthroughRaft) Storage() storage.Storage {
+func (p *passthroughRaft) Storage() storage.MeshStorage {
 	return &passthroughStorage{raft: p}
 }
 

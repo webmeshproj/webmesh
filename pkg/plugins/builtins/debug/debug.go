@@ -42,7 +42,7 @@ type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedIPAMPluginServer
 
-	data    storage.Storage
+	data    storage.MeshStorage
 	datamux sync.Mutex
 	closec  chan struct{}
 	servec  chan struct{}

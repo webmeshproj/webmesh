@@ -144,7 +144,7 @@ type PutLeaseOptions struct {
 }
 
 // New returns a new Peers interface.
-func New(db storage.Storage) Peers {
+func New(db storage.MeshStorage) Peers {
 	return &peers{
 		db:    db,
 		graph: NewGraph(db),
@@ -152,7 +152,7 @@ func New(db storage.Storage) Peers {
 }
 
 type peers struct {
-	db    storage.Storage
+	db    storage.MeshStorage
 	graph Graph
 }
 

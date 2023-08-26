@@ -30,13 +30,12 @@ import (
 // RaftStorage is the interface for storing and retrieving data about the state of the mesh.
 // This interface is used by mesh members that are part of the Raft cluster.
 type RaftStorage interface {
-	Storage
 	raft.LogStore
 	raft.StableStore
 }
 
-// Storage is the interface for storing and retrieving data about the state of the mesh.
-type Storage interface {
+// MeshStorage is the interface for storing and retrieving data about the state of the mesh.
+type MeshStorage interface {
 	// GetValue returns the value of a key.
 	GetValue(ctx context.Context, key string) (string, error)
 	// PutValue sets the value of a key. TTL is optional and can be set to 0.

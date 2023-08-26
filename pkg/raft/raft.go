@@ -88,7 +88,7 @@ type Raft interface {
 	// Any error returned by the callback is returned by Bootstrap.
 	Bootstrap(ctx context.Context, opts *BootstrapOptions) error
 	// Storage returns the storage. This is only valid after Start is called.
-	Storage() storage.Storage
+	Storage() storage.MeshStorage
 	// Configuration returns the current raft configuration.
 	Configuration() (raft.Configuration, error)
 	// LastIndex returns the last index sent to the Raft instance.
@@ -128,6 +128,12 @@ type Raft interface {
 type StartOptions struct {
 	// NodeID is the node ID.
 	NodeID string
+	// Transport is the Raft transport.
+	Transport transport.RaftTransport
+	// MeshStorage is the mesh storage.
+	MeshStorage storage.MeshStorage
+	// RaftStorage is the Raft storage.
+	RaftStorage storage.RaftStorage
 }
 
 // BootstrapOptions are options for bootstrapping a Raft node.
@@ -143,24 +149,20 @@ type BootstrapOptions struct {
 }
 
 // New returns a new Raft node.
-func New(opts *Options, transport transport.RaftTransport) Raft {
-	return newRaftNode(opts, transport)
+func New(opts *Options) Raft {
+	return newRaftNode(opts)
 }
 
 // raftNode is a Raft node. It implements the Raft interface.
 type raftNode struct {
-	opts                        *Options
-	nodeID                      raft.ServerID
-	raft                        *raft.Raft
 	started                     atomic.Bool
 	lastAppliedIndex            atomic.Uint64
 	currentTerm                 atomic.Uint64
-	listenPort                  uint16
+	opts                        *Options
+	nodeID                      raft.ServerID
+	raft                        *raft.Raft
 	raftTransport               transport.RaftTransport
-	raftSnapshots               raft.SnapshotStore
-	logDB                       LogStoreCloser
-	stableDB                    StableStoreCloser
-	dataDB                      storage.Storage
+	meshDB                      storage.MeshStorage
 	raftDB                      *raftStorage
 	snapshotter                 snapshots.Snapshotter
 	observer                    *raft.Observer
@@ -171,18 +173,16 @@ type raftNode struct {
 }
 
 // newRaftNode returns a new Raft node.
-func newRaftNode(opts *Options, transport transport.RaftTransport) *raftNode {
+func newRaftNode(opts *Options) *raftNode {
 	log := slog.Default().With(slog.String("component", "raft"))
 	if opts.InMemory {
-		log = log.With(slog.String("storage", "memory"))
+		log = log.With(slog.String("storage", ":memory:"))
 	} else {
 		log = log.With(slog.String("storage", opts.DataDir))
 	}
 	return &raftNode{
-		opts:          opts,
-		log:           log,
-		raftTransport: transport,
-		listenPort:    transport.AddrPort().Port(),
+		opts: opts,
+		log:  log,
 	}
 }
 
@@ -193,6 +193,9 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	}
 	r.mu.Lock()
 	r.nodeID = raft.ServerID(opts.NodeID)
+	r.raftTransport = opts.Transport
+	r.meshDB = opts.MeshStorage
+	r.raftDB = &raftStorage{MeshStorage: opts.MeshStorage, raft: r}
 	// Ensure the data directories exist if not in-memory
 	if !r.opts.InMemory {
 		for _, dir := range []string{r.opts.StorePath(), r.opts.DataStoragePath()} {
@@ -203,32 +206,40 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 			}
 		}
 	}
-	// Create the stores
-	r.log.Debug("creating raft stores")
-	err := r.createDataStores(ctx)
-	if err != nil {
-		r.mu.Unlock()
-		return fmt.Errorf("create data stores: %w", err)
+	// Create the snapshot stores
+	var snapshotStore raft.SnapshotStore
+	if r.opts.InMemory {
+		snapshotStore = raft.NewInmemSnapshotStore()
+	} else {
+		var err error
+		snapshotStore, err = raft.NewFileSnapshotStoreWithLogger(
+			r.opts.DataDir,
+			int(r.opts.SnapshotRetention),
+			&hclogAdapter{
+				Logger: r.log.With("component", "snapshotstore"),
+				level:  r.opts.LogLevel,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("new file snapshot store: %w", err)
+		}
 	}
-	r.raftDB = &raftStorage{r.dataDB, r}
-	r.snapshotter = snapshots.New(r.dataDB)
-	handleErr := func(cause error) error {
-		defer r.closeDataStores(ctx)
-		return cause
-	}
+	r.log.Debug("creating raft snaps")
+	r.snapshotter = snapshots.New(r.meshDB)
 	// Create the raft instance.
 	r.log.Info("starting raft instance", slog.String("listen-addr", string(r.raftTransport.LocalAddr())))
 	// We unlock here so raft can call back into the Apply/RestoreSnapshot methods if needed.
 	r.mu.Unlock()
+	var err error
 	r.raft, err = raft.NewRaft(
 		r.opts.RaftConfig(opts.NodeID),
 		&raftNodeFSM{r},
-		&MonotonicLogStore{r.logDB},
-		r.stableDB,
-		r.raftSnapshots,
+		&MonotonicLogStore{opts.RaftStorage},
+		opts.RaftStorage,
+		snapshotStore,
 		r.raftTransport)
 	if err != nil {
-		return handleErr(fmt.Errorf("new raft: %w", err))
+		return fmt.Errorf("new raft: %w", err)
 	}
 	// Register observers.
 	r.observerChan = make(chan raft.Observation, r.opts.ObserverChanBuffer)
@@ -250,7 +261,7 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 		return ErrClosed
 	}
 	if opts.AdvertiseAddress == "" {
-		opts.AdvertiseAddress = fmt.Sprintf("localhost:%d", r.listenPort)
+		opts.AdvertiseAddress = fmt.Sprintf("localhost:%d", r.ListenPort())
 	}
 	addr, err := netutil.ResolveTCPAddr(ctx, opts.AdvertiseAddress, 15)
 	if err != nil {
@@ -331,7 +342,7 @@ func (r *raftNode) Configuration() (raft.Configuration, error) {
 
 // ListenPort returns the listen port.
 func (r *raftNode) ListenPort() uint16 {
-	return r.listenPort
+	return r.raftTransport.AddrPort().Port()
 }
 
 // LastIndex returns the last index sent to the Raft instance.
@@ -386,7 +397,7 @@ func (r *raftNode) IsObserver() bool {
 }
 
 // Storage returns the storage.
-func (r *raftNode) Storage() storage.Storage {
+func (r *raftNode) Storage() storage.MeshStorage {
 	return r.raftDB
 }
 
@@ -449,7 +460,6 @@ func (r *raftNode) Stop(ctx context.Context) error {
 	r.log.Debug("stopping raft node")
 	defer r.log.Debug("raft node stopped")
 	defer r.started.Store(false)
-	defer r.closeDataStores(ctx)
 	// If we were not running in memory, force a snapshot.
 	if !r.opts.InMemory {
 		r.log.Debug("taking raft storage snapshot")

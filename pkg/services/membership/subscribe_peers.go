@@ -109,7 +109,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	return nil
 }
 
-func listDNSServers(ctx context.Context, st storage.Storage, peerID string) ([]string, error) {
+func listDNSServers(ctx context.Context, st storage.MeshStorage, peerID string) ([]string, error) {
 	var servers []string
 	dnsServers, err := peers.New(st).ListByFeature(ctx, v1.Feature_MESH_DNS)
 	if err != nil {
@@ -130,7 +130,7 @@ func listDNSServers(ctx context.Context, st storage.Storage, peerID string) ([]s
 	return servers, nil
 }
 
-func listICEServers(ctx context.Context, st storage.Storage, peerID string) ([]string, error) {
+func listICEServers(ctx context.Context, st storage.MeshStorage, peerID string) ([]string, error) {
 	var servers []string
 	iceServers, err := peers.New(st).ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
 	if err != nil {

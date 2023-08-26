@@ -47,7 +47,7 @@ func (a ACLs) Proto() []*v1.NetworkACL {
 // ACL is a Network ACL. It contains a reference to the database for evaluating group membership.
 type ACL struct {
 	*v1.NetworkACL
-	storage storage.Storage
+	storage storage.MeshStorage
 }
 
 // Proto returns the protobuf representation of the ACL.

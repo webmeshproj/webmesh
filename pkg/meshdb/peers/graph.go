@@ -31,7 +31,7 @@ import (
 // GraphStore implements graph.Store[string, Node] where
 // string is the node ID and Node is the node itself.
 type GraphStore struct {
-	storage.Storage
+	storage.MeshStorage
 }
 
 // NodesPrefix is where nodes are stored in the database.
@@ -44,12 +44,12 @@ const NodesPrefix = "/registry/nodes"
 const EdgesPrefix = "/registry/edges"
 
 // NewGraph creates a new Graph instance.
-func NewGraph(st storage.Storage) Graph {
+func NewGraph(st storage.MeshStorage) Graph {
 	return graph.NewWithStore(graphHasher, NewGraphStore(st))
 }
 
 // NewGraphStore creates a new GraphStore instance.
-func NewGraphStore(st storage.Storage) graph.Store[string, Node] {
+func NewGraphStore(st storage.MeshStorage) graph.Store[string, Node] {
 	return graph.Store[string, Node](&GraphStore{st})
 }
 

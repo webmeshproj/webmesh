@@ -25,7 +25,7 @@ type Manager interface {
 	// Get returns the plugin with the given name.
 	Get(name string) (v1.PluginClient, bool)
 	// ServeStorage handles queries from plugins against the given storage backend.
-	ServeStorage(db storage.Storage)
+	ServeStorage(db storage.MeshStorage)
 	// HasAuth returns true if the manager has an auth plugin.
 	HasAuth() bool
 	// HasWatchers returns true if the manager has any watch plugins.
@@ -68,7 +68,7 @@ func (m *manager) Get(name string) (v1.PluginClient, bool) {
 }
 
 // ServeStorage handles queries from plugins against the given storage backend.
-func (m *manager) ServeStorage(db storage.Storage) {
+func (m *manager) ServeStorage(db storage.MeshStorage) {
 	m.handleQueries(db)
 }
 
@@ -240,7 +240,7 @@ func (m *manager) Close() error {
 }
 
 // handleQueries handles SQL queries from plugins.
-func (m *manager) handleQueries(db storage.Storage) {
+func (m *manager) handleQueries(db storage.MeshStorage) {
 	for plugin, client := range m.plugins {
 		ctx := context.Background()
 		q, err := client.InjectQuerier(ctx)
@@ -257,7 +257,7 @@ func (m *manager) handleQueries(db storage.Storage) {
 }
 
 // handleQueryClient handles a query client.
-func (m *manager) handleQueryClient(plugin string, db storage.Storage, client clients.PluginClient, queries v1.Plugin_InjectQuerierClient) {
+func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, client clients.PluginClient, queries v1.Plugin_InjectQuerierClient) {
 	defer func() {
 		if err := queries.CloseSend(); err != nil {
 			m.log.Error("close query stream", "plugin", plugin, "error", err)

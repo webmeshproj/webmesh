@@ -121,12 +121,12 @@ type RBAC interface {
 }
 
 // New returns a new RBAC.
-func New(st storage.Storage) RBAC {
+func New(st storage.MeshStorage) RBAC {
 	return &rbac{st}
 }
 
 type rbac struct {
-	storage.Storage
+	storage.MeshStorage
 }
 
 // Disable disables RBAC.
@@ -140,7 +140,7 @@ func (r *rbac) Disable(ctx context.Context) error {
 
 // IsDisabled returns true if RBAC is disabled.
 func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
-	_, err := r.Storage.GetValue(ctx, rbacDisabledKey)
+	_, err := r.GetValue(ctx, rbacDisabledKey)
 	if err != nil {
 		if err == storage.ErrKeyNotFound {
 			return false, nil

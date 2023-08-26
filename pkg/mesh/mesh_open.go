@@ -29,6 +29,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/storage/badger"
+	"github.com/webmeshproj/webmesh/pkg/storage/memory"
 )
 
 // Open opens the store.
@@ -71,21 +73,40 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		}
 	}
 	if s.opts.IsRaftMember() {
-		transport, err := transport.NewRaftTCPTransport(s, transport.TCPTransportOptions{
-			Addr:    s.opts.Raft.ListenAddress,
-			MaxPool: s.opts.Raft.ConnectionPoolCount,
-			Timeout: s.opts.Raft.ConnectionTimeout,
-		})
-		if err != nil {
-			return fmt.Errorf("create transport: %w", err)
-		}
-		s.raft = raft.New(s.opts.Raft, transport)
+		s.raft = raft.New(s.opts.Raft)
 	} else {
 		s.raft = raft.NewPassthrough(s)
 	}
-	err = s.raft.Start(ctx, &raft.StartOptions{
-		NodeID: s.ID(),
+	var startOpts raft.StartOptions
+	startOpts.NodeID = s.ID()
+	transport, err := transport.NewRaftTCPTransport(s, transport.TCPTransportOptions{
+		Addr:    s.opts.Raft.ListenAddress,
+		MaxPool: s.opts.Raft.ConnectionPoolCount,
+		Timeout: s.opts.Raft.ConnectionTimeout,
 	})
+	if err != nil {
+		return fmt.Errorf("create transport: %w", err)
+	}
+	startOpts.Transport = transport
+	if s.opts.Raft.InMemory {
+		startOpts.RaftStorage = memory.NewRaftStorage()
+		startOpts.MeshStorage, err = badger.New(&badger.Options{InMemory: true})
+		if err != nil {
+			return fmt.Errorf("create badger in-memory storage: %w", err)
+		}
+	} else {
+		startOpts.RaftStorage, err = badger.NewRaftStorage(s.opts.Raft.StorePath())
+		if err != nil {
+			return fmt.Errorf("create raft storage: %w", err)
+		}
+		startOpts.MeshStorage, err = badger.New(&badger.Options{
+			DiskPath: s.opts.Raft.DataStoragePath(),
+		})
+		if err != nil {
+			return fmt.Errorf("create badger storage: %w", err)
+		}
+	}
+	err = s.raft.Start(ctx, &startOpts)
 	if err != nil {
 		return fmt.Errorf("start raft: %w", err)
 	}

@@ -32,7 +32,7 @@ import (
 )
 
 // Open opens a new database connection to a plugin query stream.
-func Open(srv v1.Plugin_InjectQuerierServer) storage.Storage {
+func Open(srv v1.Plugin_InjectQuerierServer) storage.MeshStorage {
 	return &pluginDB{srv: srv}
 }
 

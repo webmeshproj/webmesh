@@ -30,6 +30,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/pb"
 	v1 "github.com/webmeshproj/api/v1"
+	raftbadger "github.com/webmeshproj/raft-badger"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -51,7 +52,8 @@ type Options struct {
 	Silent bool
 }
 
-func New(opts *Options) (storage.Storage, error) {
+// New returns a new Badger storage.
+func New(opts *Options) (storage.MeshStorage, error) {
 	var badgeropts badger.Options
 	if opts.InMemory {
 		badgeropts = badger.DefaultOptions("").WithInMemory(true)
@@ -68,6 +70,11 @@ func New(opts *Options) (storage.Storage, error) {
 		return nil, fmt.Errorf("badger open: %w", err)
 	}
 	return &badgerStorage{db: db}, nil
+}
+
+// NewRaftStorage returns a new RaftStorage based on Badger.
+func NewRaftStorage(storagePath string) (storage.RaftStorage, error) {
+	return raftbadger.New(slog.Default().With("component", "raftbadger"), storagePath)
 }
 
 // GetValue returns the value of a key.

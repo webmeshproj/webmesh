@@ -62,11 +62,11 @@ const (
 )
 
 type state struct {
-	storage.Storage
+	storage.MeshStorage
 }
 
 // New returns a new State.
-func New(db storage.Storage) State {
+func New(db storage.MeshStorage) State {
 	return &state{db}
 }
 

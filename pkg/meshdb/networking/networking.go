@@ -85,12 +85,12 @@ type Networking interface {
 type AdjacencyMap map[string]map[string]graph.Edge[string]
 
 // New returns a new Networking interface.
-func New(st storage.Storage) Networking {
+func New(st storage.MeshStorage) Networking {
 	return &networking{st}
 }
 
 type networking struct {
-	storage.Storage
+	storage.MeshStorage
 }
 
 // PutNetworkACL creates or updates a NetworkACL.
@@ -134,7 +134,7 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, erro
 	}
 	return &ACL{
 		NetworkACL: acl,
-		storage:    n.Storage,
+		storage:    n.MeshStorage,
 	}, nil
 }
 
@@ -162,7 +162,7 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 		}
 		out = append(out, &ACL{
 			NetworkACL: acl,
-			storage:    n.Storage,
+			storage:    n.MeshStorage,
 		})
 		return nil
 	})

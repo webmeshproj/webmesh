@@ -78,7 +78,7 @@ type Mesh interface {
 	// Leader returns the current Raft leader ID.
 	Leader() (string, error)
 	// Storage returns a storage interface for use by the application.
-	Storage() storage.Storage
+	Storage() storage.MeshStorage
 	// Raft returns the Raft interface.
 	Raft() raft.Raft
 	// Network returns the Network manager.
@@ -206,7 +206,7 @@ func (s *meshStore) Domain() string {
 }
 
 // Storage returns a storage interface for use by the application.
-func (s *meshStore) Storage() storage.Storage {
+func (s *meshStore) Storage() storage.MeshStorage {
 	return s.raft.Storage()
 }
 

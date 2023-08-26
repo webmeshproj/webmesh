@@ -133,5 +133,5 @@ func (r *raftNodeFSM) applyLog(l *raft.Log) (res any) {
 		go r.raftNode.opts.OnApplyLog(ctx, l.Term, l.Index, cmd)
 	}
 	// Apply the log entry to the database.
-	return raftlogs.Apply(ctx, r.raftNode.dataDB, cmd)
+	return raftlogs.Apply(ctx, r.raftNode.meshDB, cmd)
 }

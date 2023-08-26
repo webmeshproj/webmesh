@@ -40,12 +40,12 @@ type Snapshotter interface {
 }
 
 type snapshotter struct {
-	st  storage.Storage
+	st  storage.MeshStorage
 	log *slog.Logger
 }
 
 // New returns a new Snapshotter.
-func New(st storage.Storage) Snapshotter {
+func New(st storage.MeshStorage) Snapshotter {
 	return &snapshotter{
 		st:  st,
 		log: slog.Default().With("component", "snapshots"),

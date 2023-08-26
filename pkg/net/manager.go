@@ -126,7 +126,7 @@ type Manager interface {
 }
 
 // New creates a new network manager.
-func New(store storage.Storage, opts *Options) Manager {
+func New(store storage.MeshStorage, opts *Options) Manager {
 	return &manager{
 		storage:  store,
 		opts:     opts,
@@ -136,7 +136,7 @@ func New(store storage.Storage, opts *Options) Manager {
 
 type manager struct {
 	opts                 *Options
-	storage              storage.Storage
+	storage              storage.MeshStorage
 	fw                   firewall.Firewall
 	wg                   wireguard.Interface
 	iceConns             map[string]clientPeerConn

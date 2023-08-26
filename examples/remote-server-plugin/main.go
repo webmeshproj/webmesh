@@ -30,7 +30,7 @@ type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedWatchPluginServer
 	// data is the meshdb database.
-	data   storage.Storage
+	data   storage.MeshStorage
 	closec chan struct{}
 }
 

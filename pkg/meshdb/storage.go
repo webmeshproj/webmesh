@@ -41,7 +41,7 @@ type Store interface {
 	// Leader returns the current Raft leader.
 	Leader() (string, error)
 	// Storage returns a storage interface for use by the application.
-	Storage() storage.Storage
+	Storage() storage.MeshStorage
 	// Raft returns the underlying Raft database.
 	Raft() raft.Raft
 	// Plugins returns the plugins for the current node.

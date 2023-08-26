@@ -31,7 +31,7 @@ import (
 )
 
 // Apply applies a raft log to the given storage.
-func Apply(ctx context.Context, db storage.Storage, logEntry *v1.RaftLogEntry) *v1.RaftApplyResponse {
+func Apply(ctx context.Context, db storage.MeshStorage, logEntry *v1.RaftLogEntry) *v1.RaftApplyResponse {
 	start := time.Now()
 	log := context.LoggerFrom(ctx)
 	switch logEntry.GetType() {
