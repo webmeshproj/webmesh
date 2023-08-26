@@ -42,7 +42,7 @@ type pluginDB struct {
 	mu sync.Mutex
 }
 
-func (p *pluginDB) Get(ctx context.Context, key string) (string, error) {
+func (p *pluginDB) GetValue(ctx context.Context, key string) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	id, err := uuid.NewRandom()
@@ -69,7 +69,7 @@ func (p *pluginDB) Get(ctx context.Context, key string) (string, error) {
 }
 
 // Put sets the value of a key.
-func (p *pluginDB) Put(ctx context.Context, key, value string, ttl time.Duration) error {
+func (p *pluginDB) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
 	return errors.New("put not implemented")
 }
 

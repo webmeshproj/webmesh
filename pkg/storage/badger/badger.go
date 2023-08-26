@@ -70,8 +70,8 @@ func New(opts *Options) (storage.Storage, error) {
 	return &badgerStorage{db: db}, nil
 }
 
-// Get returns the value of a key.
-func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
+// GetValue returns the value of a key.
+func (b *badgerStorage) GetValue(ctx context.Context, key string) (string, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	if key == "" {
@@ -101,8 +101,8 @@ func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
 	return value, err
 }
 
-// Put sets the value of a key.
-func (b *badgerStorage) Put(ctx context.Context, key, value string, ttl time.Duration) error {
+// PutValue sets the value of a key.
+func (b *badgerStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if key == "" {

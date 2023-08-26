@@ -201,7 +201,7 @@ func (p *Plugin) handleDBGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Info("getting key from database", "key", key)
-	resp, err := p.data.Get(r.Context(), key)
+	resp, err := p.data.GetValue(r.Context(), key)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -194,8 +194,8 @@ type passthroughStorage struct {
 	raft *passthroughRaft
 }
 
-// Get returns the value of a key.
-func (p *passthroughStorage) Get(ctx context.Context, key string) (string, error) {
+// GetValue returns the value of a key.
+func (p *passthroughStorage) GetValue(ctx context.Context, key string) (string, error) {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return "", err
@@ -223,8 +223,8 @@ func (p *passthroughStorage) Get(ctx context.Context, key string) (string, error
 	return result.GetValue()[0], nil
 }
 
-// Put sets the value of a key. TTL is optional and can be set to 0.
-func (p *passthroughStorage) Put(ctx context.Context, key, value string, ttl time.Duration) error {
+// PutValue sets the value of a key. TTL is optional and can be set to 0.
+func (p *passthroughStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
 	// We pass this through to the publish API. Should only be called by non-raft nodes wanting to publish
 	// non-internal values. The server will enforce permissions and other restrictions.
 	cli, close, err := p.newStorageClient(ctx)

@@ -31,7 +31,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) erro
 	case v1.QueryRequest_GET:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		val, err := s.store.Storage().Get(stream.Context(), req.GetQuery())
+		val, err := s.store.Storage().GetValue(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {

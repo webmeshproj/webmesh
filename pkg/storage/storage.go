@@ -23,14 +23,24 @@ import (
 	"errors"
 	"io"
 	"time"
+
+	"github.com/hashicorp/raft"
 )
+
+// RaftStorage is the interface for storing and retrieving data about the state of the mesh.
+// This interface is used by mesh members that are part of the Raft cluster.
+type RaftStorage interface {
+	Storage
+	raft.LogStore
+	raft.StableStore
+}
 
 // Storage is the interface for storing and retrieving data about the state of the mesh.
 type Storage interface {
-	// Get returns the value of a key.
-	Get(ctx context.Context, key string) (string, error)
-	// Put sets the value of a key. TTL is optional and can be set to 0.
-	Put(ctx context.Context, key, value string, ttl time.Duration) error
+	// GetValue returns the value of a key.
+	GetValue(ctx context.Context, key string) (string, error)
+	// PutValue sets the value of a key. TTL is optional and can be set to 0.
+	PutValue(ctx context.Context, key, value string, ttl time.Duration) error
 	// Delete removes a key.
 	Delete(ctx context.Context, key string) error
 	// List returns all keys with a given prefix.

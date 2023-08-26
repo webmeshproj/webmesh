@@ -71,7 +71,7 @@ func New(db storage.Storage) State {
 }
 
 func (s *state) GetIPv6Prefix(ctx context.Context) (netip.Prefix, error) {
-	prefix, err := s.Get(ctx, IPv6PrefixKey)
+	prefix, err := s.GetValue(ctx, IPv6PrefixKey)
 	if err != nil {
 		return netip.Prefix{}, err
 	}
@@ -79,7 +79,7 @@ func (s *state) GetIPv6Prefix(ctx context.Context) (netip.Prefix, error) {
 }
 
 func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
-	prefix, err := s.Get(ctx, IPv4PrefixKey)
+	prefix, err := s.GetValue(ctx, IPv4PrefixKey)
 	if err != nil {
 		return netip.Prefix{}, err
 	}
@@ -87,7 +87,7 @@ func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
 }
 
 func (s *state) GetMeshDomain(ctx context.Context) (string, error) {
-	return s.Get(ctx, MeshDomainKey)
+	return s.GetValue(ctx, MeshDomainKey)
 }
 
 func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {

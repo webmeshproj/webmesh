@@ -176,7 +176,7 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 	case v1.QueryRequest_GET:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		val, err := app.mesh.Storage().Get(stream.Context(), req.GetQuery())
+		val, err := app.mesh.Storage().GetValue(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -264,7 +264,7 @@ func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.
 	if meshdb.IsReservedPrefix(req.GetKey()) {
 		return nil, status.Errorf(codes.InvalidArgument, "key %q is reserved", req.GetKey())
 	}
-	err := app.mesh.Storage().Put(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())
+	err := app.mesh.Storage().PutValue(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error publishing: %v", err)
 	}

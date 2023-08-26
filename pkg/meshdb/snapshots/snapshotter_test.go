@@ -41,7 +41,7 @@ func TestSnapshotter(t *testing.T) {
 		"/registry/abc": "def",
 	}
 	for key, val := range testValues {
-		if err := db.Put(context.Background(), key, val, 0); err != nil {
+		if err := db.PutValue(context.Background(), key, val, 0); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -76,7 +76,7 @@ func TestSnapshotter(t *testing.T) {
 
 	// Ensure the keys were restored.
 	for key, val := range testValues {
-		got, err := db.Get(context.Background(), key)
+		got, err := db.GetValue(context.Background(), key)
 		if err != nil {
 			t.Fatal(err)
 		}

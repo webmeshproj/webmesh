@@ -40,7 +40,7 @@ func Apply(ctx context.Context, db storage.Storage, logEntry *v1.RaftLogEntry) *
 			slog.String("key", logEntry.GetKey()),
 			slog.String("value", logEntry.GetValue()),
 		)
-		err := db.Put(ctx, logEntry.GetKey(), logEntry.GetValue(), logEntry.Ttl.AsDuration())
+		err := db.PutValue(ctx, logEntry.GetKey(), logEntry.GetValue(), logEntry.Ttl.AsDuration())
 		res := &v1.RaftApplyResponse{}
 		if err != nil {
 			res.Error = err.Error()

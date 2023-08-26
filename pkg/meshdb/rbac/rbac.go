@@ -131,7 +131,7 @@ type rbac struct {
 
 // Disable disables RBAC.
 func (r *rbac) Disable(ctx context.Context) error {
-	err := r.Put(ctx, rbacDisabledKey, "true", 0)
+	err := r.PutValue(ctx, rbacDisabledKey, "true", 0)
 	if err != nil {
 		return fmt.Errorf("put rbac disabled: %w", err)
 	}
@@ -140,7 +140,7 @@ func (r *rbac) Disable(ctx context.Context) error {
 
 // IsDisabled returns true if RBAC is disabled.
 func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
-	_, err := r.Storage.Get(ctx, rbacDisabledKey)
+	_, err := r.Storage.GetValue(ctx, rbacDisabledKey)
 	if err != nil {
 		if err == storage.ErrKeyNotFound {
 			return false, nil
@@ -182,7 +182,7 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 		return fmt.Errorf("marshal role: %w", err)
 	}
 	key := fmt.Sprintf("%s/%s", rolesPrefix, role.GetName())
-	err = r.Put(ctx, key, string(data), 0)
+	err = r.PutValue(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put role: %w", err)
 	}
@@ -192,7 +192,7 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 // GetRole returns a role by name.
 func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 	key := fmt.Sprintf("%s/%s", rolesPrefix, name)
-	data, err := r.Get(ctx, key)
+	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if err == storage.ErrKeyNotFound {
 			return nil, ErrRoleNotFound
@@ -261,7 +261,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 	if err != nil {
 		return fmt.Errorf("marshal rolebinding: %w", err)
 	}
-	err = r.Put(ctx, key, string(data), 0)
+	err = r.PutValue(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put rolebinding: %w", err)
 	}
@@ -271,7 +271,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 // GetRoleBinding returns a rolebinding by name.
 func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding, error) {
 	key := fmt.Sprintf("%s/%s", rolebindingsPrefix, name)
-	data, err := r.Get(ctx, key)
+	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if err == storage.ErrKeyNotFound {
 			return nil, ErrRoleBindingNotFound
@@ -327,7 +327,7 @@ func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
 	if err != nil {
 		return fmt.Errorf("marshal group: %w", err)
 	}
-	err = r.Put(ctx, key, string(data), 0)
+	err = r.PutValue(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put group: %w", err)
 	}
@@ -337,7 +337,7 @@ func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
 // GetGroup returns a group by name.
 func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 	key := fmt.Sprintf("%s/%s", groupsPrefix, name)
-	data, err := r.Get(ctx, key)
+	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if err == storage.ErrKeyNotFound {
 			return nil, ErrGroupNotFound

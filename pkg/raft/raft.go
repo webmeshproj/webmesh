@@ -203,7 +203,6 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 			}
 		}
 	}
-
 	// Create the stores
 	r.log.Debug("creating raft stores")
 	err := r.createDataStores(ctx)

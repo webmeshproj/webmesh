@@ -43,7 +43,7 @@ import (
 
 func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
 	// Check if the mesh network is defined
-	_, err := s.Storage().Get(ctx, state.IPv6PrefixKey)
+	_, err := s.Storage().GetValue(ctx, state.IPv6PrefixKey)
 	var firstBootstrap bool
 	if err != nil {
 		if !errors.Is(err, storage.ErrKeyNotFound) {
@@ -116,11 +116,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
 		slog.String("ipv4-network", s.opts.Bootstrap.IPv4Network),
 		slog.String("ipv6-network", meshnetworkv6.String()))
-	err = s.Storage().Put(ctx, state.IPv6PrefixKey, meshnetworkv6.String(), 0)
+	err = s.Storage().PutValue(ctx, state.IPv6PrefixKey, meshnetworkv6.String(), 0)
 	if err != nil {
 		return fmt.Errorf("set IPv6 prefix to db: %w", err)
 	}
-	err = s.Storage().Put(ctx, state.IPv4PrefixKey, meshnetworkv4.String(), 0)
+	err = s.Storage().PutValue(ctx, state.IPv4PrefixKey, meshnetworkv4.String(), 0)
 	if err != nil {
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
 	}
@@ -128,7 +128,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	if !strings.HasSuffix(s.meshDomain, ".") {
 		s.meshDomain += "."
 	}
-	err = s.Storage().Put(ctx, state.MeshDomainKey, s.meshDomain, 0)
+	err = s.Storage().PutValue(ctx, state.MeshDomainKey, s.meshDomain, 0)
 	if err != nil {
 		return fmt.Errorf("set mesh domain to db: %w", err)
 	}

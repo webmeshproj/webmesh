@@ -281,7 +281,7 @@ func (m *manager) handleQueryClient(plugin string, db storage.Storage, client cl
 			var result v1.PluginQueryResult
 			result.Id = query.GetId()
 			result.Key = query.GetQuery()
-			val, err := db.Get(queries.Context(), query.GetQuery())
+			val, err := db.GetValue(queries.Context(), query.GetQuery())
 			if err != nil {
 				result.Error = err.Error()
 			} else {

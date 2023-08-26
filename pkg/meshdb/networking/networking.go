@@ -110,7 +110,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 	if err != nil {
 		return fmt.Errorf("marshal network acl: %w", err)
 	}
-	err = n.Put(ctx, key, string(data), 0)
+	err = n.PutValue(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put network acl: %w", err)
 	}
@@ -120,7 +120,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 // GetNetworkACL returns a NetworkACL by name.
 func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, error) {
 	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, name)
-	data, err := n.Get(ctx, key)
+	data, err := n.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
 			return nil, ErrACLNotFound
@@ -176,7 +176,7 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
 	}
-	err = n.Put(ctx, key, string(data), 0)
+	err = n.PutValue(ctx, key, string(data), 0)
 	if err != nil {
 		return fmt.Errorf("put network route: %w", err)
 	}
@@ -186,7 +186,7 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 // GetRoute returns a Route by name.
 func (n *networking) GetRoute(ctx context.Context, name string) (*v1.Route, error) {
 	key := fmt.Sprintf("%s/%s", RoutesPrefix, name)
-	data, err := n.Get(ctx, key)
+	data, err := n.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
 			return nil, ErrRouteNotFound

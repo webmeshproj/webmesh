@@ -65,7 +65,7 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 		return fmt.Errorf("marshal node: %w", err)
 	}
 	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
-	if err := g.Put(context.Background(), key, string(data), 0); err != nil {
+	if err := g.PutValue(context.Background(), key, string(data), 0); err != nil {
 		return fmt.Errorf("put node: %w", err)
 	}
 	return nil
@@ -79,7 +79,7 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 		return
 	}
 	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
-	data, err := g.Get(context.Background(), key)
+	data, err := g.GetValue(context.Background(), key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
 			err = graph.ErrVertexNotFound
@@ -101,7 +101,7 @@ func (g *GraphStore) RemoveVertex(nodeID string) error {
 		return fmt.Errorf("node ID must not be empty")
 	}
 	key := fmt.Sprintf("%s/%s", NodesPrefix, nodeID)
-	_, err := g.Get(context.Background(), key)
+	_, err := g.GetValue(context.Background(), key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
 			err = graph.ErrVertexNotFound
@@ -206,7 +206,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 	if err != nil {
 		return fmt.Errorf("marshal edge: %w", err)
 	}
-	err = g.Put(context.Background(), edgeKey, string(edgeData), 0)
+	err = g.PutValue(context.Background(), edgeKey, string(edgeData), 0)
 	if err != nil {
 		return fmt.Errorf("put node edge: %w", err)
 	}
@@ -217,7 +217,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 // Edge instance. If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[string]) error {
 	key := fmt.Sprintf("%s/%s/%s", EdgesPrefix, sourceNode, targetNode)
-	_, err := g.Get(context.Background(), key)
+	_, err := g.GetValue(context.Background(), key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
 			return graph.ErrEdgeNotFound
@@ -233,7 +233,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode string, edge graph.Edge[s
 	if err != nil {
 		return fmt.Errorf("marshal edge: %w", err)
 	}
-	err = g.Put(context.Background(), key, string(edgeData), 0)
+	err = g.PutValue(context.Background(), key, string(edgeData), 0)
 	if err != nil {
 		return fmt.Errorf("put node edge: %w", err)
 	}
@@ -269,7 +269,7 @@ func (g *GraphStore) RemoveEdge(sourceNode, targetNode string) error {
 // If the edge doesn't exist, ErrEdgeNotFound should be returned.
 func (g *GraphStore) Edge(sourceNode, targetNode string) (graph.Edge[string], error) {
 	key := fmt.Sprintf("%s/%s/%s", EdgesPrefix, sourceNode, targetNode)
-	data, err := g.Get(context.Background(), key)
+	data, err := g.GetValue(context.Background(), key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
 			return graph.Edge[string]{}, graph.ErrEdgeNotFound
