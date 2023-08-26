@@ -154,9 +154,8 @@ func (r *raftNode) createDataStores(ctx context.Context) error {
 
 func (r *raftNode) closeDataStores(ctx context.Context) {
 	for name, closer := range map[string]io.Closer{
-		"raft transport": r.raftTransport,
-		"data database":  r.dataDB,
-		"raft log db":    r.logDB,
+		"data database": r.dataDB,
+		"raft log db":   r.logDB,
 	} {
 		r.log.Debug("closing " + name)
 		if err := closer.Close(); err != nil {
@@ -220,7 +219,7 @@ func (rs *raftStorage) Restore(ctx context.Context, r io.Reader) error {
 func (rs *raftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLogEntry) error {
 	log := context.LoggerFrom(ctx)
 	log.Debug("sending log to leader")
-	c, err := rs.raft.leaderDialer.DialLeader(ctx)
+	c, err := rs.raft.raftTransport.DialLeader(ctx)
 	if err != nil {
 		return fmt.Errorf("dial leader: %w", err)
 	}

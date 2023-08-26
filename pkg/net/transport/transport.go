@@ -20,17 +20,31 @@ package transport
 
 import (
 	"context"
-	"net"
 	"net/netip"
+
+	"github.com/hashicorp/raft"
+	"google.golang.org/grpc"
 )
 
 // Transport is the interface for sending and receiving messages between nodes.
 type Transport interface {
-	net.Listener
-
-	// Dial is used to create a new outgoing connection
-	Dial(ctx context.Context, address string) (net.Conn, error)
+	raft.Transport
+	LeaderDialer
 
 	// AddrPort returns the address and port the transport is listening on.
 	AddrPort() netip.AddrPort
+}
+
+// LeaderDialer is the interface for dialing the current leader.
+type LeaderDialer interface {
+	// DialLeader opens a gRPC connection to the current leader.
+	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
+}
+
+// LeaderDialerFunc is a function that implements LeaderDialer.
+type LeaderDialerFunc func(ctx context.Context) (*grpc.ClientConn, error)
+
+// DialLeader implements LeaderDialer.
+func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
+	return f(ctx)
 }

@@ -26,6 +26,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 )
@@ -70,7 +71,16 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		}
 	}
 	if s.opts.IsRaftMember() {
-		s.raft = raft.New(s.opts.Raft, s)
+		transport, err := transport.NewTCPTransport(s, transport.TCPTransportOptions{
+			Addr:      s.opts.Raft.ListenAddress,
+			Advertise: s.opts.Bootstrap.AdvertiseAddress,
+			MaxPool:   s.opts.Raft.ConnectionPoolCount,
+			Timeout:   s.opts.Raft.ConnectionTimeout,
+		})
+		if err != nil {
+			return fmt.Errorf("create transport: %w", err)
+		}
+		s.raft = raft.New(s.opts.Raft, transport)
 	} else {
 		s.raft = raft.NewPassthrough(s)
 	}

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
+	"net/netip"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -34,7 +34,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
@@ -65,33 +64,15 @@ type (
 	LeaderObservation = raft.LeaderObservation
 )
 
-// LeaderDialer is the interface for dialing the leader.
-type LeaderDialer interface {
+// Transport is the interface for the Raft transport.
+type Transport interface {
+	raft.Transport
+
+	// DialLeader opens a gRPC connection to the current leader.
 	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
-}
 
-// LeaderDialerFunc is the function signature for dialing the leader.
-// It is supplied by the mesh during startup. It can be used as an
-// alternative to the LeaderDialer interface.
-type LeaderDialerFunc func(ctx context.Context) (*grpc.ClientConn, error)
-
-func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
-	return f(ctx)
-}
-
-// NodeDialer is an interface for dialing an arbitrary node. The node ID
-// is optional and if empty, implementations can choose the node to dial.
-type NodeDialer interface {
-	Dial(ctx context.Context, id string) (*grpc.ClientConn, error)
-}
-
-// NodeDialerFunc is the function signature for dialing an arbitrary node.
-// It is supplied by the mesh during startup. It can be used as an
-// alternative to the NodeDialer interface.
-type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, error)
-
-func (f NodeDialerFunc) Dial(ctx context.Context, id string) (*grpc.ClientConn, error) {
-	return f(ctx, id)
+	// AddrPort returns the address and port the transport is listening on.
+	AddrPort() netip.AddrPort
 }
 
 // Raft states.
@@ -174,8 +155,8 @@ type BootstrapOptions struct {
 }
 
 // New returns a new Raft node.
-func New(opts *Options, dialer LeaderDialer) Raft {
-	return newRaftNode(opts, dialer)
+func New(opts *Options, transport Transport) Raft {
+	return newRaftNode(opts, transport)
 }
 
 // raftNode is a Raft node. It implements the Raft interface.
@@ -187,7 +168,7 @@ type raftNode struct {
 	lastAppliedIndex            atomic.Uint64
 	currentTerm                 atomic.Uint64
 	listenPort                  uint16
-	raftTransport               *raft.NetworkTransport
+	raftTransport               Transport
 	raftSnapshots               raft.SnapshotStore
 	logDB                       LogStoreCloser
 	stableDB                    StableStoreCloser
@@ -197,30 +178,24 @@ type raftNode struct {
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
 	observerClose, observerDone chan struct{}
-	leaderDialer                LeaderDialer
 	log                         *slog.Logger
 	mu                          sync.Mutex
 }
 
-type wrappedTransport struct {
-	transport.Transport
-}
-
-func (w *wrappedTransport) Dial(addr raft.ServerAddress, timeout time.Duration) (net.Conn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	return w.Transport.Dial(ctx, string(addr))
-}
-
 // newRaftNode returns a new Raft node.
-func newRaftNode(opts *Options, dialer LeaderDialer) *raftNode {
+func newRaftNode(opts *Options, transport Transport) *raftNode {
 	log := slog.Default().With(slog.String("component", "raft"))
 	if opts.InMemory {
 		log = log.With(slog.String("storage", "memory"))
 	} else {
 		log = log.With(slog.String("storage", opts.DataDir))
 	}
-	return &raftNode{opts: opts, log: log, leaderDialer: dialer}
+	return &raftNode{
+		opts:          opts,
+		log:           log,
+		raftTransport: transport,
+		listenPort:    transport.AddrPort().Port(),
+	}
 }
 
 // Start starts the Raft node.
@@ -240,31 +215,17 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 			}
 		}
 	}
-	// Create the raft network transport
-	r.log.Debug("creating raft network transport")
-	sl, err := transport.NewTCPTransport(r.opts.ListenAddress)
-	if err != nil {
-		r.mu.Unlock()
-		return fmt.Errorf("new raft stream layer: %w", err)
-	}
-	r.listenPort = sl.AddrPort().Port()
-	r.raftTransport = raft.NewNetworkTransport(&wrappedTransport{sl},
-		r.opts.ConnectionPoolCount,
-		r.opts.ConnectionTimeout,
-		&logWriter{log: r.log},
-	)
+
 	// Create the stores
 	r.log.Debug("creating raft stores")
-	err = r.createDataStores(ctx)
+	err := r.createDataStores(ctx)
 	if err != nil {
 		r.mu.Unlock()
-		defer r.raftTransport.Close()
 		return fmt.Errorf("create data stores: %w", err)
 	}
 	r.raftDB = &raftStorage{r.dataDB, r}
 	r.snapshotter = snapshots.New(r.dataDB)
 	handleErr := func(cause error) error {
-		defer r.raftTransport.Close()
 		defer r.closeDataStores(ctx)
 		return cause
 	}
@@ -501,7 +462,6 @@ func (r *raftNode) Stop(ctx context.Context) error {
 	r.log.Debug("stopping raft node")
 	defer r.log.Debug("raft node stopped")
 	defer r.started.Store(false)
-	defer r.raftTransport.Close()
 	defer r.closeDataStores(ctx)
 	// If we were not running in memory, force a snapshot.
 	if !r.opts.InMemory {
