@@ -224,6 +224,7 @@ func (o *Options) ToFeatureSet(raftMember bool) []v1.Feature {
 	features := []v1.Feature{v1.Feature_NODES}
 	if raftMember {
 		features = append(features, v1.Feature_MEMBERSHIP)
+		features = append(features, v1.Feature_STORAGE)
 	}
 	if o.API != nil {
 		if !o.API.DisableLeaderProxy {

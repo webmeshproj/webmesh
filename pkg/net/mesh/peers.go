@@ -99,6 +99,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.Storage, peerID string) (
 				return ""
 			}(),
 			RaftMember: node.RaftPort > 0,
+			Features:   node.Features,
 		}
 		if edge.Properties.Attributes != nil {
 			// Check if the ICE attribute is set
