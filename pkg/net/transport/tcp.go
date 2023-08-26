@@ -30,8 +30,6 @@ import (
 type TCPTransportOptions struct {
 	// Addr is the address to listen on.
 	Addr string
-	// Advertise is the address to advertise to other nodes.
-	Advertise string
 	// MaxPool is the maximum number of connections to pool.
 	MaxPool int
 	// Timeout is the timeout for dialing a connection.

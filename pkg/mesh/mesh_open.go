@@ -72,10 +72,9 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	}
 	if s.opts.IsRaftMember() {
 		transport, err := transport.NewTCPTransport(s, transport.TCPTransportOptions{
-			Addr:      s.opts.Raft.ListenAddress,
-			Advertise: s.opts.Bootstrap.AdvertiseAddress,
-			MaxPool:   s.opts.Raft.ConnectionPoolCount,
-			Timeout:   s.opts.Raft.ConnectionTimeout,
+			Addr:    s.opts.Raft.ListenAddress,
+			MaxPool: s.opts.Raft.ConnectionPoolCount,
+			Timeout: s.opts.Raft.ConnectionTimeout,
 		})
 		if err != nil {
 			return fmt.Errorf("create transport: %w", err)
