@@ -26,7 +26,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 	"github.com/webmeshproj/webmesh/pkg/storage/memory"
 )
 
@@ -40,10 +39,7 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	stor := st.(*meshStore)
 	stor.testStore = true
 	raftStorage := memory.NewRaftStorage()
-	meshStorage, err := badger.New(&badger.Options{InMemory: true})
-	if err != nil {
-		return nil, err
-	}
+	meshStorage := memory.NewMeshStorage()
 	transport, err := transport.NewRaftTCPTransport(st, transport.TCPTransportOptions{
 		Addr:    ":0",
 		MaxPool: 1,
