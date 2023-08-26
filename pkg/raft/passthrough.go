@@ -25,34 +25,19 @@ import (
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
-
-// NodeDialer is an interface for dialing an arbitrary node. The node ID
-// is optional and if empty, implementations can choose the node to dial.
-type NodeDialer interface {
-	Dial(ctx context.Context, id string) (*grpc.ClientConn, error)
-}
-
-// NodeDialerFunc is the function signature for dialing an arbitrary node.
-// It is supplied by the mesh during startup. It can be used as an
-// alternative to the NodeDialer interface.
-type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, error)
-
-func (f NodeDialerFunc) Dial(ctx context.Context, id string) (*grpc.ClientConn, error) {
-	return f(ctx, id)
-}
 
 // ErrNotRaftMember is returned for methods that are only valid on raft members.
 var ErrNotRaftMember = errors.New("not a raft member")
 
 // NewPassthrough creates a new raft instance that is a no-op for most methods
 // and uses the given Dialer for storage connections.
-func NewPassthrough(dialer NodeDialer) Raft {
+func NewPassthrough(dialer transport.NodeDialer) Raft {
 	return &passthroughRaft{
 		dialer:     dialer,
 		subCancels: []func(){},
@@ -66,7 +51,7 @@ func NewPassthrough(dialer NodeDialer) Raft {
 // It should later be removed in favor of less coupling between the connection
 // and raft interfaces.
 type passthroughRaft struct {
-	dialer     NodeDialer
+	dialer     transport.NodeDialer
 	nodeID     string
 	subCancels []func()
 	closec     chan struct{}

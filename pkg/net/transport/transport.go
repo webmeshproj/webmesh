@@ -48,3 +48,18 @@ type LeaderDialerFunc func(ctx context.Context) (*grpc.ClientConn, error)
 func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 	return f(ctx)
 }
+
+// NodeDialer is an interface for dialing an arbitrary node. The node ID
+// is optional and if empty, implementations can choose the node to dial.
+type NodeDialer interface {
+	Dial(ctx context.Context, id string) (*grpc.ClientConn, error)
+}
+
+// NodeDialerFunc is the function signature for dialing an arbitrary node.
+// It is supplied by the mesh during startup. It can be used as an
+// alternative to the NodeDialer interface.
+type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, error)
+
+func (f NodeDialerFunc) Dial(ctx context.Context, id string) (*grpc.ClientConn, error) {
+	return f(ctx, id)
+}
