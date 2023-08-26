@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/netip"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -30,10 +29,10 @@ import (
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
@@ -63,17 +62,6 @@ type (
 	// LeaderObservation is an alias for raft.LeaderObservation.
 	LeaderObservation = raft.LeaderObservation
 )
-
-// Transport is the interface for the Raft transport.
-type Transport interface {
-	raft.Transport
-
-	// DialLeader opens a gRPC connection to the current leader.
-	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
-
-	// AddrPort returns the address and port the transport is listening on.
-	AddrPort() netip.AddrPort
-}
 
 // Raft states.
 const (
@@ -155,7 +143,7 @@ type BootstrapOptions struct {
 }
 
 // New returns a new Raft node.
-func New(opts *Options, transport Transport) Raft {
+func New(opts *Options, transport transport.RaftTransport) Raft {
 	return newRaftNode(opts, transport)
 }
 
@@ -168,7 +156,7 @@ type raftNode struct {
 	lastAppliedIndex            atomic.Uint64
 	currentTerm                 atomic.Uint64
 	listenPort                  uint16
-	raftTransport               Transport
+	raftTransport               transport.RaftTransport
 	raftSnapshots               raft.SnapshotStore
 	logDB                       LogStoreCloser
 	stableDB                    StableStoreCloser
@@ -183,7 +171,7 @@ type raftNode struct {
 }
 
 // newRaftNode returns a new Raft node.
-func newRaftNode(opts *Options, transport Transport) *raftNode {
+func newRaftNode(opts *Options, transport transport.RaftTransport) *raftNode {
 	log := slog.Default().With(slog.String("component", "raft"))
 	if opts.InMemory {
 		log = log.With(slog.String("storage", "memory"))
