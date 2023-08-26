@@ -123,7 +123,7 @@ func (p *passthroughRaft) LastAppliedIndex() uint64 {
 	return 0
 }
 
-func (p *passthroughRaft) ListenPort() int {
+func (p *passthroughRaft) ListenPort() uint16 {
 	return 0
 }
 

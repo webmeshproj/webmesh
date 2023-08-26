@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -33,6 +34,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
@@ -125,7 +127,7 @@ type Raft interface {
 	// LastAppliedIndex returns the last applied index.
 	LastAppliedIndex() uint64
 	// ListenPort returns the listen port.
-	ListenPort() int
+	ListenPort() uint16
 	// LeaderID returns the leader ID.
 	LeaderID() (string, error)
 	// IsLeader returns true if the Raft node is the leader.
@@ -184,7 +186,7 @@ type raftNode struct {
 	started                     atomic.Bool
 	lastAppliedIndex            atomic.Uint64
 	currentTerm                 atomic.Uint64
-	listenPort                  int
+	listenPort                  uint16
 	raftTransport               *raft.NetworkTransport
 	raftSnapshots               raft.SnapshotStore
 	logDB                       LogStoreCloser
@@ -198,6 +200,16 @@ type raftNode struct {
 	leaderDialer                LeaderDialer
 	log                         *slog.Logger
 	mu                          sync.Mutex
+}
+
+type wrappedTransport struct {
+	transport.Transport
+}
+
+func (w *wrappedTransport) Dial(addr raft.ServerAddress, timeout time.Duration) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return w.Transport.Dial(ctx, string(addr))
 }
 
 // newRaftNode returns a new Raft node.
@@ -230,13 +242,13 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	}
 	// Create the raft network transport
 	r.log.Debug("creating raft network transport")
-	sl, err := NewStreamLayer(r.opts.ListenAddress)
+	sl, err := transport.NewTCPTransport(r.opts.ListenAddress)
 	if err != nil {
 		r.mu.Unlock()
 		return fmt.Errorf("new raft stream layer: %w", err)
 	}
-	r.listenPort = sl.ListenPort()
-	r.raftTransport = raft.NewNetworkTransport(sl,
+	r.listenPort = sl.AddrPort().Port()
+	r.raftTransport = raft.NewNetworkTransport(&wrappedTransport{sl},
 		r.opts.ConnectionPoolCount,
 		r.opts.ConnectionTimeout,
 		&logWriter{log: r.log},
@@ -370,7 +382,7 @@ func (r *raftNode) Configuration() (raft.Configuration, error) {
 }
 
 // ListenPort returns the listen port.
-func (r *raftNode) ListenPort() int {
+func (r *raftNode) ListenPort() uint16 {
 	return r.listenPort
 }
 

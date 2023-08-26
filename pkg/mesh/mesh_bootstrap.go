@@ -287,7 +287,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		ID:                 s.ID(),
 		PublicKey:          wireguardKey.PublicKey(),
 		GRPCPort:           s.opts.Mesh.GRPCAdvertisePort,
-		RaftPort:           s.raft.ListenPort(),
+		RaftPort:           int(s.raft.ListenPort()),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
 		WireGuardEndpoints: s.opts.WireGuard.Endpoints,
 		ZoneAwarenessID:    s.opts.Mesh.ZoneAwarenessID,

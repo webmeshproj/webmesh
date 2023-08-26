@@ -107,7 +107,7 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		MTU:                   s.opts.WireGuard.MTU,
 		RecordMetrics:         s.opts.WireGuard.RecordMetrics,
 		RecordMetricsInterval: s.opts.WireGuard.RecordMetricsInterval,
-		RaftPort:              s.raft.ListenPort(),
+		RaftPort:              int(s.raft.ListenPort()),
 		GRPCPort:              s.opts.Mesh.GRPCAdvertisePort,
 		ZoneAwarenessID:       s.opts.Mesh.ZoneAwarenessID,
 		DialOptions:           s.grpcCreds(context.Background()),
