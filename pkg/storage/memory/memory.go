@@ -40,18 +40,22 @@ func NewRaftStorage() storage.RaftStorage {
 }
 
 // NewMeshStorage returns a memory-based mesh storage that is only suitable for testing.
-// It ignores TTLs and does not persist data.
 func NewMeshStorage() storage.MeshStorage {
 	return &meshStorage{
-		data: make(map[string]string),
+		data: make(map[string]dataItem),
 		subs: make(map[string]subscription),
 	}
 }
 
 type meshStorage struct {
-	data map[string]string
+	data map[string]dataItem
 	subs map[string]subscription
 	mu   sync.RWMutex
+}
+
+type dataItem struct {
+	value string
+	ttl   time.Time
 }
 
 type subscription struct {
@@ -65,7 +69,11 @@ func (st *meshStorage) GetValue(ctx context.Context, key string) (string, error)
 	st.mu.RLock()
 	defer st.mu.RUnlock()
 	if val, ok := st.data[key]; ok {
-		return val, nil
+		if val.ttl != (time.Time{}) && time.Now().After(val.ttl) {
+			delete(st.data, key)
+			return "", storage.ErrKeyNotFound
+		}
+		return val.value, nil
 	}
 	return "", storage.ErrKeyNotFound
 }
@@ -73,7 +81,15 @@ func (st *meshStorage) GetValue(ctx context.Context, key string) (string, error)
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
 func (st *meshStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
 	st.mu.Lock()
-	st.data[key] = value
+	st.data[key] = dataItem{
+		value: value,
+		ttl: func() time.Time {
+			if ttl == 0 {
+				return time.Time{}
+			}
+			return time.Now().Add(ttl)
+		}(),
+	}
 	st.mu.Unlock()
 	for id, sub := range st.subs {
 		if strings.HasPrefix(key, sub.prefix) {
@@ -111,7 +127,8 @@ func (st *meshStorage) List(ctx context.Context, prefix string) ([]string, error
 	var keys []string
 	for k := range st.data {
 		if strings.HasPrefix(k, prefix) {
-			keys = append(keys, k)
+			key := k
+			keys = append(keys, key)
 		}
 	}
 	return keys, nil
@@ -125,7 +142,13 @@ func (st *meshStorage) IterPrefix(ctx context.Context, prefix string, fn storage
 	defer st.mu.RUnlock()
 	for k, v := range st.data {
 		if strings.HasPrefix(k, prefix) {
-			if err := fn(k, v); err != nil {
+			if v.ttl != (time.Time{}) && time.Now().After(v.ttl) {
+				delete(st.data, k)
+				continue
+			}
+			key := k
+			val := v
+			if err := fn(key, val.value); err != nil {
 				return err
 			}
 		}
@@ -141,7 +164,13 @@ func (st *meshStorage) Snapshot(ctx context.Context) (io.Reader, error) {
 		Kv: make(map[string]string),
 	}
 	for k, v := range st.data {
-		data.Kv[k] = v
+		if v.ttl != (time.Time{}) && time.Now().After(v.ttl) {
+			delete(st.data, k)
+			continue
+		}
+		key := k
+		val := v
+		data.Kv[key] = val.value
 	}
 	kvdata, err := proto.Marshal(&data)
 	if err != nil {
@@ -162,7 +191,14 @@ func (st *meshStorage) Restore(ctx context.Context, r io.Reader) error {
 	if err := proto.Unmarshal(kvdata, &data); err != nil {
 		return fmt.Errorf("memory restore: %w", err)
 	}
-	st.data = data.Kv
+	st.data = make(map[string]dataItem)
+	for k, v := range data.Kv {
+		key := k
+		val := v
+		st.data[key] = dataItem{
+			value: val,
+		}
+	}
 	return nil
 }
 

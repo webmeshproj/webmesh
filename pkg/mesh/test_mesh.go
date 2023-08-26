@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +34,7 @@ import (
 // NewTestMesh creates a new test mesh and waits for it to be ready.
 // The context is used to enforce startup timeouts.
 func NewTestMesh(ctx context.Context) (Mesh, error) {
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 	st, err := New(newTestOptions())
 	if err != nil {
 		return nil, err
