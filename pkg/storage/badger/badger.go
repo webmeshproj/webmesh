@@ -41,7 +41,17 @@ type badgerStorage struct {
 	mu sync.RWMutex
 }
 
-func New(opts *storage.Options) (storage.Storage, error) {
+// Options are the options for creating a new Badger storage.
+type Options struct {
+	// InMemory specifies whether to use an in-memory storage.
+	InMemory bool
+	// DiskPath is the path to the disk storage.
+	DiskPath string
+	// Silent specifies whether to suppress log output.
+	Silent bool
+}
+
+func New(opts *Options) (storage.Storage, error) {
 	var badgeropts badger.Options
 	if opts.InMemory {
 		badgeropts = badger.DefaultOptions("").WithInMemory(true)

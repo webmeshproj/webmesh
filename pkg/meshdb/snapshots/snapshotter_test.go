@@ -22,14 +22,13 @@ import (
 	"io"
 	"testing"
 
-	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 )
 
 func TestSnapshotter(t *testing.T) {
 	t.Parallel()
 
-	db, err := badger.New(&storage.Options{InMemory: true, Silent: true})
+	db, err := badger.New(&badger.Options{InMemory: true, Silent: true})
 	if err != nil {
 		t.Fatal(err)
 	}

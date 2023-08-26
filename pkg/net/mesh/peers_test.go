@@ -28,7 +28,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 )
 
@@ -433,7 +432,7 @@ func TestWireGuardPeers(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			db, err := badger.New(&storage.Options{InMemory: true, Silent: true})
+			db, err := badger.New(&badger.Options{InMemory: true, Silent: true})
 			if err != nil {
 				t.Fatalf("create test db: %v", err)
 			}

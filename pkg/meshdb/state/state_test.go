@@ -24,7 +24,6 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 )
 
@@ -179,7 +178,7 @@ func TestListPeerPrivateRPCAddresses(t *testing.T) {
 
 func setupTest(t *testing.T) (*state, func()) {
 	t.Helper()
-	db, err := badger.New(&storage.Options{InMemory: true, Silent: true})
+	db, err := badger.New(&badger.Options{InMemory: true, Silent: true})
 	if err != nil {
 		t.Fatal(err)
 	}

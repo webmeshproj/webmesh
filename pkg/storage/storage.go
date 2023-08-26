@@ -58,13 +58,3 @@ type PrefixIterator func(key, value string) error
 
 // ErrKeyNotFound is the error returned when a key is not found.
 var ErrKeyNotFound = errors.New("key not found")
-
-// Options are the options for creating a new Storage.
-type Options struct {
-	// InMemory specifies whether to use an in-memory storage.
-	InMemory bool
-	// DiskPath is the path to the disk storage.
-	DiskPath string
-	// Silent specifies whether to suppress log output.
-	Silent bool
-}
