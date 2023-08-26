@@ -169,10 +169,14 @@ func (st *meshStorage) Restore(ctx context.Context, r io.Reader) error {
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (st *meshStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (func(), error) {
-	ctx, cancel := context.WithCancel(ctx)
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	st.subs[uuid.NewString()] = subscription{
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return nil, fmt.Errorf("memory subscribe: %w", err)
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	st.subs[id.String()] = subscription{
 		prefix: prefix,
 		fn:     fn,
 		ctx:    ctx,
