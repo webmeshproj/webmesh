@@ -35,6 +35,24 @@ builds:
       - mipsle
       - mips
 
+  - id: node-wasm
+    main: cmd/webmesh-wasm/main.go
+    binary: webmesh-wasm
+    env:
+      - CGO_ENABLED=0
+    tags:
+      - osusergo
+      - netgo
+    ldflags:
+      - -s -w 
+      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
+    goos:
+      - js
+    goarch:
+      - wasm
+
   - id: wmctl
     main: cmd/wmctl/main.go
     binary: wmctl

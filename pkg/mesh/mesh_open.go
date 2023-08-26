@@ -26,15 +26,12 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/net"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
-	"github.com/webmeshproj/webmesh/pkg/storage/badger"
-	"github.com/webmeshproj/webmesh/pkg/storage/memory"
 )
 
 // Open opens the store.
-func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error) {
+func (s *meshStore) Open(ctx context.Context, opts *ConnectOptions) (err error) {
 	if s.open.Load() {
 		return ErrOpen
 	}
@@ -77,34 +74,11 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	} else {
 		s.raft = raft.NewPassthrough(s)
 	}
-	var startOpts raft.StartOptions
-	startOpts.NodeID = s.ID()
-	transport, err := transport.NewRaftTCPTransport(s, transport.TCPTransportOptions{
-		Addr:    s.opts.Raft.ListenAddress,
-		MaxPool: s.opts.Raft.ConnectionPoolCount,
-		Timeout: s.opts.Raft.ConnectionTimeout,
-	})
-	if err != nil {
-		return fmt.Errorf("create transport: %w", err)
-	}
-	startOpts.Transport = transport
-	if s.opts.Raft.InMemory {
-		startOpts.RaftStorage = memory.NewRaftStorage()
-		startOpts.MeshStorage, err = badger.New(&badger.Options{InMemory: true})
-		if err != nil {
-			return fmt.Errorf("create badger in-memory storage: %w", err)
-		}
-	} else {
-		startOpts.RaftStorage, err = badger.NewRaftStorage(s.opts.Raft.StorePath())
-		if err != nil {
-			return fmt.Errorf("create raft storage: %w", err)
-		}
-		startOpts.MeshStorage, err = badger.New(&badger.Options{
-			DiskPath: s.opts.Raft.DataStoragePath(),
-		})
-		if err != nil {
-			return fmt.Errorf("create badger storage: %w", err)
-		}
+	startOpts := raft.StartOptions{
+		NodeID:      s.ID(),
+		Transport:   opts.RaftTransport,
+		MeshStorage: opts.MeshStorage,
+		RaftStorage: opts.RaftStorage,
 	}
 	err = s.raft.Start(ctx, &startOpts)
 	if err != nil {
@@ -153,17 +127,17 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 	if s.opts.Bootstrap.Enabled {
 		// Attempt bootstrap.
 		log.Info("bootstrapping cluster")
-		if err = s.bootstrap(ctx, features, key); err != nil {
+		if err = s.bootstrap(ctx, opts.Features, key); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if s.opts.Mesh.JoinAddress != "" {
 		// Attempt to join the cluster.
-		err = s.join(ctx, features, s.opts.Mesh.JoinAddress, key)
+		err = s.join(ctx, opts.Features, s.opts.Mesh.JoinAddress, key)
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
 	} else if s.opts.Discovery != nil && s.opts.Discovery.UseKadDHT && s.opts.Discovery.PSK != "" {
-		err = s.joinWithKadDHT(ctx, features, key)
+		err = s.joinWithKadDHT(ctx, opts.Features, key)
 		if err != nil {
 			return handleErr(fmt.Errorf("join with kad dht: %w", err))
 		}

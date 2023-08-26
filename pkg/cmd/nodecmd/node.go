@@ -33,7 +33,11 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/badger"
+	"github.com/webmeshproj/webmesh/pkg/storage/memory"
 	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/version"
@@ -145,10 +149,40 @@ func executeSingleMesh(ctx context.Context, config *Options) error {
 	}
 	log := slog.Default()
 
-	// Connect to the mesh
+	// Create a new mesh node
 	st, err := mesh.New(config.Mesh)
 	if err != nil {
 		return fmt.Errorf("failed to create mesh connection: %w", err)
+	}
+	// Create a raft transport
+	transport, err := transport.NewRaftTCPTransport(st, transport.TCPTransportOptions{
+		Addr:    config.Mesh.Raft.ListenAddress,
+		MaxPool: config.Mesh.Raft.ConnectionPoolCount,
+		Timeout: config.Mesh.Raft.ConnectionTimeout,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create raft transport: %w", err)
+	}
+	// Create the raft storage
+	var raftStorage storage.RaftStorage
+	var meshStorage storage.MeshStorage
+	if config.Mesh.Raft.InMemory {
+		raftStorage = memory.NewRaftStorage()
+		meshStorage, err = badger.New(&badger.Options{InMemory: true})
+		if err != nil {
+			return fmt.Errorf("create badger in-memory storage: %w", err)
+		}
+	} else {
+		raftStorage, err = badger.NewRaftStorage(config.Mesh.Raft.StorePath())
+		if err != nil {
+			return fmt.Errorf("create raft storage: %w", err)
+		}
+		meshStorage, err = badger.New(&badger.Options{
+			DiskPath: config.Mesh.Raft.DataStoragePath(),
+		})
+		if err != nil {
+			return fmt.Errorf("create badger storage: %w", err)
+		}
 	}
 	var features []v1.Feature
 	if !config.Global.DisableFeatureAdvertisement {
@@ -163,7 +197,12 @@ func executeSingleMesh(ctx context.Context, config *Options) error {
 		}()
 		features = config.Services.ToFeatureSet(isRaftMember)
 	}
-	err = st.Open(ctx, features)
+	err = st.Open(ctx, &mesh.ConnectOptions{
+		Features:      features,
+		RaftTransport: transport,
+		RaftStorage:   raftStorage,
+		MeshStorage:   meshStorage,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to open mesh connection: %w", err)
 	}

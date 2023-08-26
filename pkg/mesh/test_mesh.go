@@ -24,6 +24,10 @@ import (
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/storage/badger"
+	"github.com/webmeshproj/webmesh/pkg/storage/memory"
 )
 
 // NewTestMesh creates a new test mesh and waits for it to be ready.
@@ -35,7 +39,24 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	}
 	stor := st.(*meshStore)
 	stor.testStore = true
-	if err := stor.Open(ctx, nil); err != nil {
+	raftStorage := memory.NewRaftStorage()
+	meshStorage, err := badger.New(&badger.Options{InMemory: true})
+	if err != nil {
+		return nil, err
+	}
+	transport, err := transport.NewRaftTCPTransport(st, transport.TCPTransportOptions{
+		Addr:    ":0",
+		MaxPool: 1,
+		Timeout: time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := stor.Open(ctx, &ConnectOptions{
+		RaftTransport: transport,
+		RaftStorage:   raftStorage,
+		MeshStorage:   meshStorage,
+	}); err != nil {
 		return nil, err
 	}
 	return stor, nil

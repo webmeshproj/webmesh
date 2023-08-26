@@ -776,8 +776,6 @@ github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1Y
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSDJfjId/PEGEShv6ugrt4kYsC5UIDaQ=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
-github.com/webmeshproj/api v0.2.5-0.20230826115142-003e919d528c h1:g5Hp91KlXxG5BAFuubDTR25honILR8JyFgYMqqXBlFk=
-github.com/webmeshproj/api v0.2.5-0.20230826115142-003e919d528c/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.2.5-0.20230826150647-f65d966e4b4c h1:DZCop5Xx2K3CPhC5x0y2Q8G9H9hklOZi2EBCTBX+/wc=
 github.com/webmeshproj/api v0.2.5-0.20230826150647-f65d966e4b4c/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944 h1:Pau7Sfvy35ulRodLsBUwdnAckYvgoNZb9wPk7ubRlZ8=

@@ -31,7 +31,11 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/badger"
+	"github.com/webmeshproj/webmesh/pkg/storage/memory"
 )
 
 // AppDaemon is the app daemon RPC server.
@@ -94,16 +98,55 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error creating mesh: %v", err)
 	}
-	isRaftMember := func() bool {
-		if app.curConfig.Mesh.Bootstrap != nil && app.curConfig.Mesh.Bootstrap.Enabled {
-			return true
+	// Create a raft transport
+	transport, err := transport.NewRaftTCPTransport(conn, transport.TCPTransportOptions{
+		Addr:    config.Mesh.Raft.ListenAddress,
+		MaxPool: config.Mesh.Raft.ConnectionPoolCount,
+		Timeout: config.Mesh.Raft.ConnectionTimeout,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create raft transport: %v", err)
+	}
+	// Create the raft storage
+	var raftStorage storage.RaftStorage
+	var meshStorage storage.MeshStorage
+	if config.Mesh.Raft.InMemory {
+		raftStorage = memory.NewRaftStorage()
+		meshStorage, err = badger.New(&badger.Options{InMemory: true})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "create badger in-memory storage: %v", err)
 		}
-		if app.curConfig.Mesh.Mesh != nil {
-			return app.curConfig.Mesh.Mesh.JoinAsVoter || app.curConfig.Mesh.Mesh.JoinAsObserver
+	} else {
+		raftStorage, err = badger.NewRaftStorage(config.Mesh.Raft.StorePath())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "create raft storage: %v", err)
 		}
-		return false
-	}()
-	err = conn.Open(ctx, app.curConfig.Services.ToFeatureSet(isRaftMember))
+		meshStorage, err = badger.New(&badger.Options{
+			DiskPath: config.Mesh.Raft.DataStoragePath(),
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "create badger storage: %v", err)
+		}
+	}
+	var features []v1.Feature
+	if !config.Global.DisableFeatureAdvertisement {
+		isRaftMember := func() bool {
+			if config.Mesh.Bootstrap != nil && config.Mesh.Bootstrap.Enabled {
+				return true
+			}
+			if config.Mesh.Mesh != nil {
+				return config.Mesh.Mesh.JoinAsVoter || config.Mesh.Mesh.JoinAsObserver
+			}
+			return false
+		}()
+		features = config.Services.ToFeatureSet(isRaftMember)
+	}
+	err = conn.Open(ctx, &mesh.ConnectOptions{
+		Features:      features,
+		RaftTransport: transport,
+		RaftStorage:   raftStorage,
+		MeshStorage:   meshStorage,
+	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error opening mesh: %v", err)
 	}

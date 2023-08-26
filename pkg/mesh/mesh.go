@@ -29,16 +29,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	v1 "github.com/webmeshproj/api/v1"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/discovery"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
@@ -65,7 +66,7 @@ type Mesh interface {
 	Domain() string
 	// Open opens the connection to the mesh. This must be called before
 	// other methods can be used.
-	Open(ctx context.Context, features []v1.Feature) error
+	Open(ctx context.Context, opts *ConnectOptions) error
 	// Ready returns a channel that will be closed when the mesh is ready.
 	// Ready is defined as having a leader and knowing its address.
 	Ready() <-chan struct{}
@@ -89,6 +90,18 @@ type Mesh interface {
 	AnnounceDHT(context.Context, *DiscoveryOptions) error
 	// LeaveDHT leaves the peer discovery service for the given PSK.
 	LeaveDHT(ctx context.Context, psk string) error
+}
+
+// ConnectOptions are options for opening the connection to the mesh.
+type ConnectOptions struct {
+	// Features are the features to broadcast.
+	Features []v1.Feature
+	// RaftTransport is the transport to use for the raft node.
+	RaftTransport transport.RaftTransport
+	// RaftStorage is the storage to use for the raft node.
+	RaftStorage storage.RaftStorage
+	// MeshStorage is the storage to use for the mesh state.
+	MeshStorage storage.MeshStorage
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh

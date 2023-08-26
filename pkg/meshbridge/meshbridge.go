@@ -32,8 +32,12 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/badger"
+	"github.com/webmeshproj/webmesh/pkg/storage/memory"
 )
 
 // Bridge is the interface for a mesh bridge. It manages multiple mesh connections
@@ -146,32 +150,65 @@ func (m *meshBridge) Start(ctx context.Context) error {
 			}
 			return false
 		}()
-		features := meshOpts.Services.ToFeatureSet(isRaftMember)
 		// Open the mesh connection
 		m.log.Info("opening mesh", slog.String("mesh-id", meshID))
-		mesh := m.Mesh(meshID)
-		if mesh == nil {
+		msh := m.Mesh(meshID)
+		if msh == nil {
 			// This should never happen
 			return handleErr(fmt.Errorf("mesh %q not found", meshID))
 		}
-		err := mesh.Open(ctx, features)
+		features := meshOpts.Services.ToFeatureSet(isRaftMember)
+		transport, err := transport.NewRaftTCPTransport(msh, transport.TCPTransportOptions{
+			Addr:    meshOpts.Mesh.Raft.ListenAddress,
+			MaxPool: meshOpts.Mesh.Raft.ConnectionPoolCount,
+			Timeout: meshOpts.Mesh.Raft.ConnectionTimeout,
+		})
+		if err != nil {
+			return fmt.Errorf("create transport: %w", err)
+		}
+		var raftStorage storage.RaftStorage
+		var meshStorage storage.MeshStorage
+		if meshOpts.Mesh.Raft.InMemory {
+			raftStorage = memory.NewRaftStorage()
+			meshStorage, err = badger.New(&badger.Options{InMemory: true})
+			if err != nil {
+				return fmt.Errorf("create badger in-memory storage: %w", err)
+			}
+		} else {
+			raftStorage, err = badger.NewRaftStorage(meshOpts.Mesh.Raft.StorePath())
+			if err != nil {
+				return fmt.Errorf("create raft storage: %w", err)
+			}
+			meshStorage, err = badger.New(&badger.Options{
+				DiskPath: meshOpts.Mesh.Raft.DataStoragePath(),
+			})
+			if err != nil {
+				return fmt.Errorf("create badger storage: %w", err)
+			}
+		}
+		err = msh.Open(ctx, &mesh.ConnectOptions{
+			Features:      features,
+			RaftTransport: transport,
+			RaftStorage:   raftStorage,
+			MeshStorage:   meshStorage,
+		})
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to open mesh %q: %w", meshID, err))
 		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-mesh.Ready():
+		case <-msh.Ready():
 		}
 		cleanFuncs = append(cleanFuncs, func() {
-			err := mesh.Close()
+			err := msh.Close()
 			if err != nil {
 				m.log.Error("failed to close mesh", slog.String("mesh-id", meshID), slog.String("error", err.Error()))
 			}
 		})
 		// Create the services for this mesh
 		m.log.Info("starting mesh services", slog.String("mesh-id", meshID))
-		srv, err := services.NewServer(mesh, meshOpts.Services)
+		srv, err := services.NewServer(msh, meshOpts.Services)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 		}

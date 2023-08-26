@@ -29,6 +29,9 @@ PARALLEL   ?= $(shell nproc)
 build: fmt vet ## Build node and wmctl binaries for the current architecture.
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl --parallelism=$(PARALLEL)
 
+build-wasm: fmt vet ## Build node wasm binary for the current architecture.
+	$(GORELEASER) build $(BUILD_ARGS) --id node-wasm --parallelism=$(PARALLEL)
+
 dist: fmt vet ## Build distribution binaries and packages for all platforms.
 	$(GORELEASER) release --skip-sign $(BUILD_ARGS) --parallelism=$(PARALLEL)
 
