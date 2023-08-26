@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/options"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
@@ -42,8 +43,8 @@ import (
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
 
-	config     *Options
-	curConfig  *Options
+	config     *options.Options
+	curConfig  *options.Options
 	mesh       mesh.Mesh
 	svcs       *services.Server
 	connecting atomic.Bool

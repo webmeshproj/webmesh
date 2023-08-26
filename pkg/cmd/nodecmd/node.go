@@ -31,6 +31,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/options"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
@@ -53,12 +54,15 @@ var (
 	appDaemonBind           = flagset.String("app-daemon-bind", "", "Address to bind the application daemon to (default: unix:///var/run/webmesh-node.sock)")
 	appDaemonGrpcWeb        = flagset.Bool("app-daemon-grpc-web", false, "Use gRPC-Web for the application daemon (default: false)")
 	appDaemonInsecureSocket = flagset.Bool("app-daemon-insecure-socket", false, "Leave default ownership on the Unix socket (default: false)")
+
+	config = options.NewOptions().BindFlags(flagset)
 )
 
 func Execute() error {
 	// Parse flags and read in configurations
-
-	flagset.Usage = usage
+	flagset.Usage = func() {
+		options.Usage(flagset)
+	}
 	err := flagset.Parse(os.Args[1:])
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -143,7 +147,7 @@ func Execute() error {
 	return executeSingleMesh(ctx, config)
 }
 
-func executeSingleMesh(ctx context.Context, config *Options) error {
+func executeSingleMesh(ctx context.Context, config *options.Options) error {
 	if (config.Global.NoIPv4 && config.Global.NoIPv6) || (config.Mesh.Mesh.NoIPv4 && config.Mesh.Mesh.NoIPv6) {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
@@ -246,7 +250,7 @@ func executeSingleMesh(ctx context.Context, config *Options) error {
 	return nil
 }
 
-func executeBridgedMesh(ctx context.Context, config *Options) error {
+func executeBridgedMesh(ctx context.Context, config *options.Options) error {
 	log := slog.Default()
 	br, err := meshbridge.New(config.Bridge)
 	if err != nil {

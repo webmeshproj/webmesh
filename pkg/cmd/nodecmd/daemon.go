@@ -38,6 +38,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/options"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
@@ -51,7 +52,7 @@ func DefaultDaemonSocket() string {
 }
 
 // RunAppDaemon runs the app daemon.
-func RunAppDaemon(ctx context.Context, config *Options) error {
+func RunAppDaemon(ctx context.Context, config *options.Options) error {
 	log := slog.Default()
 
 	// Setup the listener

@@ -17,16 +17,9 @@ limitations under the License.
 // Entrypoint for webmesh nodes.
 package main
 
-import (
-	"fmt"
-	"os"
+import "fmt"
 
-	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd"
-)
-
+// Main is intentionally left blank. The node is started by the wasm runtime.
 func main() {
-	if err := nodecmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
+	fmt.Println("Hello from wasm!")
 }

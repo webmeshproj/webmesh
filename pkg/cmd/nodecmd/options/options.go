@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package nodecmd contains the entrypoint for webmesh nodes.
-package nodecmd
+// Package options contains configuration parsing for the nodecmd.
+package options
 
 import (
 	"bytes"
@@ -33,10 +33,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/version"
-)
-
-var (
-	config = NewOptions().BindFlags(flagset)
 )
 
 // Options are the node options.
@@ -114,7 +110,8 @@ func (o *Options) MarshalTo(w io.Writer) error {
 	return nil
 }
 
-func usage() {
+// Usage prints the usage of the given flagset.
+func Usage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "Webmesh Node (Version: %s)\n\n", version.Version)
 	fmt.Fprintf(os.Stderr, "Usage: %s [flags]\n", os.Args[0])
 

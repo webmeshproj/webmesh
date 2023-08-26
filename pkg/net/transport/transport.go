@@ -34,6 +34,9 @@ type RaftTransport interface {
 
 	// AddrPort returns the address and port the transport is listening on.
 	AddrPort() netip.AddrPort
+
+	// Close closes the transport.
+	Close() error
 }
 
 // LeaderDialer is the interface for dialing the current leader.

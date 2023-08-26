@@ -460,6 +460,7 @@ func (r *raftNode) Stop(ctx context.Context) error {
 	r.log.Debug("stopping raft node")
 	defer r.log.Debug("raft node stopped")
 	defer r.started.Store(false)
+	defer r.raftTransport.Close()
 	// If we were not running in memory, force a snapshot.
 	if !r.opts.InMemory {
 		r.log.Debug("taking raft storage snapshot")
