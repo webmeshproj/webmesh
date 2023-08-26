@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+// Package badger implements a storage backend using badger.
+package badger
 
 import (
 	"bytes"
@@ -28,8 +29,11 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/pb"
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 type badgerStorage struct {
@@ -37,16 +41,17 @@ type badgerStorage struct {
 	mu sync.RWMutex
 }
 
-func newBadgerStorage(opts *Options) (Storage, error) {
+func New(opts *storage.Options) (storage.Storage, error) {
 	var badgeropts badger.Options
 	if opts.InMemory {
 		badgeropts = badger.DefaultOptions("").WithInMemory(true)
 	} else {
 		badgeropts = badger.DefaultOptions(opts.DiskPath)
 	}
-	badgeropts.Logger = nil
 	if !opts.Silent {
 		badgeropts.Logger = &logger{slog.Default().With("component", "badger")}
+	} else {
+		badgeropts.Logger = &logger{slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{}))}
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {
@@ -67,7 +72,7 @@ func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
 		item, err := txn.Get([]byte(key))
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
-				return ErrKeyNotFound
+				return storage.ErrKeyNotFound
 			}
 			return fmt.Errorf("badger get: %w", err)
 		}
@@ -81,7 +86,7 @@ func (b *badgerStorage) Get(ctx context.Context, key string) (string, error) {
 		return nil
 	})
 	if err != nil && err == badger.ErrKeyNotFound {
-		return "", ErrKeyNotFound
+		return "", storage.ErrKeyNotFound
 	}
 	return value, err
 }
@@ -118,7 +123,7 @@ func (b *badgerStorage) Delete(ctx context.Context, key string) error {
 		err := txn.Delete([]byte(key))
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
-				return ErrKeyNotFound
+				return storage.ErrKeyNotFound
 			}
 			return fmt.Errorf("badger delete: %w", err)
 		}
@@ -146,7 +151,7 @@ func (b *badgerStorage) List(ctx context.Context, prefix string) ([]string, erro
 }
 
 // IterPrefix iterates over all keys with a given prefix.
-func (b *badgerStorage) IterPrefix(ctx context.Context, prefix string, fn PrefixIterator) error {
+func (b *badgerStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	err := b.db.View(func(txn *badger.Txn) error {
@@ -178,12 +183,33 @@ func (b *badgerStorage) Snapshot(ctx context.Context) (io.Reader, error) {
 			return nil, fmt.Errorf("badger run log gc: %w", err)
 		}
 	}
-	var buf bytes.Buffer
-	_, err := b.db.Backup(&buf, 0)
+	data := v1.RaftSnapshot{
+		Kv: make(map[string]string),
+	}
+	err := b.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				data.Kv[string(k)] = string(v)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("badger snapshot: %w", err)
 	}
-	return &buf, nil
+	kvdata, err := proto.Marshal(&data)
+	if err != nil {
+		return nil, fmt.Errorf("badger snapshot: %w", err)
+	}
+	return bytes.NewReader(kvdata), nil
 }
 
 // Restore restores a snapshot of the storage.
@@ -194,7 +220,24 @@ func (b *badgerStorage) Restore(ctx context.Context, r io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("badger restore: %w", err)
 	}
-	err = b.db.Load(r, 16)
+	data := v1.RaftSnapshot{}
+	kvdata, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("badger restore: %w", err)
+	}
+	err = proto.Unmarshal(kvdata, &data)
+	if err != nil {
+		return fmt.Errorf("badger restore: %w", err)
+	}
+	err = b.db.Update(func(txn *badger.Txn) error {
+		for k, v := range data.Kv {
+			err := txn.Set([]byte(k), []byte(v))
+			if err != nil {
+				return fmt.Errorf("badger restore: %w", err)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return fmt.Errorf("badger restore: %w", err)
 	}
@@ -204,7 +247,7 @@ func (b *badgerStorage) Restore(ctx context.Context, r io.Reader) error {
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe. If the given context is cancelled,
 // the subscription will be automatically unsubscribed.
-func (b *badgerStorage) Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (func(), error) {
+func (b *badgerStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (func(), error) {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		sub := func(kv *badger.KVList) error {

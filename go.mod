@@ -34,7 +34,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.1.0
-	github.com/webmeshproj/api v0.2.5-0.20230826115142-003e919d528c
+	github.com/webmeshproj/api v0.2.5-0.20230826150647-f65d966e4b4c
 	github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944
 	golang.org/x/crypto v0.12.0
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63

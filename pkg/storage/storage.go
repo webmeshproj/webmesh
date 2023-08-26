@@ -68,14 +68,3 @@ type Options struct {
 	// Silent specifies whether to suppress log output.
 	Silent bool
 }
-
-// New returns a new Storage.
-func New(opts *Options) (Storage, error) {
-	return newBadgerStorage(opts)
-}
-
-// NewTestStorage is a helper for creating an in-memory storage suitable
-// for testing.
-func NewTestStorage() (Storage, error) {
-	return New(&Options{InMemory: true, Silent: true})
-}

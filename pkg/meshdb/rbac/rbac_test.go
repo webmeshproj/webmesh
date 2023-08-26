@@ -25,6 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 )
 
 const admin = "admin"
@@ -92,7 +93,7 @@ var groupSeeds = []*v1.Group{
 func setupTest(t *testing.T) (*rbac, func()) {
 	t.Helper()
 	ctx := context.Background()
-	st, err := storage.NewTestStorage()
+	st, err := badger.New(&storage.Options{InMemory: true, Silent: true})
 	if err != nil {
 		t.Fatal(err)
 	}

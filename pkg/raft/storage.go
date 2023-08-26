@@ -32,6 +32,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 )
 
 // MarshalLogEntry marshals a RaftLogEntry.
@@ -110,7 +111,7 @@ func (r *raftNode) createDataStores(ctx context.Context) error {
 		r.logDB = raftstore
 		r.stableDB = raftstore
 		r.raftSnapshots = raft.NewInmemSnapshotStore()
-		r.dataDB, err = storage.New(&storage.Options{InMemory: true})
+		r.dataDB, err = badger.New(&storage.Options{InMemory: true})
 		if err != nil {
 			err = fmt.Errorf("new inmem storage: %w", err)
 		}
@@ -142,7 +143,7 @@ func (r *raftNode) createDataStores(ctx context.Context) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("new file snapshot store: %w", err))
 	}
-	r.dataDB, err = storage.New(&storage.Options{
+	r.dataDB, err = badger.New(&storage.Options{
 		DiskPath: r.opts.DataStoragePath(),
 	})
 	if err != nil {
