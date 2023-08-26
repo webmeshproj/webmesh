@@ -26,8 +26,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Transport is the interface for sending and receiving messages between nodes.
-type Transport interface {
+// RaftTransport defines the methods needed for raft consensus to function
+// in a webmesh cluster.
+type RaftTransport interface {
 	raft.Transport
 	LeaderDialer
 
@@ -60,6 +61,7 @@ type NodeDialer interface {
 // alternative to the NodeDialer interface.
 type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, error)
 
+// Dial implements NodeDialer.
 func (f NodeDialerFunc) Dial(ctx context.Context, id string) (*grpc.ClientConn, error) {
 	return f(ctx, id)
 }

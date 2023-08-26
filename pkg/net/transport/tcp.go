@@ -36,8 +36,8 @@ type TCPTransportOptions struct {
 	Timeout time.Duration
 }
 
-// NewTCPTransport creates a new TCP transport listening on the given address.
-func NewTCPTransport(leaderDialer LeaderDialer, opts TCPTransportOptions) (Transport, error) {
+// NewRaftTCPTransport creates a new TCP transport listening on the given address.
+func NewRaftTCPTransport(leaderDialer LeaderDialer, opts TCPTransportOptions) (RaftTransport, error) {
 	sl, err := newTCPStreamLayter(opts.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("create TCP stream layer: %w", err)

@@ -71,7 +71,7 @@ func (s *meshStore) Open(ctx context.Context, features []v1.Feature) (err error)
 		}
 	}
 	if s.opts.IsRaftMember() {
-		transport, err := transport.NewTCPTransport(s, transport.TCPTransportOptions{
+		transport, err := transport.NewRaftTCPTransport(s, transport.TCPTransportOptions{
 			Addr:    s.opts.Raft.ListenAddress,
 			MaxPool: s.opts.Raft.ConnectionPoolCount,
 			Timeout: s.opts.Raft.ConnectionTimeout,
