@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package storage
 
 import (
 	v1 "github.com/webmeshproj/api/v1"
@@ -22,7 +22,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (s *Server) Query(req *v1.QueryRequest, stream v1.Node_QueryServer) error {
+func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) error {
 	if !s.store.Raft().IsVoter() && !s.store.Raft().IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "node not available to query")

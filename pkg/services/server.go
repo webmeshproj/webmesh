@@ -41,6 +41,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/services/node"
+	"github.com/webmeshproj/webmesh/pkg/services/storage"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
 )
@@ -133,11 +134,14 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 			return nil, err
 		}
 	}
-	// Register the membership API if we are a raft member
+	// Register the membership and storage APIs if we are a raft member
+	// TODO: Make this more dynamic
 	isRaftMember := store.Raft().IsVoter() || store.Raft().IsObserver()
 	if isRaftMember {
 		log.Debug("registering membership service")
 		v1.RegisterMembershipServer(server, membership.NewServer(store, insecureServices))
+		log.Debug("registering storage service")
+		v1.RegisterStorageServer(server, storage.NewServer(store, insecureServices))
 	}
 	// Always register the node server
 	log.Debug("registering node service")

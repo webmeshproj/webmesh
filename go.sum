@@ -778,6 +778,8 @@ github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSD
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
 github.com/webmeshproj/api v0.2.4 h1:KNra/dkYIBIVtutDKb5g0sDei4t9rCQE1o0HctzJHtY=
 github.com/webmeshproj/api v0.2.4/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
+github.com/webmeshproj/api v0.2.5-0.20230826104137-e926a45a8026 h1:k6ZZ0fk/p+nU9uQziCLQ/HDwRsoSGdU9nA8PhC3TOso=
+github.com/webmeshproj/api v0.2.5-0.20230826104137-e926a45a8026/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944 h1:Pau7Sfvy35ulRodLsBUwdnAckYvgoNZb9wPk7ubRlZ8=
 github.com/webmeshproj/raft-badger v0.0.0-20230808161310-f874ad74d944/go.mod h1:eHhYsRLIRd0yXTBtJI7qb9IbDGas8DNs08Ba1NUDmDM=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=

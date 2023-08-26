@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package storage
 
 import (
 	v1 "github.com/webmeshproj/api/v1"
@@ -32,14 +32,14 @@ var canSubscribeAction = rbac.Actions{
 	},
 }
 
-func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Node_SubscribeServer) error {
+func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Storage_SubscribeServer) error {
 	if !s.store.Raft().IsVoter() && !s.store.Raft().IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "current node not available to subscribe")
 	}
 	if !meshdb.IsReservedPrefix(req.GetPrefix()) {
 		// Don't allow subscriptions to generic prefixes without permissions
-		allowed, err := s.rbacEval.Evaluate(srv.Context(), canSubscribeAction.For(req.GetPrefix()))
+		allowed, err := s.rbac.Evaluate(srv.Context(), canSubscribeAction.For(req.GetPrefix()))
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to evaluate subscribe permissions: %v", err)
 		}

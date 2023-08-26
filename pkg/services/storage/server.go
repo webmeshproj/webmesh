@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package node contains the webmesh node service.
-package node
+// Package storage provides the storage server.
+package storage
 
 import (
 	"log/slog"
-	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 
@@ -27,21 +26,17 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
-// Server is the webmesh node service.
+// Server is the webmesh storage server.
 type Server struct {
-	v1.UnimplementedNodeServer
+	v1.UnimplementedStorageServer
 
-	store     meshdb.Store
-	rbacEval  rbac.Evaluator
-	features  []v1.Feature
-	startedAt time.Time
-	log       *slog.Logger
+	store meshdb.Store
+	rbac  rbac.Evaluator
+	log   *slog.Logger
 }
 
-// NewServer returns a new Server. Features are used for returning what features are enabled.
-// It is the callers responsibility to ensure those servers are registered on the node.
-// Insecure is used to disable authorization.
-func NewServer(store meshdb.Store, features []v1.Feature, insecure bool) *Server {
+// NewServer returns a new storage Server.
+func NewServer(store meshdb.Store, insecure bool) *Server {
 	var rbaceval rbac.Evaluator
 	if insecure {
 		rbaceval = rbac.NewNoopEvaluator()
@@ -49,10 +44,8 @@ func NewServer(store meshdb.Store, features []v1.Feature, insecure bool) *Server
 		rbaceval = rbac.NewStoreEvaluator(store)
 	}
 	return &Server{
-		store:     store,
-		rbacEval:  rbaceval,
-		features:  features,
-		startedAt: time.Now(),
-		log:       slog.Default().With("component", "node-server"),
+		store: store,
+		rbac:  rbaceval,
+		log:   slog.Default().With("component", "storage-server"),
 	}
 }

@@ -195,7 +195,7 @@ type passthroughStorage struct {
 
 // Get returns the value of a key.
 func (p *passthroughStorage) Get(ctx context.Context, key string) (string, error) {
-	cli, close, err := p.newNodeClient(ctx)
+	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -226,7 +226,7 @@ func (p *passthroughStorage) Get(ctx context.Context, key string) (string, error
 func (p *passthroughStorage) Put(ctx context.Context, key, value string, ttl time.Duration) error {
 	// We pass this through to the publish API. Should only be called by non-raft nodes wanting to publish
 	// non-internal values. The server will enforce permissions and other restrictions.
-	cli, close, err := p.newNodeClient(ctx)
+	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func (p *passthroughStorage) Delete(ctx context.Context, key string) error {
 
 // List returns all keys with a given prefix.
 func (p *passthroughStorage) List(ctx context.Context, prefix string) ([]string, error) {
-	cli, close, err := p.newNodeClient(ctx)
+	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +274,7 @@ func (p *passthroughStorage) List(ctx context.Context, prefix string) ([]string,
 // that the iterator not attempt any write operations as this will cause
 // a deadlock.
 func (p *passthroughStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
-	cli, close, err := p.newNodeClient(ctx)
+	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -381,7 +381,7 @@ func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn st
 }
 
 func (p *passthroughStorage) doSubscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) error {
-	cli, close, err := p.newNodeClient(ctx)
+	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -414,7 +414,7 @@ func (p *passthroughStorage) Close() error {
 	return nil
 }
 
-func (p *passthroughStorage) newNodeClient(ctx context.Context) (v1.NodeClient, func(), error) {
+func (p *passthroughStorage) newStorageClient(ctx context.Context) (v1.StorageClient, func(), error) {
 	select {
 	case <-p.raft.closec:
 		return nil, nil, ErrClosed
@@ -424,7 +424,7 @@ func (p *passthroughStorage) newNodeClient(ctx context.Context) (v1.NodeClient, 
 	if err != nil {
 		return nil, nil, err
 	}
-	return v1.NewNodeClient(c), func() { _ = c.Close() }, nil
+	return v1.NewStorageClient(c), func() { _ = c.Close() }, nil
 }
 
 func (p *passthroughStorage) checkErr(fn func() error) {

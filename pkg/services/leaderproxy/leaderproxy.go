@@ -123,12 +123,14 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewMembershipClient(conn).GetRaftConfiguration(ctx, req.(*v1.RaftConfigurationRequest))
 
 	// Node API
-	case v1.Node_Query_FullMethodName:
-		return v1.NewNodeClient(conn).Query(ctx, req.(*v1.QueryRequest))
-	case v1.Node_Publish_FullMethodName:
-		return v1.NewNodeClient(conn).Publish(ctx, req.(*v1.PublishRequest))
 	case v1.Node_GetStatus_FullMethodName:
 		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*v1.GetStatusRequest))
+
+	//Storage API
+	case v1.Storage_Query_FullMethodName:
+		return v1.NewStorageClient(conn).Query(ctx, req.(*v1.QueryRequest))
+	case v1.Storage_Publish_FullMethodName:
+		return v1.NewStorageClient(conn).Publish(ctx, req.(*v1.PublishRequest))
 
 	// Mesh API
 	case v1.Mesh_GetNode_FullMethodName:
@@ -209,6 +211,30 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
 	switch info.FullMethod {
+
+	// Node API
+	case v1.Node_NegotiateDataChannel_FullMethodName:
+		client := v1.NewNodeClient(conn)
+		stream, err := client.NegotiateDataChannel(ctx)
+		if err != nil {
+			return err
+		}
+		return proxyStream[v1.DataChannelNegotiation, v1.DataChannelNegotiation](ctx, ss, stream)
+
+	// Membership API
+	case v1.Membership_SubscribePeers_FullMethodName:
+		client := v1.NewMembershipClient(conn)
+		var req *v1.SubscribePeersRequest
+		if err := ss.RecvMsg(&req); err != nil {
+			return err
+		}
+		stream, err := client.SubscribePeers(ctx, req)
+		if err != nil {
+			return err
+		}
+		return proxyStream[v1.SubscribePeersRequest, v1.PeerConfigurations](ctx, ss, stream)
+
+	// WebRTC API
 	case v1.WebRTC_StartDataChannel_FullMethodName:
 		client := v1.NewWebRTCClient(conn)
 		stream, err := client.StartDataChannel(ctx)
@@ -216,6 +242,20 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 			return err
 		}
 		return proxyStream[v1.StartDataChannelRequest, v1.DataChannelOffer](ctx, ss, stream)
+
+	// Storage API
+	case v1.Storage_Subscribe_FullMethodName:
+		client := v1.NewStorageClient(conn)
+		var req *v1.SubscribeRequest
+		if err := ss.RecvMsg(&req); err != nil {
+			return err
+		}
+		stream, err := client.Subscribe(ctx, req)
+		if err != nil {
+			return err
+		}
+		return proxyStream[v1.SubscribeRequest, v1.SubscriptionEvent](ctx, ss, stream)
+
 	default:
 		return status.Errorf(codes.Unimplemented, "unimplemented leader-proxy method: %s", info.FullMethod)
 	}

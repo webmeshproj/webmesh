@@ -39,14 +39,17 @@ var MethodPolicyMap = map[string]MethodPolicy{
 	v1.Membership_Update_FullMethodName:               RequireLeader,
 	v1.Membership_Leave_FullMethodName:                RequireLeader,
 	v1.Membership_Apply_FullMethodName:                RequireLeader,
+	v1.Membership_SubscribePeers_FullMethodName:       AllowNonLeader,
 	v1.Membership_GetRaftConfiguration_FullMethodName: AllowNonLeader,
 
 	// Node API
-	v1.Node_Query_FullMethodName:                AllowNonLeader,
-	v1.Node_Publish_FullMethodName:              AllowNonLeader,
-	v1.Node_Subscribe_FullMethodName:            RequireLocal,
 	v1.Node_GetStatus_FullMethodName:            RequireLocal,
 	v1.Node_NegotiateDataChannel_FullMethodName: RequireLocal,
+
+	// Storage API
+	v1.Storage_Query_FullMethodName:     AllowNonLeader,
+	v1.Storage_Publish_FullMethodName:   AllowNonLeader,
+	v1.Storage_Subscribe_FullMethodName: RequireLocal,
 
 	// Mesh API
 	v1.Mesh_GetNode_FullMethodName:      AllowNonLeader,

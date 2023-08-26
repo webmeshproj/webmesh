@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package storage
 
 import (
 	v1 "github.com/webmeshproj/api/v1"
@@ -38,7 +38,7 @@ func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.Publi
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return nil, status.Error(codes.Unavailable, "node not available to publish")
 	}
-	allowed, err := s.rbacEval.Evaluate(ctx, canPublishAction.For(req.GetKey()))
+	allowed, err := s.rbac.Evaluate(ctx, canPublishAction.For(req.GetKey()))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to evaluate publish permissions: %v", err)
 	}
