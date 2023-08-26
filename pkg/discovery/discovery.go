@@ -30,5 +30,6 @@ type Discovery interface {
 	// Stop stops the discovery service.
 	Stop() error
 	// Accept returns a connection to a peer.
+	// TODO: This needs to be hooked into any configured authentication mechanism.
 	Accept() (io.ReadWriteCloser, error)
 }
