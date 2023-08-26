@@ -464,9 +464,9 @@ func TestWireGuardPeers(t *testing.T) {
 			}
 			for peerID, edges := range tc.edges {
 				for _, edge := range edges {
-					err = peerdb.PutEdge(ctx, peers.Edge{
-						From: peerID,
-						To:   edge,
+					err = peerdb.PutEdge(ctx, &v1.MeshEdge{
+						Source: peerID,
+						Target: edge,
 					})
 					if err != nil {
 						t.Fatalf("put edge from %q to %q: %v", peerID, edge, err)

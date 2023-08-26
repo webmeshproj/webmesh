@@ -346,17 +346,17 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 				slog.String("server-id", string(server.ID)),
 				slog.String("peer-id", string(peer.ID)),
 			)
-			err = p.PutEdge(ctx, peers.Edge{
-				From:   string(server.ID),
-				To:     string(peer.ID),
+			err = p.PutEdge(ctx, &v1.MeshEdge{
+				Source: string(server.ID),
+				Target: string(peer.ID),
 				Weight: 99,
 			})
 			if err != nil {
 				return fmt.Errorf("create edge: %w", err)
 			}
-			err = p.PutEdge(ctx, peers.Edge{
-				From:   string(peer.ID),
-				To:     string(server.ID),
+			err = p.PutEdge(ctx, &v1.MeshEdge{
+				Source: string(peer.ID),
+				Target: string(server.ID),
 				Weight: 99,
 			})
 			if err != nil {
@@ -376,11 +376,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)
 			}
-			err = p.PutEdge(ctx, peers.Edge{
-				From:   s.ID(),
-				To:     peer,
+			err = p.PutEdge(ctx, &v1.MeshEdge{
+				Source: s.ID(),
+				Target: peer,
 				Weight: 0,
-				Attrs: map[string]string{
+				Attributes: map[string]string{
 					v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String(): "true",
 				},
 			})

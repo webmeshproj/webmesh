@@ -238,9 +238,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		joiningServer = proxiedFrom
 	}
 	log.Debug("adding edge between caller and joining server", slog.String("joining_server", joiningServer))
-	err = p.PutEdge(ctx, peers.Edge{
-		From:   joiningServer,
-		To:     req.GetId(),
+	err = p.PutEdge(ctx, &v1.MeshEdge{
+		Source: joiningServer,
+		Target: req.GetId(),
 		Weight: 1,
 	})
 	if err != nil {
@@ -256,9 +256,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		for _, peer := range allPeers {
 			if peer.ID != req.GetId() && peer.PrimaryEndpoint != "" {
 				log.Debug("adding edge from public peer to public caller", slog.String("peer", peer.ID))
-				err = p.PutEdge(ctx, peers.Edge{
-					From:   peer.ID,
-					To:     req.GetId(),
+				err = p.PutEdge(ctx, &v1.MeshEdge{
+					Source: peer.ID,
+					Target: req.GetId(),
 					Weight: 99,
 				})
 				if err != nil {
@@ -281,9 +281,9 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 			log.Debug("Adding edges to peer in the same zone", slog.String("peer", peer.ID))
 			if peer.ID != req.GetId() {
-				err = p.PutEdge(ctx, peers.Edge{
-					From:   peer.ID,
-					To:     req.GetId(),
+				err = p.PutEdge(ctx, &v1.MeshEdge{
+					Source: peer.ID,
+					Target: req.GetId(),
 					Weight: 1,
 				})
 				if err != nil {
@@ -312,11 +312,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 			}
 			log.Debug("Adding ICE edge to peer", slog.String("peer", peer))
-			err = p.PutEdge(ctx, peers.Edge{
-				From:   peer,
-				To:     req.GetId(),
+			err = p.PutEdge(ctx, &v1.MeshEdge{
+				Source: peer,
+				Target: req.GetId(),
 				Weight: 1,
-				Attrs: map[string]string{
+				Attributes: map[string]string{
 					v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String(): "true",
 				},
 			})

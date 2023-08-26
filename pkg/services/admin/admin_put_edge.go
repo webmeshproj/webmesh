@@ -56,12 +56,7 @@ func (s *Server) PutEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty
 			return nil, status.Errorf(codes.InvalidArgument, "invalid node ID: %s", id)
 		}
 	}
-	err := s.peers.PutEdge(ctx, peers.Edge{
-		From:   edge.GetSource(),
-		To:     edge.GetTarget(),
-		Weight: int(edge.GetWeight()),
-		Attrs:  edge.GetAttributes(),
-	})
+	err := s.peers.PutEdge(ctx, edge)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

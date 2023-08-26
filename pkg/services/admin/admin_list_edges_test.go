@@ -59,20 +59,18 @@ func TestListEdges(t *testing.T) {
 	}
 
 	// Verify edge is present
-	edges, err := server.ListEdges(ctx, nil)
+	edge, err := server.GetEdge(ctx, &v1.MeshEdge{
+		Source: server.store.ID(),
+		Target: "foo",
+	})
 	if err != nil {
-		t.Errorf("ListEdges() error = %v", err)
+		t.Errorf("GetEdge() error = %v", err)
 		return
 	}
-	var edge *v1.MeshEdge
-	for _, e := range edges.GetItems() {
-		if e.Source == server.store.ID() && e.Target == "foo" {
-			edge = e
-			break
-		}
+	if edge.Source != server.store.ID() {
+		t.Errorf("edge.Source = %v, want %v", edge.Source, server.store.ID())
 	}
-	if edge == nil {
-		t.Errorf("ListEdges() did not return expected edge")
-		return
+	if edge.Target != "foo" {
+		t.Errorf("edge.Target = %v, want %v", edge.Target, "foo")
 	}
 }

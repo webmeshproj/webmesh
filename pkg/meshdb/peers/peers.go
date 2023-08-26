@@ -92,23 +92,11 @@ type Peers interface {
 	// ListByFeature lists all nodes with a given feature.
 	ListByFeature(ctx context.Context, feature v1.Feature) ([]Node, error)
 	// AddEdge adds an edge between two nodes.
-	PutEdge(ctx context.Context, edge Edge) error
+	PutEdge(ctx context.Context, edge *v1.MeshEdge) error
 	// RemoveEdge removes an edge between two nodes.
 	RemoveEdge(ctx context.Context, from, to string) error
 	// DrawGraph draws the graph of nodes to the given Writer.
 	DrawGraph(ctx context.Context, w io.Writer) error
-}
-
-// Edge represents an edge between two nodes.
-type Edge struct {
-	// From is the ID of the source node.
-	From string `json:"from"`
-	// To is the ID of the target node.
-	To string `json:"to"`
-	// Weight is the weight of the edge.
-	Weight int `json:"weight"`
-	// Attrs are the edge's attributes.
-	Attrs map[string]string `json:"attrs"`
 }
 
 // PutOptions are options for creating or updating a node.
@@ -285,33 +273,32 @@ func (p *peers) ListByFeature(ctx context.Context, feature v1.Feature) ([]Node, 
 	return out, nil
 }
 
-func (p *peers) PutEdge(ctx context.Context, edge Edge) error {
-	if edge.From == edge.To {
+func (p *peers) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
+	if edge.Source == edge.Target {
 		return nil
 	}
-	opts := []func(*graph.EdgeProperties){graph.EdgeWeight(edge.Weight)}
-	if edge.Attrs != nil {
-		for k, v := range edge.Attrs {
+	opts := []func(*graph.EdgeProperties){graph.EdgeWeight(int(edge.Weight))}
+	if len(edge.Attributes) > 0 {
+		for k, v := range edge.Attributes {
 			opts = append(opts, graph.EdgeAttribute(k, v))
 		}
 	}
 	// Save the raft log some trouble by checking if the edge already exists.
-	graphEdge, err := p.graph.Edge(edge.From, edge.To)
+	graphEdge, err := p.graph.Edge(edge.Source, edge.Target)
 	if err == nil {
 		// Check if the weight or attributes changed
-		if !cmp.Equal(graphEdge.Properties.Attributes, edge.Attrs) {
-			return p.graph.UpdateEdge(edge.From, edge.To, opts...)
+		if !cmp.Equal(graphEdge.Properties.Attributes, edge.Attributes) {
+			return p.graph.UpdateEdge(edge.Source, edge.Target, opts...)
 		}
-		// Only update the weight if it's higher than the existing weight.
-		if graphEdge.Properties.Weight != edge.Weight && edge.Weight > graphEdge.Properties.Weight {
-			return p.graph.UpdateEdge(edge.From, edge.To, opts...)
+		if graphEdge.Properties.Weight != int(edge.Weight) {
+			return p.graph.UpdateEdge(edge.Source, edge.Target, opts...)
 		}
 		return nil
 	}
 	if !errors.Is(err, graph.ErrEdgeNotFound) {
 		return fmt.Errorf("get edge: %w", err)
 	}
-	err = p.graph.AddEdge(edge.From, edge.To, opts...)
+	err = p.graph.AddEdge(edge.Source, edge.Target, opts...)
 	if err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {
 		return fmt.Errorf("add edge: %w", err)
 	}
