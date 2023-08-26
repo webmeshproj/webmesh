@@ -313,7 +313,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		Version: v1.AllocateIPRequest_IP_VERSION_6,
 	})
 	if err != nil {
-		return fmt.Errorf("allocate IPv4 address: %w", err)
+		return fmt.Errorf("allocate IPv6 address: %w", err)
 	}
 	self.PrivateIPv6 = privatev6
 	s.log.Debug("Creating ourself in the database", slog.Any("params", self))

@@ -20,9 +20,12 @@ limitations under the License.
 package ipam
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"net/netip"
 	"sync"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	v1 "github.com/webmeshproj/api/v1"
@@ -32,7 +35,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -173,7 +175,7 @@ func (p *Plugin) allocateV6(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	var tries int
 	maxTries := 100
 	for tries < maxTries {
-		prefix, err := netutil.Random64(globalPrefix)
+		prefix, err := random64(globalPrefix)
 		if err != nil {
 			return nil, fmt.Errorf("random IPv6: %w", err)
 		}
@@ -204,6 +206,29 @@ func (p *Plugin) next32(cidr netip.Prefix, set map[netip.Prefix]struct{}) (netip
 		ip = ip.Next()
 	}
 	return netip.Prefix{}, fmt.Errorf("no more addresses in %s", cidr)
+}
+
+// Random64 generates a random /64 prefix from a /48 prefix.
+func random64(prefix netip.Prefix) (netip.Prefix, error) {
+	if !prefix.Addr().Is6() {
+		return netip.Prefix{}, fmt.Errorf("prefix must be IPv6")
+	}
+	if prefix.Bits() != 48 {
+		return netip.Prefix{}, fmt.Errorf("prefix must be /48")
+	}
+
+	// Convert the prefix to a slice
+	ip := prefix.Addr().AsSlice()
+
+	// Generate a random subnet
+	var subnet [2]byte
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	binary.BigEndian.PutUint16(subnet[:], uint16(r.Intn(65536)))
+	ip[6] = subnet[0]
+	ip[7] = subnet[1]
+
+	addr, _ := netip.AddrFromSlice(ip)
+	return netip.PrefixFrom(addr, 64), nil
 }
 
 func (p *Plugin) isStaticAllocation(ip netip.Prefix) bool {
