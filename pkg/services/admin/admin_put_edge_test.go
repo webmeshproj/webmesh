@@ -35,7 +35,7 @@ func TestPutEdge(t *testing.T) {
 	// Pre register the nodes
 	p := peers.New(server.store.Storage())
 	for _, peer := range []string{"foo", "baz"} {
-		key, err := wgtypes.GenerateKey()
+		key, err := wgtypes.GeneratePrivateKey()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

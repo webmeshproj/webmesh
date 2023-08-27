@@ -35,7 +35,7 @@ func TestListEdges(t *testing.T) {
 	// No empty condition
 
 	// Place a dummy peer
-	key, err := wgtypes.GenerateKey()
+	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
 		t.Errorf("GenerateKey() error = %v", err)
 		return

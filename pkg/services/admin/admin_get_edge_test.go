@@ -34,7 +34,7 @@ func TestGetEdge(t *testing.T) {
 	server := newTestServer(t)
 
 	// Place a dummy peer
-	key, err := wgtypes.GenerateKey()
+	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
 		t.Errorf("GenerateKey() error = %v", err)
 		return

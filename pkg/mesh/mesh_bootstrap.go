@@ -283,9 +283,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 	p := peers.New(s.Storage())
+	pubKey := wireguardKey.PublicKey()
 	self := peers.Node{
 		ID:                 s.ID(),
 		PublicKey:          wireguardKey.PublicKey(),
+		PrivateIPv6:        netutil.AssignToPrefix(meshnetworkv6, pubKey[:]),
 		GRPCPort:           s.opts.Mesh.GRPCAdvertisePort,
 		RaftPort:           int(s.raft.ListenPort()),
 		PrimaryEndpoint:    s.opts.Mesh.PrimaryEndpoint,
@@ -306,16 +308,6 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		}
 		self.PrivateIPv4 = privatev4
 	}
-	// We always assign a v6 address, even if we're not using it.
-	privatev6, err := s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-		NodeId:  s.ID(),
-		Subnet:  meshnetworkv6.String(),
-		Version: v1.AllocateIPRequest_IP_VERSION_6,
-	})
-	if err != nil {
-		return fmt.Errorf("allocate IPv6 address: %w", err)
-	}
-	self.PrivateIPv6 = privatev6
 	s.log.Debug("Creating ourself in the database", slog.Any("params", self))
 	err = p.Put(ctx, self)
 	if err != nil {
@@ -394,7 +386,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	if !s.opts.Mesh.NoIPv4 && !s.opts.Raft.PreferIPv6 {
 		raftAddr = net.JoinHostPort(privatev4.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
 	} else {
-		raftAddr = net.JoinHostPort(privatev6.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
+		raftAddr = net.JoinHostPort(self.PrivateIPv6.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
 	}
 	if s.testStore {
 		// We dont manage network connections on test stores
@@ -405,7 +397,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	opts := &meshnet.StartOptions{
 		Key:       wireguardKey,
 		AddressV4: privatev4,
-		AddressV6: privatev6,
+		AddressV6: self.PrivateIPv6,
 		NetworkV4: meshnetworkv4,
 		NetworkV6: meshnetworkv6,
 	}

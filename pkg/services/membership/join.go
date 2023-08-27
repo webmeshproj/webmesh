@@ -34,6 +34,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 var canVoteAction = &rbac.Action{
@@ -180,19 +181,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	var leasev4, leasev6 netip.Prefix
-	// We always try to generate an IPv6 address for the peer, even if they choose not to
-	// use it. This helps enforce an upper bound on the umber of peers we can have in the network
-	// (ULA/48 with /64 prefixes == 65536 peers same as a /16 class B and the limit for direct WireGuard
-	// peers an interface can hold).
-	log.Debug("Assigning IPv6 address to peer")
-	leasev6, err = s.store.Plugins().AllocateIP(ctx, &v1.AllocateIPRequest{
-		NodeId:  req.GetId(),
-		Subnet:  s.ipv6Prefix.String(),
-		Version: v1.AllocateIPRequest_IP_VERSION_6,
-	})
-	if err != nil {
-		return nil, handleErr(status.Errorf(codes.Internal, "failed to allocate IPv6 address: %v", err))
-	}
+	// We always generate an IPv6 address for the peer from their public key
+	leasev6 = netutil.AssignToPrefix(s.ipv6Prefix, publicKey[:])
 	log.Debug("Assigned IPv6 address to peer", slog.String("ipv6", leasev6.String()))
 	// Acquire an IPv4 address for the peer only if requested
 	if req.GetAssignIpv4() {

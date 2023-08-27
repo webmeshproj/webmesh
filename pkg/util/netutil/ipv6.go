@@ -18,7 +18,7 @@ package netutil
 
 import (
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"log/slog"
@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-// GenerateULA generates a unique local address with a /48 prefix
+// GenerateULA generates a unique local address with a /32 prefix
 // according to RFC 4193. The network is returned as a netip.Prefix.
 func GenerateULA() (netip.Prefix, error) {
 	secret, err := generateLocalSecret()
@@ -38,41 +38,36 @@ func GenerateULA() (netip.Prefix, error) {
 	return GenerateULAWithPSK(secret), nil
 }
 
-// GenerateULAWithSecret generates a unique local address with a /48 prefix
+// GenerateULAWithSecret generates a unique local address with a /32 prefix
 // using a pre-shared key. The network is returned as a netip.Prefix.
 func GenerateULAWithPSK(psk []byte) netip.Prefix {
-	sha := sha1.New()
+	sha := sha256.New()
 	sha.Write(psk)
 	var ip []byte
-	// 8 bit prefix with L bit set
+	// 1 byte prefix with L bit set
 	ip = append(ip, 0xfd)
-	// 40 bits of random data
-	ip = append(ip, sha.Sum(nil)[15:]...)
-	// subnet ID set to 0
-	ip = append(ip, 0x00, 0)
-	// 64 bits of zeroes, to be used for client addresses for each node
-	ip = append(ip, make([]byte, 8)...)
+	// 5 bytes of random data
+	ip = append(ip, sha.Sum(nil)[:5]...)
+	// Ignore the 2 subnet bytes and do 10 bytes of zeroes
+	// for client addresses
+	ip = append(ip, make([]byte, 10)...)
 	addr, _ := netip.AddrFromSlice(ip)
-	return netip.PrefixFrom(addr, 48)
+	return netip.PrefixFrom(addr, 32)
 }
 
-// AssignToPrefix assigns a /112 prefix within a /48 prefix using a public key.
-func AssignToPrefix(prefix netip.Prefix, publicKey []byte) (netip.Prefix, error) {
-	if !prefix.Addr().Is6() {
-		return netip.Prefix{}, fmt.Errorf("prefix must be IPv6")
-	}
-	if prefix.Bits() != 48 {
-		return netip.Prefix{}, fmt.Errorf("prefix must be /48")
-	}
+// AssignToPrefix assigns a /112 prefix within a /32 prefix using a public key.
+// It does not check that the given prefix is a valid /32 prefix.
+func AssignToPrefix(prefix netip.Prefix, publicKey []byte) netip.Prefix {
 	// Convert the prefix to a slice
 	ip := prefix.Addr().AsSlice()
-	// Write the varint length of the public key to the remaining 8 bytes of the prefix
-	var data [8]byte
-	binary.BigEndian.PutUint64(data[:], binary.BigEndian.Uint64(publicKey[8:]))
-	// Set the client ID to the contents of the public key
-	copy(ip[8:], data[:])
+	// Take a hash of the public key
+	sha := sha256.New()
+	sha.Write(publicKey)
+	data := sha.Sum(nil)
+	// Set the client ID to the first 8 bytes of the hash
+	copy(ip[6:], data[:8])
 	addr, _ := netip.AddrFromSlice(ip)
-	return netip.PrefixFrom(addr, 112), nil
+	return netip.PrefixFrom(addr, 112)
 }
 
 func generateLocalSecret() ([]byte, error) {

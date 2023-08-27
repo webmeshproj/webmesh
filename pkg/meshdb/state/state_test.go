@@ -231,9 +231,9 @@ func setupTest(t *testing.T) (*state, func()) {
 
 func mustGenerateKey(t *testing.T) wgtypes.Key {
 	t.Helper()
-	key, err := wgtypes.GenerateKey()
+	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return key
+	return key.PublicKey()
 }

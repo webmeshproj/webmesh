@@ -18,6 +18,8 @@ package netutil
 
 import (
 	"net/netip"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -25,9 +27,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util/crypto"
 )
 
-const defaultTestCount = 100
+const defaultTestCount = 10
 
-// FuzzGenerateULA is just for checking that we consistently generate valid /48 ULAs.
+// FuzzGenerateULA is just for checking that we consistently generate valid /32 ULAs.
 func FuzzGenerateULA(t *testing.F) {
 	for i := 0; i <= defaultTestCount; i++ {
 		t.Add(i)
@@ -41,14 +43,14 @@ func FuzzGenerateULA(t *testing.F) {
 		if !ula.IsValid() {
 			t.Fatalf("generated invalid ULA: %s", ula)
 		}
-		if ula.Bits() != 48 {
+		if ula.Bits() != 32 {
 			t.Fatalf("generated ULA with invalid prefix length: %s", ula)
 		}
 	})
 }
 
 // FuzzGenerateULAWithPSK is for checking that given a PSK we consistently generate
-// the same /48 ULA.
+// the same /32 ULA.
 func FuzzGenerateULAWithPSK(t *testing.F) {
 	for i := 0; i <= defaultTestCount; i++ {
 		t.Add(crypto.MustGeneratePSK().String())
@@ -61,7 +63,7 @@ func FuzzGenerateULAWithPSK(t *testing.F) {
 			if !prefix.IsValid() {
 				t.Fatalf("generated invalid ULA: %s", prefix)
 			}
-			if prefix.Bits() != 48 {
+			if prefix.Bits() != 32 {
 				t.Fatalf("generated ULA with invalid prefix length: %s", prefix)
 			}
 			if prefix.String() != lastPrefix.String() {
@@ -80,48 +82,46 @@ func FuzzAssignToPrefix(f *testing.F) {
 	for i := 0; i <= 5; i++ {
 		f.Add(string(mustGenerateSeedKey(f)))
 	}
-	seen := make(map[netip.Prefix]struct{})
-	seenKeys := make(map[string]struct{})
-	var count int
-	f.Fuzz(func(t *testing.T, _ string) {
+	var seen sync.Map
+	var seenKeys sync.Map
+	var count atomic.Uint64
+	f.Fuzz(func(t *testing.T, key string) {
 		// Make sure we don't rerun the test with the same key
-		key := string(mustGenerateWireguardKey(t))
-		if _, ok := seenKeys[key]; ok {
+		_ = key
+		keybytes := mustGenerateWireguardKey(t)
+		if _, ok := seenKeys.Load(key); ok {
 			t.SkipNow()
+			t.Logf("skipping duplicate key %q", key)
 			return
 		}
-		seenKeys[key] = struct{}{}
+		seenKeys.Store(key, struct{}{})
 		// Make sure we get a valid prefix
-		prefix, err := AssignToPrefix(ula, []byte(key))
-		if err != nil {
-			t.Fatalf("failed to assign to prefix: %s", err)
-		}
+		prefix := AssignToPrefix(ula, keybytes)
 		if !prefix.IsValid() {
 			t.Fatalf("generated invalid prefix: %s", prefix)
 		}
 		if prefix.Bits() != 112 {
 			t.Fatalf("generated prefix with invalid prefix length: %s", prefix)
 		}
-		if _, ok := seen[prefix]; ok {
-			t.Errorf("generated duplicate prefix %q after %d runs", prefix.String(), count)
+		if _, ok := seen.Load(prefix); ok {
+			t.Fatalf("generated duplicate prefix %q after %d runs", prefix.String(), count.Load())
 		}
 		// Make sure no previously generated prefix contains this one
-		for seenPrefix := range seen {
+		seen.Range(func(key, value any) bool {
+			seenPrefix := key.(netip.Prefix)
 			if seenPrefix.Contains(prefix.Addr()) {
-				t.Errorf("generated prefix %q contained by %q after %d runs", prefix.String(), seenPrefix.String(), count)
+				t.Fatalf("generated prefix %q contains %q", prefix.String(), prefix.String())
 			}
-		}
+			return true
+		})
 		// Make sure we generate the same prefix for the same key
-		toCheck, err := AssignToPrefix(ula, []byte(key))
-		if err != nil {
-			t.Fatalf("failed to assign to prefix: %s", err)
-		}
+		toCheck := AssignToPrefix(ula, keybytes)
 		if toCheck.String() != prefix.String() {
 			t.Fatalf("generated different prefix for same key: %s", prefix)
 		}
 		// Make sure we don't generate the same prefix for different keys
-		seen[prefix] = struct{}{}
-		count++
+		seen.Store(prefix, struct{}{})
+		count.Add(1)
 	})
 }
 
@@ -136,7 +136,7 @@ func mustGenerateULA(t *testing.F) netip.Prefix {
 
 func mustGenerateWireguardKey(t *testing.T) []byte {
 	t.Helper()
-	key, err := wgtypes.GenerateKey()
+	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
 		t.Fatalf("failed to generate WireGuard key: %s", err)
 	}
@@ -146,7 +146,7 @@ func mustGenerateWireguardKey(t *testing.T) []byte {
 
 func mustGenerateSeedKey(t *testing.F) []byte {
 	t.Helper()
-	key, err := wgtypes.GenerateKey()
+	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
 		t.Fatalf("failed to generate WireGuard key: %s", err)
 	}

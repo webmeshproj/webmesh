@@ -20,12 +20,9 @@ limitations under the License.
 package ipam
 
 import (
-	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"net/netip"
 	"sync"
-	"time"
 
 	"github.com/mitchellh/mapstructure"
 	v1 "github.com/webmeshproj/api/v1"
@@ -119,13 +116,6 @@ func (p *Plugin) Allocate(ctx context.Context, r *v1.AllocateIPRequest) (*v1.All
 			}, nil
 		}
 		return p.allocateV4(ctx, r)
-	case v1.AllocateIPRequest_IP_VERSION_6:
-		if addr, ok := p.config.StaticIPv6[r.GetNodeId()]; ok {
-			return &v1.AllocatedIP{
-				Ip: addr,
-			}, nil
-		}
-		return p.allocateV6(ctx, r)
 	default:
 		return nil, fmt.Errorf("unsupported IP version: %v", r.GetVersion())
 	}
@@ -156,40 +146,6 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	}, nil
 }
 
-func (p *Plugin) allocateV6(ctx context.Context, r *v1.AllocateIPRequest) (*v1.AllocatedIP, error) {
-	globalPrefix, err := netip.ParsePrefix(r.GetSubnet())
-	if err != nil {
-		return nil, fmt.Errorf("parse subnet: %w", err)
-	}
-	nodes, err := peers.New(p.data).List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list nodes: %w", err)
-	}
-	allocated := make(map[netip.Prefix]struct{}, len(nodes))
-	for _, node := range nodes {
-		n := node
-		if n.PrivateIPv6.IsValid() {
-			allocated[n.PrivateIPv6] = struct{}{}
-		}
-	}
-	var tries int
-	maxTries := 100
-	for tries < maxTries {
-		prefix, err := random64(globalPrefix)
-		if err != nil {
-			return nil, fmt.Errorf("random IPv6: %w", err)
-		}
-		if _, ok := allocated[prefix]; !ok && !p.isStaticAllocation(prefix) {
-			return &v1.AllocatedIP{
-				Ip: prefix.String(),
-			}, nil
-		}
-		// Collision, try again
-		tries++
-	}
-	return nil, fmt.Errorf("failed to find available IPv6 after %d tries", maxTries)
-}
-
 // TODO: Release is not implemented server-side yet either.
 func (p *Plugin) Release(context.Context, *v1.ReleaseIPRequest) (*emptypb.Empty, error) {
 	// No-op, we don't actually track leases explicitly
@@ -206,29 +162,6 @@ func (p *Plugin) next32(cidr netip.Prefix, set map[netip.Prefix]struct{}) (netip
 		ip = ip.Next()
 	}
 	return netip.Prefix{}, fmt.Errorf("no more addresses in %s", cidr)
-}
-
-// Random64 generates a random /64 prefix from a /48 prefix.
-func random64(prefix netip.Prefix) (netip.Prefix, error) {
-	if !prefix.Addr().Is6() {
-		return netip.Prefix{}, fmt.Errorf("prefix must be IPv6")
-	}
-	if prefix.Bits() != 48 {
-		return netip.Prefix{}, fmt.Errorf("prefix must be /48")
-	}
-
-	// Convert the prefix to a slice
-	ip := prefix.Addr().AsSlice()
-
-	// Generate a random subnet
-	var subnet [2]byte
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	binary.BigEndian.PutUint16(subnet[:], uint16(r.Intn(65536)))
-	ip[6] = subnet[0]
-	ip[7] = subnet[1]
-
-	addr, _ := netip.AddrFromSlice(ip)
-	return netip.PrefixFrom(addr, 64), nil
 }
 
 func (p *Plugin) isStaticAllocation(ip netip.Prefix) bool {
