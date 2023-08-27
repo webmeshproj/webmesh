@@ -21,17 +21,25 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
 	"github.com/hashicorp/raft"
 )
 
+// DualStorage represents a storage interface that can serve as both a mesh and Raft storage.
+type DualStorage interface {
+	MeshStorage
+	RaftStorage
+}
+
 // RaftStorage is the interface for storing and retrieving data about the state of the mesh.
 // This interface is used by mesh members that are part of the Raft cluster.
 type RaftStorage interface {
 	raft.LogStore
 	raft.StableStore
+	io.Closer
 }
 
 // MeshStorage is the interface for storing and retrieving data about the state of the mesh.
@@ -46,7 +54,7 @@ type MeshStorage interface {
 	List(ctx context.Context, prefix string) ([]string, error)
 	// IterPrefix iterates over all keys with a given prefix. It is important
 	// that the iterator not attempt any write operations as this will cause
-	// a deadlock.
+	// a deadlock. The iteration will stop if the iterator returns an error.
 	IterPrefix(ctx context.Context, prefix string, fn PrefixIterator) error
 	// Snapshot returns a snapshot of the storage.
 	Snapshot(ctx context.Context) (io.Reader, error)
@@ -67,3 +75,13 @@ type PrefixIterator func(key, value string) error
 
 // ErrKeyNotFound is the error returned when a key is not found.
 var ErrKeyNotFound = errors.New("key not found")
+
+// NewKeyNotFoundError returns a new ErrKeyNotFound error.
+func NewKeyNotFoundError(key string) error {
+	return fmt.Errorf("%w: %s", ErrKeyNotFound, key)
+}
+
+// IsKeyNotFoundError returns true if the given error is a ErrKeyNotFound error.
+func IsKeyNotFoundError(err error) bool {
+	return errors.Is(err, ErrKeyNotFound)
+}

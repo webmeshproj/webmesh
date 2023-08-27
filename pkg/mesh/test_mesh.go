@@ -28,7 +28,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/storage/memory"
+	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
 // NewTestMesh creates a new test mesh and waits for it to be ready.
@@ -41,8 +41,10 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	}
 	stor := st.(*meshStore)
 	stor.testStore = true
-	raftStorage := memory.NewRaftStorage()
-	meshStorage := memory.NewMeshStorage()
+	storage, err := nutsdb.New(nutsdb.Options{InMemory: true})
+	if err != nil {
+		return nil, err
+	}
 	transport, err := transport.NewRaftTCPTransport(st, transport.TCPTransportOptions{
 		Addr:    ":0",
 		MaxPool: 1,
@@ -53,8 +55,8 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	}
 	if err := stor.Open(ctx, &ConnectOptions{
 		RaftTransport: transport,
-		RaftStorage:   raftStorage,
-		MeshStorage:   meshStorage,
+		RaftStorage:   storage,
+		MeshStorage:   storage,
 	}); err != nil {
 		return nil, err
 	}

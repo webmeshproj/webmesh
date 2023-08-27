@@ -32,6 +32,9 @@ import (
 
 	"github.com/hashicorp/raft"
 	"github.com/nutsdb/nutsdb"
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
@@ -39,13 +42,14 @@ import (
 type nutsDiskStorage struct {
 	firstIndex, lastIndex atomic.Uint64
 	store                 *nutsdb.DB
+	subs                  *subscriptionManager
 	meshmu                sync.RWMutex
 	raftmu                sync.RWMutex
 }
 
 // New returns a new RoseDB storage. The returned storage can be used
 // for both the mesh and Raft.
-func newDiskStorage(storagePath string) (Storage, error) {
+func newDiskStorage(storagePath string) (storage.DualStorage, error) {
 	db, err := nutsdb.Open(
 		nutsdb.DefaultOptions,
 		nutsdb.WithDir(storagePath),
@@ -77,7 +81,10 @@ func newDiskStorage(storagePath string) (Storage, error) {
 	if err != nil {
 		return nil, err
 	}
-	st := &nutsDiskStorage{store: db}
+	st := &nutsDiskStorage{
+		store: db,
+		subs:  newSubscriptionManager(),
+	}
 	st.firstIndex.Store(first)
 	st.lastIndex.Store(last)
 	return st, nil
@@ -89,28 +96,75 @@ func newDiskStorage(storagePath string) (Storage, error) {
 func (db *nutsDiskStorage) GetValue(ctx context.Context, key string) (string, error) {
 	db.meshmu.RLock()
 	defer db.meshmu.RUnlock()
-	return "", nil
+	var value string
+	err := db.store.View(func(tx *nutsdb.Tx) error {
+		entry, err := tx.Get(meshStoreBucket, []byte(key))
+		if err != nil {
+			return fmt.Errorf("get value: %w", err)
+		}
+		value = string(entry.Value)
+		return nil
+	})
+	if err != nil {
+		if isNotFoundErr(err) {
+			return "", storage.NewKeyNotFoundError(key)
+		}
+		return "", err
+	}
+	return value, nil
 }
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
 func (db *nutsDiskStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
 	db.meshmu.Lock()
-	defer db.meshmu.Unlock()
+	err := db.store.Update(func(tx *nutsdb.Tx) error {
+		err := tx.Put(meshStoreBucket, []byte(key), []byte(value), uint32(ttl.Seconds()))
+		if err != nil {
+			return fmt.Errorf("put value: %w", err)
+		}
+		return nil
+	})
+	db.meshmu.Unlock()
+	if err != nil {
+		return err
+	}
+	db.subs.Notify(key, value)
 	return nil
 }
 
 // Delete removes a key.
 func (db *nutsDiskStorage) Delete(ctx context.Context, key string) error {
 	db.meshmu.Lock()
-	defer db.meshmu.Unlock()
-	return nil
+	err := db.store.Update(func(tx *nutsdb.Tx) error {
+		err := tx.Delete(meshStoreBucket, []byte(key))
+		if err != nil {
+			return fmt.Errorf("delete value: %w", err)
+		}
+		return nil
+	})
+	db.meshmu.Unlock()
+	if err == nil {
+		db.subs.Notify(key, "")
+	}
+	return ignoreNotFound(err)
 }
 
 // List returns all keys with a given prefix.
 func (db *nutsDiskStorage) List(ctx context.Context, prefix string) ([]string, error) {
 	db.meshmu.RLock()
 	defer db.meshmu.RUnlock()
-	return nil, nil
+	var keys []string
+	err := db.store.View(func(tx *nutsdb.Tx) error {
+		entries, err := tx.PrefixScan(meshStoreBucket, []byte(prefix), 0, math.MaxInt)
+		if err != nil {
+			return fmt.Errorf("list values: %w", err)
+		}
+		for _, entry := range entries {
+			keys = append(keys, string(entry.Key))
+		}
+		return nil
+	})
+	return keys, ignoreNotFound(err)
 }
 
 // IterPrefix iterates over all keys with a given prefix. It is important
@@ -119,31 +173,99 @@ func (db *nutsDiskStorage) List(ctx context.Context, prefix string) ([]string, e
 func (db *nutsDiskStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
 	db.meshmu.RLock()
 	defer db.meshmu.RUnlock()
-	return nil
+	err := db.store.View(func(tx *nutsdb.Tx) error {
+		entries, err := tx.PrefixScan(meshStoreBucket, []byte(prefix), 0, math.MaxInt)
+		if err != nil {
+			return fmt.Errorf("iter prefix: %w", err)
+		}
+		for _, entry := range entries {
+			err = fn(string(entry.Key), string(entry.Value))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return ignoreNotFound(err)
 }
 
 // Snapshot returns a snapshot of the storage.
 func (db *nutsDiskStorage) Snapshot(ctx context.Context) (io.Reader, error) {
 	db.meshmu.Lock()
 	defer db.meshmu.Unlock()
-	return nil, nil
+	snapshot := &v1.RaftSnapshot{
+		Kv: make(map[string]*v1.RaftDataItem),
+	}
+	err := db.store.View(func(tx *nutsdb.Tx) error {
+		entries, err := tx.PrefixScan(meshStoreBucket, []byte(""), 0, math.MaxInt)
+		if err != nil {
+			return fmt.Errorf("snapshot: %w", err)
+		}
+		for _, entry := range entries {
+			var ttl time.Duration
+			if entry.Meta != nil {
+				ttl = time.Duration(entry.Meta.TTL) * time.Second
+			}
+			snapshot.Kv[string(entry.Key)] = &v1.RaftDataItem{
+				Key:   string(entry.Key),
+				Value: string(entry.Value),
+				Ttl:   durationpb.New(ttl),
+			}
+		}
+		return nil
+	})
+	if err != nil && !isNotFoundErr(err) {
+		return nil, err
+	}
+	data, err := proto.Marshal(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("snapshot: %w", err)
+	}
+	return bytes.NewReader(data), nil
 }
 
 // Restore restores a snapshot of the storage.
 func (db *nutsDiskStorage) Restore(ctx context.Context, r io.Reader) error {
 	db.meshmu.Lock()
 	defer db.meshmu.Unlock()
-	return nil
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("restore: %w", err)
+	}
+	var snapshot v1.RaftSnapshot
+	err = proto.Unmarshal(data, &snapshot)
+	if err != nil {
+		return fmt.Errorf("restore: %w", err)
+	}
+	err = db.store.Update(func(tx *nutsdb.Tx) error {
+		err := tx.DeleteBucket(0, meshStoreBucket)
+		if err != nil {
+			return fmt.Errorf("restore: %w", err)
+		}
+		for _, item := range snapshot.Kv {
+			err = tx.Put(meshStoreBucket, []byte(item.Key), []byte(item.Value), uint32(item.Ttl.Seconds))
+			if err != nil {
+				return fmt.Errorf("restore: %w", err)
+			}
+		}
+		return nil
+	})
+	return err
 }
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (db *nutsDiskStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
-	return nil, nil
+	return db.subs.Subscribe(ctx, prefix, fn)
 }
 
 // Close closes the storage.
 func (db *nutsDiskStorage) Close() error {
+	db.meshmu.Lock()
+	defer db.meshmu.Unlock()
+	db.raftmu.Lock()
+	defer db.raftmu.Unlock()
+	db.subs.Close()
 	return db.store.Close()
 }
 

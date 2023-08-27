@@ -194,7 +194,7 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 	key := fmt.Sprintf("%s/%s", rolesPrefix, name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if storage.IsKeyNotFoundError(err) {
 			return nil, ErrRoleNotFound
 		}
 		return nil, fmt.Errorf("get role: %w", err)
@@ -273,7 +273,7 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding
 	key := fmt.Sprintf("%s/%s", rolebindingsPrefix, name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if storage.IsKeyNotFoundError(err) {
 			return nil, ErrRoleBindingNotFound
 		}
 		return nil, fmt.Errorf("get rolebinding: %w", err)
@@ -339,7 +339,7 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 	key := fmt.Sprintf("%s/%s", groupsPrefix, name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if storage.IsKeyNotFoundError(err) {
 			return nil, ErrGroupNotFound
 		}
 		return nil, fmt.Errorf("get group: %w", err)

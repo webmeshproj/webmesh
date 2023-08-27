@@ -24,7 +24,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage/badger"
+	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
 var (
@@ -178,9 +178,9 @@ func TestListPeerPrivateRPCAddresses(t *testing.T) {
 
 func setupTest(t *testing.T) (*state, func()) {
 	t.Helper()
-	db, err := badger.New(&badger.Options{InMemory: true, Silent: true})
+	db, err := nutsdb.New(nutsdb.Options{InMemory: true})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("create test db: %v", err)
 	}
 	close := func() {
 		err := db.Close()

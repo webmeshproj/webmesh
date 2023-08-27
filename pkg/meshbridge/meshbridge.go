@@ -36,7 +36,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
@@ -166,36 +165,25 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("create transport: %w", err)
 		}
-		var raftStorage storage.RaftStorage
-		var meshStorage storage.MeshStorage
+		var storage storage.DualStorage
 		if meshOpts.Mesh.Raft.InMemory {
-			raftStorage, err = nutsdb.New(nutsdb.Options{InMemory: true})
+			storage, err = nutsdb.New(nutsdb.Options{InMemory: true})
 			if err != nil {
-				return fmt.Errorf("create raft in-memory storage: %w", err)
-			}
-			meshStorage, err = badger.New(&badger.Options{InMemory: true})
-			if err != nil {
-				return fmt.Errorf("create badger in-memory storage: %w", err)
+				return fmt.Errorf("create in-memory storage: %w", err)
 			}
 		} else {
-			raftStorage, err = nutsdb.New(nutsdb.Options{
-				DiskPath: meshOpts.Mesh.Raft.StorePath(),
-			})
-			if err != nil {
-				return fmt.Errorf("create raft storage: %w", err)
-			}
-			meshStorage, err = badger.New(&badger.Options{
+			storage, err = nutsdb.New(nutsdb.Options{
 				DiskPath: meshOpts.Mesh.Raft.DataStoragePath(),
 			})
 			if err != nil {
-				return fmt.Errorf("create badger storage: %w", err)
+				return fmt.Errorf("create disk storage: %w", err)
 			}
 		}
 		err = msh.Open(ctx, &mesh.ConnectOptions{
 			Features:      features,
 			RaftTransport: transport,
-			RaftStorage:   raftStorage,
-			MeshStorage:   meshStorage,
+			RaftStorage:   storage,
+			MeshStorage:   storage,
 		})
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to open mesh %q: %w", meshID, err))

@@ -37,7 +37,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
@@ -168,29 +167,18 @@ func executeSingleMesh(ctx context.Context, config *options.Options) error {
 		return fmt.Errorf("failed to create raft transport: %w", err)
 	}
 	// Create the raft storage
-	var raftStorage storage.RaftStorage
-	var meshStorage storage.MeshStorage
+	var storage storage.DualStorage
 	if config.Mesh.Raft.InMemory {
-		raftStorage, err = nutsdb.New(nutsdb.Options{InMemory: true})
+		storage, err = nutsdb.New(nutsdb.Options{InMemory: true})
 		if err != nil {
-			return fmt.Errorf("create raft in-memory storage: %w", err)
-		}
-		meshStorage, err = badger.New(&badger.Options{InMemory: true})
-		if err != nil {
-			return fmt.Errorf("create badger in-memory storage: %w", err)
+			return fmt.Errorf("create in-memory storage: %w", err)
 		}
 	} else {
-		raftStorage, err = nutsdb.New(nutsdb.Options{
-			DiskPath: config.Mesh.Raft.StorePath(),
-		})
-		if err != nil {
-			return fmt.Errorf("create raft storage: %w", err)
-		}
-		meshStorage, err = badger.New(&badger.Options{
+		storage, err = nutsdb.New(nutsdb.Options{
 			DiskPath: config.Mesh.Raft.DataStoragePath(),
 		})
 		if err != nil {
-			return fmt.Errorf("create badger storage: %w", err)
+			return fmt.Errorf("create raft storage: %w", err)
 		}
 	}
 	var features []v1.Feature
@@ -209,8 +197,8 @@ func executeSingleMesh(ctx context.Context, config *options.Options) error {
 	err = st.Open(ctx, &mesh.ConnectOptions{
 		Features:      features,
 		RaftTransport: transport,
-		RaftStorage:   raftStorage,
-		MeshStorage:   meshStorage,
+		RaftStorage:   storage,
+		MeshStorage:   storage,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open mesh connection: %w", err)

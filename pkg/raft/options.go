@@ -57,10 +57,8 @@ const (
 	LeaveOnShutdownEnvVar     = "RAFT_LEAVE_ON_SHUTDOWN"
 	StartupTimeoutEnvVar      = "RAFT_STARTUP_TIMEOUT"
 
-	// RaftStorePath is the raft stable and log store directory.
-	RaftStorePath = "raft-store"
-	// DataStoragePath is the raft data storage directory.
-	DataStoragePath = "raft-data"
+	// DataStoragePath is the path to the data storage directory.
+	DataStoragePath = "data"
 	// DefaultListenPort is the default raft listen port
 	DefaultListenPort = 9443
 )
@@ -254,11 +252,6 @@ func (o *Options) RaftConfig(nodeID string) *raft.Config {
 		level:  o.LogLevel,
 	}
 	return config
-}
-
-// StorePath returns the stable store path.
-func (o *Options) StorePath() string {
-	return filepath.Join(o.DataDir, RaftStorePath)
 }
 
 // DataStoragePath returns the data directory.

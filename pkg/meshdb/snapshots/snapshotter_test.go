@@ -22,15 +22,15 @@ import (
 	"io"
 	"testing"
 
-	"github.com/webmeshproj/webmesh/pkg/storage/badger"
+	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
 func TestSnapshotter(t *testing.T) {
 	t.Parallel()
 
-	db, err := badger.New(&badger.Options{InMemory: true, Silent: true})
+	db, err := nutsdb.New(nutsdb.Options{InMemory: true})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("create test db: %v", err)
 	}
 	defer db.Close()
 

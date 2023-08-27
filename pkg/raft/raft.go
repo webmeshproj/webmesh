@@ -198,12 +198,10 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	r.raftDB = &raftStorage{MeshStorage: opts.MeshStorage, raft: r}
 	// Ensure the data directories exist if not in-memory
 	if !r.opts.InMemory {
-		for _, dir := range []string{r.opts.StorePath(), r.opts.DataStoragePath()} {
-			err := os.MkdirAll(dir, 0755)
-			if err != nil {
-				r.mu.Unlock()
-				return fmt.Errorf("raft mkdir %q: %w", dir, err)
-			}
+		err := os.MkdirAll(r.opts.DataStoragePath(), 0755)
+		if err != nil {
+			r.mu.Unlock()
+			return fmt.Errorf("raft mkdir %q: %w", r.opts.DataStoragePath(), err)
 		}
 	}
 	// Create the snapshot stores

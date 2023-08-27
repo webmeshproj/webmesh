@@ -26,13 +26,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// Storage is the NutsDB storage interface. It implements both the mesh and Raft
-// storage interfaces.
-type Storage interface {
-	storage.MeshStorage
-	storage.RaftStorage
-}
-
 // Options are the options for creating a new NutsDB storage.
 type Options struct {
 	// InMemory specifies whether to use an in-memory storage.
@@ -41,19 +34,19 @@ type Options struct {
 	DiskPath string
 }
 
-const (
-	meshStorageBucket = "mesh-storage"
-	logStoreBucket    = "raft-log"
-	stableStoreBucket = "raft-stable"
-)
-
 // New creates a new NutsDB storage.
-func New(opts Options) (Storage, error) {
+func New(opts Options) (storage.DualStorage, error) {
 	if opts.InMemory {
 		return newInMemoryStorage()
 	}
 	return newDiskStorage(opts.DiskPath)
 }
+
+const (
+	meshStoreBucket   = "mesh-storage"
+	logStoreBucket    = "raft-log"
+	stableStoreBucket = "raft-stable"
+)
 
 func isNotFoundErr(err error) bool {
 	// These guys need help with their error management.

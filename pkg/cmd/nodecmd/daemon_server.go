@@ -35,7 +35,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/badger"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
@@ -109,29 +108,18 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		return nil, status.Errorf(codes.Internal, "failed to create raft transport: %v", err)
 	}
 	// Create the raft storage
-	var raftStorage storage.RaftStorage
-	var meshStorage storage.MeshStorage
+	var storage storage.DualStorage
 	if config.Mesh.Raft.InMemory {
-		raftStorage, err = nutsdb.New(nutsdb.Options{InMemory: true})
+		storage, err = nutsdb.New(nutsdb.Options{InMemory: true})
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "create raft in-memory storage: %v", err)
-		}
-		meshStorage, err = badger.New(&badger.Options{InMemory: true})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "create badger in-memory storage: %v", err)
+			return nil, status.Errorf(codes.Internal, "create in-memory storage: %v", err)
 		}
 	} else {
-		raftStorage, err = nutsdb.New(nutsdb.Options{
-			DiskPath: config.Mesh.Raft.StorePath(),
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "create raft storage: %v", err)
-		}
-		meshStorage, err = badger.New(&badger.Options{
+		storage, err = nutsdb.New(nutsdb.Options{
 			DiskPath: config.Mesh.Raft.DataStoragePath(),
 		})
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "create badger storage: %v", err)
+			return nil, status.Errorf(codes.Internal, "create raft storage: %v", err)
 		}
 	}
 	var features []v1.Feature
@@ -150,8 +138,8 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	err = conn.Open(ctx, &mesh.ConnectOptions{
 		Features:      features,
 		RaftTransport: transport,
-		RaftStorage:   raftStorage,
-		MeshStorage:   meshStorage,
+		RaftStorage:   storage,
+		MeshStorage:   storage,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error opening mesh: %v", err)
