@@ -1,3 +1,5 @@
+//go:build !wasm
+
 /*
 Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
 

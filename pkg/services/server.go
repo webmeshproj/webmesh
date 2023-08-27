@@ -21,12 +21,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -161,13 +159,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 func (s *Server) ListenAndServe() error {
 	s.mu.Lock()
 	if s.opts.Metrics != nil && s.opts.Metrics.Enabled {
-		go func() {
-			s.log.Info(fmt.Sprintf("Starting HTTP metrics server on %s", s.opts.Metrics.ListenAddress))
-			http.Handle(s.opts.Metrics.Path, promhttp.Handler())
-			if err := http.ListenAndServe(s.opts.Metrics.ListenAddress, nil); err != nil {
-				s.log.Error("metrics server failed", slog.String("error", err.Error()))
-			}
-		}()
+		startMetricsServer(s.log, s.opts.Metrics.ListenAddress, s.opts.Metrics.Path)
 	}
 	if s.opts.TURN != nil && s.opts.TURN.Enabled {
 		var err error

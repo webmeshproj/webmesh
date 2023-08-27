@@ -1,3 +1,5 @@
+//go:build !wasm
+
 /*
 Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
 
@@ -27,6 +29,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/discovery"
 	"github.com/webmeshproj/webmesh/pkg/discovery/libp2p"
 )
 
@@ -79,6 +82,21 @@ func (s *meshStore) LeaveDHT(ctx context.Context, psk string) error {
 		delete(s.discoveries, psk)
 	}
 	return nil
+}
+
+func (s *meshStore) newDiscoveryJoiner(ctx context.Context) (discovery.Discovery, error) {
+	var bsPeers []multiaddr.Multiaddr
+	for _, p := range s.opts.Discovery.KadBootstrapServers {
+		mul, err := multiaddr.NewMultiaddr(p)
+		if err != nil {
+			return nil, fmt.Errorf("new multiaddr: %w", err)
+		}
+		bsPeers = append(bsPeers, mul)
+	}
+	return libp2p.NewKadDHTJoiner(ctx, &libp2p.KadDHTOptions{
+		PSK:            s.opts.Discovery.PSK,
+		BootstrapPeers: bsPeers,
+	})
 }
 
 func (s *meshStore) handleIncomingDiscoveryPeer(conn io.ReadWriteCloser) {

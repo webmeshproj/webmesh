@@ -26,14 +26,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/discovery/libp2p"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 )
 
@@ -90,18 +88,7 @@ func (s *meshStore) join(ctx context.Context, features []v1.Feature, joinAddr st
 
 func (s *meshStore) joinWithKadDHT(ctx context.Context, features []v1.Feature, key wgtypes.Key) error {
 	s.log.Info("Joining mesh via Kad DHT")
-	var peers []multiaddr.Multiaddr
-	for _, p := range s.opts.Discovery.KadBootstrapServers {
-		mul, err := multiaddr.NewMultiaddr(p)
-		if err != nil {
-			return fmt.Errorf("new multiaddr: %w", err)
-		}
-		peers = append(peers, mul)
-	}
-	discover, err := libp2p.NewKadDHTJoiner(ctx, &libp2p.KadDHTOptions{
-		PSK:            s.opts.Discovery.PSK,
-		BootstrapPeers: peers,
-	})
+	discover, err := s.newDiscoveryJoiner(ctx)
 	if err != nil {
 		return fmt.Errorf("new kad dht joiner: %w", err)
 	}

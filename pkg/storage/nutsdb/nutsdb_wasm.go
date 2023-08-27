@@ -1,5 +1,3 @@
-//go:build !wasm
-
 /*
 Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
 
@@ -16,29 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package nutsdb implements the storage backends using NutsDB.
 package nutsdb
 
 import (
-	"os"
-	"testing"
+	"errors"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-func TestDiskStorage(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Fatalf("failed to remove temp dir: %v", err)
-		}
-	})
-	st, err := newDiskStorage(dir)
-	if err != nil {
-		t.Fatalf("failed to create in-memory storage: %v", err)
-	}
-	defer st.Close()
-	storage.RunDualStorageConformance(t, st)
+// Options are the options for creating a new NutsDB storage.
+type Options struct {
+	// InMemory specifies whether to use an in-memory storage.
+	InMemory bool
+	// DiskPath is the path to use for disk storage.
+	DiskPath string
+}
+
+// New creates a new NutsDB storage.
+func New(opts Options) (storage.DualStorage, error) {
+	return nil, errors.New("not implemented")
 }

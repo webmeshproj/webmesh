@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !wasm
 
 /*
 Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>

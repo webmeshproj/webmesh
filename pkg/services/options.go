@@ -25,9 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
-	promapi "github.com/prometheus/client_golang/prometheus"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -180,11 +178,8 @@ func (o *Options) ServerOptions(store mesh.Mesh, log *slog.Logger) (srvrOptions 
 		logging.StreamServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
 	}
 	if o.Metrics.Enabled {
-		log.Debug("registering gRPC metrics interceptors")
-		metrics := prometheus.NewServerMetrics(prometheus.WithServerHandlingTimeHistogram())
-		unarymiddlewares = append(unarymiddlewares, metrics.UnaryServerInterceptor())
-		streammiddlewares = append(streammiddlewares, metrics.StreamServerInterceptor())
-		if err := promapi.Register(metrics); err != nil {
+		unarymiddlewares, streammiddlewares, err = appendMetricsMiddlewares(log, unarymiddlewares, streammiddlewares)
+		if err != nil {
 			return nil, err
 		}
 	}

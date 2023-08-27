@@ -1,5 +1,3 @@
-//go:build !wasm
-
 /*
 Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
 
@@ -16,29 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nutsdb
+package link
 
 import (
-	"os"
-	"testing"
-
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"context"
+	"errors"
+	"net/netip"
 )
 
-func TestDiskStorage(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Fatalf("failed to remove temp dir: %v", err)
-		}
-	})
-	st, err := newDiskStorage(dir)
-	if err != nil {
-		t.Fatalf("failed to create in-memory storage: %v", err)
-	}
-	defer st.Close()
-	storage.RunDualStorageConformance(t, st)
+// SetInterfaceAddress sets the address of the interface with the given name.
+func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
+	return errors.New("not implemented")
 }
