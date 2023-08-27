@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/dgraph-io/badger/v4 v4.2.0
 	github.com/dominikbraun/graph v0.23.0
+	github.com/flower-corp/rosedb v1.1.1
 	github.com/go-ldap/ldap/v3 v3.4.5
 	github.com/go-ping/ping v1.1.0
 	github.com/golang/snappy v0.0.4
@@ -150,6 +151,7 @@ require (
 	github.com/pion/srtp/v2 v2.0.16 // indirect
 	github.com/pion/transport/v2 v2.2.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/plar/go-adaptive-radix-tree v1.0.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect

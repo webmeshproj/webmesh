@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package storage contains the interface for storing and retrieving data
-// about the state of the mesh.
+// about the state of the mesh and providing storage backends for raft.
 package storage
 
 import (
@@ -54,7 +54,7 @@ type MeshStorage interface {
 	Restore(ctx context.Context, r io.Reader) error
 	// Subscribe will call the given function whenever a key with the given prefix is changed.
 	// The returned function can be called to unsubscribe.
-	Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (func(), error)
+	Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (context.CancelFunc, error)
 	// Close closes the storage.
 	Close() error
 }

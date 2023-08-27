@@ -147,7 +147,7 @@ func (p *pluginDB) Restore(ctx context.Context, r io.Reader) error {
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (p *pluginDB) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (func(), error) {
+func (p *pluginDB) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	return nil, errors.New("subscribe not implemented")
 }
 

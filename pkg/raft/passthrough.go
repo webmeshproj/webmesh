@@ -321,7 +321,7 @@ func (p *passthroughStorage) Restore(ctx context.Context, r io.Reader) error {
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (func(), error) {
+func (p *passthroughStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	p.raft.mu.Lock()
 	p.raft.subCancels = append(p.raft.subCancels, cancel)
