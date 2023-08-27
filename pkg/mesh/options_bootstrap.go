@@ -99,7 +99,7 @@ const (
 	DefaultIPv4Network   = "172.16.0.0/12"
 	DefaultMeshDomain    = "webmesh.internal."
 	DefaultAdminUser     = "admin"
-	DefaultNetworkPolicy = NetworkPolicyDeny
+	DefaultNetworkPolicy = NetworkPolicyAccept
 )
 
 // NewBootstrapOptions creates a new BootstrapOptions.

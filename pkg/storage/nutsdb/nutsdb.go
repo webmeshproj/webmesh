@@ -41,6 +41,7 @@ type Options struct {
 }
 
 const (
+	meshStorageBucket = "mesh-storage"
 	logStoreBucket    = "raft-log"
 	stableStoreBucket = "raft-stable"
 )
