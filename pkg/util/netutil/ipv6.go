@@ -21,6 +21,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
+	"hash/crc64"
 	"log/slog"
 	mrand "math/rand"
 	"net"
@@ -67,11 +68,10 @@ func AssignToPrefix(prefix netip.Prefix, publicKey []byte) (netip.Prefix, error)
 	// Convert the prefix to a slice
 	ip := prefix.Addr().AsSlice()
 	// Generate a random subnet using the secret
-	var subnet [14]byte
-	sha := sha1.New()
-	sha.Write(publicKey)
-	copy(subnet[:], sha.Sum(nil))
-	ip = append(ip[:6], subnet[:]...)
+	var subnet [8]byte
+	sum := crc64.Checksum(publicKey, crc64.MakeTable(crc64.ISO))
+	binary.BigEndian.PutUint64(subnet[:], sum)
+	copy(ip[8:], subnet[:])
 	addr, _ := netip.AddrFromSlice(ip)
 	return netip.PrefixFrom(addr, 96), nil
 }
