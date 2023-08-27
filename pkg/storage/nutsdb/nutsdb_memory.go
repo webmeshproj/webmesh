@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -31,7 +30,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/nutsdb/nutsdb"
 	"github.com/nutsdb/nutsdb/inmemory"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -56,7 +54,7 @@ func newInMemoryStorage() (Storage, error) {
 	var first, last uint64
 	entries, _, err := db.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
 	if err != nil {
-		if !errors.Is(err, nutsdb.ErrPrefixScan) {
+		if !isNotFoundErr(err) {
 			return nil, fmt.Errorf("get first, last raft index: %w", err)
 		}
 	} else {
@@ -160,7 +158,7 @@ func (db *nutsInmemStorage) GetLog(index uint64, log *raft.Log) error {
 	binary.BigEndian.PutUint64(key[:], index)
 	entry, err := db.memstore.Get(logStoreBucket, key[:])
 	if err != nil {
-		if isKeyNotFoundErr(err) {
+		if isNotFoundErr(err) {
 			return raft.ErrLogNotFound
 		}
 		return fmt.Errorf("get log: %w", err)
@@ -204,7 +202,7 @@ func (db *nutsInmemStorage) storeLog(log *raft.Log) error {
 	if err != nil {
 		return fmt.Errorf("store log: %w", err)
 	}
-	if log.Index < db.firstIndex.Load() {
+	if log.Index < db.lastIndex.Load() {
 		db.lastIndex.Store(log.Index)
 	}
 	return nil
@@ -216,7 +214,7 @@ func (db *nutsInmemStorage) DeleteRange(min, max uint64) error {
 	defer db.raftmu.Unlock()
 	entries, _, err := db.memstore.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
 	if err != nil {
-		if isKeyNotFoundErr(err) {
+		if isNotFoundErr(err) {
 			return nil
 		}
 		return fmt.Errorf("delete range: %w", err)
@@ -251,7 +249,7 @@ func (db *nutsInmemStorage) Get(key []byte) ([]byte, error) {
 	defer db.raftmu.RUnlock()
 	val, err := db.memstore.Get(stableStoreBucket, key)
 	if err != nil {
-		if isKeyNotFoundErr(err) {
+		if isNotFoundErr(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("get stable store: %w", err)
@@ -277,7 +275,7 @@ func (db *nutsInmemStorage) GetUint64(key []byte) (uint64, error) {
 	defer db.raftmu.RUnlock()
 	val, err := db.memstore.Get(stableStoreBucket, key)
 	if err != nil {
-		if isKeyNotFoundErr(err) {
+		if isNotFoundErr(err) {
 			return 0, nil
 		}
 		return 0, fmt.Errorf("get stable store: %w", err)

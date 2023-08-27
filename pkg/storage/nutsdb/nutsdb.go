@@ -19,6 +19,7 @@ package nutsdb
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/nutsdb/nutsdb"
 
@@ -54,9 +55,26 @@ func New(opts Options) (Storage, error) {
 	return newDiskStorage(opts.DiskPath)
 }
 
-func isKeyNotFoundErr(err error) bool {
-	return errors.Is(err, nutsdb.ErrBucket) ||
-		errors.Is(err, nutsdb.ErrBucketNotFound) ||
-		errors.Is(err, nutsdb.ErrKeyNotFound) ||
-		errors.Is(err, nutsdb.ErrPrefixScan)
+func isNotFoundErr(err error) bool {
+	// These guys need help with their error management.
+	return nutsdb.IsBucketNotFound(err) ||
+		nutsdb.IsBucketEmpty(err) ||
+		nutsdb.IsKeyEmpty(err) ||
+		nutsdb.IsKeyNotFound(err) ||
+		nutsdb.IsPrefixScan(err) ||
+		nutsdb.IsPrefixSearchScan(err) ||
+		errors.Is(err, nutsdb.ErrBucket) ||
+		errors.Is(err, nutsdb.ErrNotFoundBucket) ||
+		errors.Is(err, nutsdb.ErrPrefixScan) ||
+		strings.Contains(err.Error(), "not found")
+}
+
+func ignoreNotFound(err error) error {
+	if err == nil {
+		return nil
+	}
+	if isNotFoundErr(err) {
+		return nil
+	}
+	return err
 }

@@ -144,7 +144,7 @@ func (db *nutsDiskStorage) Subscribe(ctx context.Context, prefix string, fn stor
 
 // Close closes the storage.
 func (db *nutsDiskStorage) Close() error {
-	return nil
+	return db.store.Close()
 }
 
 // Raft Log Storage Operations
@@ -168,9 +168,6 @@ func (db *nutsDiskStorage) GetLog(index uint64, log *raft.Log) error {
 	err := db.store.View(func(tx *nutsdb.Tx) error {
 		entry, err := tx.Get(logStoreBucket, key[:])
 		if err != nil {
-			if isKeyNotFoundErr(err) {
-				return raft.ErrLogNotFound
-			}
 			return fmt.Errorf("get log: %w", err)
 		}
 		err = gob.NewDecoder(bytes.NewReader(entry.Value)).Decode(log)
@@ -179,7 +176,13 @@ func (db *nutsDiskStorage) GetLog(index uint64, log *raft.Log) error {
 		}
 		return nil
 	})
-	return err
+	if err != nil {
+		if isNotFoundErr(err) {
+			return raft.ErrLogNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 // StoreLog stores a log entry.
@@ -203,7 +206,7 @@ func (db *nutsDiskStorage) StoreLog(log *raft.Log) error {
 	if err != nil {
 		return err
 	}
-	if log.Index < db.firstIndex.Load() {
+	if log.Index < db.lastIndex.Load() {
 		db.lastIndex.Store(log.Index)
 	}
 	return nil
@@ -239,7 +242,7 @@ func (db *nutsDiskStorage) DeleteRange(min, max uint64) error {
 	err := db.store.Update(func(tx *nutsdb.Tx) error {
 		entries, err := tx.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
 		if err != nil {
-			if isKeyNotFoundErr(err) {
+			if isNotFoundErr(err) {
 				return nil
 			}
 			return fmt.Errorf("delete range: %w", err)
@@ -255,6 +258,11 @@ func (db *nutsDiskStorage) DeleteRange(min, max uint64) error {
 		}
 		return nil
 	})
+	if err != nil {
+		if isNotFoundErr(err) {
+			return nil
+		}
+	}
 	return err
 }
 
@@ -281,15 +289,12 @@ func (db *nutsDiskStorage) Get(key []byte) ([]byte, error) {
 	err := db.store.View(func(tx *nutsdb.Tx) error {
 		entry, err := tx.Get(stableStoreBucket, key)
 		if err != nil {
-			if isKeyNotFoundErr(err) {
-				return nil
-			}
 			return fmt.Errorf("get stable store: %w", err)
 		}
 		val = entry.Value
 		return nil
 	})
-	return val, err
+	return val, ignoreNotFound(err)
 }
 
 func (db *nutsDiskStorage) SetUint64(key []byte, val uint64) error {
@@ -315,16 +320,10 @@ func (db *nutsDiskStorage) GetUint64(key []byte) (uint64, error) {
 	err := db.store.View(func(tx *nutsdb.Tx) error {
 		entry, err := tx.Get(stableStoreBucket, key)
 		if err != nil {
-			if isKeyNotFoundErr(err) {
-				return nil
-			}
 			return fmt.Errorf("get stable store: %w", err)
 		}
 		copy(val[:], entry.Value)
 		return nil
 	})
-	if err != nil {
-		return 0, err
-	}
-	return binary.BigEndian.Uint64(val[:]), nil
+	return binary.BigEndian.Uint64(val[:]), ignoreNotFound(err)
 }

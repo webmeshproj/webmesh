@@ -24,9 +24,7 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.default-network-policy=accept
       - --raft.in-memory
-      - --mesh.heartbeat-purge-threshold=30
       - --plugins.debug.listen-address=:6060
       - --plugins.debug.enable-db-querier=true
     ports:
@@ -44,6 +42,7 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --raft.in-memory
+      - --mesh.join-as-voter
       - --mesh.join-address=bootstrap-node:8443
       - --mesh.max-join-retries=15
     restart: on-failure
