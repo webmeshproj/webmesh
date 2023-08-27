@@ -38,7 +38,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/badger"
-	"github.com/webmeshproj/webmesh/pkg/storage/memory"
+	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/version"
@@ -171,13 +171,18 @@ func executeSingleMesh(ctx context.Context, config *options.Options) error {
 	var raftStorage storage.RaftStorage
 	var meshStorage storage.MeshStorage
 	if config.Mesh.Raft.InMemory {
-		raftStorage = memory.NewRaftStorage()
+		raftStorage, err = nutsdb.New(nutsdb.Options{InMemory: true})
+		if err != nil {
+			return fmt.Errorf("create raft in-memory storage: %w", err)
+		}
 		meshStorage, err = badger.New(&badger.Options{InMemory: true})
 		if err != nil {
 			return fmt.Errorf("create badger in-memory storage: %w", err)
 		}
 	} else {
-		raftStorage, err = badger.NewRaftStorage(config.Mesh.Raft.StorePath())
+		raftStorage, err = nutsdb.New(nutsdb.Options{
+			DiskPath: config.Mesh.Raft.StorePath(),
+		})
 		if err != nil {
 			return fmt.Errorf("create raft storage: %w", err)
 		}

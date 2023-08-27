@@ -36,7 +36,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/badger"
-	"github.com/webmeshproj/webmesh/pkg/storage/memory"
+	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
 // AppDaemon is the app daemon RPC server.
@@ -112,13 +112,18 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	var raftStorage storage.RaftStorage
 	var meshStorage storage.MeshStorage
 	if config.Mesh.Raft.InMemory {
-		raftStorage = memory.NewRaftStorage()
+		raftStorage, err = nutsdb.New(nutsdb.Options{InMemory: true})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "create raft in-memory storage: %v", err)
+		}
 		meshStorage, err = badger.New(&badger.Options{InMemory: true})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "create badger in-memory storage: %v", err)
 		}
 	} else {
-		raftStorage, err = badger.NewRaftStorage(config.Mesh.Raft.StorePath())
+		raftStorage, err = nutsdb.New(nutsdb.Options{
+			DiskPath: config.Mesh.Raft.StorePath(),
+		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "create raft storage: %v", err)
 		}

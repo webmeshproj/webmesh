@@ -30,7 +30,6 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/pb"
 	v1 "github.com/webmeshproj/api/v1"
-	raftbadger "github.com/webmeshproj/raft-badger"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -70,11 +69,6 @@ func New(opts *Options) (storage.MeshStorage, error) {
 		return nil, fmt.Errorf("badger open: %w", err)
 	}
 	return &badgerStorage{db: db}, nil
-}
-
-// NewRaftStorage returns a new RaftStorage based on Badger.
-func NewRaftStorage(storagePath string) (storage.RaftStorage, error) {
-	return raftbadger.New(slog.Default().With("component", "raftbadger"), storagePath)
 }
 
 // GetValue returns the value of a key.

@@ -37,7 +37,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/badger"
-	"github.com/webmeshproj/webmesh/pkg/storage/memory"
+	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
 // Bridge is the interface for a mesh bridge. It manages multiple mesh connections
@@ -169,13 +169,18 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		var raftStorage storage.RaftStorage
 		var meshStorage storage.MeshStorage
 		if meshOpts.Mesh.Raft.InMemory {
-			raftStorage = memory.NewRaftStorage()
+			raftStorage, err = nutsdb.New(nutsdb.Options{InMemory: true})
+			if err != nil {
+				return fmt.Errorf("create raft in-memory storage: %w", err)
+			}
 			meshStorage, err = badger.New(&badger.Options{InMemory: true})
 			if err != nil {
 				return fmt.Errorf("create badger in-memory storage: %w", err)
 			}
 		} else {
-			raftStorage, err = badger.NewRaftStorage(meshOpts.Mesh.Raft.StorePath())
+			raftStorage, err = nutsdb.New(nutsdb.Options{
+				DiskPath: meshOpts.Mesh.Raft.StorePath(),
+			})
 			if err != nil {
 				return fmt.Errorf("create raft storage: %w", err)
 			}
