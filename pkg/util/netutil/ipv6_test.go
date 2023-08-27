@@ -72,15 +72,26 @@ func FuzzGenerateULAWithPSK(t *testing.F) {
 }
 
 // FuzzAssignToPrefix is for checking that given a prefix and a PSK we consistently
-// generate the same /96 subnet.
+// generate the same /112 subnet.
 func FuzzAssignToPrefix(f *testing.F) {
 	// Generate a ULA for this test iteration
 	ula := mustGenerateULA(f)
+	// Seed dummy data we aren't actually going to use
 	for i := 0; i <= 5; i++ {
-		f.Add(string(mustGenerateWireguardKey(f)))
+		f.Add(string(mustGenerateSeedKey(f)))
 	}
-	seen := make(map[string]struct{})
-	f.Fuzz(func(t *testing.T, key string) {
+	seen := make(map[netip.Prefix]struct{})
+	seenKeys := make(map[string]struct{})
+	var count int
+	f.Fuzz(func(t *testing.T, _ string) {
+		// Make sure we don't rerun the test with the same key
+		key := string(mustGenerateWireguardKey(t))
+		if _, ok := seenKeys[key]; ok {
+			t.SkipNow()
+			return
+		}
+		seenKeys[key] = struct{}{}
+		// Make sure we get a valid prefix
 		prefix, err := AssignToPrefix(ula, []byte(key))
 		if err != nil {
 			t.Fatalf("failed to assign to prefix: %s", err)
@@ -88,12 +99,29 @@ func FuzzAssignToPrefix(f *testing.F) {
 		if !prefix.IsValid() {
 			t.Fatalf("generated invalid prefix: %s", prefix)
 		}
-		if prefix.Bits() != 96 {
+		if prefix.Bits() != 112 {
 			t.Fatalf("generated prefix with invalid prefix length: %s", prefix)
 		}
-		if _, ok := seen[prefix.String()]; ok {
-			t.Errorf("generated duplicate prefix: %s", prefix)
+		if _, ok := seen[prefix]; ok {
+			t.Errorf("generated duplicate prefix %q after %d runs", prefix.String(), count)
 		}
+		// Make sure no previously generated prefix contains this one
+		for seenPrefix := range seen {
+			if seenPrefix.Contains(prefix.Addr()) {
+				t.Errorf("generated prefix %q contained by %q after %d runs", prefix.String(), seenPrefix.String(), count)
+			}
+		}
+		// Make sure we generate the same prefix for the same key
+		toCheck, err := AssignToPrefix(ula, []byte(key))
+		if err != nil {
+			t.Fatalf("failed to assign to prefix: %s", err)
+		}
+		if toCheck.String() != prefix.String() {
+			t.Fatalf("generated different prefix for same key: %s", prefix)
+		}
+		// Make sure we don't generate the same prefix for different keys
+		seen[prefix] = struct{}{}
+		count++
 	})
 }
 
@@ -106,11 +134,22 @@ func mustGenerateULA(t *testing.F) netip.Prefix {
 	return ula
 }
 
-func mustGenerateWireguardKey(t *testing.F) []byte {
+func mustGenerateWireguardKey(t *testing.T) []byte {
 	t.Helper()
 	key, err := wgtypes.GenerateKey()
 	if err != nil {
 		t.Fatalf("failed to generate WireGuard key: %s", err)
 	}
-	return key[:]
+	pubkey := key.PublicKey()
+	return pubkey[:]
+}
+
+func mustGenerateSeedKey(t *testing.F) []byte {
+	t.Helper()
+	key, err := wgtypes.GenerateKey()
+	if err != nil {
+		t.Fatalf("failed to generate WireGuard key: %s", err)
+	}
+	pubkey := key.PublicKey()
+	return pubkey[:]
 }

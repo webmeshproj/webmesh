@@ -21,7 +21,6 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
-	"hash/crc64"
 	"log/slog"
 	mrand "math/rand"
 	"net"
@@ -57,7 +56,7 @@ func GenerateULAWithPSK(psk []byte) netip.Prefix {
 	return netip.PrefixFrom(addr, 48)
 }
 
-// AssignToPrefix assigns a /96 prefix within a /48 prefix using a public key.
+// AssignToPrefix assigns a /112 prefix within a /48 prefix using a public key.
 func AssignToPrefix(prefix netip.Prefix, publicKey []byte) (netip.Prefix, error) {
 	if !prefix.Addr().Is6() {
 		return netip.Prefix{}, fmt.Errorf("prefix must be IPv6")
@@ -67,13 +66,10 @@ func AssignToPrefix(prefix netip.Prefix, publicKey []byte) (netip.Prefix, error)
 	}
 	// Convert the prefix to a slice
 	ip := prefix.Addr().AsSlice()
-	// Generate a random subnet using the secret
-	var subnet [8]byte
-	sum := crc64.Checksum(publicKey, crc64.MakeTable(crc64.ISO))
-	binary.BigEndian.PutUint64(subnet[:], sum)
-	copy(ip[8:], subnet[:])
+	// Set the client ID to the contents of the public key
+	copy(ip[8:], publicKey)
 	addr, _ := netip.AddrFromSlice(ip)
-	return netip.PrefixFrom(addr, 96), nil
+	return netip.PrefixFrom(addr, 112), nil
 }
 
 func generateLocalSecret() ([]byte, error) {
