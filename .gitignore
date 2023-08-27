@@ -3,3 +3,4 @@ bin/
 *.sqlite
 .vscode
 coverage.out
+*/testdata/*

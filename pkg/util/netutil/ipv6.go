@@ -66,8 +66,11 @@ func AssignToPrefix(prefix netip.Prefix, publicKey []byte) (netip.Prefix, error)
 	}
 	// Convert the prefix to a slice
 	ip := prefix.Addr().AsSlice()
+	// Write the varint length of the public key to the remaining 8 bytes of the prefix
+	var data [8]byte
+	binary.BigEndian.PutUint64(data[:], binary.BigEndian.Uint64(publicKey[8:]))
 	// Set the client ID to the contents of the public key
-	copy(ip[8:], publicKey)
+	copy(ip[8:], data[:])
 	addr, _ := netip.AddrFromSlice(ip)
 	return netip.PrefixFrom(addr, 112), nil
 }
