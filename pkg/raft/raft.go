@@ -163,7 +163,6 @@ type raftNode struct {
 	nodeID                      raft.ServerID
 	raft                        *raft.Raft
 	raftTransport               transport.RaftTransport
-	meshDB                      storage.MeshStorage
 	raftDB                      *raftStorage
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
@@ -199,7 +198,7 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	r.mu.Lock()
 	r.nodeID = raft.ServerID(opts.NodeID)
 	r.raftTransport = opts.Transport
-	r.meshDB = opts.MeshStorage
+	// r.meshDB = opts.MeshStorage
 	r.raftDB = &raftStorage{MeshStorage: opts.MeshStorage, raft: r}
 	// Ensure the data directories exist if not in-memory
 	if !r.opts.InMemory {
@@ -233,7 +232,7 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	// We unlock here so raft can call back into the Apply/RestoreSnapshot methods if needed.
 	r.mu.Unlock()
 	var err error
-	r.fsm = fsm.New(r.meshDB, fsm.Options{
+	r.fsm = fsm.New(opts.MeshStorage, fsm.Options{
 		ApplyTimeout:      r.opts.ApplyTimeout,
 		OnApplyLog:        r.opts.OnApplyLog,
 		OnSnapshotRestore: r.opts.OnSnapshotRestore,
@@ -489,6 +488,13 @@ func (r *raftNode) Stop(ctx context.Context) error {
 			r.log.Error("failed to transfer leadership", slog.String("error", err.Error()))
 		}
 	}
+	// Shut down the storage when we're done.
+	defer func() {
+		err := r.raftDB.Close()
+		if err != nil {
+			r.log.Error("failed to close raft storage", slog.String("error", err.Error()))
+		}
+	}()
 	r.log.Debug("shutting down raft node")
 	err := r.raft.Shutdown().Error()
 	if err != nil {
