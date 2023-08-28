@@ -11,7 +11,7 @@ env:
   DISTROLESS_IMAGE_NAME: ghcr.io/webmeshproj/node-distroless
   GO_VERSION: ^1.21
   NODE_VERSION: 18
-  GOLANGCI_LINT_VERSION: v1.54.0
+  GOLANGCI_LINT_VERSION: v1.54.2
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   DISTROLESS_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   BUILD_PARALLELISM: 4
