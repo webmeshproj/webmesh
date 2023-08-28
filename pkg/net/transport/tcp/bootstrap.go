@@ -74,7 +74,7 @@ type bootstrapTransport struct {
 // LeaderElect implements BootstrapTransport.
 func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt transport.JoinRoundTripper, err error) {
 	log := context.LoggerFrom(ctx).With("bootstrap-transport", "tcp")
-	log.Info("Starting bootstrap TCP transport")
+	log.Debug("Starting bootstrap TCP transport")
 	raftTransport, err := NewRaftTransport(nil, RaftTransportOptions{
 		Addr:    t.Addr,
 		MaxPool: t.MaxPool,
@@ -137,7 +137,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	if err := rft.BootstrapCluster(bootstrapConfig).Error(); err != nil {
 		if err == raft.ErrCantBootstrap {
 			// The cluster was already bootstrapped (basically we took too long to get there)
-			log.Info("Bootstrap transport cluster already bootstrapped")
+			log.Debug("Bootstrap transport cluster already bootstrapped")
 			// Build a transport that tries to join the other peers
 			var opts meshgrpc.JoinOptions
 			for _, peer := range t.Peers {
@@ -163,11 +163,11 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 			}
 			if id == rftOpts.LocalID {
 				// We won the election
-				log.Info("Bootstrap transport elected leader")
+				log.Debug("Bootstrap transport elected leader")
 				return true, nil, nil
 			}
 			// We lost the election, build a transport to the leader
-			log.Info("Bootstrap transport is follower")
+			log.Debug("Bootstrap transport is follower")
 			leader := t.Peers[string(id)]
 			return false, meshgrpc.NewJoinRoundTripper(meshgrpc.JoinOptions{
 				Addrs:          []string{leader.DialAddr},
