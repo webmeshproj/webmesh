@@ -54,11 +54,8 @@ services:
       - --services.meshdns.enabled
       - --services.metrics.enabled
       - --services.metrics.listen-address=:8000
-      - --services.dashboard.enabled
-      - --services.dashboard.listen-address=:8080
     ports:
       - 8000:8000
-      - 8080:8080
       - 8443:8443
       - 5354:5353/udp
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
