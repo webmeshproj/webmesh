@@ -87,10 +87,10 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	// Build a suitable raft configuration
 	rftOpts := raft.DefaultConfig()
 	rftOpts.LocalID = raft.ServerID(t.NodeID)
-	rftOpts.HeartbeatTimeout = t.ElectionTimeout / 2
+	rftOpts.HeartbeatTimeout = t.ElectionTimeout
 	rftOpts.ElectionTimeout = t.ElectionTimeout
 	rftOpts.LeaderLeaseTimeout = t.ElectionTimeout
-	rftOpts.CommitTimeout = t.ElectionTimeout / 2
+	rftOpts.CommitTimeout = t.ElectionTimeout
 	rftOpts.SnapshotInterval = time.Minute
 	rftOpts.SnapshotThreshold = 1024
 	rftOpts.TrailingLogs = 1024
