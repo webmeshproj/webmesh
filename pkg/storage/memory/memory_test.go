@@ -23,7 +23,7 @@ import (
 )
 
 func TestInmemStorage(t *testing.T) {
-	st := NewMeshStorage()
+	st := New()
 	defer st.Close()
-	storage.RunMeshStorageConformance(t, st)
+	storage.RunDualStorageConformance(t, st)
 }

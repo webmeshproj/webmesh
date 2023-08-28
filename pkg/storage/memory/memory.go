@@ -35,28 +35,17 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// NewRaftStorage returns a new in-memory Raft storage.
-func NewRaftStorage() storage.RaftStorage {
-	return &memStorageCloser{raft.NewInmemStore()}
-}
-
-type memStorageCloser struct {
-	*raft.InmemStore
-}
-
-func (m *memStorageCloser) Close() error {
-	return nil
-}
-
 // NewMeshStorage returns a memory-based mesh storage that is only suitable for testing.
-func NewMeshStorage() storage.MeshStorage {
+func New() storage.DualStorage {
 	return &meshStorage{
-		data: make(map[string]dataItem),
-		subs: make(map[string]subscription),
+		InmemStore: raft.NewInmemStore(),
+		data:       make(map[string]dataItem),
+		subs:       make(map[string]subscription),
 	}
 }
 
 type meshStorage struct {
+	*raft.InmemStore
 	data map[string]dataItem
 	subs map[string]subscription
 	mu   sync.RWMutex
@@ -71,6 +60,7 @@ type subscription struct {
 	prefix string
 	fn     storage.SubscribeFunc
 	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // GetValue returns the value of a key.
@@ -239,11 +229,17 @@ func (st *meshStorage) Subscribe(ctx context.Context, prefix string, fn storage.
 		prefix: prefix,
 		fn:     fn,
 		ctx:    ctx,
+		cancel: cancel,
 	}
 	return cancel, nil
 }
 
 // Close closes the storage.
 func (st *meshStorage) Close() error {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for _, sub := range st.subs {
+		sub.cancel()
+	}
 	return nil
 }

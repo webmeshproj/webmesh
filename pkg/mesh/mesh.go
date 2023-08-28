@@ -76,8 +76,8 @@ type Mesh interface {
 	Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error)
 	// DialLeader opens a new gRPC connection to the current Raft leader.
 	DialLeader(context.Context) (*grpc.ClientConn, error)
-	// Leader returns the current Raft leader ID.
-	Leader() (string, error)
+	// LeaderID returns the current Raft leader ID.
+	LeaderID() (string, error)
 	// Storage returns a storage interface for use by the application.
 	Storage() storage.MeshStorage
 	// Raft returns the Raft interface.
@@ -246,7 +246,7 @@ func (s *meshStore) Ready() <-chan struct{} {
 	go func() {
 		defer close(ch)
 		for {
-			leader, err := s.Leader()
+			leader, err := s.LeaderID()
 			if err != nil {
 				s.log.Debug("waiting for leader", slog.String("error", err.Error()))
 				time.Sleep(time.Millisecond * 100)
@@ -267,7 +267,7 @@ func (s *meshStore) Ready() <-chan struct{} {
 }
 
 // Leader returns the current Raft leader.
-func (s *meshStore) Leader() (string, error) {
+func (s *meshStore) LeaderID() (string, error) {
 	if s.raft == nil || !s.open.Load() {
 		return "", ErrNotOpen
 	}
@@ -279,7 +279,7 @@ func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 	if s.raft == nil || !s.open.Load() {
 		return nil, ErrNotOpen
 	}
-	leader, err := s.Leader()
+	leader, err := s.LeaderID()
 	if err != nil {
 		return nil, err
 	}

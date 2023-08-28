@@ -26,9 +26,21 @@ import (
 func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
 	t.Helper()
 
-	t.Run("RaftLogStore", func(t *testing.T) {})
+	t.Run("RaftLogStore", func(t *testing.T) {
+		t.Run("FirstIndex", func(t *testing.T) {})
+		t.Run("LastIndex", func(t *testing.T) {})
+		t.Run("GetLog", func(t *testing.T) {})
+		t.Run("StoreLog", func(t *testing.T) {})
+		t.Run("StoreLogs", func(t *testing.T) {})
+		t.Run("DeleteRange", func(t *testing.T) {})
+	})
 
-	t.Run("RaftStableStore", func(t *testing.T) {})
+	t.Run("RaftStableStore", func(t *testing.T) {
+		t.Run("Set", func(t *testing.T) {})
+		t.Run("Get", func(t *testing.T) {})
+		t.Run("SetUint64", func(t *testing.T) {})
+		t.Run("GetUint64", func(t *testing.T) {})
+	})
 }
 
 // RunMeshStorageConformance tests that the MeshStorage interface is implemented correctly.

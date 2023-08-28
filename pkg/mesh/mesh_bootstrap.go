@@ -436,7 +436,7 @@ func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1
 		return nil
 	}
 	// We "join" the cluster again through the usual workflow of adding a voter.
-	leader, err := s.Leader()
+	leader, err := s.LeaderID()
 	if err != nil {
 		return fmt.Errorf("get leader ID: %w", err)
 	}
