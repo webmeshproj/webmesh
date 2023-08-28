@@ -17,6 +17,7 @@ limitations under the License.
 package tcp
 
 import (
+	"io"
 	"log/slog"
 	"time"
 
@@ -94,7 +95,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	rftOpts.SnapshotInterval = time.Minute
 	rftOpts.SnapshotThreshold = 1024
 	rftOpts.TrailingLogs = 1024
-	rftOpts.Logger = nil
+	rftOpts.LogOutput = io.Discard
 
 	// Resolve our advertise address
 	addr, err := netutil.ResolveTCPAddr(ctx, t.Advertise, 15)
