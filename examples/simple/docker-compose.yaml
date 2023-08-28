@@ -2,10 +2,15 @@ version: "3"
 
 networks:
   simple:
+    enable_ipv6: true
+    driver: bridge
     ipam:
       driver: default
       config:
         - subnet: 10.1.0.0/24
+          gateway: 10.1.0.1
+        - subnet: 2001:db8:3200::/64
+          gateway: 2001:db8:3200::1
 
 services:
   bootstrap-node:
@@ -15,39 +20,35 @@ services:
       dockerfile: Dockerfile
     networks:
       simple:
+        ipv4_address: 10.1.0.2
+        ipv6_address: 2001:db8:3200::2
     hostname: bootstrap-node
     entrypoint:
       - /webmesh-node
-      - --global.log-level=debug
       - --global.insecure
-      - --global.no-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --raft.in-memory
-      - --plugins.debug.listen-address=:6060
-      - --plugins.debug.enable-db-querier=true
-    ports:
-      - 6060:6060
-      - 8443:8443
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
 
   join-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       simple:
+        ipv4_address: 10.1.0.3
+        ipv6_address: 2001:db8:3200::3
     hostname: join-node
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
       - --raft.in-memory
       - --mesh.join-as-observer
       - --mesh.join-address=bootstrap-node:8443
       - --mesh.max-join-retries=15
-      - --plugins.debug.listen-address=:6061
-      - --plugins.debug.enable-db-querier=true
     restart: on-failure
-    ports:
-      - 6061:6061
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
