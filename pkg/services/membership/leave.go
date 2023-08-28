@@ -38,7 +38,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// Check that the node is indeed who they say they are
-	if !s.insecure {
+	if s.rbac.IsSecure() {
 		if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
 			if proxiedFor != req.GetId() {
 				return nil, status.Errorf(codes.PermissionDenied, "proxied for %s, not %s", proxiedFor, req.GetId())

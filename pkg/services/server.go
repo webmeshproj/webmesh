@@ -32,13 +32,14 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/services/admin"
 	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/membership"
 	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/services/node"
+	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/services/storage"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
@@ -76,9 +77,9 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	var rbacDisabled bool
 	maxTries := 5
 	for i := 0; i < maxTries; i++ {
-		rbacDisabled, err = rbac.New(store.Storage()).IsDisabled(context.Background())
+		rbacDisabled, err = rbacdb.New(store.Storage()).IsDisabled(context.Background())
 		if err != nil {
-			log.Error("failed to check rbac status", "error", err.Error())
+			log.Error("Failed to check rbac status", "error", err.Error())
 			if i == maxTries-1 {
 				return nil, err
 			}
@@ -87,33 +88,37 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		}
 		break
 	}
+	var rbacEvaluator rbac.Evaluator
 	insecureServices := !store.Plugins().HasAuth() || rbacDisabled
 	if insecureServices {
-		log.Warn("running services without authorization")
+		log.Warn("Running services without authorization")
+		rbacEvaluator = rbac.NewNoopEvaluator()
+	} else {
+		rbacEvaluator = rbac.NewStoreEvaluator(store.Storage())
 	}
 	if o.API != nil {
 		if o.API.Admin {
-			log.Debug("registering admin api")
-			v1.RegisterAdminServer(server, admin.New(store.Storage(), store.Raft(), insecureServices))
+			log.Debug("Registering admin api")
+			v1.RegisterAdminServer(server, admin.New(store.Storage(), store.Raft(), rbacEvaluator))
 		}
 		if o.API.Mesh {
-			log.Debug("registering mesh api")
+			log.Debug("Registering mesh api")
 			v1.RegisterMeshServer(server, meshapi.NewServer(store.Storage(), store.Raft()))
 		}
 		if o.API.WebRTC {
-			log.Debug("registering webrtc api")
+			log.Debug("Registering WebRTC api")
 			v1.RegisterWebRTCServer(server, webrtc.NewServer(webrtc.Options{
 				ID:          store.ID(),
 				Storage:     store.Storage(),
 				Wireguard:   store.Network().WireGuard(),
 				NodeDialer:  store,
+				RBAC:        rbacEvaluator,
 				StunServers: strings.Split(o.API.STUNServers, ","),
-				Insecure:    insecureServices,
 			}))
 		}
 	}
 	if o.MeshDNS != nil && o.MeshDNS.Enabled {
-		log.Debug("registering mesh dns")
+		log.Debug("Registering MeshDNS server")
 		server.meshdns = meshdns.NewServer(&meshdns.Options{
 			UDPListenAddr:     o.MeshDNS.ListenUDP,
 			TCPListenAddr:     o.MeshDNS.ListenTCP,
@@ -136,7 +141,7 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		}
 	}
 	if o.Dashboard != nil && o.Dashboard.Enabled {
-		log.Debug("registering dashboard handlers")
+		log.Debug("Registering dashboard HTTP handlers")
 		server.dashboard, err = dashboard.NewServer(server.srv, o.Dashboard)
 		if err != nil {
 			return nil, err
@@ -146,13 +151,13 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	// TODO: Make this more dynamic
 	isRaftMember := store.Raft().IsVoter() || store.Raft().IsObserver()
 	if isRaftMember {
-		log.Debug("registering membership service")
-		v1.RegisterMembershipServer(server, membership.NewServer(store.Raft(), store.Plugins(), insecureServices))
-		log.Debug("registering storage service")
-		v1.RegisterStorageServer(server, storage.NewServer(store.Raft(), insecureServices))
+		log.Debug("Registering membership service")
+		v1.RegisterMembershipServer(server, membership.NewServer(store.Raft(), store.Plugins(), rbacEvaluator))
+		log.Debug("Registering storage service")
+		v1.RegisterStorageServer(server, storage.NewServer(store.Raft(), rbacEvaluator))
 	}
 	// Always register the node server
-	log.Debug("registering node service")
+	log.Debug("Registering node service")
 	v1.RegisterNodeServer(server, node.NewServer(node.Options{
 		Raft:       store.Raft(),
 		WireGuard:  store.Network().WireGuard(),
@@ -161,10 +166,10 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 		Features:   o.ToFeatureSet(isRaftMember),
 	}))
 	// Register the health service
-	log.Debug("registering health service")
+	log.Debug("Registering health service")
 	healthpb.RegisterHealthServer(server, server)
 	// Register the reflection service
-	log.Debug("registering reflection service")
+	log.Debug("Registering reflection service")
 	reflection.Register(server)
 	return server, nil
 }

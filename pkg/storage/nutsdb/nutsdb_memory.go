@@ -56,30 +56,10 @@ func newInMemoryStorage() (storage.DualStorage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open in-memory storage: %w", err)
 	}
-	// Get first, last index from db and set them
-	var first, last uint64
-	entries, _, err := db.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
-	if err != nil {
-		if !isNotFoundErr(err) {
-			return nil, fmt.Errorf("get first, last raft index: %w", err)
-		}
-	} else {
-		for _, entry := range entries {
-			index := binary.BigEndian.Uint64(entry.Key)
-			if first != 0 && index < first {
-				first = index
-			}
-			if index > last {
-				last = index
-			}
-		}
-	}
 	st := &nutsInmemStorage{
 		memstore: db,
 		subs:     newSubscriptionManager(),
 	}
-	st.firstIndex.Store(first)
-	st.lastIndex.Store(last)
 	return st, nil
 }
 
@@ -312,6 +292,9 @@ func (db *nutsInmemStorage) storeLog(log *raft.Log) error {
 	err = db.memstore.Put(logStoreBucket, key[:], buf.Bytes(), 0)
 	if err != nil {
 		return fmt.Errorf("store log: %w", err)
+	}
+	if db.firstIndex.Load() == 0 {
+		db.firstIndex.Store(log.Index)
 	}
 	if log.Index > db.lastIndex.Load() {
 		db.lastIndex.Store(log.Index)

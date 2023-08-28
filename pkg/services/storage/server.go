@@ -36,16 +36,10 @@ type Server struct {
 }
 
 // NewServer returns a new storage Server.
-func NewServer(raft raft.Raft, insecure bool) *Server {
-	var rbaceval rbac.Evaluator
-	if insecure {
-		rbaceval = rbac.NewNoopEvaluator()
-	} else {
-		rbaceval = rbac.NewStoreEvaluator(raft.Storage())
-	}
+func NewServer(raft raft.Raft, rbac rbac.Evaluator) *Server {
 	return &Server{
 		raft: raft,
-		rbac: rbaceval,
+		rbac: rbac,
 		log:  slog.Default().With("component", "storage-server"),
 	}
 }

@@ -42,22 +42,16 @@ type Options struct {
 	Storage     storage.MeshStorage
 	Wireguard   wireguard.Interface
 	NodeDialer  transport.NodeDialer
+	RBAC        rbac.Evaluator
 	StunServers []string
-	Insecure    bool
 }
 
 // NewServer returns a new Server.
 func NewServer(opts Options) *Server {
-	var rbaceval rbac.Evaluator
-	if opts.Insecure {
-		rbaceval = rbac.NewNoopEvaluator()
-	} else {
-		rbaceval = rbac.NewStoreEvaluator(opts.Storage)
-	}
 	return &Server{
 		store:    opts.Storage,
 		wg:       opts.Wireguard,
-		rbacEval: rbaceval,
+		rbacEval: opts.RBAC,
 		opts:     opts,
 	}
 }

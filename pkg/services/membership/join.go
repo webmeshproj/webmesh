@@ -105,7 +105,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// Check that the node is indeed who they say they are
-	if !s.insecure {
+	if s.rbac.IsSecure() {
 		if !nodeIDMatchesContext(ctx, req.GetId()) {
 			return nil, status.Errorf(codes.PermissionDenied, "node id %s does not match authenticated caller", req.GetId())
 		}
@@ -129,7 +129,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 		if len(actions) > 0 {
-			allowed, err := s.rbacEval.Evaluate(ctx, actions)
+			allowed, err := s.rbac.Evaluate(ctx, actions)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to evaluate permissions: %v", err)
 			}

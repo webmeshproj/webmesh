@@ -40,31 +40,21 @@ type Server struct {
 
 	raft       raft.Raft
 	plugins    plugins.Manager
-	rbacEval   rbac.Evaluator
+	rbac       rbac.Evaluator
 	ipv4Prefix netip.Prefix
 	ipv6Prefix netip.Prefix
 	meshDomain string
 	log        *slog.Logger
-	// insecure flags that no authentication plugins are enabled.
-	insecure bool
-	// lock taken during the join/update process to prevent concurrent node changes.
-	mu sync.Mutex
+	mu         sync.Mutex
 }
 
 // NewServer returns a new Server.
-func NewServer(raft raft.Raft, plugins plugins.Manager, insecure bool) *Server {
-	var rbaceval rbac.Evaluator
-	if insecure {
-		rbaceval = rbac.NewNoopEvaluator()
-	} else {
-		rbaceval = rbac.NewStoreEvaluator(raft.Storage())
-	}
+func NewServer(raft raft.Raft, plugins plugins.Manager, rbac rbac.Evaluator) *Server {
 	return &Server{
-		raft:     raft,
-		plugins:  plugins,
-		rbacEval: rbaceval,
-		insecure: insecure,
-		log:      slog.Default().With("component", "membership-server"),
+		raft:    raft,
+		plugins: plugins,
+		rbac:    rbac,
+		log:     slog.Default().With("component", "membership-server"),
 	}
 }
 

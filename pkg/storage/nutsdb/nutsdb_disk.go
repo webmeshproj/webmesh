@@ -59,8 +59,20 @@ func newDiskStorage(storagePath string) (storage.DualStorage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open nutsdb: %w", err)
 	}
-	// Get first, last index from db and set them
-	var first, last uint64
+	first, last, err := getFirstAndLastIndex(db)
+	if err != nil {
+		return nil, err
+	}
+	st := &nutsDiskStorage{
+		store: db,
+		subs:  newSubscriptionManager(),
+	}
+	st.firstIndex.Store(first)
+	st.lastIndex.Store(last)
+	return st, nil
+}
+
+func getFirstAndLastIndex(db *nutsdb.DB) (first, last uint64, err error) {
 	err = db.View(func(tx *nutsdb.Tx) error {
 		entries, err := tx.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
 		if err != nil {
@@ -80,16 +92,7 @@ func newDiskStorage(storagePath string) (storage.DualStorage, error) {
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	st := &nutsDiskStorage{
-		store: db,
-		subs:  newSubscriptionManager(),
-	}
-	st.firstIndex.Store(first)
-	st.lastIndex.Store(last)
-	return st, nil
+	return
 }
 
 // Mesh Storage Operations
@@ -315,6 +318,26 @@ func (db *nutsDiskStorage) GetLog(index uint64, log *raft.Log) error {
 func (db *nutsDiskStorage) StoreLog(log *raft.Log) error {
 	db.raftlogmu.Lock()
 	defer db.raftlogmu.Unlock()
+	return db.storeLog(log)
+}
+
+// StoreLogs stores multiple log entries. By default the logs stored may not be contiguous with previous logs (i.e. may have a gap in Index since the last log written). If an implementation can't tolerate this it may optionally implement `MonotonicLogStore` to indicate that this is not allowed. This changes Raft's behaviour after restoring a user snapshot to remove all previous logs instead of relying on a "gap" to signal the discontinuity between logs before the snapshot and logs after.
+func (db *nutsDiskStorage) StoreLogs(logs []*raft.Log) error {
+	db.raftlogmu.Lock()
+	defer db.raftlogmu.Unlock()
+	err := db.store.Update(func(tx *nutsdb.Tx) error {
+		for _, log := range logs {
+			err := db.storeLog(log)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
+}
+
+func (db *nutsDiskStorage) storeLog(log *raft.Log) error {
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(log)
 	if err != nil {
@@ -332,36 +355,13 @@ func (db *nutsDiskStorage) StoreLog(log *raft.Log) error {
 	if err != nil {
 		return err
 	}
+	if db.firstIndex.Load() == 0 {
+		db.firstIndex.Store(log.Index)
+	}
 	if log.Index > db.lastIndex.Load() {
 		db.lastIndex.Store(log.Index)
 	}
 	return nil
-}
-
-// StoreLogs stores multiple log entries. By default the logs stored may not be contiguous with previous logs (i.e. may have a gap in Index since the last log written). If an implementation can't tolerate this it may optionally implement `MonotonicLogStore` to indicate that this is not allowed. This changes Raft's behaviour after restoring a user snapshot to remove all previous logs instead of relying on a "gap" to signal the discontinuity between logs before the snapshot and logs after.
-func (db *nutsDiskStorage) StoreLogs(logs []*raft.Log) error {
-	db.raftlogmu.Lock()
-	defer db.raftlogmu.Unlock()
-	err := db.store.Update(func(tx *nutsdb.Tx) error {
-		for _, log := range logs {
-			var buf bytes.Buffer
-			err := gob.NewEncoder(&buf).Encode(log)
-			if err != nil {
-				return fmt.Errorf("store logs: %w", err)
-			}
-			var key [8]byte
-			binary.BigEndian.PutUint64(key[:], log.Index)
-			err = tx.Put(logStoreBucket, key[:], buf.Bytes(), 0)
-			if err != nil {
-				return fmt.Errorf("store logs: %w", err)
-			}
-			if log.Index > db.lastIndex.Load() {
-				db.lastIndex.Store(log.Index)
-			}
-		}
-		return nil
-	})
-	return err
 }
 
 // DeleteRange deletes a range of log entries. The range is inclusive.

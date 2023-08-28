@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
 func newTestServer(t *testing.T) *Server {
@@ -37,7 +38,7 @@ func newTestServer(t *testing.T) *Server {
 	t.Cleanup(func() {
 		store.Close()
 	})
-	return New(store.Storage(), store.Raft(), true)
+	return New(store.Storage(), store.Raft(), rbac.NewNoopEvaluator())
 }
 
 type testCase[REQ any] struct {

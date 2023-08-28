@@ -41,17 +41,13 @@ type Server struct {
 }
 
 // New creates a new admin server.
-func New(store storage.MeshStorage, raft raft.Raft, insecure bool) *Server {
-	rbacEval := rbac.NewStoreEvaluator(store)
-	if insecure {
-		rbacEval = rbac.NewNoopEvaluator()
-	}
+func New(store storage.MeshStorage, raft raft.Raft, rbac rbac.Evaluator) *Server {
 	return &Server{
 		store:      store,
 		raft:       raft,
 		peers:      peers.New(store),
 		rbac:       rbacdb.New(store),
-		rbacEval:   rbacEval,
+		rbacEval:   rbac,
 		networking: networking.New(store),
 	}
 }

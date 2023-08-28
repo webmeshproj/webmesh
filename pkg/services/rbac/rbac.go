@@ -34,6 +34,8 @@ type Evaluator interface {
 	// Evaluate returns true if the given actions are allowed for the
 	// peer information provided in the context.
 	Evaluate(ctx context.Context, actions Actions) (bool, error)
+	// IsSecure returns true if the evaluator is secure.
+	IsSecure() bool
 }
 
 // Action is a convenience type for an action.
@@ -72,6 +74,10 @@ func NewStoreEvaluator(store storage.MeshStorage) Evaluator {
 
 type storeEvaluator struct {
 	rbac rbac.RBAC
+}
+
+func (s *storeEvaluator) IsSecure() bool {
+	return true
 }
 
 // Evaluate returns true if the given action is allowed for the peer information provided in the context.
@@ -115,4 +121,8 @@ type noopEvaluator struct{}
 // Evaluate returns true if the given action is allowed for the peer information provided in the context.
 func (n *noopEvaluator) Evaluate(ctx context.Context, actions Actions) (bool, error) {
 	return true, nil
+}
+
+func (s *noopEvaluator) IsSecure() bool {
+	return false
 }
