@@ -17,7 +17,9 @@ limitations under the License.
 package netutil
 
 import (
+	"io"
 	"net/netip"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -87,7 +89,9 @@ func FuzzAssignToPrefix(f *testing.F) {
 	var count atomic.Uint64
 	f.Fuzz(func(t *testing.T, key string) {
 		// Make sure we don't rerun the test with the same key
-		_ = key
+		// Make sure we also consumed the fuzz data
+		c := io.NopCloser(strings.NewReader(key))
+		defer c.Close()
 		keybytes := mustGenerateWireguardKey(t)
 		if _, ok := seenKeys.Load(key); ok {
 			t.SkipNow()
@@ -102,6 +106,9 @@ func FuzzAssignToPrefix(f *testing.F) {
 		}
 		if prefix.Bits() != 112 {
 			t.Fatalf("generated prefix with invalid prefix length: %s", prefix)
+		}
+		if !ula.Contains(prefix.Addr()) {
+			t.Fatalf("generated prefix %q not contained in ULA %q", prefix.String(), ula.String())
 		}
 		if _, ok := seen.Load(prefix); ok {
 			t.Fatalf("generated duplicate prefix %q after %d runs", prefix.String(), count.Load())

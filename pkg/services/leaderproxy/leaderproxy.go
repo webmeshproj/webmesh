@@ -29,18 +29,27 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 )
 
 // Interceptor is the leaderproxy interceptor.
 type Interceptor struct {
-	store meshdb.Store
+	raft   raft.Raft
+	dialer Dialer
+}
+
+// Dialer is the interface required for the leader proxy interceptor.
+type Dialer interface {
+	transport.LeaderDialer
+	transport.NodeDialer
 }
 
 // New returns a new leader proxy interceptor.
-func New(store meshdb.Store) *Interceptor {
+func New(raft raft.Raft, dialer Dialer) *Interceptor {
 	return &Interceptor{
-		store: store,
+		raft:   raft,
+		dialer: dialer,
 	}
 }
 
@@ -49,7 +58,7 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Fast path - if we are the leader, it doesn't make sense to proxy the request.
 		log := context.LoggerFrom(ctx)
-		if i.store.Raft().IsLeader() {
+		if i.raft.IsLeader() {
 			log.Debug("currently the leader, handling request locally", slog.String("method", info.FullMethod))
 			return handler(ctx, req)
 		}
@@ -76,7 +85,7 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		log := context.LoggerFrom(ss.Context())
-		if i.store.Raft().IsLeader() {
+		if i.raft.IsLeader() {
 			log.Debug("currently the leader, handling stream locally", slog.String("method", info.FullMethod))
 			return handler(srv, ss)
 		}
@@ -100,12 +109,12 @@ func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 }
 
 func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	conn, err := i.store.DialLeader(ctx)
+	conn, err := i.dialer.DialLeader(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, string(i.store.ID()))
+	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, string(i.raft.ID()))
 	if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
@@ -201,12 +210,12 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 }
 
 func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	conn, err := i.store.DialLeader(ss.Context())
+	conn, err := i.dialer.DialLeader(ss.Context())
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	ctx := metadata.AppendToOutgoingContext(ss.Context(), ProxiedFromMeta, string(i.store.ID()))
+	ctx := metadata.AppendToOutgoingContext(ss.Context(), ProxiedFromMeta, string(i.raft.ID()))
 	if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}

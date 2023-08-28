@@ -142,7 +142,7 @@ func (r *rbac) Disable(ctx context.Context) error {
 func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
 	_, err := r.GetValue(ctx, rbacDisabledKey)
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if storage.IsKeyNotFoundError(err) {
 			return false, nil
 		}
 		return false, fmt.Errorf("get rbac disabled: %w", err)

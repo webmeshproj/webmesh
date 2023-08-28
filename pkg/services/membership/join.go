@@ -58,7 +58,7 @@ var canPutEdgeAction = &rbac.Action{
 }
 
 func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
-	if !s.store.Raft().IsLeader() {
+	if !s.raft.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.mu.Lock()
@@ -145,7 +145,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Issue a barrier to the raft cluster to ensure all nodes are
 	// fully caught up before we make changes
 	// TODO: Make timeout configurable
-	_, err = s.store.Raft().Barrier(ctx, time.Second*15)
+	_, err = s.raft.Barrier(ctx, time.Second*15)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
@@ -153,7 +153,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Send another barrier after we're done to ensure all nodes are
 	// fully caught up before we return
 	defer func() {
-		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
+		_, _ = s.raft.Barrier(ctx, time.Second*15)
 	}()
 
 	// Start building a list of clean up functions to run if we fail
@@ -172,7 +172,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err))
 		} else if created {
 			cleanFuncs = append(cleanFuncs, func() {
-				err := networking.New(s.store.Storage()).DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
+				err := networking.New(s.raft.Storage()).DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
 				if err != nil {
 					log.Warn("Failed to delete route", slog.String("error", err.Error()))
 				}
@@ -187,7 +187,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Acquire an IPv4 address for the peer only if requested
 	if req.GetAssignIpv4() {
 		log.Debug("Assigning IPv4 address to peer")
-		leasev4, err = s.store.Plugins().AllocateIP(ctx, &v1.AllocateIPRequest{
+		leasev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
 			NodeId:  req.GetId(),
 			Subnet:  s.ipv4Prefix.String(),
 			Version: v1.AllocateIPRequest_IP_VERSION_4,
@@ -198,7 +198,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Debug("Assigned IPv4 address to peer", slog.String("ipv4", leasev4.String()))
 	}
 	// Write the peer to the database
-	p := peers.New(s.store.Storage())
+	p := peers.New(s.raft.Storage())
 	err = p.Put(ctx, peers.Node{
 		ID:                 req.GetId(),
 		PublicKey:          publicKey,
@@ -223,7 +223,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	})
 	// At this point we want to
 	// Add an edge from the joining server to the caller
-	joiningServer := string(s.store.ID())
+	joiningServer := string(s.raft.ID())
 	if proxiedFrom, ok := leaderproxy.ProxiedFrom(ctx); ok {
 		joiningServer = proxiedFrom
 	}
@@ -331,17 +331,17 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 		if req.GetAsVoter() {
 			log.Info("Adding voter to cluster", slog.String("raft_address", raftAddress))
-			if err := s.store.Raft().AddVoter(ctx, req.GetId(), raftAddress); err != nil {
+			if err := s.raft.AddVoter(ctx, req.GetId(), raftAddress); err != nil {
 				return nil, handleErr(status.Errorf(codes.Internal, "failed to add voter: %v", err))
 			}
 		} else if req.GetAsObserver() {
 			log.Info("Adding observer to cluster", slog.String("raft_address", raftAddress))
-			if err := s.store.Raft().AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
+			if err := s.raft.AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
 				return nil, handleErr(status.Errorf(codes.Internal, "failed to add non-voter: %v", err))
 			}
 		}
 		cleanFuncs = append(cleanFuncs, func() {
-			err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
+			err := s.raft.RemoveServer(ctx, req.GetId(), false)
 			if err != nil {
 				log.Warn("Failed to remove voter", slog.String("error", err.Error()))
 			}
@@ -378,7 +378,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 	}
-	peers, err := mesh.WireGuardPeersFor(ctx, s.store.Storage(), req.GetId())
+	peers, err := mesh.WireGuardPeersFor(ctx, s.raft.Storage(), req.GetId())
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
 	}

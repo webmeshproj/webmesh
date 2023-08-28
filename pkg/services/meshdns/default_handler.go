@@ -33,7 +33,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	if q.Qtype == dns.TypeNS && q.Name == "." {
 		// This is a root NS request, return the configured root NS records
 		s.log.Debug("handling root NS request")
-		m := s.newMsg(nil, r)
+		m := s.newMsg(meshDomain{}, r)
 		for _, mux := range s.meshmuxes {
 			mux.mu.RLock()
 			m.Ns = append(m.Ns, newNSRecord(mux.meshes[0]))
@@ -46,7 +46,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	if s.opts.DisableForwarding {
 		// We're not forwarding, so return NXDOMAIN
 		s.log.Debug("handling request with forwarding disabled")
-		m := s.newMsg(nil, r)
+		m := s.newMsg(meshDomain{}, r)
 		s.writeMsg(w, r, m, dns.RcodeNameError)
 		return
 	}
@@ -54,7 +54,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	if len(s.extforwarders) == 0 && len(s.meshforwarders) == 0 {
 		// If there are no forwarders, return a NXDOMAIN
 		s.log.Debug("forward request with no forwarders configured")
-		m := s.newMsg(nil, r)
+		m := s.newMsg(meshDomain{}, r)
 		s.writeMsg(w, r, m, dns.RcodeNameError)
 		return
 	}
@@ -100,7 +100,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		if err != nil {
 			if ctx.Err() != nil {
 				s.log.Error("failed to forward lookup", slog.String("error", err.Error()))
-				m := s.newMsg(nil, r)
+				m := s.newMsg(meshDomain{}, r)
 				s.writeMsg(w, r, m, dns.RcodeServerFailure)
 				return
 			}
@@ -135,6 +135,6 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		// If the forwarder returned NXDOMAIN, try the next forwarder
 	}
 	// If all forwarders returned NXDOMAIN, return NXDOMAIN
-	m := s.newMsg(nil, r)
+	m := s.newMsg(meshDomain{}, r)
 	s.writeMsg(w, r, m, dns.RcodeNameError)
 }

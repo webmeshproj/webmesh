@@ -20,22 +20,25 @@ package meshapi
 import (
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Server is the webmesh Mesh service.
 type Server struct {
 	v1.UnimplementedMeshServer
 
-	store meshdb.Store
+	store storage.MeshStorage
+	raft  raft.Raft
 	peers peers.Peers
 }
 
 // NewServer returns a new Server.
-func NewServer(store meshdb.Store) *Server {
+func NewServer(store storage.MeshStorage, raft raft.Raft) *Server {
 	return &Server{
 		store: store,
-		peers: peers.New(store.Storage()),
+		raft:  raft,
+		peers: peers.New(store),
 	}
 }

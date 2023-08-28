@@ -28,46 +28,46 @@ import (
 )
 
 func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.Status, error) {
-	if req.GetId() != "" && req.GetId() != string(s.store.ID()) {
+	if req.GetId() != "" && req.GetId() != string(s.Raft.ID()) {
 		return s.getRemoteNodeStatus(ctx, req.GetId())
 	}
 	var leader string
 	var err error
-	leader, err = s.store.Leader()
+	leader, err = s.Raft.LeaderID()
 	if err != nil {
 		s.log.Error("failed to lookup current leader", slog.String("error", err.Error()))
 	}
-	ifaceMetrics, err := s.store.Network().WireGuard().Metrics()
+	ifaceMetrics, err := s.WireGuard.Metrics()
 	if err != nil {
 		return nil, err
 	}
 	return &v1.Status{
-		Id:        string(s.store.ID()),
+		Id:        string(s.Raft.ID()),
 		Version:   version.Version,
 		Commit:    version.Commit,
 		BuildDate: version.BuildDate,
 		Uptime:    time.Since(s.startedAt).String(),
 		StartedAt: timestamppb.New(s.startedAt),
-		Features:  s.features,
+		Features:  s.Features,
 		ClusterStatus: func() v1.ClusterStatus {
-			if s.store.Raft().IsLeader() {
+			if s.Raft.IsLeader() {
 				return v1.ClusterStatus_CLUSTER_LEADER
-			} else if s.store.Raft().IsVoter() {
+			} else if s.Raft.IsVoter() {
 				return v1.ClusterStatus_CLUSTER_VOTER
-			} else if s.store.Raft().IsObserver() {
+			} else if s.Raft.IsObserver() {
 				return v1.ClusterStatus_CLUSTER_NON_VOTER
 			}
 			return v1.ClusterStatus_CLUSTER_NODE
 		}(),
 		CurrentLeader:    leader,
-		LastLogIndex:     s.store.Raft().LastIndex(),
-		LastApplied:      s.store.Raft().LastAppliedIndex(),
+		LastLogIndex:     s.Raft.LastIndex(),
+		LastApplied:      s.Raft.LastAppliedIndex(),
 		InterfaceMetrics: ifaceMetrics,
 	}, nil
 }
 
 func (s *Server) getRemoteNodeStatus(ctx context.Context, nodeID string) (*v1.Status, error) {
-	conn, err := s.store.Dial(ctx, nodeID)
+	conn, err := s.NodeDialer.Dial(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}

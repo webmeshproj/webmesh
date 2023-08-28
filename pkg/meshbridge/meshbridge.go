@@ -229,8 +229,11 @@ func (m *meshBridge) Start(ctx context.Context) error {
 		for _, mesh := range m.meshes {
 			ms := mesh
 			err := m.meshdns.RegisterDomain(meshdns.DomainOptions{
-				Mesh:     ms,
-				IPv6Only: true,
+				MeshDomain:          ms.Domain(),
+				MeshStorage:         ms.Storage(),
+				Raft:                ms.Raft(),
+				IPv6Only:            true,
+				SubscribeForwarders: false,
 			})
 			if err != nil {
 				return handleErr(fmt.Errorf("failed to register mesh %q with meshdns: %w", ms.ID(), err))

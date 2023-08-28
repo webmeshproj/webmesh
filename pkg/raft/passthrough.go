@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -57,6 +58,11 @@ type passthroughRaft struct {
 	closec     chan struct{}
 	log        *slog.Logger
 	mu         sync.Mutex
+}
+
+// ID returns the node ID of the raft member.
+func (p *passthroughRaft) ID() string {
+	return p.nodeID
 }
 
 func (p *passthroughRaft) Start(ctx context.Context, opts *StartOptions) error {
@@ -215,8 +221,8 @@ func (p *passthroughStorage) GetValue(ctx context.Context, key string) (string, 
 	}
 	if result.GetError() != "" {
 		// TODO: Should find a way to type assert this error
-		if result.GetError() == "key not found" {
-			return "", storage.ErrKeyNotFound
+		if strings.Contains(result.GetError(), storage.ErrKeyNotFound.Error()) {
+			return "", storage.NewKeyNotFoundError(key)
 		}
 		return "", errors.New(result.GetError())
 	}

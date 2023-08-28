@@ -20,33 +20,44 @@ package webrtc
 import (
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Server is the webmesh WebRTC service.
 type Server struct {
 	v1.UnimplementedWebRTCServer
 
-	store       meshdb.Store
-	meshstate   state.State
-	rbacEval    rbac.Evaluator
-	stunServers []string
+	store    storage.MeshStorage
+	wg       wireguard.Interface
+	rbacEval rbac.Evaluator
+	opts     Options
+}
+
+// Options are options for the WebRTC service.
+type Options struct {
+	ID          string
+	Storage     storage.MeshStorage
+	Wireguard   wireguard.Interface
+	NodeDialer  transport.NodeDialer
+	StunServers []string
+	Insecure    bool
 }
 
 // NewServer returns a new Server.
-func NewServer(store meshdb.Store, stunServers []string, insecure bool) *Server {
+func NewServer(opts Options) *Server {
 	var rbaceval rbac.Evaluator
-	if insecure {
+	if opts.Insecure {
 		rbaceval = rbac.NewNoopEvaluator()
 	} else {
-		rbaceval = rbac.NewStoreEvaluator(store)
+		rbaceval = rbac.NewStoreEvaluator(opts.Storage)
 	}
 	return &Server{
-		store:       store,
-		meshstate:   state.New(store.Storage()),
-		rbacEval:    rbaceval,
-		stunServers: stunServers,
+		store:    opts.Storage,
+		wg:       opts.Wireguard,
+		rbacEval: rbaceval,
+		opts:     opts,
 	}
 }

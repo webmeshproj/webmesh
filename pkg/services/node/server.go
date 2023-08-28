@@ -23,26 +23,35 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 )
 
 // Server is the webmesh node service.
 type Server struct {
 	v1.UnimplementedNodeServer
-
-	store     meshdb.Store
-	features  []v1.Feature
+	Options
 	startedAt time.Time
 	log       *slog.Logger
+}
+
+// Options are options for the Node service.
+type Options struct {
+	Raft       raft.Raft
+	WireGuard  wireguard.Interface
+	NodeDialer transport.NodeDialer
+	Plugins    plugins.Manager
+	Features   []v1.Feature
 }
 
 // NewServer returns a new Server. Features are used for returning what features are enabled.
 // It is the callers responsibility to ensure those servers are registered on the node.
 // Insecure is used to disable authorization.
-func NewServer(store meshdb.Store, features []v1.Feature) *Server {
+func NewServer(opts Options) *Server {
 	return &Server{
-		store:     store,
-		features:  features,
+		Options:   opts,
 		startedAt: time.Now(),
 		log:       slog.Default().With("component", "node-server"),
 	}

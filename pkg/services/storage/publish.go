@@ -34,7 +34,7 @@ var canPublishAction = rbac.Actions{
 }
 
 func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
-	if !s.store.Raft().IsVoter() && !s.store.Raft().IsObserver() {
+	if !s.raft.IsVoter() && !s.raft.IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return nil, status.Error(codes.Unavailable, "node not available to publish")
 	}
@@ -50,7 +50,7 @@ func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.Publi
 		return nil, status.Errorf(codes.InvalidArgument, "key %q is reserved", req.GetKey())
 	}
 	// TODO: Validate key and value and check for overlaps and other issues.
-	err = s.store.Storage().PutValue(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())
+	err = s.raft.Storage().PutValue(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error publishing: %v", err)
 	}

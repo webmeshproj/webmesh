@@ -103,7 +103,7 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 		log.Error("Request has invalid port")
 		return status.Error(codes.InvalidArgument, "invalid port provided in request")
 	}
-	if r.GetNodeId() == string(s.store.ID()) {
+	if r.GetNodeId() == s.opts.ID {
 		// We are the destination node.
 		return s.handleLocalNegotiation(log, stream, r, remoteAddr)
 	}
@@ -117,11 +117,11 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	if r.GetProto() == "udp" && r.GetPort() == 0 {
 		log.Info("Negotiating WireGuard proxy connection")
 		// Lookup our WireGuard port.
-		port, err := s.store.Network().WireGuard().ListenPort()
+		port, err := s.wg.ListenPort()
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get WireGuard listen port: %v", err)
 		}
-		conn, err = datachannels.NewWireGuardProxyServer(stream.Context(), s.stunServers, uint16(port))
+		conn, err = datachannels.NewWireGuardProxyServer(stream.Context(), s.opts.StunServers, uint16(port))
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 			Proto:       r.GetProto(),
 			SrcAddress:  remoteAddr,
 			DstAddress:  net.JoinHostPort(r.GetDst(), strconv.Itoa(int(r.GetPort()))),
-			STUNServers: s.stunServers,
+			STUNServers: s.opts.StunServers,
 		})
 		if err != nil {
 			return err
@@ -144,7 +144,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	log.Debug("Sending offer to client", slog.String("offer", conn.Offer()))
 	err = stream.Send(&v1.DataChannelOffer{
 		Offer:       conn.Offer(),
-		StunServers: s.stunServers,
+		StunServers: s.opts.StunServers,
 	})
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to send offer to client: %s", err.Error())
@@ -222,7 +222,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRTC_StartDataChannelServer, r *v1.StartDataChannelRequest, remoteAddr string) error {
 	// Start a negotiation with the peer.
 	log.Info("Negotiating data channel with remote peer")
-	conn, err := s.store.Dial(clientStream.Context(), r.GetNodeId())
+	conn, err := s.opts.NodeDialer.Dial(clientStream.Context(), r.GetNodeId())
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 		Src:         remoteAddr,
 		Dst:         r.GetDst(),
 		Port:        r.GetPort(),
-		StunServers: s.stunServers,
+		StunServers: s.opts.StunServers,
 	})
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to send negotiation request to peer: %s", err.Error())
@@ -259,7 +259,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	// Forward the offer to the client
 	err = clientStream.Send(&v1.DataChannelOffer{
 		Offer:       resp.GetOffer(),
-		StunServers: s.stunServers,
+		StunServers: s.opts.StunServers,
 	})
 	if err != nil {
 		return err

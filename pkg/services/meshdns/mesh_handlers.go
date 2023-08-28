@@ -22,12 +22,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/raft"
 	"github.com/miekg/dns"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 type meshLookupMux struct {
@@ -35,19 +35,26 @@ type meshLookupMux struct {
 	*Server
 	domain   string
 	ipv6Only bool
-	meshes   []meshdb.Store
+	meshes   []meshDomain
 	mu       sync.RWMutex
 }
 
-func (s *Server) newMeshLookupMux(mesh meshdb.Store, ipv6Only bool) *meshLookupMux {
+type meshDomain struct {
+	domain   string
+	storage  storage.MeshStorage
+	raft     raft.Raft
+	ipv6Only bool
+}
+
+func (s *Server) newMeshLookupMux(dom meshDomain) *meshLookupMux {
 	mux := &meshLookupMux{
 		ServeMux: dns.NewServeMux(),
 		Server:   s,
-		domain:   mesh.Domain(),
-		meshes:   []meshdb.Store{mesh},
-		ipv6Only: ipv6Only,
+		domain:   dom.domain,
+		meshes:   []meshDomain{dom},
+		ipv6Only: dom.ipv6Only,
 	}
-	domPattern := strings.TrimSuffix(mesh.Domain(), ".")
+	domPattern := strings.TrimSuffix(dom.domain, ".")
 	mux.HandleFunc(fmt.Sprintf("leader.%s", domPattern), s.contextHandler(mux.handleLeaderLookup))
 	mux.HandleFunc(fmt.Sprintf("voters.%s", domPattern), s.contextHandler(mux.handleVotersLookup))
 	mux.HandleFunc(fmt.Sprintf("observers.%s", domPattern), s.contextHandler(mux.handleObserversLookup))
@@ -55,10 +62,10 @@ func (s *Server) newMeshLookupMux(mesh meshdb.Store, ipv6Only bool) *meshLookupM
 	return mux
 }
 
-func (s *meshLookupMux) appendMesh(mesh meshdb.Store) {
+func (s *meshLookupMux) appendMesh(dom meshDomain) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.meshes = append(s.meshes, mesh)
+	s.meshes = append(s.meshes, dom)
 }
 
 func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
@@ -92,7 +99,7 @@ func (s *meshLookupMux) handleLeaderLookup(ctx context.Context, w dns.ResponseWr
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
-	leaderID, err := mesh.Leader()
+	leaderID, err := mesh.raft.LeaderID()
 	if err != nil {
 		s.log.Error("failed to get leader", slog.String("error", err.Error()))
 		s.writeMsg(w, r, m, dns.RcodeServerFailure)
@@ -119,7 +126,7 @@ func (s *meshLookupMux) handleVotersLookup(ctx context.Context, w dns.ResponseWr
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
-	config, err := mesh.Raft().Configuration()
+	config, err := mesh.raft.Configuration()
 	if err != nil {
 		s.log.Error("failed to get configuration", slog.String("error", err.Error()))
 		s.writeMsg(w, r, m, dns.RcodeServerFailure)
@@ -149,7 +156,7 @@ func (s *meshLookupMux) handleObserversLookup(ctx context.Context, w dns.Respons
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
-	config, err := mesh.Raft().Configuration()
+	config, err := mesh.raft.Configuration()
 	if err != nil {
 		s.log.Error("failed to get configuration", slog.String("error", err.Error()))
 		s.writeMsg(w, r, m, dns.RcodeServerFailure)

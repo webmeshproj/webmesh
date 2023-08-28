@@ -36,7 +36,7 @@ import (
 )
 
 func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateResponse, error) {
-	if !s.store.Raft().IsLeader() {
+	if !s.raft.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.mu.Lock()
@@ -107,7 +107,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	// Issue a barrier to the raft cluster to ensure all nodes are
 	// fully caught up before we make changes
 	// TODO: Make timeout configurable
-	_, err = s.store.Raft().Barrier(ctx, time.Second*15)
+	_, err = s.raft.Barrier(ctx, time.Second*15)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
@@ -115,18 +115,18 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	// Send another barrier after we're done to ensure all nodes are
 	// fully caught up before we return
 	defer func() {
-		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
+		_, _ = s.raft.Barrier(ctx, time.Second*15)
 	}()
 
 	// Lookup the peer's current state
 	var currentSuffrage raft.ServerSuffrage = -1
 	var currentAddress raft.ServerAddress = ""
-	cfg, err := s.store.Raft().Configuration()
+	cfg, err := s.raft.Configuration()
 	if err != nil {
 		// Should never happen
 		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
 	}
-	p := peers.New(s.store.Storage())
+	p := peers.New(s.raft.Storage())
 	peer, err := p.Get(ctx, req.GetId())
 	if err != nil {
 		if errors.Is(err, peers.ErrNodeNotFound) {
@@ -209,7 +209,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		}
 		// Promote to voter
 		log.Info("promoting to voter", slog.String("raft_address", string(currentAddress)))
-		if err := s.store.Raft().AddVoter(ctx, peer.ID, string(currentAddress)); err != nil {
+		if err := s.raft.AddVoter(ctx, peer.ID, string(currentAddress)); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to promote to voter: %v", err)
 		}
 	}

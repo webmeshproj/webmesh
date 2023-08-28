@@ -37,7 +37,7 @@ func newTestServer(t *testing.T) *Server {
 	t.Cleanup(func() {
 		store.Close()
 	})
-	return New(store, true)
+	return New(store.Storage(), store.Raft(), true)
 }
 
 type testCase[REQ any] struct {

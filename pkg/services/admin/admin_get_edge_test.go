@@ -39,8 +39,16 @@ func TestGetEdge(t *testing.T) {
 		t.Errorf("GenerateKey() error = %v", err)
 		return
 	}
-	err = peers.New(server.store.Storage()).Put(ctx, peers.Node{
+	err = peers.New(server.store).Put(ctx, peers.Node{
 		ID:        "foo",
+		PublicKey: key.PublicKey(),
+	})
+	if err != nil {
+		t.Errorf("Put() error = %v", err)
+		return
+	}
+	err = peers.New(server.store).Put(ctx, peers.Node{
+		ID:        "bar",
 		PublicKey: key.PublicKey(),
 	})
 	if err != nil {
@@ -49,8 +57,8 @@ func TestGetEdge(t *testing.T) {
 	}
 	// Place an edge from us to the dummy peer
 	_, err = server.PutEdge(ctx, &v1.MeshEdge{
-		Source: server.store.ID(),
-		Target: "foo",
+		Source: "foo",
+		Target: "bar",
 	})
 	if err != nil {
 		t.Errorf("PutEdge() error = %v", err)
@@ -70,12 +78,12 @@ func TestGetEdge(t *testing.T) {
 		},
 		{
 			name: "non-existent edge",
-			req:  &v1.MeshEdge{Source: "foo", Target: "bar"},
+			req:  &v1.MeshEdge{Source: "bar", Target: "bar"},
 			code: codes.NotFound,
 		},
 		{
 			name: "existing edge",
-			req:  &v1.MeshEdge{Source: server.store.ID(), Target: "foo"},
+			req:  &v1.MeshEdge{Source: "foo", Target: "bar"},
 			code: codes.OK,
 		},
 	}

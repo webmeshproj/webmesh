@@ -1,4 +1,4 @@
-//go:build !wasm
+// go:build !wasm
 
 /*
 Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
@@ -45,7 +45,8 @@ type nutsInmemStorage struct {
 	memstore              *inmemory.DB
 	subs                  *subscriptionManager
 	meshmu                sync.RWMutex
-	raftmu                sync.RWMutex
+	raftstbmu             sync.RWMutex
+	raftlogmu             sync.RWMutex
 }
 
 // New returns a new RoseDB storage. The returned storage can be used
@@ -65,7 +66,7 @@ func newInMemoryStorage() (storage.DualStorage, error) {
 	} else {
 		for _, entry := range entries {
 			index := binary.BigEndian.Uint64(entry.Key)
-			if index < first {
+			if first != 0 && index < first {
 				first = index
 			}
 			if index > last {
@@ -239,9 +240,11 @@ func (db *nutsInmemStorage) Subscribe(ctx context.Context, prefix string, fn sto
 // Close closes the storage.
 func (db *nutsInmemStorage) Close() error {
 	db.meshmu.Lock()
+	db.raftstbmu.Lock()
+	db.raftlogmu.Lock()
 	defer db.meshmu.Unlock()
-	db.raftmu.Lock()
-	defer db.raftmu.Unlock()
+	defer db.raftstbmu.Unlock()
+	defer db.raftlogmu.Unlock()
 	db.subs.Close()
 	return nil
 }
@@ -260,8 +263,8 @@ func (db *nutsInmemStorage) LastIndex() (uint64, error) {
 
 // GetLog gets a log entry at a given index.
 func (db *nutsInmemStorage) GetLog(index uint64, log *raft.Log) error {
-	db.raftmu.RLock()
-	defer db.raftmu.RUnlock()
+	db.raftlogmu.RLock()
+	defer db.raftlogmu.RUnlock()
 	var key [8]byte
 	binary.BigEndian.PutUint64(key[:], index)
 	entry, err := db.memstore.Get(logStoreBucket, key[:])
@@ -280,15 +283,15 @@ func (db *nutsInmemStorage) GetLog(index uint64, log *raft.Log) error {
 
 // StoreLog stores a log entry.
 func (db *nutsInmemStorage) StoreLog(log *raft.Log) error {
-	db.raftmu.Lock()
-	defer db.raftmu.Unlock()
+	db.raftlogmu.Lock()
+	defer db.raftlogmu.Unlock()
 	return db.storeLog(log)
 }
 
 // StoreLogs stores multiple log entries. By default the logs stored may not be contiguous with previous logs (i.e. may have a gap in Index since the last log written). If an implementation can't tolerate this it may optionally implement `MonotonicLogStore` to indicate that this is not allowed. This changes Raft's behaviour after restoring a user snapshot to remove all previous logs instead of relying on a "gap" to signal the discontinuity between logs before the snapshot and logs after.
 func (db *nutsInmemStorage) StoreLogs(logs []*raft.Log) error {
-	db.raftmu.Lock()
-	defer db.raftmu.Unlock()
+	db.raftlogmu.Lock()
+	defer db.raftlogmu.Unlock()
 	for _, log := range logs {
 		err := db.storeLog(log)
 		if err != nil {
@@ -310,7 +313,7 @@ func (db *nutsInmemStorage) storeLog(log *raft.Log) error {
 	if err != nil {
 		return fmt.Errorf("store log: %w", err)
 	}
-	if log.Index < db.lastIndex.Load() {
+	if log.Index > db.lastIndex.Load() {
 		db.lastIndex.Store(log.Index)
 	}
 	return nil
@@ -318,8 +321,8 @@ func (db *nutsInmemStorage) storeLog(log *raft.Log) error {
 
 // DeleteRange deletes a range of log entries. The range is inclusive.
 func (db *nutsInmemStorage) DeleteRange(min, max uint64) error {
-	db.raftmu.Lock()
-	defer db.raftmu.Unlock()
+	db.raftlogmu.Lock()
+	defer db.raftlogmu.Unlock()
 	entries, _, err := db.memstore.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
 	if err != nil {
 		if isNotFoundErr(err) {
@@ -342,8 +345,8 @@ func (db *nutsInmemStorage) DeleteRange(min, max uint64) error {
 // Raft Stable Storage Operations
 
 func (db *nutsInmemStorage) Set(key []byte, val []byte) error {
-	db.raftmu.Lock()
-	defer db.raftmu.Unlock()
+	db.raftstbmu.Lock()
+	defer db.raftstbmu.Unlock()
 	err := db.memstore.Put(stableStoreBucket, key, val, 0)
 	if err != nil {
 		return fmt.Errorf("set stable store: %w", err)
@@ -353,8 +356,8 @@ func (db *nutsInmemStorage) Set(key []byte, val []byte) error {
 
 // Get returns the value for key, or an empty byte slice if key was not found.
 func (db *nutsInmemStorage) Get(key []byte) ([]byte, error) {
-	db.raftmu.RLock()
-	defer db.raftmu.RUnlock()
+	db.raftstbmu.RLock()
+	defer db.raftstbmu.RUnlock()
 	val, err := db.memstore.Get(stableStoreBucket, key)
 	if err != nil {
 		if isNotFoundErr(err) {
@@ -366,8 +369,8 @@ func (db *nutsInmemStorage) Get(key []byte) ([]byte, error) {
 }
 
 func (db *nutsInmemStorage) SetUint64(key []byte, val uint64) error {
-	db.raftmu.Lock()
-	defer db.raftmu.Unlock()
+	db.raftstbmu.Lock()
+	defer db.raftstbmu.Unlock()
 	var buf [8]byte
 	binary.BigEndian.PutUint64(buf[:], val)
 	err := db.memstore.Put(stableStoreBucket, key, buf[:], 0)
@@ -379,8 +382,8 @@ func (db *nutsInmemStorage) SetUint64(key []byte, val uint64) error {
 
 // GetUint64 returns the uint64 value for key, or 0 if key was not found.
 func (db *nutsInmemStorage) GetUint64(key []byte) (uint64, error) {
-	db.raftmu.RLock()
-	defer db.raftmu.RUnlock()
+	db.raftstbmu.RLock()
+	defer db.raftstbmu.RUnlock()
 	val, err := db.memstore.Get(stableStoreBucket, key)
 	if err != nil {
 		if isNotFoundErr(err) {

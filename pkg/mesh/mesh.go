@@ -29,12 +29,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	v1 "github.com/webmeshproj/api/v1"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/discovery"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
@@ -248,14 +248,16 @@ func (s *meshStore) Ready() <-chan struct{} {
 		for {
 			leader, err := s.Leader()
 			if err != nil {
-				time.Sleep(50 * time.Millisecond)
+				s.log.Debug("waiting for leader", slog.String("error", err.Error()))
+				time.Sleep(time.Second)
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			_, err = peers.New(s.Storage()).Get(ctx, leader)
 			cancel()
 			if err != nil {
-				time.Sleep(50 * time.Millisecond)
+				s.log.Debug("waiting for leader", slog.String("leader", leader), slog.String("error", err.Error()))
+				time.Sleep(time.Second)
 				continue
 			}
 			return

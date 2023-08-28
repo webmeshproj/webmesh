@@ -23,40 +23,13 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/golang/snappy"
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
-
-// MarshalLogEntry marshals a RaftLogEntry.
-func MarshalLogEntry(logEntry *v1.RaftLogEntry) ([]byte, error) {
-	data, err := proto.Marshal(logEntry)
-	if err == nil {
-		data = snappy.Encode(nil, data)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("encode log entry: %w", err)
-	}
-	return data, nil
-}
-
-// UnmarshalLogEntry unmarshals a RaftLogEntry.
-func UnmarshalLogEntry(data []byte) (*v1.RaftLogEntry, error) {
-	data, err := snappy.Decode(nil, data)
-	if err != nil {
-		return nil, fmt.Errorf("decode log entry: %w", err)
-	}
-	logEntry := &v1.RaftLogEntry{}
-	if err := proto.Unmarshal(data, logEntry); err != nil {
-		return nil, fmt.Errorf("unmarshal log entry: %w", err)
-	}
-	return logEntry, nil
-}
 
 var _ = raft.MonotonicLogStore(&MonotonicLogStore{})
 
@@ -143,34 +116,15 @@ func (rs *raftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLog
 }
 
 func (rs *raftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
-	defer func() {
-		timeout := rs.raft.opts.ApplyTimeout
-		if deadline, ok := ctx.Deadline(); ok {
-			timeout = time.Until(deadline)
-		}
-		err := rs.raft.Raft().Barrier(timeout).Error()
-		if err != nil {
-			rs.raft.log.Error("barrier error", slog.String("error", err.Error()))
-		}
-	}()
-	timeout := rs.raft.opts.ApplyTimeout
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.Until(deadline)
-	}
-	data, err := MarshalLogEntry(logEntry)
+	res, err := rs.raft.Apply(ctx, logEntry)
 	if err != nil {
-		return fmt.Errorf("marshal log entry: %w", err)
-	}
-	f := rs.raft.Raft().Apply(data, timeout)
-	if err := f.Error(); err != nil {
 		if errors.Is(err, raft.ErrNotLeader) {
 			return ErrNotLeader
 		}
 		return fmt.Errorf("apply log entry: %w", err)
 	}
-	resp := f.Response().(*v1.RaftApplyResponse)
-	if resp.GetError() != "" {
-		return fmt.Errorf("apply log entry data: %s", resp.GetError())
+	if res.GetError() != "" {
+		return fmt.Errorf("apply log entry data: %s", res.GetError())
 	}
 	return nil
 }

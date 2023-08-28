@@ -33,7 +33,7 @@ var canSubscribeAction = rbac.Actions{
 }
 
 func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Storage_SubscribeServer) error {
-	if !s.store.Raft().IsVoter() && !s.store.Raft().IsObserver() {
+	if !s.raft.IsVoter() && !s.raft.IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "current node not available to subscribe")
 	}
@@ -48,7 +48,7 @@ func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Storage_SubscribeSer
 			return status.Error(codes.PermissionDenied, "not allowed")
 		}
 	}
-	cancel, err := s.store.Storage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
+	cancel, err := s.raft.Storage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
 		err := srv.Send(&v1.SubscriptionEvent{
 			Key:   key,
 			Value: value,

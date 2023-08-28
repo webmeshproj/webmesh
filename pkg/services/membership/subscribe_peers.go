@@ -47,7 +47,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	peerID := req.GetId()
 	log := s.log.With("remote-peer", peerID)
 	ctx := stream.Context()
-	st := s.store.Storage()
+	st := s.raft.Storage()
 
 	var iceServers []string
 	var dnsServers []string

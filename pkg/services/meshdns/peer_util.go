@@ -23,16 +23,15 @@ import (
 	"github.com/miekg/dns"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
-func (s *Server) appendPeerToMessage(ctx context.Context, st meshdb.Store, r, m *dns.Msg, peerID string, ipv6Only bool) error {
-	peer, err := peers.New(st.Storage()).Get(ctx, peerID)
+func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *dns.Msg, peerID string, ipv6Only bool) error {
+	peer, err := peers.New(dom.storage).Get(ctx, peerID)
 	if err != nil {
 		return err
 	}
-	fqdn := newFQDN(st, peer.ID)
+	fqdn := newFQDN(dom, peer.ID)
 	for i, q := range r.Question {
 		switch q.Qtype {
 		case dns.TypeTXT:

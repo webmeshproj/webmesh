@@ -24,7 +24,6 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
@@ -67,13 +66,13 @@ func (s *Server) contextHandler(next contextDNSHandler) dns.HandlerFunc {
 	}
 }
 
-func (s *Server) newMsg(mesh meshdb.Store, r *dns.Msg) *dns.Msg {
+func (s *Server) newMsg(mesh meshDomain, r *dns.Msg) *dns.Msg {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.Compress = s.opts.Compression
 	m.Authoritative = true
 	m.RecursionAvailable = true
-	if mesh != nil {
+	if mesh != (meshDomain{}) {
 		m.Ns = []dns.RR{newNSRecord(mesh)}
 	}
 	return m
@@ -88,18 +87,18 @@ func (s *Server) writeMsg(w dns.ResponseWriter, req, reply *dns.Msg, rcode int) 
 	}
 }
 
-func newFQDN(mesh meshdb.Store, id string) string {
-	return dns.CanonicalName(fmt.Sprintf("%s.%s", id, mesh.Domain()))
+func newFQDN(mesh meshDomain, id string) string {
+	return dns.CanonicalName(fmt.Sprintf("%s.%s", id, mesh.domain))
 }
 
-func newNSRecord(mesh meshdb.Store) dns.RR {
+func newNSRecord(mesh meshDomain) dns.RR {
 	return &dns.NS{
 		Hdr: dns.RR_Header{
-			Name:   dns.CanonicalName(mesh.Domain()),
+			Name:   dns.CanonicalName(mesh.domain),
 			Rrtype: dns.TypeNS,
 			Class:  dns.ClassINET,
 			Ttl:    1,
 		},
-		Ns: dns.CanonicalName(fmt.Sprintf("%s.%s", mesh.ID(), mesh.Domain())),
+		Ns: dns.CanonicalName(fmt.Sprintf("%s.%s", mesh.raft.ID(), mesh.domain)),
 	}
 }

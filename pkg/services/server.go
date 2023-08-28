@@ -94,16 +94,22 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	if o.API != nil {
 		if o.API.Admin {
 			log.Debug("registering admin api")
-			v1.RegisterAdminServer(server, admin.New(store, insecureServices))
+			v1.RegisterAdminServer(server, admin.New(store.Storage(), store.Raft(), insecureServices))
 		}
 		if o.API.Mesh {
 			log.Debug("registering mesh api")
-			v1.RegisterMeshServer(server, meshapi.NewServer(store))
+			v1.RegisterMeshServer(server, meshapi.NewServer(store.Storage(), store.Raft()))
 		}
 		if o.API.WebRTC {
 			log.Debug("registering webrtc api")
-			stunURLs := strings.Split(o.API.STUNServers, ",")
-			v1.RegisterWebRTCServer(server, webrtc.NewServer(store, stunURLs, insecureServices))
+			v1.RegisterWebRTCServer(server, webrtc.NewServer(webrtc.Options{
+				ID:          store.ID(),
+				Storage:     store.Storage(),
+				Wireguard:   store.Network().WireGuard(),
+				NodeDialer:  store,
+				StunServers: strings.Split(o.API.STUNServers, ","),
+				Insecure:    insecureServices,
+			}))
 		}
 	}
 	if o.MeshDNS != nil && o.MeshDNS.Enabled {
@@ -119,7 +125,10 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 			CacheSize:         o.MeshDNS.CacheSize,
 		})
 		err := server.meshdns.RegisterDomain(meshdns.DomainOptions{
-			Mesh:                store,
+			MeshDomain:          store.Domain(),
+			MeshStorage:         store.Storage(),
+			Raft:                store.Raft(),
+			IPv6Only:            false, // TODO: Expose this as an option
 			SubscribeForwarders: o.MeshDNS.SubscribeForwarders,
 		})
 		if err != nil {
@@ -138,13 +147,19 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	isRaftMember := store.Raft().IsVoter() || store.Raft().IsObserver()
 	if isRaftMember {
 		log.Debug("registering membership service")
-		v1.RegisterMembershipServer(server, membership.NewServer(store, insecureServices))
+		v1.RegisterMembershipServer(server, membership.NewServer(store.Raft(), store.Plugins(), insecureServices))
 		log.Debug("registering storage service")
-		v1.RegisterStorageServer(server, storage.NewServer(store, insecureServices))
+		v1.RegisterStorageServer(server, storage.NewServer(store.Raft(), insecureServices))
 	}
 	// Always register the node server
 	log.Debug("registering node service")
-	v1.RegisterNodeServer(server, node.NewServer(store, o.ToFeatureSet(isRaftMember)))
+	v1.RegisterNodeServer(server, node.NewServer(node.Options{
+		Raft:       store.Raft(),
+		WireGuard:  store.Network().WireGuard(),
+		NodeDialer: store,
+		Plugins:    store.Plugins(),
+		Features:   o.ToFeatureSet(isRaftMember),
+	}))
 	// Register the health service
 	log.Debug("registering health service")
 	healthpb.RegisterHealthServer(server, server)

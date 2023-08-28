@@ -42,8 +42,12 @@ services:
       - --global.insecure
       - --global.no-ipv6
       - --raft.in-memory
-      - --mesh.join-as-voter
+      - --mesh.join-as-observer
       - --mesh.join-address=bootstrap-node:8443
       - --mesh.max-join-retries=15
+      - --plugins.debug.listen-address=:6061
+      - --plugins.debug.enable-db-querier=true
     restart: on-failure
+    ports:
+      - 6061:6061
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

@@ -31,8 +31,8 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/raft/fsm"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
@@ -81,6 +81,8 @@ const (
 type Raft interface {
 	// Start starts the Raft node.
 	Start(ctx context.Context, opts *StartOptions) error
+	// ID returns the node ID.
+	ID() string
 	// Bootstrap attempts to bootstrap the Raft cluster. If the cluster is already
 	// bootstrapped, ErrAlreadyBootstrapped is returned. If the cluster is not
 	// bootstrapped and bootstrapping succeeds, the optional callback is called
@@ -156,15 +158,13 @@ func New(opts *Options) Raft {
 // raftNode is a Raft node. It implements the Raft interface.
 type raftNode struct {
 	started                     atomic.Bool
-	lastAppliedIndex            atomic.Uint64
-	currentTerm                 atomic.Uint64
+	fsm                         *fsm.RaftFSM
 	opts                        *Options
 	nodeID                      raft.ServerID
 	raft                        *raft.Raft
 	raftTransport               transport.RaftTransport
 	meshDB                      storage.MeshStorage
 	raftDB                      *raftStorage
-	snapshotter                 snapshots.Snapshotter
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
 	observerClose, observerDone chan struct{}
@@ -184,6 +184,11 @@ func newRaftNode(opts *Options) *raftNode {
 		opts: opts,
 		log:  log,
 	}
+}
+
+// ID returns the node ID.
+func (r *raftNode) ID() string {
+	return string(r.nodeID)
 }
 
 // Start starts the Raft node.
@@ -219,19 +224,23 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 			},
 		)
 		if err != nil {
+			r.mu.Unlock()
 			return fmt.Errorf("new file snapshot store: %w", err)
 		}
 	}
-	r.log.Debug("creating raft snaps")
-	r.snapshotter = snapshots.New(r.meshDB)
 	// Create the raft instance.
 	r.log.Info("starting raft instance", slog.String("listen-addr", string(r.raftTransport.LocalAddr())))
 	// We unlock here so raft can call back into the Apply/RestoreSnapshot methods if needed.
 	r.mu.Unlock()
 	var err error
+	r.fsm = fsm.New(r.meshDB, fsm.Options{
+		ApplyTimeout:      r.opts.ApplyTimeout,
+		OnApplyLog:        r.opts.OnApplyLog,
+		OnSnapshotRestore: r.opts.OnSnapshotRestore,
+	})
 	r.raft, err = raft.NewRaft(
 		r.opts.RaftConfig(opts.NodeID),
-		&raftNodeFSM{r},
+		r.fsm,
 		&MonotonicLogStore{opts.RaftStorage},
 		opts.RaftStorage,
 		snapshotStore,
@@ -350,7 +359,7 @@ func (r *raftNode) LastIndex() uint64 {
 
 // LastAppliedIndex returns the last applied index.
 func (r *raftNode) LastAppliedIndex() uint64 {
-	return r.lastAppliedIndex.Load()
+	return r.fsm.LastAppliedIndex()
 }
 
 func (r *raftNode) LeaderID() (string, error) {
@@ -401,11 +410,15 @@ func (r *raftNode) Storage() storage.MeshStorage {
 
 // Apply applies a raft log entry.
 func (r *raftNode) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
+	if !r.IsLeader() {
+		return nil, ErrNotLeader
+	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	data, err := MarshalLogEntry(log)
+	r.log.Debug("applying log entry", slog.String("type", log.Type.String()), slog.String("key", log.Key), slog.Duration("timeout", timeout))
+	data, err := fsm.MarshalLogEntry(log)
 	if err != nil {
 		return nil, fmt.Errorf("marshal log entry: %w", err)
 	}

@@ -41,6 +41,9 @@ func New(opts Options) (storage.DualStorage, error) {
 	if opts.InMemory {
 		return newInMemoryStorage()
 	}
+	if opts.DiskPath == "" {
+		return nil, errors.New("disk path must be specified")
+	}
 	return newDiskStorage(opts.DiskPath)
 }
 

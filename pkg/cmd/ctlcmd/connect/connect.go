@@ -111,7 +111,11 @@ func Connect(ctx context.Context, opts Options, stopChan chan struct{}) error {
 			UDPListenAddr: fmt.Sprintf(":%d", opts.LocalDNSPort),
 		})
 		err := server.RegisterDomain(meshdns.DomainOptions{
-			Mesh: st,
+			MeshDomain:          st.Domain(),
+			MeshStorage:         st.Storage(),
+			Raft:                st.Raft(),
+			IPv6Only:            false,
+			SubscribeForwarders: true,
 		})
 		if err != nil {
 			defer func() {

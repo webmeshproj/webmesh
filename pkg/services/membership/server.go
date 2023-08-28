@@ -26,10 +26,10 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
@@ -38,7 +38,8 @@ import (
 type Server struct {
 	v1.UnimplementedMembershipServer
 
-	store      meshdb.Store
+	raft       raft.Raft
+	plugins    plugins.Manager
 	rbacEval   rbac.Evaluator
 	ipv4Prefix netip.Prefix
 	ipv6Prefix netip.Prefix
@@ -51,15 +52,16 @@ type Server struct {
 }
 
 // NewServer returns a new Server.
-func NewServer(store mesh.Mesh, insecure bool) *Server {
+func NewServer(raft raft.Raft, plugins plugins.Manager, insecure bool) *Server {
 	var rbaceval rbac.Evaluator
 	if insecure {
 		rbaceval = rbac.NewNoopEvaluator()
 	} else {
-		rbaceval = rbac.NewStoreEvaluator(store)
+		rbaceval = rbac.NewStoreEvaluator(raft.Storage())
 	}
 	return &Server{
-		store:    store,
+		raft:     raft,
+		plugins:  plugins,
 		rbacEval: rbaceval,
 		insecure: insecure,
 		log:      slog.Default().With("component", "membership-server"),
@@ -68,7 +70,7 @@ func NewServer(store mesh.Mesh, insecure bool) *Server {
 
 func (s *Server) loadMeshState(ctx context.Context) error {
 	var err error
-	state := state.New(s.store.Storage())
+	state := state.New(s.raft.Storage())
 	if !s.ipv6Prefix.IsValid() {
 		s.log.Debug("Looking up mesh IPv6 prefix")
 		s.ipv6Prefix, err = state.GetIPv6Prefix(ctx)
@@ -94,7 +96,7 @@ func (s *Server) loadMeshState(ctx context.Context) error {
 }
 
 func (s *Server) ensurePeerRoutes(ctx context.Context, nodeID string, routes []string) (created bool, err error) {
-	nw := networking.New(s.store.Storage())
+	nw := networking.New(s.raft.Storage())
 	current, err := nw.GetRoutesByNode(ctx, nodeID)
 	if err != nil {
 		return false, fmt.Errorf("get routes for node %q: %w", nodeID, err)

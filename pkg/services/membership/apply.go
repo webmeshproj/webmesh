@@ -31,7 +31,7 @@ import (
 )
 
 func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
-	if !s.store.Raft().IsLeader() {
+	if !s.raft.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.mu.Lock()
@@ -40,7 +40,7 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !ok {
 		return nil, status.Errorf(codes.FailedPrecondition, "no peer")
 	}
-	cfg, err := s.store.Raft().Configuration()
+	cfg, err := s.raft.Configuration()
 	if err != nil {
 		// Should never happen
 		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
@@ -65,14 +65,14 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	// Issue a barrier to the raft cluster to ensure all nodes are
 	// fully caught up before we make changes
 	// TODO: Make timeout configurable
-	_, err = s.store.Raft().Barrier(ctx, time.Second*15)
+	_, err = s.raft.Barrier(ctx, time.Second*15)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
 	}
 	// Send another barrier after we're done to ensure all nodes are
 	// fully caught up before we return
 	defer func() {
-		_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
+		_, _ = s.raft.Barrier(ctx, time.Second*15)
 	}()
-	return s.store.Raft().Apply(ctx, log)
+	return s.raft.Apply(ctx, log)
 }

@@ -42,7 +42,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 	if req.GetPort() == 0 && req.GetProto() == "udp" {
 		log.Info("Creating WireGuard proxy connection")
 		// Lookup our WireGuard port.
-		port, err := s.store.Network().WireGuard().ListenPort()
+		port, err := s.WireGuard.ListenPort()
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get WireGuard listen port: %v", err)
 		}

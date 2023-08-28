@@ -47,7 +47,6 @@ services:
       # We can leave the default and it won't affect DNS later, unless there are overlaps,
       # but that is intended only for testing.
       - --bootstrap.enabled
-      - --bootstrap.default-network-policy=accept
       - --bootstrap.mesh-domain=site-1.internal
       # Run a local meshdns server and subscribe to forwarders for other domains
       - --services.meshdns.enabled
@@ -77,7 +76,6 @@ services:
       - --raft.in-memory
       # Same as above, but with the domain site-2.internal.
       - --bootstrap.enabled
-      - --bootstrap.default-network-policy=accept
       - --bootstrap.mesh-domain=site-2.internal
       - --services.meshdns.enabled
       - --services.meshdns.subscribe-forwarders
@@ -115,6 +113,8 @@ services:
       - --bridge.site-1.services.listen-address=:8443
       - --bridge.site-1.raft.listen-address=:9443
       - --bridge.site-1.mesh.join-as-observer
+      - --plugins.debug.listen-address=:6061
+      - --plugins.debug.enable-db-querier=true
       # Site 2 Options
       - --bridge.site-2.mesh.join-address=site-2-node:8443
       - --bridge.site-2.raft.in-memory
@@ -122,6 +122,8 @@ services:
       - --bridge.site-2.wireguard.listen-port=51822
       - --bridge.site-2.raft.listen-address=:9444
       - --bridge.site-2.mesh.join-as-observer
+      - --plugins.debug.listen-address=:6062
+      - --plugins.debug.enable-db-querier=true
       # Bridged DNS Options. The DNS server will handle queries for both
       # site-1.internal and site-2.internal and act as a forwarder for each.
       - --bridge.services.meshdns.enabled

@@ -32,7 +32,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
-	if !s.store.Raft().IsLeader() {
+	if !s.raft.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.mu.Lock()
@@ -56,7 +56,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 
 	// Send a barrier afterwards to sync the cluster
 	// Check if they were a raft member
-	cfg, err := s.store.Raft().Configuration()
+	cfg, err := s.raft.Configuration()
 	if err != nil {
 		// Should never happen
 		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
@@ -71,16 +71,16 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 	if raftMember {
 		defer func() {
-			_, _ = s.store.Raft().Barrier(ctx, time.Second*15)
+			_, _ = s.raft.Barrier(ctx, time.Second*15)
 		}()
 		s.log.Info("Removing mesh node from raft", "id", req.GetId())
-		err := s.store.Raft().RemoveServer(ctx, req.GetId(), false)
+		err := s.raft.RemoveServer(ctx, req.GetId(), false)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to remove raft member: %v", err)
 		}
 	}
 	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
-	err = peers.New(s.store.Storage()).Delete(ctx, req.GetId())
+	err = peers.New(s.raft.Storage()).Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}

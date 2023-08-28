@@ -22,7 +22,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
@@ -30,22 +30,22 @@ import (
 type Server struct {
 	v1.UnimplementedStorageServer
 
-	store meshdb.Store
-	rbac  rbac.Evaluator
-	log   *slog.Logger
+	raft raft.Raft
+	rbac rbac.Evaluator
+	log  *slog.Logger
 }
 
 // NewServer returns a new storage Server.
-func NewServer(store meshdb.Store, insecure bool) *Server {
+func NewServer(raft raft.Raft, insecure bool) *Server {
 	var rbaceval rbac.Evaluator
 	if insecure {
 		rbaceval = rbac.NewNoopEvaluator()
 	} else {
-		rbaceval = rbac.NewStoreEvaluator(store)
+		rbaceval = rbac.NewStoreEvaluator(raft.Storage())
 	}
 	return &Server{
-		store: store,
-		rbac:  rbaceval,
-		log:   slog.Default().With("component", "storage-server"),
+		raft: raft,
+		rbac: rbaceval,
+		log:  slog.Default().With("component", "storage-server"),
 	}
 }

@@ -190,7 +190,7 @@ func (o *Options) ServerOptions(store mesh.Mesh, log *slog.Logger) (srvrOptions 
 	}
 	if !o.API.DisableLeaderProxy {
 		log.Debug("registering leader proxy interceptors")
-		leaderProxy := leaderproxy.New(store)
+		leaderProxy := leaderproxy.New(store.Raft(), store)
 		unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
 		streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
 	}

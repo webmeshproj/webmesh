@@ -35,13 +35,13 @@ func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshN
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get node: %v", err)
 	}
-	cfg, err := s.store.Raft().Configuration()
+	cfg, err := s.raft.Configuration()
 	if err != nil {
 		// Should never happen
 		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
 	}
 	servers := cfg.Servers
-	leader, err := s.store.Leader()
+	leader, err := s.raft.LeaderID()
 	if err != nil {
 		context.LoggerFrom(ctx).Error("failed to get leader", slog.String("error", err.Error()))
 	}

@@ -39,7 +39,7 @@ var putNetworkACLAction = rbac.Actions{
 }
 
 func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptypb.Empty, error) {
-	if !s.store.Raft().IsLeader() {
+	if !s.raft.IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if acl.GetName() == "" {

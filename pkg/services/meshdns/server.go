@@ -29,9 +29,10 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	dnsutil "github.com/webmeshproj/webmesh/pkg/net/system/dns"
+	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Options are the Mesh DNS server options.
@@ -112,8 +113,12 @@ type cacheValue struct {
 }
 
 type DomainOptions struct {
-	// Mesh is the mesh that this domain belongs to.
-	Mesh meshdb.Store
+	// MeshDomain is the domain to serve.
+	MeshDomain string
+	// MeshStorage is the storage for the mesh that this domain belongs to.
+	MeshStorage storage.MeshStorage
+	// Raft is the raft instance for the mesh that this domain belongs to.
+	Raft raft.Raft
 	// IPv6Only indicates that this domain should only respond to IPv6 requests.
 	IPv6Only bool
 	// SubscribeForwarders indicates that new forwarders added to the mesh should be
@@ -125,24 +130,30 @@ type DomainOptions struct {
 func (s *Server) RegisterDomain(opts DomainOptions) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	dom := meshDomain{
+		domain:   opts.MeshDomain,
+		storage:  opts.MeshStorage,
+		raft:     opts.Raft,
+		ipv6Only: opts.IPv6Only,
+	}
 	// Check if we have an overlapping domain. This is not a good way to run this,
 	// but we'll support it for test cases. A flag should maybe be exposed to cause
 	// this to error.
 	var found bool
 	for _, mux := range s.meshmuxes {
-		if opts.Mesh.Domain() == mux.domain {
-			mux.appendMesh(opts.Mesh)
+		if opts.MeshDomain == mux.domain {
+			mux.appendMesh(dom)
 			found = true
 		}
 	}
 	if !found {
-		mux := s.newMeshLookupMux(opts.Mesh, opts.IPv6Only)
-		s.mux.Handle(opts.Mesh.Domain(), mux)
+		mux := s.newMeshLookupMux(dom)
+		s.mux.Handle(dom.domain, mux)
 		s.meshmuxes = append(s.meshmuxes, mux)
 	}
 	if opts.SubscribeForwarders {
-		cancel, err := opts.Mesh.Storage().Subscribe(context.Background(), peers.NodesPrefix, func(_, _ string) {
-			peers, err := peers.New(opts.Mesh.Storage()).ListByFeature(context.Background(), v1.Feature_FORWARD_MESH_DNS)
+		cancel, err := dom.storage.Subscribe(context.Background(), peers.NodesPrefix, func(_, _ string) {
+			peers, err := peers.New(dom.storage).ListByFeature(context.Background(), v1.Feature_FORWARD_MESH_DNS)
 			if err != nil {
 				s.log.Warn("failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
 				return

@@ -26,11 +26,11 @@ import (
 )
 
 func (s *Server) GetRaftConfiguration(ctx context.Context, _ *v1.RaftConfigurationRequest) (*v1.RaftConfigurationResponse, error) {
-	leader, err := s.store.Raft().LeaderID()
+	leader, err := s.raft.LeaderID()
 	if err != nil {
 		return nil, status.Errorf(codes.FailedPrecondition, "no leader: %v", err)
 	}
-	config, err := s.store.Raft().Configuration()
+	config, err := s.raft.Configuration()
 	if err != nil {
 		return nil, status.Errorf(codes.FailedPrecondition, "failed to get configuration: %v", err)
 	}

@@ -23,7 +23,7 @@ import (
 )
 
 func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) error {
-	if !s.store.Raft().IsVoter() && !s.store.Raft().IsObserver() {
+	if !s.raft.IsVoter() && !s.raft.IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "node not available to query")
 	}
@@ -31,7 +31,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) erro
 	case v1.QueryRequest_GET:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		val, err := s.store.Storage().GetValue(stream.Context(), req.GetQuery())
+		val, err := s.raft.Storage().GetValue(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -44,7 +44,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) erro
 	case v1.QueryRequest_LIST:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		vals, err := s.store.Storage().List(stream.Context(), req.GetQuery())
+		vals, err := s.raft.Storage().List(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -55,7 +55,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) erro
 			return err
 		}
 	case v1.QueryRequest_ITER:
-		err := s.store.Storage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
+		err := s.raft.Storage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
 			var result v1.QueryResponse
 			result.Key = key
 			result.Value = []string{value}
