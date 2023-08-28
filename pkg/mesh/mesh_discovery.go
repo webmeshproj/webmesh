@@ -25,6 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 )
 
@@ -39,11 +40,12 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts *DiscoveryOptions) err
 		}
 		peers = append(peers, mul)
 	}
-	discover, err := libp2p.NewDHTAnnouncer(ctx, libp2p.DHTAnnounceOptions{
+	announceOpts := libp2p.DHTAnnounceOptions{
 		PSK:            opts.PSK,
 		BootstrapPeers: peers,
 		DiscoveryTTL:   time.Minute, // TODO: Make this configurable
-	}, &joinProxy{s})
+	}
+	discover, err := libp2p.NewDHTAnnouncer(ctx, announceOpts, transport.JoinServerFunc(s.proxyJoinToLeader))
 	if err != nil {
 		return fmt.Errorf("new kad dht announcer: %w", err)
 	}
@@ -65,13 +67,9 @@ func (s *meshStore) LeaveDHT(ctx context.Context, psk string) error {
 	return nil
 }
 
-type joinProxy struct {
-	*meshStore
-}
-
-func (p *joinProxy) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+func (s *meshStore) proxyJoinToLeader(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
 	log := context.LoggerFrom(ctx)
-	c, err := p.DialLeader(ctx)
+	c, err := s.DialLeader(ctx)
 	if err != nil {
 		log.Error("failed to dial leader", slog.String("error", err.Error()))
 		return nil, err

@@ -32,10 +32,26 @@ type JoinRoundTripper interface {
 	RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
 }
 
+// JoinRoundTripperFunc is a function that implements JoinRoundTripper.
+type JoinRoundTripperFunc func(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+
+// RoundTrip implements JoinRoundTripper.
+func (f JoinRoundTripperFunc) RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+	return f(ctx, req)
+}
+
 // JoinServer is the interface for handling requests to join a cluster.
 type JoinServer interface {
 	// Join is executed when a request to join a cluster is received.
 	Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+}
+
+// JoinServerFunc is a function that implements JoinServer.
+type JoinServerFunc func(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+
+// Join implements JoinServer.
+func (f JoinServerFunc) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+	return f(ctx, req)
 }
 
 // BootstrapTransport is the interface for dialing other peers to bootstrap
@@ -48,6 +64,14 @@ type BootstrapTransport interface {
 	// should be returned with an optional JoinRoundTripper to nodes who are
 	// already bootstrapped.
 	LeaderElect(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error)
+}
+
+// BootstrapTransportFunc is a function that implements BootstrapTransport.
+type BootstrapTransportFunc func(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error)
+
+// LeaderElect implements BootstrapTransport.
+func (f BootstrapTransportFunc) LeaderElect(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error) {
+	return f(ctx)
 }
 
 // RaftTransport defines the methods needed for raft consensus to function
