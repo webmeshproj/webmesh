@@ -18,21 +18,22 @@ package libp2p
 
 import (
 	"errors"
+	"io"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	meshdiscovery "github.com/webmeshproj/webmesh/pkg/discovery"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// KadDHTOptions are the options for creating a new libp2p kademlia DHT.
-type KadDHTOptions struct {
+type DHTAnnounceOptions struct {
 }
 
-// NewKadDHTAnnouncer creates a new announcer for the libp2p kademlia DHT.
-func NewKadDHTAnnouncer(ctx context.Context, opts *KadDHTOptions) (meshdiscovery.Discovery, error) {
+func NewDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions, join transport.JoinServer) (io.Closer, error) {
 	return nil, errors.New("not implemented")
 }
 
-// NewKadDHTJoiner creates a new joiner for the libp2p kademlia DHT.
-func NewKadDHTJoiner(ctx context.Context, opts *KadDHTOptions) (meshdiscovery.Discovery, error) {
+type DHTJoinOptions struct {
+}
+
+func NewDHTJoinRoundTripper(opts DHTJoinOptions) transport.JoinRoundTripper {
 	return nil, errors.New("not implemented")
 }

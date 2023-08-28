@@ -21,7 +21,7 @@ package libp2p
 import (
 	"fmt"
 	"io"
-	"net"
+	"log/slog"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -32,10 +32,12 @@ import (
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	"github.com/multiformats/go-multiaddr"
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	meshdiscovery "github.com/webmeshproj/webmesh/pkg/discovery"
 	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
 // DHTAnnounceOptions are options for announcing the host or discovering peers
@@ -53,8 +55,9 @@ type DHTAnnounceOptions struct {
 	DiscoveryTTL time.Duration
 }
 
-// NewKadDHTAnnouncer creates a new announcer for the libp2p kademlia DHT.
-func NewKadDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions) (meshdiscovery.Discovery, error) {
+// NewDHTAnnouncer creates a new announcer on the kadmilia DHT and executes
+// received join requests against the given join Server.
+func NewDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions, join transport.JoinServer) (io.Closer, error) {
 	log := context.LoggerFrom(ctx)
 	err := buffers.SetMaximumReadBuffer(2500000)
 	if err != nil {
@@ -64,68 +67,117 @@ func NewKadDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions) (meshdisco
 	if err != nil {
 		log.Warn("Failed to set maximum write buffer", "error", err.Error())
 	}
+	acceptc := make(chan network.Stream, 1)
 	host, err := libp2p.New(opts.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)
 	}
-	return &kadDHTAnnouncer{
-		opts:    opts,
-		host:    host,
-		acceptc: make(chan io.ReadWriteCloser, 1),
-		closec:  make(chan struct{}),
-		stop:    func() {},
-	}, nil
-}
-
-// kadDHTAnnouncer is an announcer for the libp2p kademlia DHT.
-type kadDHTAnnouncer struct {
-	opts    DHTAnnounceOptions
-	host    host.Host
-	acceptc chan io.ReadWriteCloser
-	closec  chan struct{}
-	stop    func()
-}
-
-// Start starts the discovery service.
-func (kad *kadDHTAnnouncer) Start(ctx context.Context) error {
-	log := context.LoggerFrom(ctx).With("id", kad.host.ID())
-	kad.host.SetStreamHandler(JoinProtocol, func(s network.Stream) {
+	host.SetStreamHandler(JoinProtocol, func(s network.Stream) {
 		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())
-		kad.acceptc <- s
+		acceptc <- s
 	})
-	kaddht, err := dht.New(ctx, kad.host)
+	log = log.With(slog.String("host-id", host.ID().String()))
+	ctx = context.WithLogger(ctx, log)
+	// Bootstrap the DHT.
+	log.Debug("Bootstrapping DHT")
+	kaddht, err := dht.New(ctx, host)
 	if err != nil {
-		return fmt.Errorf("libp2p new dht: %w", err)
+		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
-	err = bootstrapDHT(ctx, kad.host, kaddht, kad.opts.BootstrapPeers)
+	err = bootstrapDHT(ctx, host, kaddht, opts.BootstrapPeers)
 	if err != nil {
-		return fmt.Errorf("libp2p bootstrap dht: %w", err)
+		defer host.Close()
+		defer kaddht.Close()
+		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
 	}
+	// Announce the join protocol with our PSK.
 	log.Debug("Announcing join protocol with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(kaddht)
-	announceCtx, cancel := context.WithCancel(context.Background())
-	kad.stop = cancel
-	var opts []discovery.Option
-	if kad.opts.DiscoveryTTL > 0 {
-		opts = append(opts, discovery.TTL(kad.opts.DiscoveryTTL))
+	var discoveryOpts []discovery.Option
+	if opts.DiscoveryTTL > 0 {
+		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.DiscoveryTTL))
 	}
-	dutil.Advertise(announceCtx, routingDiscovery, kad.opts.PSK, opts...)
-	return nil
+	dutil.Advertise(context.Background(), routingDiscovery, opts.PSK, discoveryOpts...)
+	announcer := &dhtAnnouncer{
+		DHTAnnounceOptions: opts,
+		host:               host,
+		dht:                kaddht,
+		acceptc:            acceptc,
+		closec:             make(chan struct{}),
+	}
+	go announcer.handleIncomingStreams(log, join)
+	return announcer, nil
 }
 
-// Stop stops the discovery service.
-func (kad *kadDHTAnnouncer) Stop() error {
-	defer close(kad.closec)
-	kad.stop()
-	return kad.host.Close()
+type dhtAnnouncer struct {
+	DHTAnnounceOptions
+	host    host.Host
+	dht     *dht.IpfsDHT
+	acceptc chan network.Stream
+	closec  chan struct{}
 }
 
-// Accept returns a connection to a peer.
-func (kad *kadDHTAnnouncer) Accept() (io.ReadWriteCloser, error) {
-	select {
-	case <-kad.closec:
-		return nil, net.ErrClosed
-	case conn := <-kad.acceptc:
-		return conn, nil
+func (srv *dhtAnnouncer) handleIncomingStreams(log *slog.Logger, joinServer transport.JoinServer) {
+	returnErr := func(stream network.Stream, err error) {
+		log.Error("Failed to handle join protocol stream", slog.String("error", err.Error()))
+		buf := []byte("ERROR: " + err.Error())
+		if _, err := stream.Write(buf); err != nil {
+			log.Error("Failed to write error to peer", slog.String("error", err.Error()))
+		}
 	}
+	for {
+		select {
+		case <-srv.closec:
+			return
+		case conn := <-srv.acceptc:
+			go func() {
+				rlog := log.With(slog.String("peer-id", conn.Conn().RemotePeer().String()))
+				rlog.Debug("Handling join protocol stream")
+				defer conn.Close()
+				// Read a join request off the wire
+				var b [8192]byte
+				n, err := conn.Read(b[:])
+				if err != nil {
+					rlog.Error("Failed to read join request from peer", slog.String("error", err.Error()))
+					returnErr(conn, err)
+					return
+				}
+				buf := b[:n]
+				var req v1.JoinRequest
+				err = proto.Unmarshal(buf, &req)
+				if err != nil {
+					rlog.Error("Failed to unmarshal join request from peer", slog.String("error", err.Error()))
+					returnErr(conn, err)
+					return
+				}
+				// Execute the join request
+				rlog.Debug("Executing join request")
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*15) // TODO: Make this configurable
+				defer cancel()
+				resp, err := joinServer.Join(context.WithLogger(ctx, rlog), &req)
+				if err != nil {
+					rlog.Error("Failed to execute join request", slog.String("error", err.Error()))
+					returnErr(conn, err)
+					return
+				}
+				// Write the response back to the peer
+				buf, err = proto.Marshal(resp)
+				if err != nil {
+					rlog.Error("Failed to marshal join response", slog.String("error", err.Error()))
+					returnErr(conn, err)
+					return
+				}
+				if _, err := conn.Write(buf); err != nil {
+					rlog.Error("Failed to write join response to peer", slog.String("error", err.Error()))
+					return
+				}
+			}()
+		}
+	}
+}
+
+func (srv *dhtAnnouncer) Close() error {
+	defer close(srv.closec)
+	defer srv.host.Close()
+	return srv.dht.Close()
 }

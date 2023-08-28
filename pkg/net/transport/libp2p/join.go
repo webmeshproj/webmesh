@@ -80,16 +80,18 @@ func (rt *dhtJoinRoundTripper) RoundTrip(ctx context.Context, req *v1.JoinReques
 	log = log.With(slog.String("host-id", host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.
+	log.Debug("Bootstrapping DHT")
 	kaddht, err := dht.New(ctx, host)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
+	defer kaddht.Close()
 	err = bootstrapDHT(ctx, host, kaddht, rt.BootstrapPeers)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
 	}
 	// Announce the join protocol with our PSK.
-	log.Debug("Announcing join protocol with our PSK")
+	log.Debug("Searching for peers on the DHT with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(kaddht)
 	peerChan, err := routingDiscovery.FindPeers(ctx, rt.PSK)
 	if err != nil {

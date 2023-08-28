@@ -32,8 +32,7 @@ type JoinRoundTripper interface {
 	RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
 }
 
-// JoinServer is the interface for receiving requests to join a cluster. It is reduced
-// in scope from the full gRPC server interface.
+// JoinServer is the interface for handling requests to join a cluster.
 type JoinServer interface {
 	// Join is executed when a request to join a cluster is received.
 	Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)

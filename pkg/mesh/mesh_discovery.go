@@ -1,5 +1,3 @@
-//go:build !wasm
-
 /*
 Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
 
@@ -20,13 +18,11 @@ package mesh
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"time"
 
 	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
@@ -43,28 +39,14 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts *DiscoveryOptions) err
 		}
 		peers = append(peers, mul)
 	}
-	discover, err := libp2p.NewKadDHTAnnouncer(ctx, libp2p.DHTAnnounceOptions{
+	discover, err := libp2p.NewDHTAnnouncer(ctx, libp2p.DHTAnnounceOptions{
 		PSK:            opts.PSK,
 		BootstrapPeers: peers,
 		DiscoveryTTL:   time.Minute, // TODO: Make this configurable
-	})
+	}, &joinProxy{s})
 	if err != nil {
 		return fmt.Errorf("new kad dht announcer: %w", err)
 	}
-	if err := discover.Start(ctx); err != nil {
-		return fmt.Errorf("start peer discovery: %w", err)
-	}
-	go func() {
-		for {
-			conn, err := discover.Accept()
-			if err != nil {
-				log.Error("failed to accept peer connection from discovery service", slog.String("error", err.Error()))
-				return
-			}
-			s.log.Debug("Got connection to peer via Kad DHT")
-			go s.handleIncomingDiscoveryPeer(conn)
-		}
-	}()
 	s.discovermu.Lock()
 	s.discoveries[opts.PSK] = discover
 	s.discovermu.Unlock()
@@ -75,7 +57,7 @@ func (s *meshStore) LeaveDHT(ctx context.Context, psk string) error {
 	s.discovermu.Lock()
 	defer s.discovermu.Unlock()
 	if d, ok := s.discoveries[psk]; ok {
-		if err := d.Stop(); err != nil {
+		if err := d.Close(); err != nil {
 			return err
 		}
 		delete(s.discoveries, psk)
@@ -83,59 +65,22 @@ func (s *meshStore) LeaveDHT(ctx context.Context, psk string) error {
 	return nil
 }
 
-func (s *meshStore) handleIncomingDiscoveryPeer(conn io.ReadWriteCloser) {
-	defer conn.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15) // TODO: Make this configurable
-	defer cancel()
-	// Read a join request off the wire
-	var req v1.JoinRequest
-	b := make([]byte, 8192)
-	n, err := conn.Read(b)
+type joinProxy struct {
+	*meshStore
+}
+
+func (p *joinProxy) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+	log := context.LoggerFrom(ctx)
+	c, err := p.DialLeader(ctx)
 	if err != nil {
-		s.log.Error("failed to read join request from discovered peer", slog.String("error", err.Error()))
-		return
-	}
-	if err := proto.Unmarshal(b[:n], &req); err != nil {
-		s.log.Error("failed to unmarshal join request from discovered peer", slog.String("error", err.Error()))
-		b = []byte("ERROR: " + err.Error())
-		if _, err := conn.Write(b); err != nil {
-			s.log.Error("failed to write error to discovered peer", slog.String("error", err.Error()))
-		}
-		return
-	}
-	// Forward the request to the leader
-	c, err := s.DialLeader(ctx)
-	if err != nil {
-		s.log.Error("failed to dial leader", slog.String("error", err.Error()))
-		b = []byte("ERROR: " + err.Error())
-		if _, err := conn.Write(b); err != nil {
-			s.log.Error("failed to write error to discovered peer", slog.String("error", err.Error()))
-		}
-		return
+		log.Error("failed to dial leader", slog.String("error", err.Error()))
+		return nil, err
 	}
 	defer c.Close()
-	resp, err := v1.NewMembershipClient(c).Join(ctx, &req)
+	resp, err := v1.NewMembershipClient(c).Join(ctx, req)
 	if err != nil {
-		s.log.Error("failed to join cluster", slog.String("error", err.Error()))
-		// Attempt to write the raw error back to the peer
-		b = []byte("ERROR: " + err.Error())
-		if _, err := conn.Write(b); err != nil {
-			s.log.Error("failed to write error to discovered peer", slog.String("error", err.Error()))
-		}
-		return
+		log.Error("failed to proxy join to cluster", slog.String("error", err.Error()))
+		return nil, err
 	}
-	// Write the response back to the peer
-	b, err = proto.Marshal(resp)
-	if err != nil {
-		s.log.Error("failed to marshal join response", slog.String("error", err.Error()))
-		b = []byte("ERROR: " + err.Error())
-		if _, err := conn.Write(b); err != nil {
-			s.log.Error("failed to write error to discovered peer", slog.String("error", err.Error()))
-		}
-		return
-	}
-	if _, err := conn.Write(b); err != nil {
-		s.log.Error("failed to write join response to discovered peer", slog.String("error", err.Error()))
-		return
-	}
+	return resp, nil
 }

@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/netip"
 	"os"
@@ -36,7 +37,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/discovery"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
@@ -146,7 +146,7 @@ func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
 		dnsUpdateGroup:   &dnsUpdateGroup,
 		log:              log.With(slog.String("node-id", string(nodeID))),
 		kvSubCancel:      func() {},
-		discoveries:      make(map[string]discovery.Discovery),
+		discoveries:      make(map[string]io.Closer),
 		closec:           make(chan struct{}),
 	}
 	return st, nil
@@ -204,7 +204,7 @@ type meshStore struct {
 	peerUpdateGroup  *errgroup.Group
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
-	discoveries      map[string]discovery.Discovery
+	discoveries      map[string]io.Closer
 	discovermu       sync.Mutex
 	closec           chan struct{}
 	log              *slog.Logger

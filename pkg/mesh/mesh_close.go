@@ -37,7 +37,7 @@ func (s *meshStore) Close() error {
 	if len(s.discoveries) > 0 {
 		s.log.Debug("stopping discovery services")
 		for _, d := range s.discoveries {
-			if err := d.Stop(); err != nil {
+			if err := d.Close(); err != nil {
 				s.log.Error("error stopping discovery service", slog.String("error", err.Error()))
 			}
 		}
