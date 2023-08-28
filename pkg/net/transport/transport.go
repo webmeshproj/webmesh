@@ -54,13 +54,17 @@ func (f JoinServerFunc) Join(ctx context.Context, req *v1.JoinRequest) (*v1.Join
 	return f(ctx, req)
 }
 
+// ErrAlreadyBootstrapped is returned when a node believes the cluster to be
+// already bootstrapped.
+var ErrAlreadyBootstrapped = raft.ErrCantBootstrap
+
 // BootstrapTransport is the interface for dialing other peers to bootstrap
 // a new mesh.
 type BootstrapTransport interface {
 	// LeaderElect should perform an initial leader election. It returns
 	// true is this node was elected leader, or otherwise a JoinRoundTripper
 	// for contacting the elected leader. If one or more nodes believe
-	// the cluster to be already bootstrapped, then raft.ErrAlreadyBootstrapped
+	// the cluster to be already bootstrapped, then ErrAlreadyBootstrapped
 	// should be returned with an optional JoinRoundTripper to nodes who are
 	// already bootstrapped.
 	LeaderElect(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error)
@@ -72,6 +76,15 @@ type BootstrapTransportFunc func(ctx context.Context) (isLeader bool, rt JoinRou
 // LeaderElect implements BootstrapTransport.
 func (f BootstrapTransportFunc) LeaderElect(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error) {
 	return f(ctx)
+}
+
+// NewNullBootstrapTransport returns a BootstrapTransport that always returns
+// true for LeaderElect and nil for JoinRoundTripper. This is useful for
+// testing and when no bootstrap transport is needed.
+func NewNullBootstrapTransport() BootstrapTransport {
+	return BootstrapTransportFunc(func(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error) {
+		return true, nil, nil
+	})
 }
 
 // RaftTransport defines the methods needed for raft consensus to function

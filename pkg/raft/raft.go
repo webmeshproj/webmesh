@@ -45,7 +45,7 @@ var (
 	// ErrNoLeader is returned when there is no leader.
 	ErrNoLeader = errors.New("no leader")
 	// ErrAlreadyBootstrapped is returned when the Raft node is already bootstrapped.
-	ErrAlreadyBootstrapped = raft.ErrCantBootstrap
+	ErrAlreadyBootstrapped = transport.ErrAlreadyBootstrapped
 	// ErrNotLeader is returned when the Raft node is not the leader.
 	ErrNotLeader = raft.ErrNotLeader
 	// ErrNotVoter is returned when the Raft node is not a voter.

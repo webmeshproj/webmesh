@@ -41,7 +41,7 @@ type RaftTransportOptions struct {
 
 // NewRaftTransport creates a new TCP transport listening on the given address.
 func NewRaftTransport(leaderDialer transport.LeaderDialer, opts RaftTransportOptions) (transport.RaftTransport, error) {
-	sl, err := newTCPStreamLayter(opts.Addr)
+	sl, err := newTCPStreamLayer(opts.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("create TCP stream layer: %w", err)
 	}
@@ -74,7 +74,7 @@ type tcpStreamLayer struct {
 	*net.Dialer
 }
 
-func newTCPStreamLayter(addr string) (*tcpStreamLayer, error) {
+func newTCPStreamLayer(addr string) (*tcpStreamLayer, error) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("listen %s: %w", addr, err)
