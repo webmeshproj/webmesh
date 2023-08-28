@@ -119,7 +119,6 @@ func (o *Options) Validate() error {
 		// We currently force all meshes into a single DNS - but keep the validator here anyway
 		{o.allDNSPortsUnique, "dns listen ports must be unique for each mesh connection"},
 		{o.allTURNPortsUnique, "turn listen ports must be unique for each mesh connection"},
-		{o.allDashboardsUnique, "dashboard listen ports must be unique for each mesh connection"},
 		{o.allMetricsListenersUnique, "metrics listen ports must be unique for each mesh connection"},
 	} {
 		valid, err := validator.validate()
@@ -217,16 +216,6 @@ func (o *Options) allTURNPortsUnique() (bool, error) {
 	for _, opts := range o.Meshes {
 		if opts.Services.TURN.Enabled {
 			addrs = append(addrs, opts.Services.TURN.ListenAddress)
-		}
-	}
-	return allAddrPortsUnique(addrs)
-}
-
-func (o *Options) allDashboardsUnique() (bool, error) {
-	var addrs []string
-	for _, opts := range o.Meshes {
-		if opts.Services.Dashboard.Enabled {
-			addrs = append(addrs, opts.Services.Dashboard.ListenAddress)
 		}
 	}
 	return allAddrPortsUnique(addrs)

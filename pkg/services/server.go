@@ -34,7 +34,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/services/admin"
-	"github.com/webmeshproj/webmesh/pkg/services/dashboard"
 	"github.com/webmeshproj/webmesh/pkg/services/membership"
 	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -47,14 +46,13 @@ import (
 
 // Server is the gRPC server.
 type Server struct {
-	opts      *Options
-	store     mesh.Mesh
-	srv       *grpc.Server
-	turn      *turn.Server
-	meshdns   *meshdns.Server
-	dashboard *dashboard.Server
-	log       *slog.Logger
-	mu        sync.Mutex
+	opts    *Options
+	store   mesh.Mesh
+	srv     *grpc.Server
+	turn    *turn.Server
+	meshdns *meshdns.Server
+	log     *slog.Logger
+	mu      sync.Mutex
 }
 
 // NewServer returns a new Server.
@@ -140,13 +138,6 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 			return nil, fmt.Errorf("register meshdns domain: %w", err)
 		}
 	}
-	if o.Dashboard != nil && o.Dashboard.Enabled {
-		log.Debug("Registering dashboard HTTP handlers")
-		server.dashboard, err = dashboard.NewServer(server.srv, o.Dashboard)
-		if err != nil {
-			return nil, err
-		}
-	}
 	// Register the membership and storage APIs if we are a raft member
 	// TODO: Make this more dynamic
 	isRaftMember := store.Raft().IsVoter() || store.Raft().IsObserver()
@@ -208,13 +199,6 @@ func (s *Server) ListenAndServe() error {
 			}
 		}()
 	}
-	if s.dashboard != nil {
-		go func() {
-			if err := s.dashboard.ListenAndServe(); err != nil {
-				s.log.Error("dashboard server failed", slog.String("error", err.Error()))
-			}
-		}()
-	}
 	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
 	lis, err := net.Listen("tcp", s.opts.ListenAddress)
 	if err != nil {
@@ -257,13 +241,6 @@ func (s *Server) Stop() {
 			s.log.Error("meshdns server shutdown failed", slog.String("error", err.Error()))
 		}
 		s.meshdns = nil
-	}
-	if s.dashboard != nil {
-		s.log.Info("Shutting down dashboard server")
-		if err := s.dashboard.Shutdown(context.Background()); err != nil {
-			s.log.Error("dashboard server shutdown failed", slog.String("error", err.Error()))
-		}
-		s.dashboard = nil
 	}
 	if s.srv != nil {
 		s.log.Info("Shutting down gRPC server")

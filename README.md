@@ -1,4 +1,4 @@
-<h1 style="text-align: left"><img align="center" height="50" src="web/webmesh.png" style="margin-top: -7px;"> Webmesh</h1>
+<h1 style="text-align: left"><img align="center" height="50" src="img/webmesh.png" style="margin-top: -7px;"> Webmesh</h1>
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/webmeshproj/webmesh)](https://goreportcard.com/report/github.com/webmeshproj/webmesh)
 ![Build and Tests](https://github.com/webmeshproj/webmesh/actions/workflows/ci.yaml/badge.svg)
