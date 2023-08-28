@@ -56,6 +56,10 @@ type Interface interface {
 	// Interface is the underlying system interface.
 	system.Interface
 
+	// NetworkV4 returns the IPv4 network of this interface.
+	NetworkV4() netip.Prefix
+	// NetworkV6 returns the IPv6 network of this interface.
+	NetworkV6() netip.Prefix
 	// Configure configures the wireguard interface to use the given key and listen port.
 	Configure(ctx context.Context, key wgtypes.Key, listenPort int) error
 	// ListenPort returns the current listen port of the wireguard interface.
@@ -96,6 +100,10 @@ type Options struct {
 	AddressV4 netip.Prefix
 	// AddressV6 is the private IPv6 address of this interface.
 	AddressV6 netip.Prefix
+	// NetworkV4 is the IPv4 network of this interface.
+	NetworkV4 netip.Prefix
+	// NetworkV6 is the IPv6 network of this interface.
+	NetworkV6 netip.Prefix
 	// Metrics is true if prometheus metrics should be enabled.
 	Metrics bool
 	// MetricsInterval is the interval at which to update metrics.
@@ -193,6 +201,14 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		go recorder.Run(rctx, opts.MetricsInterval)
 	}
 	return wg, nil
+}
+
+func (w *wginterface) NetworkV4() netip.Prefix {
+	return w.opts.NetworkV4
+}
+
+func (w *wginterface) NetworkV6() netip.Prefix {
+	return w.opts.NetworkV6
 }
 
 // ListenPort returns the current listen port of the wireguard interface.

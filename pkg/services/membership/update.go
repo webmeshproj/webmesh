@@ -36,6 +36,11 @@ import (
 )
 
 func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateResponse, error) {
+	if !context.IsInNetwork(ctx, s.wg) {
+		addr, _ := context.PeerAddrFrom(ctx)
+		s.log.Warn("Received Update request from out of network", slog.String("peer", addr.String()))
+		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")
+	}
 	if !s.raft.IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}

@@ -26,10 +26,17 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 )
 
 func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer) error {
+	// Make sure the request is coming from in-network
+	if !context.IsInNetwork(stream.Context(), s.WireGuard) {
+		addr, _ := context.PeerAddrFrom(stream.Context())
+		s.log.Warn("Received NegotiateDataChannel request from out of network", slog.String("peer", addr.String()))
+		return status.Errorf(codes.PermissionDenied, "request is not in-network")
+	}
 	// Pull the initial request from the stream
 	req, err := stream.Recv()
 	if err != nil {

@@ -17,6 +17,8 @@ limitations under the License.
 package membership
 
 import (
+	"log/slog"
+
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
@@ -26,6 +28,11 @@ import (
 )
 
 func (s *Server) GetRaftConfiguration(ctx context.Context, _ *v1.RaftConfigurationRequest) (*v1.RaftConfigurationResponse, error) {
+	if !context.IsInNetwork(ctx, s.wg) {
+		addr, _ := context.PeerAddrFrom(ctx)
+		s.log.Warn("Received GetRaftConfiguration request from out of network", slog.String("peer", addr.String()))
+		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")
+	}
 	leader, err := s.raft.LeaderID()
 	if err != nil {
 		return nil, status.Errorf(codes.FailedPrecondition, "no leader: %v", err)

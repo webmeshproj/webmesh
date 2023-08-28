@@ -17,6 +17,7 @@ limitations under the License.
 package membership
 
 import (
+	"log/slog"
 	"sync"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -31,6 +32,11 @@ import (
 )
 
 func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Membership_SubscribePeersServer) error {
+	if !context.IsInNetwork(stream.Context(), s.wg) {
+		addr, _ := context.PeerAddrFrom(stream.Context())
+		s.log.Warn("Received SubscribePeers request from out of network", slog.String("peer", addr.String()))
+		return status.Errorf(codes.PermissionDenied, "request is not in-network")
+	}
 	// Validate inputs
 	if req.GetId() == "" {
 		return status.Error(codes.InvalidArgument, "node id required")

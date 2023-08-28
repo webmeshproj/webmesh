@@ -32,6 +32,17 @@ const (
 	RequireLocal
 )
 
+// RouteRequiresInNetworkSource returns true if the given route requires that the
+// request is routed from a peer in the network.
+func RouteRequiresInNetworkSource(route string) bool {
+	return route == v1.Membership_Update_FullMethodName ||
+		route == v1.Membership_Leave_FullMethodName ||
+		route == v1.Membership_Apply_FullMethodName ||
+		route == v1.Membership_SubscribePeers_FullMethodName ||
+		route == v1.Membership_GetRaftConfiguration_FullMethodName ||
+		route == v1.Node_NegotiateDataChannel_FullMethodName
+}
+
 // MethodPolicyMap is a map of method names to their MethodPolicy.
 var MethodPolicyMap = map[string]MethodPolicy{
 	// Membership API

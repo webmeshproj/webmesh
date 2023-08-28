@@ -19,6 +19,7 @@ package node
 
 import (
 	"log/slog"
+	"net/netip"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -44,6 +45,8 @@ type Options struct {
 	NodeDialer transport.NodeDialer
 	Plugins    plugins.Manager
 	Features   []v1.Feature
+	NetworkV4  netip.Prefix
+	NetworkV6  netip.Prefix
 }
 
 // NewServer returns a new Server. Features are used for returning what features are enabled.

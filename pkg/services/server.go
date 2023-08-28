@@ -152,7 +152,12 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 	isRaftMember := store.Raft().IsVoter() || store.Raft().IsObserver()
 	if isRaftMember {
 		log.Debug("Registering membership service")
-		v1.RegisterMembershipServer(server, membership.NewServer(store.Raft(), store.Plugins(), rbacEvaluator))
+		v1.RegisterMembershipServer(server, membership.NewServer(membership.Options{
+			Raft:      store.Raft(),
+			Plugins:   store.Plugins(),
+			RBAC:      rbacEvaluator,
+			WireGuard: store.Network().WireGuard(),
+		}))
 		log.Debug("Registering storage service")
 		v1.RegisterStorageServer(server, storage.NewServer(store.Raft(), rbacEvaluator))
 	}

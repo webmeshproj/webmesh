@@ -20,6 +20,7 @@ package context
 import (
 	"context"
 	"log/slog"
+	"net/netip"
 	"time"
 
 	"google.golang.org/grpc"
@@ -124,9 +125,49 @@ func MetadataFrom(ctx Context) (map[string][]string, bool) {
 // AuthInfoFrom is a convenience wrapper around retrieving the gRPC authentication info
 // from an incoming request.
 func AuthInfoFrom(ctx Context) (credentials.AuthInfo, bool) {
-	p, ok := peer.FromContext(ctx)
+	p, ok := PeerFrom(ctx)
 	if !ok {
 		return nil, false
 	}
 	return p.AuthInfo, p.AuthInfo != nil
+}
+
+// PeerAddrFrom is a convenience wrapper around retrieving the gRPC peer address
+// from an incoming request.
+func PeerAddrFrom(ctx Context) (netip.Addr, bool) {
+	p, ok := PeerFrom(ctx)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	addrport, err := netip.ParseAddrPort(p.Addr.String())
+	if err != nil {
+		LoggerFrom(ctx).Warn("failed to parse peer address", "error", err.Error())
+		return netip.Addr{}, false
+	}
+	return addrport.Addr(), true
+}
+
+// Network is an interface that returns the IPv4 and IPv6 networks of the mesh.
+type Network interface {
+	NetworkV4() netip.Prefix
+	NetworkV6() netip.Prefix
+}
+
+// IsInNetwork returns true if the given context is from a peer in the given
+// network.
+func IsInNetwork(ctx Context, network Network) bool {
+	addr, ok := PeerAddrFrom(ctx)
+	if !ok {
+		return false
+	}
+	if addr.Is4() {
+		return network.NetworkV4().Contains(addr)
+	}
+	return network.NetworkV6().Contains(addr)
+}
+
+// PeerFrom is a convenience wrapper around retrieving the gRPC peer info
+// from an incoming request.
+func PeerFrom(ctx Context) (*peer.Peer, bool) {
+	return peer.FromContext(ctx)
 }

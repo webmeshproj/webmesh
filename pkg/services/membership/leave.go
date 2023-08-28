@@ -17,6 +17,7 @@ limitations under the License.
 package membership
 
 import (
+	"log/slog"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -29,6 +30,11 @@ import (
 )
 
 func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResponse, error) {
+	if !context.IsInNetwork(ctx, s.wg) {
+		addr, _ := context.PeerAddrFrom(ctx)
+		s.log.Warn("Received Leave request from out of network", slog.String("peer", addr.String()))
+		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")
+	}
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}

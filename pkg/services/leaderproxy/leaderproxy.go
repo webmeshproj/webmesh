@@ -35,8 +35,9 @@ import (
 
 // Interceptor is the leaderproxy interceptor.
 type Interceptor struct {
-	raft   raft.Raft
-	dialer Dialer
+	raft    raft.Raft
+	dialer  Dialer
+	network context.Network
 }
 
 // Dialer is the interface required for the leader proxy interceptor.
@@ -46,10 +47,11 @@ type Dialer interface {
 }
 
 // New returns a new leader proxy interceptor.
-func New(raft raft.Raft, dialer Dialer) *Interceptor {
+func New(raft raft.Raft, dialer Dialer, network context.Network) *Interceptor {
 	return &Interceptor{
-		raft:   raft,
-		dialer: dialer,
+		raft:    raft,
+		dialer:  dialer,
+		network: network,
 	}
 }
 
@@ -57,10 +59,18 @@ func New(raft raft.Raft, dialer Dialer) *Interceptor {
 func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Fast path - if we are the leader, it doesn't make sense to proxy the request.
+		// However, this could be a place to centralize checking the source address of the request.
 		log := context.LoggerFrom(ctx)
 		if i.raft.IsLeader() {
 			log.Debug("currently the leader, handling request locally", slog.String("method", info.FullMethod))
 			return handler(ctx, req)
+		}
+		if RouteRequiresInNetworkSource(info.FullMethod) {
+			if !context.IsInNetwork(ctx, i.network) {
+				addr, _ := context.PeerAddrFrom(ctx)
+				log.Warn("Received request from out of network", slog.String("peer", addr.String()), slog.String("method", info.FullMethod))
+				return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")
+			}
 		}
 		policy, ok := MethodPolicyMap[info.FullMethod]
 		if ok {
@@ -88,6 +98,13 @@ func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 		if i.raft.IsLeader() {
 			log.Debug("currently the leader, handling stream locally", slog.String("method", info.FullMethod))
 			return handler(srv, ss)
+		}
+		if RouteRequiresInNetworkSource(info.FullMethod) {
+			if !context.IsInNetwork(ss.Context(), i.network) {
+				addr, _ := context.PeerAddrFrom(ss.Context())
+				log.Warn("Received request from out of network", slog.String("peer", addr.String()), slog.String("method", info.FullMethod))
+				return status.Errorf(codes.PermissionDenied, "request is not in-network")
+			}
 		}
 		policy, ok := MethodPolicyMap[info.FullMethod]
 		if ok {

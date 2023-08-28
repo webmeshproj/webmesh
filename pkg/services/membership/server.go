@@ -28,6 +28,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
@@ -41,6 +42,7 @@ type Server struct {
 	raft       raft.Raft
 	plugins    plugins.Manager
 	rbac       rbac.Evaluator
+	wg         wireguard.Interface
 	ipv4Prefix netip.Prefix
 	ipv6Prefix netip.Prefix
 	meshDomain string
@@ -48,12 +50,21 @@ type Server struct {
 	mu         sync.Mutex
 }
 
+// Options are the options for the Membership service.
+type Options struct {
+	Raft      raft.Raft
+	Plugins   plugins.Manager
+	RBAC      rbac.Evaluator
+	WireGuard wireguard.Interface
+}
+
 // NewServer returns a new Server.
-func NewServer(raft raft.Raft, plugins plugins.Manager, rbac rbac.Evaluator) *Server {
+func NewServer(opts Options) *Server {
 	return &Server{
-		raft:    raft,
-		plugins: plugins,
-		rbac:    rbac,
+		raft:    opts.Raft,
+		plugins: opts.Plugins,
+		rbac:    opts.RBAC,
+		wg:      opts.WireGuard,
 		log:     slog.Default().With("component", "membership-server"),
 	}
 }

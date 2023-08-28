@@ -226,6 +226,8 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 		MetricsInterval:     m.opts.RecordMetricsInterval,
 		AddressV4:           opts.AddressV4,
 		AddressV6:           opts.AddressV6,
+		NetworkV4:           opts.NetworkV4,
+		NetworkV6:           opts.NetworkV6,
 		DisableIPv4:         m.opts.DisableIPv4,
 		DisableIPv6:         m.opts.DisableIPv6,
 	}

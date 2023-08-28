@@ -154,6 +154,22 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		addr, _ := netip.AddrFromSlice(ip.IP)
 		ones, _ := ip.Mask.Size()
 		prefix := netip.PrefixFrom(addr, ones)
+
+		// Skip adding routes to our own network
+		if w.opts.NetworkV4.IsValid() && addr.Is4() && !w.opts.DisableIPv4 {
+			if w.opts.NetworkV4.Contains(addr) {
+				w.log.Debug("skipping route to own network", slog.String("prefix", prefix.String()))
+				continue
+			}
+		}
+		if w.opts.NetworkV6.IsValid() && addr.Is6() && !w.opts.DisableIPv6 {
+			if w.opts.NetworkV6.Contains(addr) {
+				w.log.Debug("skipping route to own network", slog.String("prefix", prefix.String()))
+				continue
+			}
+		}
+
+		// Add any other routes
 		if prefix.Addr().Is4() && !w.opts.DisableIPv4 {
 			w.log.Debug("adding ipv4 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
