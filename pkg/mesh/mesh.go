@@ -98,6 +98,8 @@ type Mesh interface {
 type ConnectOptions struct {
 	// Features are the features to broadcast to others in the mesh.
 	Features []v1.Feature
+	// BootstrapTransport is the transport to use for bootstrapping the mesh.
+	BootstrapTransport transport.BootstrapTransport
 	// JoinRoundTripper is the round tripper to use for joining the mesh.
 	JoinRoundTripper transport.JoinRoundTripper
 	// RaftTransport is the transport to use for the raft node.
@@ -106,6 +108,8 @@ type ConnectOptions struct {
 	RaftStorage storage.RaftStorage
 	// MeshStorage is the storage to use for the mesh state.
 	MeshStorage storage.MeshStorage
+	// ForceBootstrap is true if the node should force bootstrap.
+	ForceBootstrap bool
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh

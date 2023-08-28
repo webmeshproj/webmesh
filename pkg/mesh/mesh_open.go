@@ -37,7 +37,7 @@ func (s *meshStore) Open(ctx context.Context, opts ConnectOptions) (err error) {
 	}
 	log := s.log
 	// If bootstrap and force are set, clear the data directory.
-	if s.opts.Bootstrap.Enabled && s.opts.Bootstrap.Force {
+	if opts.BootstrapTransport != nil && opts.ForceBootstrap {
 		log.Warn("force bootstrap enabled, clearing data directory")
 		err = os.RemoveAll(s.opts.Raft.DataDir)
 		if err != nil && !os.IsNotExist(err) {
@@ -124,10 +124,14 @@ func (s *meshStore) Open(ctx context.Context, opts ConnectOptions) (err error) {
 	if err != nil {
 		return fmt.Errorf("load wireguard key: %w", err)
 	}
-	if s.opts.Bootstrap.Enabled {
+	if opts.BootstrapTransport != nil {
 		// Attempt bootstrap.
-		log.Info("bootstrapping cluster")
-		if err = s.bootstrap(ctx, opts.JoinRoundTripper, opts.Features, key); err != nil {
+		if err = s.bootstrap(ctx, MeshBootstrapOptions{
+			BootstrapTransport: opts.BootstrapTransport,
+			WireguardKey:       key,
+			JoinRoundTripper:   opts.JoinRoundTripper,
+			Features:           opts.Features,
+		}); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if opts.JoinRoundTripper != nil {

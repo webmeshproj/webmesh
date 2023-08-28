@@ -18,7 +18,6 @@ limitations under the License.
 package nodecmd
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -35,6 +34,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/options"
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
@@ -204,12 +204,20 @@ func executeSingleMesh(ctx context.Context, config *options.Options) error {
 	if err != nil {
 		return fmt.Errorf("failed to create join transport: %w", err)
 	}
+	var bootstrapTransport transport.BootstrapTransport
+	var forceBootstrap bool
+	if config.Mesh.Bootstrap != nil && config.Mesh.Bootstrap.Enabled {
+		forceBootstrap = config.Mesh.Bootstrap.Force
+		bootstrapTransport = newBootstrapTransport(ctx, st, config)
+	}
 	err = st.Open(ctx, mesh.ConnectOptions{
-		Features:         features,
-		RaftTransport:    raftTransport,
-		RaftStorage:      storage,
-		MeshStorage:      storage,
-		JoinRoundTripper: joinTransport,
+		Features:           features,
+		BootstrapTransport: bootstrapTransport,
+		JoinRoundTripper:   joinTransport,
+		RaftTransport:      raftTransport,
+		RaftStorage:        storage,
+		MeshStorage:        storage,
+		ForceBootstrap:     forceBootstrap,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open mesh connection: %w", err)
@@ -335,4 +343,53 @@ func getJoinTransport(ctx context.Context, st mesh.Mesh, config *options.Options
 	}
 	// A nil transport is technically okay, it means we are a single-node mesh
 	return joinTransport, nil
+}
+
+func newBootstrapTransport(ctx context.Context, st mesh.Mesh, config *options.Options) transport.BootstrapTransport {
+	if len(config.Mesh.Bootstrap.Servers) == 0 {
+		return transport.NewNullBootstrapTransport()
+	}
+	return tcp.NewBootstrapTransport(tcp.BootstrapTransportOptions{
+		NodeID:          st.ID(),
+		Addr:            config.Mesh.Bootstrap.ListenAddress,
+		Advertise:       config.Mesh.Bootstrap.AdvertiseAddress,
+		MaxPool:         config.Mesh.Raft.ConnectionPoolCount,
+		Timeout:         config.Mesh.Raft.ConnectionTimeout,
+		ElectionTimeout: config.Mesh.Raft.ElectionTimeout,
+		Credentials:     st.Credentials(ctx),
+		Peers: func() map[string]tcp.BootstrapPeer {
+			if config.Mesh.Bootstrap.Servers == nil {
+				return nil
+			}
+			peers := make(map[string]tcp.BootstrapPeer)
+			for id, addr := range config.Mesh.Bootstrap.Servers {
+				if id == st.ID() {
+					continue
+				}
+				nodeID := id
+				nodeAddr := addr
+				nodeHost, _, err := net.SplitHostPort(nodeAddr)
+				if err != nil {
+					// We should have caught this earlier
+					context.LoggerFrom(ctx).Warn("Encountered invalid bootstrap server address",
+						slog.String("address", nodeAddr), slog.String("error", err.Error()))
+					continue
+				}
+				// Deterine what their join address will be
+				var joinAddr string
+				if port, ok := config.Mesh.Bootstrap.ServersGRPCPorts[nodeID]; ok {
+					joinAddr = net.JoinHostPort(nodeHost, fmt.Sprintf("%d", port))
+				} else {
+					// Assume the default gRPC port
+					joinAddr = net.JoinHostPort(nodeHost, fmt.Sprintf("%d", mesh.DefaultGRPCPort))
+				}
+				peers[nodeID] = tcp.BootstrapPeer{
+					NodeID:        nodeID,
+					AdvertiseAddr: nodeAddr,
+					DialAddr:      joinAddr,
+				}
+			}
+			return peers
+		}(),
+	})
 }

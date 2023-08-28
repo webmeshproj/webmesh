@@ -31,7 +31,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
@@ -266,22 +265,9 @@ func (o *Options) mergeMeshOptions(opts *mesh.Options, primaryEndpoint netip.Add
 	if !primaryEndpoint.IsValid() {
 		return nil
 	}
-	// Determine the raft and wireguard ports so we can set our
-	// advertise addresses.
-	var raftPort, wireguardPort uint16
+	// Determine wireguard port so we can set our endpoints
+	var wireguardPort uint16
 	wireguardPort = uint16(opts.WireGuard.ListenPort)
-	_, port, err := net.SplitHostPort(opts.Raft.ListenAddress)
-	if err != nil {
-		return fmt.Errorf("failed to parse raft listen address: %w", err)
-	}
-	raftPortz, err := strconv.ParseUint(port, 10, 16)
-	if err != nil {
-		return fmt.Errorf("failed to parse raft listen address: %w", err)
-	}
-	raftPort = uint16(raftPortz)
-	if raftPort == 0 {
-		raftPort = raft.DefaultListenPort
-	}
 	if wireguardPort == 0 {
 		wireguardPort = wireguard.DefaultListenPort
 	}
@@ -302,7 +288,16 @@ func (o *Options) mergeMeshOptions(opts *mesh.Options, primaryEndpoint netip.Add
 		opts.WireGuard.Endpoints = eps
 	}
 	if opts.Bootstrap.AdvertiseAddress == "" {
-		opts.Bootstrap.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(raftPort)).String()
+		// Determine the bootstrap raft port
+		_, port, err := net.SplitHostPort(opts.Bootstrap.ListenAddress)
+		if err != nil {
+			return fmt.Errorf("failed to parse bootstrap listen address: %w", err)
+		}
+		portz, err := strconv.ParseUint(port, 10, 16)
+		if err != nil {
+			return fmt.Errorf("failed to parse bootstrap listen address: %w", err)
+		}
+		opts.Bootstrap.AdvertiseAddress = netip.AddrPortFrom(primaryEndpoint, uint16(portz)).String()
 	}
 	return nil
 }

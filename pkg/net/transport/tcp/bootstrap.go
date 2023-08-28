@@ -17,6 +17,7 @@ limitations under the License.
 package tcp
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -72,7 +73,7 @@ type bootstrapTransport struct {
 // LeaderElect implements BootstrapTransport.
 func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt transport.JoinRoundTripper, err error) {
 	log := context.LoggerFrom(ctx).With("bootstrap-transport", "tcp")
-	log.Info("Starting bootstrap transport")
+	log.Info("Starting bootstrap TCP transport")
 	raftTransport, err := NewRaftTransport(nil, RaftTransportOptions{
 		Addr:    t.Addr,
 		MaxPool: t.MaxPool,
@@ -123,7 +124,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 			Suffrage: raft.Voter,
 		})
 	}
-
+	log.Debug("Starting bootstrap transport raft instance", slog.String("local-id", string(rftOpts.LocalID)), slog.Any("config", bootstrapConfig))
 	rft, err := raft.NewRaft(rftOpts, &raft.MockFSM{}, raft.NewInmemStore(), raft.NewInmemStore(), raft.NewInmemSnapshotStore(), raftTransport)
 	if err != nil {
 		return false, nil, err
@@ -148,6 +149,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	}
 
 	// Wait for whoever is the leader
+	log.Debug("Waiting for bootstrap transport leader election results")
 	for {
 		select {
 		case <-ctx.Done():
@@ -155,12 +157,11 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		case <-time.After(time.Millisecond * 250):
 			addr, id := rft.LeaderWithID()
 			if addr == "" {
-				log.Debug("Waiting for bootstrap transport leader")
 				continue
 			}
 			if id == rftOpts.LocalID {
 				// We won the election
-				log.Info("Bootstrap transport is leader")
+				log.Info("Bootstrap transport elected leader")
 				return true, nil, nil
 			}
 			// We lost the election, build a transport to the leader

@@ -18,15 +18,14 @@ package mesh
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
+	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
@@ -45,7 +44,7 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	if err != nil {
 		return nil, err
 	}
-	transport, err := tcp.NewRaftTransport(st, tcp.RaftTransportOptions{
+	raftTransport, err := tcp.NewRaftTransport(st, tcp.RaftTransportOptions{
 		Addr:    ":0",
 		MaxPool: 1,
 		Timeout: time.Second,
@@ -54,67 +53,17 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 		return nil, err
 	}
 	if err := stor.Open(ctx, ConnectOptions{
-		RaftTransport: transport,
-		RaftStorage:   storage,
-		MeshStorage:   storage,
+		BootstrapTransport: transport.NewNullBootstrapTransport(),
+		JoinRoundTripper:   nil,
+		RaftTransport:      raftTransport,
+		RaftStorage:        storage,
+		MeshStorage:        storage,
+		ForceBootstrap:     false,
+		Features:           []v1.Feature{},
 	}); err != nil {
 		return nil, err
 	}
 	return stor, nil
-}
-
-// NewTestCluster creates a new test cluster and waits for it to be ready.
-// The context is used to enforce startup timeouts. Clusters cannot be
-// created in parallel without specifying unique raft ports. If startPort
-// is 0, a default port will be used. The number of nodes must be greater
-// than 0.
-func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Mesh, error) {
-	const defaultStartPort = 10000
-	if startPort == 0 {
-		startPort = defaultStartPort
-	}
-	if numNodes < 1 {
-		return nil, errors.New("invalid number of nodes")
-	}
-	bootstrapServers := make(map[string]string)
-	for i := 0; i < numNodes; i++ {
-		nodeID := fmt.Sprintf("node-%d", i)
-		bootstrapServers[nodeID] = fmt.Sprintf("127.0.0.1:%d", startPort+i)
-	}
-	opts := make([]*Options, numNodes)
-	for i := 0; i < numNodes; i++ {
-		thisID := fmt.Sprintf("node-%d", i)
-		thisAddr := fmt.Sprintf("127.0.0.1:%d", startPort+i)
-		opts[i] = newTestOptions()
-		opts[i].Mesh.NodeID = thisID
-		opts[i].Bootstrap.AdvertiseAddress = thisAddr
-		opts[i].Bootstrap.Servers = bootstrapServers
-		opts[i].Raft.ListenAddress = thisAddr
-	}
-	stores := make([]Mesh, numNodes)
-	for i := 0; i < numNodes; i++ {
-		st, err := New(opts[i])
-		if err != nil {
-			return nil, err
-		}
-		stor := st.(*meshStore)
-		stor.testStore = true
-		stores[i] = stor
-	}
-	g, ctx := errgroup.WithContext(ctx)
-	for i := 0; i < numNodes; i++ {
-		i := i
-		g.Go(func() error {
-			if err := stores[i].Open(ctx, ConnectOptions{}); err != nil {
-				return err
-			}
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-	return stores, nil
 }
 
 func newTestOptions() *Options {

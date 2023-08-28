@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -34,7 +35,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/raft/fsm"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 var (
@@ -88,11 +88,8 @@ type Raft interface {
 	// ID returns the node ID.
 	ID() string
 	// Bootstrap attempts to bootstrap the Raft cluster. If the cluster is already
-	// bootstrapped, ErrAlreadyBootstrapped is returned. If the cluster is not
-	// bootstrapped and bootstrapping succeeds, the optional callback is called
-	// with isLeader flag set to true if the node is the leader, and false otherwise.
-	// Any error returned by the callback is returned by Bootstrap.
-	Bootstrap(ctx context.Context, opts *BootstrapOptions, cb BootstrapCallback) error
+	// bootstrapped, ErrAlreadyBootstrapped is returned.
+	Bootstrap(ctx context.Context) error
 	// Storage returns the storage. This is only valid after Start is called.
 	Storage() storage.MeshStorage
 	// Configuration returns the current raft configuration.
@@ -262,48 +259,24 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 }
 
 // Bootstrap attempts to bootstrap the Raft cluster.
-func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions, cb BootstrapCallback) error {
+func (r *raftNode) Bootstrap(ctx context.Context) error {
 	r.mu.Lock()
 	if !r.started.Load() {
 		r.mu.Unlock()
 		return ErrClosed
 	}
-	if opts.AdvertiseAddress == "" {
-		opts.AdvertiseAddress = fmt.Sprintf("localhost:%d", r.ListenPort())
-	}
-	addr, err := netutil.ResolveTCPAddr(ctx, opts.AdvertiseAddress, 15)
-	if err != nil {
-		r.mu.Unlock()
-		return fmt.Errorf("resolve advertise address: %w", err)
-	}
+	port := r.raftTransport.AddrPort().Port()
 	cfg := raft.Configuration{
 		Servers: []raft.Server{
 			{
 				Suffrage: raft.Voter,
 				ID:       r.nodeID,
-				Address:  raft.ServerAddress(addr.String()),
+				Address:  raft.ServerAddress(net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))),
 			},
 		},
 	}
-	if len(opts.Servers) > 0 {
-		for nodeID, listenAddres := range opts.Servers {
-			if nodeID == string(r.nodeID) {
-				continue
-			}
-			addr, err := netutil.ResolveTCPAddr(ctx, listenAddres, 15)
-			if err != nil {
-				r.mu.Unlock()
-				return fmt.Errorf("resolve server address: %w", err)
-			}
-			cfg.Servers = append(cfg.Servers, raft.Server{
-				Suffrage: raft.Voter,
-				ID:       raft.ServerID(nodeID),
-				Address:  raft.ServerAddress(addr.String()),
-			})
-		}
-	}
 	f := r.raft.BootstrapCluster(cfg)
-	err = f.Error()
+	err := f.Error()
 	if err != nil {
 		r.mu.Unlock()
 		if err == raft.ErrCantBootstrap {
@@ -323,14 +296,12 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions, cb Boo
 				time.Sleep(time.Millisecond * 500)
 				continue
 			}
-			// We need to unlock before return as the OnBootstrapped
-			// callback will want to write to storage.
 			r.mu.Unlock()
-			if cb == nil {
-				return nil
+			if id != r.nodeID {
+				// Something very wrong happened.
+				return fmt.Errorf("bootstrap cluster: leader is not us")
 			}
-			isLeader := id == r.nodeID
-			return cb(isLeader)
+			return nil
 		}
 	}
 }

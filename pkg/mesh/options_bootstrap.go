@@ -31,6 +31,7 @@ import (
 const (
 	BootstrapEnabledEnvVar              = "BOOTSTRAP_ENABLED"
 	AdvertiseAddressEnvVar              = "BOOTSTRAP_ADVERTISE_ADDRESS"
+	BootstrapListenAddressEnvVar        = "BOOTSTRAP_LISTEN_ADDRESS"
 	BootstrapServersEnvVar              = "BOOTSTRAP_SERVERS"
 	BootstrapServersGRPCPortsEnvVar     = "BOOTSTRAP_SERVERS_GRPC_PORTS"
 	BootstrapIPv4NetworkEnvVar          = "BOOTSTRAP_IPV4_NETWORK"
@@ -49,6 +50,8 @@ type BootstrapOptions struct {
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty" toml:"enabled,omitempty" mapstructure:"enabled,omitempty"`
 	// AdvertiseAddress is the initial address to advertise for raft consensus.
 	AdvertiseAddress string `json:"advertise-address,omitempty" yaml:"advertise-address,omitempty" toml:"advertise-address,omitempty" mapstructure:"advertise-address,omitempty"`
+	// ListenAddress is the initial address to use when using TCP raft consensus to bootstrap.
+	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty" mapstructure:"listen-address,omitempty"`
 	// Servers is a map of node IDs to addresses to bootstrap with. If empty, the node will use the advertise
 	// address as the bootstrap server. If not empty, all nodes in the map should be started with the same
 	// list configurations. If any are different then the first node to become leader will pick them. This
@@ -66,7 +69,7 @@ type BootstrapOptions struct {
 	Admin string `json:"admin,omitempty" yaml:"admin,omitempty" toml:"admin,omitempty" mapstructure:"admin,omitempty"`
 	// Voters is a comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster.
 	// BootstrapServers are automatically added to this list.
-	Voters string `json:"voters,omitempty" yaml:"voters,omitempty" toml:"voters,omitempty" mapstructure:"voters,omitempty"`
+	Voters []string `json:"voters,omitempty" yaml:"voters,omitempty" toml:"voters,omitempty" mapstructure:"voters,omitempty"`
 	// DefaultNetworkPolicy is the default network policy to apply to the mesh when bootstraping a new cluster.
 	DefaultNetworkPolicy string `json:"default-network-policy,omitempty" yaml:"default-network-policy,omitempty" toml:"default-network-policy,omitempty" mapstructure:"default-network-policy,omitempty"`
 	// DisableRBAC is the flag to disable RBAC when bootstrapping a new cluster.
@@ -96,20 +99,28 @@ func (n NetworkPolicy) IsValid() bool {
 }
 
 const (
-	DefaultIPv4Network   = "172.16.0.0/12"
-	DefaultMeshDomain    = "webmesh.internal."
-	DefaultAdminUser     = "admin"
-	DefaultNetworkPolicy = NetworkPolicyAccept
+	DefaultIPv4Network            = "172.16.0.0/12"
+	DefaultMeshDomain             = "webmesh.internal."
+	DefaultAdminUser              = "admin"
+	DefaultNetworkPolicy          = NetworkPolicyAccept
+	DefaultBootstrapListenAddress = "[::]:9444"
 )
 
 // NewBootstrapOptions creates a new BootstrapOptions.
 func NewBootstrapOptions() *BootstrapOptions {
 	return &BootstrapOptions{
 		Enabled:              false,
+		ListenAddress:        DefaultBootstrapListenAddress,
 		IPv4Network:          DefaultIPv4Network,
 		MeshDomain:           DefaultMeshDomain,
 		Admin:                DefaultAdminUser,
 		DefaultNetworkPolicy: string(DefaultNetworkPolicy),
+		Voters: func() []string {
+			if val := os.Getenv(BootstrapVotersEnvVar); val != "" {
+				return strings.Split(val, ",")
+			}
+			return nil
+		}(),
 	}
 }
 
@@ -189,6 +200,8 @@ but will be replaced with the WireGuard address after bootstrapping.`)
 			}
 			return nil
 		})
+	fl.StringVar(&o.ListenAddress, p+"bootstrap.raft-port", envutil.GetEnvDefault(BootstrapListenAddressEnvVar, DefaultBootstrapListenAddress),
+		"Local TCP address to bootstrap with.")
 	fl.Func(p+"bootstrap.servers-grpc-ports",
 		`Comma separated list of gRPC ports to bootstrap with. This is only used
 if bootstrap is true. If empty, the node will use the advertise address and
@@ -215,8 +228,13 @@ Ports should be in the form of <node-id>=<port>.`,
 		"Domain of the mesh to write to the database when bootstraping a new cluster.")
 	fl.StringVar(&o.Admin, p+"bootstrap.admin", envutil.GetEnvDefault(BootstrapAdminEnvVar, "admin"),
 		"Admin username to bootstrap the cluster with.")
-	fl.StringVar(&o.Voters, p+"bootstrap.voters", envutil.GetEnvDefault(BootstrapVotersEnvVar, ""),
-		"Comma separated list of voters to bootstrap the cluster with. bootstrap-servers are already included in this list.")
+	fl.Func(p+"bootstrap.voters",
+		"Comma separated list of voters to bootstrap the cluster with. bootstrap-servers are already included in this list.",
+		func(val string) error {
+			o.Voters = append(o.Voters, strings.Split(val, ",")...)
+			return nil
+		},
+	)
 	fl.StringVar(&o.DefaultNetworkPolicy, p+"bootstrap.default-network-policy", envutil.GetEnvDefault(BootstrapDefaultNetworkPolicyEnvVar, string(NetworkPolicyDeny)),
 		"Default network policy to bootstrap the cluster with.")
 	fl.BoolVar(&o.DisableRBAC, p+"bootstrap.disable-rbac", envutil.GetEnvDefault(BootstrapDisableRBACEnvVar, "false") == "true",

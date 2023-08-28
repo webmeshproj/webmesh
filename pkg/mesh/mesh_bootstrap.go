@@ -26,7 +26,6 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
-	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -42,8 +41,21 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
-func (s *meshStore) bootstrap(ctx context.Context, rt transport.JoinRoundTripper, features []v1.Feature, wireguardKey wgtypes.Key) error {
+type MeshBootstrapOptions struct {
+	// BootstrapTransport is the transport to use for bootstrapping.
+	BootstrapTransport transport.BootstrapTransport
+	// WireguardKey is the wireguard key to use for bootstrapping.
+	WireguardKey wgtypes.Key
+	// JoinRoundTripper is the round tripper to use for joining if
+	// we detect we are already bootstrapped.
+	JoinRoundTripper transport.JoinRoundTripper
+	// Features are the features to advertise when bootstrapping.
+	Features []v1.Feature
+}
+
+func (s *meshStore) bootstrap(ctx context.Context, opts MeshBootstrapOptions) error {
 	// Check if the mesh network is defined
+	s.log.Debug("Checking if cluster is already bootstrapped")
 	_, err := s.Storage().GetValue(ctx, state.IPv6PrefixKey)
 	var firstBootstrap bool
 	if err != nil {
@@ -52,45 +64,39 @@ func (s *meshStore) bootstrap(ctx context.Context, rt transport.JoinRoundTripper
 		}
 		firstBootstrap = true
 	}
+	// We will always attempt to rejoin as a voter
+	s.opts.Mesh.JoinAsVoter = true
 	if !firstBootstrap {
 		// We have data, so the cluster is already bootstrapped.
 		s.log.Info("Cluster already bootstrapped, attempting to rejoin as voter")
-		return s.join(ctx, rt, features, wireguardKey)
+		return s.join(ctx, opts.JoinRoundTripper, opts.Features, opts.WireguardKey)
 	}
-	var bootstrapOpts raft.BootstrapOptions
-	bootstrapOpts.Servers = s.opts.Bootstrap.Servers
-	bootstrapOpts.AdvertiseAddress = s.opts.Bootstrap.AdvertiseAddress
-	err = s.raft.Bootstrap(ctx, &bootstrapOpts, func(isLeader bool) error {
-		if isLeader {
-			s.log.Info("We were elected leader")
-			return s.initialBootstrapLeader(ctx, features, wireguardKey)
-		}
-		if s.testStore {
-			return nil
-		}
-		s.opts.Mesh.JoinAsVoter = true
-		s.log.Info("We were not elected leader")
-		return s.join(ctx, rt, features, wireguardKey)
-	})
+	s.log.Debug("Cluster not yet bootstrapped, attempting to bootstrap")
+	isLeader, joinRT, err := opts.BootstrapTransport.LeaderElect(ctx)
 	if err != nil {
-		// If the error is that we already bootstrapped and
-		// there were other servers to bootstrap with, then
-		// we might just need to rejoin the cluster.
 		if errors.Is(err, raft.ErrAlreadyBootstrapped) && len(s.opts.Bootstrap.Servers) > 0 {
 			s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
-			s.opts.Mesh.JoinAsVoter = true
-			return s.join(ctx, rt, features, wireguardKey)
+			return s.join(ctx, opts.JoinRoundTripper, opts.Features, opts.WireguardKey)
 		}
-		return fmt.Errorf("bootstrap cluster: %w", err)
+		return fmt.Errorf("leader elect: %w", err)
 	}
-	return nil
+	if isLeader {
+		s.log.Info("We were elected leader")
+		return s.initialBootstrapLeader(ctx, opts.Features, opts.WireguardKey)
+	}
+	if s.testStore {
+		return nil
+	}
+	s.log.Info("We were not elected leader")
+	return s.join(ctx, joinRT, opts.Features, opts.WireguardKey)
 }
 
 func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
-	cfg, err := s.raft.Configuration()
+	// We'll bootstrap the raft cluster as just ourselves.
+	s.log.Info("Bootstrapping raft cluster")
+	err := s.raft.Bootstrap(ctx)
 	if err != nil {
-		// Should never happen
-		return fmt.Errorf("get raft configuration: %w", err)
+		return fmt.Errorf("bootstrap raft: %w", err)
 	}
 
 	// Set initial cluster configurations to the raft log
@@ -178,15 +184,14 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 				Type: v1.SubjectType_SUBJECT_NODE,
 				Name: s.opts.Bootstrap.Admin,
 			})
-			for _, server := range cfg.Servers {
+			for id := range s.opts.Bootstrap.Servers {
 				out = append(out, &v1.Subject{
 					Type: v1.SubjectType_SUBJECT_NODE,
-					Name: string(server.ID),
+					Name: string(id),
 				})
 			}
-			if s.opts.Bootstrap.Voters != "" {
-				voters := strings.Split(s.opts.Bootstrap.Voters, ",")
-				for _, voter := range voters {
+			if s.opts.Bootstrap.Voters != nil {
+				for _, voter := range s.opts.Bootstrap.Voters {
 					out = append(out, &v1.Subject{
 						Type: v1.SubjectType_SUBJECT_NODE,
 						Name: voter,
@@ -303,41 +308,41 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 		return fmt.Errorf("create node: %w", err)
 	}
 	// Pre-create slots and edges for the other bootstrap servers.
-	for _, server := range cfg.Servers {
-		if string(server.ID) == s.nodeID {
+	for id := range s.opts.Bootstrap.Servers {
+		if id == s.nodeID {
 			continue
 		}
 		s.log.Info("creating node in database for bootstrap server",
-			slog.String("server-id", string(server.ID)),
+			slog.String("server-id", id),
 		)
 		err = p.Put(ctx, peers.Node{
-			ID: string(server.ID),
+			ID: id,
 		})
 		if err != nil {
 			return fmt.Errorf("create node: %w", err)
 		}
 	}
 	// Do the loop again for edges
-	for _, server := range cfg.Servers {
-		for _, peer := range cfg.Servers {
-			if peer.ID == server.ID {
+	for id := range s.opts.Bootstrap.Servers {
+		for _, peer := range s.opts.Bootstrap.Servers {
+			if id == peer {
 				continue
 			}
 			s.log.Info("creating edges in database for bootstrap server",
-				slog.String("server-id", string(server.ID)),
-				slog.String("peer-id", string(peer.ID)),
+				slog.String("server-id", id),
+				slog.String("peer-id", peer),
 			)
 			err = p.PutEdge(ctx, &v1.MeshEdge{
-				Source: string(server.ID),
-				Target: string(peer.ID),
+				Source: id,
+				Target: peer,
 				Weight: 99,
 			})
 			if err != nil {
 				return fmt.Errorf("create edge: %w", err)
 			}
 			err = p.PutEdge(ctx, &v1.MeshEdge{
-				Source: string(peer.ID),
-				Target: string(server.ID),
+				Source: id,
+				Target: peer,
 				Weight: 99,
 			})
 			if err != nil {
@@ -370,16 +375,16 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 			}
 		}
 	}
+	if s.testStore {
+		// We dont manage network connections on test stores
+		return nil
+	}
 	// Determine what our raft address will be
 	var raftAddr string
 	if !s.opts.Mesh.NoIPv4 && !s.opts.Raft.PreferIPv6 {
 		raftAddr = net.JoinHostPort(privatev4.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
 	} else {
 		raftAddr = net.JoinHostPort(self.PrivateIPv6.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
-	}
-	if s.testStore {
-		// We dont manage network connections on test stores
-		return nil
 	}
 	// Start network resources
 	s.log.Info("Starting network manager")
@@ -405,12 +410,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 			return fmt.Errorf("add dns servers: %w", err)
 		}
 	}
-	// Make sure everyone is aware of the bootstrap data
-	_, err = s.raft.Barrier(ctx, time.Second*5)
-	if err != nil {
-		return fmt.Errorf("barrier: %w", err)
-	}
-	// We need to readd ourselves server to the cluster as a voter with the acquired address.
+	// We need to readd ourselves server to the cluster as a voter with the acquired raft address.
 	s.log.Info("re-adding ourselves to the cluster with the acquired wireguard address")
 	err = s.raft.AddVoter(ctx, s.ID(), raftAddr)
 	if err != nil {

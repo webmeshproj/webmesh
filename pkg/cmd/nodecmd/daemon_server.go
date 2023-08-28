@@ -32,6 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -99,7 +100,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		return nil, status.Errorf(codes.Internal, "error creating mesh: %v", err)
 	}
 	// Create a raft transport
-	transport, err := tcp.NewRaftTransport(conn, tcp.RaftTransportOptions{
+	raftTransport, err := tcp.NewRaftTransport(conn, tcp.RaftTransportOptions{
 		Addr:    app.curConfig.Mesh.Raft.ListenAddress,
 		MaxPool: app.curConfig.Mesh.Raft.ConnectionPoolCount,
 		Timeout: app.curConfig.Mesh.Raft.ConnectionTimeout,
@@ -139,12 +140,20 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "build join transport: %v", err)
 	}
+	var bootstrapTransport transport.BootstrapTransport
+	var forceBootstrap bool
+	if app.curConfig.Mesh.Bootstrap != nil && app.curConfig.Mesh.Bootstrap.Enabled {
+		forceBootstrap = app.curConfig.Mesh.Bootstrap.Force
+		bootstrapTransport = newBootstrapTransport(ctx, conn, app.curConfig)
+	}
 	err = conn.Open(ctx, mesh.ConnectOptions{
-		Features:         features,
-		RaftTransport:    transport,
-		RaftStorage:      storage,
-		MeshStorage:      storage,
-		JoinRoundTripper: joinTransport,
+		Features:           features,
+		BootstrapTransport: bootstrapTransport,
+		JoinRoundTripper:   joinTransport,
+		RaftTransport:      raftTransport,
+		RaftStorage:        storage,
+		MeshStorage:        storage,
+		ForceBootstrap:     forceBootstrap,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error opening mesh: %v", err)
