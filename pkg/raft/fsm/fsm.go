@@ -141,8 +141,6 @@ func (r *RaftFSM) applyLog(l *raft.Log) (cmd *v1.RaftLogEntry, res *v1.RaftApply
 	defer func() {
 		log.Debug("finished applying log", slog.String("took", time.Since(start).String()))
 	}()
-	defer r.lastAppliedIndex.Store(l.Index)
-	defer r.currentTerm.Store(l.Term)
 
 	// Validate the term/index of the log entry.
 	dbTerm := r.currentTerm.Load()
@@ -160,6 +158,9 @@ func (r *RaftFSM) applyLog(l *raft.Log) (cmd *v1.RaftLogEntry, res *v1.RaftApply
 			Time: time.Since(start).String(),
 		}
 	}
+
+	defer r.lastAppliedIndex.Store(l.Index)
+	defer r.currentTerm.Store(l.Term)
 
 	if l.Type != raft.LogCommand {
 		// We only care about command logs.
