@@ -774,10 +774,6 @@ github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1Y
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSDJfjId/PEGEShv6ugrt4kYsC5UIDaQ=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
-github.com/webmeshproj/api v0.2.5-0.20230827151446-a18170192efd h1:KaEJm2k+GZfMKZUXkL9UyNb/8asQMxZQKdLLs3TFeZI=
-github.com/webmeshproj/api v0.2.5-0.20230827151446-a18170192efd/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
-github.com/webmeshproj/api v0.2.5-0.20230828231954-96e38f4548fb h1:R/mW2yfrsN+mnO/BGgBrfH065gqvHEjEOXQJKsSDSRU=
-github.com/webmeshproj/api v0.2.5-0.20230828231954-96e38f4548fb/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.2.5-0.20230828234228-422be5c56b44 h1:5Ol14zntvGm+FOg1xfumrGXT+N/lyR6Mp6kVEn7/oEg=
 github.com/webmeshproj/api v0.2.5-0.20230828234228-422be5c56b44/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=

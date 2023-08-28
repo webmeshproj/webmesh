@@ -51,8 +51,6 @@ type Plugin struct {
 type Config struct {
 	// StaticIPv4 is a map of node names to IPv4 addresses.
 	StaticIPv4 map[string]string `mapstructure:"static-ipv4,omitempty"`
-	// StaticIPv6 is a map of node names to IPv6 addresses.
-	StaticIPv6 map[string]string `mapstructure:"static-ipv6,omitempty"`
 }
 
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {
@@ -173,11 +171,6 @@ func (p *Plugin) isStaticAllocation(ip netip.Prefix) bool {
 			}
 		}
 		return false
-	}
-	for _, addr := range p.config.StaticIPv6 {
-		if addr == ip.String() {
-			return true
-		}
 	}
 	return false
 }
