@@ -100,6 +100,10 @@ func (p *externalServerPlugin) Close(ctx context.Context, in *emptypb.Empty, opt
 	return &emptypb.Empty{}, p.conn.Close()
 }
 
+func (p *externalServerPlugin) Raft() v1.RaftPluginClient {
+	return v1.NewRaftPluginClient(p.conn)
+}
+
 func (p *externalServerPlugin) Storage() v1.StoragePluginClient {
 	return v1.NewStoragePluginClient(p.conn)
 }

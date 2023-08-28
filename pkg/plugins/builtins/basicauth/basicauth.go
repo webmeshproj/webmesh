@@ -62,8 +62,8 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Name:        "basic-auth",
 		Version:     version.Version,
 		Description: "Basic authentication plugin",
-		Capabilities: []v1.PluginCapability{
-			v1.PluginCapability_PLUGIN_CAPABILITY_AUTH,
+		Capabilities: []v1.PluginInfo_PluginCapability{
+			v1.PluginInfo_AUTH,
 		},
 	}, nil
 }

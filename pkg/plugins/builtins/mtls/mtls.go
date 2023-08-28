@@ -52,8 +52,8 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Name:        "mtls",
 		Version:     version.Version,
 		Description: "mTLS authentication plugin",
-		Capabilities: []v1.PluginCapability{
-			v1.PluginCapability_PLUGIN_CAPABILITY_AUTH,
+		Capabilities: []v1.PluginInfo_PluginCapability{
+			v1.PluginInfo_AUTH,
 		},
 	}, nil
 }

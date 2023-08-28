@@ -77,10 +77,9 @@ func NewDefaultOptions() Options {
 // GetInfo returns the plugin info.
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {
 	return &v1.PluginInfo{
-		Name:         "debug",
-		Version:      version.Version,
-		Description:  "Debug server plugin",
-		Capabilities: []v1.PluginCapability{},
+		Name:        "debug",
+		Version:     version.Version,
+		Description: "Debug server plugin",
 	}, nil
 }
 
@@ -104,7 +103,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 }
 
 // InjectQuerier injects the querier.
-func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
+func (p *Plugin) InjectQuerier(srv v1.StoragePlugin_InjectQuerierServer) error {
 	p.datamux.Lock()
 	p.data = plugindb.Open(srv)
 	p.datamux.Unlock()

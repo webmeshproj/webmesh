@@ -29,6 +29,7 @@ func main() {
 type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedWatchPluginServer
+	v1.UnimplementedStoragePluginServer
 	// data is the meshdb database.
 	data   storage.MeshStorage
 	closec chan struct{}
@@ -41,8 +42,9 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Name:        "stdout-watch",
 		Version:     version.Version,
 		Description: "Watch plugin that prints events to stdout",
-		Capabilities: []v1.PluginCapability{
-			v1.PluginCapability_PLUGIN_CAPABILITY_WATCH,
+		Capabilities: []v1.PluginInfo_PluginCapability{
+			v1.PluginInfo_WATCH,
+			v1.PluginInfo_STORAGE,
 		},
 	}, nil
 }
@@ -51,18 +53,6 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 // methods are called. The configuration is passed in the req parameter as a mapstructure.
 func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, nil
-}
-
-// InjectQuerier can optionally be implemented by plugins that want to use the meshdb.
-// It is called after Configure and before any other methods are called. The stream
-// can be used with the plugindb package to open a database connection.
-func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
-	p.data = plugindb.Open(srv)
-	select {
-	case <-p.closec:
-	case <-srv.Context().Done():
-	}
-	return nil
 }
 
 // Emit is called for Watch plugins when an event is emitted.
@@ -79,6 +69,18 @@ func (p *Plugin) Emit(ctx context.Context, ev *v1.Event) (*emptypb.Empty, error)
 	// Print the node details (they'll match those of the event).
 	fmt.Printf("%+v\n", node)
 	return &emptypb.Empty{}, nil
+}
+
+// InjectQuerier can optionally be implemented by plugins that want to use the meshdb.
+// It is called after Configure and before any other methods are called. The stream
+// can be used with the plugindb package to open a database connection.
+func (p *Plugin) InjectQuerier(srv v1.StoragePlugin_InjectQuerierServer) error {
+	p.data = plugindb.Open(srv)
+	select {
+	case <-p.closec:
+	case <-srv.Context().Done():
+	}
+	return nil
 }
 
 // Close is called when the plugin is shutting down.

@@ -55,10 +55,6 @@ func (p *externalProcessPlugin) Configure(ctx context.Context, in *v1.PluginConf
 	return p.cli.Configure(ctx, in)
 }
 
-func (p *externalProcessPlugin) InjectQuerier(ctx context.Context, opts ...grpc.CallOption) (v1.Plugin_InjectQuerierClient, error) {
-	return p.cli.InjectQuerier(ctx, opts...)
-}
-
 func (p *externalProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
@@ -82,6 +78,10 @@ func (p *externalProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, op
 		return nil, fmt.Errorf("close: %v", errs)
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (p *externalProcessPlugin) Raft() v1.RaftPluginClient {
+	return v1.NewRaftPluginClient(p.conn)
 }
 
 func (p *externalProcessPlugin) Storage() v1.StoragePluginClient {

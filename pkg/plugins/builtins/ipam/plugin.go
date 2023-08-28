@@ -39,6 +39,7 @@ import (
 type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedIPAMPluginServer
+	v1.UnimplementedStoragePluginServer
 
 	config  Config
 	data    storage.MeshStorage
@@ -59,9 +60,9 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Name:        "ipam",
 		Version:     version.Version,
 		Description: "Simple IPAM plugin",
-		Capabilities: []v1.PluginCapability{
-			v1.PluginCapability_PLUGIN_CAPABILITY_IPAMV4,
-			v1.PluginCapability_PLUGIN_CAPABILITY_IPAMV6,
+		Capabilities: []v1.PluginInfo_PluginCapability{
+			v1.PluginInfo_IPAMV4,
+			v1.PluginInfo_STORAGE,
 		},
 	}, nil
 }
@@ -81,7 +82,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	return &emptypb.Empty{}, nil
 }
 
-func (p *Plugin) InjectQuerier(srv v1.Plugin_InjectQuerierServer) error {
+func (p *Plugin) InjectQuerier(srv v1.StoragePlugin_InjectQuerierServer) error {
 	p.datamux.Lock()
 	p.data = plugindb.Open(srv)
 	p.datamux.Unlock()
@@ -97,6 +98,11 @@ func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty,
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
 	defer close(p.closec)
+	if p.data == nil {
+		// Safeguard to make sure we don't get called before the query stream
+		// is opened.
+		return nil, fmt.Errorf("plugin not configured")
+	}
 	return &emptypb.Empty{}, p.data.Close()
 }
 
@@ -108,17 +114,12 @@ func (p *Plugin) Allocate(ctx context.Context, r *v1.AllocateIPRequest) (*v1.All
 		// is opened.
 		return nil, fmt.Errorf("plugin not configured")
 	}
-	switch r.GetVersion() {
-	case v1.AllocateIPRequest_IP_VERSION_4:
-		if addr, ok := p.config.StaticIPv4[r.GetNodeId()]; ok {
-			return &v1.AllocatedIP{
-				Ip: addr,
-			}, nil
-		}
-		return p.allocateV4(ctx, r)
-	default:
-		return nil, fmt.Errorf("unsupported IP version: %v", r.GetVersion())
+	if addr, ok := p.config.StaticIPv4[r.GetNodeId()]; ok {
+		return &v1.AllocatedIP{
+			Ip: addr,
+		}, nil
 	}
+	return p.allocateV4(ctx, r)
 }
 
 func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.AllocatedIP, error) {

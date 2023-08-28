@@ -74,11 +74,11 @@ func (s *meshStore) newObserver() func(raft.Observation) {
 					return
 				}
 				err = s.plugins.Emit(ctx, &v1.Event{
-					Type: func() v1.WatchEvent {
+					Type: func() v1.Event_WatchEvent {
 						if data.Removed {
-							return v1.WatchEvent_WATCH_EVENT_NODE_LEAVE
+							return v1.Event_NODE_LEAVE
 						}
-						return v1.WatchEvent_WATCH_EVENT_NODE_JOIN
+						return v1.Event_NODE_JOIN
 					}(),
 					Event: &v1.Event_Node{
 						Node: node.Proto(func() v1.ClusterStatus {
@@ -105,7 +105,7 @@ func (s *meshStore) newObserver() func(raft.Observation) {
 					return
 				}
 				err = s.plugins.Emit(ctx, &v1.Event{
-					Type: v1.WatchEvent_WATCH_EVENT_LEADER_CHANGE,
+					Type: v1.Event_LEADER_CHANGE,
 					Event: &v1.Event_Node{
 						Node: node.Proto(v1.ClusterStatus_CLUSTER_LEADER),
 					},

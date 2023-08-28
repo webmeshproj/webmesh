@@ -32,12 +32,12 @@ import (
 )
 
 // Open opens a new database connection to a plugin query stream.
-func Open(srv v1.Plugin_InjectQuerierServer) storage.MeshStorage {
+func Open(srv v1.StoragePlugin_InjectQuerierServer) storage.MeshStorage {
 	return &pluginDB{srv: srv}
 }
 
 type pluginDB struct {
-	srv v1.Plugin_InjectQuerierServer
+	srv v1.StoragePlugin_InjectQuerierServer
 	// TODO: Add a multiplexer to allow multiple queries at once?
 	mu sync.Mutex
 }

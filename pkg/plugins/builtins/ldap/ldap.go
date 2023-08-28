@@ -87,8 +87,8 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Name:        "ldap",
 		Version:     version.Version,
 		Description: "LDAP authentication plugin",
-		Capabilities: []v1.PluginCapability{
-			v1.PluginCapability_PLUGIN_CAPABILITY_AUTH,
+		Capabilities: []v1.PluginInfo_PluginCapability{
+			v1.PluginInfo_AUTH,
 		},
 	}, nil
 }

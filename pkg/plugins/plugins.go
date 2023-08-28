@@ -41,10 +41,11 @@ var (
 // NewManager creates a new plugin manager.
 func NewManager(ctx context.Context, opts *Options) (Manager, error) {
 	builtIns := builtins.NewPluginMap()
-	var auth, ipamv4, ipamv6 clients.PluginClient
+	var auth, ipamv4 clients.PluginClient
 	allPlugins := make(map[string]clients.PluginClient)
-	stores := make([]clients.PluginClient, 0)
+	raftstores := make([]clients.PluginClient, 0)
 	emitters := make([]clients.PluginClient, 0)
+	stores := make(map[string]clients.PluginClient)
 	log := context.LoggerFrom(ctx)
 	for name, cfg := range opts.Plugins {
 		log.Info("loading plugin", "name", name)
@@ -61,17 +62,17 @@ func NewManager(ctx context.Context, opts *Options) (Manager, error) {
 		}
 		for _, cap := range info.Capabilities {
 			switch cap {
-			case v1.PluginCapability_PLUGIN_CAPABILITY_AUTH:
+			case v1.PluginInfo_AUTH:
 				// TODO: allow multiple auth plugins.
 				auth = plugin
-			case v1.PluginCapability_PLUGIN_CAPABILITY_IPAMV4:
+			case v1.PluginInfo_IPAMV4:
 				ipamv4 = plugin
-			case v1.PluginCapability_PLUGIN_CAPABILITY_IPAMV6:
-				ipamv6 = plugin
-			case v1.PluginCapability_PLUGIN_CAPABILITY_STORE:
-				stores = append(stores, plugin)
-			case v1.PluginCapability_PLUGIN_CAPABILITY_WATCH:
+			case v1.PluginInfo_RAFT:
+				raftstores = append(raftstores, plugin)
+			case v1.PluginInfo_WATCH:
 				emitters = append(emitters, plugin)
+			case v1.PluginInfo_STORAGE:
+				stores[name] = plugin
 			}
 		}
 		// Configure the plugin.
@@ -91,24 +92,24 @@ func NewManager(ctx context.Context, opts *Options) (Manager, error) {
 		}
 		allPlugins[name] = plugin
 	}
-	// If both IPAM plugins are unconfigured, use the in-process IPAM plugin.
-	if ipamv4 == nil && ipamv6 == nil {
+	// If IPAM is not configured use the in-process IPAM plugin.
+	if ipamv4 == nil {
 		ipam := builtIns["ipam"]
 		if _, err := ipam.Configure(ctx, &v1.PluginConfiguration{}); err != nil {
 			return nil, fmt.Errorf("configure in-process IPAM plugin: %w", err)
 		}
 		ipamv4 = ipam
-		ipamv6 = ipam
 		allPlugins["ipam"] = ipam
+		stores["ipam"] = ipam
 	}
 	m := &manager{
-		auth:     auth,
-		ipamv4:   ipamv4,
-		ipamv6:   ipamv6,
-		stores:   stores,
-		emitters: emitters,
-		plugins:  allPlugins,
-		log:      slog.Default().With("component", "plugin-manager"),
+		auth:       auth,
+		ipamv4:     ipamv4,
+		raftstores: raftstores,
+		stores:     stores,
+		emitters:   emitters,
+		plugins:    allPlugins,
+		log:        slog.Default().With("component", "plugin-manager"),
 	}
 	return m, nil
 }

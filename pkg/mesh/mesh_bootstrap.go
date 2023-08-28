@@ -293,9 +293,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	var privatev4 netip.Prefix
 	if !s.opts.Mesh.NoIPv4 {
 		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeId:  s.ID(),
-			Subnet:  s.opts.Bootstrap.IPv4Network,
-			Version: v1.AllocateIPRequest_IP_VERSION_4,
+			NodeId: s.ID(),
+			Subnet: s.opts.Bootstrap.IPv4Network,
 		})
 		if err != nil {
 			return fmt.Errorf("allocate IPv4 address: %w", err)

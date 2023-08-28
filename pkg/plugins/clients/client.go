@@ -26,6 +26,8 @@ import (
 type PluginClient interface {
 	v1.PluginClient
 
+	// Raft returns a raft client.
+	Raft() v1.RaftPluginClient
 	// Storage returns a storage client.
 	Storage() v1.StoragePluginClient
 	// Auth returns an auth client.

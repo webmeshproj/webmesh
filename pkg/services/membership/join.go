@@ -188,9 +188,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if req.GetAssignIpv4() {
 		log.Debug("Assigning IPv4 address to peer")
 		leasev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeId:  req.GetId(),
-			Subnet:  s.ipv4Prefix.String(),
-			Version: v1.AllocateIPRequest_IP_VERSION_4,
+			NodeId: req.GetId(),
+			Subnet: s.ipv4Prefix.String(),
 		})
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to allocate IPv4 address: %v", err))

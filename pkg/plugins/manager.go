@@ -52,13 +52,13 @@ type Manager interface {
 
 type manager struct {
 	// db       storage.Storage
-	auth     clients.PluginClient
-	ipamv4   clients.PluginClient
-	ipamv6   clients.PluginClient
-	stores   []clients.PluginClient
-	emitters []clients.PluginClient
-	plugins  map[string]clients.PluginClient
-	log      *slog.Logger
+	auth       clients.PluginClient
+	ipamv4     clients.PluginClient
+	stores     map[string]clients.PluginClient
+	raftstores []clients.PluginClient
+	emitters   []clients.PluginClient
+	plugins    map[string]clients.PluginClient
+	log        *slog.Logger
 }
 
 // Get returns the plugin with the given name.
@@ -123,46 +123,29 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 func (m *manager) AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (netip.Prefix, error) {
 	var addr netip.Prefix
 	var err error
-	switch req.GetVersion() {
-	case v1.AllocateIPRequest_IP_VERSION_4:
-		if m.ipamv4 == nil {
-			return addr, ErrUnsupported
-		}
-		res, err := m.ipamv4.IPAM().Allocate(ctx, req)
-		if err != nil {
-			return addr, fmt.Errorf("allocate IPv4: %w", err)
-		}
-		addr, err = netip.ParsePrefix(res.GetIp())
-		if err != nil {
-			return addr, fmt.Errorf("parse IPv4 address: %w", err)
-		}
-	case v1.AllocateIPRequest_IP_VERSION_6:
-		if m.ipamv6 == nil {
-			return addr, ErrUnsupported
-		}
-		res, err := m.ipamv6.IPAM().Allocate(ctx, req)
-		if err != nil {
-			return addr, fmt.Errorf("allocate IPv6: %w", err)
-		}
-		addr, err = netip.ParsePrefix(res.GetIp())
-		if err != nil {
-			return addr, fmt.Errorf("parse IPv6 address: %w", err)
-		}
-	default:
-		err = fmt.Errorf("unsupported IP version: %v", req.GetVersion())
+	if m.ipamv4 == nil {
+		return addr, ErrUnsupported
+	}
+	res, err := m.ipamv4.IPAM().Allocate(ctx, req)
+	if err != nil {
+		return addr, fmt.Errorf("allocate IPv4: %w", err)
+	}
+	addr, err = netip.ParsePrefix(res.GetIp())
+	if err != nil {
+		return addr, fmt.Errorf("parse IPv4 address: %w", err)
 	}
 	return addr, err
 }
 
 // ApplyRaftLog applies a raft log entry to all storage plugins.
 func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) ([]*v1.RaftApplyResponse, error) {
-	if len(m.stores) == 0 {
+	if len(m.raftstores) == 0 {
 		return nil, nil
 	}
-	out := make([]*v1.RaftApplyResponse, len(m.stores))
+	out := make([]*v1.RaftApplyResponse, len(m.raftstores))
 	errs := make([]error, 0)
-	for i, store := range m.stores {
-		resp, err := store.Storage().Store(ctx, entry)
+	for i, store := range m.raftstores {
+		resp, err := store.Raft().Store(ctx, entry)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -178,7 +161,7 @@ func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) (
 
 // ApplySnapshot applies a snapshot to all storage plugins.
 func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) error {
-	if len(m.stores) == 0 {
+	if len(m.raftstores) == 0 {
 		return nil
 	}
 	defer data.Close()
@@ -187,8 +170,8 @@ func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, da
 		return fmt.Errorf("read snapshot: %w", err)
 	}
 	errs := make([]error, 0)
-	for _, store := range m.stores {
-		_, err := store.Storage().RestoreSnapshot(ctx, &v1.DataSnapshot{
+	for _, store := range m.raftstores {
+		_, err := store.Raft().RestoreSnapshot(ctx, &v1.DataSnapshot{
 			Term:  meta.Term,
 			Index: meta.Index,
 			Data:  snapsot,
@@ -241,9 +224,9 @@ func (m *manager) Close() error {
 
 // handleQueries handles SQL queries from plugins.
 func (m *manager) handleQueries(db storage.MeshStorage) {
-	for plugin, client := range m.plugins {
+	for plugin, client := range m.stores {
 		ctx := context.Background()
-		q, err := client.InjectQuerier(ctx)
+		q, err := client.Storage().InjectQuerier(ctx)
 		if err != nil {
 			if status.Code(err) == codes.Unimplemented {
 				m.log.Debug("plugin does not implement queries", "plugin", plugin)
@@ -252,12 +235,12 @@ func (m *manager) handleQueries(db storage.MeshStorage) {
 			m.log.Error("start query stream", "plugin", plugin, "error", err)
 			continue
 		}
-		go m.handleQueryClient(plugin, db, client, q)
+		go m.handleQueryClient(plugin, db, q)
 	}
 }
 
 // handleQueryClient handles a query client.
-func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, client clients.PluginClient, queries v1.Plugin_InjectQuerierClient) {
+func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queries v1.StoragePlugin_InjectQuerierClient) {
 	defer func() {
 		if err := queries.CloseSend(); err != nil {
 			m.log.Error("close query stream", "plugin", plugin, "error", err)
@@ -324,6 +307,33 @@ func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, clien
 			err = queries.Send(&result)
 			if err != nil {
 				m.log.Error("send query results EOF", "plugin", plugin, "error", err)
+			}
+		case v1.PluginQuery_PUT:
+			// TODO: Implement
+			var result v1.PluginQueryResult
+			result.Id = query.GetId()
+			result.Error = fmt.Sprintf("unsupported command: %v", query.GetCommand())
+			err = queries.Send(&result)
+			if err != nil {
+				m.log.Error("send query result", "plugin", plugin, "error", err)
+			}
+		case v1.PluginQuery_DELETE:
+			// TODO: Implement
+			var result v1.PluginQueryResult
+			result.Id = query.GetId()
+			result.Error = fmt.Sprintf("unsupported command: %v", query.GetCommand())
+			err = queries.Send(&result)
+			if err != nil {
+				m.log.Error("send query result", "plugin", plugin, "error", err)
+			}
+		case v1.PluginQuery_SUBSCRIBE:
+			// TODO: Implement (this will require wraping the stream in a multiplexer)
+			var result v1.PluginQueryResult
+			result.Id = query.GetId()
+			result.Error = fmt.Sprintf("unsupported command: %v", query.GetCommand())
+			err = queries.Send(&result)
+			if err != nil {
+				m.log.Error("send query result", "plugin", plugin, "error", err)
 			}
 		default:
 			var result v1.PluginQueryResult
