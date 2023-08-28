@@ -31,7 +31,7 @@ import (
 )
 
 func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, servers []multiaddr.Multiaddr) error {
-	log := context.LoggerFrom(ctx).With("id", host.ID())
+	log := context.LoggerFrom(ctx)
 	err := kaddht.Bootstrap(ctx)
 	if err != nil {
 		return fmt.Errorf("libp2p dht bootstrap: %w", err)

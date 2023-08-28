@@ -19,24 +19,50 @@ limitations under the License.
 package libp2p
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
-	"io"
-	"net"
+	"log/slog"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/host"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/multiformats/go-multiaddr"
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	meshdiscovery "github.com/webmeshproj/webmesh/pkg/discovery"
 	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// NewKadDHTJoiner creates a new joiner for the libp2p kademlia DHT.
-func NewKadDHTJoiner(ctx context.Context, opts *KadDHTOptions) (meshdiscovery.Discovery, error) {
+// DHTJoinOptions are options for joining a cluster with the libp2p kademlia DHT.
+type DHTJoinOptions struct {
+	// PSK is the pre-shared key to use as a rendezvous point for the DHT.
+	PSK string
+	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
+	// If empty or nil, the default bootstrap peers will be used.
+	BootstrapPeers []multiaddr.Multiaddr
+	// Options are options for configuring the libp2p host.
+	Options []libp2p.Option
+	// ConnectTimeout is the per-address timeout for connecting to a peer.
+	ConnectTimeout time.Duration
+}
+
+// NewDHTJoinRoundTripper returns a round tripper that uses the libp2p kademlia DHT to join a cluster.
+func NewDHTJoinRoundTripper(opts DHTJoinOptions) transport.JoinRoundTripper {
+	return &dhtJoinRoundTripper{opts}
+}
+
+type dhtJoinRoundTripper struct {
+	DHTJoinOptions
+}
+
+// RoundTrip executes a request to join a cluster.
+func (rt *dhtJoinRoundTripper) RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
 	log := context.LoggerFrom(ctx)
+	// Try to set the maximum read and write buffer sizes.
 	err := buffers.SetMaximumReadBuffer(2500000)
 	if err != nil {
 		log.Warn("Failed to set maximum read buffer", "error", err.Error())
@@ -45,97 +71,81 @@ func NewKadDHTJoiner(ctx context.Context, opts *KadDHTOptions) (meshdiscovery.Di
 	if err != nil {
 		log.Warn("Failed to set maximum write buffer", "error", err.Error())
 	}
-	host, err := libp2p.New(opts.Options...)
+	// Create a new libp2p host.
+	host, err := libp2p.New(rt.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)
 	}
-	return &kadDHTJoiner{
-		opts:       opts,
-		host:       host,
-		triedPeers: map[string]struct{}{},
-		acceptc:    make(chan io.ReadWriteCloser, 1),
-		closec:     make(chan struct{}),
-	}, nil
-}
-
-// kadDHTJoiner is a joiner for the libp2p kademlia DHT.
-type kadDHTJoiner struct {
-	opts       *KadDHTOptions
-	host       host.Host
-	triedPeers map[string]struct{}
-	acceptc    chan io.ReadWriteCloser
-	closec     chan struct{}
-}
-
-func (kad *kadDHTJoiner) Start(ctx context.Context) error {
-	log := context.LoggerFrom(ctx).With("id", kad.host.ID())
-	kaddht, err := dht.New(ctx, kad.host)
+	defer host.Close()
+	log = log.With(slog.String("host-id", host.ID().String()))
+	ctx = context.WithLogger(ctx, log)
+	// Bootstrap the DHT.
+	kaddht, err := dht.New(ctx, host)
 	if err != nil {
-		return fmt.Errorf("libp2p new dht: %w", err)
+		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
-	err = bootstrapDHT(ctx, kad.host, kaddht, kad.opts.BootstrapPeers)
+	err = bootstrapDHT(ctx, host, kaddht, rt.BootstrapPeers)
 	if err != nil {
-		return fmt.Errorf("libp2p bootstrap dht: %w", err)
+		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
 	}
+	// Announce the join protocol with our PSK.
 	log.Debug("Announcing join protocol with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(kaddht)
-	go kad.waitForPeers(ctx, routingDiscovery)
-	return nil
-}
-
-func (kad *kadDHTJoiner) waitForPeers(ctx context.Context, routingDiscovery *drouting.RoutingDiscovery) {
-	log := context.LoggerFrom(ctx).With("id", kad.host.ID())
-	peerChan, err := routingDiscovery.FindPeers(ctx, kad.opts.PSK)
+	peerChan, err := routingDiscovery.FindPeers(ctx, rt.PSK)
 	if err != nil {
-		log.Error("Failed to find peers, retrying in 3 seconds", "error", err.Error())
-		select {
-		case <-kad.closec:
-			return
-		case <-time.After(3 * time.Second):
-			go kad.waitForPeers(ctx, routingDiscovery)
-		}
+		return nil, fmt.Errorf("libp2p find peers: %w", err)
 	}
+	// Marshal the join request
+	joinData, err := proto.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal join request: %w", err)
+	}
+	// Wait for a peer to connect to
+	log.Debug("Waiting for peer to establish connection with")
 	for peer := range peerChan {
-		if peer.ID == kad.host.ID() || len(peer.Addrs) == 0 {
+		// Ignore ourselves and hosts with no addresses.
+		jlog := log.With(slog.String("peer-id", peer.ID.String()), slog.Any("peer-addrs", peer.Addrs))
+		if peer.ID == host.ID() || len(peer.Addrs) == 0 {
+			jlog.Debug("Ignoring peer")
 			continue
 		}
-		if _, ok := kad.triedPeers[peer.ID.String()]; ok {
-			log.Debug("Already tried peer", "peer", peer.ID)
-			continue
+		jlog.Debug("Dialing peer")
+		var joinCtx context.Context
+		var cancel context.CancelFunc
+		if rt.ConnectTimeout > 0 {
+			joinCtx, cancel = context.WithTimeout(ctx, rt.ConnectTimeout)
+		} else {
+			joinCtx, cancel = context.WithCancel(ctx)
 		}
-		kad.triedPeers[peer.ID.String()] = struct{}{}
-		log.Debug("Found peer to join", "peer", peer.ID)
-		jctx, cancel := context.WithTimeout(ctx, 5*time.Second) // TODO: Make this configurable
-		s, err := kad.host.NewStream(jctx, peer.ID, JoinProtocol)
+		stream, err := host.NewStream(joinCtx, peer.ID, JoinProtocol)
 		cancel()
 		if err != nil {
-			log.Warn("Failed to connect to peer", "peer", peer.ID, "error", err.Error())
+			// We'll try again with the next peer.
+			jlog.Warn("Failed to connect to peer", slog.String("error", err.Error()))
 			continue
 		}
-		log.Debug("Connected to peer", "peer", peer.ID)
-		kad.acceptc <- s
+		jlog.Debug("Connected to peer")
+		defer stream.Close()
+		// Send a join request to the peer over the stream.
+		jlog.Debug("Sending join request to peer")
+		_, err = stream.Write(joinData)
+		if err != nil {
+			return nil, fmt.Errorf("write join request: %w", err)
+		}
+		var b [8192]byte
+		n, err := stream.Read(b[:])
+		if err != nil {
+			return nil, fmt.Errorf("read join response: %w", err)
+		}
+		if bytes.HasPrefix(b[:n], []byte("ERROR: ")) {
+			return nil, fmt.Errorf("join error: %s", string(bytes.TrimPrefix(b[:n], []byte("ERROR: "))))
+		}
+		var resp v1.JoinResponse
+		err = proto.Unmarshal(b[:n], &resp)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal join response: %w", err)
+		}
+		return &resp, nil
 	}
-	log.Debug("peer channel exhausted, retrying in 3 seconds")
-	select {
-	case <-kad.closec:
-		return
-	case <-time.After(3 * time.Second):
-		go kad.waitForPeers(ctx, routingDiscovery)
-	}
-}
-
-// Stop stops the discovery service.
-func (kad *kadDHTJoiner) Stop() error {
-	defer close(kad.closec)
-	return kad.host.Close()
-}
-
-// Accept returns a connection to a peer.
-func (kad *kadDHTJoiner) Accept() (io.ReadWriteCloser, error) {
-	select {
-	case <-kad.closec:
-		return nil, net.ErrClosed
-	case conn := <-kad.acceptc:
-		return conn, nil
-	}
+	return nil, errors.New("no peers found to join")
 }

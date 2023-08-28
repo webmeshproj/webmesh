@@ -77,6 +77,10 @@ const (
 	Nonvoter = raft.Nonvoter
 )
 
+// BootstrapCallback is a callback for when the cluster is bootstrapped.
+// The isLeader flag is set to true if the node is the leader, and false otherwise.
+type BootstrapCallback func(isLeader bool) error
+
 // Raft is the interface for Raft consensus and storage.
 type Raft interface {
 	// Start starts the Raft node.
@@ -88,7 +92,7 @@ type Raft interface {
 	// bootstrapped and bootstrapping succeeds, the optional callback is called
 	// with isLeader flag set to true if the node is the leader, and false otherwise.
 	// Any error returned by the callback is returned by Bootstrap.
-	Bootstrap(ctx context.Context, opts *BootstrapOptions) error
+	Bootstrap(ctx context.Context, opts *BootstrapOptions, cb BootstrapCallback) error
 	// Storage returns the storage. This is only valid after Start is called.
 	Storage() storage.MeshStorage
 	// Configuration returns the current raft configuration.
@@ -146,8 +150,6 @@ type BootstrapOptions struct {
 	// Servers are the Raft servers to bootstrap with.
 	// Keys are the node IDs, and values are the Raft addresses.
 	Servers map[string]string
-	// OnBootstrapped is called when the cluster is bootstrapped.
-	OnBootstrapped func(isLeader bool) error
 }
 
 // New returns a new Raft node.
@@ -260,7 +262,7 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 }
 
 // Bootstrap attempts to bootstrap the Raft cluster.
-func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error {
+func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions, cb BootstrapCallback) error {
 	r.mu.Lock()
 	if !r.started.Load() {
 		r.mu.Unlock()
@@ -303,7 +305,7 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 	f := r.raft.BootstrapCluster(cfg)
 	err = f.Error()
 	if err != nil {
-		defer r.mu.Unlock()
+		r.mu.Unlock()
 		if err == raft.ErrCantBootstrap {
 			return ErrAlreadyBootstrapped
 		}
@@ -324,11 +326,11 @@ func (r *raftNode) Bootstrap(ctx context.Context, opts *BootstrapOptions) error 
 			// We need to unlock before return as the OnBootstrapped
 			// callback will want to write to storage.
 			r.mu.Unlock()
-			if opts.OnBootstrapped == nil {
+			if cb == nil {
 				return nil
 			}
 			isLeader := id == r.nodeID
-			return opts.OnBootstrapped(isLeader)
+			return cb(isLeader)
 		}
 	}
 }

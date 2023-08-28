@@ -23,8 +23,22 @@ import (
 	"net/netip"
 
 	"github.com/hashicorp/raft"
+	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 )
+
+// JoinRoundTripper is the interface for executing a request to join a cluster.
+type JoinRoundTripper interface {
+	// RoundTrip executes a request to join a cluster.
+	RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+}
+
+// JoinServer is the interface for receiving requests to join a cluster. It is reduced
+// in scope from the full gRPC server interface.
+type JoinServer interface {
+	// Join is executed when a request to join a cluster is received.
+	Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+}
 
 // RaftTransport defines the methods needed for raft consensus to function
 // in a webmesh cluster.

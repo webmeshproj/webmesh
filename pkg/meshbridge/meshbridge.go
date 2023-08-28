@@ -28,8 +28,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/discovery/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
@@ -157,7 +159,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 			return handleErr(fmt.Errorf("mesh %q not found", meshID))
 		}
 		features := meshOpts.Services.ToFeatureSet(isRaftMember)
-		transport, err := transport.NewRaftTCPTransport(msh, transport.TCPTransportOptions{
+		raftTransport, err := transport.NewRaftTCPTransport(msh, transport.TCPTransportOptions{
 			Addr:    meshOpts.Mesh.Raft.ListenAddress,
 			MaxPool: meshOpts.Mesh.Raft.ConnectionPoolCount,
 			Timeout: meshOpts.Mesh.Raft.ConnectionTimeout,
@@ -179,11 +181,16 @@ func (m *meshBridge) Start(ctx context.Context) error {
 				return fmt.Errorf("create disk storage: %w", err)
 			}
 		}
-		err = msh.Open(ctx, &mesh.ConnectOptions{
-			Features:      features,
-			RaftTransport: transport,
-			RaftStorage:   storage,
-			MeshStorage:   storage,
+		joinTransport, err := getJoinTransport(ctx, msh, meshOpts)
+		if err != nil {
+			return handleErr(fmt.Errorf("create join transport: %w", err))
+		}
+		err = msh.Open(ctx, mesh.ConnectOptions{
+			Features:         features,
+			RaftTransport:    raftTransport,
+			RaftStorage:      storage,
+			MeshStorage:      storage,
+			JoinRoundTripper: joinTransport,
 		})
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to open mesh %q: %w", meshID, err))
@@ -357,4 +364,56 @@ func (m *meshBridge) Stop(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func getJoinTransport(ctx context.Context, st mesh.Mesh, config *MeshOptions) (transport.JoinRoundTripper, error) {
+	var joinTransport transport.JoinRoundTripper
+	if config.Mesh.Bootstrap != nil && config.Mesh.Bootstrap.Enabled {
+		// Our join transport is the gRPC transport to other bootstrap nodes
+		var addrs []string
+		for id, addr := range config.Mesh.Bootstrap.Servers {
+			if id == st.ID() {
+				continue
+			}
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid bootstrap server address: %w", err)
+			}
+			var addr string
+			if len(config.Mesh.Bootstrap.ServersGRPCPorts) > 0 && config.Mesh.Bootstrap.ServersGRPCPorts[host] != 0 {
+				addr = fmt.Sprintf("%s:%d", host, config.Mesh.Bootstrap.ServersGRPCPorts[host])
+			} else {
+				// Assume the default port
+				addr = fmt.Sprintf("%s:%d", host, mesh.DefaultGRPCPort)
+			}
+			addrs = append(addrs, addr)
+		}
+		joinTransport = transport.NewGRPCJoinRoundTripper(transport.GRPCJoinOptions{
+			Addrs:          addrs,
+			Credentials:    st.Credentials(ctx),
+			AddressTimeout: time.Second * 3,
+		})
+	} else if config.Mesh.Mesh.JoinAddress != "" {
+		joinTransport = transport.NewGRPCJoinRoundTripper(transport.GRPCJoinOptions{
+			Addrs:          []string{config.Mesh.Mesh.JoinAddress},
+			Credentials:    st.Credentials(ctx),
+			AddressTimeout: time.Second * 3,
+		})
+	} else if config.Mesh.Discovery != nil && config.Mesh.Discovery.UseKadDHT {
+		var addrs []multiaddr.Multiaddr
+		for _, addr := range config.Mesh.Discovery.KadBootstrapServers {
+			maddr, err := multiaddr.NewMultiaddr(addr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid bootstrap peer address: %w", err)
+			}
+			addrs = append(addrs, maddr)
+		}
+		joinTransport = libp2p.NewDHTJoinRoundTripper(libp2p.DHTJoinOptions{
+			PSK:            config.Mesh.Discovery.PSK,
+			BootstrapPeers: addrs,
+			ConnectTimeout: time.Second * 3,
+		})
+	}
+	// A nil transport is technically okay, it means we are a single-node mesh
+	return joinTransport, nil
 }

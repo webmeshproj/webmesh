@@ -70,7 +70,7 @@ func (p *passthroughRaft) Start(ctx context.Context, opts *StartOptions) error {
 	return nil
 }
 
-func (p *passthroughRaft) Bootstrap(ctx context.Context, opts *BootstrapOptions) error {
+func (p *passthroughRaft) Bootstrap(ctx context.Context, opts *BootstrapOptions, cb BootstrapCallback) error {
 	return ErrNotRaftMember
 }
 

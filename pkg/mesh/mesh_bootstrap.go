@@ -36,61 +36,50 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
-func (s *meshStore) bootstrap(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
+func (s *meshStore) bootstrap(ctx context.Context, rt transport.JoinRoundTripper, features []v1.Feature, wireguardKey wgtypes.Key) error {
 	// Check if the mesh network is defined
 	_, err := s.Storage().GetValue(ctx, state.IPv6PrefixKey)
 	var firstBootstrap bool
 	if err != nil {
-		if !errors.Is(err, storage.ErrKeyNotFound) {
+		if !storage.IsKeyNotFoundError(err) {
 			return fmt.Errorf("get mesh network: %w", err)
 		}
 		firstBootstrap = true
 	}
 	if !firstBootstrap {
 		// We have data, so the cluster is already bootstrapped.
-		s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
-		// We rejoin as a voter no matter what
-		s.opts.Mesh.JoinAsVoter = true
-		if len(s.opts.Bootstrap.Servers) == 0 {
-			// We were the only bootstrap server, so we need to rejoin ourselves
-			// This is not foolproof, but it's the best we can do if the bootstrap
-			// flag is left on.
-			s.log.Info("cluster already bootstrapped and no other servers set, attempting to rejoin self")
-			return s.recoverWireguard(ctx)
-		}
-		// Try to rejoin one of the bootstrap servers
-		return s.rejoinBootstrapServer(ctx, features, wireguardKey)
+		s.log.Info("Cluster already bootstrapped, attempting to rejoin as voter")
+		return s.join(ctx, rt, features, wireguardKey)
 	}
 	var bootstrapOpts raft.BootstrapOptions
 	bootstrapOpts.Servers = s.opts.Bootstrap.Servers
 	bootstrapOpts.AdvertiseAddress = s.opts.Bootstrap.AdvertiseAddress
-	bootstrapOpts.OnBootstrapped = func(isLeader bool) error {
+	err = s.raft.Bootstrap(ctx, &bootstrapOpts, func(isLeader bool) error {
 		if isLeader {
+			s.log.Info("We were elected leader")
 			return s.initialBootstrapLeader(ctx, features, wireguardKey)
 		}
-		return s.initialBootstrapNonLeader(ctx, features, wireguardKey)
-	}
-	err = s.raft.Bootstrap(ctx, &bootstrapOpts)
+		if s.testStore {
+			return nil
+		}
+		s.opts.Mesh.JoinAsVoter = true
+		s.log.Info("We were not elected leader")
+		return s.join(ctx, rt, features, wireguardKey)
+	})
 	if err != nil {
 		// If the error is that we already bootstrapped and
 		// there were other servers to bootstrap with, then
 		// we might just need to rejoin the cluster.
-		if errors.Is(err, raft.ErrAlreadyBootstrapped) {
-			if len(s.opts.Bootstrap.Servers) > 0 {
-				s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
-				s.opts.Mesh.JoinAsVoter = true
-				return s.rejoinBootstrapServer(ctx, features, wireguardKey)
-			}
-			// We were the only bootstrap server, so we need to rejoin ourselves
-			// This is not foolproof, but it's the best we can do if the bootstrap
-			// flag is left on.
-			s.log.Info("cluster already bootstrapped and no other servers set, attempting to rejoin self")
-			return s.recoverWireguard(ctx)
+		if errors.Is(err, raft.ErrAlreadyBootstrapped) && len(s.opts.Bootstrap.Servers) > 0 {
+			s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
+			s.opts.Mesh.JoinAsVoter = true
+			return s.join(ctx, rt, features, wireguardKey)
 		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
@@ -429,67 +418,4 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, features []v1.Fe
 	}
 	s.log.Info("initial bootstrap complete")
 	return nil
-}
-
-func (s *meshStore) initialBootstrapNonLeader(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
-	if s.testStore {
-		return nil
-	}
-	// We "join" the cluster again through the usual workflow of adding a voter.
-	leader, err := s.LeaderID()
-	if err != nil {
-		return fmt.Errorf("get leader ID: %w", err)
-	}
-	var advertiseAddress net.Addr
-	for id, addr := range s.opts.Bootstrap.Servers {
-		if id == leader {
-			advertiseAddress, err = netutil.ResolveTCPAddr(ctx, addr, 10)
-			if err != nil {
-				return fmt.Errorf("resolve advertise address: %w", err)
-			}
-		}
-	}
-	// We need to extract the host part from the address
-	// since we are going to use it to join the cluster.
-	addr := advertiseAddress.(*net.TCPAddr).AddrPort()
-	var grpcPort int
-	if port, ok := s.opts.Bootstrap.ServersGRPCPorts[string(leader)]; ok {
-		grpcPort = port
-	} else {
-		grpcPort = s.opts.Mesh.GRPCAdvertisePort
-	}
-	joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
-	s.opts.Mesh.JoinAsVoter = true
-	time.Sleep(3 * time.Second)
-	return s.join(ctx, features, joinAddr, wireguardKey)
-}
-
-func (s *meshStore) rejoinBootstrapServer(ctx context.Context, features []v1.Feature, wireguardKey wgtypes.Key) error {
-	s.opts.Mesh.JoinAsVoter = true
-	for id, server := range s.opts.Bootstrap.Servers {
-		if id == s.ID() {
-			continue
-		}
-		advertiseAddress, err := netutil.ResolveTCPAddr(ctx, server, 10)
-		if err != nil {
-			return fmt.Errorf("resolve advertise address: %w", err)
-		}
-		// We need to extract the host part from the address
-		// since we are going to use it to join the cluster.
-		addr := advertiseAddress.(*net.TCPAddr).AddrPort()
-		var grpcPort int
-		if port, ok := s.opts.Bootstrap.ServersGRPCPorts[id]; ok {
-			grpcPort = port
-		} else {
-			grpcPort = s.opts.Mesh.GRPCAdvertisePort
-		}
-		joinAddr := net.JoinHostPort(addr.Addr().String(), strconv.Itoa(grpcPort))
-		if err = s.join(ctx, features, joinAddr, wireguardKey); err != nil {
-			s.log.Warn("failed to rejoin bootstrap server", slog.String("error", err.Error()))
-			continue
-		}
-		return nil
-	}
-	s.log.Error("no joinable bootstrap servers found, falling back to wireguard recovery")
-	return s.recoverWireguard(ctx)
 }

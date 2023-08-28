@@ -135,7 +135,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		}()
 		features = config.Services.ToFeatureSet(isRaftMember)
 	}
-	err = conn.Open(ctx, &mesh.ConnectOptions{
+	err = conn.Open(ctx, mesh.ConnectOptions{
 		Features:      features,
 		RaftTransport: transport,
 		RaftStorage:   storage,

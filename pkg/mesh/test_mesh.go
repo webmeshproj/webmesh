@@ -53,7 +53,7 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := stor.Open(ctx, &ConnectOptions{
+	if err := stor.Open(ctx, ConnectOptions{
 		RaftTransport: transport,
 		RaftStorage:   storage,
 		MeshStorage:   storage,
@@ -105,7 +105,7 @@ func NewTestCluster(ctx context.Context, numNodes int, startPort int) ([]Mesh, e
 	for i := 0; i < numNodes; i++ {
 		i := i
 		g.Go(func() error {
-			if err := stores[i].Open(ctx, nil); err != nil {
+			if err := stores[i].Open(ctx, ConnectOptions{}); err != nil {
 				return err
 			}
 			return nil

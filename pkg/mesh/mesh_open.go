@@ -31,7 +31,7 @@ import (
 )
 
 // Open opens the store.
-func (s *meshStore) Open(ctx context.Context, opts *ConnectOptions) (err error) {
+func (s *meshStore) Open(ctx context.Context, opts ConnectOptions) (err error) {
 	if s.open.Load() {
 		return ErrOpen
 	}
@@ -114,7 +114,7 @@ func (s *meshStore) Open(ctx context.Context, opts *ConnectOptions) (err error) 
 		RaftPort:              int(s.raft.ListenPort()),
 		GRPCPort:              s.opts.Mesh.GRPCAdvertisePort,
 		ZoneAwarenessID:       s.opts.Mesh.ZoneAwarenessID,
-		DialOptions:           s.grpcCreds(context.Background()),
+		DialOptions:           s.Credentials(context.Background()),
 		DisableIPv4:           s.opts.Mesh.NoIPv4,
 		DisableIPv6:           s.opts.Mesh.NoIPv6,
 	})
@@ -127,19 +127,14 @@ func (s *meshStore) Open(ctx context.Context, opts *ConnectOptions) (err error) 
 	if s.opts.Bootstrap.Enabled {
 		// Attempt bootstrap.
 		log.Info("bootstrapping cluster")
-		if err = s.bootstrap(ctx, opts.Features, key); err != nil {
+		if err = s.bootstrap(ctx, opts.JoinRoundTripper, opts.Features, key); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
-	} else if s.opts.Mesh.JoinAddress != "" {
+	} else if opts.JoinRoundTripper != nil {
 		// Attempt to join the cluster.
-		err = s.join(ctx, opts.Features, s.opts.Mesh.JoinAddress, key)
+		err = s.join(ctx, opts.JoinRoundTripper, opts.Features, key)
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
-		}
-	} else if s.opts.Discovery != nil && s.opts.Discovery.UseKadDHT && s.opts.Discovery.PSK != "" {
-		err = s.joinWithKadDHT(ctx, opts.Features, key)
-		if err != nil {
-			return handleErr(fmt.Errorf("join with kad dht: %w", err))
 		}
 	} else {
 		// We neither had the bootstrap flag nor any join flags set.

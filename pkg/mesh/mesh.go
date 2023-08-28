@@ -66,12 +66,14 @@ type Mesh interface {
 	Domain() string
 	// Open opens the connection to the mesh. This must be called before
 	// other methods can be used.
-	Open(ctx context.Context, opts *ConnectOptions) error
+	Open(ctx context.Context, opts ConnectOptions) error
 	// Ready returns a channel that will be closed when the mesh is ready.
 	// Ready is defined as having a leader and knowing its address.
 	Ready() <-chan struct{}
 	// Close closes the connection to the mesh and shuts down the storage.
 	Close() error
+	// Credentials returns the gRPC credentials to use for dialing the mesh.
+	Credentials(ctx context.Context) []grpc.DialOption
 	// Dial opens a new gRPC connection to the given node.
 	Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error)
 	// DialLeader opens a new gRPC connection to the current Raft leader.
@@ -94,8 +96,10 @@ type Mesh interface {
 
 // ConnectOptions are options for opening the connection to the mesh.
 type ConnectOptions struct {
-	// Features are the features to broadcast.
+	// Features are the features to broadcast to others in the mesh.
 	Features []v1.Feature
+	// JoinRoundTripper is the round tripper to use for joining the mesh.
+	JoinRoundTripper transport.JoinRoundTripper
 	// RaftTransport is the transport to use for the raft node.
 	RaftTransport transport.RaftTransport
 	// RaftStorage is the storage to use for the raft node.
@@ -299,6 +303,28 @@ func (s *meshStore) Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, 
 	return s.dialWithLocalStorage(ctx, nodeID)
 }
 
+func (s *meshStore) Credentials(ctx context.Context) []grpc.DialOption {
+	log := context.LoggerFrom(ctx)
+	var opts []grpc.DialOption
+	if s.opts.TLS.Insecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		// MTLS is included in the TLS config already if enabled.
+		log.Debug("using TLS credentials")
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
+	}
+	if s.opts.Auth != nil {
+		if s.opts.Auth.Basic != nil {
+			log.Debug("using basic auth credentials")
+			opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
+		} else if s.opts.Auth.LDAP != nil {
+			log.Debug("using LDAP auth credentials")
+			opts = append(opts, ldap.NewCreds(s.opts.Auth.LDAP.Username, s.opts.Auth.LDAP.Password))
+		}
+	}
+	return opts
+}
+
 func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
 	node, err := peers.New(s.Storage()).Get(ctx, nodeID)
 	if err != nil {
@@ -365,27 +391,5 @@ func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (
 }
 
 func (s *meshStore) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, addr, s.grpcCreds(ctx)...)
-}
-
-func (s *meshStore) grpcCreds(ctx context.Context) []grpc.DialOption {
-	log := context.LoggerFrom(ctx)
-	var opts []grpc.DialOption
-	if s.opts.TLS.Insecure {
-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else {
-		// MTLS is included in the TLS config already if enabled.
-		log.Debug("using TLS credentials")
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
-	}
-	if s.opts.Auth != nil {
-		if s.opts.Auth.Basic != nil {
-			log.Debug("using basic auth credentials")
-			opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
-		} else if s.opts.Auth.LDAP != nil {
-			log.Debug("using LDAP auth credentials")
-			opts = append(opts, ldap.NewCreds(s.opts.Auth.LDAP.Username, s.opts.Auth.LDAP.Password))
-		}
-	}
-	return opts
+	return grpc.DialContext(ctx, addr, s.Credentials(ctx)...)
 }
