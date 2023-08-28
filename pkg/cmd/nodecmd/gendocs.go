@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/options"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -104,6 +105,7 @@ FENCE
 // GenBridgeMarkdownDoc generates the markdown documentation for the bridge commands.
 func GenBridgeMarkdownDoc(title string, weight int, outfile string) error {
 	var sb strings.Builder
+	config := options.NewOptions().BindFlags(flagset)
 	config.Bridge.Meshes = make(map[string]*meshbridge.MeshOptions)
 	config.Bridge.Meshes["<mesh-id>"] = &meshbridge.MeshOptions{
 		Mesh:     mesh.NewDefaultOptions(),

@@ -31,10 +31,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/discovery/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/grpc"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -159,7 +161,7 @@ func (m *meshBridge) Start(ctx context.Context) error {
 			return handleErr(fmt.Errorf("mesh %q not found", meshID))
 		}
 		features := meshOpts.Services.ToFeatureSet(isRaftMember)
-		raftTransport, err := transport.NewRaftTCPTransport(msh, transport.TCPTransportOptions{
+		raftTransport, err := tcp.NewRaftTransport(msh, tcp.RaftTransportOptions{
 			Addr:    meshOpts.Mesh.Raft.ListenAddress,
 			MaxPool: meshOpts.Mesh.Raft.ConnectionPoolCount,
 			Timeout: meshOpts.Mesh.Raft.ConnectionTimeout,
@@ -388,13 +390,13 @@ func getJoinTransport(ctx context.Context, st mesh.Mesh, config *MeshOptions) (t
 			}
 			addrs = append(addrs, addr)
 		}
-		joinTransport = transport.NewGRPCJoinRoundTripper(transport.GRPCJoinOptions{
+		joinTransport = grpc.NewJoinRoundTripper(grpc.JoinOptions{
 			Addrs:          addrs,
 			Credentials:    st.Credentials(ctx),
 			AddressTimeout: time.Second * 3,
 		})
 	} else if config.Mesh.Mesh.JoinAddress != "" {
-		joinTransport = transport.NewGRPCJoinRoundTripper(transport.GRPCJoinOptions{
+		joinTransport = grpc.NewJoinRoundTripper(grpc.JoinOptions{
 			Addrs:          []string{config.Mesh.Mesh.JoinAddress},
 			Credentials:    st.Credentials(ctx),
 			AddressTimeout: time.Second * 3,

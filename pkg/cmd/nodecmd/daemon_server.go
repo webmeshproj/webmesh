@@ -32,7 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
@@ -99,47 +99,52 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		return nil, status.Errorf(codes.Internal, "error creating mesh: %v", err)
 	}
 	// Create a raft transport
-	transport, err := transport.NewRaftTCPTransport(conn, transport.TCPTransportOptions{
-		Addr:    config.Mesh.Raft.ListenAddress,
-		MaxPool: config.Mesh.Raft.ConnectionPoolCount,
-		Timeout: config.Mesh.Raft.ConnectionTimeout,
+	transport, err := tcp.NewRaftTransport(conn, tcp.RaftTransportOptions{
+		Addr:    app.curConfig.Mesh.Raft.ListenAddress,
+		MaxPool: app.curConfig.Mesh.Raft.ConnectionPoolCount,
+		Timeout: app.curConfig.Mesh.Raft.ConnectionTimeout,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create raft transport: %v", err)
 	}
 	// Create the raft storage
 	var storage storage.DualStorage
-	if config.Mesh.Raft.InMemory {
+	if app.curConfig.Mesh.Raft.InMemory {
 		storage, err = nutsdb.New(nutsdb.Options{InMemory: true})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "create in-memory storage: %v", err)
 		}
 	} else {
 		storage, err = nutsdb.New(nutsdb.Options{
-			DiskPath: config.Mesh.Raft.DataStoragePath(),
+			DiskPath: app.curConfig.Mesh.Raft.DataStoragePath(),
 		})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "create raft storage: %v", err)
 		}
 	}
 	var features []v1.Feature
-	if !config.Global.DisableFeatureAdvertisement {
+	if !app.curConfig.Global.DisableFeatureAdvertisement {
 		isRaftMember := func() bool {
-			if config.Mesh.Bootstrap != nil && config.Mesh.Bootstrap.Enabled {
+			if app.curConfig.Mesh.Bootstrap != nil && app.curConfig.Mesh.Bootstrap.Enabled {
 				return true
 			}
-			if config.Mesh.Mesh != nil {
-				return config.Mesh.Mesh.JoinAsVoter || config.Mesh.Mesh.JoinAsObserver
+			if app.curConfig.Mesh.Mesh != nil {
+				return app.curConfig.Mesh.Mesh.JoinAsVoter || app.curConfig.Mesh.Mesh.JoinAsObserver
 			}
 			return false
 		}()
-		features = config.Services.ToFeatureSet(isRaftMember)
+		features = app.curConfig.Services.ToFeatureSet(isRaftMember)
+	}
+	joinTransport, err := getJoinTransport(ctx, conn, app.curConfig)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "build join transport: %v", err)
 	}
 	err = conn.Open(ctx, mesh.ConnectOptions{
-		Features:      features,
-		RaftTransport: transport,
-		RaftStorage:   storage,
-		MeshStorage:   storage,
+		Features:         features,
+		RaftTransport:    transport,
+		RaftStorage:      storage,
+		MeshStorage:      storage,
+		JoinRoundTripper: joinTransport,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error opening mesh: %v", err)

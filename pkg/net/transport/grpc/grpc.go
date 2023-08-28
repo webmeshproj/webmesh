@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package transport
+// Packgage grpc contains gRPC based transport implementations.
+package grpc
 
 import (
 	"errors"
@@ -24,10 +25,11 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// GRPCJoinOptions are options for the gRPC join round tripper.
-type GRPCJoinOptions struct {
+// JoinOptions are options for the gRPC join round tripper.
+type JoinOptions struct {
 	// Addrs is a list of addresses to try to join. The list will be iterated on
 	// until a successful join occurs.
 	Addrs []string
@@ -38,16 +40,16 @@ type GRPCJoinOptions struct {
 	AddressTimeout time.Duration
 }
 
-// NewGRPCJoinRoundTripper creates a new gRPC join round tripper.
-func NewGRPCJoinRoundTripper(opts GRPCJoinOptions) JoinRoundTripper {
-	return &grpcJoinRoundTripper{opts}
+// NewJoinRoundTripper creates a new gRPC join round tripper.
+func NewJoinRoundTripper(opts JoinOptions) transport.JoinRoundTripper {
+	return &joinRoundTripper{opts}
 }
 
-type grpcJoinRoundTripper struct {
-	GRPCJoinOptions
+type joinRoundTripper struct {
+	JoinOptions
 }
 
-func (rt *grpcJoinRoundTripper) RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+func (rt *joinRoundTripper) RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
 	var err error
 	for _, addr := range rt.Addrs {
 		if ctx.Err() != nil {

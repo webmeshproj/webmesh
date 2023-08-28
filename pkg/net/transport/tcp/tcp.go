@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package transport
+// Package tcp provides TCP based transports.
+package tcp
 
 import (
 	"context"
@@ -24,10 +25,12 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
+
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// TCPTransportOptions are options for the TCP transport.
-type TCPTransportOptions struct {
+// RaftTransportOptions are options for the TCP transport.
+type RaftTransportOptions struct {
 	// Addr is the address to listen on.
 	Addr string
 	// MaxPool is the maximum number of connections to pool.
@@ -36,8 +39,8 @@ type TCPTransportOptions struct {
 	Timeout time.Duration
 }
 
-// NewRaftTCPTransport creates a new TCP transport listening on the given address.
-func NewRaftTCPTransport(leaderDialer LeaderDialer, opts TCPTransportOptions) (RaftTransport, error) {
+// NewRaftTransport creates a new TCP transport listening on the given address.
+func NewRaftTransport(leaderDialer transport.LeaderDialer, opts RaftTransportOptions) (transport.RaftTransport, error) {
 	sl, err := newTCPStreamLayter(opts.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("create TCP stream layer: %w", err)
@@ -51,17 +54,17 @@ func NewRaftTCPTransport(leaderDialer LeaderDialer, opts TCPTransportOptions) (R
 		defer t.Close()
 		return nil, fmt.Errorf("parse address: %w", err)
 	}
-	return &TCPTransport{NetworkTransport: t, LeaderDialer: leaderDialer, laddr: laddr}, nil
+	return &RaftTransport{NetworkTransport: t, LeaderDialer: leaderDialer, laddr: laddr}, nil
 }
 
-// TCPTransport is a transport that uses raw TCP.
-type TCPTransport struct {
+// RaftTransport is a transport that uses raw TCP.
+type RaftTransport struct {
 	*raft.NetworkTransport
-	LeaderDialer
+	transport.LeaderDialer
 	laddr netip.AddrPort
 }
 
-func (t *TCPTransport) AddrPort() netip.AddrPort {
+func (t *RaftTransport) AddrPort() netip.AddrPort {
 	return t.laddr
 }
 

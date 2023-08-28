@@ -27,7 +27,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
@@ -45,7 +45,7 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	if err != nil {
 		return nil, err
 	}
-	transport, err := transport.NewRaftTCPTransport(st, transport.TCPTransportOptions{
+	transport, err := tcp.NewRaftTransport(st, tcp.RaftTransportOptions{
 		Addr:    ":0",
 		MaxPool: 1,
 		Timeout: time.Second,

@@ -29,7 +29,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/discovery/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 )
 
 func (s *meshStore) AnnounceDHT(ctx context.Context, opts *DiscoveryOptions) error {
@@ -43,7 +43,7 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts *DiscoveryOptions) err
 		}
 		peers = append(peers, mul)
 	}
-	discover, err := libp2p.NewKadDHTAnnouncer(ctx, &libp2p.KadDHTOptions{
+	discover, err := libp2p.NewKadDHTAnnouncer(ctx, libp2p.DHTAnnounceOptions{
 		PSK:            opts.PSK,
 		BootstrapPeers: peers,
 		DiscoveryTTL:   time.Minute, // TODO: Make this configurable

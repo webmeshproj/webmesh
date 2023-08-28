@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -30,14 +31,30 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshdiscovery "github.com/webmeshproj/webmesh/pkg/discovery"
 	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 )
 
+// DHTAnnounceOptions are options for announcing the host or discovering peers
+// on the libp2p kademlia DHT.
+type DHTAnnounceOptions struct {
+	// PSK is the pre-shared key to use as a rendezvous point for the DHT.
+	PSK string
+	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
+	// If empty or nil, the default bootstrap peers will be used.
+	BootstrapPeers []multiaddr.Multiaddr
+	// Options are options for configuring the libp2p host.
+	Options []libp2p.Option
+	// DiscoveryTTL is the TTL to use for the discovery service.
+	// This is only applicable when announcing the host.
+	DiscoveryTTL time.Duration
+}
+
 // NewKadDHTAnnouncer creates a new announcer for the libp2p kademlia DHT.
-func NewKadDHTAnnouncer(ctx context.Context, opts *KadDHTOptions) (meshdiscovery.Discovery, error) {
+func NewKadDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions) (meshdiscovery.Discovery, error) {
 	log := context.LoggerFrom(ctx)
 	err := buffers.SetMaximumReadBuffer(2500000)
 	if err != nil {
@@ -62,7 +79,7 @@ func NewKadDHTAnnouncer(ctx context.Context, opts *KadDHTOptions) (meshdiscovery
 
 // kadDHTAnnouncer is an announcer for the libp2p kademlia DHT.
 type kadDHTAnnouncer struct {
-	opts    *KadDHTOptions
+	opts    DHTAnnounceOptions
 	host    host.Host
 	acceptc chan io.ReadWriteCloser
 	closec  chan struct{}

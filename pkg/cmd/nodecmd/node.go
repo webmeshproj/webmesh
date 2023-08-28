@@ -35,10 +35,12 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/options"
-	"github.com/webmeshproj/webmesh/pkg/discovery/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/grpc"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
@@ -57,12 +59,11 @@ var (
 	appDaemonBind           = flagset.String("app-daemon-bind", "", "Address to bind the application daemon to (default: unix:///var/run/webmesh-node.sock)")
 	appDaemonGrpcWeb        = flagset.Bool("app-daemon-grpc-web", false, "Use gRPC-Web for the application daemon (default: false)")
 	appDaemonInsecureSocket = flagset.Bool("app-daemon-insecure-socket", false, "Leave default ownership on the Unix socket (default: false)")
-
-	config = options.NewOptions().BindFlags(flagset)
 )
 
 func Execute() error {
 	// Parse flags and read in configurations
+	config := options.NewOptions().BindFlags(flagset)
 	flagset.Usage = func() {
 		options.Usage(flagset)
 	}
@@ -162,7 +163,7 @@ func executeSingleMesh(ctx context.Context, config *options.Options) error {
 		return fmt.Errorf("failed to create mesh connection: %w", err)
 	}
 	// Create a raft transport
-	raftTransport, err := transport.NewRaftTCPTransport(st, transport.TCPTransportOptions{
+	raftTransport, err := tcp.NewRaftTransport(st, tcp.RaftTransportOptions{
 		Addr:    config.Mesh.Raft.ListenAddress,
 		MaxPool: config.Mesh.Raft.ConnectionPoolCount,
 		Timeout: config.Mesh.Raft.ConnectionTimeout,
@@ -306,13 +307,13 @@ func getJoinTransport(ctx context.Context, st mesh.Mesh, config *options.Options
 			}
 			addrs = append(addrs, addr)
 		}
-		joinTransport = transport.NewGRPCJoinRoundTripper(transport.GRPCJoinOptions{
+		joinTransport = grpc.NewJoinRoundTripper(grpc.JoinOptions{
 			Addrs:          addrs,
 			Credentials:    st.Credentials(ctx),
 			AddressTimeout: time.Second * 3,
 		})
 	} else if config.Mesh.Mesh.JoinAddress != "" {
-		joinTransport = transport.NewGRPCJoinRoundTripper(transport.GRPCJoinOptions{
+		joinTransport = grpc.NewJoinRoundTripper(grpc.JoinOptions{
 			Addrs:          []string{config.Mesh.Mesh.JoinAddress},
 			Credentials:    st.Credentials(ctx),
 			AddressTimeout: time.Second * 3,

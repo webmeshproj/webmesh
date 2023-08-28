@@ -16,6 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package libp2p provides discovery mechanisms using Kademlia DHT.
 package libp2p
 
 import (
@@ -25,10 +26,14 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
+
+// JoinProtocol is the protocol used for joining a mesh.
+const JoinProtocol = protocol.ID("/webmesh/join/0.0.1")
 
 func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, servers []multiaddr.Multiaddr) error {
 	log := context.LoggerFrom(ctx)

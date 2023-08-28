@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package transport provides a simple interface for sending and receiving raft
-// messages between nodes.
+// Package transport defines the interfaces needed for various mesh operations.
 package transport
 
 import (
@@ -38,6 +37,18 @@ type JoinRoundTripper interface {
 type JoinServer interface {
 	// Join is executed when a request to join a cluster is received.
 	Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+}
+
+// BootstrapTransport is the interface for dialing other peers to bootstrap
+// a new mesh.
+type BootstrapTransport interface {
+	// LeaderElect should perform an initial leader election. It returns
+	// true is this node was elected leader, or otherwise a JoinRoundTripper
+	// for contacting the elected leader. If one or more nodes believe
+	// the cluster to be already bootstrapped, then raft.ErrAlreadyBootstrapped
+	// should be returned with an optional JoinRoundTripper to nodes who are
+	// already bootstrapped.
+	LeaderElect(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error)
 }
 
 // RaftTransport defines the methods needed for raft consensus to function
