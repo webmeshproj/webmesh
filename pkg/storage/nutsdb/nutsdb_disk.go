@@ -243,9 +243,18 @@ func (db *nutsDiskStorage) Restore(ctx context.Context, r io.Reader) error {
 		return fmt.Errorf("restore: %w", err)
 	}
 	err = db.store.Update(func(tx *nutsdb.Tx) error {
-		err := tx.DeleteBucket(0, meshStoreBucket)
-		if err != nil {
+		// Do a full prefix scan and delete everything
+		entries, err := tx.PrefixScan(meshStoreBucket, []byte(""), 0, math.MaxInt)
+		if ignoreNotFound(err) != nil {
 			return fmt.Errorf("restore: %w", err)
+		}
+		if err == nil {
+			for _, entry := range entries {
+				err = tx.Delete(meshStoreBucket, entry.Key)
+				if err != nil {
+					return fmt.Errorf("restore: %w", err)
+				}
+			}
 		}
 		for _, item := range snapshot.Kv {
 			err = tx.Put(meshStoreBucket, []byte(item.Key), []byte(item.Value), uint32(item.Ttl.Seconds))
@@ -318,7 +327,10 @@ func (db *nutsDiskStorage) GetLog(index uint64, log *raft.Log) error {
 func (db *nutsDiskStorage) StoreLog(log *raft.Log) error {
 	db.raftlogmu.Lock()
 	defer db.raftlogmu.Unlock()
-	return db.storeLog(log)
+	err := db.store.Update(func(tx *nutsdb.Tx) error {
+		return db.storeLog(log, tx)
+	})
+	return err
 }
 
 // StoreLogs stores multiple log entries. By default the logs stored may not be contiguous with previous logs (i.e. may have a gap in Index since the last log written). If an implementation can't tolerate this it may optionally implement `MonotonicLogStore` to indicate that this is not allowed. This changes Raft's behaviour after restoring a user snapshot to remove all previous logs instead of relying on a "gap" to signal the discontinuity between logs before the snapshot and logs after.
@@ -327,7 +339,7 @@ func (db *nutsDiskStorage) StoreLogs(logs []*raft.Log) error {
 	defer db.raftlogmu.Unlock()
 	err := db.store.Update(func(tx *nutsdb.Tx) error {
 		for _, log := range logs {
-			err := db.storeLog(log)
+			err := db.storeLog(log, tx)
 			if err != nil {
 				return err
 			}
@@ -337,7 +349,7 @@ func (db *nutsDiskStorage) StoreLogs(logs []*raft.Log) error {
 	return err
 }
 
-func (db *nutsDiskStorage) storeLog(log *raft.Log) error {
+func (db *nutsDiskStorage) storeLog(log *raft.Log, tx *nutsdb.Tx) error {
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(log)
 	if err != nil {
@@ -345,13 +357,10 @@ func (db *nutsDiskStorage) storeLog(log *raft.Log) error {
 	}
 	var key [8]byte
 	binary.BigEndian.PutUint64(key[:], log.Index)
-	err = db.store.Update(func(tx *nutsdb.Tx) error {
-		err = tx.Put(logStoreBucket, key[:], buf.Bytes(), 0)
-		if err != nil {
-			return fmt.Errorf("store log: %w", err)
-		}
-		return nil
-	})
+	err = tx.Put(logStoreBucket, key[:], buf.Bytes(), 0)
+	if err != nil {
+		return fmt.Errorf("store log: %w", err)
+	}
 	if err != nil {
 		return err
 	}
