@@ -249,7 +249,7 @@ func (s *meshStore) Ready() <-chan struct{} {
 			leader, err := s.Leader()
 			if err != nil {
 				s.log.Debug("waiting for leader", slog.String("error", err.Error()))
-				time.Sleep(time.Second)
+				time.Sleep(time.Millisecond * 100)
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -257,7 +257,7 @@ func (s *meshStore) Ready() <-chan struct{} {
 			cancel()
 			if err != nil {
 				s.log.Debug("waiting for leader", slog.String("leader", leader), slog.String("error", err.Error()))
-				time.Sleep(time.Second)
+				time.Sleep(time.Millisecond * 100)
 				continue
 			}
 			return

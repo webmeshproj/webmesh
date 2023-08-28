@@ -203,6 +203,11 @@ func executeSingleMesh(ctx context.Context, config *options.Options) error {
 	if err != nil {
 		return fmt.Errorf("failed to open mesh connection: %w", err)
 	}
+	select {
+	case <-st.Ready():
+	case <-ctx.Done():
+		return fmt.Errorf("failed to start mesh node: %w", ctx.Err())
+	}
 	handleErr := func(cause error) error {
 		if err := st.Close(); err != nil {
 			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
