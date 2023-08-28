@@ -38,7 +38,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshbridge"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/grpc"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -315,13 +314,13 @@ func getJoinTransport(ctx context.Context, st mesh.Mesh, config *options.Options
 			}
 			addrs = append(addrs, addr)
 		}
-		joinTransport = grpc.NewJoinRoundTripper(grpc.JoinOptions{
+		joinTransport = tcp.NewJoinRoundTripper(tcp.JoinOptions{
 			Addrs:          addrs,
 			Credentials:    st.Credentials(ctx),
 			AddressTimeout: time.Second * 3,
 		})
 	} else if config.Mesh.Mesh.JoinAddress != "" {
-		joinTransport = grpc.NewJoinRoundTripper(grpc.JoinOptions{
+		joinTransport = tcp.NewJoinRoundTripper(tcp.JoinOptions{
 			Addrs:          []string{config.Mesh.Mesh.JoinAddress},
 			Credentials:    st.Credentials(ctx),
 			AddressTimeout: time.Second * 3,

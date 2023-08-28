@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Packgage grpc contains gRPC based transport implementations.
-package grpc
+package tcp
 
 import (
 	"errors"
@@ -33,7 +32,7 @@ type JoinOptions struct {
 	// Addrs is a list of addresses to try to join. The list will be iterated on
 	// until a successful join occurs.
 	Addrs []string
-	// Credentials are tge gRPC DialOptions to use for the gRPC connection.
+	// Credentials are the gRPC DialOptions to use for the gRPC connection.
 	Credentials []grpc.DialOption
 	// AddressTimeout is the timeout for dialing each address. If not set
 	// any timeout on the context will be used.
@@ -49,34 +48,37 @@ type joinRoundTripper struct {
 	JoinOptions
 }
 
+// RoundTrip implements the transport.JoinRoundTripper interface.
 func (rt *joinRoundTripper) RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
 	var err error
+	cancel := func() {}
 	for _, addr := range rt.Addrs {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 		log := context.LoggerFrom(ctx).With("join-addr", addr)
-		log.Debug("attempting to join node")
+		log.Debug("Attempting to join node")
+		var dialCtx context.Context
 		if rt.AddressTimeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, rt.AddressTimeout)
-			defer cancel()
+			dialCtx, cancel = context.WithTimeout(ctx, rt.AddressTimeout)
+		} else {
+			dialCtx = ctx
 		}
-		var conn *grpc.ClientConn
-		conn, err = grpc.DialContext(ctx, addr, rt.Credentials...)
+		conn, err := grpc.DialContext(dialCtx, addr, rt.Credentials...)
+		cancel()
 		if err != nil {
-			log.Debug("failed to dial node", "error", err)
+			log.Debug("Failed to dial node", "error", err)
 			continue
 		}
 		defer conn.Close()
-		log.Debug("dial successful")
+		log.Debug("Dial successful")
 		var resp *v1.JoinResponse
 		resp, err = v1.NewMembershipClient(conn).Join(ctx, req)
 		if err != nil {
-			log.Debug("join request failed", "error", err)
+			log.Debug("Join request failed", "error", err)
 			continue
 		}
-		log.Debug("join request successful")
+		log.Debug("Join request successful")
 		return resp, nil
 	}
 	if err != nil {

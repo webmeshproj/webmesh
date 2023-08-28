@@ -26,7 +26,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	meshgrpc "github.com/webmeshproj/webmesh/pkg/net/transport/grpc"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
@@ -139,13 +138,13 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 			// The cluster was already bootstrapped (basically we took too long to get there)
 			log.Debug("Bootstrap transport cluster already bootstrapped")
 			// Build a transport that tries to join the other peers
-			var opts meshgrpc.JoinOptions
+			var opts JoinOptions
 			for _, peer := range t.Peers {
 				opts.Addrs = append(opts.Addrs, peer.DialAddr)
 			}
 			opts.Credentials = t.Credentials
 			opts.AddressTimeout = t.Timeout
-			return false, meshgrpc.NewJoinRoundTripper(opts), transport.ErrAlreadyBootstrapped
+			return false, NewJoinRoundTripper(opts), transport.ErrAlreadyBootstrapped
 		}
 		return false, nil, err
 	}
@@ -169,7 +168,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 			// We lost the election, build a transport to the leader
 			log.Debug("Bootstrap transport is follower")
 			leader := t.Peers[string(id)]
-			return false, meshgrpc.NewJoinRoundTripper(meshgrpc.JoinOptions{
+			return false, NewJoinRoundTripper(JoinOptions{
 				Addrs:          []string{leader.DialAddr},
 				Credentials:    t.Credentials,
 				AddressTimeout: t.Timeout,
