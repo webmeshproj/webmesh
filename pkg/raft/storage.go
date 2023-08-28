@@ -50,7 +50,7 @@ type raftStorage struct {
 }
 
 // Put sets the value of a key.
-func (rs *raftStorage) Put(ctx context.Context, key, value string, ttl time.Duration) error {
+func (rs *raftStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
 	if !rs.raft.IsVoter() {
 		return ErrNotVoter
 	}

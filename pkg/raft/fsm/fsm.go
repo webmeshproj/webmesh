@@ -147,9 +147,7 @@ func (r *RaftFSM) applyLog(l *raft.Log) (cmd *v1.RaftLogEntry, res *v1.RaftApply
 	// Validate the term/index of the log entry.
 	dbTerm := r.currentTerm.Load()
 	dbIndex := r.lastAppliedIndex.Load()
-	log.Debug("last applied index",
-		slog.Int("last-term", int(dbTerm)),
-		slog.Int("last-index", int(dbIndex)))
+	log.Debug("last applied index", slog.Int("last-term", int(dbTerm)), slog.Int("last-index", int(dbIndex)))
 
 	if l.Term < dbTerm {
 		log.Debug("received log from old term")
@@ -181,7 +179,7 @@ func (r *RaftFSM) applyLog(l *raft.Log) (cmd *v1.RaftLogEntry, res *v1.RaftApply
 			Error: fmt.Sprintf("decode log entry: %s", err.Error()),
 		}
 	}
-	log.Info("applying log entry", slog.String("command", cmd.String()))
+	log.Debug("applying log entry", slog.String("command", cmd.String()))
 
 	var ctx context.Context
 	var cancel context.CancelFunc
