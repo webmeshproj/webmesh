@@ -43,19 +43,28 @@ func (f RoundTripperFunc[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*
 // JoinRoundTripper is the interface for joining a cluster.
 type JoinRoundTripper = RoundTripper[v1.JoinRequest, v1.JoinResponse]
 
-// JoinServer is the interface for handling requests to join a cluster.
-type JoinServer interface {
-	// Join is executed when a request to join a cluster is received.
-	Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+// JoinRoundTripperFunc is a function that implements JoinRoundTripper.
+type JoinRoundTripperFunc = RoundTripperFunc[v1.JoinRequest, v1.JoinResponse]
+
+// UnaryServer is the interface for handling unary requests.
+type UnaryServer[REQ, RESP any] interface {
+	// Serve is executed when a unary request is received.
+	Serve(ctx context.Context, req *REQ) (*RESP, error)
 }
 
-// JoinServerFunc is a function that implements JoinServer.
-type JoinServerFunc func(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+// UnaryServerFunc is a function that implements UnaryServer.
+type UnaryServerFunc[REQ, RESP any] func(ctx context.Context, req *REQ) (*RESP, error)
 
-// Join implements JoinServer.
-func (f JoinServerFunc) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+// Serve implements UnaryServer.
+func (f UnaryServerFunc[REQ, RESP]) Serve(ctx context.Context, req *REQ) (*RESP, error) {
 	return f(ctx, req)
 }
+
+// JoinServer is the interface for handling requests to join a cluster.
+type JoinServer = UnaryServer[v1.JoinRequest, v1.JoinResponse]
+
+// JoinServerFunc is a function that implements JoinServer.
+type JoinServerFunc = UnaryServerFunc[v1.JoinRequest, v1.JoinResponse]
 
 // ErrAlreadyBootstrapped is returned when a node believes the cluster to be
 // already bootstrapped.

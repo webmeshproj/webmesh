@@ -154,7 +154,7 @@ func (srv *dhtAnnouncer) handleIncomingStreams(log *slog.Logger, joinServer tran
 				rlog.Debug("Executing join request")
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*15) // TODO: Make this configurable
 				defer cancel()
-				resp, err := joinServer.Join(context.WithLogger(ctx, rlog), &req)
+				resp, err := joinServer.Serve(context.WithLogger(ctx, rlog), &req)
 				if err != nil {
 					rlog.Error("Failed to execute join request", slog.String("error", err.Error()))
 					returnErr(conn, err)
