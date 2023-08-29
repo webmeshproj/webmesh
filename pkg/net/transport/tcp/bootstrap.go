@@ -138,7 +138,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 			// The cluster was already bootstrapped (basically we took too long to get there)
 			log.Debug("Bootstrap transport cluster already bootstrapped")
 			// Build a transport that tries to join the other peers
-			var opts JoinOptions
+			var opts RoundTripOptions
 			for _, peer := range t.Peers {
 				opts.Addrs = append(opts.Addrs, peer.DialAddr)
 			}
@@ -168,7 +168,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 			// We lost the election, build a transport to the leader
 			log.Debug("Bootstrap transport is follower")
 			leader := t.Peers[string(id)]
-			return false, NewJoinRoundTripper(JoinOptions{
+			return false, NewJoinRoundTripper(RoundTripOptions{
 				Addrs:          []string{leader.DialAddr},
 				Credentials:    t.Credentials,
 				AddressTimeout: t.Timeout,

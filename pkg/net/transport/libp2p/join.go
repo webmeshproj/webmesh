@@ -37,8 +37,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// DHTJoinOptions are options for joining a cluster with the libp2p kademlia DHT.
-type DHTJoinOptions struct {
+// RoundTripOptions are options for performing a round trip against
+// a libp2p host.
+type RoundTripOptions struct {
 	// PSK is the pre-shared key to use as a rendezvous point for the DHT.
 	PSK string
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
@@ -50,18 +51,26 @@ type DHTJoinOptions struct {
 	ConnectTimeout time.Duration
 }
 
-// NewDHTJoinRoundTripper returns a round tripper that uses the libp2p kademlia DHT to join a cluster.
-func NewDHTJoinRoundTripper(opts DHTJoinOptions) transport.JoinRoundTripper {
-	return &dhtJoinRoundTripper{opts}
+// NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
+func NewRoundTripper[REQ, RESP any](opts RoundTripOptions, method string) transport.RoundTripper[REQ, RESP] {
+	return &dhtRoundTripper[REQ, RESP]{RoundTripOptions: opts, method: method}
 }
 
-type dhtJoinRoundTripper struct {
-	DHTJoinOptions
+// NewJoinRoundTripper returns a round tripper that uses the libp2p kademlia DHT to join a cluster.
+func NewJoinRoundTripper(opts RoundTripOptions) transport.JoinRoundTripper {
+	return &dhtRoundTripper[v1.JoinRequest, v1.JoinResponse]{
+		RoundTripOptions: opts,
+		method:           v1.Membership_Join_FullMethodName,
+	}
 }
 
-// RoundTrip executes a request to join a cluster.
-func (rt *dhtJoinRoundTripper) RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
-	log := context.LoggerFrom(ctx)
+type dhtRoundTripper[REQ, RESP any] struct {
+	RoundTripOptions
+	method string
+}
+
+func (rt *dhtRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
+	log := context.LoggerFrom(ctx).With("method", rt.method)
 	// Try to set the maximum read and write buffer sizes.
 	err := buffers.SetMaximumReadBuffer(2500000)
 	if err != nil {
@@ -98,7 +107,7 @@ func (rt *dhtJoinRoundTripper) RoundTrip(ctx context.Context, req *v1.JoinReques
 		return nil, fmt.Errorf("libp2p find peers: %w", err)
 	}
 	// Marshal the join request
-	joinData, err := proto.Marshal(req)
+	joinData, err := proto.Marshal(any(req).(proto.Message))
 	if err != nil {
 		return nil, fmt.Errorf("marshal join request: %w", err)
 	}
@@ -129,25 +138,26 @@ func (rt *dhtJoinRoundTripper) RoundTrip(ctx context.Context, req *v1.JoinReques
 		jlog.Debug("Connected to peer")
 		defer stream.Close()
 		// Send a join request to the peer over the stream.
-		jlog.Debug("Sending join request to peer")
+		jlog.Debug("Sending request to peer")
 		_, err = stream.Write(joinData)
 		if err != nil {
-			return nil, fmt.Errorf("write join request: %w", err)
+			return nil, fmt.Errorf("write request: %w", err)
 		}
 		var b [8192]byte
 		n, err := stream.Read(b[:])
 		if err != nil {
-			return nil, fmt.Errorf("read join response: %w", err)
+			return nil, fmt.Errorf("read response: %w", err)
 		}
+		jlog.Debug("Received response from peer")
 		if bytes.HasPrefix(b[:n], []byte("ERROR: ")) {
-			return nil, fmt.Errorf("join error: %s", string(bytes.TrimPrefix(b[:n], []byte("ERROR: "))))
+			return nil, fmt.Errorf("error from remote: %s", string(bytes.TrimPrefix(b[:n], []byte("ERROR: "))))
 		}
-		var resp v1.JoinResponse
-		err = proto.Unmarshal(b[:n], &resp)
+		var resp RESP
+		err = proto.Unmarshal(b[:n], any(&resp).(proto.Message))
 		if err != nil {
-			return nil, fmt.Errorf("unmarshal join response: %w", err)
+			return nil, fmt.Errorf("unmarshal response: %w", err)
 		}
 		return &resp, nil
 	}
-	return nil, errors.New("no peers found to join")
+	return nil, errors.New("no peers found to dial")
 }

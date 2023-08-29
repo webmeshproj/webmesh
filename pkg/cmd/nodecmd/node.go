@@ -314,13 +314,13 @@ func getJoinTransport(ctx context.Context, st mesh.Mesh, config *options.Options
 			}
 			addrs = append(addrs, addr)
 		}
-		joinTransport = tcp.NewJoinRoundTripper(tcp.JoinOptions{
+		joinTransport = tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
 			Addrs:          addrs,
 			Credentials:    st.Credentials(ctx),
 			AddressTimeout: time.Second * 3,
 		})
 	} else if config.Mesh.Mesh.JoinAddress != "" {
-		joinTransport = tcp.NewJoinRoundTripper(tcp.JoinOptions{
+		joinTransport = tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
 			Addrs:          []string{config.Mesh.Mesh.JoinAddress},
 			Credentials:    st.Credentials(ctx),
 			AddressTimeout: time.Second * 3,
@@ -334,7 +334,7 @@ func getJoinTransport(ctx context.Context, st mesh.Mesh, config *options.Options
 			}
 			addrs = append(addrs, maddr)
 		}
-		joinTransport = libp2p.NewDHTJoinRoundTripper(libp2p.DHTJoinOptions{
+		joinTransport = libp2p.NewJoinRoundTripper(libp2p.RoundTripOptions{
 			PSK:            config.Mesh.Discovery.PSK,
 			BootstrapPeers: addrs,
 			ConnectTimeout: time.Second * 3,
