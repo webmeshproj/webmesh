@@ -26,19 +26,22 @@ import (
 	"google.golang.org/grpc"
 )
 
-// JoinRoundTripper is the interface for executing a request to join a cluster.
-type JoinRoundTripper interface {
-	// RoundTrip executes a request to join a cluster.
-	RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+// RoundTripper is a generic interface for executing a request and returning
+// a response.
+type RoundTripper[REQ, RESP any] interface {
+	RoundTrip(ctx context.Context, req *REQ) (*RESP, error)
 }
 
-// JoinRoundTripperFunc is a function that implements JoinRoundTripper.
-type JoinRoundTripperFunc func(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error)
+// RoundTripperFunc is a function that implements RoundTripper.
+type RoundTripperFunc[REQ, RESP any] func(ctx context.Context, req *REQ) (*RESP, error)
 
-// RoundTrip implements JoinRoundTripper.
-func (f JoinRoundTripperFunc) RoundTrip(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+// RoundTrip implements RoundTripper.
+func (f RoundTripperFunc[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
 	return f(ctx, req)
 }
+
+// JoinRoundTripper is the interface for joining a cluster.
+type JoinRoundTripper = RoundTripper[v1.JoinRequest, v1.JoinResponse]
 
 // JoinServer is the interface for handling requests to join a cluster.
 type JoinServer interface {
