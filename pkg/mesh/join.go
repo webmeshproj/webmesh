@@ -34,7 +34,7 @@ import (
 func (s *meshStore) join(ctx context.Context, opts ConnectOptions, key wgtypes.Key) error {
 	log := s.log
 	ctx = context.WithLogger(ctx, log)
-	log.Info("Joining mesh")
+	log.Info("Joining webmesh cluster")
 	var tries int
 	for tries <= opts.MaxJoinRetries {
 		if tries > 0 {

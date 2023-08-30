@@ -159,7 +159,6 @@ func RunSingleNode(ctx context.Context, config *config.Config) error {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
 	log := context.LoggerFrom(ctx)
-	log.Info("Starting mesh node")
 	// Create a new mesh connection
 	meshConfig, err := config.NewMeshConfig(ctx)
 	if err != nil {

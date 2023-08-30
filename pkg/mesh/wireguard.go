@@ -102,14 +102,14 @@ func (s *meshStore) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
 			}
 			if stat.ModTime().Add(s.opts.KeyRotationInterval).Before(time.Now()) {
 				// Delete the key file if it's older than the key rotation interval.
-				s.log.Info("removing expired wireguard key file")
+				s.log.Info("Removing expired WireGuard key file", "file", s.opts.WireGuardKeyFile)
 				if err := os.Remove(s.opts.WireGuardKeyFile); err != nil {
 					return key, fmt.Errorf("remove key file: %w", err)
 				}
 			} else {
 				// If we got here, the key file exists and is not older than the key rotation interval.
 				// We'll load the key from the file.
-				s.log.Info("loading wireguard key from file")
+				s.log.Info("Loading WireGuard key from file", "file", s.opts.WireGuardKeyFile)
 				keyData, err := os.ReadFile(s.opts.WireGuardKeyFile)
 				if err != nil {
 					return key, fmt.Errorf("read key file: %w", err)
@@ -118,13 +118,14 @@ func (s *meshStore) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
 			}
 		}
 	}
-	s.log.Info("generating new wireguard key")
+	s.log.Info("Generating new WireGuard key")
 	// Generate a new key and save it to the specified file.
 	key, err = wgtypes.GeneratePrivateKey()
 	if err != nil {
 		return key, fmt.Errorf("generate private key: %w", err)
 	}
 	if s.opts.WireGuardKeyFile != "" {
+		s.log.Info("Saving WireGuard key to file", "file", s.opts.WireGuardKeyFile)
 		if err := os.WriteFile(s.opts.WireGuardKeyFile, []byte(key.String()+"\n"), 0600); err != nil {
 			return key, fmt.Errorf("write key file: %w", err)
 		}
