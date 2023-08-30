@@ -148,7 +148,10 @@ func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty,
 	defer p.datamux.Unlock()
 	close(p.closec)
 	<-p.servec
-	return &emptypb.Empty{}, p.data.Close()
+	if p.data != nil {
+		return &emptypb.Empty{}, p.data.Close()
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (p *Plugin) serve(opts Config) {
