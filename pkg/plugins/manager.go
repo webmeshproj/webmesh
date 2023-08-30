@@ -101,18 +101,18 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 	}
 	// Query each plugin for its capabilities.
 	for name, plugin := range plugins {
-		log.Debug("querying plugin capabilities", "plugin", name)
+		log.Debug("Querying plugin capabilities", "plugin", name)
 		resp, err := plugin.Client.GetInfo(ctx, &emptypb.Empty{})
 		if err != nil {
 			return nil, fmt.Errorf("get plugin info: %w", err)
 		}
-		log.Debug("plugin info", slog.Any("info", resp))
+		log.Debug("Plugin info", slog.Any("info", resp))
 		plugin.capabilities = resp.GetCapabilities()
 		plugin.name = resp.GetName()
 		// Configure the plugin
 		conf, err := structpb.NewStruct(plugin.Config)
 		if err != nil {
-			return nil, fmt.Errorf("convert plugin config: %w", err)
+			return nil, fmt.Errorf("convert plugin config to structpb: %w", err)
 		}
 		_, err = plugin.Client.Configure(ctx, &v1.PluginConfiguration{
 			Config: conf,

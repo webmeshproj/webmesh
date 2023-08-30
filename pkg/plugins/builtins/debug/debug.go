@@ -61,7 +61,7 @@ type Config struct {
 	// PProfProfiles is the list of profiles to enable for pprof.
 	// An empty list enables all profiles. Each will be available at
 	// /<path-prefix>/pprof/<profile>.
-	PprofProfiles []string `mapstructure:"pprof-profiles" koanf:"pprof-profiles"`
+	PprofProfiles string `mapstructure:"pprof-profiles" koanf:"pprof-profiles"`
 	// EnableDBQuerier enables the database querier.
 	EnableDBQuerier bool `mapstructure:"enable-db-querier" koanf:"enable-db-querier"`
 }
@@ -71,7 +71,6 @@ func (c *Config) DefaultOptions() *Config {
 	return &Config{
 		ListenAddress: "localhost:6060",
 		PathPrefix:    "/debug",
-		PprofProfiles: []string{},
 	}
 }
 
@@ -87,10 +86,10 @@ func (c *Config) AsMapStructure() map[string]any {
 
 // BindFlags binds the debug plugin flags.
 func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringVar(&o.ListenAddress, prefix+"listen-address", "localhost:6060", "Address to listen on")
+	fs.StringVar(&o.ListenAddress, prefix+"listen-address", "localhost:6060", "Address to lissten on")
 	fs.StringVar(&o.PathPrefix, prefix+"path-prefix", "/debug", "Path prefix to use for the debug server")
 	fs.BoolVar(&o.DisablePProf, prefix+"disable-pprof", o.DisablePProf, "Disable pprof")
-	fs.StringSliceVar(&o.PprofProfiles, prefix+"pprof-profiles", o.PprofProfiles, "Pprof profiles to enable")
+	fs.StringVar(&o.PprofProfiles, prefix+"pprof-profiles", "", "Pprof profiles to enable (default: all)")
 	fs.BoolVar(&o.EnableDBQuerier, prefix+"enable-db-querier", o.EnableDBQuerier, "Enable database querier")
 }
 
@@ -99,7 +98,6 @@ func NewDefaultOptions() Config {
 	return Config{
 		ListenAddress: "localhost:6060",
 		PathPrefix:    "/debug",
-		PprofProfiles: []string{},
 	}
 }
 
@@ -160,10 +158,11 @@ func (p *Plugin) serve(opts Config) {
 	pathPrefix := strings.TrimSuffix(opts.PathPrefix, "/")
 	if !opts.DisablePProf {
 		pprofProfiles := opts.PprofProfiles
-		if len(pprofProfiles) == 0 {
-			pprofProfiles = []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex"}
+		profiles := strings.Split(pprofProfiles, ",")
+		if len(profiles) == 0 {
+			profiles = []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex"}
 		}
-		for _, profile := range pprofProfiles {
+		for _, profile := range profiles {
 			mux.Handle(fmt.Sprintf("%s/pprof/%s", pathPrefix, profile), pprof.Handler(profile))
 		}
 	}
@@ -180,13 +179,13 @@ func (p *Plugin) serve(opts Config) {
 		},
 	}
 	go func() {
-		log.Info("starting debug server", "addr", opts.ListenAddress)
+		log.Info("Starting debug server", "listen-address", opts.ListenAddress)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("error running debug server", "err", err.Error())
 		}
 	}()
 	<-p.closec
-	log.Info("closing debug server")
+	log.Info("Shutting down debug server")
 	if err := server.Shutdown(context.Background()); err != nil {
 		log.Error("error closing debug server", "err", err.Error())
 	}
