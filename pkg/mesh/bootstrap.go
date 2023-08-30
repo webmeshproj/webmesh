@@ -401,9 +401,19 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// Start network resources
 	s.log.Info("Starting network manager")
 	startopts := &meshnet.StartOptions{
-		Key:       wireguardKey,
-		AddressV4: privatev4,
-		AddressV6: self.PrivateIPv6,
+		Key: wireguardKey,
+		AddressV4: func() netip.Prefix {
+			if !s.opts.DisableIPv4 {
+				return privatev4
+			}
+			return netip.Prefix{}
+		}(),
+		AddressV6: func() netip.Prefix {
+			if !s.opts.DisableIPv6 {
+				return self.PrivateIPv6
+			}
+			return netip.Prefix{}
+		}(),
 		NetworkV4: meshnetworkv4,
 		NetworkV6: meshnetworkv6,
 	}

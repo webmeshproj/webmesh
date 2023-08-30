@@ -21,21 +21,17 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --bootstrap.servers=bootstrap-node-2=10.1.0.2:9001,bootstrap-node-3=10.1.0.3:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.in-memory
-      - --services.api.peer-discovery
-      - --services.api.mesh
-      - --services.metrics.enabled
       - --services.meshdns.enabled
     ports:
       - 8443:8443
-      - 5354:5353/udp
-      - 51820:51820/udp
+      - 5354:53/udp
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   bootstrap-node-2:
@@ -47,11 +43,11 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9001,bootstrap-node-3=10.1.0.3:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -65,11 +61,11 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9443,bootstrap-node-2=10.1.0.2:9443,bootstrap-node-3=10.1.0.3:9443
+      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9001,bootstrap-node-2=10.1.0.2:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

@@ -114,6 +114,9 @@ func (o *GlobalOptions) Validate() error {
 // ApplyGlobals applies the global options to the given options. It returns the
 // options for convenience.
 func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
+	// Protocol preferences
+	o.Mesh.DisableIPv4 = global.DisableIPv4
+	o.Mesh.DisableIPv6 = global.DisableIPv6
 	// Gather possible endpoints
 	var primaryEndpoint netip.Addr
 	var detectedEndpoints endpoints.PrefixList
