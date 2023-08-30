@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,6 +71,8 @@ type Options struct {
 	ZoneAwarenessID string
 	// DialOptions are the dial options to use when calling peer nodes.
 	DialOptions []grpc.DialOption
+	// LocalDNSAddr is a local network address service MeshDNS.
+	LocalDNSAddr netip.AddrPort
 	// DisableIPv4 disables IPv4 on the interface.
 	DisableIPv4 bool
 	// DisableIPv6 disables IPv6 on the interface.
@@ -117,6 +120,10 @@ type Manager interface {
 	// WireGuard returns the wireguard interface.
 	// The wireguard interface is only available after Start has been called.
 	WireGuard() wireguard.Interface
+	// Dial behaves like the standard library DialContext, but uses the
+	// wireguard interface for all connections. The address can be a nodeID
+	// or a network address.
+	Dial(ctx context.Context, network, address string) (net.Conn, error)
 	// Resolver returns a net.Resolver that can be used to resolve DNS names.
 	Resolver() *net.Resolver
 	// Close closes the network manager and cleans up any resources.
@@ -165,13 +172,52 @@ func (m *manager) Resolver() *net.Resolver {
 	if len(m.dnsservers) == 0 {
 		return net.DefaultResolver
 	}
-	// TODO: use all DNS servers
+	if m.opts.LocalDNSAddr.IsValid() {
+		return &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, network, m.opts.LocalDNSAddr.String())
+			},
+		}
+	}
 	return &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, m.dnsservers[0].String())
 		},
 	}
+}
+
+// Dial behaves like the standard library DialContext, but uses the
+// wireguard interface for all connections. The address can be a nodeID
+// or a network address.
+func (m *manager) Dial(ctx context.Context, network, address string) (net.Conn, error) {
+	res := m.Resolver()
+	dialer := &net.Dialer{
+		Resolver: res,
+	}
+	// If the address is a node ID, we'll use storage to lookup it's address
+	// and dial that instead.
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("split host port: %w", err)
+	}
+	// This is a bit of a hack, but for now we'll check if its a single word
+	// and not an IP address.
+	if net.ParseIP(host) == nil && len(strings.Split(host, ".")) == 0 {
+		// We'll assume it's a node ID
+		peer, err := peers.New(m.storage).Get(ctx, host)
+		if err != nil {
+			return nil, fmt.Errorf("get peer: %w", err)
+		}
+		// If it's a v4 network use the peer's v4 address
+		if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
+			address = net.JoinHostPort(peer.PrivateIPv4.String(), port)
+		} else {
+			address = net.JoinHostPort(peer.PrivateIPv6.String(), port)
+		}
+	}
+	return dialer.DialContext(ctx, network, address)
 }
 
 func (m *manager) Start(ctx context.Context, opts *StartOptions) error {

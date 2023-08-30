@@ -307,6 +307,14 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 		return
 	}
 
+	var localDNSAddr netip.AddrPort
+	if o.Services.MeshDNS.Enabled {
+		localDNSAddr, err = netip.ParseAddrPort(o.Services.MeshDNS.ListenUDP)
+		if err != nil {
+			return
+		}
+	}
+
 	opts = mesh.ConnectOptions{
 		Raft:                 raft,
 		JoinRoundTripper:     joinRT,
@@ -343,6 +351,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 			GRPCPort:              o.Mesh.GRPCAdvertisePort,
 			ZoneAwarenessID:       o.Mesh.ZoneAwarenessID,
 			DialOptions:           conn.Credentials(),
+			LocalDNSAddr:          localDNSAddr,
 			DisableIPv4:           o.Mesh.DisableIPv4,
 			DisableIPv6:           o.Mesh.DisableIPv6,
 		},
