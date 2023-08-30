@@ -33,7 +33,7 @@ type WebmeshNode interface {
 	Mesh() mesh.Mesh
 	// Raft is the underlying Raft instance.
 	Raft() raft.Raft
-	// Storage is the udnerlying storage instance.
+	// Storage is the underlying storage instance.
 	Storage() storage.Storage
 	// Services returns the underlying services instance
 	// if it is running.
