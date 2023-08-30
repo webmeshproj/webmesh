@@ -61,9 +61,8 @@ func (c *Config) LoadFrom(fs *pflag.FlagSet, confFiles []string) error {
 		}
 	}
 	// Load environment variables
-	err := k.Load(env.Provider("WEBMESH_", ".", func(s string) string {
-		return strings.Replace(strings.ToLower(
-			strings.TrimPrefix(s, "WEBMESH_")), "_", ".", -1)
+	err := k.Load(env.Provider("", ".", func(s string) string {
+		return strings.Replace(strings.ToLower(s), "_", ".", -1)
 	}), nil)
 	if err != nil {
 		return fmt.Errorf("error loading environment variables: %w", err)

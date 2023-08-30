@@ -24,6 +24,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/pflag"
+
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins"
 )
 
 var configPrefixes = []string{
@@ -36,10 +38,17 @@ var configPrefixes = []string{
 	"tls",
 	"wireguard",
 	"discovery",
+	"plugins",
 }
 
 // Usage returns a string describing the nodecmd's usage.
 func Usage() string {
+	// Register the builtin plugins for their usage docs.
+	pluginConfigs := builtins.NewPluginConfigs()
+	for pluginName, pluginConfig := range pluginConfigs {
+		pluginConfig.BindFlags(fmt.Sprintf("plugins.%s.", pluginName), flagset)
+	}
+
 	var sb strings.Builder
 	sb.WriteString("Usage: webmesh-node [options]\n\n")
 
@@ -89,6 +98,11 @@ The order of precedence for parsing is:
 
 // GenMarkdownDoc returns a string describing the nodecmd's usage in markdown format.
 func GenMarkdownDoc(title string, weight int, outfile string) error {
+	// Register the builtin plugins for their usage docs.
+	pluginConfigs := builtins.NewPluginConfigs()
+	for pluginName, pluginConfig := range pluginConfigs {
+		pluginConfig.BindFlags(fmt.Sprintf("plugins.%s.", pluginName), flagset)
+	}
 	var sb strings.Builder
 	// Doc header
 	sb.WriteString(fmt.Sprintf(`---
