@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -68,10 +69,12 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
 	}
 	var raftMember bool
+	var raftSuffrage raft.ServerSuffrage = -1
 	for _, srv := range cfg.Servers {
 		if string(srv.ID) == req.GetId() {
 			// They were a raft member, so remove them
 			raftMember = true
+			raftSuffrage = srv.Suffrage
 			break
 		}
 	}
@@ -85,10 +88,59 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 			return nil, status.Errorf(codes.Internal, "failed to remove raft member: %v", err)
 		}
 	}
+
+	// Lookup the peer first to make sure they exist
+	leaving, err := peers.New(s.raft.Storage()).Get(ctx, req.GetId())
+	if err != nil {
+		if err == peers.ErrNodeNotFound {
+			// We're done here if they don't exist
+			return &v1.LeaveResponse{}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get peer: %v", err)
+	}
+
 	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
 	err = peers.New(s.raft.Storage()).Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}
+
+	go func() {
+		// Notify any watching plugins
+		if s.plugins != nil && s.plugins.HasWatchers() {
+			err := s.plugins.Emit(context.Background(), &v1.Event{
+				Type: v1.Event_NODE_JOIN,
+				Event: &v1.Event_Node{
+					Node: &v1.MeshNode{
+						Id:                 leaving.ID,
+						PrimaryEndpoint:    leaving.PrimaryEndpoint,
+						WireguardEndpoints: leaving.WireGuardEndpoints,
+						ZoneAwarenessId:    leaving.ZoneAwarenessID,
+						RaftPort:           int32(leaving.RaftPort),
+						GrpcPort:           int32(leaving.GRPCPort),
+						MeshdnsPort:        int32(leaving.DNSPort),
+						PublicKey:          leaving.PublicKey.String(),
+						PrivateIpv4:        leaving.PrivateIPv4.String(),
+						PrivateIpv6:        leaving.PrivateIPv6.String(),
+						Features:           leaving.Features,
+						ClusterStatus: func() v1.ClusterStatus {
+							switch raftSuffrage {
+							case raft.Voter:
+								return v1.ClusterStatus_CLUSTER_VOTER
+							case raft.Nonvoter:
+								return v1.ClusterStatus_CLUSTER_NON_VOTER
+							default:
+								return v1.ClusterStatus_CLUSTER_NODE
+							}
+						}(),
+					},
+				},
+			})
+			if err != nil {
+				s.log.Warn("Failed to emit event", "error", err.Error())
+			}
+		}
+	}()
+
 	return &v1.LeaveResponse{}, nil
 }

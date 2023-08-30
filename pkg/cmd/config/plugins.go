@@ -64,7 +64,6 @@ func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 		if prefix != "" {
 			flagPrefix = prefix + "." + flagPrefix
 		}
-		fmt.Println("Binding flags for", pluginName, "with prefix", flagPrefix)
 		if pluginConfig, ok := pluginConfigs[pluginName]; ok {
 			pconf := pluginConfig
 			pconf.BindFlags(flagPrefix, fs)

@@ -86,5 +86,6 @@ func (p *Plugin) InjectQuerier(srv v1.StoragePlugin_InjectQuerierServer) error {
 // Close is called when the plugin is shutting down.
 func (p *Plugin) Close(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	close(p.closec)
+	p.closec = make(chan struct{})
 	return &emptypb.Empty{}, nil
 }

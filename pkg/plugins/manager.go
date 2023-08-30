@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/netip"
 	"strings"
 
@@ -105,6 +106,7 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 		if err != nil {
 			return nil, fmt.Errorf("get plugin info: %w", err)
 		}
+		log.Debug("plugin info", slog.Any("info", resp))
 		plugin.capabilities = resp.GetCapabilities()
 		plugin.name = resp.GetName()
 		// Configure the plugin
@@ -332,6 +334,7 @@ func (m *manager) Emit(ctx context.Context, ev *v1.Event) error {
 	errs := make([]error, 0)
 	for _, plugin := range m.plugins {
 		if plugin.hasCapability(v1.PluginInfo_WATCH) {
+			m.log.Debug("Emitting event", "plugin", plugin.name, "event", ev.String())
 			_, err := plugin.Client.Events().Emit(ctx, ev)
 			if err != nil {
 				errs = append(errs, err)

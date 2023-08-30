@@ -21,13 +21,14 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
+      - --global.log-level=debug
       - --global.disable-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --raft.in-memory
-      # TODO: Fix this
-      - --plugins.server=server=10.1.0.1:8081,insecure=true
+      - --plugins.test-plugin.remote.server=10.1.0.1:8081
+      - --plugins.test-plugin.remote.insecure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   join-node:

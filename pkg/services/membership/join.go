@@ -418,6 +418,42 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
+	go func() {
+		// Notify any watching plugins
+		if s.plugins != nil && s.plugins.HasWatchers() {
+			err := s.plugins.Emit(context.Background(), &v1.Event{
+				Type: v1.Event_NODE_JOIN,
+				Event: &v1.Event_Node{
+					Node: &v1.MeshNode{
+						Id:                 req.GetId(),
+						PrimaryEndpoint:    req.GetPrimaryEndpoint(),
+						WireguardEndpoints: req.GetWireguardEndpoints(),
+						ZoneAwarenessId:    req.GetZoneAwarenessId(),
+						RaftPort:           int32(req.GetRaftPort()),
+						GrpcPort:           int32(req.GetGrpcPort()),
+						MeshdnsPort:        int32(req.GetMeshdnsPort()),
+						PublicKey:          req.GetPublicKey(),
+						PrivateIpv4:        leasev4.String(),
+						PrivateIpv6:        leasev6.String(),
+						Features:           req.GetFeatures(),
+						ClusterStatus: func() v1.ClusterStatus {
+							if req.GetAsVoter() {
+								return v1.ClusterStatus_CLUSTER_VOTER
+							}
+							if req.GetAsObserver() {
+								return v1.ClusterStatus_CLUSTER_NON_VOTER
+							}
+							return v1.ClusterStatus_CLUSTER_NODE
+						}(),
+					},
+				},
+			})
+			if err != nil {
+				log.Warn("Failed to emit event", slog.String("error", err.Error()))
+			}
+		}
+	}()
+
 	log.Debug("Sending join response", slog.Any("response", resp))
 	return resp, nil
 }
