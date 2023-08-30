@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra/doc"
 
+	"github.com/webmeshproj/webmesh/pkg/cmd/bridgecmd"
 	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd"
 	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd"
 )
@@ -33,6 +34,7 @@ func main() {
 	out := fs.String("out", "", "Output for generated file")
 	ctldocs := fs.Bool("ctl", false, "Generate docs for wmctl")
 	nodedocs := fs.Bool("node", false, "Generate docs for webmesh-node")
+	bridgedocs := fs.Bool("bridge", false, "Generate docs for webmesh-node bridge mode")
 	if len(os.Args) < 2 {
 		fs.Usage()
 		os.Exit(1)
@@ -41,9 +43,9 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	if !*ctldocs && !*nodedocs {
+	if !*ctldocs && !*nodedocs && !*bridgedocs {
 		fs.Usage()
-		fatal(errors.New("must specify -ctl or -node"))
+		fatal(errors.New("must specify -ctl or -node or -bridge"))
 	}
 	if *out == "" {
 		fs.Usage()
@@ -57,9 +59,17 @@ func main() {
 		}
 		return
 	}
-	err = nodecmd.GenMarkdownDoc("Configuration", -10, *out)
-	if err != nil {
-		fatal(err)
+	if *nodedocs {
+		err = nodecmd.GenMarkdownDoc("Configuration", -10, *out)
+		if err != nil {
+			fatal(err)
+		}
+	}
+	if *bridgedocs {
+		err = bridgecmd.GenMarkdownDoc("Bridge Configuration", -9, *out)
+		if err != nil {
+			fatal(err)
+		}
 	}
 }
 
