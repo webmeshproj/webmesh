@@ -37,27 +37,18 @@ services:
     hostname: site-1-leader
     entrypoint:
       - /webmesh-node
-      - --global.log-level=debug
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.primary-endpoint=10.250.0.1
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.advertise-address=site-1-leader:9443
-      - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
+      - --bootstrap.advertise-address=site-1-leader:9001
+      - --bootstrap.servers=site-2-leader=site-2-leader:9001,site-3-leader=site-3-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --bootstrap.default-network-policy=accept
       - --raft.in-memory
       - --mesh.zone-awareness-id=site-1
-      - --services.api.mesh
-      - --services.api.admin
-      - --services.meshdns.enabled
-      - --services.metrics.enabled
-      - --services.metrics.listen-address=:8000
     ports:
-      - 8000:8000
       - 8443:8443
-      - 5354:5353/udp
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-1-follower-1:
@@ -68,10 +59,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-1-leader:8443
-      - --mesh.max-join-retries=10
       - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -84,10 +73,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-1-leader:8443
-      - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -100,10 +87,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-1-leader:8443
-      - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -119,16 +104,14 @@ services:
     hostname: site-2-leader
     entrypoint:
       - /webmesh-node
-      - --global.log-level=debug
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.primary-endpoint=10.250.0.2
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.advertise-address=site-2-leader:9443
-      - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
+      - --bootstrap.advertise-address=site-2-leader:9001
+      - --bootstrap.servers=site-1-leader=site-1-leader:9001,site-3-leader=site-3-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --bootstrap.default-network-policy=accept
       - --raft.in-memory
       - --mesh.zone-awareness-id=site-2
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -141,10 +124,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-2-leader:8443
-      - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -157,10 +138,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-2-leader:8443
-      - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -173,10 +152,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-2-leader:8443
-      - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -192,16 +169,14 @@ services:
     hostname: site-3-leader
     entrypoint:
       - /webmesh-node
-      - --global.log-level=debug
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.primary-endpoint=10.250.0.3
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.advertise-address=site-3-leader:9443
-      - --bootstrap.servers=site-1-leader=site-1-leader:9443,site-2-leader=site-2-leader:9443,site-3-leader=site-3-leader:9443
+      - --bootstrap.advertise-address=site-3-leader:9001
+      - --bootstrap.servers=site-1-leader=site-1-leader:9001,site-2-leader=site-2-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --bootstrap.default-network-policy=accept
       - --raft.in-memory
       - --mesh.zone-awareness-id=site-3
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -214,10 +189,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-3-leader:8443
-      - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -230,10 +203,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-3-leader:8443
-      - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -246,10 +217,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=site-3-leader:8443
-      - --mesh.max-join-retries=15
       - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
