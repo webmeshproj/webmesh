@@ -30,6 +30,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/raft/fsm"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -38,8 +39,9 @@ var ErrNotRaftMember = errors.New("not a raft member")
 
 // NewPassthrough creates a new raft instance that is a no-op for most methods
 // and uses the given Dialer for storage connections.
-func NewPassthrough(dialer transport.NodeDialer) Raft {
+func NewPassthrough(nodeID string, dialer transport.NodeDialer) Raft {
 	return &passthroughRaft{
+		nodeID:     nodeID,
 		dialer:     dialer,
 		subCancels: []func(){},
 		closec:     make(chan struct{}),
@@ -60,13 +62,28 @@ type passthroughRaft struct {
 	mu         sync.Mutex
 }
 
+// OnApply registers a callback for when a log is applied to the state machine.
+func (r *passthroughRaft) OnApply(cb fsm.ApplyCallback) {
+	// No-op
+}
+
+// OnSnapshotRestore registers a callback for when a snapshot is restored.
+func (r *passthroughRaft) OnSnapshotRestore(cb fsm.SnapshotRestoreCallback) {
+	// No-op
+}
+
+// OnObservation registers a callback for when an observation is received.
+func (r *passthroughRaft) OnObservation(cb ObservationCallback) {
+	// No-op
+}
+
 // ID returns the node ID of the raft member.
 func (p *passthroughRaft) ID() string {
 	return p.nodeID
 }
 
-func (p *passthroughRaft) Start(ctx context.Context, opts *StartOptions) error {
-	p.nodeID = opts.NodeID
+func (p *passthroughRaft) Start(ctx context.Context, opts StartOptions) error {
+	// No-op
 	return nil
 }
 
@@ -149,6 +166,10 @@ func (p *passthroughRaft) LeaderID() (string, error) {
 }
 
 func (p *passthroughRaft) IsLeader() bool {
+	return false
+}
+
+func (r *passthroughRaft) IsMember() bool {
 	return false
 }
 

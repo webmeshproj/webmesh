@@ -23,7 +23,6 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -81,10 +80,20 @@ const (
 // The isLeader flag is set to true if the node is the leader, and false otherwise.
 type BootstrapCallback func(isLeader bool) error
 
+// ObservationCallback is a callback that can be registered for when an observation
+// is received.
+type ObservationCallback func(ctx context.Context, obs Observation)
+
 // Raft is the interface for Raft consensus and storage.
 type Raft interface {
+	// OnApply registers a callback for when a log is applied to the state machine.
+	OnApply(cb fsm.ApplyCallback)
+	// OnSnapshotRestore registers a callback for when a snapshot is restored.
+	OnSnapshotRestore(cb fsm.SnapshotRestoreCallback)
+	// OnObservation registers a callback for when an observation is received.
+	OnObservation(cb ObservationCallback)
 	// Start starts the Raft node.
-	Start(ctx context.Context, opts *StartOptions) error
+	Start(ctx context.Context, opts StartOptions) error
 	// ID returns the node ID.
 	ID() string
 	// Bootstrap attempts to bootstrap the Raft cluster. If the cluster is already
@@ -108,6 +117,8 @@ type Raft interface {
 	IsVoter() bool
 	// IsObserver returns true if the Raft node is an observer.
 	IsObserver() bool
+	// IsMember is a convenience method that returns true if the Raft node is a voter or observer.
+	IsMember() bool
 	// AddNonVoter adds a non-voting node to the cluster with timeout enforced by the context.
 	AddNonVoter(ctx context.Context, id string, addr string) error
 	// AddVoter adds a voting node to the cluster with timeout enforced by the context.
@@ -127,30 +138,8 @@ type Raft interface {
 	Stop(ctx context.Context) error
 }
 
-// StartOptons are options for starting a Raft node.
-type StartOptions struct {
-	// NodeID is the node ID.
-	NodeID string
-	// Transport is the Raft transport.
-	Transport transport.RaftTransport
-	// MeshStorage is the mesh storage.
-	MeshStorage storage.MeshStorage
-	// RaftStorage is the Raft storage.
-	RaftStorage storage.RaftStorage
-}
-
-// BootstrapOptions are options for bootstrapping a Raft node.
-type BootstrapOptions struct {
-	// AdvertiseAddress is the address to advertise to the other
-	// bootstrap nodes. Defaults to localhost:listen_port if empty.
-	AdvertiseAddress string
-	// Servers are the Raft servers to bootstrap with.
-	// Keys are the node IDs, and values are the Raft addresses.
-	Servers map[string]string
-}
-
 // New returns a new Raft node.
-func New(opts *Options) Raft {
+func New(opts Options) Raft {
 	return newRaftNode(opts)
 }
 
@@ -158,7 +147,7 @@ func New(opts *Options) Raft {
 type raftNode struct {
 	started                     atomic.Bool
 	fsm                         *fsm.RaftFSM
-	opts                        *Options
+	opts                        Options
 	nodeID                      raft.ServerID
 	raft                        *raft.Raft
 	raftTransport               transport.RaftTransport
@@ -166,12 +155,16 @@ type raftNode struct {
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
 	observerClose, observerDone chan struct{}
+	applycbs                    []fsm.ApplyCallback
+	snapshotcbs                 []fsm.SnapshotRestoreCallback
+	observationcbs              []ObservationCallback
 	log                         *slog.Logger
+	cbmu                        sync.Mutex
 	mu                          sync.Mutex
 }
 
 // newRaftNode returns a new Raft node.
-func newRaftNode(opts *Options) *raftNode {
+func newRaftNode(opts Options) *raftNode {
 	log := slog.Default().With(slog.String("component", "raft"))
 	if opts.InMemory {
 		log = log.With(slog.String("storage", ":memory:"))
@@ -179,8 +172,9 @@ func newRaftNode(opts *Options) *raftNode {
 		log = log.With(slog.String("storage", opts.DataDir))
 	}
 	return &raftNode{
-		opts: opts,
-		log:  log,
+		opts:   opts,
+		nodeID: raft.ServerID(opts.NodeID),
+		log:    log,
 	}
 }
 
@@ -189,24 +183,45 @@ func (r *raftNode) ID() string {
 	return string(r.nodeID)
 }
 
+// OnApply registers a callback for when a log is applied to the state machine.
+func (r *raftNode) OnApply(cb fsm.ApplyCallback) {
+	r.cbmu.Lock()
+	defer r.cbmu.Unlock()
+	r.applycbs = append(r.applycbs, cb)
+}
+
+// OnSnapshotRestore registers a callback for when a snapshot is restored.
+func (r *raftNode) OnSnapshotRestore(cb fsm.SnapshotRestoreCallback) {
+	r.cbmu.Lock()
+	defer r.cbmu.Unlock()
+	r.snapshotcbs = append(r.snapshotcbs, cb)
+}
+
+// OnObservation registers a callback for when an observation is received.
+func (r *raftNode) OnObservation(cb ObservationCallback) {
+	r.cbmu.Lock()
+	defer r.cbmu.Unlock()
+	r.observationcbs = append(r.observationcbs, cb)
+}
+
+// StartOptons are options for starting a Raft node.
+type StartOptions struct {
+	// Transport is the Raft transport.
+	Transport transport.RaftTransport
+	// MeshStorage is the mesh storage.
+	MeshStorage storage.MeshStorage
+	// RaftStorage is the Raft storage.
+	RaftStorage storage.RaftStorage
+}
+
 // Start starts the Raft node.
-func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
+func (r *raftNode) Start(ctx context.Context, opts StartOptions) error {
 	if r.started.Load() {
 		return ErrStarted
 	}
 	r.mu.Lock()
-	r.nodeID = raft.ServerID(opts.NodeID)
 	r.raftTransport = opts.Transport
-	// r.meshDB = opts.MeshStorage
 	r.raftDB = &raftStorage{MeshStorage: opts.MeshStorage, raft: r}
-	// Ensure the data directories exist if not in-memory
-	if !r.opts.InMemory {
-		err := os.MkdirAll(r.opts.DataStoragePath(), 0755)
-		if err != nil {
-			r.mu.Unlock()
-			return fmt.Errorf("raft mkdir %q: %w", r.opts.DataStoragePath(), err)
-		}
-	}
 	// Create the snapshot stores
 	var snapshotStore raft.SnapshotStore
 	if r.opts.InMemory {
@@ -233,11 +248,11 @@ func (r *raftNode) Start(ctx context.Context, opts *StartOptions) error {
 	var err error
 	r.fsm = fsm.New(opts.MeshStorage, fsm.Options{
 		ApplyTimeout:      r.opts.ApplyTimeout,
-		OnApplyLog:        r.opts.OnApplyLog,
-		OnSnapshotRestore: r.opts.OnSnapshotRestore,
+		OnApplyLog:        r.applycbs,
+		OnSnapshotRestore: r.snapshotcbs,
 	})
 	r.raft, err = raft.NewRaft(
-		r.opts.RaftConfig(opts.NodeID),
+		r.opts.RaftConfig(string(r.nodeID)),
 		r.fsm,
 		&MonotonicLogStore{opts.RaftStorage},
 		opts.RaftStorage,
@@ -345,6 +360,11 @@ func (r *raftNode) LeaderID() (string, error) {
 // IsLeader returns true if the Raft node is the leader.
 func (r *raftNode) IsLeader() bool {
 	return r.raft.State() == raft.Leader
+}
+
+// IsMember is a convenience method that returns true if the Raft node is a voter or observer.
+func (r *raftNode) IsMember() bool {
+	return r.IsVoter() || r.IsObserver()
 }
 
 // IsVoter returns true if the Raft node is a voter.

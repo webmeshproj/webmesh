@@ -21,12 +21,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra/doc"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd"
-	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd"
 )
 
 func main() {
@@ -58,14 +56,14 @@ func main() {
 		}
 		return
 	}
-	err = nodecmd.GenMarkdownDoc("Configuration", -10, filepath.Join(*out, "configuration.md"))
-	if err != nil {
-		fatal(err)
-	}
-	err = nodecmd.GenBridgeMarkdownDoc("Bridge Configuration", -9, filepath.Join(*out, "bridge-configuration.md"))
-	if err != nil {
-		fatal(err)
-	}
+	// err = nodecmd.GenMarkdownDoc("Configuration", -10, filepath.Join(*out, "configuration.md"))
+	// if err != nil {
+	// 	fatal(err)
+	// }
+	// err = nodecmd.GenBridgeMarkdownDoc("Bridge Configuration", -9, filepath.Join(*out, "bridge-configuration.md"))
+	// if err != nil {
+	// 	fatal(err)
+	// }
 }
 
 func fatal(err error) {

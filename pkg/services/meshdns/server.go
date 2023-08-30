@@ -35,6 +35,15 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
+// DefaultAdvertisePort is the default port to advertise for Mesh DNS.
+const DefaultAdvertisePort = 53
+
+// DefaultListenUDP is the default UDP listen address.
+const DefaultListenUDP = "[::]:53"
+
+// DefaultListenTCP is the default TCP listen address.
+const DefaultListenTCP = "[::]:53"
+
 // Options are the Mesh DNS server options.
 type Options struct {
 	// UDPListenAddr is the UDP address to listen on.
@@ -235,13 +244,14 @@ func (s *Server) ListenAndServe() error {
 }
 
 // Shutdown shuts down the Mesh DNS server.
-func (s *Server) Shutdown() error {
+func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var closeErr error
 	for _, cancel := range s.subCancels {
 		cancel()
 	}
+	s.log.Info("Shutting down meshdns server")
 	if s.udpServer != nil {
 		if err := s.udpServer.Shutdown(); err != nil {
 			closeErr = fmt.Errorf("udp server shutdown: %w", err)

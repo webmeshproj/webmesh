@@ -17,111 +17,70 @@ limitations under the License.
 package raft
 
 import (
-	"errors"
-	"flag"
-	"fmt"
-	"io"
 	"log/slog"
-	"net"
-	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
-	v1 "github.com/webmeshproj/api/v1"
-
-	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/util/envutil"
 )
 
-const (
-	RaftListenAddressEnvVar   = "RAFT_LISTEN_ADDRESS"
-	DataDirEnvVar             = "RAFT_DATA_DIR"
-	InMemoryEnvVar            = "RAFT_IN_MEMORY"
-	ConnectionPoolCountEnvVar = "RAFT_CONNECTION_POOL_COUNT"
-	ConnectionTimeoutEnvVar   = "RAFT_CONNECTION_TIMEOUT"
-	HeartbeatTimeoutEnvVar    = "RAFT_HEARTBEAT_TIMEOUT"
-	ElectionTimeoutEnvVar     = "RAFT_ELECTION_TIMEOUT"
-	ApplyTimeoutEnvVar        = "RAFT_APPLY_TIMEOUT"
-	CommitTimeoutEnvVar       = "RAFT_COMMIT_TIMEOUT"
-	MaxAppendEntriesEnvVar    = "RAFT_MAX_APPEND_ENTRIES"
-	LeaderLeaseTimeoutEnvVar  = "RAFT_LEADER_LEASE_TIMEOUT"
-	SnapshotIntervalEnvVar    = "RAFT_SNAPSHOT_INTERVAL"
-	SnapshotThresholdEnvVar   = "RAFT_SNAPSHOT_THRESHOLD"
-	SnapshotRetentionEnvVar   = "RAFT_SNAPSHOT_RETENTION"
-	ObserverChanBufferEnvVar  = "RAFT_OBSERVER_CHAN_BUFFER"
-	RaftLogLevelEnvVar        = "RAFT_LOG_LEVEL"
-	RaftPreferIPv6EnvVar      = "RAFT_PREFER_IPV6"
-	LeaveOnShutdownEnvVar     = "RAFT_LEAVE_ON_SHUTDOWN"
-	StartupTimeoutEnvVar      = "RAFT_STARTUP_TIMEOUT"
+// DefaultDataDir is the default data directory.
+var DefaultDataDir = func() string {
+	if runtime.GOOS == "windows" {
+		return "C:\\ProgramData\\webmesh\\store"
+	}
+	return "/var/lib/webmesh/store"
+}()
 
-	// DataStoragePath is the path to the data storage directory.
-	DataStoragePath = "data"
+const (
 	// DefaultListenPort is the default raft listen port
-	DefaultListenPort = 9443
+	DefaultListenPort = 9000
+	// DefaultListenAddress is the default raft listen address
+	DefaultListenAddress = "[::]:9000"
 )
 
 // Options are the raft options.
 type Options struct {
-	// ListenAddress is the address to listen on for raft.
-	ListenAddress string `json:"listen-address,omitempty" yaml:"listen-address,omitempty" toml:"listen-address,omitempty" mapstructure:"listen-address,omitempty"`
+	// NodeID is the node ID.
+	NodeID string
 	// DataDir is the directory to store data in.
-	DataDir string `json:"data-dir,omitempty" yaml:"data-dir,omitempty" toml:"data-dir,omitempty" mapstructure:"data-dir,omitempty"`
+	DataDir string
 	// InMemory is if the store should be in memory. This should only be used for testing and ephemeral nodes.
-	InMemory bool `json:"in-memory,omitempty" yaml:"in-memory,omitempty" toml:"in-memory,omitempty" mapstructure:"in-memory,omitempty"`
+	InMemory bool
 	// ConnectionPoolCount is the number of connections to pool. If 0, no connection pooling is used.
-	ConnectionPoolCount int `json:"connection-pool-count,omitempty" yaml:"connection-pool-count,omitempty" toml:"connection-pool-count,omitempty" mapstructure:"connection-pool-count,omitempty"`
+	ConnectionPoolCount int
 	// ConnectionTimeout is the timeout for connections.
-	ConnectionTimeout time.Duration `json:"connection-timeout,omitempty" yaml:"connection-timeout,omitempty" toml:"connection-timeout,omitempty" mapstructure:"connection-timeout,omitempty"`
+	ConnectionTimeout time.Duration
 	// HeartbeatTimeout is the timeout for heartbeats.
-	HeartbeatTimeout time.Duration `json:"heartbeat-timeout,omitempty" yaml:"heartbeat-timeout,omitempty" toml:"heartbeat-timeout,omitempty" mapstructure:"heartbeat-timeout,omitempty"`
+	HeartbeatTimeout time.Duration
 	// ElectionTimeout is the timeout for elections.
-	ElectionTimeout time.Duration `json:"election-timeout,omitempty" yaml:"election-timeout,omitempty" toml:"election-timeout,omitempty" mapstructure:"election-timeout,omitempty"`
+	ElectionTimeout time.Duration
 	// ApplyTimeout is the timeout for applying.
-	ApplyTimeout time.Duration `json:"apply-timeout,omitempty" yaml:"apply-timeout,omitempty" toml:"apply-timeout,omitempty" mapstructure:"apply-timeout,omitempty"`
+	ApplyTimeout time.Duration
 	// CommitTimeout is the timeout for committing.
-	CommitTimeout time.Duration `json:"commit-timeout,omitempty" yaml:"commit-timeout,omitempty" toml:"commit-timeout,omitempty" mapstructure:"commit-timeout,omitempty"`
+	CommitTimeout time.Duration
 	// MaxAppendEntries is the maximum number of append entries.
-	MaxAppendEntries int `json:"max-append-entries,omitempty" yaml:"max-append-entries,omitempty" toml:"max-append-entries,omitempty" mapstructure:"max-append-entries,omitempty"`
+	MaxAppendEntries int
 	// LeaderLeaseTimeout is the timeout for leader leases.
-	LeaderLeaseTimeout time.Duration `json:"leader-lease-timeout,omitempty" yaml:"leader-lease-timeout,omitempty" toml:"leader-lease-timeout,omitempty" mapstructure:"leader-lease-timeout,omitempty"`
+	LeaderLeaseTimeout time.Duration
 	// SnapshotInterval is the interval to take snapshots.
-	SnapshotInterval time.Duration `json:"snapshot-interval,omitempty" yaml:"snapshot-interval,omitempty" toml:"snapshot-interval,omitempty" mapstructure:"snapshot-interval,omitempty"`
+	SnapshotInterval time.Duration
 	// SnapshotThreshold is the threshold to take snapshots.
-	SnapshotThreshold uint64 `json:"snapshot-threshold,omitempty" yaml:"snapshot-threshold,omitempty" toml:"snapshot-threshold,omitempty" mapstructure:"snapshot-threshold,omitempty"`
+	SnapshotThreshold uint64
 	// SnapshotRetention is the number of snapshots to retain.
-	SnapshotRetention uint64 `json:"snapshot-retention,omitempty" yaml:"snapshot-retention,omitempty" toml:"snapshot-retention,omitempty" mapstructure:"snapshot-retention,omitempty"`
+	SnapshotRetention uint64
 	// ObserverChanBuffer is the buffer size for the observer channel.
-	ObserverChanBuffer int `json:"observer-chan-buffer,omitempty" yaml:"observer-chan-buffer,omitempty" toml:"observer-chan-buffer,omitempty" mapstructure:"observer-chan-buffer,omitempty"`
+	ObserverChanBuffer int
 	// LogLevel is the log level for the raft backend.
-	LogLevel string `json:"log-level,omitempty" yaml:"log-level,omitempty" toml:"log-level,omitempty" mapstructure:"log-level,omitempty"`
-	// PreferIPv6 is the prefer IPv6 flag.
-	PreferIPv6 bool `json:"prefer-ipv6,omitempty" yaml:"prefer-ipv6,omitempty" toml:"prefer-ipv6,omitempty" mapstructure:"prefer-ipv6,omitempty"`
-	// LeaveOnShutdown is the leave on shutdown flag.
-	LeaveOnShutdown bool `json:"leave-on-shutdown,omitempty" yaml:"leave-on-shutdown,omitempty" toml:"leave-on-shutdown,omitempty" mapstructure:"leave-on-shutdown,omitempty"`
-
-	// Below are callbacks used internally or by external packages.
-	OnApplyLog        func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) `json:"-" yaml:"-" toml:"-" mapstructure:"-"`
-	OnSnapshotRestore func(ctx context.Context, meta *SnapshotMeta, data io.ReadCloser)   `json:"-" yaml:"-" toml:"-" mapstructure:"-"`
-	OnObservation     func(ev Observation)                                                `json:"-" yaml:"-" toml:"-" mapstructure:"-"`
+	LogLevel string
 }
 
-// NewOptions returns new raft options with the default values and given listen port.
-// If the port is 0, the default is used.
-func NewOptions(port int) *Options {
-	if port == 0 {
-		port = DefaultListenPort
-	}
-	return &Options{
-		ListenAddress: fmt.Sprintf("[::]:%d", port),
-		DataDir: func() string {
-			if runtime.GOOS == "windows" {
-				return "C:\\ProgramData\\webmesh\\store"
-			}
-			return "/var/lib/webmesh/store"
-		}(),
+// NewOptions returns new raft options with sensible defaults.
+func NewOptions(nodeID string) Options {
+	return Options{
+		NodeID:             nodeID,
+		DataDir:            DefaultDataDir,
 		ConnectionTimeout:  time.Second * 3,
 		HeartbeatTimeout:   time.Second * 3,
 		ElectionTimeout:    time.Second * 3,
@@ -135,89 +94,6 @@ func NewOptions(port int) *Options {
 		ObserverChanBuffer: 100,
 		LogLevel:           "info",
 	}
-}
-
-// BindFlags binds the flags to the options.
-func (o *Options) BindFlags(fl *flag.FlagSet, prefix ...string) {
-	var p string
-	if len(prefix) > 0 {
-		p = strings.Join(prefix, ".") + "."
-	}
-	fl.StringVar(&o.ListenAddress, p+"raft.listen-address", envutil.GetEnvDefault(RaftListenAddressEnvVar, "[::]:9443"),
-		"Raft listen address.")
-	fl.StringVar(&o.DataDir, p+"raft.data-dir", envutil.GetEnvDefault(DataDirEnvVar, "/var/lib/webmesh/store"),
-		"Store data directory.")
-	fl.BoolVar(&o.InMemory, p+"raft.in-memory", envutil.GetEnvDefault(InMemoryEnvVar, "false") == "true",
-		"Store data in memory. This should only be used for testing and ephemeral nodes.")
-	fl.IntVar(&o.ConnectionPoolCount, p+"raft.connection-pool-count", envutil.GetEnvIntDefault(ConnectionPoolCountEnvVar, 0),
-		"Raft connection pool count.")
-	fl.DurationVar(&o.ConnectionTimeout, p+"raft.connection-timeout", envutil.GetEnvDurationDefault(ConnectionTimeoutEnvVar, time.Second*3),
-		"Raft connection timeout.")
-	fl.DurationVar(&o.HeartbeatTimeout, p+"raft.heartbeat-timeout", envutil.GetEnvDurationDefault(HeartbeatTimeoutEnvVar, time.Second*3),
-		"Raft heartbeat timeout.")
-	fl.DurationVar(&o.ElectionTimeout, p+"raft.election-timeout", envutil.GetEnvDurationDefault(ElectionTimeoutEnvVar, time.Second*3),
-		"Raft election timeout.")
-	fl.DurationVar(&o.ApplyTimeout, p+"raft.apply-timeout", envutil.GetEnvDurationDefault(ApplyTimeoutEnvVar, time.Second*15),
-		"Raft apply timeout.")
-	fl.DurationVar(&o.CommitTimeout, p+"raft.commit-timeout", envutil.GetEnvDurationDefault(CommitTimeoutEnvVar, time.Second*15),
-		"Raft commit timeout.")
-	fl.IntVar(&o.MaxAppendEntries, p+"raft.max-append-entries", envutil.GetEnvIntDefault(MaxAppendEntriesEnvVar, 15),
-		"Raft max append entries.")
-	fl.DurationVar(&o.LeaderLeaseTimeout, p+"raft.leader-lease-timeout", envutil.GetEnvDurationDefault(LeaderLeaseTimeoutEnvVar, time.Second*3),
-		"Raft leader lease timeout.")
-	fl.DurationVar(&o.SnapshotInterval, p+"raft.snapshot-interval", envutil.GetEnvDurationDefault(SnapshotIntervalEnvVar, time.Minute*3),
-		"Raft snapshot interval.")
-	fl.Uint64Var(&o.SnapshotThreshold, p+"raft.snapshot-threshold", uint64(envutil.GetEnvIntDefault(SnapshotThresholdEnvVar, 5)),
-		"Raft snapshot threshold.")
-	fl.Uint64Var(&o.SnapshotRetention, p+"raft.snapshot-retention", uint64(envutil.GetEnvIntDefault(SnapshotRetentionEnvVar, 3)),
-		"Raft snapshot retention.")
-	fl.StringVar(&o.LogLevel, p+"raft.log-level", envutil.GetEnvDefault(RaftLogLevelEnvVar, "info"),
-		"Raft log level.")
-	fl.BoolVar(&o.PreferIPv6, p+"raft.prefer-ipv6", envutil.GetEnvDefault(RaftPreferIPv6EnvVar, "false") == "true",
-		"Prefer IPv6 when connecting to raft peers.")
-	fl.IntVar(&o.ObserverChanBuffer, p+"raft.observer-chan-buffer", envutil.GetEnvIntDefault(ObserverChanBufferEnvVar, 100),
-		"Raft observer channel buffer size.")
-	fl.BoolVar(&o.LeaveOnShutdown, p+"raft.leave-on-shutdown", envutil.GetEnvDefault(LeaveOnShutdownEnvVar, "false") == "true",
-		"Leave the cluster when the server shuts down.")
-}
-
-// Validate validates the raft options.
-func (o *Options) Validate() error {
-	if o == nil {
-		return errors.New("raft options cannot be empty")
-	}
-	_, _, err := net.SplitHostPort(o.ListenAddress)
-	if err != nil {
-		return fmt.Errorf("listen address is invalid: %w", err)
-	}
-	if o.DataDir == "" && !o.InMemory {
-		return errors.New("data directory is required")
-	}
-	if o.ConnectionPoolCount < 0 {
-		return errors.New("connection pool count must be >= 0")
-	}
-	if o.ConnectionTimeout <= 0 {
-		return errors.New("connection timeout must be > 0")
-	}
-	if o.HeartbeatTimeout <= 0 {
-		return errors.New("heartbeat timeout must be > 0")
-	}
-	if o.ElectionTimeout <= 0 {
-		return errors.New("election timeout must be > 0")
-	}
-	if o.CommitTimeout <= 0 {
-		return errors.New("commit timeout must be > 0")
-	}
-	if o.MaxAppendEntries <= 0 {
-		return errors.New("max append entries must be > 0")
-	}
-	if o.LeaderLeaseTimeout <= 0 {
-		return errors.New("leader lease timeout must be > 0")
-	}
-	if o.SnapshotInterval <= 0 {
-		return errors.New("snapshot interval must be > 0")
-	}
-	return nil
 }
 
 // RaftConfig builds a raft config.
@@ -252,18 +128,4 @@ func (o *Options) RaftConfig(nodeID string) *raft.Config {
 		level:  o.LogLevel,
 	}
 	return config
-}
-
-// DataStoragePath returns the data directory.
-func (o *Options) DataStoragePath() string {
-	return filepath.Join(o.DataDir, DataStoragePath)
-}
-
-// DeepCopy returns a deep copy of the options.
-func (o *Options) DeepCopy() *Options {
-	if o == nil {
-		return nil
-	}
-	other := *o
-	return &other
 }

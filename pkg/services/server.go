@@ -21,149 +21,60 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"strings"
 	"sync"
-	"time"
 
-	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	"github.com/webmeshproj/webmesh/pkg/services/admin"
-	"github.com/webmeshproj/webmesh/pkg/services/membership"
-	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
-	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
-	"github.com/webmeshproj/webmesh/pkg/services/node"
-	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/services/storage"
-	"github.com/webmeshproj/webmesh/pkg/services/turn"
-	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
 )
+
+// DefaultGRPCPort is the default port for the gRPC server.
+const DefaultGRPCPort = 8443
+
+// DefaultGRPCListenAddress is the default listen address for the gRPC server.
+const DefaultGRPCListenAddress = "[::]:8443"
+
+// MeshServer is the generic interface for additional services that
+// can be managed by this server.
+type MeshServer interface {
+	// ListenAndServe starts the server and blocks until the server exits.
+	ListenAndServe() error
+	// Shutdown attempts to stops the server gracefully.
+	Shutdown(ctx context.Context) error
+}
+
+// Options contains the configuration for the gRPC server.
+type Options struct {
+	// ListenAddress is the address to start the gRPC server on.
+	ListenAddress string
+	// ServerOptions are options for the server. This should include
+	// any registered authentication mechanisms.
+	ServerOptions []grpc.ServerOption
+	// Servers are additional servers to manage alongside the gRPC server.
+	Servers []MeshServer
+}
 
 // Server is the gRPC server.
 type Server struct {
-	opts    *Options
-	store   mesh.Mesh
-	srv     *grpc.Server
-	turn    *turn.Server
-	meshdns *meshdns.Server
-	log     *slog.Logger
-	mu      sync.Mutex
+	opts Options
+	srv  *grpc.Server
+	srvs []MeshServer
+	log  *slog.Logger
+	mu   sync.Mutex
 }
 
 // NewServer returns a new Server.
 // TODO: We need to dynamically expose certain services only to the internal mesh.
-func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
-	log := slog.Default().With("component", "server")
-	if err := o.Validate(); err != nil {
-		return nil, err
-	}
-	serveOpts, err := o.ServerOptions(store, log)
-	if err != nil {
-		return nil, err
-	}
+func NewServer(o Options) (*Server, error) {
+	log := slog.Default().With("component", "mesh-services")
 	server := &Server{
-		srv:   grpc.NewServer(serveOpts...),
-		opts:  o,
-		store: store,
-		log:   log,
+		opts: o,
+		srv:  grpc.NewServer(o.ServerOptions...),
+		srvs: o.Servers,
+		log:  log,
 	}
-	var rbacDisabled bool
-	maxTries := 5
-	for i := 0; i < maxTries; i++ {
-		rbacDisabled, err = rbacdb.New(store.Storage()).IsDisabled(context.Background())
-		if err != nil {
-			log.Error("Failed to check rbac status", "error", err.Error())
-			if i == maxTries-1 {
-				return nil, err
-			}
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		break
-	}
-	var rbacEvaluator rbac.Evaluator
-	insecureServices := !store.Plugins().HasAuth() || rbacDisabled
-	if insecureServices {
-		log.Warn("Running services without authorization")
-		rbacEvaluator = rbac.NewNoopEvaluator()
-	} else {
-		rbacEvaluator = rbac.NewStoreEvaluator(store.Storage())
-	}
-	if o.API != nil {
-		if o.API.Admin {
-			log.Debug("Registering admin api")
-			v1.RegisterAdminServer(server, admin.New(store.Storage(), store.Raft(), rbacEvaluator))
-		}
-		if o.API.Mesh {
-			log.Debug("Registering mesh api")
-			v1.RegisterMeshServer(server, meshapi.NewServer(store.Storage(), store.Raft()))
-		}
-		if o.API.WebRTC {
-			log.Debug("Registering WebRTC api")
-			v1.RegisterWebRTCServer(server, webrtc.NewServer(webrtc.Options{
-				ID:          store.ID(),
-				Storage:     store.Storage(),
-				Wireguard:   store.Network().WireGuard(),
-				NodeDialer:  store,
-				RBAC:        rbacEvaluator,
-				StunServers: strings.Split(o.API.STUNServers, ","),
-			}))
-		}
-	}
-	if o.MeshDNS != nil && o.MeshDNS.Enabled {
-		log.Debug("Registering MeshDNS server")
-		server.meshdns = meshdns.NewServer(&meshdns.Options{
-			UDPListenAddr:     o.MeshDNS.ListenUDP,
-			TCPListenAddr:     o.MeshDNS.ListenTCP,
-			ReusePort:         o.MeshDNS.ReusePort,
-			Compression:       o.MeshDNS.EnableCompression,
-			RequestTimeout:    o.MeshDNS.RequestTimeout,
-			Forwarders:        o.MeshDNS.Forwarders,
-			DisableForwarding: o.MeshDNS.DisableForwarding,
-			CacheSize:         o.MeshDNS.CacheSize,
-		})
-		err := server.meshdns.RegisterDomain(meshdns.DomainOptions{
-			MeshDomain:          store.Domain(),
-			MeshStorage:         store.Storage(),
-			Raft:                store.Raft(),
-			IPv6Only:            false, // TODO: Expose this as an option
-			SubscribeForwarders: o.MeshDNS.SubscribeForwarders,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("register meshdns domain: %w", err)
-		}
-	}
-	// Register the membership and storage APIs if we are a raft member
-	// TODO: Make this more dynamic
-	isRaftMember := store.Raft().IsVoter() || store.Raft().IsObserver()
-	if isRaftMember {
-		log.Debug("Registering membership service")
-		v1.RegisterMembershipServer(server, membership.NewServer(membership.Options{
-			Raft:      store.Raft(),
-			Plugins:   store.Plugins(),
-			RBAC:      rbacEvaluator,
-			WireGuard: store.Network().WireGuard(),
-		}))
-		log.Debug("Registering storage service")
-		v1.RegisterStorageServer(server, storage.NewServer(store.Raft(), rbacEvaluator))
-	}
-	// Always register the node server
-	log.Debug("Registering node service")
-	v1.RegisterNodeServer(server, node.NewServer(node.Options{
-		Raft:       store.Raft(),
-		WireGuard:  store.Network().WireGuard(),
-		NodeDialer: store,
-		Plugins:    store.Plugins(),
-		Features:   o.ToFeatureSet(isRaftMember),
-	}))
-	// Register the health service
-	log.Debug("Registering health service")
-	healthpb.RegisterHealthServer(server, server)
 	// Register the reflection service
 	log.Debug("Registering reflection service")
 	reflection.Register(server)
@@ -174,43 +85,32 @@ func NewServer(store mesh.Mesh, o *Options) (*Server, error) {
 // then blocks until the gRPC server exits.
 func (s *Server) ListenAndServe() error {
 	s.mu.Lock()
-	if s.opts.Metrics != nil && s.opts.Metrics.Enabled {
-		startMetricsServer(s.log, s.opts.Metrics.ListenAddress, s.opts.Metrics.Path)
-	}
-	if s.opts.TURN != nil && s.opts.TURN.Enabled {
-		var err error
-		s.log.Info(fmt.Sprintf("Starting TURN server on %s:%d", s.opts.TURN.ListenAddress, s.opts.TURN.ListenPort))
-		s.turn, err = turn.NewServer(&turn.Options{
-			PublicIP:        s.opts.TURN.PublicIP,
-			RelayAddressUDP: s.opts.TURN.ListenAddress,
-			ListenUDP:       fmt.Sprintf(":%d", s.opts.TURN.ListenPort),
-			Realm:           s.opts.TURN.ServerRealm,
-			PortRange:       s.opts.TURN.STUNPortRange,
+	var g errgroup.Group
+	for _, srv := range s.srvs {
+		sr := srv
+		g.Go(func() error {
+			if err := sr.ListenAndServe(); err != nil {
+				s.log.Error("mesh server failed", slog.String("error", err.Error()))
+				return err
+			}
+			return nil
 		})
+	}
+	g.Go(func() error {
+		s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
+		lis, err := net.Listen("tcp", s.opts.ListenAddress)
 		if err != nil {
 			s.mu.Unlock()
-			return fmt.Errorf("create turn server: %w", err)
+			return fmt.Errorf("start TCP listener: %w", err)
 		}
-	}
-	if s.meshdns != nil {
-		go func() {
-			if err := s.meshdns.ListenAndServe(); err != nil {
-				s.log.Error("meshdns server failed", slog.String("error", err.Error()))
-			}
-		}()
-	}
-	s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
-	lis, err := net.Listen("tcp", s.opts.ListenAddress)
-	if err != nil {
-		s.mu.Unlock()
-		return fmt.Errorf("start TCP listener: %w", err)
-	}
-	defer lis.Close()
+		defer lis.Close()
+		if err := s.srv.Serve(lis); err != nil {
+			return fmt.Errorf("grpc serve: %w", err)
+		}
+		return nil
+	})
 	s.mu.Unlock()
-	if err := s.srv.Serve(lis); err != nil {
-		return fmt.Errorf("grpc serve: %w", err)
-	}
-	return nil
+	return g.Wait()
 }
 
 // RegisterService implements grpc.RegistrarService.
@@ -223,74 +123,20 @@ func (s *Server) GetServiceInfo() map[string]grpc.ServiceInfo {
 	return s.srv.GetServiceInfo()
 }
 
-// Stop stops the gRPC server gracefully. You cannot use the server again
-// after calling Stop.
-func (s *Server) Stop() {
+// Shutdown stops the gRPC server and all mesh services gracefully.
+// You cannot use the server again after calling Stop.
+func (s *Server) Shutdown(ctx context.Context) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.turn != nil {
-		s.log.Info("Shutting down TURN server")
-		if err := s.turn.Close(); err != nil {
-			s.log.Error("turn server shutdown failed", slog.String("error", err.Error()))
+	for _, srv := range s.srvs {
+		s.log.Debug("Shutting down mesh server")
+		err := srv.Shutdown(ctx)
+		if err != nil {
+			s.log.Error("mesh server shutdown failed", slog.String("error", err.Error()))
 		}
-		s.turn = nil
-	}
-	if s.meshdns != nil {
-		s.log.Info("Shutting down meshdns server")
-		if err := s.meshdns.Shutdown(); err != nil {
-			s.log.Error("meshdns server shutdown failed", slog.String("error", err.Error()))
-		}
-		s.meshdns = nil
 	}
 	if s.srv != nil {
 		s.log.Info("Shutting down gRPC server")
 		s.srv.GracefulStop()
-		s.srv = nil
 	}
-}
-
-// Check implements grpc.health.v1.HealthServer.
-func (s *Server) Check(context.Context, *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
-	return &healthpb.HealthCheckResponse{
-		Status: s.currentStatus(),
-	}, nil
-}
-
-// Watch implements grpc.health.v1.HealthServer.
-func (s *Server) Watch(_ *healthpb.HealthCheckRequest, srv healthpb.Health_WatchServer) error {
-	last := s.currentStatus()
-	err := srv.Send(&healthpb.HealthCheckResponse{
-		Status: last,
-	})
-	if err != nil {
-		return err
-	}
-	t := time.NewTicker(1 * time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-srv.Context().Done():
-			return nil
-		case <-t.C:
-			current := s.currentStatus()
-			if last != current {
-				last = current
-				err := srv.Send(&healthpb.HealthCheckResponse{
-					Status: current,
-				})
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-}
-
-func (s *Server) currentStatus() healthpb.HealthCheckResponse_ServingStatus {
-	_, err := s.store.LeaderID()
-	if err != nil {
-		s.log.Error("failed to get leader", "error", err)
-		return healthpb.HealthCheckResponse_NOT_SERVING
-	}
-	return healthpb.HealthCheckResponse_SERVING
 }

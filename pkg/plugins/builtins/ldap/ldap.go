@@ -30,6 +30,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -54,27 +55,59 @@ type Plugin struct {
 // Config is the configuration for the LDAP plugin.
 type Config struct {
 	// Server is the LDAP server to connect to. Specify as ldap[s]://host[:port].
-	Server string `mapstructure:"server"`
+	Server string `mapstructure:"server" koanf:"server"`
 	// BindDN is the DN to bind with.
-	BindDN string `mapstructure:"bind-dn"`
+	BindDN string `mapstructure:"bind-dn" koanf:"bind-dn"`
 	// BindPassword is the password to bind with.
-	BindPassword string `mapstructure:"bind-password"`
+	BindPassword string `mapstructure:"bind-password" koanf:"bind-password"`
 	// CAFile is the path to a CA file to use to verify the LDAP server's certificate.
-	CAFile string `mapstructure:"ca-file"`
+	CAFile string `mapstructure:"ca-file" koanf:"ca-file"`
 	// UserBaseDN is the base DN to use to search for users. If empty, the entire
 	// directory will be searched.
-	UserBaseDN string `mapstructure:"user-base-dn"`
+	UserBaseDN string `mapstructure:"user-base-dn" koanf:"user-base-dn"`
 	// UserIDAttribute is the attribute to use to identify the user.
-	UserIDAttribute string `mapstructure:"user-id-attribute"`
+	UserIDAttribute string `mapstructure:"user-id-attribute" koanf:"user-id-attribute"`
 	// NodeIDAttribute is the attribute to use to identify the node. If not specified, the
 	// UserIDAttribute will be used.
-	NodeIDAttribute string `mapstructure:"node-id-attribute"`
+	NodeIDAttribute string `mapstructure:"node-id-attribute" koanf:"node-id-attribute"`
 	// UserDisabledAttribute is the attribute to use to determine if the user is disabled.
 	// If not specified, all user's will be considered active.
-	UserDisabledAttribute string `mapstructure:"user-status-attribute"`
+	UserDisabledAttribute string `mapstructure:"user-status-attribute" koanf:"user-status-attribute"`
 	// UserDisabledValue is the value of the UserStatusAttribute that indicates the user is disabled.
 	// If not specified, any non-empty value of the UserDisabledAttribute will be considered disabled.
-	UserDisabledValue string `mapstructure:"user-disabled-value"`
+	UserDisabledValue string `mapstructure:"user-disabled-value" koanf:"user-disabled-value"`
+}
+
+// BindFlags binds the flags to the config.
+func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
+	fs.StringVar(&c.Server, prefix+"server", c.Server, "LDAP server to connect to")
+	fs.StringVar(&c.BindDN, prefix+"bind-dn", c.BindDN, "DN to bind with")
+	fs.StringVar(&c.BindPassword, prefix+"bind-password", c.BindPassword, "Password to bind with")
+	fs.StringVar(&c.CAFile, prefix+"ca-file", c.CAFile, "Path to CA file to use to verify the LDAP server's certificate")
+	fs.StringVar(&c.UserBaseDN, prefix+"user-base-dn", c.UserBaseDN, "Base DN to use to search for users")
+	fs.StringVar(&c.UserIDAttribute, prefix+"user-id-attribute", c.UserIDAttribute, "Attribute to use to identify the user")
+	fs.StringVar(&c.NodeIDAttribute, prefix+"node-id-attribute", c.NodeIDAttribute, "Attribute to use to identify the node")
+	fs.StringVar(&c.UserDisabledAttribute, prefix+"user-status-attribute", c.UserDisabledAttribute, "Attribute to use to determine if the user is disabled")
+	fs.StringVar(&c.UserDisabledValue, prefix+"user-disabled-value", c.UserDisabledValue, "Value of the user status attribute that indicates the user is disabled")
+}
+
+func (c *Config) AsMapStructure() map[string]any {
+	return map[string]any{
+		"server":                c.Server,
+		"bind-dn":               c.BindDN,
+		"bind-password":         c.BindPassword,
+		"ca-file":               c.CAFile,
+		"user-base-dn":          c.UserBaseDN,
+		"user-id-attribute":     c.UserIDAttribute,
+		"node-id-attribute":     c.NodeIDAttribute,
+		"user-status-attribute": c.UserDisabledAttribute,
+		"user-disabled-value":   c.UserDisabledValue,
+	}
+}
+
+// DefaultOptions returns the default options for the plugin.
+func (c *Config) DefaultOptions() *Config {
+	return &Config{}
 }
 
 const (

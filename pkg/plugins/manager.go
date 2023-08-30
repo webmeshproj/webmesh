@@ -1,9 +1,9 @@
 package plugins
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/netip"
 	"strings"
 
@@ -14,16 +14,55 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ipam"
 	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
+var (
+	// ErrUnsupported is returned when a plugin capability is not supported
+	// by any of the registered plugins.
+	ErrUnsupported = status.Error(codes.Unimplemented, "unsupported plugin capability")
+)
+
+// Options are the options for creating a new plugin manager.
+type Options struct {
+	// Storage is the storage backend to use for plugins.
+	Storage storage.MeshStorage
+	// Plugins is a map of plugin names to plugin configs.
+	Plugins map[string]Plugin
+}
+
+// Plugin represents a plugin client and its configuration.
+type Plugin struct {
+	// Client is the plugin client.
+	Client clients.PluginClient
+	// Config is the plugin configuration.
+	Config map[string]any
+
+	// capabilities discovered from the plugin when we started.
+	capabilities []v1.PluginInfo_PluginCapability
+	// name is the name returned by the plugin.
+	name string
+}
+
+// hasCapability returns true if the plugin has the given capability.
+func (p *Plugin) hasCapability(cap v1.PluginInfo_PluginCapability) bool {
+	for _, c := range p.capabilities {
+		if c == cap {
+			return true
+		}
+	}
+	return false
+}
+
 // Manager is the interface for managing plugins.
 type Manager interface {
 	// Get returns the plugin with the given name.
-	Get(name string) (v1.PluginClient, bool)
+	Get(name string) (clients.PluginClient, bool)
 	// ServeStorage handles queries from plugins against the given storage backend.
 	ServeStorage(db storage.MeshStorage)
 	// HasAuth returns true if the manager has an auth plugin.
@@ -50,21 +89,106 @@ type Manager interface {
 	Close() error
 }
 
+// NewManager creates a new plugin manager.
+func NewManager(ctx context.Context, opts Options) (Manager, error) {
+	// Create the manager.
+	log := context.LoggerFrom(ctx).With("component", "plugin-manager")
+	plugins := make(map[string]*Plugin, len(opts.Plugins))
+	for n, plugin := range opts.Plugins {
+		name := n
+		plugins[name] = &plugin
+	}
+	// Query each plugin for its capabilities.
+	for name, plugin := range plugins {
+		log.Debug("querying plugin capabilities", "plugin", name)
+		resp, err := plugin.Client.GetInfo(ctx, &emptypb.Empty{})
+		if err != nil {
+			return nil, fmt.Errorf("get plugin info: %w", err)
+		}
+		plugin.capabilities = resp.GetCapabilities()
+		plugin.name = resp.GetName()
+		// Configure the plugin
+		conf, err := structpb.NewStruct(plugin.Config)
+		if err != nil {
+			return nil, fmt.Errorf("convert plugin config: %w", err)
+		}
+		_, err = plugin.Client.Configure(ctx, &v1.PluginConfiguration{
+			Config: conf,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("configure plugin: %w", err)
+		}
+	}
+	handleErr := func(cause error) error {
+		// Make sure we close all plugins if we fail to start.
+		for _, plugin := range plugins {
+			_, err := plugin.Client.Close(context.Background(), &emptypb.Empty{})
+			if err != nil {
+				// Don't report unimplemented close methods.
+				if status.Code(err) != codes.Unimplemented {
+					log.Error("close plugin", "plugin", plugin.name, "error", err)
+				}
+			}
+		}
+		return cause
+	}
+	// We only support a single auth and IPv4 mechanism for now. So only
+	// track the first ones we see
+	var auth *Plugin
+	var ipamv4 *Plugin
+	for name, plugin := range plugins {
+		if plugin.hasCapability(v1.PluginInfo_AUTH) {
+			if auth != nil {
+				return nil, handleErr(fmt.Errorf("multiple auth plugins found: %s, %s", auth.name, name))
+			}
+			auth = plugin
+		}
+		if plugin.hasCapability(v1.PluginInfo_IPAMV4) {
+			if ipamv4 != nil {
+				return nil, handleErr(fmt.Errorf("multiple IPAM plugins found: %s, %s", ipamv4.name, name))
+			}
+			ipamv4 = plugin
+		}
+	}
+	// If we didn't find any IPAM plugins, register the default one
+	if ipamv4 == nil {
+		plug := &Plugin{
+			Client: clients.NewInProcessClient(&ipam.Plugin{}),
+			capabilities: []v1.PluginInfo_PluginCapability{
+				v1.PluginInfo_IPAMV4,
+				v1.PluginInfo_STORAGE,
+			},
+			name: "simple-ipam",
+		}
+		_, err := plug.Client.Configure(ctx, &v1.PluginConfiguration{})
+		if err != nil {
+			return nil, handleErr(fmt.Errorf("configure default IPAM plugin: %w", err))
+		}
+		plugins[plug.name] = plug
+		ipamv4 = plug
+	}
+	m := &manager{
+		storage: opts.Storage,
+		plugins: plugins,
+		auth:    auth,
+		ipamv4:  ipamv4,
+		log:     log,
+	}
+	return m, nil
+}
+
 type manager struct {
-	// db       storage.Storage
-	auth       clients.PluginClient
-	ipamv4     clients.PluginClient
-	stores     map[string]clients.PluginClient
-	raftstores []clients.PluginClient
-	emitters   []clients.PluginClient
-	plugins    map[string]clients.PluginClient
-	log        *slog.Logger
+	storage storage.MeshStorage
+	plugins map[string]*Plugin
+	auth    *Plugin
+	ipamv4  *Plugin
+	log     context.Logger
 }
 
 // Get returns the plugin with the given name.
-func (m *manager) Get(name string) (v1.PluginClient, bool) {
+func (m *manager) Get(name string) (clients.PluginClient, bool) {
 	p, ok := m.plugins[name]
-	return p, ok
+	return p.Client, ok
 }
 
 // ServeStorage handles queries from plugins against the given storage backend.
@@ -79,7 +203,12 @@ func (m *manager) HasAuth() bool {
 
 // HasWatchers returns true if the manager has any watch plugins.
 func (m *manager) HasWatchers() bool {
-	return len(m.emitters) > 0
+	for _, plugin := range m.plugins {
+		if plugin.hasCapability(v1.PluginInfo_WATCH) {
+			return true
+		}
+	}
+	return false
 }
 
 // AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin.
@@ -89,7 +218,7 @@ func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 		if m.auth == nil {
 			return handler(ctx, req)
 		}
-		resp, err := m.auth.Auth().Authenticate(ctx, m.newAuthRequest(ctx))
+		resp, err := m.auth.Client.Auth().Authenticate(ctx, m.newAuthRequest(ctx))
 		if err != nil {
 			return nil, status.Errorf(codes.Unauthenticated, "authenticate: %v", err)
 		}
@@ -107,7 +236,7 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 		if m.auth == nil {
 			return handler(srv, ss)
 		}
-		resp, err := m.auth.Auth().Authenticate(ss.Context(), m.newAuthRequest(ss.Context()))
+		resp, err := m.auth.Client.Auth().Authenticate(ss.Context(), m.newAuthRequest(ss.Context()))
 		if err != nil {
 			return status.Errorf(codes.Unauthenticated, "authenticate: %v", err)
 		}
@@ -126,7 +255,7 @@ func (m *manager) AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (ne
 	if m.ipamv4 == nil {
 		return addr, ErrUnsupported
 	}
-	res, err := m.ipamv4.IPAM().Allocate(ctx, req)
+	res, err := m.ipamv4.Client.IPAM().Allocate(ctx, req)
 	if err != nil {
 		return addr, fmt.Errorf("allocate IPv4: %w", err)
 	}
@@ -139,13 +268,14 @@ func (m *manager) AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (ne
 
 // ApplyRaftLog applies a raft log entry to all storage plugins.
 func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) ([]*v1.RaftApplyResponse, error) {
-	if len(m.raftstores) == 0 {
+	raftstores := m.getRaftStores()
+	if len(raftstores) == 0 {
 		return nil, nil
 	}
-	out := make([]*v1.RaftApplyResponse, len(m.raftstores))
+	out := make([]*v1.RaftApplyResponse, len(raftstores))
 	errs := make([]error, 0)
-	for i, store := range m.raftstores {
-		resp, err := store.Raft().Store(ctx, entry)
+	for i, store := range raftstores {
+		resp, err := store.Client.Raft().Store(ctx, entry)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -161,7 +291,8 @@ func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) (
 
 // ApplySnapshot applies a snapshot to all storage plugins.
 func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) error {
-	if len(m.raftstores) == 0 {
+	raftstores := m.getRaftStores()
+	if len(raftstores) == 0 {
 		return nil
 	}
 	defer data.Close()
@@ -170,8 +301,8 @@ func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, da
 		return fmt.Errorf("read snapshot: %w", err)
 	}
 	errs := make([]error, 0)
-	for _, store := range m.raftstores {
-		_, err := store.Raft().RestoreSnapshot(ctx, &v1.DataSnapshot{
+	for _, store := range raftstores {
+		_, err := store.Client.Raft().RestoreSnapshot(ctx, &v1.DataSnapshot{
 			Term:  meta.Term,
 			Index: meta.Index,
 			Data:  snapsot,
@@ -186,20 +317,29 @@ func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, da
 	return nil
 }
 
+func (m *manager) getRaftStores() []*Plugin {
+	var raftstores []*Plugin
+	for _, plugin := range m.plugins {
+		if plugin.hasCapability(v1.PluginInfo_RAFT) {
+			raftstores = append(raftstores, plugin)
+		}
+	}
+	return raftstores
+}
+
 // Emit emits an event to all watch plugins.
 func (m *manager) Emit(ctx context.Context, ev *v1.Event) error {
-	if len(m.emitters) == 0 {
-		return nil
-	}
 	errs := make([]error, 0)
-	for _, emitter := range m.emitters {
-		_, err := emitter.Events().Emit(ctx, ev)
-		if err != nil {
-			errs = append(errs, err)
+	for _, plugin := range m.plugins {
+		if plugin.hasCapability(v1.PluginInfo_WATCH) {
+			_, err := plugin.Client.Events().Emit(ctx, ev)
+			if err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("emit: %v", errs)
+		return fmt.Errorf("emit: %w", errors.Join(errs...))
 	}
 	return nil
 }
@@ -208,7 +348,7 @@ func (m *manager) Emit(ctx context.Context, ev *v1.Event) error {
 func (m *manager) Close() error {
 	errs := make([]error, 0)
 	for _, p := range m.plugins {
-		_, err := p.Close(context.Background(), &emptypb.Empty{})
+		_, err := p.Client.Close(context.Background(), &emptypb.Empty{})
 		if err != nil {
 			// Don't report unimplemented close methods.
 			if status.Code(err) != codes.Unimplemented {
@@ -224,9 +364,12 @@ func (m *manager) Close() error {
 
 // handleQueries handles SQL queries from plugins.
 func (m *manager) handleQueries(db storage.MeshStorage) {
-	for plugin, client := range m.stores {
+	for plugin, client := range m.plugins {
+		if !client.hasCapability(v1.PluginInfo_STORAGE) {
+			continue
+		}
 		ctx := context.Background()
-		q, err := client.Storage().InjectQuerier(ctx)
+		q, err := client.Client.Storage().InjectQuerier(ctx)
 		if err != nil {
 			if status.Code(err) == codes.Unimplemented {
 				m.log.Debug("plugin does not implement queries", "plugin", plugin)

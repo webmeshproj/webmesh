@@ -21,13 +21,22 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"net/http"
 
 	"github.com/pion/turn/v2"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
+
+// DefaultPortRange is the default port range for the TURN server.
+const DefaultPortRange = "49152-65535"
+
+// DefaultListenAddress is the default listen address for the TURN server.
+const DefaultListenAddress = "[::]:3478"
+
+// DefaultRelayAddress is the default relay address for the TURN server.
+const DefaultRelayAddress = "0.0.0.0"
 
 // Options contains the options for the TURN server.
 type Options struct {
@@ -46,39 +55,47 @@ type Options struct {
 
 // Server is a TURN server.
 type Server struct {
-	*turn.Server
-	conn net.PacketConn
-	http *http.Server
+	Options
+	context.Context
+	cancel context.CancelFunc
 }
 
 // NewServer creates and starts a new TURN server.
-func NewServer(o *Options) (*Server, error) {
-	if o.PortRange == "" {
-		o.PortRange = "49152-65535"
+func NewServer(o Options) *Server {
+	ctx, cancel := context.WithCancel(context.Background())
+	server := &Server{Options: o, Context: ctx, cancel: cancel}
+	return server
+}
+
+// ListenAndServe starts the TURN server and blocks until the server exits.
+func (s *Server) ListenAndServe() error {
+	if s.PortRange == "" {
+		s.PortRange = DefaultPortRange
 	}
-	if o.RelayAddressUDP == "" {
-		o.RelayAddressUDP = "0.0.0.0"
+	if s.RelayAddressUDP == "" {
+		s.RelayAddressUDP = DefaultRelayAddress
 	}
-	startPort, endPort, err := netutil.ParsePortRange(o.PortRange)
+	startPort, endPort, err := netutil.ParsePortRange(s.PortRange)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse port range: %w", err)
+		return fmt.Errorf("failed to parse port range: %w", err)
 	}
-	if o.ListenUDP == "" {
-		return nil, fmt.Errorf("listen port UDP must be set")
+	if s.ListenUDP == "" {
+		s.ListenUDP = DefaultListenAddress
 	}
-	udpConn, err := net.ListenPacket("udp", o.ListenUDP)
+	udpConn, err := net.ListenPacket("udp", s.ListenUDP)
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen on UDP: %w", err)
+		return fmt.Errorf("failed to listen on UDP: %w", err)
 	}
+	defer udpConn.Close()
 	log := slog.Default().With("component", "turn-server")
-	log.Info("Listening for STUN requests", slog.String("listen-addr", o.ListenUDP))
+	log.Info("Listening for STUN requests", slog.String("listen-addr", s.ListenUDP))
 	pktConn := &stunLogger{
 		PacketConn: udpConn,
 		log:        log.With("channel", "stun"),
 	}
 	// Create the turn server
-	s, err := turn.NewServer(turn.ServerConfig{
-		Realm:         o.Realm,
+	srv, err := turn.NewServer(turn.ServerConfig{
+		Realm:         s.Realm,
 		LoggerFactory: logutil.NewSTUNLoggerFactory(log.With("server", "turn")),
 		// Set AuthHandler callback
 		// This is called every time a user tries to authenticate with the TURN server
@@ -92,8 +109,8 @@ func NewServer(o *Options) (*Server, error) {
 			{
 				PacketConn: pktConn,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorPortRange{
-					RelayAddress: net.ParseIP(o.PublicIP),
-					Address:      o.RelayAddressUDP,
+					RelayAddress: net.ParseIP(s.PublicIP),
+					Address:      s.RelayAddressUDP,
 					MinPort:      uint16(startPort),
 					MaxPort:      uint16(endPort),
 				},
@@ -101,22 +118,16 @@ func NewServer(o *Options) (*Server, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create TURN server: %w", err)
+		return fmt.Errorf("failed to create TURN server: %w", err)
 	}
-	server := &Server{Server: s, conn: pktConn}
-	return server, nil
+	defer srv.Close()
+	// Block until the server exits
+	<-s.Done()
+	return nil
 }
 
-// ListenPort returns the UDP port the TURN server is listening on.
-func (s *Server) ListenPort() int {
-	return s.conn.LocalAddr().(*net.UDPAddr).Port
-}
-
-func (s *Server) Close() error {
-	if s.http != nil {
-		if err := s.http.Close(); err != nil {
-			slog.Default().Error("failed to close campfire websocket server", slog.String("error", err.Error()))
-		}
-	}
-	return s.Server.Close()
+func (s *Server) Shutdown(ctx context.Context) error {
+	context.LoggerFrom(ctx).Info("Shutting down TURN server")
+	s.cancel()
+	return nil
 }

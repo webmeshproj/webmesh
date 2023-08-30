@@ -315,36 +315,45 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
+	// Collect the list of peers we will send to the new node
+	peers, err := mesh.WireGuardPeersFor(ctx, s.raft.Storage(), req.GetId())
+	if err != nil {
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
+	}
+
 	// Add the node to Raft if requested
 	// The node will otherwise need to subscribe to cluster events manually with
 	// the Subscribe RPC.
 	if req.GetAsVoter() || req.GetAsObserver() {
 		// Add peer to the raft cluster
-		var raftAddress string
-		if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
-			// Prefer IPv4 for raft
-			raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
-		} else {
-			// Use IPv6 for raft
-			raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+		addRaftMember := func() {
+			// Wait for the call to be complete before adding the raft member
+			// To give the caller a better chance at being ready before the
+			// first heartbeat.
+			<-ctx.Done()
+			var raftAddress string
+			if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
+				// Prefer IPv4 for raft
+				raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+			} else {
+				// Use IPv6 for raft
+				raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+			}
+			if req.GetAsVoter() {
+				log.Info("Adding voter to cluster", slog.String("raft_address", raftAddress))
+				if err := s.raft.AddVoter(ctx, req.GetId(), raftAddress); err != nil {
+					log.Error("Failed to add voter", slog.String("error", err.Error()))
+					return
+				}
+			} else if req.GetAsObserver() {
+				log.Info("Adding observer to cluster", slog.String("raft_address", raftAddress))
+				if err := s.raft.AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
+					log.Error("Failed to add observer", slog.String("error", err.Error()))
+					return
+				}
+			}
 		}
-		if req.GetAsVoter() {
-			log.Info("Adding voter to cluster", slog.String("raft_address", raftAddress))
-			if err := s.raft.AddVoter(ctx, req.GetId(), raftAddress); err != nil {
-				return nil, handleErr(status.Errorf(codes.Internal, "failed to add voter: %v", err))
-			}
-		} else if req.GetAsObserver() {
-			log.Info("Adding observer to cluster", slog.String("raft_address", raftAddress))
-			if err := s.raft.AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
-				return nil, handleErr(status.Errorf(codes.Internal, "failed to add non-voter: %v", err))
-			}
-		}
-		cleanFuncs = append(cleanFuncs, func() {
-			err := s.raft.RemoveServer(ctx, req.GetId(), false)
-			if err != nil {
-				log.Warn("Failed to remove voter", slog.String("error", err.Error()))
-			}
-		})
+		go addRaftMember()
 	}
 
 	// Start building the response
@@ -377,10 +386,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 	}
-	peers, err := mesh.WireGuardPeersFor(ctx, s.raft.Storage(), req.GetId())
-	if err != nil {
-		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
-	}
+
 	var requiresICE bool
 	for _, peer := range peers {
 		if peer.PrimaryEndpoint == "" || peer.Ice {

@@ -23,10 +23,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
@@ -34,10 +34,9 @@ import (
 // The context is used to enforce startup timeouts.
 func NewTestMesh(ctx context.Context) (Mesh, error) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	st, err := New(newTestOptions())
-	if err != nil {
-		return nil, err
-	}
+	st := New(Config{
+		NodeID: uuid.NewString(),
+	})
 	stor := st.(*meshStore)
 	stor.testStore = true
 	storage, err := nutsdb.New(nutsdb.Options{InMemory: true})
@@ -52,30 +51,30 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := stor.Open(ctx, ConnectOptions{
-		BootstrapTransport: transport.NewNullBootstrapTransport(),
-		JoinRoundTripper:   nil,
-		RaftTransport:      raftTransport,
-		RaftStorage:        storage,
-		MeshStorage:        storage,
-		ForceBootstrap:     false,
-		Features:           []v1.Feature{},
+	opts := raft.NewOptions(st.ID())
+	opts.InMemory = true
+	rft := raft.New(opts)
+	if err := rft.Start(ctx, raft.StartOptions{
+		Transport:   raftTransport,
+		MeshStorage: storage,
+		RaftStorage: storage,
+	}); err != nil {
+		return nil, err
+	}
+	if err := stor.Connect(ctx, ConnectOptions{
+		Raft:                 rft,
+		GRPCAdvertisePort:    8443,
+		MeshDNSAdvertisePort: 53,
+		Bootstrap: &BootstrapOptions{
+			Transport:            transport.NewNullBootstrapTransport(),
+			IPv4Network:          "172.16.0.0/12",
+			MeshDomain:           "webmesh.internal",
+			Admin:                "admin",
+			DisableRBAC:          false,
+			DefaultNetworkPolicy: "accept",
+		},
 	}); err != nil {
 		return nil, err
 	}
 	return stor, nil
-}
-
-func newTestOptions() *Options {
-	opts := NewDefaultOptions()
-	opts.Raft.ConnectionTimeout = 100 * time.Millisecond
-	opts.Raft.HeartbeatTimeout = 100 * time.Millisecond
-	opts.Raft.ElectionTimeout = 100 * time.Millisecond
-	opts.Raft.LeaderLeaseTimeout = 100 * time.Millisecond
-	opts.Raft.ListenAddress = ":0"
-	opts.Raft.InMemory = true
-	opts.TLS.Insecure = true
-	opts.Bootstrap.Enabled = true
-	opts.Mesh.NodeID = uuid.NewString()
-	return opts
 }

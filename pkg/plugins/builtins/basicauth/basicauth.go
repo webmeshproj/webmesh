@@ -29,6 +29,7 @@ import (
 	"sync"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -49,7 +50,22 @@ type Plugin struct {
 type Config struct {
 	// HTPasswdFile is the path to an htpasswd file to use to verify client
 	// credentials.
-	HTPasswdFile string `mapstructure:"htpasswd-file"`
+	HTPasswdFile string `mapstructure:"htpasswd-file" koanf:"htpasswd-file"`
+}
+
+func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
+	fs.StringVar(&c.HTPasswdFile, prefix+"htpasswd-file", c.HTPasswdFile, "path to htpasswd file")
+}
+
+func (c *Config) AsMapStructure() map[string]any {
+	return map[string]any{
+		"htpasswd-file": c.HTPasswdFile,
+	}
+}
+
+// DefaultOptions returns the default options for the plugin.
+func (c *Config) DefaultOptions() *Config {
+	return &Config{}
 }
 
 const (

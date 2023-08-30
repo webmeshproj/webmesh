@@ -29,6 +29,9 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
+// Logger is an alias to slog.Logger for convenience.
+type Logger = *slog.Logger
+
 // Context is an alias to context.Context for convenience and to avoid
 // confusion with the context package.
 type Context = context.Context
@@ -64,13 +67,13 @@ func WithCancel(ctx Context) (Context, CancelFunc) {
 type logContextKey struct{}
 
 // WithLogger returns a context with the given logger set.
-func WithLogger(ctx Context, logger *slog.Logger) Context {
+func WithLogger(ctx Context, logger Logger) Context {
 	return context.WithValue(ctx, logContextKey{}, logger)
 }
 
 // LoggerFrom returns the logger from the context. If no logger is set, the
 // default logger is returned.
-func LoggerFrom(ctx Context) *slog.Logger {
+func LoggerFrom(ctx Context) Logger {
 	logger, ok := ctx.Value(logContextKey{}).(*slog.Logger)
 	if !ok {
 		return slog.Default()
@@ -80,7 +83,7 @@ func LoggerFrom(ctx Context) *slog.Logger {
 
 // LogInjectUnaryServerInterceptor returns a unary server interceptor that
 // injects the logger into the context.
-func LogInjectUnaryServerInterceptor(logger *slog.Logger) grpc.UnaryServerInterceptor {
+func LogInjectUnaryServerInterceptor(logger Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		return handler(WithLogger(ctx, logger), req)
 	}
@@ -88,7 +91,7 @@ func LogInjectUnaryServerInterceptor(logger *slog.Logger) grpc.UnaryServerInterc
 
 // LogInjectStreamServerInterceptor returns a stream server interceptor that
 // injects the logger into the context.
-func LogInjectStreamServerInterceptor(logger *slog.Logger) grpc.StreamServerInterceptor {
+func LogInjectStreamServerInterceptor(logger Logger) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		return handler(srv, &logInjectServerStream{ss, logger})
 	}
@@ -96,7 +99,7 @@ func LogInjectStreamServerInterceptor(logger *slog.Logger) grpc.StreamServerInte
 
 type logInjectServerStream struct {
 	grpc.ServerStream
-	logger *slog.Logger
+	logger Logger
 }
 
 func (ss *logInjectServerStream) Context() Context {

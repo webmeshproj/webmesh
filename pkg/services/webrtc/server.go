@@ -26,6 +26,11 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
+// DefaultSTUNServers are the default STUN servers to use.
+var DefaultSTUNServers = []string{
+	"stun:stun.l.google.com:19302",
+}
+
 // Server is the webmesh WebRTC service.
 type Server struct {
 	v1.UnimplementedWebRTCServer

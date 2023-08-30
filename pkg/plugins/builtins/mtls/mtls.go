@@ -25,6 +25,7 @@ import (
 	"os"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -44,7 +45,23 @@ type Config struct {
 	// CAFile is the path to a CA file to use to verify client certificates.
 	// If not provided, the system pool and any intermediate chains provided
 	// in the authentication request will be used.
-	CAFile string `mapstructure:"ca-file"`
+	CAFile string `koanf:"ca-file" mapstructure:"ca-file"`
+}
+
+// BindFlags binds the plugin flags to the given flag set.
+func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
+	fs.StringVar(&c.CAFile, prefix+"ca-file", "", "Path to a CA file to use to verify client certificates.")
+}
+
+func (c *Config) AsMapStructure() map[string]any {
+	return map[string]any{
+		"ca-file": c.CAFile,
+	}
+}
+
+// DefaultOptions returns the default options for the plugin.
+func (c *Config) DefaultOptions() *Config {
+	return &Config{}
 }
 
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {

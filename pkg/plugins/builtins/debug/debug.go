@@ -28,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -48,26 +49,54 @@ type Plugin struct {
 	servec  chan struct{}
 }
 
-// Options are the options for the debug plugin.
-type Options struct {
+// Config are the options for the debug plugin.
+type Config struct {
 	// ListenAddress is the address to listen on. Defaults to "localhost:6060".
-	ListenAddress string `mapstructure:"listen-address"`
+	ListenAddress string `mapstructure:"listen-address" koanf:"listen-address"`
 	// PathPrefix is the path prefix to use for the debug server.
 	// Defaults to "/debug".
-	PathPrefix string `mapstructure:"path-prefix"`
+	PathPrefix string `mapstructure:"path-prefix" koanf:"path-prefix"`
 	// DisablePProf disables pprof.
-	DisablePProf bool `mapstructure:"disable-pprof"`
+	DisablePProf bool `mapstructure:"disable-pprof" koanf:"disable-pprof"`
 	// PProfProfiles is the list of profiles to enable for pprof.
 	// An empty list enables all profiles. Each will be available at
 	// /<path-prefix>/pprof/<profile>.
-	PprofProfiles []string `mapstructure:"pprof-profiles"`
+	PprofProfiles []string `mapstructure:"pprof-profiles" koanf:"pprof-profiles"`
 	// EnableDBQuerier enables the database querier.
-	EnableDBQuerier bool `mapstructure:"enable-db-querier"`
+	EnableDBQuerier bool `mapstructure:"enable-db-querier" koanf:"enable-db-querier"`
+}
+
+// DefaultOptions returns the default options for the plugin.
+func (c *Config) DefaultOptions() *Config {
+	return &Config{
+		ListenAddress: "localhost:6060",
+		PathPrefix:    "/debug",
+		PprofProfiles: []string{},
+	}
+}
+
+func (c *Config) AsMapStructure() map[string]any {
+	return map[string]any{
+		"listen-address":    c.ListenAddress,
+		"path-prefix":       c.PathPrefix,
+		"disable-pprof":     c.DisablePProf,
+		"pprof-profiles":    c.PprofProfiles,
+		"enable-db-querier": c.EnableDBQuerier,
+	}
+}
+
+// BindFlags binds the debug plugin flags.
+func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
+	fs.StringVar(&o.ListenAddress, prefix+"listen-address", "localhost:6060", "Address to listen on")
+	fs.StringVar(&o.PathPrefix, prefix+"path-prefix", "/debug", "Path prefix to use for the debug server")
+	fs.BoolVar(&o.DisablePProf, prefix+"disable-pprof", o.DisablePProf, "Disable pprof")
+	fs.StringSliceVar(&o.PprofProfiles, prefix+"pprof-profiles", o.PprofProfiles, "Pprof profiles to enable")
+	fs.BoolVar(&o.EnableDBQuerier, prefix+"enable-db-querier", o.EnableDBQuerier, "Enable database querier")
 }
 
 // NewDefaultOptions returns the default options for the debug plugin.
-func NewDefaultOptions() Options {
-	return Options{
+func NewDefaultOptions() Config {
+	return Config{
 		ListenAddress: "localhost:6060",
 		PathPrefix:    "/debug",
 		PprofProfiles: []string{},
@@ -124,7 +153,7 @@ func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty,
 	return &emptypb.Empty{}, p.data.Close()
 }
 
-func (p *Plugin) serve(opts Options) {
+func (p *Plugin) serve(opts Config) {
 	defer close(p.servec)
 	log := slog.Default().With("plugin", "debug")
 	mux := http.NewServeMux()

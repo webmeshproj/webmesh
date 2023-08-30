@@ -23,37 +23,29 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
-	"time"
 
-	"github.com/multiformats/go-multiaddr"
-	v1 "github.com/webmeshproj/api/v1"
+	"github.com/spf13/pflag"
 
-	"github.com/webmeshproj/webmesh/pkg/cmd/nodecmd/options"
+	"github.com/webmeshproj/webmesh/pkg/cmd/bridgecmd"
+	"github.com/webmeshproj/webmesh/pkg/cmd/config"
+	nodedaemon "github.com/webmeshproj/webmesh/pkg/cmd/nodedamon"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
-	"github.com/webmeshproj/webmesh/pkg/meshbridge"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
-	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 var (
-	flagset                 = flag.NewFlagSet("webmesh-node", flag.ContinueOnError)
+	flagset                 = pflag.NewFlagSet("webmesh-node", pflag.ContinueOnError)
 	versionFlag             = flagset.Bool("version", false, "Print version information and exit")
 	configFlag              = flagset.String("config", "", "Path to a configuration file")
 	printConfig             = flagset.Bool("print-config", false, "Print the configuration and exit")
 	startTimeout            = flagset.Duration("start-timeout", 0, "Timeout for starting the node (default: no timeout)")
+	shutdownTimeout         = flagset.Duration("shutdown-timeout", 0, "Timeout for shutting down the node (default: no timeout)")
 	appDaemon               = flagset.Bool("app-daemon", false, "Run the node as an application daemon (default: false)")
 	appDaemonBind           = flagset.String("app-daemon-bind", "", "Address to bind the application daemon to (default: unix:///var/run/webmesh-node.sock)")
 	appDaemonGrpcWeb        = flagset.Bool("app-daemon-grpc-web", false, "Use gRPC-Web for the application daemon (default: false)")
@@ -62,10 +54,8 @@ var (
 
 func Execute() error {
 	// Parse flags and read in configurations
-	config := options.NewOptions().BindFlags(flagset)
-	flagset.Usage = func() {
-		options.Usage(flagset)
-	}
+	config := &config.Config{}
+	config.BindFlags("", flagset)
 	err := flagset.Parse(os.Args[1:])
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -73,6 +63,8 @@ func Execute() error {
 		}
 		return err
 	}
+
+	// Dump the version and exit
 	if *versionFlag {
 		fmt.Println("Webmesh Node")
 		fmt.Println("  Version:   ", version.Version)
@@ -80,22 +72,19 @@ func Execute() error {
 		fmt.Println("  Build Date:", version.BuildDate)
 		return nil
 	}
+
+	// Load the configuration
+	var configs []string
 	if *configFlag != "" {
-		f, err := os.Open(*configFlag)
-		if err != nil {
-			return fmt.Errorf("failed to open config file: %w", err)
-		}
-		err = util.DecodeOptions(f, filepath.Ext(*configFlag), config)
-		if err != nil {
-			return fmt.Errorf("failed to decode config file: %w", err)
-		}
+		configs = append(configs, *configFlag)
 	}
-	err = config.Global.Overlay(config.Mesh, config.Services, config.Bridge)
+	err = config.LoadFrom(flagset, configs)
 	if err != nil {
 		return err
 	}
+
+	// Dump the config and exit
 	if *printConfig {
-		// Dump the config and exit
 		out, err := json.MarshalIndent(config, "", "  ")
 		if err != nil {
 			return err
@@ -104,10 +93,16 @@ func Execute() error {
 		return nil
 	}
 
+	// Apply globals
+	config, err = config.Global.ApplyGlobals(config)
+	if err != nil {
+		return err
+	}
+
 	// Time to get going
 
 	log := logutil.SetupLogging(config.Global.LogLevel)
-	ctx := context.Background()
+	ctx := context.WithLogger(context.Background(), log)
 
 	if !*appDaemon {
 		if err := config.Validate(); err != nil {
@@ -135,7 +130,12 @@ func Execute() error {
 	log.Debug("Current configuration", slog.Any("options", out))
 
 	if *appDaemon {
-		return RunAppDaemon(ctx, config)
+		return nodedaemon.Run(ctx, nodedaemon.Config{
+			Bind:           *appDaemonBind,
+			InsecureSocket: *appDaemonInsecureSocket,
+			GRPCWeb:        *appDaemonGrpcWeb,
+			Config:         config,
+		})
 	}
 
 	if *startTimeout > 0 {
@@ -145,89 +145,61 @@ func Execute() error {
 	}
 
 	if len(config.Bridge.Meshes) > 0 {
-		return executeBridgedMesh(ctx, config)
+		return bridgecmd.RunBridgeConnection(ctx, config.Bridge)
 	}
-	return executeSingleMesh(ctx, config)
+	return runMeshConnection(ctx, config)
 }
 
-func executeSingleMesh(ctx context.Context, config *options.Options) error {
-	if (config.Global.NoIPv4 && config.Global.NoIPv6) || (config.Mesh.Mesh.NoIPv4 && config.Mesh.Mesh.NoIPv6) {
+func runMeshConnection(ctx context.Context, config *config.Config) error {
+	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
-	log := slog.Default()
-
-	// Create a new mesh node
-	st, err := mesh.New(config.Mesh)
+	log := context.LoggerFrom(ctx)
+	log.Info("Starting mesh node")
+	// Create a new mesh connection
+	meshConfig, err := config.NewMeshConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create mesh connection: %w", err)
+		return fmt.Errorf("failed to create mesh config: %w", err)
 	}
-	// Create a raft transport
-	raftTransport, err := tcp.NewRaftTransport(st, tcp.RaftTransportOptions{
-		Addr:    config.Mesh.Raft.ListenAddress,
-		MaxPool: config.Mesh.Raft.ConnectionPoolCount,
-		Timeout: config.Mesh.Raft.ConnectionTimeout,
-	})
+	meshConn := mesh.New(meshConfig)
+	// Create a new raft node
+	raftNode, err := config.NewRaftNode(meshConn)
 	if err != nil {
-		return fmt.Errorf("failed to create raft transport: %w", err)
+		return fmt.Errorf("failed to create raft node: %w", err)
 	}
-	// Create the raft storage
-	var storage storage.DualStorage
-	if config.Mesh.Raft.InMemory {
-		storage, err = nutsdb.New(nutsdb.Options{InMemory: true})
-		if err != nil {
-			return fmt.Errorf("create in-memory storage: %w", err)
-		}
-	} else {
-		storage, err = nutsdb.New(nutsdb.Options{
-			DiskPath: config.Mesh.Raft.DataStoragePath(),
-		})
-		if err != nil {
-			return fmt.Errorf("create raft storage: %w", err)
-		}
+	startOpts, err := config.NewRaftStartOptions(meshConn)
+	if err != nil {
+		return fmt.Errorf("failed to create raft start options: %w", err)
 	}
-	var features []v1.Feature
-	if !config.Global.DisableFeatureAdvertisement {
-		isRaftMember := func() bool {
-			if config.Mesh.Bootstrap != nil && config.Mesh.Bootstrap.Enabled {
-				return true
+	connectOpts, err := config.NewConnectOptions(ctx, meshConn, raftNode)
+	if err != nil {
+		return fmt.Errorf("failed to create connect options: %w", err)
+	}
+	// Start the raft node
+	err = raftNode.Start(ctx, startOpts)
+	if err != nil {
+		return fmt.Errorf("failed to start raft node: %w", err)
+	}
+	// Connect to the mesh
+	err = meshConn.Connect(ctx, connectOpts)
+	if err != nil {
+		defer func() {
+			err := raftNode.Stop(context.Background())
+			if err != nil {
+				log.Error("failed to shutdown raft node", slog.String("error", err.Error()))
 			}
-			if config.Mesh.Mesh != nil {
-				return config.Mesh.Mesh.JoinAsVoter || config.Mesh.Mesh.JoinAsObserver
-			}
-			return false
 		}()
-		features = config.Services.ToFeatureSet(isRaftMember)
-	}
-	// Determine our join transport
-	joinTransport, err := getJoinTransport(ctx, st, config)
-	if err != nil {
-		return fmt.Errorf("failed to create join transport: %w", err)
-	}
-	var bootstrapTransport transport.BootstrapTransport
-	var forceBootstrap bool
-	if config.Mesh.Bootstrap != nil && config.Mesh.Bootstrap.Enabled {
-		forceBootstrap = config.Mesh.Bootstrap.Force
-		bootstrapTransport = newBootstrapTransport(ctx, st, config)
-	}
-	err = st.Open(ctx, mesh.ConnectOptions{
-		Features:           features,
-		BootstrapTransport: bootstrapTransport,
-		JoinRoundTripper:   joinTransport,
-		RaftTransport:      raftTransport,
-		RaftStorage:        storage,
-		MeshStorage:        storage,
-		ForceBootstrap:     forceBootstrap,
-	})
-	if err != nil {
 		return fmt.Errorf("failed to open mesh connection: %w", err)
 	}
 	select {
-	case <-st.Ready():
+	case <-meshConn.Ready():
 	case <-ctx.Done():
 		return fmt.Errorf("failed to start mesh node: %w", ctx.Err())
 	}
+
+	// If anything goes wrong at this point, make sure we close down cleanly.
 	handleErr := func(cause error) error {
-		if err := st.Close(); err != nil {
+		if err := meshConn.Close(); err != nil {
 			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
 		}
 		return fmt.Errorf("failed to start mesh node: %w", cause)
@@ -235,14 +207,22 @@ func executeSingleMesh(ctx context.Context, config *options.Options) error {
 	log.Info("Mesh connection is ready, starting services")
 
 	// Start the mesh services
-	srv, err := services.NewServer(st, config.Services)
+	srvOpts, err := config.NewServiceOptions(ctx, meshConn)
+	if err != nil {
+		return handleErr(fmt.Errorf("failed to create service options: %w", err))
+	}
+	srv, err := services.NewServer(srvOpts)
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
+	}
+	err = config.RegisterAPIs(ctx, meshConn, srv)
+	if err != nil {
+		return handleErr(fmt.Errorf("failed to register APIs: %w", err))
 	}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			err = handleErr(err)
-			log.Error("gRPC server failed", slog.String("error", err.Error()))
+			log.Error("Mesh services failed", slog.String("error", err.Error()))
 			os.Exit(1)
 		}
 	}()
@@ -255,140 +235,18 @@ func executeSingleMesh(ctx context.Context, config *options.Options) error {
 	// Shutdown the mesh connection last
 	defer func() {
 		log.Info("Shutting down mesh connection")
-		if err = st.Close(); err != nil {
+		if err = meshConn.Close(); err != nil {
 			log.Error("failed to shutdown mesh connection", slog.String("error", err.Error()))
 		}
 	}()
 
 	// Stop the gRPC server
-	log.Info("Shutting down gRPC server")
-	srv.Stop()
+	log.Info("Shutting down mesh services")
+	if *shutdownTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), *shutdownTimeout)
+		defer cancel()
+	}
+	srv.Shutdown(ctx)
 	return nil
-}
-
-func executeBridgedMesh(ctx context.Context, config *options.Options) error {
-	log := slog.Default()
-	br, err := meshbridge.New(config.Bridge)
-	if err != nil {
-		return fmt.Errorf("failed to create mesh bridge: %w", err)
-	}
-	err = br.Start(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to start mesh bridge: %w", err)
-	}
-	defer func() {
-		err := br.Stop(context.Background())
-		if err != nil {
-			log.Error("failed to shutdown mesh bridge", slog.String("error", err.Error()))
-		}
-	}()
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	select {
-	case <-sig:
-		return nil
-	case err := <-br.ServeError():
-		return fmt.Errorf("mesh bridge failed: %w", err)
-	}
-}
-
-func getJoinTransport(ctx context.Context, st mesh.Mesh, config *options.Options) (transport.JoinRoundTripper, error) {
-	var joinTransport transport.JoinRoundTripper
-	if config.Mesh.Bootstrap != nil && config.Mesh.Bootstrap.Enabled {
-		// Our join transport is the gRPC transport to other bootstrap nodes
-		var addrs []string
-		for id, addr := range config.Mesh.Bootstrap.Servers {
-			if id == st.ID() {
-				continue
-			}
-			host, _, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid bootstrap server address: %w", err)
-			}
-			var addr string
-			if len(config.Mesh.Bootstrap.ServersGRPCPorts) > 0 && config.Mesh.Bootstrap.ServersGRPCPorts[host] != 0 {
-				addr = fmt.Sprintf("%s:%d", host, config.Mesh.Bootstrap.ServersGRPCPorts[host])
-			} else {
-				// Assume the default port
-				addr = fmt.Sprintf("%s:%d", host, mesh.DefaultGRPCPort)
-			}
-			addrs = append(addrs, addr)
-		}
-		joinTransport = tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
-			Addrs:          addrs,
-			Credentials:    st.Credentials(ctx),
-			AddressTimeout: time.Second * 3,
-		})
-	} else if config.Mesh.Mesh.JoinAddress != "" {
-		joinTransport = tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
-			Addrs:          []string{config.Mesh.Mesh.JoinAddress},
-			Credentials:    st.Credentials(ctx),
-			AddressTimeout: time.Second * 3,
-		})
-	} else if config.Mesh.Discovery != nil && config.Mesh.Discovery.UseKadDHT {
-		var addrs []multiaddr.Multiaddr
-		for _, addr := range config.Mesh.Discovery.KadBootstrapServers {
-			maddr, err := multiaddr.NewMultiaddr(addr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid bootstrap peer address: %w", err)
-			}
-			addrs = append(addrs, maddr)
-		}
-		joinTransport = libp2p.NewJoinRoundTripper(libp2p.RoundTripOptions{
-			PSK:            config.Mesh.Discovery.PSK,
-			BootstrapPeers: addrs,
-			ConnectTimeout: time.Second * 3,
-		})
-	}
-	// A nil transport is technically okay, it means we are a single-node mesh
-	return joinTransport, nil
-}
-
-func newBootstrapTransport(ctx context.Context, st mesh.Mesh, config *options.Options) transport.BootstrapTransport {
-	if len(config.Mesh.Bootstrap.Servers) == 0 {
-		return transport.NewNullBootstrapTransport()
-	}
-	return tcp.NewBootstrapTransport(tcp.BootstrapTransportOptions{
-		NodeID:          st.ID(),
-		Addr:            config.Mesh.Bootstrap.ListenAddress,
-		Advertise:       config.Mesh.Bootstrap.AdvertiseAddress,
-		MaxPool:         config.Mesh.Raft.ConnectionPoolCount,
-		Timeout:         config.Mesh.Raft.ConnectionTimeout,
-		ElectionTimeout: config.Mesh.Raft.ElectionTimeout,
-		Credentials:     st.Credentials(ctx),
-		Peers: func() map[string]tcp.BootstrapPeer {
-			if config.Mesh.Bootstrap.Servers == nil {
-				return nil
-			}
-			peers := make(map[string]tcp.BootstrapPeer)
-			for id, addr := range config.Mesh.Bootstrap.Servers {
-				if id == st.ID() {
-					continue
-				}
-				nodeID := id
-				nodeAddr := addr
-				nodeHost, _, err := net.SplitHostPort(nodeAddr)
-				if err != nil {
-					// We should have caught this earlier
-					context.LoggerFrom(ctx).Warn("Encountered invalid bootstrap server address",
-						slog.String("address", nodeAddr), slog.String("error", err.Error()))
-					continue
-				}
-				// Deterine what their join address will be
-				var joinAddr string
-				if port, ok := config.Mesh.Bootstrap.ServersGRPCPorts[nodeID]; ok {
-					joinAddr = net.JoinHostPort(nodeHost, fmt.Sprintf("%d", port))
-				} else {
-					// Assume the default gRPC port
-					joinAddr = net.JoinHostPort(nodeHost, fmt.Sprintf("%d", mesh.DefaultGRPCPort))
-				}
-				peers[nodeID] = tcp.BootstrapPeer{
-					NodeID:        nodeID,
-					AdvertiseAddr: nodeAddr,
-					DialAddr:      joinAddr,
-				}
-			}
-			return peers
-		}(),
-	})
 }

@@ -18,6 +18,8 @@ limitations under the License.
 package builtins
 
 import (
+	"github.com/spf13/pflag"
+
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/debug"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ipam"
@@ -34,5 +36,33 @@ func NewPluginMap() map[string]clients.PluginClient {
 		"basic-auth": clients.NewInProcessClient(&basicauth.Plugin{}),
 		"ldap":       clients.NewInProcessClient(&ldap.Plugin{}),
 		"debug":      clients.NewInProcessClient(&debug.Plugin{}),
+	}
+}
+
+// IsBuiltIn returns true if the plugin is a built-in plugin.
+func IsBuiltIn(pluginName string) bool {
+	_, ok := NewPluginMap()[pluginName]
+	return ok
+}
+
+// FlagBinder is an interface implemented by the built-in plugin
+// option sets to bind them to the given flag set.
+type FlagBinder interface {
+	// BindFlags is called to bind the options to the flagset
+	// with the given prefix.
+	BindFlags(string, *pflag.FlagSet)
+	// AsMapStructure is called to convert the options to a map
+	// of string keys and values.
+	AsMapStructure() map[string]any
+}
+
+// NewPluginConfigs returns a map of the built-in plugin configurations.
+func NewPluginConfigs() map[string]FlagBinder {
+	return map[string]FlagBinder{
+		"ipam":       &ipam.Config{},
+		"mtls":       &mtls.Config{},
+		"basic-auth": &basicauth.Config{},
+		"ldap":       &ldap.Config{},
+		"debug":      &debug.Config{},
 	}
 }

@@ -45,7 +45,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --raft.in-memory
-      - --mesh.join-as-observer
+      - --raft.request-observer
       - --mesh.join-address=bootstrap-node:8443
       - --mesh.max-join-retries=15
     restart: on-failure

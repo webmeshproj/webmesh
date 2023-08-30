@@ -22,7 +22,6 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
-	"runtime"
 	"sync"
 	"time"
 
@@ -57,8 +56,6 @@ type Options struct {
 	PersistentKeepAlive time.Duration
 	// ForceTUN is whether to force the use of TUN.
 	ForceTUN bool
-	// Modprobe is whether to use modprobe to attempt to load the wireguard kernel module.
-	Modprobe bool
 	// MTU is the MTU to use for the wireguard interface.
 	MTU int
 	// RecordMetrics is whether to enable metrics recording.
@@ -126,7 +123,7 @@ type Manager interface {
 }
 
 // New creates a new network manager.
-func New(store storage.MeshStorage, opts *Options) Manager {
+func New(store storage.MeshStorage, opts Options) Manager {
 	return &manager{
 		storage:  store,
 		opts:     opts,
@@ -135,7 +132,7 @@ func New(store storage.MeshStorage, opts *Options) Manager {
 }
 
 type manager struct {
-	opts                 *Options
+	opts                 Options
 	storage              storage.MeshStorage
 	fw                   firewall.Firewall
 	wg                   wireguard.Interface
@@ -206,13 +203,6 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	m.fw, err = firewall.New(fwopts)
 	if err != nil {
 		return fmt.Errorf("new firewall: %w", err)
-	}
-	if m.opts.Modprobe && runtime.GOOS == "linux" {
-		err := loadModule()
-		if err != nil {
-			// Will attempt a TUN device later on
-			log.Error("load wireguard kernel module", slog.String("error", err.Error()))
-		}
 	}
 	wgopts := &wireguard.Options{
 		NodeID:              m.opts.NodeID,

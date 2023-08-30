@@ -17,6 +17,7 @@ limitations under the License.
 package raft
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/hashicorp/raft"
@@ -47,8 +48,8 @@ func (r *raftNode) observe() (closeCh, doneCh chan struct{}) {
 				case raft.FailedHeartbeatObservation:
 					r.log.Debug("FailedHeartbeatObservation", slog.Any("data", data))
 				}
-				if r.opts.OnObservation != nil {
-					r.opts.OnObservation(ev)
+				for _, obs := range r.observationcbs {
+					obs(context.Background(), ev)
 				}
 			}
 		}

@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -50,7 +51,23 @@ type Plugin struct {
 // Config contains static address assignments for nodes.
 type Config struct {
 	// StaticIPv4 is a map of node names to IPv4 addresses.
-	StaticIPv4 map[string]string `mapstructure:"static-ipv4,omitempty"`
+	StaticIPv4 map[string]string `mapstructure:"static-ipv4,omitempty" koanf:"static-ipv4,omitempty"`
+}
+
+// BindFlags binds the plugin flags to the given flag set.
+func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
+	fs.StringToStringVar(&c.StaticIPv4, prefix+"static-ipv4", nil, "Static IPv4 assignments.")
+}
+
+func (c *Config) AsMapStructure() map[string]any {
+	return map[string]any{
+		"static-ipv4": c.StaticIPv4,
+	}
+}
+
+// DefaultOptions returns the default options for the plugin.
+func (c *Config) DefaultOptions() *Config {
+	return &Config{}
 }
 
 func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error) {

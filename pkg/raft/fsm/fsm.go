@@ -38,12 +38,13 @@ import (
 
 var _ raft.FSM = &RaftFSM{}
 
-// ApplyLogCallback is the callback for when a log entry is applied.
-type ApplyLogCallback func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry)
+// ApplyCallback is a callback that can be registered for everytime a log is applied
+// to the state machine.
+type ApplyCallback func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry)
 
-// OnSnapshotRestoreCallback is the callback for when a snapshot is restored.
-// TODO: This is not used yet.
-type OnSnapshotRestoreCallback func(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser)
+// SnapshotRestoreCallback is a callback that can be registered for when a snapshot
+// is restored.
+type SnapshotRestoreCallback func(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser)
 
 // RaftFSM is the Raft FSM.
 type RaftFSM struct {
@@ -60,10 +61,10 @@ type RaftFSM struct {
 type Options struct {
 	// ApplyTimeout is the timeout for applying a log entry.
 	ApplyTimeout time.Duration
-	// OnApplyLog is the callback for when a log entry is applied.
-	OnApplyLog ApplyLogCallback
-	// OnSnapshotRestore is the callback for when a snapshot is restored.
-	OnSnapshotRestore OnSnapshotRestoreCallback
+	// OnApplyLog are the callbacks for when a log entry is applied.
+	OnApplyLog []ApplyCallback
+	// OnSnapshotRestore are the callbacks for when a snapshot is restored.
+	OnSnapshotRestore []SnapshotRestoreCallback
 }
 
 // New returns a new RaftFSM. The storage interface must be a direct
@@ -115,11 +116,11 @@ func (r *RaftFSM) ApplyBatch(logs []*raft.Log) []any {
 	var cmd *v1.RaftLogEntry
 	for i, l := range logs {
 		cmd, res[i] = r.applyLog(l)
+		for _, cb := range r.opts.OnApplyLog {
+			cb(context.Background(), l.Term, l.Index, cmd)
+		}
 	}
 	r.mu.Unlock()
-	if cmd != nil {
-		r.opts.OnApplyLog(context.Background(), logs[len(logs)-1].Term, logs[len(logs)-1].Index, cmd)
-	}
 	return res
 }
 
@@ -129,7 +130,9 @@ func (r *RaftFSM) Apply(l *raft.Log) any {
 	cmd, res := r.applyLog(l)
 	r.mu.Unlock()
 	if cmd != nil {
-		r.opts.OnApplyLog(context.Background(), l.Term, l.Index, cmd)
+		for _, cb := range r.opts.OnApplyLog {
+			cb(context.Background(), l.Term, l.Index, cmd)
+		}
 	}
 	return res
 }

@@ -18,23 +18,16 @@ limitations under the License.
 package mesh
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/netip"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
-	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
@@ -42,11 +35,24 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
-	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
+
+// DefaultMeshDomain is the default domain for the mesh network.
+const DefaultMeshDomain = "webmesh.internal"
+
+// DefaultIPv4Network is the default IPv4 network for the mesh.
+const DefaultIPv4Network = "172.16.0.0/12"
+
+// DefaultNetworkPolicy is the default network policy for the mesh.
+const DefaultNetworkPolicy = "accept"
+
+// DefaultBootstrapListenAddress is the default listen address for the bootstrap transport.
+const DefaultBootstrapListenAddress = "[::]:9001"
+
+// DefaultMeshAdmin is the default mesh admin node ID.
+const DefaultMeshAdmin = "admin"
 
 var (
 	// ErrNotOpen is returned when attempting to close a store that is not open.
@@ -60,148 +66,110 @@ var (
 // Mesh is the connection to the Webmesh. It controls raft consensus, plugins,
 // data storage, and WireGuard connections.
 type Mesh interface {
+	// NodeDialer is the dialer for node connections.
+	transport.NodeDialer
+	// LeaderDialer is the dialer for leader connections.
+	transport.LeaderDialer
+
 	// ID returns the node ID.
 	ID() string
 	// Domain returns the domain of the mesh network.
 	Domain() string
-	// Open opens the connection to the mesh. This must be called before
+	// Connect opens the connection to the mesh. This must be called before
 	// other methods can be used.
-	Open(ctx context.Context, opts ConnectOptions) error
+	Connect(ctx context.Context, opts ConnectOptions) error
 	// Ready returns a channel that will be closed when the mesh is ready.
 	// Ready is defined as having a leader and knowing its address.
 	Ready() <-chan struct{}
 	// Close closes the connection to the mesh and shuts down the storage.
 	Close() error
 	// Credentials returns the gRPC credentials to use for dialing the mesh.
-	Credentials(ctx context.Context) []grpc.DialOption
-	// Dial opens a new gRPC connection to the given node.
-	Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error)
-	// DialLeader opens a new gRPC connection to the current Raft leader.
-	DialLeader(context.Context) (*grpc.ClientConn, error)
+	Credentials() []grpc.DialOption
 	// LeaderID returns the current Raft leader ID.
 	LeaderID() (string, error)
 	// Storage returns a storage interface for use by the application.
 	Storage() storage.MeshStorage
-	// Raft returns the Raft interface.
+	// Raft returns the Raft interface. This will be nil if connect has not
+	// been called.
 	Raft() raft.Raft
 	// Network returns the Network manager.
 	Network() net.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
 	// AnnounceDHT announces the peer discovery service via DHT.
-	AnnounceDHT(context.Context, *DiscoveryOptions) error
+	AnnounceDHT(context.Context, DiscoveryOptions) error
 	// LeaveDHT leaves the peer discovery service for the given PSK.
 	LeaveDHT(ctx context.Context, psk string) error
 }
 
-// ConnectOptions are options for opening the connection to the mesh.
-type ConnectOptions struct {
-	// Features are the features to broadcast to others in the mesh.
-	Features []v1.Feature
-	// BootstrapTransport is the transport to use for bootstrapping the mesh.
-	BootstrapTransport transport.BootstrapTransport
-	// JoinRoundTripper is the round tripper to use for joining the mesh.
-	JoinRoundTripper transport.JoinRoundTripper
-	// RaftTransport is the transport to use for the raft node.
-	RaftTransport transport.RaftTransport
-	// RaftStorage is the storage to use for the raft node.
-	RaftStorage storage.RaftStorage
-	// MeshStorage is the storage to use for the mesh state.
-	MeshStorage storage.MeshStorage
-	// ForceBootstrap is true if the node should force bootstrap.
-	ForceBootstrap bool
+// Config contains the configurations for a new mesh connection.
+type Config struct {
+	// NodeID is the node ID to use. If empty, the one from the raft
+	// instance will be used.
+	NodeID string
+	// Credentials are gRPC credentials to use when dialing the mesh.
+	Credentials []grpc.DialOption
+	// HeartbeatPurgeThreshold is the number of failed heartbeats before
+	// assuming a peer is offline. This is only applicable when currently
+	// the leader of the raft group.
+	HeartbeatPurgeThreshold int
+	// ZoneAwarenessID is an to use with zone-awareness to determine
+	// peers in the same LAN segment.
+	ZoneAwarenessID string
+	// UseMeshDNS will attempt to set the system DNS to any discovered
+	// DNS servers. This is only applicable when not serving MeshDNS
+	// ourselves.
+	UseMeshDNS bool
+	// LocalMeshDNSAddr is the address MeshDNS is listening on locally.
+	LocalMeshDNSAddr string
+	// WireGuardKeyFile is a location to store and reuse a WireGuard key.
+	// This is optional. If specified and the file does not exist, one will
+	// be generated and stored there.
+	WireGuardKeyFile string
+	// KeyRotationInterval is the interval to rotate WireGuard keys. This is
+	// only applicable when a WireguardKeyFile is specified. Otherwise a new
+	// one will be generated on each startup.
+	KeyRotationInterval time.Duration
+	// DisableIPv4 is true if IPv4 should be disabled.
+	DisableIPv4 bool
+	// DisableIPv6 is true if IPv6 should be disabled.
+	DisableIPv6 bool
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh
 // before it can be used.
-func New(opts *Options) (Mesh, error) {
-	return NewWithLogger(opts, slog.Default())
+func New(opts Config) Mesh {
+	return NewWithLogger(slog.Default(), opts)
 }
 
 // NewWithLogger creates a new Mesh with the given logger. You must call
 // Open() on the returned mesh before it can be used.
-func NewWithLogger(opts *Options, log *slog.Logger) (Mesh, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-	nodeID := opts.Mesh.NodeID
-	var tlsConfig *tls.Config
-	if !opts.TLS.Insecure {
-		var err error
-		tlsConfig, err = opts.TLSConfig()
-		if err != nil {
-			return nil, err
-		}
-	}
+func NewWithLogger(log *slog.Logger, opts Config) Mesh {
 	log = log.With(slog.String("component", "mesh"))
-	if nodeID == "" || nodeID == hostnameFlagDefault {
-		nodeID = determineNodeID(log, tlsConfig, opts)
-	}
 	var peerUpdateGroup, routeUpdateGroup, dnsUpdateGroup errgroup.Group
 	peerUpdateGroup.SetLimit(1)
 	routeUpdateGroup.SetLimit(1)
 	dnsUpdateGroup.SetLimit(1)
 	st := &meshStore{
 		opts:             opts,
-		tlsConfig:        tlsConfig,
-		nodeID:           nodeID,
+		nodeID:           opts.NodeID,
 		peerUpdateGroup:  &peerUpdateGroup,
 		routeUpdateGroup: &routeUpdateGroup,
 		dnsUpdateGroup:   &dnsUpdateGroup,
-		log:              log.With(slog.String("node-id", string(nodeID))),
+		log:              log.With(slog.String("node-id", string(opts.NodeID))),
 		kvSubCancel:      func() {},
 		discoveries:      make(map[string]io.Closer),
 		closec:           make(chan struct{}),
 	}
-	return st, nil
-}
-
-func determineNodeID(log *slog.Logger, tlsConfig *tls.Config, opts *Options) string {
-	// Check if we are using mTLS.
-	if tlsConfig != nil {
-		if len(tlsConfig.Certificates) > 0 {
-			clientCert := tlsConfig.Certificates[0]
-			leaf, err := x509.ParseCertificate(clientCert.Certificate[0])
-			if err != nil {
-				log.Warn("unable to parse client certificate to determine node ID", slog.String("error", err.Error()))
-			} else {
-				nodeID := leaf.Subject.CommonName
-				log.Info("using CN as node ID", slog.String("node-id", nodeID))
-				return nodeID
-			}
-		}
-	}
-	// Check if we are using auth
-	if opts.Auth != nil {
-		if opts.Auth.Basic != nil && opts.Auth.Basic.Username != "" {
-			log.Info("using basic auth username as node ID",
-				slog.String("node-id", opts.Auth.Basic.Username))
-			return opts.Auth.Basic.Username
-		}
-		if opts.Auth.LDAP != nil && opts.Auth.LDAP.Username != "" {
-			log.Info("using LDAP username as node ID",
-				slog.String("node-id", opts.Auth.LDAP.Username))
-			return opts.Auth.LDAP.Username
-		}
-	}
-	// Try to retrieve the system hostname
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Warn("unable to retrieve system hostname, generating random UUID for node ID",
-			slog.String("error", err.Error()))
-		return uuid.NewString()
-	}
-	log.Info("using system hostname as node ID", slog.String("node-id", string(hostname)))
-	return hostname
+	return st
 }
 
 type meshStore struct {
 	open             atomic.Bool
 	nodeID           string
 	meshDomain       string
-	opts             *Options
+	opts             Config
 	raft             raft.Raft
-	tlsConfig        *tls.Config
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
 	nw               net.Manager
@@ -307,26 +275,8 @@ func (s *meshStore) Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, 
 	return s.dialWithLocalStorage(ctx, nodeID)
 }
 
-func (s *meshStore) Credentials(ctx context.Context) []grpc.DialOption {
-	log := context.LoggerFrom(ctx)
-	var opts []grpc.DialOption
-	if s.opts.TLS.Insecure {
-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else {
-		// MTLS is included in the TLS config already if enabled.
-		log.Debug("using TLS credentials")
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfig)))
-	}
-	if s.opts.Auth != nil {
-		if s.opts.Auth.Basic != nil {
-			log.Debug("using basic auth credentials")
-			opts = append(opts, basicauth.NewCreds(s.opts.Auth.Basic.Username, s.opts.Auth.Basic.Password))
-		} else if s.opts.Auth.LDAP != nil {
-			log.Debug("using LDAP auth credentials")
-			opts = append(opts, ldap.NewCreds(s.opts.Auth.LDAP.Username, s.opts.Auth.LDAP.Password))
-		}
-	}
-	return opts
+func (s *meshStore) Credentials() []grpc.DialOption {
+	return s.opts.Credentials
 }
 
 func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
@@ -334,14 +284,14 @@ func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID string) (*g
 	if err != nil {
 		return nil, fmt.Errorf("get node private rpc address: %w", err)
 	}
-	if s.opts.Mesh.NoIPv4 {
+	if s.opts.DisableIPv4 {
 		addr := node.PrivateRPCAddrV6()
 		if !addr.IsValid() {
 			return nil, fmt.Errorf("node %q has no private IPv6 address", nodeID)
 		}
 		return s.newGRPCConn(ctx, addr.String())
 	}
-	if s.opts.Mesh.NoIPv6 {
+	if s.opts.DisableIPv6 {
 		addr := node.PrivateRPCAddrV4()
 		if !addr.IsValid() {
 			return nil, fmt.Errorf("node %q has no private IPv4 address", nodeID)
@@ -377,11 +327,11 @@ func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (
 	if toDial == nil {
 		return nil, fmt.Errorf("no wireguard peer found for node %q", nodeID)
 	}
-	if s.opts.Mesh.NoIPv4 && toDial.PrivateIPv6.IsValid() {
+	if s.opts.DisableIPv4 && toDial.PrivateIPv6.IsValid() {
 		addr := netip.AddrPortFrom(toDial.PrivateIPv6.Addr(), uint16(toDial.GRPCPort))
 		return s.newGRPCConn(ctx, addr.String())
 	}
-	if s.opts.Mesh.NoIPv6 && toDial.PrivateIPv4.IsValid() {
+	if s.opts.DisableIPv6 && toDial.PrivateIPv4.IsValid() {
 		addr := netip.AddrPortFrom(toDial.PrivateIPv4.Addr(), uint16(toDial.GRPCPort))
 		return s.newGRPCConn(ctx, addr.String())
 	}
@@ -395,5 +345,5 @@ func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (
 }
 
 func (s *meshStore) newGRPCConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, addr, s.Credentials(ctx)...)
+	return grpc.DialContext(ctx, addr, s.Credentials()...)
 }
