@@ -17,3 +17,28 @@ limitations under the License.
 // Package embed provides a simplified way to run a webmesh node in-process.
 // This will hopefully be completed soon.
 package embed
+
+import (
+	"github.com/ipld/go-ipld-prime/storage"
+
+	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
+)
+
+// WebmeshNode is an embedded webmesh node.
+type WebmeshNode interface {
+	// Mesh returns the underlying mesh instance.
+	Mesh() mesh.Mesh
+	// Raft is the underlying Raft instance.
+	Raft() raft.Raft
+	// Storage is the udnerlying storage instance.
+	Storage() storage.Storage
+	// Services returns the underlying services instance
+	// if it is running.
+	Services() *services.Server
+	// MeshDNS returns the underlying MeshDNS instance
+	// if it is running.
+	MeshDNS() *meshdns.Server
+}
