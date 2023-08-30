@@ -102,6 +102,21 @@ func (o *RaftOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.LogLevel, prefix+"raft.log-level", "info", "Raft log level.")
 }
 
+// Validate validates the options.
+func (o *RaftOptions) Validate() error {
+	if o.ListenAddress == "" {
+		return fmt.Errorf("raft.listen-address is required")
+	}
+	_, _, err := net.SplitHostPort(o.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("raft.listen-address is invalid: %w", err)
+	}
+	if !o.InMemory && o.DataDir == "" {
+		return fmt.Errorf("raft.data-dir is required")
+	}
+	return nil
+}
+
 // RaftListenPort returns the listen port for the raft transport.
 func (o *Config) RaftListenPort() int {
 	_, port, err := net.SplitHostPort(o.Raft.ListenAddress)

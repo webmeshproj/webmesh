@@ -97,6 +97,26 @@ func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.DisableFeatureAdvertisement, prefix+"mesh.disable-feature-advertisement", false, "Disable feature advertisement.")
 }
 
+// Validate validates the options.
+func (o *MeshOptions) Validate() error {
+	if o.DisableIPv4 && o.DisableIPv6 {
+		return fmt.Errorf("cannot disable both IPv4 and IPv6")
+	}
+	if o.JoinAddress != "" && o.MaxJoinRetries < 0 {
+		return fmt.Errorf("max join retries must be >= 0")
+	}
+	if o.PrimaryEndpoint != "" {
+		_, _, err := net.SplitHostPort(o.PrimaryEndpoint)
+		if err != nil {
+			return fmt.Errorf("invalid primary endpoint: %w", err)
+		}
+	}
+	if o.GRPCAdvertisePort <= 1024 {
+		return fmt.Errorf("invalid gRPC advertise port")
+	}
+	return nil
+}
+
 // NewMeshConfig return a new Mesh configuration based on the node configuration.
 func (o *Config) NewMeshConfig(ctx context.Context) (conf mesh.Config, err error) {
 	log := context.LoggerFrom(ctx)

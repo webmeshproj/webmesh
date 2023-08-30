@@ -19,7 +19,10 @@ package config
 import (
 	"crypto/tls"
 	"encoding/base64"
+	"fmt"
 	"log/slog"
+	"net"
+	"net/netip"
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -43,6 +46,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/storage"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
+	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // ServiceOptions contains the configuration for the mesh services.
@@ -92,6 +96,35 @@ func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	}
 }
 
+// Validate validates the options.
+func (s *ServiceOptions) Validate() error {
+	if s.GRPCListenAddress == "" {
+		return fmt.Errorf("grpc-listen-address must be set")
+	}
+	_, _, err := net.SplitHostPort(s.GRPCListenAddress)
+	if err != nil {
+		return fmt.Errorf("grpc-listen-address is invalid: %w", err)
+	}
+	if !s.Insecure {
+		if (s.TLSCertFile == "" || s.TLSKeyFile == "") || (s.TLSCertData == "" || s.TLSKeyData == "") {
+			return fmt.Errorf("tls-cert-file and tls-key-file or tls-cert-data and tls-key-data must be set")
+		}
+	}
+	if s.TURN.Enabled {
+		err := s.TURN.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	if s.Metrics.Enabled {
+		err := s.Metrics.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // APIOptions are the options for which APIs to register and expose.
 type APIOptions struct {
 	// MeshEnabled is true if the mesh API should be registered.
@@ -136,6 +169,35 @@ func (t *TURNOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.StringVar(&t.ListenAddress, prefix+"services.turn.listen-address", turn.DefaultListenAddress, "Address to listen on for STUN/TURN requests.")
 	fl.StringVar(&t.Realm, prefix+"services.turn.realm", "webmesh", "Realm used for TURN server authentication.")
 	fl.StringVar(&t.TURNPortRange, prefix+"services.turn.port-range", turn.DefaultPortRange, "Port range to use for TURN relays.")
+}
+
+// Validate values the TURN options.
+func (t *TURNOptions) Validate() error {
+	if !t.Enabled {
+		return nil
+	}
+	if t.ListenAddress == "" {
+		return fmt.Errorf("services.turn.listen-address must be set")
+	} else {
+		_, _, err := net.SplitHostPort(t.ListenAddress)
+		if err != nil {
+			return fmt.Errorf("services.turn.listen-address is invalid: %w", err)
+		}
+	}
+	if t.PublicIP == "" || t.Endpoint == "" {
+		return fmt.Errorf("services.turn.public-ip or services.turn.endpoint must be set")
+	}
+	if t.PublicIP != "" {
+		_, err := netip.ParseAddr(t.PublicIP)
+		if err != nil {
+			return fmt.Errorf("services.turn.public-ip is invalid: %w", err)
+		}
+	}
+	_, _, err := netutil.ParsePortRange(t.TURNPortRange)
+	if err != nil {
+		return fmt.Errorf("services.turn.port-range is invalid: %w", err)
+	}
+	return nil
 }
 
 // BindFlags binds the flags.
@@ -196,6 +258,21 @@ func (m *MetricsOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&m.Enabled, prefix+"services.metrics.enabled", false, "Enable gRPC metrics.")
 	fl.StringVar(&m.ListenAddress, prefix+"services.metrics.listen-address", metrics.DefaultListenAddress, "gRPC metrics listen address.")
 	fl.StringVar(&m.Path, prefix+"services.metrics.path", metrics.DefaultPath, "gRPC metrics path.")
+}
+
+// Validate validates the options.
+func (m *MetricsOptions) Validate() error {
+	if !m.Enabled {
+		return nil
+	}
+	if m.ListenAddress == "" {
+		return fmt.Errorf("services.metrics.listen-address must be set")
+	}
+	_, _, err := net.SplitHostPort(m.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("services.metrics.listen-address is invalid: %w", err)
+	}
+	return nil
 }
 
 // RegisterAPIs registers the configured APIs to the given server.

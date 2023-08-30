@@ -20,7 +20,6 @@ package nodecmd
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -41,6 +40,7 @@ import (
 
 var (
 	flagset                 = pflag.NewFlagSet("webmesh-node", pflag.ContinueOnError)
+	helpFlag                = flagset.Bool("help", false, "Print usage information and exit")
 	versionFlag             = flagset.Bool("version", false, "Print version information and exit")
 	configFlag              = flagset.String("config", "", "Path to a configuration file")
 	printConfig             = flagset.Bool("print-config", false, "Print the configuration and exit")
@@ -54,14 +54,19 @@ var (
 
 func Execute() error {
 	// Parse flags and read in configurations
-	config := &config.Config{}
-	config.BindFlags("", flagset)
+	conf := &config.Config{}
+	conf.BindFlags("", flagset)
 	err := flagset.Parse(os.Args[1:])
 	if err != nil {
-		if errors.Is(err, flag.ErrHelp) {
+		if errors.Is(err, pflag.ErrHelp) {
 			return nil
 		}
 		return err
+	}
+
+	if *helpFlag {
+		fmt.Fprint(os.Stderr, Usage(flagset))
+		return nil
 	}
 
 	// Dump the version and exit
@@ -78,14 +83,14 @@ func Execute() error {
 	if *configFlag != "" {
 		configs = append(configs, *configFlag)
 	}
-	err = config.LoadFrom(flagset, configs)
+	err = conf.LoadFrom(flagset, configs)
 	if err != nil {
 		return err
 	}
 
 	// Dump the config and exit
 	if *printConfig {
-		out, err := json.MarshalIndent(config, "", "  ")
+		out, err := json.MarshalIndent(conf, "", "  ")
 		if err != nil {
 			return err
 		}
@@ -94,22 +99,29 @@ func Execute() error {
 	}
 
 	// Apply globals
-	config, err = config.Global.ApplyGlobals(config)
+	conf, err = conf.Global.ApplyGlobals(conf)
 	if err != nil {
 		return err
 	}
 
-	// Time to get going
-
-	log := logutil.SetupLogging(config.Global.LogLevel)
-	ctx := context.WithLogger(context.Background(), log)
-
+	// Validate the configuration
 	if !*appDaemon {
-		if err := config.Validate(); err != nil {
-			flagset.Usage()
+		err = conf.Validate()
+		if err != nil {
+			if errors.Is(err, config.ErrNoMesh) {
+				// Display usage if no mesh is configured
+				fmt.Fprint(os.Stderr, Usage(flagset))
+				fmt.Fprintln(os.Stderr, "No mesh configured")
+				os.Exit(1)
+			}
 			return err
 		}
 	}
+
+	// Time to get going
+
+	log := logutil.SetupLogging(conf.Global.LogLevel)
+	ctx := context.WithLogger(context.Background(), log)
 
 	log.Info("Starting webmesh node",
 		slog.String("version", version.Version),
@@ -118,7 +130,7 @@ func Execute() error {
 	)
 
 	// Log all options at debug level
-	dump, err := json.Marshal(config)
+	dump, err := json.Marshal(conf)
 	if err != nil {
 		return err
 	}
@@ -129,25 +141,25 @@ func Execute() error {
 	}
 	log.Debug("Current configuration", slog.Any("options", out))
 
-	if *appDaemon {
-		return nodedaemon.Run(ctx, nodedaemon.Config{
-			Bind:           *appDaemonBind,
-			InsecureSocket: *appDaemonInsecureSocket,
-			GRPCWeb:        *appDaemonGrpcWeb,
-			Config:         config,
-		})
-	}
-
 	if *startTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *startTimeout)
 		defer cancel()
 	}
 
-	if len(config.Bridge.Meshes) > 0 {
-		return bridgecmd.RunBridgeConnection(ctx, config.Bridge)
+	if *appDaemon {
+		return nodedaemon.Run(context.Background(), nodedaemon.Config{
+			Bind:           *appDaemonBind,
+			InsecureSocket: *appDaemonInsecureSocket,
+			GRPCWeb:        *appDaemonGrpcWeb,
+			Config:         conf,
+		})
 	}
-	return runMeshConnection(ctx, config)
+
+	if len(conf.Bridge.Meshes) > 0 {
+		return bridgecmd.RunBridgeConnection(ctx, conf.Bridge)
+	}
+	return runMeshConnection(ctx, conf)
 }
 
 func runMeshConnection(ctx context.Context, config *config.Config) error {

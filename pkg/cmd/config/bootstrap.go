@@ -17,9 +17,13 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+	"net"
+
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
 )
 
 // BootstrapOptions are options for bootstrapping a new mesh.
@@ -71,4 +75,44 @@ func (o *BootstrapOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.DefaultNetworkPolicy, prefix+"bootstrap.default-network-policy", mesh.DefaultNetworkPolicy, "Default network policy to apply to the mesh when bootstraping a new cluster")
 	fs.BoolVar(&o.DisableRBAC, prefix+"bootstrap.disable-rbac", false, "Disable RBAC when bootstrapping a new cluster")
 	fs.BoolVar(&o.Force, prefix+"bootstrap.force", false, "Force new bootstrap")
+}
+
+// Validate validates the bootstrap options.
+func (o *BootstrapOptions) Validate() error {
+	if !o.Enabled {
+		return nil
+	}
+	if o.AdvertiseAddress == "" {
+		return fmt.Errorf("advertise address must be set when bootstrapping")
+	}
+	if o.ListenAddress == "" {
+		return fmt.Errorf("listen address must be set when bootstrapping")
+	}
+	_, _, err := net.SplitHostPort(o.AdvertiseAddress)
+	if err != nil {
+		return fmt.Errorf("advertise address must be a valid host:port")
+	}
+	_, _, err = net.SplitHostPort(o.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("listen address must be a valid host:port")
+	}
+	if o.IPv4Network == "" {
+		return fmt.Errorf("ipv4 network must be set when bootstrapping")
+	}
+	if _, _, err := net.ParseCIDR(o.IPv4Network); err != nil {
+		return fmt.Errorf("ipv4 network must be a valid CIDR")
+	}
+	if o.MeshDomain == "" {
+		return fmt.Errorf("mesh domain must be set when bootstrapping")
+	}
+	if o.Admin == "" {
+		return fmt.Errorf("admin must be set when bootstrapping")
+	}
+	if o.DefaultNetworkPolicy == "" {
+		return fmt.Errorf("default network policy must be set when bootstrapping")
+	}
+	if o.DefaultNetworkPolicy != string(firewall.PolicyAccept) && o.DefaultNetworkPolicy != string(firewall.PolicyDrop) {
+		return fmt.Errorf("default network policy must be accept or drop")
+	}
+	return nil
 }

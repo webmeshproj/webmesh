@@ -80,7 +80,7 @@ func (o *GlobalOptions) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.TLSKeyFile, "global.tls-key-file", "", "TLS key file.")
 	fs.StringVar(&o.TLSCAFile, "global.tls-ca-file", "", "TLS CA file.")
 	fs.StringVar(&o.TLSClientCAFile, "global.tls-client-ca-file", "", "TLS client CA file.")
-	fs.BoolVar(&o.MTLS, "mtls", false, "global.Enable mutual TLS.")
+	fs.BoolVar(&o.MTLS, "global.mtls", false, "Enable mutual TLS.")
 	fs.BoolVar(&o.VerifyChainOnly, "global.verify-chain-only", false, "Verify only the certificate chain.")
 	fs.BoolVar(&o.Insecure, "global.insecure", false, "Disable TLS.")
 	fs.BoolVar(&o.InsecureSkipVerify, "global.insecure-skip-verify", false, "Skip TLS verification.")
@@ -92,6 +92,23 @@ func (o *GlobalOptions) BindFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", false, "Detect and advertise IPv6 endpoints.")
 	fs.BoolVar(&o.DisableIPv4, "global.disable-ipv4", false, "Disable IPv4.")
 	fs.BoolVar(&o.DisableIPv6, "global.disable-ipv6", false, "Disable IPv6.")
+}
+
+// Validate validates the global options.
+func (o *GlobalOptions) Validate() error {
+	if o.DisableIPv4 && o.DisableIPv6 {
+		return fmt.Errorf("both IPv4 and IPv6 are disabled")
+	}
+	if o.MTLS && o.TLSCertFile == "" {
+		return fmt.Errorf("mtls is enabled but no tls-cert-file is set")
+	}
+	if o.MTLS && o.TLSKeyFile == "" {
+		return fmt.Errorf("mtls is enabled but no tls-key-file is set")
+	}
+	if o.MTLS && (o.TLSCAFile == "" || o.TLSClientCAFile == "") {
+		return fmt.Errorf("mtls is enabled but no tls-ca-file is set")
+	}
+	return nil
 }
 
 // ApplyGlobals applies the global options to the given options. It returns the

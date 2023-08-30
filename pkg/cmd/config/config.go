@@ -82,9 +82,55 @@ func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
 	return o
 }
 
+// ErrNoMesh is returned when no mesh is configured to be bootstrapped or joined.
+var ErrNoMesh = fmt.Errorf("no mesh configured")
+
 // Validate validates the configuration.
 func (o *Config) Validate() error {
-	// TODO: Validate the configuration
+	// Make sure we are either bootstrapping or joining a mesh
+	if !o.Bootstrap.Enabled || o.Mesh.JoinAddress == "" || (!o.Discovery.UseKadDHT || o.Discovery.PSK == "") {
+		return ErrNoMesh
+	}
+	err := o.Global.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid global options: %w", err)
+	}
+	if o.Bootstrap.Enabled {
+		err := o.Bootstrap.Validate()
+		if err != nil {
+			return fmt.Errorf("invalid bootstrap options: %w", err)
+		}
+	}
+	err = o.Auth.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid auth options: %w", err)
+	}
+	err = o.Mesh.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid mesh options: %w", err)
+	}
+	if o.IsRaftMember() {
+		err := o.Raft.Validate()
+		if err != nil {
+			return fmt.Errorf("invalid raft options: %w", err)
+		}
+	}
+	err = o.Services.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid service options: %w", err)
+	}
+	err = o.WireGuard.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid wireguard options: %w", err)
+	}
+	err = o.Discovery.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid discovery options: %w", err)
+	}
+	err = o.Bridge.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid bridge options: %w", err)
+	}
 	return nil
 }
 

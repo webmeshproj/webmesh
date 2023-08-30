@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -109,4 +110,40 @@ func (m *BridgeMeshDNSOptions) BindFlags(fl *pflag.FlagSet) {
 	fl.BoolVar(&m.SubscribeForwarders, "bridge.meshdns.subscribe-forwarders", true, "Subscribe to new nodes that can forward requests.")
 	fl.BoolVar(&m.DisableForwarding, "bridge.meshdns.disable-forwarding", false, "Disable forwarding requests.")
 	fl.IntVar(&m.CacheSize, "bridge.meshdns.cache-size", 0, "Size of the remote DNS cache (0 = disabled).")
+}
+
+// Validate recursively validates the config.
+func (b *BridgeOptions) Validate() error {
+	for _, conf := range b.Meshes {
+		if err := conf.Validate(); err != nil {
+			return err
+		}
+	}
+	if len(b.Meshes) > 0 {
+		// Also validate DNS
+		if err := b.MeshDNS.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Validate validates the bridge dns options.
+func (m *BridgeMeshDNSOptions) Validate() error {
+	if !m.Enabled {
+		return nil
+	}
+	if m.ListenUDP == "" {
+		return fmt.Errorf("bridge.meshdns.listen-udp must be set")
+	}
+	if m.ListenTCP == "" {
+		return fmt.Errorf("bridge.meshdns.listen-tcp must be set")
+	}
+	if m.RequestTimeout <= 0 {
+		return fmt.Errorf("bridge.meshdns.request-timeout must be > 0")
+	}
+	if m.CacheSize < 0 {
+		return fmt.Errorf("bridge.meshdns.cache-size must be >= 0")
+	}
+	return nil
 }

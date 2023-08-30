@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -66,11 +67,33 @@ func (o *WireGuardOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.ForceInterfaceName, prefix+"wireguard.force-interface-name", false, "Force the use of the given name by deleting any pre-existing interface with the same name.")
 	fs.BoolVar(&o.ForceTUN, prefix+"wireguard.force-tun", false, "Force the use of a TUN interface.")
 	fs.BoolVar(&o.Masquerade, prefix+"wireguard.masquerade", true, "Enable masquerading of traffic from the wireguard interface.")
-	fs.DurationVar(&o.PersistentKeepAlive, prefix+"wireguard.persistent-keepalive", 0, "The interval at which to send keepalive packets to peers. If unset, keepalive packets will automatically be sent to publicly accessible peers when this instance is behind a NAT. Otherwise, no keep-alive packets are sent.")
+	fs.DurationVar(&o.PersistentKeepAlive, prefix+"wireguard.persistent-keepalive", 0, "The interval at which to send keepalive packets to peers.")
 	fs.IntVar(&o.MTU, prefix+"wireguard.mtu", system.DefaultMTU, "The MTU to use for the interface.")
 	fs.StringSliceVar(&o.Endpoints, prefix+"wireguard.endpoints", nil, "Additional WireGuard endpoints to broadcast when joining.")
 	fs.StringVar(&o.KeyFile, prefix+"wireguard.key-file", "", "The path to the WireGuard private key. If it does not exist it will be created.")
 	fs.DurationVar(&o.KeyRotationInterval, prefix+"wireguard.key-rotation-interval", time.Hour*24*7, "The interval to rotate wireguard keys. Set this to 0 to disable key rotation.")
 	fs.BoolVar(&o.RecordMetrics, prefix+"wireguard.record-metrics", false, "Record WireGuard metrics. These are only exposed if the metrics server is enabled.")
 	fs.DurationVar(&o.RecordMetricsInterval, prefix+"wireguard.record-metrics-interval", time.Second*10, "The interval at which to update WireGuard metrics.")
+}
+
+// Validate validates the options.
+func (o *WireGuardOptions) Validate() error {
+	if o.ListenPort <= 1024 {
+		return fmt.Errorf("wireguard.listen-port must be greater than 1024")
+	}
+	if o.InterfaceName == "" {
+		return fmt.Errorf("wireguard.interface-name must be set")
+	}
+	if o.MTU < 1280 {
+		return fmt.Errorf("wireguard.mtu must be greater than 1280")
+	}
+	if o.KeyRotationInterval < 0 {
+		return fmt.Errorf("wireguard.key-rotation-interval must be greater than 0")
+	}
+	if o.RecordMetrics {
+		if o.RecordMetricsInterval < 0 {
+			return fmt.Errorf("wireguard.record-metrics-interval must be greater than 0")
+		}
+	}
+	return nil
 }

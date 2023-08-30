@@ -17,8 +17,10 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
 )
 
@@ -45,4 +47,18 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.UseKadDHT, prefix+"discovery.use-kad-dht", false, "use the libp2p kademlia DHT for discovery")
 	fs.StringSliceVar(&o.KadBootstrapServers, prefix+"discovery.kad-bootstrap-servers", nil, "list of bootstrap servers to use for the DHT")
 	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", time.Minute, "TTL for the announcement")
+}
+
+// Validate validates the discovery options.
+func (o *DiscoveryOptions) Validate() error {
+	if len(o.KadBootstrapServers) > 0 {
+		// Make sure all the addresses are valid
+		for _, addr := range o.KadBootstrapServers {
+			_, err := multiaddr.NewMultiaddr(addr)
+			if err != nil {
+				return fmt.Errorf("invalid bootstrap server address: %w", err)
+			}
+		}
+	}
+	return nil
 }
