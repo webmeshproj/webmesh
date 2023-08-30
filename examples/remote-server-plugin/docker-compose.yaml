@@ -21,13 +21,12 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --global.log-level=debug
       - --bootstrap.enabled
-      - --bootstrap.default-network-policy=accept
       - --raft.in-memory
+      # TODO: Fix this
       - --plugins.server=server=10.1.0.1:8081,insecure=true
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -39,9 +38,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=bootstrap-node:8443
-      - --mesh.max-join-retries=15
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

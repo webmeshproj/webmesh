@@ -7,9 +7,6 @@ networks:
       config:
         - subnet: 10.1.0.0/24
 
-volumes:
-  bootstrap-node:
-
 services:
   bootstrap-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -23,20 +20,15 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.log-level=debug
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --raft.data-dir=/data
-      - --wireguard.key-file=/data/wireguard.key
       - --plugins.basic-auth.htpasswd-file=/etc/htpasswd
     ports:
       - 8443:8443
-      - 51820:51820/udp
     volumes:
-      - bootstrap-node:/data
       - ./htpasswd:/etc/htpasswd
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -48,11 +40,8 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.log-level=debug
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=10.1.0.5:8443
-      - --mesh.max-join-retries=10
       - --auth.basic.username=join-node
       - --auth.basic.password=dobad
     restart: on-failure

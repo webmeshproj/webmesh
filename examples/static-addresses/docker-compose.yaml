@@ -20,19 +20,14 @@ services:
       - /webmesh-node
       - --global.log-level=debug
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.default-network-policy=accept
       - --raft.in-memory
-      - --mesh.heartbeat-purge-threshold=30
-      - --plugins.debug.listen-address=:6060
-      - --plugins.debug.enable-db-querier=true
       - --plugins.ipam.static-ipv4=join-node=172.16.0.20/32
       - --plugins.ipam.static-ipv4=bootstrap-node=172.16.0.10/32
     ports:
-      - 6060:6060
       - 8443:8443
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -44,9 +39,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --mesh.join-address=bootstrap-node:8443
-      - --mesh.max-join-retries=15
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

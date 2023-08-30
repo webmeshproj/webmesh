@@ -35,17 +35,16 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
+      - --global.disable-ipv6
       - --global.primary-endpoint=10.40.0.1
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.100.10.0/24
-      - --bootstrap.default-network-policy=accept
       - --bootstrap.disable-rbac
       - --raft.in-memory
-      - --services.api.mesh
+      - --services.api.mesh-enabled
       # Enable the WebRTC API to help nodes with ICE connectivity.
-      - --services.api.webrtc
+      - --services.api.webrtc-enabled
       - --services.api.stun-servers=stun:10.40.0.1:3478
       # Enable an embedded TURN server. You can optionally use a public one.
       - --services.turn.enabled
@@ -69,8 +68,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --discovery.use-kad-dht
       - --discovery.psk=superkadsecret
       - --mesh.direct-peers=site-2-peer,site-3-peer
@@ -87,8 +85,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --discovery.use-kad-dht
       - --discovery.psk=superkadsecret
       - --mesh.direct-peers=site-1-peer,site-3-peer
@@ -105,8 +102,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.no-ipv6
-      - --raft.in-memory
+      - --global.disable-ipv6
       - --discovery.use-kad-dht
       - --discovery.psk=superkadsecret
       - --mesh.direct-peers=site-1-peer,site-2-peer
