@@ -108,8 +108,9 @@ type Manager interface {
 	RefreshDNSServers(ctx context.Context) error
 	// AddPeer adds a peer to the wireguard interface.
 	AddPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) error
-	// RefreshPeers walks all peers in the database and ensures they are added to the wireguard interface.
-	RefreshPeers(ctx context.Context) error
+	// RefreshPeers walks all peers against the provided list and makes sure
+	// they are up to date.
+	RefreshPeers(ctx context.Context, peers []*v1.WireGuardPeer) error
 	// Firewall returns the firewall.
 	// The firewall is only available after Start has been called.
 	Firewall() firewall.Firewall
@@ -382,7 +383,7 @@ func (m *manager) AddPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	return m.addPeer(ctx, peer, iceServers)
 }
 
-func (m *manager) RefreshPeers(ctx context.Context) error {
+func (m *manager) RefreshPeers(ctx context.Context, wgpeers []*v1.WireGuardPeer) error {
 	m.wgmu.Lock()
 	defer m.wgmu.Unlock()
 	if m.wg == nil {
@@ -390,10 +391,7 @@ func (m *manager) RefreshPeers(ctx context.Context) error {
 	}
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
-	wgpeers, err := mesh.WireGuardPeersFor(ctx, m.storage, m.opts.NodeID)
-	if err != nil {
-		return fmt.Errorf("wireguard peers for: %w", err)
-	}
+
 	log.Debug("current wireguard peers", slog.Any("peers", wgpeers))
 	currentPeers := m.wg.Peers()
 	seenPeers := make(map[string]struct{})
@@ -648,7 +646,12 @@ func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, 
 		defer func() {
 			// This is a hacky way to attempt to reconnect to the peer if
 			// the ICE connection is closed and they are still in the store.
-			if err := m.RefreshPeers(context.Background()); err != nil {
+			wgpeers, err := mesh.WireGuardPeersFor(ctx, m.storage, m.opts.NodeID)
+			if err != nil {
+				log.Error("error getting wireguard peers after ICE connection closed", slog.String("error", err.Error()))
+				return
+			}
+			if err := m.RefreshPeers(context.Background(), wgpeers); err != nil {
 				log.Error("error refreshing peers after ICE connection closed", slog.String("error", err.Error()))
 			}
 		}()

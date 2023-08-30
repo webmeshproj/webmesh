@@ -24,6 +24,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 )
 
 func (s *meshStore) onDBUpdate(key, value string) {
@@ -86,7 +87,12 @@ func (s *meshStore) queuePeersUpdate() {
 	s.peerUpdateGroup.TryGo(func() error {
 		defer cancel()
 		s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
-		if err := s.nw.RefreshPeers(ctx); err != nil {
+		wgpeers, err := mesh.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+		if err != nil {
+			s.log.Error("error getting wireguard peers", slog.String("error", err.Error()))
+			return nil
+		}
+		if err := s.nw.RefreshPeers(ctx, wgpeers); err != nil {
 			s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
 		}
 		return nil

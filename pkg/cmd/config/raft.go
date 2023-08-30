@@ -31,6 +31,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/memory"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
@@ -195,6 +196,10 @@ func (o *Config) NewRaftTransport(conn mesh.Mesh) (transport.RaftTransport, erro
 
 // NewDualStorage creates a new mesh and raft storage for the current configuration.
 func (o *Config) NewDualStorage() (storage.DualStorage, error) {
+	if !o.IsRaftMember() {
+		// We shouldn't get here, but we'll return a simple in-memory storage
+		return memory.New(), nil
+	}
 	if o.Raft.InMemory {
 		st, err := nutsdb.New(nutsdb.Options{InMemory: true})
 		if err != nil {

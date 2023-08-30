@@ -88,7 +88,7 @@ var ErrNoMesh = fmt.Errorf("no mesh configured")
 // Validate validates the configuration.
 func (o *Config) Validate() error {
 	// Make sure we are either bootstrapping or joining a mesh
-	if !o.Bootstrap.Enabled || o.Mesh.JoinAddress == "" || (!o.Discovery.UseKadDHT || o.Discovery.PSK == "") {
+	if !o.Bootstrap.Enabled && o.Mesh.JoinAddress == "" && (!o.Discovery.UseKadDHT && o.Discovery.PSK == "") {
 		return ErrNoMesh
 	}
 	err := o.Global.Validate()

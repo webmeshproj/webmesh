@@ -106,7 +106,9 @@ func (o *MeshOptions) Validate() error {
 		return fmt.Errorf("max join retries must be >= 0")
 	}
 	if o.PrimaryEndpoint != "" {
-		_, _, err := net.SplitHostPort(o.PrimaryEndpoint)
+		// Add a dummy port to the primary endpoint
+		ep := net.JoinHostPort(o.PrimaryEndpoint, "0")
+		_, _, err := net.SplitHostPort(ep)
 		if err != nil {
 			return fmt.Errorf("invalid primary endpoint: %w", err)
 		}

@@ -22,6 +22,7 @@ import (
 	"io"
 	"log/slog"
 	"net/netip"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 
@@ -184,9 +185,65 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		}
 	}
 	// Register an update hook to watch for network changes.
-	s.kvSubCancel, err = s.raft.Storage().Subscribe(context.Background(), "", s.onDBUpdate)
-	if err != nil {
-		return handleErr(fmt.Errorf("subscribe: %w", err))
+	if s.raft.IsMember() {
+		s.log.Debug("Subscribing to peer updates from local storage")
+		s.kvSubCancel, err = s.raft.Storage().Subscribe(context.Background(), "", s.onDBUpdate)
+		if err != nil {
+			return handleErr(fmt.Errorf("subscribe: %w", err))
+		}
+	} else if !s.testStore {
+		// Otherwise we are going to subscibe to peer updates from the network leader
+		s.log.Debug("Subscribing to peer updates from the network")
+		var subctx context.Context
+		subctx, s.kvSubCancel = context.WithCancel(context.Background())
+		go func() {
+			for {
+				c, err := s.DialLeader(subctx)
+				if err != nil {
+					s.log.Error("failed to dial leader", slog.String("error", err.Error()))
+					if subctx.Err() != nil {
+						return
+					}
+					time.Sleep(time.Second)
+					continue
+				}
+				defer c.Close()
+				stream, err := v1.NewMembershipClient(c).SubscribePeers(subctx, &v1.SubscribePeersRequest{
+					Id: s.ID(),
+				})
+				if err != nil {
+					s.log.Error("failed to subscribe to peers", slog.String("error", err.Error()))
+					if subctx.Err() != nil {
+						return
+					}
+					time.Sleep(time.Second)
+					continue
+				}
+				defer func() {
+					_ = stream.CloseSend()
+				}()
+				for {
+					peers, err := stream.Recv()
+					if err != nil {
+						s.log.Error("failed to receive peer updates", slog.String("error", err.Error()))
+						if subctx.Err() != nil {
+							return
+						}
+						time.Sleep(time.Second)
+						break
+					}
+					err = s.nw.RefreshPeers(subctx, peers.Peers)
+					if err != nil {
+						s.log.Error("failed to refresh peers", slog.String("error", err.Error()))
+						if subctx.Err() != nil {
+							return
+						}
+						time.Sleep(time.Second)
+						break
+					}
+				}
+			}
+		}()
 	}
 	if opts.Discovery != nil && opts.Discovery.Announce {
 		err = s.AnnounceDHT(ctx, *opts.Discovery)

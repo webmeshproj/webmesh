@@ -29,6 +29,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 )
 
 func (s *meshStore) recoverWireguard(ctx context.Context) error {
@@ -79,7 +80,11 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
-	return s.nw.RefreshPeers(ctx)
+	wgpeers, err := mesh.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+	if err != nil {
+		return fmt.Errorf("get wireguard peers: %w", err)
+	}
+	return s.nw.RefreshPeers(ctx, wgpeers)
 }
 
 func (s *meshStore) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {
