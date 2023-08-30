@@ -58,12 +58,14 @@ type Server struct {
 	Options
 	context.Context
 	cancel context.CancelFunc
+	log    *slog.Logger
 }
 
 // NewServer creates and starts a new TURN server.
-func NewServer(o Options) *Server {
+func NewServer(ctx context.Context, o Options) *Server {
+	log := context.LoggerFrom(ctx).With("component", "turn-server")
 	ctx, cancel := context.WithCancel(context.Background())
-	server := &Server{Options: o, Context: ctx, cancel: cancel}
+	server := &Server{Options: o, Context: ctx, cancel: cancel, log: log}
 	return server
 }
 
@@ -87,7 +89,7 @@ func (s *Server) ListenAndServe() error {
 		return fmt.Errorf("failed to listen on UDP: %w", err)
 	}
 	defer udpConn.Close()
-	log := slog.Default().With("component", "turn-server")
+	log := s.log
 	log.Info("Listening for STUN requests", slog.String("listen-addr", s.ListenUDP))
 	pktConn := &stunLogger{
 		PacketConn: udpConn,

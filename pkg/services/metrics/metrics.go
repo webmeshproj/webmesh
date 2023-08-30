@@ -26,8 +26,9 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	promapi "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/webmeshproj/webmesh/pkg/context"
 	"google.golang.org/grpc"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // DefaultListenAddress is the default listen address for the node Metrics.
@@ -48,18 +49,20 @@ type Options struct {
 type Server struct {
 	Options
 	srv *http.Server
+	log *slog.Logger
 }
 
 // New returns a new metrics server.
-func New(o Options) *Server {
+func New(ctx context.Context, o Options) *Server {
 	return &Server{
 		Options: o,
+		log:     context.LoggerFrom(ctx),
 	}
 }
 
 // ListenAndServe starts the server and blocks until the server exits.
 func (s *Server) ListenAndServe() error {
-	slog.Default().Info("Starting Prometheus metrics server", slog.String("listen_address", s.ListenAddress), slog.String("path", s.Path))
+	s.log.Info("Starting Prometheus metrics server", slog.String("listen_address", s.ListenAddress), slog.String("path", s.Path))
 	srv := &http.Server{
 		Addr: s.ListenAddress,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +74,7 @@ func (s *Server) ListenAndServe() error {
 		}),
 	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Default().Error("metrics server failed", slog.String("error", err.Error()))
+		s.log.Error("metrics server failed", slog.String("error", err.Error()))
 	}
 	return nil
 }

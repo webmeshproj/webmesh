@@ -59,7 +59,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 		}
 	} else {
 		log.Info("Creating standard webrtc peer connection")
-		conn, err = datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
+		conn, err = datachannels.NewServerPeerConnection(stream.Context(), &datachannels.OfferOptions{
 			Proto:       req.GetProto(),
 			SrcAddress:  req.GetSrc(),
 			DstAddress:  net.JoinHostPort(req.GetDst(), strconv.Itoa(int(req.GetPort()))),

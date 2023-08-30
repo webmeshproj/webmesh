@@ -19,7 +19,6 @@ package plugins
 import (
 	"flag"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -37,7 +36,7 @@ func Serve(ctx context.Context, plugin v1.PluginServer) error {
 	addr := flag.String("listen-address", "127.0.0.1:0", "address to listen on")
 	broadcastFd := flag.Int("broadcast-fd", -1, "file descriptor to broadcast the address on")
 	flag.Parse()
-	log := slog.Default()
+	log := context.LoggerFrom(ctx)
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		return err

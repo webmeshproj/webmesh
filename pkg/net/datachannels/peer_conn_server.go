@@ -27,6 +27,7 @@ import (
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
@@ -71,7 +72,7 @@ type OfferOptions struct {
 }
 
 // NewServerPeerConnection creates a new peer connection with the given options.
-func NewServerPeerConnection(opts *OfferOptions) (*ServerPeerConnection, error) {
+func NewServerPeerConnection(ctx context.Context, opts *OfferOptions) (*ServerPeerConnection, error) {
 	if opts.Proto == "" {
 		opts.Proto = "tcp"
 	}
@@ -92,7 +93,7 @@ func NewServerPeerConnection(opts *OfferOptions) (*ServerPeerConnection, error) 
 		proto:          opts.Proto,
 		srcAddress:     opts.SrcAddress,
 		dstAddress:     opts.DstAddress,
-		logger: slog.Default().With(
+		logger: context.LoggerFrom(ctx).With(
 			slog.String("proto", opts.Proto),
 			slog.String("src", opts.SrcAddress),
 			slog.String("dst", opts.DstAddress),

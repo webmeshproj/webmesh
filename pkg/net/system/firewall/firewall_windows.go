@@ -24,7 +24,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
-func newFirewall(opts *Options) (Firewall, error) {
+func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 	return &winFirewall{}, nil
 }
 

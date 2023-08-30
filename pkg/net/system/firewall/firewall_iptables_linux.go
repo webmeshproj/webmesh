@@ -17,20 +17,21 @@ limitations under the License.
 package firewall
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os/exec"
 	"strings"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // newIPTablesFirewall returns a new iptables firewall manager. This firewall manager
 // is technically not safe for use with multiple interfaces. The Close method may restore
 // rules from another interface. But documentation should push people to use nftables instead.
 // This is just a fallback.
-func newIPTablesFirewall(_ *Options) (Firewall, error) {
+func newIPTablesFirewall(ctx context.Context, _ *Options) (Firewall, error) {
 	fw := &iptablesFirewall{
-		log: slog.Default().With(slog.String("component", "iptables-firewall")),
+		log: context.LoggerFrom(ctx).With(slog.String("component", "iptables-firewall")),
 	}
 	var initialRules []string
 	rules, err := fw.execOutput(context.Background(), "-S")

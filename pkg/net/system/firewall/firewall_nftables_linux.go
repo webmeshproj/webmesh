@@ -54,7 +54,7 @@ type firewall struct {
 }
 
 // newFirewall returns a new nftables firewall manager.
-func newFirewall(opts *Options) (Firewall, error) {
+func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 	// Initialize a long lasting connection to the nftables library
 	conn := nftableslib.InitConn()
 	// Initialize tables
@@ -67,7 +67,7 @@ func newFirewall(opts *Options) (Firewall, error) {
 	if err != nil {
 		if strings.Contains(err.Error(), "not supported") || strings.Contains(err.Error(), "no such file") {
 			// Try to fallback to iptables
-			return newIPTablesFirewall(opts)
+			return newIPTablesFirewall(ctx, opts)
 		}
 		return nil, err
 	}

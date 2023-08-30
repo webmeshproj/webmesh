@@ -24,6 +24,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
@@ -52,10 +53,10 @@ type Options struct {
 // NewServer returns a new Server. Features are used for returning what features are enabled.
 // It is the callers responsibility to ensure those servers are registered on the node.
 // Insecure is used to disable authorization.
-func NewServer(opts Options) *Server {
+func NewServer(ctx context.Context, opts Options) *Server {
 	return &Server{
 		Options:   opts,
 		startedAt: time.Now(),
-		log:       slog.Default().With("component", "node-server"),
+		log:       context.LoggerFrom(ctx).With("component", "node-server"),
 	}
 }

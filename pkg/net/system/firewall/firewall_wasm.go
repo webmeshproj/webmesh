@@ -17,8 +17,11 @@ limitations under the License.
 // Package firewall contains an interface for interacting with the system firewall.
 package firewall
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
-func newFirewall(opts *Options) (Firewall, error) {
+func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 	return nil, errors.New("not implemented")
 }

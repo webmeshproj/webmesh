@@ -144,8 +144,8 @@ type Raft interface {
 }
 
 // New returns a new Raft node.
-func New(opts Options) Raft {
-	return newRaftNode(opts)
+func New(ctx context.Context, opts Options) Raft {
+	return newRaftNode(ctx, opts)
 }
 
 // raftNode is a Raft node. It implements the Raft interface.
@@ -169,8 +169,8 @@ type raftNode struct {
 }
 
 // newRaftNode returns a new Raft node.
-func newRaftNode(opts Options) *raftNode {
-	log := slog.Default().With(slog.String("component", "raft"))
+func newRaftNode(ctx context.Context, opts Options) *raftNode {
+	log := context.LoggerFrom(ctx).With(slog.String("component", "raft"))
 	if opts.InMemory {
 		log = log.With(slog.String("storage", ":memory:"))
 	} else {
@@ -251,7 +251,7 @@ func (r *raftNode) Start(ctx context.Context, opts StartOptions) error {
 	// We unlock here so raft can call back into the Apply/RestoreSnapshot methods if needed.
 	r.mu.Unlock()
 	var err error
-	r.fsm = fsm.New(opts.MeshStorage, fsm.Options{
+	r.fsm = fsm.New(ctx, opts.MeshStorage, fsm.Options{
 		ApplyTimeout: r.opts.ApplyTimeout,
 		OnApplyLog: func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) {
 			r.cbmu.Lock()
@@ -288,7 +288,7 @@ func (r *raftNode) Start(ctx context.Context, opts StartOptions) error {
 		},
 	})
 	r.raft, err = raft.NewRaft(
-		r.opts.RaftConfig(string(r.nodeID)),
+		r.opts.RaftConfig(ctx, string(r.nodeID)),
 		r.fsm,
 		&MonotonicLogStore{opts.RaftStorage},
 		opts.RaftStorage,

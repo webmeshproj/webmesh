@@ -79,7 +79,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	for meshID, meshConn := range meshes {
 		// Create a new raft node and build connection options
 		meshConfig := config.Meshes[meshID]
-		raftNode, err := meshConfig.NewRaftNode(meshConn)
+		raftNode, err := meshConfig.NewRaftNode(ctx, meshConn)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create raft node: %w", err))
 		}
@@ -135,7 +135,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create service options: %w", err))
 		}
-		srv, err := services.NewServer(srvOpts)
+		srv, err := services.NewServer(ctx, srvOpts)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 		}
@@ -166,7 +166,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 				return handleErr(fmt.Errorf("failed to parse meshdns listen UDP port: %w", err))
 			}
 		}
-		dnsSrv := meshdns.NewServer(&meshdns.Options{
+		dnsSrv := meshdns.NewServer(ctx, &meshdns.Options{
 			UDPListenAddr:     config.MeshDNS.ListenUDP,
 			TCPListenAddr:     config.MeshDNS.ListenTCP,
 			ReusePort:         config.MeshDNS.ReusePort,

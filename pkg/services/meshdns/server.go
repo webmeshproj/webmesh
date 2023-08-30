@@ -18,7 +18,6 @@ limitations under the License.
 package meshdns
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -29,6 +28,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	dnsutil "github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -69,8 +69,8 @@ type Options struct {
 }
 
 // NewServer returns a new Mesh DNS server.
-func NewServer(o *Options) *Server {
-	log := slog.Default().With("component", "mesh-dns")
+func NewServer(ctx context.Context, o *Options) *Server {
+	log := context.LoggerFrom(ctx).With("component", "mesh-dns")
 	srv := &Server{
 		mux:            dns.NewServeMux(),
 		opts:           o,

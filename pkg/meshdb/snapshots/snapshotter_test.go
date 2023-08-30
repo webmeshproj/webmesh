@@ -45,7 +45,7 @@ func TestSnapshotter(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	snaps := New(db)
+	snaps := New(context.Background(), db)
 
 	// Take a snapshot.
 	snap, err := snaps.Snapshot(context.Background())

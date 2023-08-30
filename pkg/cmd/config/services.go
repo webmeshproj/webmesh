@@ -303,7 +303,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 	}
 	// Always register the node API
 	log.Debug("Registering node service")
-	v1.RegisterNodeServer(srv, node.NewServer(node.Options{
+	v1.RegisterNodeServer(srv, node.NewServer(ctx, node.Options{
 		Raft:       conn.Raft(),
 		WireGuard:  conn.Network().WireGuard(),
 		NodeDialer: conn,
@@ -313,14 +313,14 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 	// Register membership and storage if we are a raft member
 	if o.IsRaftMember() {
 		log.Debug("Registering membership service")
-		v1.RegisterMembershipServer(srv, membership.NewServer(membership.Options{
+		v1.RegisterMembershipServer(srv, membership.NewServer(ctx, membership.Options{
 			Raft:      conn.Raft(),
 			Plugins:   conn.Plugins(),
 			RBAC:      rbacEvaluator,
 			WireGuard: conn.Network().WireGuard(),
 		}))
 		log.Debug("Registering storage service")
-		v1.RegisterStorageServer(srv, storage.NewServer(conn.Raft(), rbacEvaluator))
+		v1.RegisterStorageServer(srv, storage.NewServer(ctx, conn.Raft(), rbacEvaluator))
 	}
 	// Register any other enabled APIs
 	if o.Services.API.MeshEnabled {
@@ -428,7 +428,7 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf se
 
 	// Append the enabled mesh services
 	if o.Services.MeshDNS.Enabled {
-		dnsServer := meshdns.NewServer(&meshdns.Options{
+		dnsServer := meshdns.NewServer(ctx, &meshdns.Options{
 			UDPListenAddr:     o.Services.MeshDNS.ListenUDP,
 			TCPListenAddr:     o.Services.MeshDNS.ListenTCP,
 			ReusePort:         o.Services.MeshDNS.ReusePort,
@@ -452,7 +452,7 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf se
 		conf.Servers = append(conf.Servers, dnsServer)
 	}
 	if o.Services.TURN.Enabled {
-		turnServer := turn.NewServer(turn.Options{
+		turnServer := turn.NewServer(ctx, turn.Options{
 			PublicIP:  o.Services.TURN.PublicIP,
 			ListenUDP: o.Services.TURN.ListenAddress,
 			Realm:     o.Services.TURN.Realm,
@@ -461,7 +461,7 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf se
 		conf.Servers = append(conf.Servers, turnServer)
 	}
 	if o.Services.Metrics.Enabled {
-		metricsServer := metrics.New(metrics.Options{
+		metricsServer := metrics.New(ctx, metrics.Options{
 			ListenAddress: o.Services.Metrics.ListenAddress,
 			Path:          o.Services.Metrics.Path,
 		})

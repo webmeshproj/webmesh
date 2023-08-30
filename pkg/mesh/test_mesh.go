@@ -53,7 +53,7 @@ func NewTestMesh(ctx context.Context) (Mesh, error) {
 	}
 	opts := raft.NewOptions(st.ID())
 	opts.InMemory = true
-	rft := raft.New(opts)
+	rft := raft.New(ctx, opts)
 	if err := rft.Start(ctx, raft.StartOptions{
 		Transport:   raftTransport,
 		MeshStorage: storage,

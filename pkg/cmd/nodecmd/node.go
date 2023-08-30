@@ -32,8 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	nodedaemon "github.com/webmeshproj/webmesh/pkg/cmd/nodedamon"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
-	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/embed"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
@@ -139,6 +138,7 @@ func Execute() error {
 	}
 
 	if *appDaemon {
+		// Start the node as an application daemon
 		return nodedaemon.Run(context.Background(), nodedaemon.Config{
 			Bind:           *appDaemonBind,
 			InsecureSocket: *appDaemonInsecureSocket,
@@ -148,108 +148,34 @@ func Execute() error {
 	}
 
 	if len(conf.Bridge.Meshes) > 0 {
+		// Start a bridged connection
 		return bridgecmd.RunBridgeConnection(ctx, conf.Bridge)
 	}
-	return RunSingleNode(ctx, conf)
-}
 
-// RunSingleNode runs a single node with the given configuration.
-func RunSingleNode(ctx context.Context, config *config.Config) error {
-	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
-		return fmt.Errorf("cannot disable both IPv4 and IPv6")
-	}
-	log := context.LoggerFrom(ctx)
-	// Create a new mesh connection
-	meshConfig, err := config.NewMeshConfig(ctx)
+	// We run in "embedded mode"
+	node, err := embed.NewNode(ctx, conf)
 	if err != nil {
-		return fmt.Errorf("failed to create mesh config: %w", err)
-	}
-	meshConn := mesh.New(meshConfig)
-	// Create a new raft node
-	raftNode, err := config.NewRaftNode(meshConn)
-	if err != nil {
-		return fmt.Errorf("failed to create raft node: %w", err)
-	}
-	startOpts, err := config.NewRaftStartOptions(meshConn)
-	if err != nil {
-		return fmt.Errorf("failed to create raft start options: %w", err)
-	}
-	connectOpts, err := config.NewConnectOptions(ctx, meshConn, raftNode)
-	if err != nil {
-		return fmt.Errorf("failed to create connect options: %w", err)
-	}
-	// Start the raft node
-	err = raftNode.Start(ctx, startOpts)
-	if err != nil {
-		return fmt.Errorf("failed to start raft node: %w", err)
-	}
-	// Connect to the mesh
-	err = meshConn.Connect(ctx, connectOpts)
-	if err != nil {
-		defer func() {
-			err := raftNode.Stop(context.Background())
-			if err != nil {
-				log.Error("failed to shutdown raft node", slog.String("error", err.Error()))
-			}
-		}()
-		return fmt.Errorf("failed to open mesh connection: %w", err)
-	}
-	select {
-	case <-meshConn.Ready():
-	case <-ctx.Done():
-		return fmt.Errorf("failed to start mesh node: %w", ctx.Err())
+		return err
 	}
 
-	// If anything goes wrong at this point, make sure we close down cleanly.
-	handleErr := func(cause error) error {
-		if err := meshConn.Close(); err != nil {
-			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
-		}
-		return fmt.Errorf("failed to start mesh node: %w", cause)
+	err = node.Start(ctx)
+	if err != nil {
+		return err
 	}
-	log.Info("Mesh connection is ready, starting services")
 
-	// Start the mesh services
-	srvOpts, err := config.NewServiceOptions(ctx, meshConn)
-	if err != nil {
-		return handleErr(fmt.Errorf("failed to create service options: %w", err))
-	}
-	srv, err := services.NewServer(srvOpts)
-	if err != nil {
-		return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
-	}
-	err = config.RegisterAPIs(ctx, meshConn, srv)
-	if err != nil {
-		return handleErr(fmt.Errorf("failed to register APIs: %w", err))
-	}
-	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			err = handleErr(err)
-			log.Error("Mesh services failed", slog.String("error", err.Error()))
-			os.Exit(1)
-		}
-	}()
-
-	// Wait for shutdown signal
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	<-sig
 
-	// Shutdown the mesh connection last
-	defer func() {
-		log.Info("Shutting down mesh connection")
-		if err = meshConn.Close(); err != nil {
-			log.Error("failed to shutdown mesh connection", slog.String("error", err.Error()))
-		}
-	}()
+	select {
+	case err = <-node.Errors():
+		return err
+	case <-sig:
+	}
 
-	// Stop the gRPC server
-	log.Info("Shutting down mesh services")
 	if *shutdownTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.Background(), *shutdownTimeout)
+		ctx, cancel = context.WithTimeout(context.WithLogger(context.Background(), log), *shutdownTimeout)
 		defer cancel()
 	}
-	srv.Shutdown(ctx)
-	return nil
+	return node.Stop(ctx)
 }

@@ -20,7 +20,6 @@ package snapshots
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -28,6 +27,7 @@ import (
 
 	"github.com/hashicorp/raft"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -45,10 +45,10 @@ type snapshotter struct {
 }
 
 // New returns a new Snapshotter.
-func New(st storage.MeshStorage) Snapshotter {
+func New(ctx context.Context, st storage.MeshStorage) Snapshotter {
 	return &snapshotter{
 		st:  st,
-		log: slog.Default().With("component", "snapshots"),
+		log: context.LoggerFrom(ctx).With("component", "snapshots"),
 	}
 }
 

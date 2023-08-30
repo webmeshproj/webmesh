@@ -22,6 +22,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
@@ -36,10 +37,10 @@ type Server struct {
 }
 
 // NewServer returns a new storage Server.
-func NewServer(raft raft.Raft, rbac rbac.Evaluator) *Server {
+func NewServer(ctx context.Context, raft raft.Raft, rbac rbac.Evaluator) *Server {
 	return &Server{
 		raft: raft,
 		rbac: rbac,
-		log:  slog.Default().With("component", "storage-server"),
+		log:  context.LoggerFrom(ctx).With("component", "storage-server"),
 	}
 }

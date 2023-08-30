@@ -27,7 +27,7 @@ import (
 
 const anchorFile = "/etc/pf.anchors/com.webmesh"
 
-func newFirewall(opts *Options) (Firewall, error) {
+func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 	// Make sure we can touch the anchor file
 	afile := anchorFile
 	if opts.ID != "" {

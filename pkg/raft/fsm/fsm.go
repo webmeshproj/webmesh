@@ -69,12 +69,12 @@ type Options struct {
 
 // New returns a new RaftFSM. The storage interface must be a direct
 // connection to the underlying database.
-func New(st storage.MeshStorage, opts Options) *RaftFSM {
+func New(ctx context.Context, st storage.MeshStorage, opts Options) *RaftFSM {
 	return &RaftFSM{
 		store:       st,
 		opts:        opts,
-		log:         slog.Default().With("component", "raft-fsm"),
-		snapshotter: snapshots.New(st),
+		log:         context.LoggerFrom(ctx).With("component", "raft-fsm"),
+		snapshotter: snapshots.New(ctx, st),
 	}
 }
 

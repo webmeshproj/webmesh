@@ -61,8 +61,8 @@ type Options struct {
 }
 
 // New returns a new firewall manager for the given options.
-func New(opts *Options) (Firewall, error) {
-	return newFirewall(opts)
+func New(ctx context.Context, opts *Options) (Firewall, error) {
+	return newFirewall(ctx, opts)
 }
 
 // DNATOptions are options for configuring a postrouting rule.

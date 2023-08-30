@@ -39,13 +39,13 @@ var ErrNotRaftMember = errors.New("not a raft member")
 
 // NewPassthrough creates a new raft instance that is a no-op for most methods
 // and uses the given Dialer for storage connections.
-func NewPassthrough(nodeID string, dialer transport.NodeDialer) Raft {
+func NewPassthrough(ctx context.Context, nodeID string, dialer transport.NodeDialer) Raft {
 	return &passthroughRaft{
 		nodeID:     nodeID,
 		dialer:     dialer,
 		subCancels: []func(){},
 		closec:     make(chan struct{}),
-		log:        slog.Default().With("component", "passthrough-raft"),
+		log:        context.LoggerFrom(ctx).With("component", "passthrough-raft"),
 	}
 }
 

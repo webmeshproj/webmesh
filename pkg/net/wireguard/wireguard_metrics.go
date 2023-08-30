@@ -19,7 +19,6 @@ limitations under the License.
 package wireguard
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -28,6 +27,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	v1 "github.com/webmeshproj/api/v1"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // Peer Metrics
@@ -124,13 +125,13 @@ type MetricsRecorder struct {
 }
 
 // NewMetricsRecorder returns a new MetricsRecorder.
-func NewMetricsRecorder(wg Interface) *MetricsRecorder {
+func NewMetricsRecorder(ctx context.Context, wg Interface) *MetricsRecorder {
 	return &MetricsRecorder{
 		wg:        wg.(*wginterface),
 		connected: make(map[string]struct{}),
 		peerSent:  make(map[string]uint64),
 		peerRcvd:  make(map[string]uint64),
-		log:       slog.Default().With("component", "wireguard-metrics"),
+		log:       context.LoggerFrom(ctx).With("component", "wireguard-metrics"),
 	}
 }
 

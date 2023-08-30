@@ -17,12 +17,13 @@ limitations under the License.
 package raft
 
 import (
-	"log/slog"
 	"runtime"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // DefaultDataDir is the default data directory.
@@ -97,7 +98,7 @@ func NewOptions(nodeID string) Options {
 }
 
 // RaftConfig builds a raft config.
-func (o *Options) RaftConfig(nodeID string) *raft.Config {
+func (o *Options) RaftConfig(ctx context.Context, nodeID string) *raft.Config {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
 	config.ShutdownOnRemove = true
@@ -124,7 +125,7 @@ func (o *Options) RaftConfig(nodeID string) *raft.Config {
 	}
 	config.LogLevel = hclog.LevelFromString(o.LogLevel).String()
 	config.Logger = &hclogAdapter{
-		Logger: slog.Default().With("component", "raft"),
+		Logger: context.LoggerFrom(ctx).With("component", "raft"),
 		level:  o.LogLevel,
 	}
 	return config

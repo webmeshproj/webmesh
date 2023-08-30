@@ -107,6 +107,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	// Use a generic timeout for now
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
+	ctx = context.WithLogger(ctx, log)
 
 	log.Info("Starting mesh node")
 	// Create a new mesh connection
@@ -116,7 +117,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	}
 	meshConn := mesh.New(meshConfig)
 	// Create a new raft node
-	raftNode, err := conf.NewRaftNode(meshConn)
+	raftNode, err := conf.NewRaftNode(ctx, meshConn)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create raft node: %v", err)
 	}
@@ -164,7 +165,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to create service options: %v", err))
 	}
-	srv, err := services.NewServer(srvOpts)
+	srv, err := services.NewServer(ctx, srvOpts)
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to create gRPC server: %v", err))
 	}

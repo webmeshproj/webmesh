@@ -192,7 +192,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		log:            log,
 	}
 	if opts.Metrics {
-		recorder := NewMetricsRecorder(wg)
+		recorder := NewMetricsRecorder(ctx, wg)
 		rctx, cancel := context.WithCancel(context.Background())
 		wg.recorderCancel = cancel
 		if opts.MetricsInterval <= 0 {

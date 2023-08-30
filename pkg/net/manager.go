@@ -247,7 +247,7 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 	}
 	log.Info("Configuring firewall", slog.Any("opts", fwopts))
 	var err error
-	m.fw, err = firewall.New(fwopts)
+	m.fw, err = firewall.New(ctx, fwopts)
 	if err != nil {
 		return fmt.Errorf("new firewall: %w", err)
 	}

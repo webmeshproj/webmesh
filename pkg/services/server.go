@@ -67,8 +67,8 @@ type Server struct {
 
 // NewServer returns a new Server.
 // TODO: We need to dynamically expose certain services only to the internal mesh.
-func NewServer(o Options) (*Server, error) {
-	log := slog.Default().With("component", "mesh-services")
+func NewServer(ctx context.Context, o Options) (*Server, error) {
+	log := context.LoggerFrom(ctx).With("component", "mesh-services")
 	server := &Server{
 		opts: o,
 		srv:  grpc.NewServer(o.ServerOptions...),

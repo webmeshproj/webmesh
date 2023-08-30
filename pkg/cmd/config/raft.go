@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -137,14 +138,14 @@ func (o *Config) IsRaftMember() bool {
 }
 
 // NewRaftNode creates a new raft node for the given mesh instance.
-func (o *Config) NewRaftNode(conn mesh.Mesh) (raft.Raft, error) {
+func (o *Config) NewRaftNode(ctx context.Context, conn mesh.Mesh) (raft.Raft, error) {
 	nodeid, err := o.NodeID()
 	if err != nil {
 		return nil, err
 	}
 	if !o.IsRaftMember() {
 		// We return a passthrough raft
-		return raft.NewPassthrough(nodeid, conn), nil
+		return raft.NewPassthrough(ctx, nodeid, conn), nil
 	}
 	opts := raft.NewOptions(nodeid)
 	opts.DataDir = o.Raft.DataDir
@@ -162,7 +163,7 @@ func (o *Config) NewRaftNode(conn mesh.Mesh) (raft.Raft, error) {
 	opts.SnapshotRetention = o.Raft.SnapshotRetention
 	opts.ObserverChanBuffer = o.Raft.ObserverChanBuffer
 	opts.LogLevel = o.Raft.LogLevel
-	return raft.New(opts), nil
+	return raft.New(ctx, opts), nil
 }
 
 // NewRaftStartOptions creates a new start options for the current configuration.

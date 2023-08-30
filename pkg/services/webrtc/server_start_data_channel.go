@@ -127,7 +127,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 		}
 	} else {
 		log.Info("Negotiating standard WebRTC connection")
-		conn, err = datachannels.NewServerPeerConnection(&datachannels.OfferOptions{
+		conn, err = datachannels.NewServerPeerConnection(stream.Context(), &datachannels.OfferOptions{
 			Proto:       r.GetProto(),
 			SrcAddress:  remoteAddr,
 			DstAddress:  net.JoinHostPort(r.GetDst(), strconv.Itoa(int(r.GetPort()))),

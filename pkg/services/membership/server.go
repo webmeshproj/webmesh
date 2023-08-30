@@ -59,13 +59,13 @@ type Options struct {
 }
 
 // NewServer returns a new Server.
-func NewServer(opts Options) *Server {
+func NewServer(ctx context.Context, opts Options) *Server {
 	return &Server{
 		raft:    opts.Raft,
 		plugins: opts.Plugins,
 		rbac:    opts.RBAC,
 		wg:      opts.WireGuard,
-		log:     slog.Default().With("component", "membership-server"),
+		log:     context.LoggerFrom(ctx).With("component", "membership-server"),
 	}
 }
 
