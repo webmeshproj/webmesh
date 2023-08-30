@@ -246,6 +246,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			var tries int
 			var maxTries int = 5
 			var err error
+		UpdateRetry:
 			for tries <= maxTries {
 				if ctx.Err() != nil {
 					return handleErr(fmt.Errorf("timed out starting up mesh bridge: %w", ctx.Err()))
@@ -266,6 +267,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 					time.Sleep(time.Second)
 					continue
 				}
+				break UpdateRetry
 			}
 			if err != nil {
 				return handleErr(fmt.Errorf("failed to send update RPC to mesh leader: %w", err))

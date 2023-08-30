@@ -44,6 +44,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.log.Info("Leave request received", slog.Any("request", req))
 	// Check that the node is indeed who they say they are
 	if s.rbac.IsSecure() {
 		if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {

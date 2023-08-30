@@ -65,7 +65,6 @@ type Config struct {
 
 // BindFlags binds the flags. The options are returned for convenience.
 func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
-	o.Global.BindFlags(fs)
 	o.Bootstrap.BindFlags(prefix, fs)
 	o.Auth.BindFlags(prefix, fs)
 	o.Mesh.BindFlags(prefix, fs)
@@ -75,8 +74,9 @@ func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
 	o.WireGuard.BindFlags(prefix, fs)
 	o.Discovery.BindFlags(prefix, fs)
 	o.Plugins.BindFlags(prefix, fs)
-	// Don't recurse on bridge configurations
+	// Don't recurse on bridge or global configurations
 	if prefix == "" {
+		o.Global.BindFlags(fs)
 		o.Bridge.BindFlags(fs)
 	}
 	return o
@@ -88,7 +88,7 @@ var ErrNoMesh = fmt.Errorf("no mesh configured")
 // Validate validates the configuration.
 func (o *Config) Validate() error {
 	// Make sure we are either bootstrapping or joining a mesh
-	if !o.Bootstrap.Enabled && o.Mesh.JoinAddress == "" && (!o.Discovery.UseKadDHT && o.Discovery.PSK == "") {
+	if !o.Bootstrap.Enabled && o.Mesh.JoinAddress == "" && (!o.Discovery.UseKadDHT && o.Discovery.PSK == "") && len(o.Bridge.Meshes) == 0 {
 		return ErrNoMesh
 	}
 	err := o.Global.Validate()

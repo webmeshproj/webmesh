@@ -66,7 +66,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	log := s.log.With("op", "join", "id", req.GetId())
 	ctx = context.WithLogger(ctx, log)
 
-	log.Debug("Join request received", slog.Any("request", req))
+	log.Info("Join request received", slog.Any("request", req))
 	// Check if we haven't loaded the mesh domain and prefixes into memory yet
 	err := s.loadMeshState(ctx)
 	if err != nil {

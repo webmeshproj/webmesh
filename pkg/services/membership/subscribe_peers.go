@@ -55,6 +55,8 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	ctx := stream.Context()
 	st := s.raft.Storage()
 
+	log.Info("Received subscribe peers request")
+
 	var iceServers []string
 	var dnsServers []string
 	var lastConfig []*v1.WireGuardPeer
