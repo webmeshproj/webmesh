@@ -82,6 +82,10 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 			return nil, status.Errorf(codes.InvalidArgument, "error loading configuration overrides: %v", err)
 		}
 	}
+	err = k.Unmarshal("", &conf)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "error unmarshalling configuration: %v", err)
+	}
 	if req.GetDisableBootstrap() {
 		conf.Bootstrap.Enabled = false
 	}
