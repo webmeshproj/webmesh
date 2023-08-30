@@ -61,8 +61,13 @@ func (c *Config) LoadFrom(fs *pflag.FlagSet, confFiles []string) error {
 		}
 	}
 	// Load environment variables
-	err := k.Load(env.Provider("", ".", func(s string) string {
-		return strings.Replace(strings.ToLower(s), "_", ".", -1)
+	err := k.Load(env.ProviderWithValue("", ".", func(key, value string) (string, any) {
+		key = strings.Replace(strings.ToLower(key), "_", ".", -1)
+		val := any(value)
+		if strings.Contains(value, ",") {
+			val = strings.Split(value, ",")
+		}
+		return key, val
 	}), nil)
 	if err != nil {
 		return fmt.Errorf("error loading environment variables: %w", err)
@@ -80,6 +85,14 @@ func (c *Config) LoadFrom(fs *pflag.FlagSet, confFiles []string) error {
 		return fmt.Errorf("error unmarshaling configuration: %w", err)
 	}
 	return nil
+}
+
+// ToMapStructure converts the configuration to a map[string]interface{}
+// structure.
+func (c Config) ToMapStructure() map[string]interface{} {
+	k := koanf.New(".")
+	_ = k.Load(structs.Provider(c, "koanf"), nil)
+	return k.Raw()
 }
 
 // MarshalJSON implements json.Marshaler.

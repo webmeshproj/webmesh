@@ -21,11 +21,16 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/knadh/koanf/providers/confmap"
+	"github.com/knadh/koanf/providers/structs"
+	"github.com/knadh/koanf/v2"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
@@ -63,7 +68,121 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		// The lock should keep this from ever happening, but just in case.
 		return nil, ErrAlreadyConnecting
 	}
-	return nil, status.Errorf(codes.Internal, "needs to be reimplemented")
+	// Take a copy of the base configuration and merge any overrides
+	conf := *app.config.Config
+	overrides := req.GetConfig().AsMap()
+	k := koanf.New(".")
+	err := k.Load(structs.Provider(conf, "koanf"), nil)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "error loading configuration: %v", err)
+	}
+	if len(overrides) > 0 {
+		err = k.Load(confmap.Provider(overrides, "koanf"), nil)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "error loading configuration overrides: %v", err)
+		}
+	}
+	if req.GetDisableBootstrap() {
+		conf.Bootstrap.Enabled = false
+	}
+	if req.GetJoinPsk() != "" {
+		conf.Bootstrap.Enabled = false
+		conf.Mesh.JoinAddress = ""
+		conf.Discovery = config.DiscoveryOptions{
+			PSK:       req.GetJoinPsk(),
+			UseKadDHT: true,
+		}
+	}
+	err = conf.Validate()
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "error validating configuration: %v", err)
+	}
+	// Time to go to work.
+	log := app.log
+
+	// Use a generic timeout for now
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+
+	log.Info("Starting mesh node")
+	// Create a new mesh connection
+	meshConfig, err := conf.NewMeshConfig(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create mesh config: %v", err)
+	}
+	meshConn := mesh.New(meshConfig)
+	// Create a new raft node
+	raftNode, err := conf.NewRaftNode(meshConn)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create raft node: %v", err)
+	}
+	startOpts, err := conf.NewRaftStartOptions(meshConn)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create raft start options: %v", err)
+	}
+	connectOpts, err := conf.NewConnectOptions(ctx, meshConn, raftNode)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create connect options: %v", err)
+	}
+	// Start the raft node
+	err = raftNode.Start(ctx, startOpts)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to start raft node: %v", err)
+	}
+	// Connect to the mesh
+	err = meshConn.Connect(ctx, connectOpts)
+	if err != nil {
+		defer func() {
+			err := raftNode.Stop(context.Background())
+			if err != nil {
+				log.Error("failed to shutdown raft node", slog.String("error", err.Error()))
+			}
+		}()
+		return nil, status.Errorf(codes.Internal, "failed to open mesh connection: %v", err)
+	}
+	select {
+	case <-meshConn.Ready():
+	case <-ctx.Done():
+		return nil, status.Errorf(codes.Internal, "failed to start mesh node: %v", ctx.Err())
+	}
+
+	// If anything goes wrong at this point, make sure we close down cleanly.
+	handleErr := func(cause error) error {
+		if err := meshConn.Close(); err != nil {
+			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
+		}
+		return cause
+	}
+	log.Info("Mesh connection is ready, starting services")
+
+	// Start the mesh services
+	srvOpts, err := conf.NewServiceOptions(ctx, meshConn)
+	if err != nil {
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to create service options: %v", err))
+	}
+	srv, err := services.NewServer(srvOpts)
+	if err != nil {
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to create gRPC server: %v", err))
+	}
+	err = conf.RegisterAPIs(ctx, meshConn, srv)
+	if err != nil {
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to register APIs: %v", err))
+	}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Error("Mesh services failed", slog.String("error", err.Error()))
+		}
+	}()
+
+	// Save the current mesh connection
+	app.mesh = meshConn
+	app.svcs = srv
+	return &v1.ConnectResponse{
+		NodeId:     meshConn.ID(),
+		MeshDomain: meshConn.Domain(),
+		Ipv4:       meshConn.Network().NetworkV4().String(),
+		Ipv6:       meshConn.Network().NetworkV6().String(),
+	}, nil
 }
 
 func (app *AppDaemon) Disconnect(ctx context.Context, _ *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {

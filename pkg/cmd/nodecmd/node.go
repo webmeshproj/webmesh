@@ -104,7 +104,7 @@ func Execute() error {
 		return err
 	}
 
-	// Validate the configuration
+	// Validate the configuration if we are not running in daemon mode.
 	if !*appDaemon {
 		err = conf.Validate()
 		if err != nil {
@@ -130,16 +130,7 @@ func Execute() error {
 	)
 
 	// Log all options at debug level
-	dump, err := json.Marshal(conf)
-	if err != nil {
-		return err
-	}
-	out := map[string]interface{}{}
-	err = json.Unmarshal(dump, &out)
-	if err != nil {
-		return err
-	}
-	log.Debug("Current configuration", slog.Any("options", out))
+	log.Debug("Current configuration", slog.Any("options", conf.ToMapStructure()))
 
 	if *startTimeout > 0 {
 		var cancel context.CancelFunc
@@ -159,10 +150,11 @@ func Execute() error {
 	if len(conf.Bridge.Meshes) > 0 {
 		return bridgecmd.RunBridgeConnection(ctx, conf.Bridge)
 	}
-	return runMeshConnection(ctx, conf)
+	return RunSingleNode(ctx, conf)
 }
 
-func runMeshConnection(ctx context.Context, config *config.Config) error {
+// RunSingleNode runs a single node with the given configuration.
+func RunSingleNode(ctx context.Context, config *config.Config) error {
 	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
