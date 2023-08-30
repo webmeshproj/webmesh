@@ -123,9 +123,9 @@ If the initial nodes are already part of a cluster, the node will join the clust
 Configuration is available via command line flags, environment variables, and configuration files.
 The configuration is parsed in the following order:
 
+- Configuration Files
 - Environment Variables
 - Command Line Flags
-- Configuration File
 
 Environment variables match the command line flags where all characters are uppercased and dashes and dots are replaced with underscores.
 For example, the command line flag BACKTICKmesh.node-idBACKTICK would be set via the environment variable BACKTICKMESH_NODE_IDBACKTICK.
