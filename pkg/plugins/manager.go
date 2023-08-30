@@ -298,7 +298,7 @@ func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, da
 		return nil
 	}
 	defer data.Close()
-	snapsot, err := io.ReadAll(data)
+	snapshot, err := io.ReadAll(data)
 	if err != nil {
 		return fmt.Errorf("read snapshot: %w", err)
 	}
@@ -307,7 +307,7 @@ func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, da
 		_, err := store.Client.Raft().RestoreSnapshot(ctx, &v1.DataSnapshot{
 			Term:  meta.Term,
 			Index: meta.Index,
-			Data:  snapsot,
+			Data:  snapshot,
 		})
 		if err != nil {
 			errs = append(errs, err)

@@ -68,7 +68,7 @@ func (r *passthroughRaft) OnApply(cb fsm.ApplyCallback) {
 }
 
 // OnSnapshotRestore registers a callback for when a snapshot is restored.
-func (r *passthroughRaft) OnSnapshotRestore(cb fsm.SnapshotRestoreCallback) {
+func (r *passthroughRaft) OnSnapshotRestore(cb SnapshotRestoreCallback) {
 	// No-op
 }
 

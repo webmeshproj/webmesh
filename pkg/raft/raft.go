@@ -18,6 +18,7 @@ limitations under the License.
 package raft
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -80,6 +81,10 @@ const (
 // The isLeader flag is set to true if the node is the leader, and false otherwise.
 type BootstrapCallback func(isLeader bool) error
 
+// SnapshotRestoreCallback is a callback that can be registered for when a snapshot
+// is restored.
+type SnapshotRestoreCallback func(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser)
+
 // ObservationCallback is a callback that can be registered for when an observation
 // is received.
 type ObservationCallback func(ctx context.Context, obs Observation)
@@ -89,7 +94,7 @@ type Raft interface {
 	// OnApply registers a callback for when a log is applied to the state machine.
 	OnApply(cb fsm.ApplyCallback)
 	// OnSnapshotRestore registers a callback for when a snapshot is restored.
-	OnSnapshotRestore(cb fsm.SnapshotRestoreCallback)
+	OnSnapshotRestore(cb SnapshotRestoreCallback)
 	// OnObservation registers a callback for when an observation is received.
 	OnObservation(cb ObservationCallback)
 	// Start starts the Raft node.
@@ -156,7 +161,7 @@ type raftNode struct {
 	observerChan                chan raft.Observation
 	observerClose, observerDone chan struct{}
 	applycbs                    []fsm.ApplyCallback
-	snapshotcbs                 []fsm.SnapshotRestoreCallback
+	snapshotcbs                 []SnapshotRestoreCallback
 	observationcbs              []ObservationCallback
 	log                         *slog.Logger
 	cbmu                        sync.Mutex
@@ -191,7 +196,7 @@ func (r *raftNode) OnApply(cb fsm.ApplyCallback) {
 }
 
 // OnSnapshotRestore registers a callback for when a snapshot is restored.
-func (r *raftNode) OnSnapshotRestore(cb fsm.SnapshotRestoreCallback) {
+func (r *raftNode) OnSnapshotRestore(cb SnapshotRestoreCallback) {
 	r.cbmu.Lock()
 	defer r.cbmu.Unlock()
 	r.snapshotcbs = append(r.snapshotcbs, cb)
@@ -247,9 +252,40 @@ func (r *raftNode) Start(ctx context.Context, opts StartOptions) error {
 	r.mu.Unlock()
 	var err error
 	r.fsm = fsm.New(opts.MeshStorage, fsm.Options{
-		ApplyTimeout:      r.opts.ApplyTimeout,
-		OnApplyLog:        r.applycbs,
-		OnSnapshotRestore: r.snapshotcbs,
+		ApplyTimeout: r.opts.ApplyTimeout,
+		OnApplyLog: func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) {
+			r.cbmu.Lock()
+			defer r.cbmu.Unlock()
+			for _, cb := range r.applycbs {
+				cb(ctx, term, index, log)
+			}
+		},
+		OnSnapshotRestore: func(ctx context.Context) {
+			r.cbmu.Lock()
+			defer r.cbmu.Unlock()
+			snaps, err := snapshotStore.List()
+			if err != nil {
+				r.log.Error("failed to list snapshots", slog.String("error", err.Error()))
+				return
+			}
+			if len(snaps) == 0 {
+				return
+			}
+			latest := snaps[0]
+			meta, f, err := snapshotStore.Open(latest.ID)
+			if err != nil {
+				r.log.Error("failed to open snapshot", slog.String("error", err.Error()))
+				return
+			}
+			defer f.Close()
+			r.log.Debug("dispatching snapshot restore callbacks", slog.Any("snapshot", meta))
+			for _, cb := range r.snapshotcbs {
+				var buf bytes.Buffer
+				tee := io.TeeReader(f, &buf)
+				cb(ctx, meta, io.NopCloser(tee))
+				f = io.NopCloser(&buf)
+			}
+		},
 	})
 	r.raft, err = raft.NewRaft(
 		r.opts.RaftConfig(string(r.nodeID)),
