@@ -50,12 +50,12 @@ var (
 	appDaemonBind           = flagset.String("app-daemon-bind", "", "Address to bind the application daemon to (default: unix:///var/run/webmesh-node.sock)")
 	appDaemonGrpcWeb        = flagset.Bool("app-daemon-grpc-web", false, "Use gRPC-Web for the application daemon (default: false)")
 	appDaemonInsecureSocket = flagset.Bool("app-daemon-insecure-socket", false, "Leave default ownership on the Unix socket (default: false)")
+
+	conf = (&config.Config{}).BindFlags("", flagset)
 )
 
 func Execute() error {
 	// Parse flags and read in configurations
-	conf := &config.Config{}
-	conf.BindFlags("", flagset)
 	err := flagset.Parse(os.Args[1:])
 	if err != nil {
 		if errors.Is(err, pflag.ErrHelp) {
@@ -65,7 +65,7 @@ func Execute() error {
 	}
 
 	if *helpFlag {
-		fmt.Fprint(os.Stderr, Usage(flagset))
+		fmt.Fprint(os.Stderr, Usage())
 		return nil
 	}
 
@@ -110,7 +110,7 @@ func Execute() error {
 		if err != nil {
 			if errors.Is(err, config.ErrNoMesh) {
 				// Display usage if no mesh is configured
-				fmt.Fprint(os.Stderr, Usage(flagset))
+				fmt.Fprint(os.Stderr, Usage())
 				fmt.Fprintln(os.Stderr, "No mesh configured")
 				os.Exit(1)
 			}
