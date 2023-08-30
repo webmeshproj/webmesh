@@ -364,7 +364,8 @@ func (r *raftNode) IsLeader() bool {
 
 // IsMember is a convenience method that returns true if the Raft node is a voter or observer.
 func (r *raftNode) IsMember() bool {
-	return r.IsVoter() || r.IsObserver()
+	// Non raft-members should be using the passthrough transport.
+	return true
 }
 
 // IsVoter returns true if the Raft node is a voter.

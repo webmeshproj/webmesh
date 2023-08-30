@@ -185,7 +185,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				Type: v1.SubjectType_SUBJECT_NODE,
 				Name: opts.Bootstrap.Admin,
 			})
-			for _, id := range opts.Bootstrap.Servers {
+			for _, id := range append(opts.Bootstrap.Servers, s.ID()) {
 				out = append(out, &v1.Subject{
 					Type: v1.SubjectType_SUBJECT_NODE,
 					Name: string(id),
@@ -335,7 +335,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		}
 	}
 	// Do the loop again for edges
-	for _, id := range opts.Bootstrap.Servers {
+	for _, id := range append(opts.Bootstrap.Servers, s.ID()) {
 		for _, peer := range opts.Bootstrap.Servers {
 			if id == peer {
 				continue

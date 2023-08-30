@@ -24,6 +24,9 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
+	"github.com/webmeshproj/webmesh/pkg/services"
 )
 
 // BootstrapOptions are options for bootstrapping a new mesh.
@@ -115,4 +118,52 @@ func (o *BootstrapOptions) Validate() error {
 		return fmt.Errorf("default network policy must be accept or drop")
 	}
 	return nil
+}
+
+// NewBootstrapTransport returns the bootstrap transport for the configuration.
+func (o *Config) NewBootstrapTransport(nodeID string, conn mesh.Mesh) transport.BootstrapTransport {
+	if len(o.Bootstrap.Servers) == 0 || !o.Bootstrap.Enabled {
+		return transport.NewNullBootstrapTransport()
+	}
+	return tcp.NewBootstrapTransport(tcp.BootstrapTransportOptions{
+		NodeID:          nodeID,
+		Addr:            o.Bootstrap.ListenAddress,
+		Advertise:       o.Bootstrap.AdvertiseAddress,
+		MaxPool:         o.Raft.ConnectionPoolCount,
+		Timeout:         o.Raft.ConnectionTimeout,
+		ElectionTimeout: o.Raft.ElectionTimeout,
+		Credentials:     conn.Credentials(),
+		Peers: func() map[string]tcp.BootstrapPeer {
+			if o.Bootstrap.Servers == nil {
+				return nil
+			}
+			peers := make(map[string]tcp.BootstrapPeer)
+			for id, addr := range o.Bootstrap.Servers {
+				if id == nodeID {
+					continue
+				}
+				peerID := id
+				nodeAddr := addr
+				nodeHost, _, err := net.SplitHostPort(nodeAddr)
+				if err != nil {
+					// We should have caught this earlier
+					continue
+				}
+				// Deterine what their join address will be
+				var joinAddr string
+				if port, ok := o.Bootstrap.ServersGRPCPorts[peerID]; ok {
+					joinAddr = net.JoinHostPort(nodeHost, fmt.Sprintf("%d", port))
+				} else {
+					// Assume the default gRPC port
+					joinAddr = net.JoinHostPort(nodeHost, fmt.Sprintf("%d", services.DefaultGRPCPort))
+				}
+				peers[peerID] = tcp.BootstrapPeer{
+					NodeID:        peerID,
+					AdvertiseAddr: nodeAddr,
+					DialAddr:      joinAddr,
+				}
+			}
+			return peers
+		}(),
+	})
 }
