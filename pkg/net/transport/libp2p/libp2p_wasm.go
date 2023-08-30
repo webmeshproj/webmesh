@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/hashicorp/raft"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
@@ -31,9 +32,18 @@ func NewDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions, join transpor
 	return nil, errors.New("not implemented")
 }
 
-type DHTJoinOptions struct {
+type RoundTripOptions struct {
 }
 
-func NewDHTJoinRoundTripper(opts DHTJoinOptions) transport.JoinRoundTripper {
+func NewJoinRoundTripper(opts RoundTripOptions) transport.JoinRoundTripper {
+	return nil, errors.New("not implemented")
+}
+
+// RaftTransportOptions are options for the TCP transport.
+type RaftTransportOptions struct {
+}
+
+// NewRaftTransport creates a new Raft transport over the Kademlia DHT.
+func NewRaftTransport(ctx context.Context, opts RaftTransportOptions) (raft.Transport, error) {
 	return nil, errors.New("not implemented")
 }
