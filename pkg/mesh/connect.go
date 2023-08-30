@@ -110,6 +110,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	// If we still don't have a node id, use raft's node id.
 	if s.ID() == "" {
 		s.nodeID = s.raft.ID()
+		s.log = s.log.With("node-id", s.nodeID)
 	}
 	log := s.log
 	// Create the plugin manager
