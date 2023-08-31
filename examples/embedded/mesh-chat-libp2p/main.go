@@ -30,15 +30,16 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/embed"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/util/crypto"
 )
 
 func main() {
-	joinServer := flag.String("join", "", "Address of node to join")
+	psk := flag.String("psk", "", "Pre-shared key")
 	loglevel := flag.String("loglevel", "", "Log level (default: silent)")
 	flag.Parse()
 
 	mode := "server"
-	if *joinServer != "" {
+	if *psk != "" {
 		mode = "client"
 	}
 
@@ -49,7 +50,7 @@ func main() {
 			os.Exit(1)
 		}
 	case "client":
-		if err := runClient(*loglevel, *joinServer); err != nil {
+		if err := runClient(*loglevel, *psk); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -76,7 +77,12 @@ func runServer(loglevel string) error {
 		return errors.New("no endpoints detected")
 	}
 
-	fmt.Printf("Bootstrapping network with primary endpoint %s...\n", eps[0].Addr().String())
+	psk, err := crypto.GeneratePSK()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Bootstrapping network with PSK: %s\n", string(psk))
 
 	conf := config.NewDefaultConfig("server-node")
 	conf.Global.LogLevel = loglevel
@@ -89,6 +95,10 @@ func runServer(loglevel string) error {
 	conf.TLS.Insecure = true
 	conf.Services.Insecure = true
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
+	conf.Discovery.Announce = true
+	conf.Discovery.UseKadDHT = true
+	conf.Discovery.PSK = string(psk)
+	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61820"}
 
 	conn, err := embed.NewNode(context.Background(), &conf)
 	if err != nil {
@@ -130,8 +140,8 @@ func runServer(loglevel string) error {
 	return nil
 }
 
-func runClient(loglevel string, join string) error {
-	fmt.Println("Joining", join)
+func runClient(loglevel string, psk string) error {
+	fmt.Println("Joining server at pre-shared key", psk)
 	ctx := context.Background()
 
 	conf := config.NewDefaultConfig("client-node")
@@ -139,7 +149,9 @@ func runClient(loglevel string, join string) error {
 	conf.Services.GRPCListenAddress = "[::]:8444"
 	conf.WireGuard.ListenPort = 61821
 	conf.WireGuard.InterfaceName = "meshclient0"
-	conf.Mesh.JoinAddress = join
+	conf.Discovery.PSK = psk
+	conf.Discovery.UseKadDHT = true
+	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61821"}
 	conf.TLS.Insecure = true
 	conf.Services.Insecure = true
 

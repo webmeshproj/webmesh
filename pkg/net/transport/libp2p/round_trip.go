@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -152,7 +153,11 @@ func (rt *dhtRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (
 		var b [8192]byte
 		n, err := stream.Read(b[:])
 		if err != nil {
-			return nil, fmt.Errorf("read response: %w", err)
+			if errors.Is(err, io.EOF) && n == 0 {
+				return nil, fmt.Errorf("read response: %w", err)
+			} else if !errors.Is(err, io.EOF) {
+				return nil, fmt.Errorf("read response: %w", err)
+			}
 		}
 		jlog.Debug("Received response from peer")
 		if bytes.HasPrefix(b[:n], []byte("ERROR: ")) {
