@@ -48,8 +48,8 @@ type WebRTCExternalSignalOptions struct {
 }
 
 // NewExternalSignalTransport returns a new WebRTC signaling transport that attempts
-// to negotiate a WebRTC using the Webmesh WebRTC signaling server. This is typically
-// used by clients trying to create a proxy connection to a server.
+// to negotiate a WebRTC connection using the Webmesh WebRTC signaling server. This is
+// typically used by clients trying to create a proxy connection to a server.
 func NewExternalSignalTransport(opts WebRTCExternalSignalOptions) transport.WebRTCSignalTransport {
 	return &webrtcExternalSignalTransport{
 		WebRTCExternalSignalOptions: opts,
@@ -80,7 +80,9 @@ type WebRTCInternalSignalOptions struct {
 
 // NewWebRTCInternalSignalTransport returns a new WebRTC signaling transport that attempts
 // to negotiate a WebRTC connection from within the mesh. This is typically used by servers
-// receiving a request from a client to connect to another node in the mesh.
+// receiving a request from a client to connect to another node in the mesh. It is not currently
+// used anywhere in the codebase, but serves as a reference for how to implement a WebRTC signaling
+// transport that acts as a proxy between two webmesh nodes.
 func NewWebRTCInternalSignalTransport(opts WebRTCInternalSignalOptions) transport.WebRTCSignalTransport {
 	return &webrtcInternalSignalTransport{
 		WebRTCInternalSignalOptions: opts,
@@ -224,6 +226,10 @@ func (rt *webrtcExternalSignalTransport) Close() error {
 	}
 	close(rt.closec)
 	defer rt.cancel()
+	if rt.stream == nil {
+		// Start wasn't even called yet
+		return nil
+	}
 	return rt.stream.CloseSend()
 }
 
@@ -401,6 +407,10 @@ func (rt *webrtcInternalSignalTransport) Close() error {
 	}
 	close(rt.closec)
 	defer rt.cancel()
+	if rt.stream == nil {
+		// Start wasn't even called yet
+		return nil
+	}
 	return rt.stream.CloseSend()
 }
 

@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/hashicorp/raft"
+
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
@@ -45,5 +46,15 @@ type RaftTransportOptions struct {
 
 // NewRaftTransport creates a new Raft transport over the Kademlia DHT.
 func NewRaftTransport(ctx context.Context, opts RaftTransportOptions) (raft.Transport, error) {
+	return nil, errors.New("not implemented")
+}
+
+// WebRTCExternalSignalOptions are options for configuring a WebRTC signaling transport.
+type WebRTCExternalSignalOptions struct{}
+
+// NewExternalSignalTransport returns a new WebRTC signaling transport that attempts
+// to negotiate a WebRTC connection using the Webmesh WebRTC signaling server. This is
+// typically used by clients trying to create a proxy connection to a server.
+func NewExternalSignalTransport(opts WebRTCExternalSignalOptions) (transport.WebRTCSignalTransport, error) {
 	return nil, errors.New("not implemented")
 }

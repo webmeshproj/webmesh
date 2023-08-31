@@ -45,7 +45,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 	log := s.log.With(slog.Any("request", req))
 	// TODO: We trust what the other node is sending for now, but we could save
 	// some errors by doing some extra validation first.
-	var conn datachannels.ServerChannel
+	var conn datachannels.ManagedServerChannel
 	if req.GetPort() == 0 && req.GetProto() == "udp" {
 		log.Info("Creating WireGuard proxy connection")
 		// Lookup our WireGuard port.

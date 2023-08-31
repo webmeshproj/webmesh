@@ -112,7 +112,7 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 
 func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_StartDataChannelServer, r *v1.StartDataChannelRequest, remoteAddr string) error {
 	log.Info("Handling negotiation locally")
-	var conn datachannels.ServerChannel
+	var conn datachannels.ManagedServerChannel
 	var err error
 	if r.GetProto() == "udp" && r.GetPort() == 0 {
 		log.Info("Negotiating WireGuard proxy connection")
