@@ -2,7 +2,7 @@ module mesh-chat
 
 go 1.21.0
 
-require github.com/webmeshproj/webmesh v0.3.3-0.20230831001002-e52c8b397e7d
+require github.com/webmeshproj/webmesh v0.3.4-0.20230831022024-93425988e635
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
