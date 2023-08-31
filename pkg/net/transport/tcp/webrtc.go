@@ -33,10 +33,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// ErrSignalTransportClosed is returned when a signal transport is closed
-// by either side of the connection.
-var ErrSignalTransportClosed = fmt.Errorf("signal transport closed")
-
 // WebRTCExternalSignalOptions are options for configuring the WebRTC transport.
 type WebRTCExternalSignalOptions struct {
 	// Resolver is a resolver for looking up nodes with the ICE negotiation feature
@@ -52,7 +48,8 @@ type WebRTCExternalSignalOptions struct {
 }
 
 // NewExternalSignalTransport returns a new WebRTC signaling transport that attempts
-// to negotiate a WebRTC connection from outside the mesh.
+// to negotiate a WebRTC using the Webmesh WebRTC signaling server. This is typically
+// used by clients trying to create a proxy connection to a server.
 func NewExternalSignalTransport(opts WebRTCExternalSignalOptions) transport.WebRTCSignalTransport {
 	return &webrtcExternalSignalTransport{
 		WebRTCExternalSignalOptions: opts,
@@ -76,13 +73,13 @@ type WebRTCInternalSignalOptions struct {
 	// SourceAddr is optional and may be populated with the address
 	// where the request originated.
 	SourceAddr netip.Addr
-	// STUNServers are the STUN servers to use for ICE negotiation.
-	STUNServers []string
+	// TURNServers are the STUN/TURN servers to use for ICE negotiation.
+	TURNServers []string
 }
 
 // NewWebRTCInternalSignalTransport returns a new WebRTC signaling transport that attempts
 // to negotiate a WebRTC connection from within the mesh. This is typically used by servers
-// receiving a request from a client.
+// receiving a request from a client to connect to another node in the mesh.
 func NewWebRTCInternalSignalTransport(opts WebRTCInternalSignalOptions) transport.WebRTCSignalTransport {
 	return &webrtcInternalSignalTransport{
 		WebRTCInternalSignalOptions: opts,
@@ -158,7 +155,7 @@ func (rt *webrtcExternalSignalTransport) SendDescription(ctx context.Context, de
 	})
 	if err != nil {
 		if status.Code(err) == codes.Canceled {
-			return ErrSignalTransportClosed
+			return transport.ErrSignalTransportClosed
 		}
 		return fmt.Errorf("send SDP description: %w", err)
 	}
@@ -179,7 +176,7 @@ func (rt *webrtcExternalSignalTransport) SendCandidate(ctx context.Context, cand
 	})
 	if err != nil {
 		if status.Code(err) == codes.Canceled {
-			return ErrSignalTransportClosed
+			return transport.ErrSignalTransportClosed
 		}
 		return fmt.Errorf("send ICE candidate: %w", err)
 	}
@@ -281,7 +278,7 @@ func (rt *webrtcInternalSignalTransport) Start(ctx context.Context) error {
 		Src:         rt.SourceAddr.String(),
 		Dst:         rt.TargetAddr.Addr().String(),
 		Port:        uint32(rt.TargetAddr.Port()),
-		StunServers: rt.STUNServers,
+		StunServers: rt.TURNServers,
 	})
 	if err != nil {
 		return fmt.Errorf("send negotiation request: %w", err)
@@ -304,7 +301,7 @@ func (rt *webrtcInternalSignalTransport) SendDescription(ctx context.Context, de
 	})
 	if err != nil {
 		if status.Code(err) == codes.Canceled {
-			return ErrSignalTransportClosed
+			return transport.ErrSignalTransportClosed
 		}
 		return fmt.Errorf("send SDP description: %w", err)
 	}
@@ -324,7 +321,7 @@ func (rt *webrtcInternalSignalTransport) SendCandidate(ctx context.Context, cand
 	})
 	if err != nil {
 		if status.Code(err) == codes.Canceled {
-			return ErrSignalTransportClosed
+			return transport.ErrSignalTransportClosed
 		}
 		return fmt.Errorf("send ICE candidate: %w", err)
 	}

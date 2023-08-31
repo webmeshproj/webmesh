@@ -19,6 +19,8 @@ package transport
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/netip"
 
 	"github.com/hashicorp/raft"
@@ -170,6 +172,16 @@ type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, erro
 // Dial implements NodeDialer.
 func (f NodeDialerFunc) Dial(ctx context.Context, id string) (*grpc.ClientConn, error) {
 	return f(ctx, id)
+}
+
+// ErrSignalTransportClosed is returned when a signal transport is closed
+// by either side of the connection.
+var ErrSignalTransportClosed = fmt.Errorf("signal transport closed")
+
+// IsSignalTransportClosed returns true if the given error is
+// ErrSignalTransportClosed.
+func IsSignalTransportClosed(err error) bool {
+	return errors.Is(err, ErrSignalTransportClosed)
 }
 
 // WebRTCSignalTransport is the transport interface for providing WebRTC signaling between
