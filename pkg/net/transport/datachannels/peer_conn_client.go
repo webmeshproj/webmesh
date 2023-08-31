@@ -80,15 +80,6 @@ func NewClientPeerConnection(ctx context.Context, protocol string, rt transport.
 	if err != nil {
 		return nil, fmt.Errorf("failed to start signaling transport: %w", err)
 	}
-	var offer webrtc.SessionDescription
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context canceled")
-	case err := <-rt.Error():
-		return nil, fmt.Errorf("signaling transport error: %w", err)
-	case offer = <-rt.Descriptions():
-	}
-
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	s.SetIncludeLoopbackCandidate(true)
@@ -152,6 +143,14 @@ func NewClientPeerConnection(ctx context.Context, protocol string, rt transport.
 		}
 		pc.channels = detached.(*datachannel.DataChannel)
 	})
+	var offer webrtc.SessionDescription
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context canceled")
+	case err := <-rt.Error():
+		return nil, fmt.Errorf("signaling transport error: %w", err)
+	case offer = <-rt.Descriptions():
+	}
 	go pc.negotiate(offer)
 	return pc, nil
 }
@@ -245,6 +244,7 @@ func (pc *ClientPeerConnection) Handle(conn net.Conn) {
 }
 
 func (pc *ClientPeerConnection) negotiate(offer webrtc.SessionDescription) {
+	defer pc.rt.Close()
 	// Set the remote SessionDescription
 	if err := pc.SetRemoteDescription(offer); err != nil {
 		pc.errors <- fmt.Errorf("failed to set remote description: %w", err)

@@ -182,6 +182,10 @@ func (rt *webrtcExternalSignalTransport) SendDescription(ctx context.Context, de
 	}
 	context.LoggerFrom(ctx).Debug("Sending SDP description", "description", string(b))
 	err = rt.stream.Send(&v1.StartDataChannelRequest{
+		NodeId: rt.NodeID,
+		Proto:  rt.TargetProto,
+		Dst:    rt.TargetAddr.Addr().String(),
+		Port:   uint32(rt.TargetAddr.Port()),
 		Answer: string(b),
 	})
 	if err != nil {
@@ -204,6 +208,10 @@ func (rt *webrtcExternalSignalTransport) SendCandidate(ctx context.Context, cand
 	}
 	context.LoggerFrom(ctx).Debug("Sending ICE candidate", "candidate", string(b))
 	err = rt.stream.Send(&v1.StartDataChannelRequest{
+		NodeId:    rt.NodeID,
+		Proto:     rt.TargetProto,
+		Dst:       rt.TargetAddr.Addr().String(),
+		Port:      uint32(rt.TargetAddr.Port()),
 		Candidate: string(b),
 	})
 	if err != nil {
@@ -358,7 +366,12 @@ func (rt *webrtcInternalSignalTransport) SendDescription(ctx context.Context, de
 	}
 	context.LoggerFrom(ctx).Debug("Sending SDP description", "description", string(b))
 	err = rt.stream.Send(&v1.DataChannelNegotiation{
-		Answer: string(b),
+		Proto:       rt.TargetProto,
+		Src:         rt.SourceAddr.String(),
+		Dst:         rt.TargetAddr.Addr().String(),
+		Port:        uint32(rt.TargetAddr.Port()),
+		Answer:      string(b),
+		StunServers: rt.WebRTCInternalSignalOptions.TURNServers,
 	})
 	if err != nil {
 		if status.Code(err) == codes.Canceled {
@@ -379,7 +392,12 @@ func (rt *webrtcInternalSignalTransport) SendCandidate(ctx context.Context, cand
 	}
 	context.LoggerFrom(ctx).Debug("Sending ICE candidate", "candidate", string(b))
 	err = rt.stream.Send(&v1.DataChannelNegotiation{
-		Candidate: string(b),
+		Proto:       rt.TargetProto,
+		Src:         rt.SourceAddr.String(),
+		Dst:         rt.TargetAddr.Addr().String(),
+		Port:        uint32(rt.TargetAddr.Port()),
+		Candidate:   string(b),
+		StunServers: rt.WebRTCInternalSignalOptions.TURNServers,
 	})
 	if err != nil {
 		if status.Code(err) == codes.Canceled {

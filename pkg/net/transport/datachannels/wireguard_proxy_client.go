@@ -49,14 +49,6 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 		return nil, fmt.Errorf("failed to start signaling transport: %w", err)
 	}
 	defer rt.Close()
-	var offer webrtc.SessionDescription
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context canceled")
-	case err := <-rt.Error():
-		return nil, fmt.Errorf("signaling transport error: %w", err)
-	case offer = <-rt.Descriptions():
-	}
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()
 	s.SetIncludeLoopbackCandidate(true)
@@ -158,6 +150,14 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 			log.Error("Failed to copy from datachannel to WireGuard", slog.String("error", err.Error()))
 		}
 	})
+	var offer webrtc.SessionDescription
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context canceled")
+	case err := <-rt.Error():
+		return nil, fmt.Errorf("signaling transport error: %w", err)
+	case offer = <-rt.Descriptions():
+	}
 	err = pc.conn.SetRemoteDescription(offer)
 	if err != nil {
 		defer pc.Close()
@@ -173,6 +173,12 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 	if err != nil {
 		defer pc.Close()
 		return nil, fmt.Errorf("failed to send answer: %w", err)
+	}
+	// Set local description and start UDP listener
+	err = pc.conn.SetLocalDescription(answer)
+	if err != nil {
+		defer pc.Close()
+		return nil, fmt.Errorf("failed to set local description: %w", err)
 	}
 	// Receive ICE candidates
 	go func() {
