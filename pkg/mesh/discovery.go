@@ -23,10 +23,12 @@ import (
 
 	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
 // DiscoveryOptions are options for performing peer discovery.
@@ -90,6 +92,10 @@ func (s *meshStore) proxyJoinToLeader(ctx context.Context, req *v1.JoinRequest) 
 		return nil, err
 	}
 	defer c.Close()
+	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedFromMeta, string(s.ID()))
+	// We are not autneticating the request beyond whatever pre-shared key was used to get
+	// here. So for now we'll assume the ID is valid. This is a TODO.
+	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedForMeta, req.GetId())
 	resp, err := v1.NewMembershipClient(c).Join(ctx, req)
 	if err != nil {
 		log.Error("failed to proxy join to cluster", slog.String("error", err.Error()))
