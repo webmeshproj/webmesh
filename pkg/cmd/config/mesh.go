@@ -355,7 +355,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 		PreferIPv6:           o.Raft.PreferIPv6,
 		Plugins:              plugins,
 		Discovery: &mesh.DiscoveryOptions{
-			BootstrapServers: o.Discovery.KadBootstrapServers,
+			BootstrapServers: o.Discovery.BootstrapServers,
 			PSK:              o.Discovery.PSK,
 			DiscoveryTTL:     o.Discovery.AnnounceTTL,
 			Announce:         o.Discovery.Announce,
@@ -427,9 +427,9 @@ func (o *Config) NewJoinTransport(nodeID string, conn mesh.Mesh) (transport.Join
 			Credentials:    conn.Credentials(),
 			AddressTimeout: time.Second * 3,
 		})
-	} else if o.Discovery.UseKadDHT {
+	} else if o.Discovery.Discover {
 		var addrs []multiaddr.Multiaddr
-		for _, addr := range o.Discovery.KadBootstrapServers {
+		for _, addr := range o.Discovery.BootstrapServers {
 			maddr, err := multiaddr.NewMultiaddr(addr)
 			if err != nil {
 				return nil, fmt.Errorf("invalid bootstrap peer address: %w", err)

@@ -29,13 +29,13 @@ type DiscoveryOptions struct {
 	// Announce is a flag to announce this peer to the discovery service.
 	// Otherwise this peer will only discover other peers.
 	Announce bool `koanf:"announce,omitempty"`
+	// Discover is a flag to use the libp2p kademlia DHT for discovery.
+	Discover bool `koanf:"discover,omitempty"`
 	// PSK is the pre-shared key to use as a rendezvous point for peer discovery.
 	PSK string `koanf:"psk,omitempty"`
-	// UseKadDHT is a flag to use the libp2p kademlia DHT for discovery.
-	UseKadDHT bool `koanf:"use-kad-dht,omitempty"`
-	// KadBootstrapServers is a list of bootstrap servers to use for the DHT.
+	// BootstrapServers is a list of bootstrap servers to use for the DHT.
 	// If empty or nil, the default bootstrap servers will be used.
-	KadBootstrapServers []string `koanf:"kad-bootstrap-servers,omitempty"`
+	BootstrapServers []string `koanf:"bootstrap-servers,omitempty"`
 	// AnnounceTTL is the TTL for the announcement.
 	AnnounceTTL time.Duration `koanf:"announce-ttl,omitempty"`
 	// LocalAddrs is a list of local addresses to announce to the discovery service.
@@ -49,7 +49,7 @@ func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 	return DiscoveryOptions{
 		Announce:    announce,
 		PSK:         psk,
-		UseKadDHT:   psk != "",
+		Discover:    psk != "",
 		AnnounceTTL: time.Minute,
 	}
 }
@@ -58,24 +58,24 @@ func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Announce, prefix+"discovery.announce", false, "announce this peer to the discovery service")
 	fs.StringVar(&o.PSK, prefix+"discovery.psk", "", "pre-shared key to use as a rendezvous point for peer discovery")
-	fs.BoolVar(&o.UseKadDHT, prefix+"discovery.use-kad-dht", false, "use the libp2p kademlia DHT for discovery")
-	fs.StringSliceVar(&o.KadBootstrapServers, prefix+"discovery.kad-bootstrap-servers", nil, "list of bootstrap servers to use for the DHT")
+	fs.BoolVar(&o.Discover, prefix+"discovery.discover", false, "use the libp2p kademlia DHT for discovery")
+	fs.StringSliceVar(&o.BootstrapServers, prefix+"discovery.bootstrap-servers", nil, "list of bootstrap servers to use for the DHT")
 	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", time.Minute, "TTL for the announcement")
 	fs.StringSliceVar(&o.LocalAddrs, prefix+"discovery.local-addrs", nil, "list of local addresses to announce to the discovery service")
 }
 
 // Validate validates the discovery options.
 func (o *DiscoveryOptions) Validate() error {
-	if len(o.KadBootstrapServers) > 0 {
+	if len(o.BootstrapServers) > 0 {
 		// Make sure all the addresses are valid
-		for _, addr := range o.KadBootstrapServers {
+		for _, addr := range o.BootstrapServers {
 			_, err := multiaddr.NewMultiaddr(addr)
 			if err != nil {
 				return fmt.Errorf("invalid bootstrap server address: %w", err)
 			}
 		}
 	}
-	if o.UseKadDHT {
+	if o.Discover || o.Announce {
 		if o.PSK == "" {
 			return fmt.Errorf("pre-shared key must be set when using the kademlia DHT")
 		}

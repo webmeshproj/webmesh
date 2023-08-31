@@ -70,6 +70,8 @@ type ServiceOptions struct {
 	DisableLeaderProxy bool `koanf:"disable-leader-proxy,omitempty"`
 	// API options
 	API APIOptions `koanf:"api,omitempty"`
+	// WebRTC options
+	WebRTC WebRTCOptions `koanf:"webrtc,omitempty"`
 	// MeshDNS options
 	MeshDNS MeshDNSOptions `koanf:"meshdns,omitempty"`
 	// TURN options
@@ -90,6 +92,7 @@ func NewServiceOptions() ServiceOptions {
 		Insecure:           false,
 		DisableLeaderProxy: false,
 		API:                APIOptions{},
+		WebRTC:             NewWebRTCOptions(),
 		MeshDNS:            NewMeshDNSOptions(),
 		TURN:               NewTURNOptions(),
 		Metrics:            NewMetricsOptions(),
@@ -107,6 +110,7 @@ func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&s.Insecure, prefix+"services.insecure", false, "Disable TLS.")
 	fl.BoolVar(&s.DisableLeaderProxy, prefix+"services.disable-leader-proxy", false, "Disable the leader proxy.")
 	s.API.BindFlags(prefix, fl)
+	s.WebRTC.BindFlags(prefix, fl)
 	s.TURN.BindFlags(prefix, fl)
 	s.Metrics.BindFlags(prefix, fl)
 	// Don't recurse on meshdns flags in bridge configurations
@@ -150,18 +154,54 @@ type APIOptions struct {
 	MeshEnabled bool `koanf:"mesh-enabled,omitempty"`
 	// AdminEnabled is true if the admin API should be registered.
 	AdminEnabled bool `koanf:"admin-enabled,omitempty"`
-	// WebRTCEnabled is true if the WebRTC API should be registered.
-	WebRTCEnabled bool `koanf:"webrtc-enabled,omitempty"`
-	// STUNServers is a list of STUN servers to use for the WebRTC API.
-	STUNServers []string `koanf:"stun-servers,omitempty"`
 }
 
 // BindFlags binds the flags.
 func (a *APIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&a.MeshEnabled, prefix+"services.api.mesh-enabled", false, "Enable and register the MeshAPI.")
 	fl.BoolVar(&a.AdminEnabled, prefix+"services.api.admin-enabled", false, "Enable and register the AdminAPI.")
-	fl.BoolVar(&a.WebRTCEnabled, prefix+"services.api.webrtc-enabled", false, "Enable and register the WebRTC API.")
-	fl.StringSliceVar(&a.STUNServers, prefix+"services.api.stun-servers", webrtc.DefaultSTUNServers, "STUN servers to use for the WebRTC API.")
+}
+
+// WebRTCOptions are the options for the WebRTC API.
+type WebRTCOptions struct {
+	// Enabled enables the WebRTC API.
+	Enabled bool `koanf:"enabled,omitempty"`
+	// STUNServers is a list of STUN servers to use for the WebRTC API.
+	STUNServers []string `koanf:"stun-servers,omitempty"`
+	// Announce is a flag to announce this service to the libp2p discovery service
+	// on the given rendezvous string.
+	Announce bool `koanf:"announce,omitempty"`
+	// RendevousStrings is a map of peer IDs to rendezvous strings
+	// for allowing signaling through libp2p.
+	RendezvousStrings map[string]string `koanf:"rendezvous-strings,omitempty"`
+	// BootstrapServers is a list of bootstrap servers to use for the DHT.
+	// If empty or nil, the default bootstrap servers will be used.
+	BootstrapServers []string `koanf:"bootstrap-servers,omitempty"`
+	// LocalAddrs is a list of local addresses to announce to the discovery service.
+	// If empty, the default local addresses will be used.
+	LocalAddrs []string `koanf:"local-addrs,omitempty"`
+	// AnnounceTTL is the TTL for each announcement.
+	AnnounceTTL time.Duration `koanf:"announce-ttl,omitempty"`
+}
+
+// NewWebRTCOptions returns a new WebRTCOptions with the default values.
+func NewWebRTCOptions() WebRTCOptions {
+	return WebRTCOptions{
+		Enabled:     false,
+		STUNServers: webrtc.DefaultSTUNServers,
+		AnnounceTTL: time.Minute,
+	}
+}
+
+// BindFlags binds the flags.
+func (w *WebRTCOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
+	fl.BoolVar(&w.Enabled, prefix+"services.webrtc.enabled", false, "Enable and register the WebRTC API.")
+	fl.StringSliceVar(&w.STUNServers, prefix+"services.webrtc.stun-servers", webrtc.DefaultSTUNServers, "TURN/STUN servers to use for the WebRTC API.")
+	fl.BoolVar(&w.Announce, prefix+"services.webrtc.announce", false, "Announce this service to the libp2p discovery service.")
+	fl.StringToStringVar(&w.RendezvousStrings, prefix+"services.webrtc.rendezvous-strings", nil, "Map of peer IDs to rendezvous strings for allowing signaling through libp2p.")
+	fl.StringSliceVar(&w.BootstrapServers, prefix+"services.webrtc.bootstrap-servers", nil, "Bootstrap servers to use for the DHT.")
+	fl.StringSliceVar(&w.LocalAddrs, prefix+"services.webrtc.local-addrs", nil, "Local addresses to announce to the discovery service.")
+	fl.DurationVar(&w.AnnounceTTL, prefix+"services.webrtc.announce-ttl", time.Minute, "TTL for each announcement.")
 }
 
 // TURNOptions are the options for the TURN server.
@@ -433,7 +473,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 		log.Debug("Registering mesh api")
 		v1.RegisterMeshServer(srv, meshapi.NewServer(conn.Storage(), conn.Raft()))
 	}
-	if o.Services.API.WebRTCEnabled {
+	if o.Services.WebRTC.Enabled {
 		log.Debug("Registering WebRTC api")
 		v1.RegisterWebRTCServer(srv, webrtc.NewServer(webrtc.Options{
 			ID:          conn.ID(),
@@ -441,7 +481,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 			Wireguard:   conn.Network().WireGuard(),
 			NodeDialer:  conn,
 			RBAC:        rbacEvaluator,
-			StunServers: o.Services.API.STUNServers,
+			StunServers: o.Services.WebRTC.STUNServers,
 		}))
 	}
 	if o.Services.API.MeshEnabled {
@@ -495,7 +535,7 @@ func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 			Port:    int32(o.Mesh.GRPCAdvertisePort),
 		})
 	}
-	if o.Services.API.WebRTCEnabled {
+	if o.Services.WebRTC.Enabled {
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_ICE_NEGOTIATION,
 			Port:    int32(o.Mesh.GRPCAdvertisePort),

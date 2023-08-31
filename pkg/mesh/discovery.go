@@ -57,12 +57,12 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts DiscoveryOptions) erro
 		}
 		peers = append(peers, mul)
 	}
-	announceOpts := libp2p.DHTAnnounceOptions{
+	announceOpts := libp2p.AnnounceOptions{
 		PSK:            opts.PSK,
 		BootstrapPeers: peers,
 		DiscoveryTTL:   opts.DiscoveryTTL,
 	}
-	discover, err := libp2p.NewDHTAnnouncer(ctx, announceOpts, transport.JoinServerFunc(s.proxyJoinToLeader))
+	discover, err := libp2p.NewJoinAnnouncer(ctx, announceOpts, transport.JoinServerFunc(s.proxyJoinToLeader))
 	if err != nil {
 		return fmt.Errorf("new kad dht announcer: %w", err)
 	}

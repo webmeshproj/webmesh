@@ -40,9 +40,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// DHTAnnounceOptions are options for announcing the host or discovering peers
+// AnnounceOptions are options for announcing the host or discovering peers
 // on the libp2p kademlia DHT.
-type DHTAnnounceOptions struct {
+type AnnounceOptions struct {
 	// PSK is the pre-shared key to use as a rendezvous point for the DHT.
 	PSK string
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
@@ -58,9 +58,9 @@ type DHTAnnounceOptions struct {
 	LocalAddrs []multiaddr.Multiaddr
 }
 
-// NewDHTAnnouncer creates a new announcer on the kadmilia DHT and executes
+// NewJoinAnnouncer creates a new announcer on the kadmilia DHT and executes
 // received join requests against the given join Server.
-func NewDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions, join transport.JoinServer) (io.Closer, error) {
+func NewJoinAnnouncer(ctx context.Context, opts AnnounceOptions, join transport.JoinServer) (io.Closer, error) {
 	log := context.LoggerFrom(ctx)
 	err := buffers.SetMaximumReadBuffer(2500000)
 	if err != nil {
@@ -104,26 +104,26 @@ func NewDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions, join transpor
 		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.DiscoveryTTL))
 	}
 	dutil.Advertise(context.Background(), routingDiscovery, opts.PSK, discoveryOpts...)
-	announcer := &dhtAnnouncer{
-		DHTAnnounceOptions: opts,
-		host:               host,
-		dht:                kaddht,
-		acceptc:            acceptc,
-		closec:             make(chan struct{}),
+	announcer := &dhtJoinAnnouncer{
+		AnnounceOptions: opts,
+		host:            host,
+		dht:             kaddht,
+		acceptc:         acceptc,
+		closec:          make(chan struct{}),
 	}
 	go announcer.handleIncomingStreams(log, join)
 	return announcer, nil
 }
 
-type dhtAnnouncer struct {
-	DHTAnnounceOptions
+type dhtJoinAnnouncer struct {
+	AnnounceOptions
 	host    host.Host
 	dht     *dht.IpfsDHT
 	acceptc chan network.Stream
 	closec  chan struct{}
 }
 
-func (srv *dhtAnnouncer) handleIncomingStreams(log *slog.Logger, joinServer transport.JoinServer) {
+func (srv *dhtJoinAnnouncer) handleIncomingStreams(log *slog.Logger, joinServer transport.JoinServer) {
 	returnErr := func(stream network.Stream, err error) {
 		log.Error("Failed to handle join protocol stream", slog.String("error", err.Error()))
 		buf := []byte("ERROR: " + err.Error())
@@ -182,7 +182,7 @@ func (srv *dhtAnnouncer) handleIncomingStreams(log *slog.Logger, joinServer tran
 	}
 }
 
-func (srv *dhtAnnouncer) Close() error {
+func (srv *dhtJoinAnnouncer) Close() error {
 	defer close(srv.closec)
 	defer srv.host.Close()
 	return srv.dht.Close()
