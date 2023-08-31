@@ -234,6 +234,22 @@ func (c *Config) NewAdminClient() (v1.AdminClient, io.Closer, error) {
 
 // DialCurrent connects to the current context.
 func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
+	cluster := c.GetCurrentCluster()
+	opts, err := c.GetDialOptions()
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	if cluster.ConnectTimeout.Duration > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cluster.ConnectTimeout.Duration)
+		defer cancel()
+	}
+	return grpc.DialContext(ctx, cluster.Server, opts...)
+}
+
+// GetDialOptions gets the credentials for the current context.
+func (c *Config) GetDialOptions() ([]grpc.DialOption, error) {
 	var opts []grpc.DialOption
 	cluster := c.GetCurrentCluster()
 	user := c.GetCurrentUser()
@@ -260,13 +276,7 @@ func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 		opts = append(opts, grpc.WithUnaryInterceptor(RequestTimeoutUnaryClientInterceptor(timeout)))
 		opts = append(opts, grpc.WithStreamInterceptor(RequestTimeoutStreamClientInterceptor(timeout)))
 	}
-	ctx := context.Background()
-	if cluster.ConnectTimeout.Duration > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, cluster.ConnectTimeout.Duration)
-		defer cancel()
-	}
-	return grpc.DialContext(ctx, cluster.Server, opts...)
+	return opts, nil
 }
 
 // GetCluster gets a cluster by name.

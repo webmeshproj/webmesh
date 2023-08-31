@@ -110,12 +110,27 @@ func (r *peerResolver) FeatureResolver(filterFn ...FilterFunc) transport.Feature
 					if addr := node.PrivateTURNAddrV6(); addr.IsValid() {
 						addrs = append(addrs, addr)
 					}
+				// Return the Raft port for Raft features
 				case v1.Feature_RAFT:
 					if addr := node.PrivateRaftAddrV4(); addr.IsValid() {
 						addrs = append(addrs, addr)
 					}
 					if addr := node.PrivateRaftAddrV6(); addr.IsValid() {
 						addrs = append(addrs, addr)
+					}
+				// ICE negotiation is a special case where we use the RPC port,
+				// but prioritize a primary endpoint if one is available.
+				case v1.Feature_ICE_NEGOTIATION:
+					if addr := node.PublicRPCAddr(); addr.IsValid() {
+						addrs = append(addrs, addr)
+					} else {
+						// Fall back to private RPC address if no public address is available.
+						if addr := node.PrivateRPCAddrV4(); addr.IsValid() {
+							addrs = append(addrs, addr)
+						}
+						if addr := node.PrivateRPCAddrV6(); addr.IsValid() {
+							addrs = append(addrs, addr)
+						}
 					}
 				// All other features use the RPC port for now.
 				default:

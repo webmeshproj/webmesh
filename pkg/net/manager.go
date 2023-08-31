@@ -37,7 +37,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
@@ -456,33 +458,11 @@ func (m *manager) RefreshPeers(ctx context.Context, wgpeers []*v1.WireGuardPeer)
 	log.Debug("current wireguard peers", slog.Any("peers", wgpeers))
 	currentPeers := m.wg.Peers()
 	seenPeers := make(map[string]struct{})
-	var iceServers []string
 	errs := make([]error, 0)
 	for _, peer := range wgpeers {
 		seenPeers[peer.GetId()] = struct{}{}
-		// Check if we need to gather ice servers
-		if peer.GetIce() && len(iceServers) == 0 {
-			peerdb := peers.New(m.storage)
-			icepeers, err := peerdb.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("list public peers with feature: %w", err))
-				continue
-			}
-			for _, icepeer := range icepeers {
-				switch {
-				// Prefer primary endpoint
-				case icepeer.PublicRPCAddr().IsValid():
-					iceServers = append(iceServers, icepeer.PublicRPCAddr().String())
-				// Fall back to private endpoint (prefering IPv4)
-				case icepeer.PrivateRPCAddrV4().IsValid():
-					iceServers = append(iceServers, icepeer.PrivateRPCAddrV4().String())
-				case icepeer.PrivateRPCAddrV6().IsValid():
-					iceServers = append(iceServers, icepeer.PrivateRPCAddrV6().String())
-				}
-			}
-		}
 		// Ensure the peer is configured
-		err := m.addPeer(ctx, peer, iceServers)
+		err := m.addPeer(ctx, peer, nil)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("add peer: %w", err))
 		}
@@ -622,11 +602,7 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 	log := context.LoggerFrom(ctx)
 	var endpoint netip.AddrPort
 	if peer.GetIce() {
-		if len(iceServers) == 0 {
-			return endpoint, fmt.Errorf("no ice servers available")
-		}
-		// TODO: Try all ICE servers
-		return m.negotiateICEConn(ctx, iceServers[0], peer)
+		return m.negotiateICEConn(ctx, peer, iceServers)
 	}
 	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
 	if peer.GetPrimaryEndpoint() != "" {
@@ -690,13 +666,13 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 	return endpoint, nil
 }
 
-func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, peer *v1.WireGuardPeer) (netip.AddrPort, error) {
+func (m *manager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (netip.AddrPort, error) {
 	m.pcmu.Lock()
 	defer m.pcmu.Unlock()
 	log := context.LoggerFrom(ctx)
 	if conn, ok := m.iceConns[peer.GetId()]; ok {
 		// We already have an ICE connection for this peer
-		log.Debug("using existing wireguard ICE connection", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
+		log.Debug("using existing wireguard ICE proxy", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
 		return conn.localAddr, nil
 	}
 	wgPort, err := m.wg.ListenPort()
@@ -704,13 +680,35 @@ func (m *manager) negotiateICEConn(ctx context.Context, negotiateServer string, 
 		return netip.AddrPort{}, fmt.Errorf("wireguard listen port: %w", err)
 	}
 	var endpoint netip.AddrPort
-	log.Debug("negotiating wireguard ICE connection", slog.String("server", negotiateServer), slog.String("peer", peer.GetId()))
-	conn, err := grpc.DialContext(ctx, negotiateServer, m.opts.DialOptions...)
-	if err != nil {
-		return endpoint, fmt.Errorf("dial webRTC server: %w", err)
+	log.Debug("Negotiating wireguard ICE proxy", slog.String("peer", peer.GetId()))
+	var resolver transport.FeatureResolver
+	if len(iceServers) > 0 {
+		// We have a hint about ICE servers, we'll use a static resolver
+		resolver = transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
+			var addports []netip.AddrPort
+			for _, server := range iceServers {
+				addr, err := net.ResolveUDPAddr("udp", server)
+				if err != nil {
+					return nil, fmt.Errorf("resolve udp addr: %w", err)
+				}
+				addports = append(addports, addr.AddrPort())
+			}
+			return addports, nil
+		})
+	} else {
+		// We'll use our local storage
+		resolver = peers.New(m.storage).Resolver().FeatureResolver(func(mn peers.MeshNode) bool {
+			return mn.GetId() != m.opts.NodeID
+		})
 	}
-	defer conn.Close()
-	pc, err := datachannels.NewWireGuardProxyClient(ctx, v1.NewWebRTCClient(conn), peer.GetId(), wgPort)
+	rt := tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{
+		Resolver:    resolver,
+		Credentials: m.opts.DialOptions,
+		NodeID:      peer.GetId(),
+		TargetProto: "udp",
+		TargetAddr:  netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
+	})
+	pc, err := datachannels.NewWireGuardProxyClient(ctx, rt, uint16(wgPort))
 	if err != nil {
 		return endpoint, fmt.Errorf("create peer connection: %w", err)
 	}

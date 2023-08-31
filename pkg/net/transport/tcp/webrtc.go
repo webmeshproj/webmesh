@@ -57,6 +57,7 @@ func NewExternalSignalTransport(opts WebRTCExternalSignalOptions) transport.WebR
 		candidatec:                  make(chan webrtc.ICECandidateInit, 16),
 		errc:                        make(chan error, 1),
 		cancel:                      func() {},
+		closec:                      make(chan struct{}),
 	}
 }
 
@@ -87,6 +88,7 @@ func NewWebRTCInternalSignalTransport(opts WebRTCInternalSignalOptions) transpor
 		candidatec:                  make(chan webrtc.ICECandidateInit, 16),
 		errc:                        make(chan error, 1),
 		cancel:                      func() {},
+		closec:                      make(chan struct{}),
 	}
 }
 
@@ -94,11 +96,37 @@ type webrtcExternalSignalTransport struct {
 	WebRTCExternalSignalOptions
 
 	stream       v1.WebRTC_StartDataChannelClient
+	turnServers  []webrtc.ICEServer
 	descriptionc chan webrtc.SessionDescription
 	candidatec   chan webrtc.ICECandidateInit
 	errc         chan error
-	mu           sync.Mutex
 	cancel       context.CancelFunc
+	closec       chan struct{}
+	mu           sync.Mutex
+}
+
+// TURNServers returns a list of TURN servers configured for the transport.
+func (rt *webrtcExternalSignalTransport) TURNServers() []webrtc.ICEServer {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	out := make([]webrtc.ICEServer, len(rt.turnServers))
+	copy(out, rt.turnServers)
+	return out
+}
+
+// Candidates returns a channel of ICE candidates received from the remote peer.
+func (rt *webrtcExternalSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
+	return rt.candidatec
+}
+
+// Descriptions returns a channel of SDP descriptions received from the remote peer.
+func (rt *webrtcExternalSignalTransport) Descriptions() <-chan webrtc.SessionDescription {
+	return rt.descriptionc
+}
+
+// Error returns a channel that receives any error encountered during signaling.
+func (rt *webrtcExternalSignalTransport) Error() <-chan error {
+	return rt.errc
 }
 
 // Start starts the transport.
@@ -150,6 +178,7 @@ func (rt *webrtcExternalSignalTransport) SendDescription(ctx context.Context, de
 	if err != nil {
 		return err
 	}
+	context.LoggerFrom(ctx).Debug("Sending SDP description", "description", string(b))
 	err = rt.stream.Send(&v1.StartDataChannelRequest{
 		Answer: string(b),
 	})
@@ -171,6 +200,7 @@ func (rt *webrtcExternalSignalTransport) SendCandidate(ctx context.Context, cand
 	if err != nil {
 		return err
 	}
+	context.LoggerFrom(ctx).Debug("Sending ICE candidate", "candidate", string(b))
 	err = rt.stream.Send(&v1.StartDataChannelRequest{
 		Candidate: string(b),
 	})
@@ -183,25 +213,16 @@ func (rt *webrtcExternalSignalTransport) SendCandidate(ctx context.Context, cand
 	return nil
 }
 
-// Candidates returns a channel of ICE candidates received from the remote peer.
-func (rt *webrtcExternalSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
-	return rt.candidatec
-}
-
-// Descriptions returns a channel of SDP descriptions received from the remote peer.
-func (rt *webrtcExternalSignalTransport) Descriptions() <-chan webrtc.SessionDescription {
-	return rt.descriptionc
-}
-
-// Error returns a channel that receives any error encountered during signaling.
-func (rt *webrtcExternalSignalTransport) Error() <-chan error {
-	return rt.errc
-}
-
 // Close closes the transport.
 func (rt *webrtcExternalSignalTransport) Close() error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
+	select {
+	case <-rt.closec:
+		return nil
+	default:
+	}
+	close(rt.closec)
 	defer rt.cancel()
 	return rt.stream.CloseSend()
 }
@@ -217,8 +238,19 @@ func (rt *webrtcExternalSignalTransport) handleNegotiateStream(ctx context.Conte
 				return
 			}
 			log.Error("Failed to receive negotiation message", "error", err.Error())
-			rt.errc <- err
+			rt.errc <- fmt.Errorf("receive negotiation message: %w", err)
 			return
+		}
+		if len(msg.GetStunServers()) > 0 {
+			// Update the list of TURN servers.
+			rt.mu.Lock()
+			rt.turnServers = make([]webrtc.ICEServer, len(msg.GetStunServers()))
+			for i, server := range msg.GetStunServers() {
+				rt.turnServers[i] = webrtc.ICEServer{
+					URLs: []string{server},
+				}
+			}
+			rt.mu.Unlock()
 		}
 		if msg.GetOffer() != "" {
 			// Unmarshal and pass the offer to the caller.
@@ -227,7 +259,7 @@ func (rt *webrtcExternalSignalTransport) handleNegotiateStream(ctx context.Conte
 			err := json.Unmarshal([]byte(msg.GetOffer()), &desc)
 			if err != nil {
 				log.Error("Failed to unmarshal SDP offer", "error", err.Error())
-				rt.errc <- err
+				rt.errc <- fmt.Errorf("unmarshal SDP offer: %w", err)
 				return
 			}
 			rt.descriptionc <- desc
@@ -239,7 +271,7 @@ func (rt *webrtcExternalSignalTransport) handleNegotiateStream(ctx context.Conte
 			err := json.Unmarshal([]byte(msg.GetCandidate()), &candidate)
 			if err != nil {
 				log.Error("Failed to unmarshal ICE candidate", "error", err.Error())
-				rt.errc <- err
+				rt.errc <- fmt.Errorf("unmarshal ICE candidate: %w", err)
 				return
 			}
 			rt.candidatec <- candidate
@@ -254,8 +286,30 @@ type webrtcInternalSignalTransport struct {
 	descriptionc chan webrtc.SessionDescription
 	candidatec   chan webrtc.ICECandidateInit
 	errc         chan error
-	mu           sync.Mutex
 	cancel       context.CancelFunc
+	closec       chan struct{}
+	mu           sync.Mutex
+}
+
+// TURNServers returns a list of TURN servers configured for the transport.
+func (rt *webrtcInternalSignalTransport) TURNServers() []webrtc.ICEServer {
+	out := make([]webrtc.ICEServer, len(rt.WebRTCInternalSignalOptions.TURNServers))
+	for i, server := range rt.WebRTCInternalSignalOptions.TURNServers {
+		out[i] = webrtc.ICEServer{
+			URLs: []string{server},
+		}
+	}
+	return out
+}
+
+// Candidates returns a channel of ICE candidates received from the remote peer.
+func (rt *webrtcInternalSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
+	return rt.candidatec
+}
+
+// Descriptions returns a channel of SDP descriptions received from the remote peer.
+func (rt *webrtcInternalSignalTransport) Descriptions() <-chan webrtc.SessionDescription {
+	return rt.descriptionc
 }
 
 // Start starts the transport.
@@ -278,7 +332,7 @@ func (rt *webrtcInternalSignalTransport) Start(ctx context.Context) error {
 		Src:         rt.SourceAddr.String(),
 		Dst:         rt.TargetAddr.Addr().String(),
 		Port:        uint32(rt.TargetAddr.Port()),
-		StunServers: rt.TURNServers,
+		StunServers: rt.WebRTCInternalSignalOptions.TURNServers,
 	})
 	if err != nil {
 		return fmt.Errorf("send negotiation request: %w", err)
@@ -296,6 +350,7 @@ func (rt *webrtcInternalSignalTransport) SendDescription(ctx context.Context, de
 	if err != nil {
 		return err
 	}
+	context.LoggerFrom(ctx).Debug("Sending SDP description", "description", string(b))
 	err = rt.stream.Send(&v1.DataChannelNegotiation{
 		Answer: string(b),
 	})
@@ -316,6 +371,7 @@ func (rt *webrtcInternalSignalTransport) SendCandidate(ctx context.Context, cand
 	if err != nil {
 		return err
 	}
+	context.LoggerFrom(ctx).Debug("Sending ICE candidate", "candidate", string(b))
 	err = rt.stream.Send(&v1.DataChannelNegotiation{
 		Candidate: string(b),
 	})
@@ -328,16 +384,6 @@ func (rt *webrtcInternalSignalTransport) SendCandidate(ctx context.Context, cand
 	return nil
 }
 
-// Candidates returns a channel of ICE candidates received from the remote peer.
-func (rt *webrtcInternalSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
-	return rt.candidatec
-}
-
-// Descriptions returns a channel of SDP descriptions received from the remote peer.
-func (rt *webrtcInternalSignalTransport) Descriptions() <-chan webrtc.SessionDescription {
-	return rt.descriptionc
-}
-
 // Error returns a channel that receives any error encountered during signaling.
 // This channel will be closed when the transport is closed.
 func (rt *webrtcInternalSignalTransport) Error() <-chan error {
@@ -348,6 +394,12 @@ func (rt *webrtcInternalSignalTransport) Error() <-chan error {
 func (rt *webrtcInternalSignalTransport) Close() error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
+	select {
+	case <-rt.closec:
+		return nil
+	default:
+	}
+	close(rt.closec)
 	defer rt.cancel()
 	return rt.stream.CloseSend()
 }
@@ -363,7 +415,7 @@ func (rt *webrtcInternalSignalTransport) handleNegotiateStream(ctx context.Conte
 				return
 			}
 			log.Error("Failed to receive negotiation message", "error", err.Error())
-			rt.errc <- err
+			rt.errc <- fmt.Errorf("receive negotiation message: %w", err)
 			return
 		}
 		if msg.GetOffer() != "" {
@@ -373,7 +425,7 @@ func (rt *webrtcInternalSignalTransport) handleNegotiateStream(ctx context.Conte
 			err := json.Unmarshal([]byte(msg.GetOffer()), &desc)
 			if err != nil {
 				log.Error("Failed to unmarshal SDP offer", "error", err.Error())
-				rt.errc <- err
+				rt.errc <- fmt.Errorf("unmarshal SDP offer: %w", err)
 				return
 			}
 			rt.descriptionc <- desc
@@ -385,7 +437,7 @@ func (rt *webrtcInternalSignalTransport) handleNegotiateStream(ctx context.Conte
 			err := json.Unmarshal([]byte(msg.GetCandidate()), &candidate)
 			if err != nil {
 				log.Error("Failed to unmarshal ICE candidate", "error", err.Error())
-				rt.errc <- err
+				rt.errc <- fmt.Errorf("unmarshal ICE candidate: %w", err)
 				return
 			}
 			rt.candidatec <- candidate

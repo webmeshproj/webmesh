@@ -189,6 +189,8 @@ func IsSignalTransportClosed(err error) bool {
 type WebRTCSignalTransport interface {
 	// Start starts the transport.
 	Start(ctx context.Context) error
+	// TURNServers returns a list of TURN servers configured for the transport.
+	TURNServers() []webrtc.ICEServer
 	// SendDescription sends an SDP description to the remote peer.
 	SendDescription(ctx context.Context, desc webrtc.SessionDescription) error
 	// SendCandidate sends an ICE candidate to the remote peer.

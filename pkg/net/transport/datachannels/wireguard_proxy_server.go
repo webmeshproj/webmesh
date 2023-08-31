@@ -42,8 +42,8 @@ type WireGuardProxyServer struct {
 	bufferSize int
 }
 
-// NewWireGuardProxyServer creates a new WireGuardProxyServer using the given STUN servers.
-// Traffix will be proxied to the wireguard interface listening on targetPort.
+// NewWireGuardProxyServer creates a new WireGuardProxyServer using the given STUN servers
+// for ICE negotiation. Traffic will be proxied to the wireguard interface listening on targetPort.
 func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPort uint16) (*WireGuardProxyServer, error) {
 	s := webrtc.SettingEngine{}
 	s.DetachDataChannels()

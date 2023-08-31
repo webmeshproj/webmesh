@@ -17,8 +17,10 @@ limitations under the License.
 package ctlcmd
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strconv"
@@ -26,9 +28,12 @@ import (
 
 	"github.com/pion/webrtc/v3"
 	"github.com/spf13/cobra"
+	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd/portforward"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 )
 
 func init() {
@@ -67,18 +72,24 @@ func portForward(cmd *cobra.Command, nodeID string, portForwardSpec string) erro
 	if err != nil {
 		return fmt.Errorf("failed to parse port forward spec: %w", err)
 	}
-	client, closer, err := cliConfig.NewWebRTCClient()
+	creds, err := cliConfig.GetDialOptions()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get dial options: %w", err)
 	}
-	defer closer.Close()
-	pc, err := datachannels.NewClientPeerConnection(cmd.Context(), &datachannels.ClientOptions{
-		Client:      client,
+	pc, err := datachannels.NewClientPeerConnection(cmd.Context(), portForwardProtocol, tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{
+		Resolver: transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
+			// Return the server address from our config
+			addrport, err := netip.ParseAddrPort(cliConfig.GetCurrentCluster().Server)
+			if err != nil {
+				return nil, err
+			}
+			return []netip.AddrPort{addrport}, nil
+		}),
+		Credentials: creds,
 		NodeID:      nodeID,
-		Protocol:    portForwardProtocol,
-		Destination: spec.RemoteAddress,
-		Port:        spec.RemotePort,
-	})
+		TargetProto: portForwardProtocol,
+		TargetAddr:  netip.MustParseAddrPort(net.JoinHostPort(portForwardAddress, strconv.Itoa(int(spec.RemotePort)))),
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %w", err)
 	}
