@@ -29,6 +29,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/embed"
+	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 )
 
 func main() {
@@ -61,8 +62,20 @@ func main() {
 // same machine.
 
 func runServer() error {
-	fmt.Println("Bootstrapping network...")
 	ctx := context.Background()
+	eps, err := endpoints.Detect(ctx, endpoints.DetectOpts{
+		DetectIPv6:     true,
+		DetectPrivate:  true,
+		SkipInterfaces: []string{},
+	})
+	if err != nil {
+		return err
+	}
+	if len(eps) == 0 {
+		return errors.New("no endpoints detected")
+	}
+
+	fmt.Printf("Bootstrapping network with primary endpoint %s...\n", eps[0].Addr().String())
 
 	conf := config.NewDefaultConfig("server-node")
 	conf.Services.GRPCListenAddress = "[::]:8443"
@@ -73,6 +86,7 @@ func runServer() error {
 	conf.Bootstrap.Enabled = true
 	conf.TLS.Insecure = true
 	conf.Services.Insecure = true
+	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 
 	conn, err := embed.NewNode(context.Background(), &conf)
 	if err != nil {
