@@ -359,6 +359,18 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 			PSK:              o.Discovery.PSK,
 			DiscoveryTTL:     o.Discovery.AnnounceTTL,
 			Announce:         o.Discovery.Announce,
+			LocalAddrs: func() []multiaddr.Multiaddr {
+				out := make([]multiaddr.Multiaddr, 0)
+				for _, addr := range o.Discovery.LocalAddrs {
+					maddr, err := multiaddr.NewMultiaddr(addr)
+					if err != nil {
+						context.LoggerFrom(ctx).Warn("Invalid local multiaddr", slog.String("address", addr))
+						continue
+					}
+					out = append(out, maddr)
+				}
+				return out
+			}(),
 		},
 		NetworkOptions: meshnet.Options{
 			NodeID:                nodeid,
