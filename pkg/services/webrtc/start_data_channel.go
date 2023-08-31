@@ -47,9 +47,7 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 	if p, ok := peer.FromContext(stream.Context()); ok {
 		remoteAddr = p.Addr.String()
 	}
-
 	log := context.LoggerFrom(stream.Context()).With(slog.String("remote_addr", remoteAddr))
-
 	// Pull the initial request from the stream in a goroutine to avoid blocking
 	// forever if the client never sends anything.
 	ctx, cancel := context.WithTimeout(stream.Context(), 10*time.Second)
@@ -127,7 +125,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 		}
 	} else {
 		log.Info("Negotiating standard WebRTC connection")
-		conn, err = datachannels.NewServerPeerConnection(stream.Context(), &datachannels.OfferOptions{
+		conn, err = datachannels.NewPeerConnectionServer(stream.Context(), &datachannels.OfferOptions{
 			Proto:       r.GetProto(),
 			SrcAddress:  remoteAddr,
 			DstAddress:  net.JoinHostPort(r.GetDst(), strconv.Itoa(int(r.GetPort()))),

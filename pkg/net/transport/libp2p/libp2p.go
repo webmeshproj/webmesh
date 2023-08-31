@@ -20,16 +20,12 @@ limitations under the License.
 package libp2p
 
 import (
-	"fmt"
 	"sync"
 
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 )
 
 // JoinProtocol is the protocol used for joining a mesh.
@@ -38,32 +34,33 @@ const JoinProtocol = protocol.ID("/webmesh/join/0.0.1")
 // WebRTCSignalProtocol is the protocol used for webrtc-signaling.
 const WebRTCSignalProtocol = protocol.ID("/webmesh/signal/0.0.1")
 
-func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, servers []multiaddr.Multiaddr) error {
-	log := context.LoggerFrom(ctx)
-	err := kaddht.Bootstrap(ctx)
-	if err != nil {
-		return fmt.Errorf("libp2p dht bootstrap: %w", err)
+// WebRTCSignalProtocolFor returns the protocol used for webrtc-signaling for the given
+// rendevous string or peer ID.
+func WebRTCSignalProtocolFor(id string) protocol.ID {
+	return protocol.ID("/webmesh/signal/0.0.1/" + id)
+}
+
+// WebRTCRendevousFrom returns the rendevous string from the given protocol ID.
+func WebRTCRendevousFrom(id protocol.ID) string {
+	if len(id) < len(WebRTCSignalProtocol)+1 {
+		return ""
 	}
-	if len(servers) == 0 {
-		servers = dht.DefaultBootstrapPeers
-	}
-	var wg sync.WaitGroup
-	for _, peerAddr := range servers {
-		peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
+	return string(id)[len(WebRTCSignalProtocol)+1:]
+}
+
+var buffersOnce sync.Once
+
+// SetBuffers sets the buffers to use for libp2p.
+func SetBuffers(ctx context.Context) {
+	buffersOnce.Do(func() {
+		log := context.LoggerFrom(ctx)
+		err := buffers.SetMaximumReadBuffer(2500000)
 		if err != nil {
-			log.Warn("Failed to parse bootstrap peer address", "error", err.Error())
-			continue
+			log.Warn("Failed to set maximum read buffer", "error", err.Error())
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := host.Connect(ctx, *peerinfo); err != nil {
-				log.Warn("Failed to connect to bootstrap peer", "error", err.Error())
-				return
-			}
-			log.Debug("Connection established with bootstrap node", "node", peerinfo.String())
-		}()
-	}
-	wg.Wait()
-	return nil
+		err = buffers.SetMaximumWriteBuffer(2500000)
+		if err != nil {
+			log.Warn("Failed to set maximum write buffer", "error", err.Error())
+		}
+	})
 }

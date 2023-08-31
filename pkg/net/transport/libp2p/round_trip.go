@@ -27,14 +27,12 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
@@ -76,14 +74,7 @@ type dhtRoundTripper[REQ, RESP any] struct {
 func (rt *dhtRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
 	log := context.LoggerFrom(ctx).With("method", rt.method)
 	// Try to set the maximum read and write buffer sizes.
-	err := buffers.SetMaximumReadBuffer(2500000)
-	if err != nil {
-		log.Warn("Failed to set maximum read buffer", "error", err.Error())
-	}
-	err = buffers.SetMaximumWriteBuffer(2500000)
-	if err != nil {
-		log.Warn("Failed to set maximum write buffer", "error", err.Error())
-	}
+	SetBuffers(context.WithLogger(ctx, log))
 	// Create a new libp2p host.
 	if len(rt.LocalAddrs) > 0 {
 		rt.Options = append(rt.Options, libp2p.ListenAddrs(rt.LocalAddrs...))
@@ -97,15 +88,11 @@ func (rt *dhtRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.
 	log.Debug("Bootstrapping DHT")
-	kaddht, err := dht.New(ctx, host)
+	kaddht, err := NewDHT(ctx, host, rt.BootstrapPeers)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
 	defer kaddht.Close()
-	err = bootstrapDHT(ctx, host, kaddht, rt.BootstrapPeers)
-	if err != nil {
-		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
-	}
 	// Announce the join protocol with our PSK.
 	log.Debug("Searching for peers on the DHT with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(kaddht)

@@ -40,12 +40,13 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
 // WebRTCExternalSignalOptions are options for configuring a WebRTC signaling transport.
 type WebRTCExternalSignalOptions struct {
+	// NodeID is the local node ID to advertise to the peer.
+	NodeID string
 	// Rendevous is the rendevous string to use for the DHT.
 	Rendevous string
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
@@ -70,14 +71,7 @@ type WebRTCExternalSignalOptions struct {
 func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOptions) (transport.WebRTCSignalTransport, error) {
 	log := context.LoggerFrom(ctx).With("libp2p", "webrtc-signal")
 	// Try to set the maximum read and write buffer sizes.
-	err := buffers.SetMaximumReadBuffer(2500000)
-	if err != nil {
-		log.Warn("Failed to set maximum read buffer", "error", err.Error())
-	}
-	err = buffers.SetMaximumWriteBuffer(2500000)
-	if err != nil {
-		log.Warn("Failed to set maximum write buffer", "error", err.Error())
-	}
+	SetBuffers(context.WithLogger(ctx, log))
 	// Create a new libp2p host.
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
@@ -100,6 +94,7 @@ func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOp
 		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
 	}
 	return &externalSignalTransport{
+		nodeID:      opts.NodeID,
 		rendevous:   opts.Rendevous,
 		targetProto: opts.TargetProto,
 		targetAddr:  opts.TargetAddr,
@@ -112,6 +107,7 @@ func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOp
 }
 
 type externalSignalTransport struct {
+	nodeID            string
 	rendevous         string
 	targetProto       string
 	targetAddr        netip.AddrPort
@@ -127,15 +123,15 @@ type externalSignalTransport struct {
 }
 
 // Start starts the transport.
-func (ext *externalSignalTransport) Start(ctx context.Context) error {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+func (rt *externalSignalTransport) Start(ctx context.Context) error {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
 	log := context.LoggerFrom(ctx).With("libp2p", "webrtc-signal")
-	routingDiscovery := drouting.NewRoutingDiscovery(ext.dht)
+	routingDiscovery := drouting.NewRoutingDiscovery(rt.dht)
 
 StartSignaling:
 	for {
-		peerChan, err := routingDiscovery.FindPeers(ctx, ext.rendevous)
+		peerChan, err := routingDiscovery.FindPeers(ctx, rt.rendevous)
 		if err != nil {
 			return fmt.Errorf("libp2p find peers: %w", err)
 		}
@@ -145,41 +141,41 @@ StartSignaling:
 			case <-ctx.Done():
 				return fmt.Errorf("context canceled")
 			case peer := <-peerChan:
-				if peer.ID == ext.host.ID() || len(peer.Addrs) == 0 {
+				if peer.ID == rt.host.ID() || len(peer.Addrs) == 0 {
 					continue
 				}
 				log := log.With(slog.String("peer-id", peer.ID.String()))
 				// Try to connect to the peer.
 				log.Debug("Connecting to peer")
-				ctx, ext.cancel = context.WithCancel(ctx)
-				stream, err := ext.host.NewStream(ctx, peer.ID, WebRTCSignalProtocol)
+				ctx, rt.cancel = context.WithCancel(ctx)
+				stream, err := rt.host.NewStream(ctx, peer.ID, WebRTCSignalProtocolFor(rt.rendevous))
 				if err != nil {
 					log.Debug("Failed to connect to peer", "error", err.Error())
 					continue
 				}
-				ext.buf = bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+				rt.buf = bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 				// Send the target protocol and address to the peer.
 				data, err := protojson.Marshal(&v1.StartDataChannelRequest{
-					NodeId: peer.ID.String(),
-					Proto:  ext.targetProto,
-					Dst:    ext.targetAddr.Addr().String(),
-					Port:   uint32(ext.targetAddr.Port()),
+					NodeId: rt.nodeID,
+					Proto:  rt.targetProto,
+					Dst:    rt.targetAddr.Addr().String(),
+					Port:   uint32(rt.targetAddr.Port()),
 				})
 				if err != nil {
 					return fmt.Errorf("marshal start data channel request: %w", err)
 				}
 				log.Debug("Sending start data channel request")
-				_, err = ext.buf.Write(append(data, '\r'))
+				_, err = rt.buf.Write(append(data, '\r'))
 				if err != nil {
 					return fmt.Errorf("write start data channel request: %w", err)
 				}
-				err = ext.buf.Flush()
+				err = rt.buf.Flush()
 				if err != nil {
 					return fmt.Errorf("flush start data channel request: %w", err)
 				}
 				// Read the next offer from the stream.
 				log.Debug("Waiting for remote description")
-				line, err := ext.buf.ReadString('\r')
+				line, err := rt.buf.ReadString('\r')
 				if err != nil {
 					return fmt.Errorf("read remote description: %w", err)
 				}
@@ -196,14 +192,14 @@ StartSignaling:
 					return fmt.Errorf("unmarshal SDP offer: %w", err)
 				}
 				log.Debug("Received remote description", "description", &offer)
-				ext.remoteDescription = offer
-				ext.turnServers = make([]webrtc.ICEServer, len(msg.GetStunServers()))
+				rt.remoteDescription = offer
+				rt.turnServers = make([]webrtc.ICEServer, len(msg.GetStunServers()))
 				for i, server := range msg.GetStunServers() {
-					ext.turnServers[i] = webrtc.ICEServer{
+					rt.turnServers[i] = webrtc.ICEServer{
 						URLs: []string{server},
 					}
 				}
-				go ext.handleStream(ctx, stream, ext.buf)
+				go rt.handleStream(ctx, stream, rt.buf)
 				break StartSignaling
 			}
 		}
@@ -212,14 +208,14 @@ StartSignaling:
 }
 
 // TURNServers returns a list of TURN servers configured for the transport.
-func (ext *externalSignalTransport) TURNServers() []webrtc.ICEServer {
-	return ext.turnServers
+func (rt *externalSignalTransport) TURNServers() []webrtc.ICEServer {
+	return rt.turnServers
 }
 
 // SendDescription sends an SDP description to the remote peer.
-func (ext *externalSignalTransport) SendDescription(ctx context.Context, desc webrtc.SessionDescription) error {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+func (rt *externalSignalTransport) SendDescription(ctx context.Context, desc webrtc.SessionDescription) error {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
 	log := context.LoggerFrom(ctx)
 	log.Debug("Sending SDP description", "description", &desc)
 	data, err := json.Marshal(desc)
@@ -233,11 +229,11 @@ func (ext *externalSignalTransport) SendDescription(ctx context.Context, desc we
 	if err != nil {
 		return fmt.Errorf("marshal start data channel request: %w", err)
 	}
-	_, err = ext.buf.Write(append(data, '\r'))
+	_, err = rt.buf.Write(append(data, '\r'))
 	if err != nil {
 		return fmt.Errorf("write start data channel request: %w", err)
 	}
-	err = ext.buf.Flush()
+	err = rt.buf.Flush()
 	if err != nil {
 		return fmt.Errorf("flush start data channel request: %w", err)
 	}
@@ -245,9 +241,9 @@ func (ext *externalSignalTransport) SendDescription(ctx context.Context, desc we
 }
 
 // SendCandidate sends an ICE candidate to the remote peer.
-func (ext *externalSignalTransport) SendCandidate(ctx context.Context, candidate webrtc.ICECandidateInit) error {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+func (rt *externalSignalTransport) SendCandidate(ctx context.Context, candidate webrtc.ICECandidateInit) error {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
 	log := context.LoggerFrom(ctx)
 	log.Debug("Sending ICE candidate", "candidate", &candidate)
 	data, err := json.Marshal(candidate)
@@ -261,11 +257,11 @@ func (ext *externalSignalTransport) SendCandidate(ctx context.Context, candidate
 	if err != nil {
 		return fmt.Errorf("marshal start data channel request: %w", err)
 	}
-	_, err = ext.buf.Write(append(data, '\r'))
+	_, err = rt.buf.Write(append(data, '\r'))
 	if err != nil {
 		return fmt.Errorf("write start data channel request: %w", err)
 	}
-	err = ext.buf.Flush()
+	err = rt.buf.Flush()
 	if err != nil {
 		return fmt.Errorf("flush start data channel request: %w", err)
 	}
@@ -273,31 +269,31 @@ func (ext *externalSignalTransport) SendCandidate(ctx context.Context, candidate
 }
 
 // Candidates returns a channel of ICE candidates received from the remote peer.
-func (ext *externalSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
-	return ext.candidatec
+func (rt *externalSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
+	return rt.candidatec
 }
 
 // RemoteDescription returns a channel the description received from the remote peer.
-func (ext *externalSignalTransport) RemoteDescription() webrtc.SessionDescription {
-	return ext.remoteDescription
+func (rt *externalSignalTransport) RemoteDescription() webrtc.SessionDescription {
+	return rt.remoteDescription
 }
 
 // Error returns a channel that receives any error encountered during signaling.
 // This channel will be closed when the transport is closed.
-func (ext *externalSignalTransport) Error() <-chan error {
-	return ext.errorc
+func (rt *externalSignalTransport) Error() <-chan error {
+	return rt.errorc
 }
 
 // Close closes the transport.
-func (ext *externalSignalTransport) Close() error {
-	ext.cancel()
-	defer ext.dht.Close()
-	return ext.host.Close()
+func (rt *externalSignalTransport) Close() error {
+	rt.cancel()
+	defer rt.dht.Close()
+	return rt.host.Close()
 }
 
-func (ext *externalSignalTransport) handleStream(ctx context.Context, stream network.Stream, buf *bufio.ReadWriter) {
+func (rt *externalSignalTransport) handleStream(ctx context.Context, stream network.Stream, buf *bufio.ReadWriter) {
 	log := context.LoggerFrom(ctx)
-	defer close(ext.errorc)
+	defer close(rt.errorc)
 	defer stream.Close()
 	for {
 		// Read the next line from the stream.
@@ -307,7 +303,7 @@ func (ext *externalSignalTransport) handleStream(ctx context.Context, stream net
 			if errors.Is(err, io.EOF) {
 				return
 			}
-			ext.errorc <- fmt.Errorf("read line: %w", err)
+			rt.errorc <- fmt.Errorf("read line: %w", err)
 			return
 		}
 		// Unmarshal the line into a start data channel offer object.
@@ -315,7 +311,7 @@ func (ext *externalSignalTransport) handleStream(ctx context.Context, stream net
 		line = line[:len(line)-1]
 		err = protojson.Unmarshal([]byte(line), &msg)
 		if err != nil {
-			ext.errorc <- fmt.Errorf("unmarshal start data channel offer: %w", err)
+			rt.errorc <- fmt.Errorf("unmarshal start data channel offer: %w", err)
 			return
 		}
 		if msg.GetCandidate() != "" {
@@ -323,10 +319,10 @@ func (ext *externalSignalTransport) handleStream(ctx context.Context, stream net
 			var candidate webrtc.ICECandidateInit
 			err = json.Unmarshal([]byte(msg.GetCandidate()), &candidate)
 			if err != nil {
-				ext.errorc <- fmt.Errorf("unmarshal ICE candidate: %w", err)
+				rt.errorc <- fmt.Errorf("unmarshal ICE candidate: %w", err)
 				return
 			}
-			ext.candidatec <- candidate
+			rt.candidatec <- candidate
 		}
 	}
 }

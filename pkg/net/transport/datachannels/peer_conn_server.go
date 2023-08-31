@@ -31,9 +31,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
-// ServerPeerConnection represents a connection to a peer where we
+// PeerConnectionServer represents a connection to a peer where we
 // forward traffic for the other end.
-type ServerPeerConnection struct {
+type PeerConnectionServer struct {
 	// PeerConnection is the underlying WebRTC peer connection.
 	*webrtc.PeerConnection
 	// offer is the offer to be sent to the peer.
@@ -71,8 +71,8 @@ type OfferOptions struct {
 	STUNServers []string
 }
 
-// NewServerPeerConnection creates a new peer connection with the given options.
-func NewServerPeerConnection(ctx context.Context, opts *OfferOptions) (*ServerPeerConnection, error) {
+// NewPeerConnectionServer creates a new peer connection server with the given options.
+func NewPeerConnectionServer(ctx context.Context, opts *OfferOptions) (*PeerConnectionServer, error) {
 	if opts.Proto == "" {
 		opts.Proto = "tcp"
 	}
@@ -88,7 +88,7 @@ func NewServerPeerConnection(ctx context.Context, opts *OfferOptions) (*ServerPe
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer connection: %w", err)
 	}
-	pc := &ServerPeerConnection{
+	pc := &PeerConnectionServer{
 		PeerConnection: conn,
 		proto:          opts.Proto,
 		srcAddress:     opts.SrcAddress,
@@ -130,12 +130,12 @@ func NewServerPeerConnection(ctx context.Context, opts *OfferOptions) (*ServerPe
 }
 
 // Offer returns the offer to be sent to the peer.
-func (pc *ServerPeerConnection) Offer() string {
+func (pc *PeerConnectionServer) Offer() string {
 	return string(pc.offerJSON)
 }
 
 // AnswerOffer answers the given offer from the peer.
-func (pc *ServerPeerConnection) AnswerOffer(answer string) error {
+func (pc *PeerConnectionServer) AnswerOffer(answer string) error {
 	var answerInit webrtc.SessionDescription
 	err := json.Unmarshal([]byte(answer), &answerInit)
 	if err != nil {
@@ -146,12 +146,12 @@ func (pc *ServerPeerConnection) AnswerOffer(answer string) error {
 
 // Candidates returns a channel that will receive potential
 // ICE candidates for the peer.
-func (pc *ServerPeerConnection) Candidates() <-chan string {
+func (pc *PeerConnectionServer) Candidates() <-chan string {
 	return pc.candidatec
 }
 
 // AddCandidate adds an ICE candidate to the peer connection.
-func (pc *ServerPeerConnection) AddCandidate(candidate string) error {
+func (pc *PeerConnectionServer) AddCandidate(candidate string) error {
 	return pc.AddICECandidate(webrtc.ICECandidateInit{
 		Candidate: candidate,
 	})
@@ -159,12 +159,12 @@ func (pc *ServerPeerConnection) AddCandidate(candidate string) error {
 
 // Closed returns a channel that will be closed when the peer connection
 // is closed.
-func (pc *ServerPeerConnection) Closed() <-chan struct{} {
+func (pc *PeerConnectionServer) Closed() <-chan struct{} {
 	return pc.closec
 }
 
 // IsClosed returns true if the peer connection is closed.
-func (pc *ServerPeerConnection) IsClosed() bool {
+func (pc *PeerConnectionServer) IsClosed() bool {
 	select {
 	case <-pc.closec:
 		return true
@@ -173,7 +173,7 @@ func (pc *ServerPeerConnection) IsClosed() bool {
 	}
 }
 
-func (pc *ServerPeerConnection) onICEConnectionStateChange(state webrtc.ICEConnectionState) {
+func (pc *PeerConnectionServer) onICEConnectionStateChange(state webrtc.ICEConnectionState) {
 	pc.logger.Debug("ICE connection state changed", slog.String("state", state.String()))
 	closeAll := func() {
 		select {
@@ -208,7 +208,7 @@ func (pc *ServerPeerConnection) onICEConnectionStateChange(state webrtc.ICEConne
 	}
 }
 
-func (pc *ServerPeerConnection) onICECandidate(c *webrtc.ICECandidate) {
+func (pc *PeerConnectionServer) onICECandidate(c *webrtc.ICECandidate) {
 	if c == nil {
 		return
 	}
@@ -223,11 +223,11 @@ func (pc *ServerPeerConnection) onICECandidate(c *webrtc.ICECandidate) {
 	pc.candidatec <- c.ToJSON().Candidate
 }
 
-func (pc *ServerPeerConnection) onDataChannelClose() {
+func (pc *PeerConnectionServer) onDataChannelClose() {
 	pc.logger.Debug("data channel has closed")
 }
 
-func (pc *ServerPeerConnection) onDataChannelOpen() {
+func (pc *PeerConnectionServer) onDataChannelOpen() {
 	pc.logger.Info("data channel has opened")
 	candidatePair, err := pc.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 	if err != nil {

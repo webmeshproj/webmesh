@@ -57,10 +57,10 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts DiscoveryOptions) erro
 		}
 		peers = append(peers, mul)
 	}
-	announceOpts := libp2p.AnnounceOptions{
+	announceOpts := libp2p.JoinAnnounceOptions{
 		PSK:            opts.PSK,
 		BootstrapPeers: peers,
-		DiscoveryTTL:   opts.DiscoveryTTL,
+		AnnounceTTL:    opts.DiscoveryTTL,
 	}
 	discover, err := libp2p.NewJoinAnnouncer(ctx, announceOpts, transport.JoinServerFunc(s.proxyJoinToLeader))
 	if err != nil {

@@ -48,8 +48,8 @@ type ClientOptions struct {
 	Port uint32
 }
 
-// ClientPeerConnection is a WebRTC peer connection for port forwarding.
-type ClientPeerConnection struct {
+// PeerConnectionClient is a WebRTC peer connection for port forwarding.
+type PeerConnectionClient struct {
 	// PeerConnection is the underlying WebRTC peer connection.
 	*webrtc.PeerConnection
 	// protocol is the protocol to use for connection channels.
@@ -71,8 +71,8 @@ type ClientPeerConnection struct {
 	logger *slog.Logger
 }
 
-// NewClientPeerConnection creates a new peer connection.
-func NewClientPeerConnection(ctx context.Context, protocol string, rt transport.WebRTCSignalTransport) (*ClientPeerConnection, error) {
+// NewPeerConnectionClient creates a new peer connection client.
+func NewPeerConnectionClient(ctx context.Context, protocol string, rt transport.WebRTCSignalTransport) (*PeerConnectionClient, error) {
 	// Send a request for a data channel.
 	log := context.LoggerFrom(ctx)
 	log.Debug("Starting signaling transport")
@@ -92,7 +92,7 @@ func NewClientPeerConnection(ctx context.Context, protocol string, rt transport.
 		return nil, fmt.Errorf("failed to create peer connection: %w", err)
 	}
 	// Build the peer connection
-	pc := &ClientPeerConnection{
+	pc := &PeerConnectionClient{
 		PeerConnection: p,
 		errors:         make(chan error, 5),
 		ready:          make(chan struct{}),
@@ -148,16 +148,16 @@ func NewClientPeerConnection(ctx context.Context, protocol string, rt transport.
 }
 
 // Errors returns a channel for receiving errors from the peer connection.
-func (pc *ClientPeerConnection) Errors() <-chan error { return pc.errors }
+func (pc *PeerConnectionClient) Errors() <-chan error { return pc.errors }
 
 // Ready returns a channel for receiving a notification when the peer connection is ready.
-func (pc *ClientPeerConnection) Ready() <-chan struct{} { return pc.ready }
+func (pc *PeerConnectionClient) Ready() <-chan struct{} { return pc.ready }
 
 // Closed returns a channel for receiving a notification when the peer connection is closed.
-func (pc *ClientPeerConnection) Closed() <-chan struct{} { return pc.closed }
+func (pc *PeerConnectionClient) Closed() <-chan struct{} { return pc.closed }
 
 // ListenAndServe creates a listener and passes incoming connections to the handler.
-func (pc *ClientPeerConnection) ListenAndServe(ctx context.Context, proto, addr string) error {
+func (pc *PeerConnectionClient) ListenAndServe(ctx context.Context, proto, addr string) error {
 	l, err := net.Listen(proto, addr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", addr, err)
@@ -167,7 +167,7 @@ func (pc *ClientPeerConnection) ListenAndServe(ctx context.Context, proto, addr 
 }
 
 // Serve handles connections on the given listener.
-func (pc *ClientPeerConnection) Serve(ctx context.Context, l net.Listener) error {
+func (pc *PeerConnectionClient) Serve(ctx context.Context, l net.Listener) error {
 	errs := make(chan error, 1)
 	go func() {
 		for {
@@ -193,7 +193,7 @@ func (pc *ClientPeerConnection) Serve(ctx context.Context, l net.Listener) error
 }
 
 // Handle handles the given connection.
-func (pc *ClientPeerConnection) Handle(conn net.Conn) {
+func (pc *PeerConnectionClient) Handle(conn net.Conn) {
 	connNumber := pc.count.Add(1)
 	if err := binary.Write(pc.channels, binary.BigEndian, connNumber); err != nil {
 		pc.errors <- fmt.Errorf("failed to write to negotiation data channel: %w", err)
@@ -235,7 +235,7 @@ func (pc *ClientPeerConnection) Handle(conn net.Conn) {
 	})
 }
 
-func (pc *ClientPeerConnection) negotiate(offer webrtc.SessionDescription) {
+func (pc *PeerConnectionClient) negotiate(offer webrtc.SessionDescription) {
 	defer pc.rt.Close()
 	// Set the remote SessionDescription
 	if err := pc.SetRemoteDescription(offer); err != nil {

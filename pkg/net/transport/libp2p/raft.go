@@ -32,7 +32,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
@@ -59,14 +58,7 @@ type RaftTransportOptions struct {
 // NewRaftTransport creates a new Raft transport over the Kademlia DHT.
 func NewRaftTransport(ctx context.Context, opts RaftTransportOptions) (raft.Transport, error) {
 	log := context.LoggerFrom(ctx)
-	err := buffers.SetMaximumReadBuffer(2500000)
-	if err != nil {
-		log.Warn("Failed to set maximum read buffer", "error", err.Error())
-	}
-	err = buffers.SetMaximumWriteBuffer(2500000)
-	if err != nil {
-		log.Warn("Failed to set maximum write buffer", "error", err.Error())
-	}
+	SetBuffers(ctx)
 	host, err := libp2p.New(opts.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)

@@ -26,10 +26,10 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-type AnnounceOptions struct {
+type JoinAnnounceOptions struct {
 }
 
-func NewAnnouncer(ctx context.Context, opts DHTAnnounceOptions, join transport.JoinServer) (io.Closer, error) {
+func NewAnnouncer(ctx context.Context, opts JoinAnnounceOptions, join transport.JoinServer) (io.Closer, error) {
 	return nil, errors.New("not implemented")
 }
 

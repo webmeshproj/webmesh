@@ -76,7 +76,7 @@ func portForward(cmd *cobra.Command, nodeID string, portForwardSpec string) erro
 	if err != nil {
 		return fmt.Errorf("failed to get dial options: %w", err)
 	}
-	pc, err := datachannels.NewClientPeerConnection(cmd.Context(), portForwardProtocol, tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{
+	pc, err := datachannels.NewPeerConnectionClient(cmd.Context(), portForwardProtocol, tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{
 		Resolver: transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
 			// Return the server address from our config
 			addrport, err := netip.ParseAddrPort(cliConfig.GetCurrentCluster().Server)

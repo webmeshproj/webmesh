@@ -36,13 +36,12 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// AnnounceOptions are options for announcing the host or discovering peers
+// JoinAnnounceOptions are options for announcing the host or discovering peers
 // on the libp2p kademlia DHT.
-type AnnounceOptions struct {
+type JoinAnnounceOptions struct {
 	// PSK is the pre-shared key to use as a rendezvous point for the DHT.
 	PSK string
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
@@ -50,9 +49,8 @@ type AnnounceOptions struct {
 	BootstrapPeers []multiaddr.Multiaddr
 	// Options are options for configuring the libp2p host.
 	Options []libp2p.Option
-	// DiscoveryTTL is the TTL to use for the discovery service.
-	// This is only applicable when announcing the host.
-	DiscoveryTTL time.Duration
+	// AnnounceTTL is the TTL to use for the discovery service.
+	AnnounceTTL time.Duration
 	// LocalAddrs is a list of local addresses to announce the host with.
 	// If empty or nil, the default local addresses will be used.
 	LocalAddrs []multiaddr.Multiaddr
@@ -60,16 +58,9 @@ type AnnounceOptions struct {
 
 // NewJoinAnnouncer creates a new announcer on the kadmilia DHT and executes
 // received join requests against the given join Server.
-func NewJoinAnnouncer(ctx context.Context, opts AnnounceOptions, join transport.JoinServer) (io.Closer, error) {
+func NewJoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, join transport.JoinServer) (io.Closer, error) {
 	log := context.LoggerFrom(ctx)
-	err := buffers.SetMaximumReadBuffer(2500000)
-	if err != nil {
-		log.Warn("Failed to set maximum read buffer", "error", err.Error())
-	}
-	err = buffers.SetMaximumWriteBuffer(2500000)
-	if err != nil {
-		log.Warn("Failed to set maximum write buffer", "error", err.Error())
-	}
+	SetBuffers(ctx)
 	acceptc := make(chan network.Stream, 1)
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
@@ -86,37 +77,32 @@ func NewJoinAnnouncer(ctx context.Context, opts AnnounceOptions, join transport.
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.
 	log.Debug("Bootstrapping DHT")
-	kaddht, err := dht.New(ctx, host)
-	if err != nil {
-		return nil, fmt.Errorf("libp2p new dht: %w", err)
-	}
-	err = bootstrapDHT(ctx, host, kaddht, opts.BootstrapPeers)
+	kaddht, err := NewDHT(ctx, host, opts.BootstrapPeers)
 	if err != nil {
 		defer host.Close()
-		defer kaddht.Close()
-		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
+		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
 	// Announce the join protocol with our PSK.
 	log.Debug("Announcing join protocol with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(kaddht)
 	var discoveryOpts []discovery.Option
-	if opts.DiscoveryTTL > 0 {
-		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.DiscoveryTTL))
+	if opts.AnnounceTTL > 0 {
+		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
 	}
 	dutil.Advertise(context.Background(), routingDiscovery, opts.PSK, discoveryOpts...)
 	announcer := &dhtJoinAnnouncer{
-		AnnounceOptions: opts,
-		host:            host,
-		dht:             kaddht,
-		acceptc:         acceptc,
-		closec:          make(chan struct{}),
+		JoinAnnounceOptions: opts,
+		host:                host,
+		dht:                 kaddht,
+		acceptc:             acceptc,
+		closec:              make(chan struct{}),
 	}
 	go announcer.handleIncomingStreams(log, join)
 	return announcer, nil
 }
 
 type dhtJoinAnnouncer struct {
-	AnnounceOptions
+	JoinAnnounceOptions
 	host    host.Host
 	dht     *dht.IpfsDHT
 	acceptc chan network.Stream
