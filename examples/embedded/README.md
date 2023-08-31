@@ -39,3 +39,5 @@ And the client with the join address of the server (assumed to be localhost):
 ```bash
 ./chat -join localhost:8443
 ```
+
+![](./chat.gif)
