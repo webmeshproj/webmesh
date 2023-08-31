@@ -38,6 +38,9 @@ type DiscoveryOptions struct {
 	KadBootstrapServers []string `koanf:"kad-bootstrap-servers,omitempty"`
 	// AnnounceTTL is the TTL for the announcement.
 	AnnounceTTL time.Duration `koanf:"announce-ttl,omitempty"`
+	// LocalAddrs is a list of local addresses to announce to the discovery service.
+	// If empty, the default local addresses will be used.
+	LocalAddrs []string `koanf:"local-addrs,omitempty"`
 }
 
 // NewDiscoveryOptions returns a new DiscoveryOptions for the given PSK.
@@ -58,6 +61,7 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.UseKadDHT, prefix+"discovery.use-kad-dht", false, "use the libp2p kademlia DHT for discovery")
 	fs.StringSliceVar(&o.KadBootstrapServers, prefix+"discovery.kad-bootstrap-servers", nil, "list of bootstrap servers to use for the DHT")
 	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", time.Minute, "TTL for the announcement")
+	fs.StringSliceVar(&o.LocalAddrs, prefix+"discovery.local-addrs", nil, "list of local addresses to announce to the discovery service")
 }
 
 // Validate validates the discovery options.
@@ -68,6 +72,23 @@ func (o *DiscoveryOptions) Validate() error {
 			_, err := multiaddr.NewMultiaddr(addr)
 			if err != nil {
 				return fmt.Errorf("invalid bootstrap server address: %w", err)
+			}
+		}
+	}
+	if o.UseKadDHT {
+		if o.PSK == "" {
+			return fmt.Errorf("pre-shared key must be set when using the kademlia DHT")
+		}
+		if o.Announce && o.AnnounceTTL <= 0 {
+			return fmt.Errorf("announce TTL must be greater than zero")
+		}
+	}
+	if len(o.LocalAddrs) > 0 {
+		// Make sure all the addresses are valid
+		for _, addr := range o.LocalAddrs {
+			_, err := multiaddr.NewMultiaddr(addr)
+			if err != nil {
+				return fmt.Errorf("invalid local address: %w", err)
 			}
 		}
 	}

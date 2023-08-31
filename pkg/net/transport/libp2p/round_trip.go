@@ -49,6 +49,9 @@ type RoundTripOptions struct {
 	Options []libp2p.Option
 	// ConnectTimeout is the per-address timeout for connecting to a peer.
 	ConnectTimeout time.Duration
+	// LocalAddrs is a list of local addresses to listen on.
+	// If empty or nil, the default local addresses will be used.
+	LocalAddrs []multiaddr.Multiaddr
 }
 
 // NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
@@ -81,6 +84,9 @@ func (rt *dhtRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (
 		log.Warn("Failed to set maximum write buffer", "error", err.Error())
 	}
 	// Create a new libp2p host.
+	if len(rt.LocalAddrs) > 0 {
+		rt.Options = append(rt.Options, libp2p.ListenAddrs(rt.LocalAddrs...))
+	}
 	host, err := libp2p.New(rt.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)

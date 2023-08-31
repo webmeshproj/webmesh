@@ -53,6 +53,9 @@ type DHTAnnounceOptions struct {
 	// DiscoveryTTL is the TTL to use for the discovery service.
 	// This is only applicable when announcing the host.
 	DiscoveryTTL time.Duration
+	// LocalAddrs is a list of local addresses to announce the host with.
+	// If empty or nil, the default local addresses will be used.
+	LocalAddrs []multiaddr.Multiaddr
 }
 
 // NewDHTAnnouncer creates a new announcer on the kadmilia DHT and executes
@@ -68,6 +71,9 @@ func NewDHTAnnouncer(ctx context.Context, opts DHTAnnounceOptions, join transpor
 		log.Warn("Failed to set maximum write buffer", "error", err.Error())
 	}
 	acceptc := make(chan network.Stream, 1)
+	if len(opts.LocalAddrs) > 0 {
+		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
+	}
 	host, err := libp2p.New(opts.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)

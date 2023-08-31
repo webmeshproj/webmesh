@@ -39,6 +39,9 @@ type DiscoveryOptions struct {
 	DiscoveryTTL time.Duration
 	// Announce is a flag to announce this peer to the discovery service.
 	Announce bool
+	// LocalAddrs are the local addresses to announce to the discovery service.
+	// If empty, the default local addresses will be used.
+	LocalAddrs []multiaddr.Multiaddr
 }
 
 func (s *meshStore) AnnounceDHT(ctx context.Context, opts DiscoveryOptions) error {
