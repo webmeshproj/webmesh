@@ -238,8 +238,13 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			}
 			// If we are bridging DNS, add it to our feature set
 			if config.MeshDNS.Enabled {
-				req.Features = append(req.Features, v1.Feature_MESH_DNS, v1.Feature_FORWARD_MESH_DNS)
-				req.MeshdnsPort = int32(dnsPort)
+				req.Features = append(req.Features, &v1.FeaturePort{
+					Feature: v1.Feature_MESH_DNS,
+					Port:    int32(dnsPort),
+				}, &v1.FeaturePort{
+					Feature: v1.Feature_FORWARD_MESH_DNS,
+					Port:    int32(dnsPort),
+				})
 			}
 			log.Info("Broadcasting routes and features to mesh", slog.String("mesh-id", meshID))
 			// Make retries configurable

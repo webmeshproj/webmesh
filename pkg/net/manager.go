@@ -222,9 +222,13 @@ func (m *manager) Dial(ctx context.Context, network, address string) (net.Conn, 
 			}
 			// If it's a v4 network use the peer's v4 address
 			if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
-				address = net.JoinHostPort(peer.PrivateIPv4.Addr().String(), port)
+				if !peer.PrivateAddrV4().IsValid() {
+					// We don't have a v4 address for this peer
+					return nil, fmt.Errorf("peer %s does not have a valid v4 address", host)
+				}
+				address = net.JoinHostPort(peer.PrivateAddrV4().Addr().String(), port)
 			} else {
-				address = net.JoinHostPort(peer.PrivateIPv6.Addr().String(), port)
+				address = net.JoinHostPort(peer.PrivateAddrV6().Addr().String(), port)
 			}
 		}
 	}
@@ -560,10 +564,22 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 		}
 		allowedRoutes = append(allowedRoutes, prefix)
 	}
+	var rpcPort int
+	var isRaftMember bool
+	for _, feat := range peer.GetFeatures() {
+		if feat.Feature == v1.Feature_STORAGE {
+			// They are a raft member
+			isRaftMember = true
+		}
+		if feat.Feature == v1.Feature_NODES {
+			// This is their RPC port
+			rpcPort = int(feat.Port)
+		}
+	}
 	wgpeer := wireguard.Peer{
 		ID:            peer.GetId(),
-		GRPCPort:      int(peer.GetGrpcPort()),
-		RaftMember:    peer.GetRaftMember(),
+		GRPCPort:      rpcPort,
+		RaftMember:    isRaftMember,
 		PublicKey:     key,
 		Endpoint:      endpoint,
 		PrivateIPv4:   priv4,

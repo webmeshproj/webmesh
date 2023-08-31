@@ -26,9 +26,11 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
@@ -285,22 +287,24 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 	p := peers.New(s.Storage())
 	pubKey := wireguardKey.PublicKey()
-	self := peers.Node{
-		ID:              s.ID(),
-		PublicKey:       wireguardKey.PublicKey(),
-		PrivateIPv6:     netutil.AssignToPrefix(meshnetworkv6, pubKey[:]),
-		GRPCPort:        opts.GRPCAdvertisePort,
-		RaftPort:        int(s.raft.ListenPort()),
-		PrimaryEndpoint: opts.PrimaryEndpoint.String(),
-		WireGuardEndpoints: func() []string {
-			out := make([]string, 0)
-			for _, ep := range opts.WireGuardEndpoints {
-				out = append(out, ep.String())
-			}
-			return out
-		}(),
-		ZoneAwarenessID: s.opts.ZoneAwarenessID,
-		Features:        opts.Features,
+	privatev6 := netutil.AssignToPrefix(meshnetworkv6, pubKey[:])
+	self := peers.MeshNode{
+		MeshNode: &v1.MeshNode{
+			Id:              s.ID(),
+			PrimaryEndpoint: opts.PrimaryEndpoint.String(),
+			WireguardEndpoints: func() []string {
+				out := make([]string, 0)
+				for _, ep := range opts.WireGuardEndpoints {
+					out = append(out, ep.String())
+				}
+				return out
+			}(),
+			ZoneAwarenessId: s.opts.ZoneAwarenessID,
+			PublicKey:       wireguardKey.PublicKey().String(),
+			PrivateIpv6:     privatev6.String(),
+			Features:        opts.Features,
+			JoinedAt:        timestamppb.New(time.Now().UTC()),
+		},
 	}
 	// Allocate addresses
 	var privatev4 netip.Prefix
@@ -312,7 +316,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		if err != nil {
 			return fmt.Errorf("allocate IPv4 address: %w", err)
 		}
-		self.PrivateIPv4 = privatev4
+		self.MeshNode.PrivateIpv4 = privatev4.String()
 	}
 	s.log.Debug("Creating ourself in the database", slog.Any("params", self))
 	err = p.Put(ctx, self)
@@ -327,8 +331,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		s.log.Info("creating node in database for bootstrap server",
 			slog.String("server-id", id),
 		)
-		err = p.Put(ctx, peers.Node{
-			ID: id,
+		err = p.Put(ctx, peers.MeshNode{
+			MeshNode: &v1.MeshNode{Id: id},
 		})
 		if err != nil {
 			return fmt.Errorf("create node: %w", err)
@@ -368,8 +372,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			if peer == s.ID() {
 				continue
 			}
-			err = p.Put(ctx, peers.Node{
-				ID: peer,
+			err = p.Put(ctx, peers.MeshNode{
+				MeshNode: &v1.MeshNode{Id: peer},
 			})
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)
@@ -396,7 +400,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if !s.opts.DisableIPv4 && !opts.PreferIPv6 {
 		raftAddr = net.JoinHostPort(privatev4.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
 	} else {
-		raftAddr = net.JoinHostPort(self.PrivateIPv6.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
+		raftAddr = net.JoinHostPort(privatev6.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
 	}
 	// Start network resources
 	s.log.Info("Starting network manager")
@@ -410,7 +414,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		}(),
 		AddressV6: func() netip.Prefix {
 			if !s.opts.DisableIPv6 {
-				return self.PrivateIPv6
+				return privatev6
 			}
 			return netip.Prefix{}
 		}(),

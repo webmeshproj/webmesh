@@ -40,17 +40,21 @@ func TestListEdges(t *testing.T) {
 		t.Errorf("GenerateKey() error = %v", err)
 		return
 	}
-	err = peers.New(server.store).Put(ctx, peers.Node{
-		ID:        "foo",
-		PublicKey: key.PublicKey(),
+	err = peers.New(server.store).Put(ctx, peers.MeshNode{
+		MeshNode: &v1.MeshNode{
+			Id:        "foo",
+			PublicKey: key.PublicKey().String(),
+		},
 	})
 	if err != nil {
 		t.Errorf("Put() error = %v", err)
 		return
 	}
-	err = peers.New(server.store).Put(ctx, peers.Node{
-		ID:        "bar",
-		PublicKey: key.PublicKey(),
+	err = peers.New(server.store).Put(ctx, peers.MeshNode{
+		MeshNode: &v1.MeshNode{
+			Id:        "bar",
+			PublicKey: key.PublicKey().String(),
+		},
 	})
 	if err != nil {
 		t.Errorf("Put() error = %v", err)

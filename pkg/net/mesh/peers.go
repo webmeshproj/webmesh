@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
@@ -62,44 +61,45 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 		if err != nil {
 			return nil, fmt.Errorf("get vertex: %w", err)
 		}
-		if node.PublicKey == (wgtypes.Key{}) {
+		if node.PublicKey == "" {
 			continue
 		}
 		// Determine the preferred wireguard endpoint
 		var primaryEndpoint string
 		if node.PrimaryEndpoint != "" {
-			for _, endpoint := range node.WireGuardEndpoints {
+			for _, endpoint := range node.GetWireguardEndpoints() {
 				if strings.HasPrefix(endpoint, node.PrimaryEndpoint) {
 					primaryEndpoint = endpoint
 					break
 				}
 			}
 		}
-		if primaryEndpoint == "" && len(node.WireGuardEndpoints) > 0 {
-			primaryEndpoint = node.WireGuardEndpoints[0]
+		if primaryEndpoint == "" && len(node.WireguardEndpoints) > 0 {
+			primaryEndpoint = node.WireguardEndpoints[0]
 		}
 		// Each direct adjacent is a peer
 		peer := &v1.WireGuardPeer{
-			Id:                 node.ID,
-			PublicKey:          node.PublicKey.String(),
-			ZoneAwarenessId:    node.ZoneAwarenessID,
+			Id:                 node.Id,
+			PublicKey:          node.PublicKey,
 			PrimaryEndpoint:    primaryEndpoint,
-			WireguardEndpoints: node.WireGuardEndpoints,
-			GrpcPort:           int32(node.GRPCPort),
+			WireguardEndpoints: node.WireguardEndpoints,
+			ZoneAwarenessId:    node.ZoneAwarenessId,
 			AddressIpv4: func() string {
-				if node.PrivateIPv4.IsValid() {
-					return node.PrivateIPv4.String()
+				if node.PrivateAddrV4().IsValid() {
+					return node.PrivateAddrV4().String()
 				}
 				return ""
 			}(),
 			AddressIpv6: func() string {
-				if node.PrivateIPv6.IsValid() {
-					return node.PrivateIPv6.String()
+				if node.PrivateAddrV6().IsValid() {
+					return node.PrivateAddrV6().String()
 				}
 				return ""
 			}(),
-			RaftMember: node.RaftPort > 0,
-			Features:   node.Features,
+			Features:      node.Features,
+			AllowedIps:    []string{},
+			AllowedRoutes: []string{},
+			Ice:           false,
 		}
 		if edge.Properties.Attributes != nil {
 			// Check if the ICE attribute is set
@@ -134,16 +134,16 @@ func recursePeers(
 	adjacencyMap networking.AdjacencyMap,
 	thisPeer string,
 	thisRoutes []netip.Prefix,
-	node *peers.Node,
+	node *peers.MeshNode,
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
-	if node.PrivateIPv4.IsValid() {
-		allowedIPs = append(allowedIPs, node.PrivateIPv4)
+	if node.PrivateAddrV4().IsValid() {
+		allowedIPs = append(allowedIPs, node.PrivateAddrV4())
 	}
-	if node.PrivateIPv6.IsValid() {
-		allowedIPs = append(allowedIPs, node.PrivateIPv6)
+	if node.PrivateAddrV6().IsValid() {
+		allowedIPs = append(allowedIPs, node.PrivateAddrV6())
 	}
 	// Does this peer expose routes?
-	routes, err := nw.GetRoutesByNode(ctx, node.ID)
+	routes, err := nw.GetRoutesByNode(ctx, node.GetId())
 	if err != nil {
 		return nil, nil, fmt.Errorf("get routes by node: %w", err)
 	}
@@ -184,15 +184,15 @@ func recurseEdges(
 	adjacencyMap networking.AdjacencyMap,
 	thisPeer string,
 	thisRoutes []netip.Prefix,
-	node *peers.Node,
+	node *peers.MeshNode,
 	visited map[string]struct{},
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
 	if visited == nil {
 		visited = make(map[string]struct{})
 	}
 	directAdjacents := adjacencyMap[thisPeer]
-	visited[node.ID] = struct{}{}
-	targets := adjacencyMap[node.ID]
+	visited[node.GetId()] = struct{}{}
+	targets := adjacencyMap[node.GetId()]
 	for target := range targets {
 		if target == thisPeer {
 			continue
@@ -208,17 +208,17 @@ func recurseEdges(
 		if err != nil {
 			return nil, nil, fmt.Errorf("get vertex: %w", err)
 		}
-		if targetNode.PublicKey == (wgtypes.Key{}) {
+		if targetNode.PublicKey == "" {
 			continue
 		}
-		if targetNode.PrivateIPv4.IsValid() {
-			allowedIPs = append(allowedIPs, targetNode.PrivateIPv4)
+		if targetNode.PrivateAddrV4().IsValid() {
+			allowedIPs = append(allowedIPs, targetNode.PrivateAddrV4())
 		}
-		if targetNode.PrivateIPv6.IsValid() {
-			allowedIPs = append(allowedIPs, targetNode.PrivateIPv6)
+		if targetNode.PrivateAddrV6().IsValid() {
+			allowedIPs = append(allowedIPs, targetNode.PrivateAddrV6())
 		}
 		// Does this peer expose routes?
-		routes, err := nw.GetRoutesByNode(ctx, targetNode.ID)
+		routes, err := nw.GetRoutesByNode(ctx, targetNode.GetId())
 		if err != nil {
 			return nil, nil, fmt.Errorf("get routes by node: %w", err)
 		}

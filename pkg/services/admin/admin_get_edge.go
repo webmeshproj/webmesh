@@ -41,8 +41,8 @@ func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, 
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &v1.MeshEdge{
-		Source:     graphEdge.Source.ID,
-		Target:     graphEdge.Target.ID,
+		Source:     graphEdge.Source.GetId(),
+		Target:     graphEdge.Target.GetId(),
 		Weight:     int32(graphEdge.Properties.Weight),
 		Attributes: graphEdge.Properties.Attributes,
 	}, nil

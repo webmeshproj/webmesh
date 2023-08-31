@@ -20,7 +20,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -62,34 +61,6 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 		}
 	}
 
-	// Send a barrier afterwards to sync the cluster
-	// Check if they were a raft member
-	cfg, err := s.raft.Configuration()
-	if err != nil {
-		// Should never happen
-		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
-	}
-	var raftMember bool
-	var raftSuffrage raft.ServerSuffrage = -1
-	for _, srv := range cfg.Servers {
-		if string(srv.ID) == req.GetId() {
-			// They were a raft member, so remove them
-			raftMember = true
-			raftSuffrage = srv.Suffrage
-			break
-		}
-	}
-	if raftMember {
-		defer func() {
-			_, _ = s.raft.Barrier(ctx, time.Second*15)
-		}()
-		s.log.Info("Removing mesh node from raft", "id", req.GetId())
-		err := s.raft.RemoveServer(ctx, req.GetId(), false)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to remove raft member: %v", err)
-		}
-	}
-
 	// Lookup the peer first to make sure they exist
 	leaving, err := peers.New(s.raft.Storage()).Get(ctx, req.GetId())
 	if err != nil {
@@ -98,6 +69,17 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 			return &v1.LeaveResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get peer: %v", err)
+	}
+
+	if leaving.PortFor(v1.Feature_RAFT) != 0 {
+		defer func() {
+			_, _ = s.raft.Barrier(ctx, time.Second*15)
+		}()
+		s.log.Info("Removing mesh node from raft", "id", req.GetId())
+		err := s.raft.RemoveServer(ctx, req.GetId(), false)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to remove raft member: %v", err)
+		}
 	}
 
 	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
@@ -113,27 +95,15 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 				Type: v1.Event_NODE_JOIN,
 				Event: &v1.Event_Node{
 					Node: &v1.MeshNode{
-						Id:                 leaving.ID,
+						Id:                 leaving.Id,
 						PrimaryEndpoint:    leaving.PrimaryEndpoint,
-						WireguardEndpoints: leaving.WireGuardEndpoints,
-						ZoneAwarenessId:    leaving.ZoneAwarenessID,
-						RaftPort:           int32(leaving.RaftPort),
-						GrpcPort:           int32(leaving.GRPCPort),
-						MeshdnsPort:        int32(leaving.DNSPort),
-						PublicKey:          leaving.PublicKey.String(),
-						PrivateIpv4:        leaving.PrivateIPv4.String(),
-						PrivateIpv6:        leaving.PrivateIPv6.String(),
+						WireguardEndpoints: leaving.WireguardEndpoints,
+						ZoneAwarenessId:    leaving.ZoneAwarenessId,
+						PublicKey:          leaving.PublicKey,
+						PrivateIpv4:        leaving.PrivateAddrV4().String(),
+						PrivateIpv6:        leaving.PrivateAddrV6().String(),
 						Features:           leaving.Features,
-						ClusterStatus: func() v1.ClusterStatus {
-							switch raftSuffrage {
-							case raft.Voter:
-								return v1.ClusterStatus_CLUSTER_VOTER
-							case raft.Nonvoter:
-								return v1.ClusterStatus_CLUSTER_NON_VOTER
-							default:
-								return v1.ClusterStatus_CLUSTER_NODE
-							}
-						}(),
+						JoinedAt:           leaving.JoinedAt,
 					},
 				},
 			})

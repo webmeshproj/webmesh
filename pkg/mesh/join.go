@@ -156,9 +156,6 @@ func (s *meshStore) newJoinRequest(opts ConnectOptions, key wgtypes.Key) *v1.Joi
 	req := &v1.JoinRequest{
 		Id:              s.ID(),
 		PublicKey:       key.PublicKey().String(),
-		RaftPort:        int32(s.raft.ListenPort()),
-		GrpcPort:        int32(opts.GRPCAdvertisePort),
-		MeshdnsPort:     int32(opts.MeshDNSAdvertisePort),
 		PrimaryEndpoint: opts.PrimaryEndpoint.String(),
 		WireguardEndpoints: func() []string {
 			var eps []string

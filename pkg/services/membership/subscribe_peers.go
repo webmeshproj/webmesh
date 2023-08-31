@@ -124,7 +124,7 @@ func listDNSServers(ctx context.Context, st storage.MeshStorage, peerID string) 
 		return nil, err
 	}
 	for _, peer := range dnsServers {
-		if peer.ID == peerID {
+		if peer.GetId() == peerID {
 			continue
 		}
 		switch {
@@ -145,7 +145,7 @@ func listICEServers(ctx context.Context, st storage.MeshStorage, peerID string) 
 		return nil, err
 	}
 	for _, peer := range iceServers {
-		if peer.ID == peerID {
+		if peer.GetId() == peerID {
 			continue
 		}
 		if peer.PublicRPCAddr().IsValid() {

@@ -32,3 +32,7 @@ type ServerChannel interface {
 	// Close closes the data channel.
 	Close() error
 }
+
+// DefaultWireGuardProxyBuffer is the default buffer size for the WireGuard proxy.
+// TODO: Make this configurable.
+const DefaultWireGuardProxyBuffer = 1024 * 1024

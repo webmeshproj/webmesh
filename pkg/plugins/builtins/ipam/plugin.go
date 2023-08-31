@@ -149,8 +149,8 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	allocated := make(map[netip.Prefix]struct{}, len(nodes))
 	for _, node := range nodes {
 		n := node
-		if n.PrivateIPv4.IsValid() {
-			allocated[n.PrivateIPv4] = struct{}{}
+		if n.PrivateAddrV4().IsValid() {
+			allocated[n.PrivateAddrV4()] = struct{}{}
 		}
 	}
 	prefix, err := p.next32(globalPrefix, allocated)

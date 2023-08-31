@@ -18,7 +18,6 @@ package peers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -53,20 +52,20 @@ func NewGraph(st storage.MeshStorage) Graph {
 }
 
 // NewGraphStore creates a new GraphStore instance.
-func NewGraphStore(st storage.MeshStorage) graph.Store[string, Node] {
-	return graph.Store[string, Node](&GraphStore{MeshStorage: st})
+func NewGraphStore(st storage.MeshStorage) graph.Store[string, MeshNode] {
+	return graph.Store[string, MeshNode](&GraphStore{MeshStorage: st})
 }
 
 // AddVertex should add the given vertex with the given hash value and vertex properties to the
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no
 // error should be returned.
-func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexProperties) error {
+func (g *GraphStore) AddVertex(nodeID string, node MeshNode, props graph.VertexProperties) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if nodeID == "" {
 		return fmt.Errorf("node ID must not be empty")
 	}
-	data, err := json.Marshal(node)
+	data, err := protojson.Marshal(node.MeshNode)
 	if err != nil {
 		return fmt.Errorf("marshal node: %w", err)
 	}
@@ -79,7 +78,7 @@ func (g *GraphStore) AddVertex(nodeID string, node Node, props graph.VertexPrope
 
 // Vertex should return the vertex and vertex properties with the given hash value. If the
 // vertex doesn't exist, ErrVertexNotFound should be returned.
-func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexProperties, err error) {
+func (g *GraphStore) Vertex(nodeID string) (node MeshNode, props graph.VertexProperties, err error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if nodeID == "" {
@@ -94,7 +93,8 @@ func (g *GraphStore) Vertex(nodeID string) (node Node, props graph.VertexPropert
 		}
 		return
 	}
-	err = json.Unmarshal([]byte(data), &node)
+	node = MeshNode{&v1.MeshNode{}}
+	err = protojson.Unmarshal([]byte(data), node.MeshNode)
 	if err != nil {
 		err = fmt.Errorf("unmarshal node: %w", err)
 	}

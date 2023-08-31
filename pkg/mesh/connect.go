@@ -37,7 +37,7 @@ type ConnectOptions struct {
 	// Raft is the Raft instance. It should not be closed.
 	Raft raft.Raft
 	// Features are the features to broadcast to others in the mesh.
-	Features []v1.Feature
+	Features []*v1.FeaturePort
 	// Plugins is a map of plugins to use.
 	Plugins map[string]plugins.Plugin
 	// JoinRoundTripper is the round tripper to use for joining the mesh.

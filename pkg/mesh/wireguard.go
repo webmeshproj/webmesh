@@ -65,13 +65,13 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 			if s.opts.DisableIPv4 {
 				return netip.Prefix{}
 			}
-			return self.PrivateIPv4
+			return self.PrivateAddrV4()
 		}(),
 		AddressV6: func() netip.Prefix {
 			if s.opts.DisableIPv6 {
 				return netip.Prefix{}
 			}
-			return self.PrivateIPv6
+			return self.PrivateAddrV6()
 		}(),
 		NetworkV4: meshnetworkv4,
 		NetworkV6: meshnetworkv6,

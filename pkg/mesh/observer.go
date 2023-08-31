@@ -86,15 +86,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 						return v1.Event_NODE_JOIN
 					}(),
 					Event: &v1.Event_Node{
-						Node: node.Proto(func() v1.ClusterStatus {
-							if data.Removed {
-								return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
-							}
-							if data.Peer.Suffrage == raft.Nonvoter {
-								return v1.ClusterStatus_CLUSTER_NON_VOTER
-							}
-							return v1.ClusterStatus_CLUSTER_VOTER
-						}()),
+						Node: node.MeshNode,
 					},
 				})
 				if err != nil {
@@ -112,7 +104,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 				err = s.plugins.Emit(ctx, &v1.Event{
 					Type: v1.Event_LEADER_CHANGE,
 					Event: &v1.Event_Node{
-						Node: node.Proto(v1.ClusterStatus_CLUSTER_LEADER),
+						Node: node.MeshNode,
 					},
 				})
 				if err != nil {

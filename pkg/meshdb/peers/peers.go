@@ -19,7 +19,6 @@ package peers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -33,6 +32,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
@@ -44,10 +45,10 @@ var ErrNodeNotFound = errors.New("node not found")
 var ErrEdgeNotFound = graph.ErrEdgeNotFound
 
 // Graph is the graph.Graph implementation for the mesh network.
-type Graph graph.Graph[string, Node]
+type Graph graph.Graph[string, MeshNode]
 
 // graphHasher is the hash key function for the graph.
-func graphHasher(n Node) string { return n.ID }
+func graphHasher(n MeshNode) string { return n.GetId() }
 
 // InvalidNodeIDChars are the characters that are not allowed in node IDs.
 var InvalidNodeIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', ','}
@@ -73,24 +74,27 @@ func IsValidID(id string) bool {
 
 // Peers is the peers interface.
 type Peers interface {
+	// Resolver returns a resolver backed by the storage
+	// of this instance.
+	Resolver() Resolver
 	// Graph returns the graph of nodes.
 	Graph() Graph
 	// Put creates or updates a node.
-	Put(ctx context.Context, n Node) error
+	Put(ctx context.Context, n MeshNode) error
 	// Get gets a node by ID.
-	Get(ctx context.Context, id string) (Node, error)
+	Get(ctx context.Context, id string) (MeshNode, error)
 	// Delete deletes a node.
 	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
-	List(ctx context.Context) ([]Node, error)
+	List(ctx context.Context) ([]MeshNode, error)
 	// ListIDs lists all node IDs.
 	ListIDs(ctx context.Context) ([]string, error)
 	// ListPublicNodes lists all public nodes.
-	ListPublicNodes(ctx context.Context) ([]Node, error)
+	ListPublicNodes(ctx context.Context) ([]MeshNode, error)
 	// ListByZoneID lists all nodes in a zone.
-	ListByZoneID(ctx context.Context, zoneID string) ([]Node, error)
+	ListByZoneID(ctx context.Context, zoneID string) ([]MeshNode, error)
 	// ListByFeature lists all nodes with a given feature.
-	ListByFeature(ctx context.Context, feature v1.Feature) ([]Node, error)
+	ListByFeature(ctx context.Context, feature v1.Feature) ([]MeshNode, error)
 	// AddEdge adds an edge between two nodes.
 	PutEdge(ctx context.Context, edge *v1.MeshEdge) error
 	// RemoveEdge removes an edge between two nodes.
@@ -144,21 +148,25 @@ type peers struct {
 	graph Graph
 }
 
+func (p *peers) Resolver() Resolver {
+	return &peerResolver{p.db}
+}
+
 func (p *peers) Graph() Graph { return p.graph }
 
-func (p *peers) Put(ctx context.Context, node Node) error {
+func (p *peers) Put(ctx context.Context, node MeshNode) error {
 	// Dedup the wireguard endpoints.
 	seen := make(map[string]struct{})
 	var wgendpoints []string
-	for _, endpoint := range node.WireGuardEndpoints {
+	for _, endpoint := range node.GetWireguardEndpoints() {
 		if _, ok := seen[endpoint]; ok {
 			continue
 		}
 		seen[endpoint] = struct{}{}
 		wgendpoints = append(wgendpoints, endpoint)
 	}
-	node.WireGuardEndpoints = wgendpoints
-	node.UpdatedAt = time.Now().UTC()
+	node.WireguardEndpoints = wgendpoints
+	node.JoinedAt = timestamppb.New(time.Now().UTC())
 	err := p.graph.AddVertex(node)
 	if err != nil {
 		return fmt.Errorf("put node: %w", err)
@@ -166,13 +174,13 @@ func (p *peers) Put(ctx context.Context, node Node) error {
 	return nil
 }
 
-func (p *peers) Get(ctx context.Context, id string) (Node, error) {
+func (p *peers) Get(ctx context.Context, id string) (MeshNode, error) {
 	node, err := p.graph.Vertex(id)
 	if err != nil {
 		if errors.Is(err, graph.ErrVertexNotFound) {
-			return Node{}, ErrNodeNotFound
+			return MeshNode{}, ErrNodeNotFound
 		}
-		return Node{}, fmt.Errorf("get node: %w", err)
+		return MeshNode{}, fmt.Errorf("get node: %w", err)
 	}
 	return node, nil
 }
@@ -202,11 +210,14 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (p *peers) List(ctx context.Context) ([]Node, error) {
-	out := make([]Node, 0)
-	err := p.db.IterPrefix(ctx, NodesPrefix, func(_, value string) error {
-		var node Node
-		err := json.Unmarshal([]byte(value), &node)
+func (p *peers) List(ctx context.Context) ([]MeshNode, error) {
+	out := make([]MeshNode, 0)
+	err := p.db.IterPrefix(ctx, NodesPrefix, func(key, value string) error {
+		if key == NodesPrefix {
+			return nil
+		}
+		node := MeshNode{&v1.MeshNode{}}
+		err := protojson.Unmarshal([]byte(value), node.MeshNode)
 		if err != nil {
 			return fmt.Errorf("unmarshal node: %w", err)
 		}
@@ -228,12 +239,12 @@ func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
 	return ids, nil
 }
 
-func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
+func (p *peers) ListPublicNodes(ctx context.Context) ([]MeshNode, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]Node, 0)
+	out := make([]MeshNode, 0)
 	for _, node := range nodes {
 		n := node
 		if n.PrimaryEndpoint != "" {
@@ -243,27 +254,27 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]Node, error) {
 	return out, nil
 }
 
-func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]Node, error) {
+func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]MeshNode, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]Node, 0)
+	out := make([]MeshNode, 0)
 	for _, node := range nodes {
 		n := node
-		if n.ZoneAwarenessID == zoneID {
+		if n.GetZoneAwarenessId() == zoneID {
 			out = append(out, n)
 		}
 	}
 	return out, nil
 }
 
-func (p *peers) ListByFeature(ctx context.Context, feature v1.Feature) ([]Node, error) {
+func (p *peers) ListByFeature(ctx context.Context, feature v1.Feature) ([]MeshNode, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]Node, 0)
+	out := make([]MeshNode, 0)
 	for _, node := range nodes {
 		n := node
 		if n.HasFeature(feature) {
@@ -317,7 +328,7 @@ func (p *peers) RemoveEdge(ctx context.Context, from, to string) error {
 }
 
 func (p *peers) DrawGraph(ctx context.Context, w io.Writer) error {
-	graph := graph.Graph[string, Node](p.graph)
+	graph := graph.Graph[string, MeshNode](p.graph)
 	err := draw.DOT(graph, w)
 	if err != nil {
 		return fmt.Errorf("draw graph: %w", err)

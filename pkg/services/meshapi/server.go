@@ -18,7 +18,13 @@ limitations under the License.
 package meshapi
 
 import (
+	"bytes"
+	"context"
+
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -41,4 +47,58 @@ func NewServer(store storage.MeshStorage, raft raft.Raft) *Server {
 		raft:  raft,
 		peers: peers.New(store),
 	}
+}
+
+func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshNode, error) {
+	node, err := s.peers.Get(ctx, req.GetId())
+	if err != nil {
+		if err == peers.ErrNodeNotFound {
+			return nil, status.Errorf(codes.NotFound, "node %s not found", req.GetId())
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get node: %v", err)
+	}
+	return node.MeshNode, nil
+}
+
+func (s *Server) ListNodes(ctx context.Context, req *emptypb.Empty) (*v1.NodeList, error) {
+	nodes, err := s.peers.List(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get node: %v", err)
+	}
+	out := make([]*v1.MeshNode, len(nodes))
+	for i, node := range nodes {
+		out[i] = node.MeshNode
+	}
+	return &v1.NodeList{
+		Nodes: out,
+	}, nil
+}
+
+func (s *Server) GetMeshGraph(ctx context.Context, _ *emptypb.Empty) (*v1.MeshGraph, error) {
+	nodeIDs, err := s.peers.ListIDs(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list node IDs: %v", err)
+	}
+	edges, err := s.peers.Graph().Edges()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list edges: %v", err)
+	}
+	out := &v1.MeshGraph{
+		Nodes: nodeIDs,
+		Edges: make([]*v1.MeshEdge, len(edges)),
+	}
+	for i, edge := range edges {
+		out.Edges[i] = &v1.MeshEdge{
+			Source: edge.Source,
+			Target: edge.Target,
+			Weight: int32(edge.Properties.Weight),
+		}
+	}
+	var buf bytes.Buffer
+	err = s.peers.DrawGraph(ctx, &buf)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to draw graph: %v", err)
+	}
+	out.Dot = buf.String()
+	return out, nil
 }

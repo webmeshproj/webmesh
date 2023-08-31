@@ -22,9 +22,39 @@ import (
 	"net/netip"
 
 	"github.com/hashicorp/raft"
+	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 )
+
+// Resolver is the interface for resolving node addresses. Implementations
+// can be pre-baked for specialized cases, such as resolving node addresses
+// by a specific feature. The returned type is an AddrPort to support
+// resolvers that need to return port numbers.
+type Resolver[T any] interface {
+	// Resolve resolves the addresses for the given lookup parameters.
+	Resolve(ctx context.Context, lookup T) ([]netip.AddrPort, error)
+}
+
+// ResolverFunc is a function that implements Resolver.
+type ResolverFunc[T any] func(ctx context.Context, lookup T) ([]netip.AddrPort, error)
+
+// Resolve implements Resolver.
+func (f ResolverFunc[T]) Resolve(ctx context.Context, lookup T) ([]netip.AddrPort, error) {
+	return f(ctx, lookup)
+}
+
+// NodeIDResolver is a resolver that resolves node addresses by node ID.
+type NodeIDResolver = Resolver[string]
+
+// NodeIDResolverFunc is a function that implements NodeIDResolver.
+type NodeIDResolverFunc = ResolverFunc[string]
+
+// FeatureResolver is a resolver that resolves node addresses by feature.
+type FeatureResolver = Resolver[v1.Feature]
+
+// FeatureResolverFunc is a function that implements FeatureResolver.
+type FeatureResolverFunc = ResolverFunc[v1.Feature]
 
 // RoundTripper is a generic interface for executing a request and returning
 // a response.
@@ -140,4 +170,24 @@ type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, erro
 // Dial implements NodeDialer.
 func (f NodeDialerFunc) Dial(ctx context.Context, id string) (*grpc.ClientConn, error) {
 	return f(ctx, id)
+}
+
+// WebRTCSignalTransport is the transport interface for providing WebRTC signaling between
+// mesh nodes.
+type WebRTCSignalTransport interface {
+	// Start starts the transport.
+	Start(ctx context.Context) error
+	// SendDescription sends an SDP description to the remote peer.
+	SendDescription(ctx context.Context, desc webrtc.SessionDescription) error
+	// SendCandidate sends an ICE candidate to the remote peer.
+	SendCandidate(ctx context.Context, candidate webrtc.ICECandidateInit) error
+	// Candidates returns a channel of ICE candidates received from the remote peer.
+	Candidates() <-chan webrtc.ICECandidateInit
+	// Descriptions returns a channel of SDP descriptions received from the remote peer.
+	Descriptions() <-chan webrtc.SessionDescription
+	// Error returns a channel that receives any error encountered during signaling.
+	// This channel will be closed when the transport is closed.
+	Error() <-chan error
+	// Close closes the transport.
+	Close() error
 }

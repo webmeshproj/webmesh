@@ -100,3 +100,6 @@ build-ctl:
 
 install-ctl: build-ctl
 	install -m 755 dist/$(CTL) $(shell go env GOPATH)/bin/$(CTL)
+
+latest-api: ## Used for development and forces a pull of the API off the main branch.
+	GOPRIVATE=github.com/webmeshproj $(GO) get -u github.com/webmeshproj/api@main

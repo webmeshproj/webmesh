@@ -20,9 +20,7 @@ package state
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/netip"
-	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -100,16 +98,9 @@ func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.Ad
 	}
 	out := make(map[string]netip.AddrPort)
 	for _, node := range nodes {
-		n := node
-		if n.PrimaryEndpoint == "" {
-			// Should not happen
-			continue
+		if addr := node.PublicRPCAddr(); addr.IsValid() {
+			out[node.GetId()] = addr
 		}
-		addr, err := netip.ParseAddr(n.PrimaryEndpoint)
-		if err != nil {
-			return nil, fmt.Errorf("parse address for node %s: %v", n.ID, err)
-		}
-		out[n.ID] = netip.AddrPortFrom(addr, uint16(n.GRPCPort))
 	}
 	return out, nil
 }
@@ -135,23 +126,16 @@ func (s *state) ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) 
 	}
 	out := make(map[string]netip.AddrPort)
 	for _, node := range nodes {
-		n := node
-		if n.ID == nodeID {
+		if node.GetId() == nodeID {
 			continue
 		}
-		var addr netip.Addr
-		if n.PrivateIPv4.IsValid() {
-			// Prefer IPv4
-			ip := strings.Split(n.PrivateIPv4.String(), "/")[0]
-			addr, err = netip.ParseAddr(ip)
+		var addr netip.AddrPort
+		if node.PrivateRPCAddrV4().IsValid() {
+			addr = node.PrivateRPCAddrV4()
 		} else {
-			ip := strings.Split(n.PrivateIPv6.String(), "/")[0]
-			addr, err = netip.ParseAddr(ip)
+			addr = node.PrivateRPCAddrV6()
 		}
-		if err != nil {
-			return nil, fmt.Errorf("parse address for node %s: %v", nodeID, err)
-		}
-		out[n.ID] = netip.AddrPortFrom(addr, uint16(n.GRPCPort))
+		out[node.GetId()] = addr
 	}
 	return out, nil
 }

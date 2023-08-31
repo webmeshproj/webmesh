@@ -154,7 +154,10 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 // ListNetworkACLs returns a list of NetworkACLs.
 func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 	out := make(ACLs, 0)
-	err := n.IterPrefix(ctx, NetworkACLsPrefix, func(_, value string) error {
+	err := n.IterPrefix(ctx, NetworkACLsPrefix, func(key, value string) error {
+		if key == NetworkACLsPrefix {
+			return nil
+		}
 		acl := &v1.NetworkACL{}
 		err := protojson.Unmarshal([]byte(value), acl)
 		if err != nil {
@@ -249,7 +252,10 @@ func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 // ListRoutes returns a list of Routes.
 func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
 	out := make([]*v1.Route, 0)
-	err := n.IterPrefix(ctx, RoutesPrefix, func(_, value string) error {
+	err := n.IterPrefix(ctx, RoutesPrefix, func(key, value string) error {
+		if key == RoutesPrefix {
+			return nil
+		}
 		route := &v1.Route{}
 		err := protojson.Unmarshal([]byte(value), route)
 		if err != nil {

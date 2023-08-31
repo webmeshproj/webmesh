@@ -31,22 +31,22 @@ func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *
 	if err != nil {
 		return err
 	}
-	fqdn := newFQDN(dom, peer.ID)
+	fqdn := newFQDN(dom, peer.GetId())
 	for i, q := range r.Question {
 		switch q.Qtype {
 		case dns.TypeTXT:
 			s.log.Debug("handling peer TXT question")
 			m.Answer = append(m.Answer, newPeerTXTRecord(fqdn, &peer))
-			if !ipv6Only && peer.PrivateIPv4.IsValid() {
+			if !ipv6Only && peer.PrivateAddrV4().IsValid() {
 				m.Extra = append(m.Extra, &dns.A{
 					Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
-					A:   peer.PrivateIPv4.Addr().AsSlice(),
+					A:   peer.PrivateAddrV4().Addr().AsSlice(),
 				})
 			}
-			if peer.PrivateIPv6.IsValid() {
+			if peer.PrivateAddrV6().IsValid() {
 				m.Extra = append(m.Extra, &dns.AAAA{
 					Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
-					AAAA: peer.PrivateIPv6.Addr().AsSlice(),
+					AAAA: peer.PrivateAddrV6().Addr().AsSlice(),
 				})
 			}
 		case dns.TypeA:
@@ -58,24 +58,24 @@ func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *
 				return errNoIPv4{}
 			}
 			s.log.Debug("handling peer A question")
-			if !peer.PrivateIPv4.IsValid() {
+			if !peer.PrivateAddrV4().IsValid() {
 				s.log.Debug("no private IPv4 address for peer")
 				return errNoIPv4{}
 			}
 			m.Answer = append(m.Answer, &dns.A{
 				Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
-				A:   peer.PrivateIPv4.Addr().AsSlice(),
+				A:   peer.PrivateAddrV4().Addr().AsSlice(),
 			})
 			m.Extra = append(m.Extra, newPeerTXTRecord(fqdn, &peer))
 		case dns.TypeAAAA:
 			s.log.Debug("handling peer AAAA question")
-			if !peer.PrivateIPv6.IsValid() {
+			if !peer.PrivateAddrV6().IsValid() {
 				s.log.Debug("no private IPv6 address for peer")
 				return errNoIPv6{}
 			}
 			m.Answer = append(m.Answer, &dns.AAAA{
 				Hdr:  dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 1},
-				AAAA: peer.PrivateIPv6.Addr().AsSlice(),
+				AAAA: peer.PrivateAddrV6().Addr().AsSlice(),
 			})
 			m.Extra = append(m.Extra, newPeerTXTRecord(fqdn, &peer))
 		}
@@ -83,14 +83,14 @@ func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *
 	return nil
 }
 
-func newPeerTXTRecord(name string, peer *peers.Node) *dns.TXT {
+func newPeerTXTRecord(name string, peer *peers.MeshNode) *dns.TXT {
 	txtData := []string{
-		fmt.Sprintf("id=%s", peer.ID),
-		fmt.Sprintf("raft_port=%d", peer.RaftPort),
-		fmt.Sprintf("grpc_port=%d", peer.GRPCPort),
+		fmt.Sprintf("id=%s", peer.GetId()),
+		fmt.Sprintf("raft_port=%d", peer.RaftPort()),
+		fmt.Sprintf("grpc_port=%d", peer.RPCPort()),
 		fmt.Sprintf("wireguard_endpoints=%s", func() string {
-			if len(peer.WireGuardEndpoints) > 0 {
-				return strings.Join(peer.WireGuardEndpoints, ",")
+			if len(peer.WireguardEndpoints) > 0 {
+				return strings.Join(peer.WireguardEndpoints, ",")
 			}
 			return "<none>"
 		}()),

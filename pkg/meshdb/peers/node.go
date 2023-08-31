@@ -18,63 +18,92 @@ limitations under the License.
 package peers
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/netip"
-	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// Node represents a node. Not all fields are populated in all contexts.
-// A fully populated node is returned by Get and List.
-type Node struct {
-	// ID is the node's ID.
-	ID string `json:"id"`
-	// PublicKey is the node's public key.
-	PublicKey wgtypes.Key `json:"publicKey"`
-	// PrimaryEndpoint is the primary public endpoint of the node.
-	PrimaryEndpoint string `json:"primaryEndpoint"`
-	// WireGuardEndpoints are the available wireguard endpoints of the node.
-	WireGuardEndpoints []string `json:"wireGuardEndpoints"`
-	// ZoneAwarenessID is the node's zone awareness ID.
-	ZoneAwarenessID string `json:"zoneAwarenessId"`
-	// PrivateIPv4 is the node's private IPv4 address.
-	PrivateIPv4 netip.Prefix `json:"privateIpv4"`
-	// PrivateIPv6 is the node's IPv6 network.
-	PrivateIPv6 netip.Prefix `json:"privateIpv6"`
-	// GRPCPort is the node's GRPC port.
-	GRPCPort int `json:"grpcPort"`
-	// RaftPort is the node's Raft port.
-	RaftPort int `json:"raftPort"`
-	// DNSPort is the node's DNS port.
-	DNSPort int `json:"dnsPort"`
-	// Features are the node's features.
-	Features []v1.Feature `json:"features"`
-	// UpdatedAt is the time the node was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
-}
+type MeshNode struct{ *v1.MeshNode }
 
 // HasFeature returns true if the node has the given feature.
-func (n Node) HasFeature(feature v1.Feature) bool {
+func (n *MeshNode) HasFeature(feature v1.Feature) bool {
 	for _, f := range n.Features {
-		if f == feature {
+		if f.Feature == feature {
 			return true
 		}
 	}
 	return false
 }
 
+// PortFor returns the port for the given feature, or 0
+// if the feature is not available on this node.
+func (n *MeshNode) PortFor(feature v1.Feature) uint16 {
+	for _, f := range n.Features {
+		if f.Feature == feature {
+			return uint16(f.Port)
+		}
+	}
+	return 0
+}
+
+// RPCPort returns the node's RPC port.
+func (n *MeshNode) RPCPort() uint16 {
+	return n.PortFor(v1.Feature_NODES)
+}
+
+// DNSPort returns the node's DNS port.
+func (n *MeshNode) DNSPort() uint16 {
+	return n.PortFor(v1.Feature_MESH_DNS)
+}
+
+// TURNPort returns the node's TURN port.
+func (n *MeshNode) TURNPort() uint16 {
+	return n.PortFor(v1.Feature_TURN_SERVER)
+}
+
+// RaftPort returns the node's Raft port.
+func (n *MeshNode) RaftPort() uint16 {
+	return n.PortFor(v1.Feature_RAFT)
+}
+
+// PrivateAddrV4 returns the node's private IPv4 address.
+// Be sure to check if the returned Addr IsValid.
+func (n *MeshNode) PrivateAddrV4() netip.Prefix {
+	if n.GetPrivateIpv4() == "" {
+		return netip.Prefix{}
+	}
+	addr, err := netip.ParsePrefix(n.GetPrivateIpv4())
+	if err != nil {
+		return netip.Prefix{}
+	}
+	return addr
+}
+
+// PrivateAddrV6 returns the node's private IPv6 address.
+// Be sure to check if the returned Addr IsValid.
+func (n *MeshNode) PrivateAddrV6() netip.Prefix {
+	if n.GetPrivateIpv6() == "" {
+		return netip.Prefix{}
+	}
+	addr, err := netip.ParsePrefix(n.GetPrivateIpv6())
+	if err != nil {
+		return netip.Prefix{}
+	}
+	return addr
+}
+
 // PublicRPCAddr returns the public address for the node's RPC server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n Node) PublicRPCAddr() netip.AddrPort {
+func (n *MeshNode) PublicRPCAddr() netip.AddrPort {
+	rpcport := n.RPCPort()
+	if rpcport == 0 {
+		return netip.AddrPort{}
+	}
 	var addrport netip.AddrPort
 	if n.PrimaryEndpoint != "" {
 		addr, err := netip.ParseAddr(n.PrimaryEndpoint)
 		if err == nil {
-			addrport = netip.AddrPortFrom(addr, uint16(n.GRPCPort))
+			addrport = netip.AddrPortFrom(addr, rpcport)
 		}
 	}
 	return addrport
@@ -82,162 +111,104 @@ func (n Node) PublicRPCAddr() netip.AddrPort {
 
 // PrivateRPCAddrV4 returns the private IPv4 address for the node's RPC server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n Node) PrivateRPCAddrV4() netip.AddrPort {
-	var addrport netip.AddrPort
-	if n.PrivateIPv4.IsValid() {
-		addrport = netip.AddrPortFrom(n.PrivateIPv4.Addr(), uint16(n.GRPCPort))
+func (n *MeshNode) PrivateRPCAddrV4() netip.AddrPort {
+	addr := n.PrivateAddrV4()
+	if !addr.IsValid() {
+		return netip.AddrPort{}
 	}
-	return addrport
+	rpcport := n.RPCPort()
+	if rpcport == 0 {
+		return netip.AddrPort{}
+	}
+	return netip.AddrPortFrom(addr.Addr(), rpcport)
 }
 
 // PrivateRPCAddrV6 returns the private IPv6 address for the node's RPC server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n Node) PrivateRPCAddrV6() netip.AddrPort {
-	var addrport netip.AddrPort
-	if n.PrivateIPv6.IsValid() {
-		addrport = netip.AddrPortFrom(n.PrivateIPv6.Addr(), uint16(n.GRPCPort))
+func (n *MeshNode) PrivateRPCAddrV6() netip.AddrPort {
+	addr := n.PrivateAddrV6()
+	if !addr.IsValid() {
+		return netip.AddrPort{}
 	}
-	return addrport
+	rpcport := n.RPCPort()
+	if rpcport == 0 {
+		return netip.AddrPort{}
+	}
+	return netip.AddrPortFrom(addr.Addr(), rpcport)
 }
 
 // PublicDNSAddr returns the public address for the node's DNS server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n Node) PublicDNSAddr() netip.AddrPort {
-	var addrport netip.AddrPort
-	if n.DNSPort == 0 {
-		return addrport
+func (n *MeshNode) PublicDNSAddr() netip.AddrPort {
+	if n.PrimaryEndpoint == "" {
+		return netip.AddrPort{}
 	}
-	if n.PrimaryEndpoint != "" {
-		addr, err := netip.ParseAddr(n.PrimaryEndpoint)
-		if err == nil {
-			addrport = netip.AddrPortFrom(addr, uint16(n.DNSPort))
-		}
+	dnsport := n.DNSPort()
+	if dnsport == 0 {
+		return netip.AddrPort{}
+	}
+	var err error
+	var addr netip.Addr
+	var addrport netip.AddrPort
+	addr, err = netip.ParseAddr(n.PrimaryEndpoint)
+	if err == nil {
+		addrport = netip.AddrPortFrom(addr, dnsport)
 	}
 	return addrport
 }
 
 // PrivateDNSAddrV4 returns the private IPv4 address for the node's DNS server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n Node) PrivateDNSAddrV4() netip.AddrPort {
-	var addrport netip.AddrPort
-	if n.DNSPort == 0 {
-		return addrport
+func (n *MeshNode) PrivateDNSAddrV4() netip.AddrPort {
+	addr := n.PrivateAddrV4()
+	if !addr.IsValid() {
+		return netip.AddrPort{}
 	}
-	if n.PrivateIPv4.IsValid() {
-		addrport = netip.AddrPortFrom(n.PrivateIPv4.Addr(), uint16(n.DNSPort))
+	dnsport := n.DNSPort()
+	if dnsport == 0 {
+		return netip.AddrPort{}
 	}
-	return addrport
+	return netip.AddrPortFrom(addr.Addr(), dnsport)
 }
 
 // PrivateDNSAddrV6 returns the private IPv6 address for the node's DNS server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n Node) PrivateDNSAddrV6() netip.AddrPort {
-	var addrport netip.AddrPort
-	if n.DNSPort == 0 {
-		return addrport
+func (n *MeshNode) PrivateDNSAddrV6() netip.AddrPort {
+	addr := n.PrivateAddrV6()
+	if !addr.IsValid() {
+		return netip.AddrPort{}
 	}
-	if n.PrivateIPv6.IsValid() {
-		addrport = netip.AddrPortFrom(n.PrivateIPv6.Addr(), uint16(n.DNSPort))
+	dnsport := n.DNSPort()
+	if dnsport == 0 {
+		return netip.AddrPort{}
 	}
-	return addrport
+	return netip.AddrPortFrom(addr.Addr(), dnsport)
 }
 
-// MarshalJSON marshals a Node to JSON.
-func (n Node) MarshalJSON() ([]byte, error) {
-	type Alias Node
-	return json.Marshal(&struct {
-		PublicKey   string `json:"publicKey"`
-		PrivateIPv4 string `json:"privateIpv4"`
-		PrivateIPv6 string `json:"privateIpv6"`
-		Alias
-	}{
-		PublicKey: n.PublicKey.String(),
-		PrivateIPv4: func() string {
-			if n.PrivateIPv4.IsValid() {
-				return n.PrivateIPv4.String()
-			}
-			return ""
-		}(),
-		PrivateIPv6: func() string {
-			if n.PrivateIPv6.IsValid() {
-				return n.PrivateIPv6.String()
-			}
-			return ""
-		}(),
-		Alias: (Alias)(n),
-	})
+// PrivateTURNAddrV4 returns the private IPv4 address for the node's TURN server.
+// Be sure to check if the returned AddrPort IsValid.
+func (n *MeshNode) PrivateTURNAddrV4() netip.AddrPort {
+	addr := n.PrivateAddrV4()
+	if !addr.IsValid() {
+		return netip.AddrPort{}
+	}
+	turnport := n.TURNPort()
+	if turnport == 0 {
+		return netip.AddrPort{}
+	}
+	return netip.AddrPortFrom(addr.Addr(), turnport)
 }
 
-// UnmarshalJSON unmarshals a Node from JSON.
-func (n *Node) UnmarshalJSON(b []byte) error {
-	type Alias Node
-	aux := &struct {
-		PublicKey   string `json:"publicKey"`
-		PrivateIPv4 string `json:"privateIpv4"`
-		PrivateIPv6 string `json:"privateIpv6"`
-		*Alias
-	}{
-		Alias: (*Alias)(n),
+// PrivateTURNAddrV6 returns the private IPv6 address for the node's TURN server.
+// Be sure to check if the returned AddrPort IsValid.
+func (n *MeshNode) PrivateTURNAddrV6() netip.AddrPort {
+	addr := n.PrivateAddrV6()
+	if !addr.IsValid() {
+		return netip.AddrPort{}
 	}
-	if err := json.Unmarshal(b, &aux); err != nil {
-		return err
+	turnport := n.TURNPort()
+	if turnport == 0 {
+		return netip.AddrPort{}
 	}
-	if aux.PublicKey != "" {
-		key, err := wgtypes.ParseKey(aux.PublicKey)
-		if err != nil {
-			return fmt.Errorf("parse node public key: %w", err)
-		}
-		n.PublicKey = key
-	}
-	if aux.PrivateIPv4 != "" {
-		network, err := netip.ParsePrefix(aux.PrivateIPv4)
-		if err != nil {
-			return fmt.Errorf("parse node private IPv4: %w", err)
-		}
-		n.PrivateIPv4 = network
-	}
-	if aux.PrivateIPv6 != "" {
-		network, err := netip.ParsePrefix(aux.PrivateIPv6)
-		if err != nil {
-			return fmt.Errorf("parse node private IPv6: %w", err)
-		}
-		n.PrivateIPv6 = network
-	}
-	return nil
-}
-
-// Proto converts a Node to the protobuf representation.
-func (n *Node) Proto(status v1.ClusterStatus) *v1.MeshNode {
-	return &v1.MeshNode{
-		Id:                 n.ID,
-		PrimaryEndpoint:    n.PrimaryEndpoint,
-		WireguardEndpoints: n.WireGuardEndpoints,
-		ZoneAwarenessId:    n.ZoneAwarenessID,
-		RaftPort:           int32(n.RaftPort),
-		GrpcPort:           int32(n.GRPCPort),
-		MeshdnsPort:        int32(n.DNSPort),
-		PublicKey: func() string {
-			if len(n.PublicKey) > 0 {
-				return n.PublicKey.String()
-			}
-			return ""
-		}(),
-		PrivateIpv4: func() string {
-			if n.PrivateIPv4.IsValid() {
-				return n.PrivateIPv4.String()
-			}
-			return ""
-		}(),
-		PrivateIpv6: func() string {
-			if n.PrivateIPv6.IsValid() {
-				return n.PrivateIPv6.String()
-			}
-			return ""
-		}(),
-		Features:  n.Features,
-		UpdatedAt: timestamppb.New(n.UpdatedAt),
-		// TODO: Get rid of this field.
-		CreatedAt:     timestamppb.New(n.UpdatedAt),
-		ClusterStatus: status,
-	}
+	return netip.AddrPortFrom(addr.Addr(), turnport)
 }

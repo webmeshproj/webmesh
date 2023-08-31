@@ -45,7 +45,7 @@ type Options struct {
 	WireGuard  wireguard.Interface
 	NodeDialer transport.NodeDialer
 	Plugins    plugins.Manager
-	Features   []v1.Feature
+	Features   []*v1.FeaturePort
 	NetworkV4  netip.Prefix
 	NetworkV6  netip.Prefix
 }

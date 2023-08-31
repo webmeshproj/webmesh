@@ -294,21 +294,13 @@ func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.Stat
 			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
 		}, nil
 	}
-	var raftStatus v1.ClusterStatus
-	if app.mesh.Raft().IsLeader() {
-		raftStatus = v1.ClusterStatus_CLUSTER_LEADER
-	} else if app.mesh.Raft().IsVoter() {
-		raftStatus = v1.ClusterStatus_CLUSTER_VOTER
-	} else {
-		raftStatus = v1.ClusterStatus_CLUSTER_NON_VOTER
-	}
 	p, err := peers.New(app.mesh.Storage()).Get(ctx, app.mesh.ID())
 	if err != nil {
 		return nil, err
 	}
 	return &v1.StatusResponse{
 		ConnectionStatus: status,
-		Node:             p.Proto(raftStatus),
+		Node:             p.MeshNode,
 	}, nil
 }
 

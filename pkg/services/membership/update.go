@@ -142,14 +142,14 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	}
 	// Determine the peer's current status
 	for _, server := range cfg.Servers {
-		if server.ID == raft.ServerID(peer.ID) {
+		if server.ID == raft.ServerID(peer.GetId()) {
 			currentSuffrage = server.Suffrage
 			currentAddress = server.Address
 			break
 		}
 	}
 	// Ensure any new routes
-	_, err = s.ensurePeerRoutes(ctx, peer.ID, req.GetRoutes())
+	_, err = s.ensurePeerRoutes(ctx, peer.GetId(), req.GetRoutes())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err)
 	}
@@ -157,21 +157,8 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	var hasChanges bool
 	toUpdate := &peer
 	// Check the public key
-	if publicKey != (wgtypes.Key{}) && publicKey != peer.PublicKey {
-		toUpdate.PublicKey = publicKey
-		hasChanges = true
-	}
-	// Check the raft, grpc, and meshdns ports
-	if req.GetRaftPort() != 0 && req.GetRaftPort() != int32(peer.RaftPort) {
-		toUpdate.RaftPort = int(req.GetRaftPort())
-		hasChanges = true
-	}
-	if req.GetGrpcPort() != 0 && req.GetGrpcPort() != int32(peer.GRPCPort) {
-		toUpdate.GRPCPort = int(req.GetGrpcPort())
-		hasChanges = true
-	}
-	if req.GetMeshdnsPort() != 0 && req.GetMeshdnsPort() != int32(peer.DNSPort) {
-		toUpdate.DNSPort = int(req.GetMeshdnsPort())
+	if publicKey != (wgtypes.Key{}) && publicKey.String() != peer.PublicKey {
+		toUpdate.PublicKey = publicKey.String()
 		hasChanges = true
 	}
 	// Check endpoints
@@ -181,15 +168,15 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	}
 	if len(req.GetWireguardEndpoints()) > 0 {
 		sort.Strings(req.GetWireguardEndpoints())
-		sort.Strings(peer.WireGuardEndpoints)
-		if !cmp.Equal(req.GetWireguardEndpoints(), peer.WireGuardEndpoints) {
-			toUpdate.WireGuardEndpoints = req.GetWireguardEndpoints()
+		sort.Strings(peer.WireguardEndpoints)
+		if !cmp.Equal(req.GetWireguardEndpoints(), peer.WireguardEndpoints) {
+			toUpdate.WireguardEndpoints = req.GetWireguardEndpoints()
 			hasChanges = true
 		}
 	}
 	// Zone awareness
-	if req.GetZoneAwarenessId() != "" && req.GetZoneAwarenessId() != peer.ZoneAwarenessID {
-		toUpdate.ZoneAwarenessID = req.GetZoneAwarenessId()
+	if req.GetZoneAwarenessId() != "" && req.GetZoneAwarenessId() != peer.ZoneAwarenessId {
+		toUpdate.ZoneAwarenessId = req.GetZoneAwarenessId()
 		hasChanges = true
 	}
 	// Features
@@ -214,7 +201,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		}
 		// Promote to voter
 		log.Info("promoting to voter", slog.String("raft_address", string(currentAddress)))
-		if err := s.raft.AddVoter(ctx, peer.ID, string(currentAddress)); err != nil {
+		if err := s.raft.AddVoter(ctx, peer.GetId(), string(currentAddress)); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to promote to voter: %v", err)
 		}
 	}

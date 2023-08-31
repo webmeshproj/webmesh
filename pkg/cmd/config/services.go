@@ -23,6 +23,7 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"strconv"
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -230,6 +231,23 @@ func (t *TURNOptions) Validate() error {
 	return nil
 }
 
+// ListenPort returns the listen port for this TURN configuration. or 0
+// if not enabled or invalid.
+func (t *TURNOptions) ListenPort() uint16 {
+	if !t.Enabled {
+		return 0
+	}
+	_, port, err := net.SplitHostPort(t.ListenAddress)
+	if err != nil {
+		return 0
+	}
+	out, err := strconv.Atoi(port)
+	if err != nil {
+		return 0
+	}
+	return uint16(out)
+}
+
 // BindFlags binds the flags.
 type MeshDNSOptions struct {
 	// Enabled enables mesh DNS.
@@ -290,6 +308,22 @@ func (m *MeshDNSOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&m.IPv6Only, prefix+"services.meshdns.ipv6-only", false, "Only respond to IPv6 requests.")
 }
 
+// ListenPort returns the listen port for the MeshDNS server is enabled.
+func (m *MeshDNSOptions) ListenPort() uint16 {
+	if !m.Enabled {
+		return 0
+	}
+	_, port, err := net.SplitHostPort(m.ListenUDP)
+	if err != nil {
+		return 0
+	}
+	out, err := strconv.Atoi(port)
+	if err != nil {
+		return 0
+	}
+	return uint16(out)
+}
+
 // Metrics are options for exposing metrics.
 type MetricsOptions struct {
 	// Enabled is true if metrics should be enabled.
@@ -314,6 +348,22 @@ func (m *MetricsOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&m.Enabled, prefix+"services.metrics.enabled", false, "Enable gRPC metrics.")
 	fl.StringVar(&m.ListenAddress, prefix+"services.metrics.listen-address", metrics.DefaultListenAddress, "gRPC metrics listen address.")
 	fl.StringVar(&m.Path, prefix+"services.metrics.path", metrics.DefaultPath, "gRPC metrics path.")
+}
+
+// ListenPort returns the listen port for the Metrics server is enabled.
+func (m *MetricsOptions) ListenPort() uint16 {
+	if !m.Enabled {
+		return 0
+	}
+	_, port, err := net.SplitHostPort(m.ListenAddress)
+	if err != nil {
+		return 0
+	}
+	out, err := strconv.Atoi(port)
+	if err != nil {
+		return 0
+	}
+	return uint16(out)
 }
 
 // Validate validates the options.
@@ -402,37 +452,72 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 }
 
 // NewFeatureSet returns a new FeatureSet for the given node options.
-func (o *Config) NewFeatureSet() []v1.Feature {
+func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 	if o.Mesh.DisableFeatureAdvertisement {
-		return []v1.Feature{v1.Feature_FEATURE_NONE}
+		return []*v1.FeaturePort{}
 	}
 	// We always expose the node API
-	var features []v1.Feature
-	features = append(features, v1.Feature_NODES)
+	var features []*v1.FeaturePort
+	features = append(features, &v1.FeaturePort{
+		Feature: v1.Feature_NODES,
+		Port:    int32(o.Mesh.GRPCAdvertisePort),
+	})
 	// If we are a raft member, we automatically serve storage and membership
 	if o.IsRaftMember() {
-		features = append(features, v1.Feature_STORAGE, v1.Feature_MEMBERSHIP)
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_STORAGE,
+			Port:    int32(o.Mesh.GRPCAdvertisePort),
+		})
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_MEMBERSHIP,
+			Port:    int32(o.Mesh.GRPCAdvertisePort),
+		})
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_RAFT,
+			Port:    int32(o.RaftListenPort()),
+		})
 	}
 	if !o.Services.DisableLeaderProxy {
-		features = append(features, v1.Feature_LEADER_PROXY)
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_LEADER_PROXY,
+			Port:    int32(o.Mesh.GRPCAdvertisePort),
+		})
 	}
 	if o.Services.API.MeshEnabled {
-		features = append(features, v1.Feature_MESH_API)
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_MESH_API,
+			Port:    int32(o.Mesh.GRPCAdvertisePort),
+		})
 	}
 	if o.Services.API.AdminEnabled {
-		features = append(features, v1.Feature_ADMIN_API)
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_ADMIN_API,
+			Port:    int32(o.Mesh.GRPCAdvertisePort),
+		})
 	}
 	if o.Services.API.WebRTCEnabled {
-		features = append(features, v1.Feature_ICE_NEGOTIATION)
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_ICE_NEGOTIATION,
+			Port:    int32(o.Mesh.GRPCAdvertisePort),
+		})
 	}
 	if o.Services.TURN.Enabled {
-		features = append(features, v1.Feature_TURN_SERVER)
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_TURN_SERVER,
+			Port:    int32(o.Services.TURN.ListenPort()),
+		})
 	}
 	if o.Services.MeshDNS.Enabled {
-		features = append(features, v1.Feature_MESH_DNS)
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_MESH_DNS,
+			Port:    int32(o.Services.MeshDNS.ListenPort()),
+		})
 	}
 	if o.Services.Metrics.Enabled {
-		features = append(features, v1.Feature_METRICS)
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_METRICS,
+			Port:    int32(o.Services.Metrics.ListenPort()),
+		})
 	}
 	return features
 }

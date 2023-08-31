@@ -27,6 +27,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
@@ -95,11 +96,15 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
-	if req.GetGrpcPort() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "grpc port required")
-	}
+	var raftPort int32
 	if req.GetAsVoter() || req.GetAsObserver() {
-		if req.GetRaftPort() <= 0 {
+		for _, feat := range req.GetFeatures() {
+			if feat.Feature == v1.Feature_RAFT {
+				raftPort = feat.Port
+				break
+			}
+		}
+		if raftPort <= 0 {
 			return nil, status.Error(codes.InvalidArgument, "raft port required")
 		}
 	}
@@ -198,18 +203,18 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	// Write the peer to the database
 	p := peers.New(s.raft.Storage())
-	err = p.Put(ctx, peers.Node{
-		ID:                 req.GetId(),
-		PublicKey:          publicKey,
-		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
-		WireGuardEndpoints: req.GetWireguardEndpoints(),
-		ZoneAwarenessID:    req.GetZoneAwarenessId(),
-		GRPCPort:           int(req.GetGrpcPort()),
-		RaftPort:           int(req.GetRaftPort()),
-		DNSPort:            int(req.GetMeshdnsPort()),
-		Features:           req.GetFeatures(),
-		PrivateIPv4:        leasev4,
-		PrivateIPv6:        leasev6,
+	err = p.Put(ctx, peers.MeshNode{
+		MeshNode: &v1.MeshNode{
+			Id:                 req.GetId(),
+			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
+			WireguardEndpoints: req.GetWireguardEndpoints(),
+			ZoneAwarenessId:    req.GetZoneAwarenessId(),
+			PublicKey:          publicKey.String(),
+			PrivateIpv4:        leasev4.String(),
+			PrivateIpv6:        leasev6.String(),
+			Features:           req.GetFeatures(),
+			JoinedAt:           timestamppb.New(time.Now().UTC()),
+		},
 	})
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to raft log: %v", err))
@@ -243,10 +248,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
 		for _, peer := range allPeers {
-			if peer.ID != req.GetId() && peer.PrimaryEndpoint != "" {
-				log.Debug("adding edge from public peer to public caller", slog.String("peer", peer.ID))
+			if peer.GetId() != req.GetId() && peer.PrimaryEndpoint != "" {
+				log.Debug("adding edge from public peer to public caller", slog.String("peer", peer.GetId()))
 				err = p.PutEdge(ctx, &v1.MeshEdge{
-					Source: peer.ID,
+					Source: peer.GetId(),
 					Target: req.GetId(),
 					Weight: 99,
 				})
@@ -265,13 +270,13 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
 		for _, peer := range zonePeers {
-			if peer.ID == req.GetId() || peer.PrimaryEndpoint == "" {
+			if peer.GetId() == req.GetId() || peer.PrimaryEndpoint == "" {
 				continue
 			}
-			log.Debug("Adding edges to peer in the same zone", slog.String("peer", peer.ID))
-			if peer.ID != req.GetId() {
+			log.Debug("Adding edges to peer in the same zone", slog.String("peer", peer.GetId()))
+			if peer.GetId() != req.GetId() {
 				err = p.PutEdge(ctx, &v1.MeshEdge{
-					Source: peer.ID,
+					Source: peer.GetId(),
 					Target: req.GetId(),
 					Weight: 1,
 				})
@@ -293,8 +298,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 				// The peer doesn't exist, so create a placeholder for it
 				log.Debug("Registering empty peer", slog.String("peer", peer))
-				err = p.Put(ctx, peers.Node{
-					ID: peer,
+				err = p.Put(ctx, peers.MeshNode{
+					MeshNode: &v1.MeshNode{Id: peer},
 				})
 				if err != nil {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to register peer: %v", err))
@@ -334,10 +339,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			var raftAddress string
 			if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
 				// Prefer IPv4 for raft
-				raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+				raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(raftPort)))
 			} else {
 				// Use IPv6 for raft
-				raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(req.GetRaftPort())))
+				raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(raftPort)))
 			}
 			if req.GetAsVoter() {
 				log.Info("Adding voter to cluster", slog.String("raft_address", raftAddress))
@@ -374,7 +379,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Warn("could not lookup DNS servers", slog.String("error", err.Error()))
 	} else {
 		for _, peer := range dnsServers {
-			if peer.ID == req.GetId() {
+			if peer.GetId() == req.GetId() {
 				continue
 			}
 			switch {
@@ -403,7 +408,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers by ICE feature: %v", err))
 		}
 		for _, peer := range peers {
-			if peer.ID == req.GetId() {
+			if peer.GetId() == req.GetId() {
 				continue
 			}
 			// We only return peers that are publicly accessible for now.
@@ -429,22 +434,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 						PrimaryEndpoint:    req.GetPrimaryEndpoint(),
 						WireguardEndpoints: req.GetWireguardEndpoints(),
 						ZoneAwarenessId:    req.GetZoneAwarenessId(),
-						RaftPort:           int32(req.GetRaftPort()),
-						GrpcPort:           int32(req.GetGrpcPort()),
-						MeshdnsPort:        int32(req.GetMeshdnsPort()),
 						PublicKey:          req.GetPublicKey(),
 						PrivateIpv4:        leasev4.String(),
 						PrivateIpv6:        leasev6.String(),
 						Features:           req.GetFeatures(),
-						ClusterStatus: func() v1.ClusterStatus {
-							if req.GetAsVoter() {
-								return v1.ClusterStatus_CLUSTER_VOTER
-							}
-							if req.GetAsObserver() {
-								return v1.ClusterStatus_CLUSTER_NON_VOTER
-							}
-							return v1.ClusterStatus_CLUSTER_NODE
-						}(),
+						JoinedAt:           timestamppb.New(time.Now().UTC()),
 					},
 				},
 			})

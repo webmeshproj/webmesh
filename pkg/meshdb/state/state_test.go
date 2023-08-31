@@ -18,9 +18,9 @@ package state
 
 import (
 	"context"
-	"net/netip"
 	"testing"
 
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
@@ -203,24 +203,44 @@ func setupTest(t *testing.T) (*state, func()) {
 	}
 	p := peers.New(db)
 	// Node with public address
-	err = p.Put(ctx, peers.Node{
-		ID:              publicNode,
-		PublicKey:       mustGenerateKey(t),
-		PrimaryEndpoint: publicNodePublicAddr,
-		GRPCPort:        rpcPort,
-		RaftPort:        2,
-		PrivateIPv4:     netip.MustParsePrefix(publicNodePrivateAddr),
+	err = p.Put(ctx, peers.MeshNode{
+		MeshNode: &v1.MeshNode{
+			Id:              publicNode,
+			PublicKey:       mustGenerateKey(t).String(),
+			PrimaryEndpoint: publicNodePublicAddr,
+			PrivateIpv4:     publicNodePrivateAddr,
+			Features: []*v1.FeaturePort{
+				{
+					Feature: v1.Feature_NODES,
+					Port:    int32(rpcPort),
+				},
+				{
+					Feature: v1.Feature_STORAGE,
+					Port:    2,
+				},
+			},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Node with private address
-	err = p.Put(ctx, peers.Node{
-		ID:          privateNode,
-		PublicKey:   mustGenerateKey(t),
-		GRPCPort:    rpcPort,
-		RaftPort:    2,
-		PrivateIPv4: netip.MustParsePrefix(privateNodePrivateAddr),
+	err = p.Put(ctx, peers.MeshNode{
+		MeshNode: &v1.MeshNode{
+			Id:          privateNode,
+			PublicKey:   mustGenerateKey(t).String(),
+			PrivateIpv4: privateNodePrivateAddr,
+			Features: []*v1.FeaturePort{
+				{
+					Feature: v1.Feature_NODES,
+					Port:    int32(rpcPort),
+				},
+				{
+					Feature: v1.Feature_STORAGE,
+					Port:    2,
+				},
+			},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
