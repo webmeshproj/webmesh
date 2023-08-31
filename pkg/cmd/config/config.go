@@ -63,6 +63,24 @@ type Config struct {
 	Bridge BridgeOptions `koanf:"bridge,omitempty"`
 }
 
+// NewDefaultConfig returns a new config with the default options. If nodeID is empty,
+// the hostname or a randomly generated one will be used.
+func NewDefaultConfig(nodeID string) Config {
+	return Config{
+		Global:    GlobalOptions{},
+		Bootstrap: NewBootstrapOptions(),
+		Auth:      AuthOptions{},
+		Mesh:      NewMeshOptions(nodeID),
+		Raft:      NewRaftOptions(),
+		Services:  NewServiceOptions(),
+		TLS:       TLSOptions{},
+		WireGuard: NewWireGuardOptions(),
+		Discovery: NewDiscoveryOptions("", false),
+		Plugins:   PluginOptions{},
+		Bridge:    BridgeOptions{},
+	}
+}
+
 // BindFlags binds the flags. The options are returned for convenience.
 func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
 	o.Bootstrap.BindFlags(prefix, fs)

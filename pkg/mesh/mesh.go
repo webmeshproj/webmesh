@@ -51,6 +51,9 @@ const DefaultNetworkPolicy = "accept"
 // DefaultBootstrapListenAddress is the default listen address for the bootstrap transport.
 const DefaultBootstrapListenAddress = "[::]:9001"
 
+// DefaultBootstrapPort is the default port for the bootstrap transport.
+const DefaultBootstrapPort = 9001
+
 // DefaultMeshAdmin is the default mesh admin node ID.
 const DefaultMeshAdmin = "admin"
 

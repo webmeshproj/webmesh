@@ -64,6 +64,24 @@ type BootstrapOptions struct {
 	Force bool `koanf:"force,omitempty"`
 }
 
+// NewBootstrapOptions returns a new BootstrapOptions with the default values.
+func NewBootstrapOptions() BootstrapOptions {
+	return BootstrapOptions{
+		Enabled:              false,
+		AdvertiseAddress:     net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", mesh.DefaultBootstrapPort)),
+		ListenAddress:        mesh.DefaultBootstrapListenAddress,
+		Servers:              nil,
+		ServersGRPCPorts:     nil,
+		IPv4Network:          mesh.DefaultIPv4Network,
+		MeshDomain:           mesh.DefaultMeshDomain,
+		Admin:                mesh.DefaultMeshAdmin,
+		Voters:               nil,
+		DefaultNetworkPolicy: mesh.DefaultNetworkPolicy,
+		DisableRBAC:          false,
+		Force:                false,
+	}
+}
+
 // BindFlags binds the bootstrap options to a flag set.
 func (o *BootstrapOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, prefix+"bootstrap.enabled", false, "Attempt to bootstrap a new cluster")

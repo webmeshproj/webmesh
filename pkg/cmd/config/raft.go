@@ -80,6 +80,32 @@ type RaftOptions struct {
 	LogLevel string `koanf:"log-level,omitempty"`
 }
 
+// NewRaftOptions returns a new RaftOptions with the default values.
+func NewRaftOptions() RaftOptions {
+	return RaftOptions{
+		ListenAddress:           raft.DefaultListenAddress,
+		DataDir:                 raft.DefaultDataDir,
+		InMemory:                false,
+		ConnectionPoolCount:     0,
+		ConnectionTimeout:       5 * time.Second,
+		HeartbeatTimeout:        time.Second,
+		ElectionTimeout:         time.Second,
+		ApplyTimeout:            10 * time.Second,
+		CommitTimeout:           10 * time.Second,
+		MaxAppendEntries:        64,
+		LeaderLeaseTimeout:      time.Second,
+		SnapshotInterval:        30 * time.Second,
+		SnapshotThreshold:       8192,
+		SnapshotRetention:       2,
+		ObserverChanBuffer:      100,
+		RequestVote:             false,
+		RequestObserver:         false,
+		PreferIPv6:              false,
+		HeartbeatPurgeThreshold: 25,
+		LogLevel:                "info",
+	}
+}
+
 // BindFlags binds the flags.
 func (o *RaftOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.ListenAddress, prefix+"raft.listen-address", raft.DefaultListenAddress, "Raft listen address.")

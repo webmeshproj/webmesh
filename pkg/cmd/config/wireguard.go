@@ -60,13 +60,31 @@ type WireGuardOptions struct {
 	RecordMetricsInterval time.Duration `koanf:"record-metrics-interval,omitempty"`
 }
 
+// NewWireGuardOptions returns a new WireGuardOptions with sensible defaults.
+func NewWireGuardOptions() WireGuardOptions {
+	return WireGuardOptions{
+		ListenPort:            wireguard.DefaultListenPort,
+		InterfaceName:         wireguard.DefaultInterfaceName,
+		ForceInterfaceName:    false,
+		ForceTUN:              false,
+		Masquerade:            false,
+		PersistentKeepAlive:   0,
+		MTU:                   system.DefaultMTU,
+		Endpoints:             nil,
+		KeyFile:               "",
+		KeyRotationInterval:   time.Hour * 24 * 7,
+		RecordMetrics:         false,
+		RecordMetricsInterval: time.Second * 10,
+	}
+}
+
 // BindFlags binds the flags.
 func (o *WireGuardOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.IntVar(&o.ListenPort, prefix+"wireguard.listen-port", wireguard.DefaultListenPort, "The port to listen on.")
 	fs.StringVar(&o.InterfaceName, prefix+"wireguard.interface-name", wireguard.DefaultInterfaceName, "The name of the interface.")
 	fs.BoolVar(&o.ForceInterfaceName, prefix+"wireguard.force-interface-name", false, "Force the use of the given name by deleting any pre-existing interface with the same name.")
 	fs.BoolVar(&o.ForceTUN, prefix+"wireguard.force-tun", false, "Force the use of a TUN interface.")
-	fs.BoolVar(&o.Masquerade, prefix+"wireguard.masquerade", true, "Enable masquerading of traffic from the wireguard interface.")
+	fs.BoolVar(&o.Masquerade, prefix+"wireguard.masquerade", false, "Enable masquerading of traffic from the wireguard interface.")
 	fs.DurationVar(&o.PersistentKeepAlive, prefix+"wireguard.persistent-keepalive", 0, "The interval at which to send keepalive packets to peers.")
 	fs.IntVar(&o.MTU, prefix+"wireguard.mtu", system.DefaultMTU, "The MTU to use for the interface.")
 	fs.StringSliceVar(&o.Endpoints, prefix+"wireguard.endpoints", nil, "Additional WireGuard endpoints to broadcast when joining.")

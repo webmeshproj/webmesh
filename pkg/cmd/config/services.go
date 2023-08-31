@@ -77,6 +77,24 @@ type ServiceOptions struct {
 	Metrics MetricsOptions `koanf:"metrics,omitempty"`
 }
 
+// NewServiceOptions returns a new ServiceOptions with the default values.
+func NewServiceOptions() ServiceOptions {
+	return ServiceOptions{
+		GRPCListenAddress:  services.DefaultGRPCListenAddress,
+		GRPCWebEnabled:     false,
+		TLSCertFile:        "",
+		TLSCertData:        "",
+		TLSKeyFile:         "",
+		TLSKeyData:         "",
+		Insecure:           false,
+		DisableLeaderProxy: false,
+		API:                APIOptions{},
+		MeshDNS:            NewMeshDNSOptions(),
+		TURN:               NewTURNOptions(),
+		Metrics:            NewMetricsOptions(),
+	}
+}
+
 // BindFlags binds the flags.
 func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.StringVar(&s.GRPCListenAddress, prefix+"services.grpc-listen-address", services.DefaultGRPCListenAddress, "gRPC listen address.")
@@ -161,6 +179,18 @@ type TURNOptions struct {
 	TURNPortRange string `koanf:"port-range,omitempty"`
 }
 
+// NewTURNOptions returns a new TURNOptions with the default values.
+func NewTURNOptions() TURNOptions {
+	return TURNOptions{
+		Enabled:       false,
+		Endpoint:      "",
+		PublicIP:      "",
+		ListenAddress: turn.DefaultListenAddress,
+		Realm:         "webmesh",
+		TURNPortRange: turn.DefaultPortRange,
+	}
+}
+
 // BindFlags binds the flags.
 func (t *TURNOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&t.Enabled, prefix+"services.turn.enabled", false, "Enable TURN server.")
@@ -228,6 +258,23 @@ type MeshDNSOptions struct {
 	IPv6Only bool `koanf:"ipv6-only,omitempty"`
 }
 
+// NewMeshDNSOptions returns a new MeshDNSOptions with the default values.
+func NewMeshDNSOptions() MeshDNSOptions {
+	return MeshDNSOptions{
+		Enabled:             false,
+		ListenUDP:           meshdns.DefaultListenUDP,
+		ListenTCP:           meshdns.DefaultListenTCP,
+		ReusePort:           0,
+		EnableCompression:   true,
+		RequestTimeout:      time.Second * 5,
+		Forwarders:          nil,
+		SubscribeForwarders: false,
+		DisableForwarding:   false,
+		CacheSize:           100,
+		IPv6Only:            false,
+	}
+}
+
 // BindFlags binds the flags.
 func (m *MeshDNSOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&m.Enabled, prefix+"services.meshdns.enabled", false, "Enable mesh DNS.")
@@ -239,7 +286,7 @@ func (m *MeshDNSOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.StringSliceVar(&m.Forwarders, prefix+"services.meshdns.forwarders", nil, "DNS forwarders (default = system resolvers).")
 	fl.BoolVar(&m.SubscribeForwarders, prefix+"services.meshdns.subscribe-forwarders", false, "Subscribe to new nodes that can forward requests.")
 	fl.BoolVar(&m.DisableForwarding, prefix+"services.meshdns.disable-forwarding", false, "Disable forwarding requests.")
-	fl.IntVar(&m.CacheSize, prefix+"services.meshdns.cache-size", 0, "Size of the remote DNS cache (0 = disabled).")
+	fl.IntVar(&m.CacheSize, prefix+"services.meshdns.cache-size", 100, "Size of the remote DNS cache (0 = disabled).")
 	fl.BoolVar(&m.IPv6Only, prefix+"services.meshdns.ipv6-only", false, "Only respond to IPv6 requests.")
 }
 
@@ -251,6 +298,15 @@ type MetricsOptions struct {
 	ListenAddress string `koanf:"listen-address,omitempty"`
 	// MetricsPath is the path to serve metrics on.
 	Path string `koanf:"path,omitempty"`
+}
+
+// NewMetricsOptions returns a new MetricsOptions with the default values.
+func NewMetricsOptions() MetricsOptions {
+	return MetricsOptions{
+		Enabled:       false,
+		ListenAddress: metrics.DefaultListenAddress,
+		Path:          metrics.DefaultPath,
+	}
 }
 
 // BindFlags binds the flags.

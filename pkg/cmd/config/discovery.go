@@ -40,6 +40,17 @@ type DiscoveryOptions struct {
 	AnnounceTTL time.Duration `koanf:"announce-ttl,omitempty"`
 }
 
+// NewDiscoveryOptions returns a new DiscoveryOptions for the given PSK.
+// Or one ready with sensible defaults if the PSK is empty.
+func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
+	return DiscoveryOptions{
+		Announce:    announce,
+		PSK:         psk,
+		UseKadDHT:   psk != "",
+		AnnounceTTL: time.Minute,
+	}
+}
+
 // BindFlags binds the flags for the discovery options.
 func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Announce, prefix+"discovery.announce", false, "announce this peer to the discovery service")

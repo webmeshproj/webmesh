@@ -80,6 +80,29 @@ type MeshOptions struct {
 	DisableFeatureAdvertisement bool `koanf:"disable-feature-advertisement,omitempty"`
 }
 
+// NewMeshOptions returns a new MeshOptions with the default values. If node id
+// is empty it will be assumed from the system or generated.
+func NewMeshOptions(nodeID string) MeshOptions {
+	if nodeID == "" {
+		nodeID = DefaultNodeID
+	}
+	return MeshOptions{
+		NodeID:                      nodeID,
+		PrimaryEndpoint:             "",
+		ZoneAwarenessID:             "",
+		JoinAddress:                 "",
+		MaxJoinRetries:              15,
+		Routes:                      nil,
+		DirectPeers:                 nil,
+		GRPCAdvertisePort:           services.DefaultGRPCPort,
+		MeshDNSAdvertisePort:        meshdns.DefaultAdvertisePort,
+		UseMeshDNS:                  false,
+		DisableIPv4:                 false,
+		DisableIPv6:                 false,
+		DisableFeatureAdvertisement: false,
+	}
+}
+
 // BindFlags binds the flags to the options.
 func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.NodeID, prefix+"mesh.node-id", "", "Node ID. One will be chosen automatically if left unset.")
