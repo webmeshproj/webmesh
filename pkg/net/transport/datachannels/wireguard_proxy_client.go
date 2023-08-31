@@ -41,7 +41,11 @@ type WireGuardProxyClient struct {
 	bufferSize int
 }
 
-func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTransport, listenPort uint16) (*WireGuardProxyClient, error) {
+// NewWireGuardProxyClient creates a new WireGuardProxyClient using the given signaling transport.
+// Traffic will be proxied to the wireguard interface listening on targetPort. It contains a method
+// for retrieving the local address to use as a WireGuard endpoint for the peer on the other side of
+// the proxy.
+func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTransport, targetPort uint16) (*WireGuardProxyClient, error) {
 	log := context.LoggerFrom(ctx)
 	log.Debug("Starting signaling transport")
 	err := rt.Start(ctx)
@@ -109,7 +113,7 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 	}
 	wgiface, err := net.DialUDP("udp", nil, &net.UDPAddr{
 		IP:   net.IPv4zero,
-		Port: int(listenPort),
+		Port: int(targetPort),
 	})
 	if err != nil {
 		defer pc.Close()
