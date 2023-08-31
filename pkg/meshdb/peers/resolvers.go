@@ -29,7 +29,7 @@ import (
 )
 
 // FilterFunc is a function that can be used to filter responses returned by a resolver.
-type FilterFunc func(*v1.MeshNode) bool
+type FilterFunc func(MeshNode) bool
 
 // Resolver provides facilities for creating various transport.Resolver instances.
 type Resolver interface {
@@ -87,6 +87,11 @@ func (r *peerResolver) FeatureResolver(filterFn ...FilterFunc) transport.Feature
 				return fmt.Errorf("unmarshal node: %w", err)
 			}
 			node := MeshNode{MeshNode: mnode}
+			for _, fn := range filterFn {
+				if !fn(node) {
+					return nil
+				}
+			}
 			if node.HasFeature(lookup) {
 				switch lookup {
 				// Return the DNS port for DNS features
@@ -103,6 +108,13 @@ func (r *peerResolver) FeatureResolver(filterFn ...FilterFunc) transport.Feature
 						addrs = append(addrs, addr)
 					}
 					if addr := node.PrivateTURNAddrV6(); addr.IsValid() {
+						addrs = append(addrs, addr)
+					}
+				case v1.Feature_RAFT:
+					if addr := node.PrivateRaftAddrV4(); addr.IsValid() {
+						addrs = append(addrs, addr)
+					}
+					if addr := node.PrivateRaftAddrV6(); addr.IsValid() {
 						addrs = append(addrs, addr)
 					}
 				// All other features use the RPC port for now.

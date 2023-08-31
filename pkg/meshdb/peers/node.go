@@ -137,6 +137,34 @@ func (n *MeshNode) PrivateRPCAddrV6() netip.AddrPort {
 	return netip.AddrPortFrom(addr.Addr(), rpcport)
 }
 
+// PrivateRaftAddrV4 returns the private IPv4 address for the node's raft listener.
+// Be sure to check if the returned AddrPort IsValid.
+func (n *MeshNode) PrivateRaftAddrV4() netip.AddrPort {
+	rpcport := n.RaftPort()
+	if rpcport == 0 {
+		return netip.AddrPort{}
+	}
+	addr := n.PrivateAddrV4()
+	if !addr.IsValid() {
+		return netip.AddrPort{}
+	}
+	return netip.AddrPortFrom(addr.Addr(), rpcport)
+}
+
+// PrivateRaftAddrV6 returns the private IPv6 address for the node's raft listener.
+// Be sure to check if the returned AddrPort IsValid.
+func (n *MeshNode) PrivateRaftAddrV6() netip.AddrPort {
+	rpcport := n.RaftPort()
+	if rpcport == 0 {
+		return netip.AddrPort{}
+	}
+	addr := n.PrivateAddrV6()
+	if !addr.IsValid() {
+		return netip.AddrPort{}
+	}
+	return netip.AddrPortFrom(addr.Addr(), rpcport)
+}
+
 // PublicDNSAddr returns the public address for the node's DNS server.
 // Be sure to check if the returned AddrPort IsValid.
 func (n *MeshNode) PublicDNSAddr() netip.AddrPort {
