@@ -143,15 +143,7 @@ func NewClientPeerConnection(ctx context.Context, protocol string, rt transport.
 		}
 		pc.channels = detached.(*datachannel.DataChannel)
 	})
-	var offer webrtc.SessionDescription
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context canceled")
-	case err := <-rt.Error():
-		return nil, fmt.Errorf("signaling transport error: %w", err)
-	case offer = <-rt.Descriptions():
-	}
-	go pc.negotiate(offer)
+	go pc.negotiate(rt.RemoteDescription())
 	return pc, nil
 }
 

@@ -215,6 +215,11 @@ func NewServerChannel(ctx context.Context, rt transport.WebRTCSignalTransport) (
 		defer c.Close()
 		return nil, fmt.Errorf("failed to send offer: %w", err)
 	}
+	err = c.SetRemoteDescription(rt.RemoteDescription())
+	if err != nil {
+		defer c.Close()
+		return nil, fmt.Errorf("failed to set remote description: %w", err)
+	}
 	// Handle ICE candidiates
 	go func() {
 		for cand := range rt.Candidates() {
@@ -224,21 +229,6 @@ func NewServerChannel(ctx context.Context, rt transport.WebRTCSignalTransport) (
 				c.errors <- fmt.Errorf("failed to add ICE candidate: %w", err)
 				return
 			}
-		}
-	}()
-	// Wait for the peer to send an answer
-	go func() {
-		select {
-		case answer := <-rt.Descriptions():
-			err := c.SetRemoteDescription(answer)
-			if err != nil {
-				defer c.Close()
-				c.errors <- fmt.Errorf("failed to set remote description: %w", err)
-			}
-			return
-		case <-ctx.Done():
-			defer c.Close()
-			c.errors <- fmt.Errorf("failed to receive answer: %w", ctx.Err())
 		}
 	}()
 	return c, nil
@@ -394,6 +384,11 @@ func NewClientChannel(ctx context.Context, rt transport.WebRTCSignalTransport) (
 		defer c.Close()
 		return nil, fmt.Errorf("failed to send offer: %w", err)
 	}
+	err = c.SetRemoteDescription(rt.RemoteDescription())
+	if err != nil {
+		defer c.Close()
+		return nil, fmt.Errorf("failed to set remote description: %w", err)
+	}
 	// Handle ICE candidiates
 	go func() {
 		for cand := range rt.Candidates() {
@@ -403,21 +398,6 @@ func NewClientChannel(ctx context.Context, rt transport.WebRTCSignalTransport) (
 				c.errors <- fmt.Errorf("failed to add ICE candidate: %w", err)
 				return
 			}
-		}
-	}()
-	// Wait for the peer to send an answer
-	go func() {
-		select {
-		case answer := <-rt.Descriptions():
-			err := c.SetRemoteDescription(answer)
-			if err != nil {
-				defer c.Close()
-				c.errors <- fmt.Errorf("failed to set remote description: %w", err)
-			}
-			return
-		case <-ctx.Done():
-			defer c.Close()
-			c.errors <- fmt.Errorf("failed to receive answer: %w", ctx.Err())
 		}
 	}()
 	return c, nil

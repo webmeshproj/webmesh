@@ -35,6 +35,9 @@ import (
 // JoinProtocol is the protocol used for joining a mesh.
 const JoinProtocol = protocol.ID("/webmesh/join/0.0.1")
 
+// WebRTCSignalProtocol is the protocol used for webrtc-signaling.
+const WebRTCSignalProtocol = protocol.ID("/webmesh/signal/0.0.1")
+
 func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, servers []multiaddr.Multiaddr) error {
 	log := context.LoggerFrom(ctx)
 	err := kaddht.Bootstrap(ctx)

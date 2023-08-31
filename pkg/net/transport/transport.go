@@ -187,7 +187,8 @@ func IsSignalTransportClosed(err error) bool {
 // WebRTCSignalTransport is the transport interface for providing WebRTC signaling between
 // mesh nodes.
 type WebRTCSignalTransport interface {
-	// Start starts the transport.
+	// Start starts the transport. This will not return until a remote peer
+	// has provided a session description.
 	Start(ctx context.Context) error
 	// TURNServers returns a list of TURN servers configured for the transport.
 	TURNServers() []webrtc.ICEServer
@@ -197,8 +198,8 @@ type WebRTCSignalTransport interface {
 	SendCandidate(ctx context.Context, candidate webrtc.ICECandidateInit) error
 	// Candidates returns a channel of ICE candidates received from the remote peer.
 	Candidates() <-chan webrtc.ICECandidateInit
-	// Descriptions returns a channel of SDP descriptions received from the remote peer.
-	Descriptions() <-chan webrtc.SessionDescription
+	// RemoteDescription returns the SDP description received from the remote peer.
+	RemoteDescription() webrtc.SessionDescription
 	// Error returns a channel that receives any error encountered during signaling.
 	// This channel will be closed when the transport is closed.
 	Error() <-chan error

@@ -154,15 +154,7 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 			log.Error("Failed to copy from datachannel to WireGuard", slog.String("error", err.Error()))
 		}
 	})
-	var offer webrtc.SessionDescription
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context canceled")
-	case err := <-rt.Error():
-		return nil, fmt.Errorf("signaling transport error: %w", err)
-	case offer = <-rt.Descriptions():
-	}
-	err = pc.conn.SetRemoteDescription(offer)
+	err = pc.conn.SetRemoteDescription(rt.RemoteDescription())
 	if err != nil {
 		defer pc.Close()
 		return nil, fmt.Errorf("failed to set remote description: %w", err)
