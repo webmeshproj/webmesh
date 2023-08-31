@@ -204,17 +204,28 @@ func (m *manager) Dial(ctx context.Context, network, address string) (net.Conn, 
 	}
 	// This is a bit of a hack, but for now we'll check if its a single word
 	// and not an IP address.
-	if net.ParseIP(host) == nil && len(strings.Split(host, ".")) == 0 {
+	if net.ParseIP(host) == nil && len(strings.Split(host, ".")) == 1 {
 		// We'll assume it's a node ID
-		peer, err := peers.New(m.storage).Get(ctx, host)
-		if err != nil {
-			return nil, fmt.Errorf("get peer: %w", err)
-		}
-		// If it's a v4 network use the peer's v4 address
-		if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
-			address = net.JoinHostPort(peer.PrivateIPv4.String(), port)
+		currentPeers := m.wg.Peers()
+		// Check if we have them registered already locally
+		if peerInfo, ok := currentPeers[host]; ok {
+			if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
+				address = net.JoinHostPort(peerInfo.PrivateIPv4.Addr().String(), port)
+			} else {
+				address = net.JoinHostPort(peerInfo.PrivateIPv6.Addr().String(), port)
+			}
 		} else {
-			address = net.JoinHostPort(peer.PrivateIPv6.String(), port)
+			// We gotta hit the database
+			peer, err := peers.New(m.storage).Get(ctx, host)
+			if err != nil {
+				return nil, fmt.Errorf("get peer: %w", err)
+			}
+			// If it's a v4 network use the peer's v4 address
+			if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
+				address = net.JoinHostPort(peer.PrivateIPv4.Addr().String(), port)
+			} else {
+				address = net.JoinHostPort(peer.PrivateIPv6.Addr().String(), port)
+			}
 		}
 	}
 	return dialer.DialContext(ctx, network, address)
