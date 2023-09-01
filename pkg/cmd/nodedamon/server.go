@@ -26,6 +26,7 @@ import (
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
+	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -35,6 +36,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
 
@@ -350,9 +352,20 @@ func (app *AppDaemon) AnnounceDHT(ctx context.Context, req *v1.AnnounceDHTReques
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	err := app.mesh.AnnounceDHT(ctx, mesh.DiscoveryOptions{
-		PSK:              req.GetPsk(),
-		BootstrapServers: req.GetBootstrapServers(),
+	var peers []multiaddr.Multiaddr
+	for _, addr := range req.GetBootstrapServers() {
+		maddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid bootstrap peer address: %v", err)
+		}
+		peers = append(peers, maddr)
+	}
+	err := app.mesh.AnnounceDHT(ctx, libp2p.JoinAnnounceOptions{
+		PSK: req.GetPsk(),
+		Host: libp2p.HostOptions{
+			BootstrapPeers: peers,
+			ConnectTimeout: time.Second * 5,
+		},
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error announcing: %v", err)

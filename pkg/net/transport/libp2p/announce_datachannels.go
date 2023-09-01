@@ -20,19 +20,15 @@ package libp2p
 
 import (
 	"bufio"
-	"fmt"
 	"log/slog"
 	"net"
 	"strconv"
 	"time"
 
-	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
-	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -48,71 +44,44 @@ type DataChannelAnnounceOptions struct {
 	RemotePeer string
 	// Rendevous is the string to use as a rendezvous point for the DHT.
 	Rendezvous string
-	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
-	// If empty or nil, the default bootstrap peers will be used.
-	BootstrapPeers []multiaddr.Multiaddr
-	// Options are options for configuring the libp2p host.
-	Options []config.Option
 	// AnnounceTTL is the TTL for each announcement.
 	AnnounceTTL time.Duration
-	// LocalAddrs is a list of local addresses to announce the host with.
-	// If empty or nil, the default local addresses will be used.
-	LocalAddrs []multiaddr.Multiaddr
 	// STUNServers is a list of STUN servers to use for NAT traversal.
 	// If empty, the default STUN servers will be used.
 	STUNServers []string
-	// DataChannelTimeout is the timeout for starting data channel connections.
-	DataChannelTimeout time.Duration
 	// WireGuardPort is the port to use for WireGuard connections.
 	WireGuardPort int
-	// ConnectTimeout is the timeout for connecting to peers.
-	ConnectTimeout time.Duration
+	// Host are options for configuring the host. These can be left
+	// empty if using a pre-created host.
+	Host HostOptions
 }
 
 // NewDataChannelAnnouncer creates a new announcer on the kadmilia DHT and executes
 // received signaling requests against the local node. The host and DHT are closed
 // when the announcer is closed.
 func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOptions) (*DataChannelAnnouncer, error) {
-	var err error
-	log := context.LoggerFrom(ctx)
-	SetBuffers(ctx)
 	announcer := &DataChannelAnnouncer{
-		opts:   opts,
-		closec: make(chan struct{}),
+		opts: opts,
 	}
-	if len(opts.LocalAddrs) > 0 {
-		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
-	}
-	host, err := libp2p.New(opts.Options...)
+	host, err := NewHost(ctx, opts.Host)
 	if err != nil {
-		return nil, fmt.Errorf("libp2p new host: %w", err)
+		return nil, err
 	}
-	host.SetStreamHandler(WebRTCSignalProtocolFor(opts.RemotePeer), func(s network.Stream) {
+	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.ID().String()))
+	host.Host().SetStreamHandler(WebRTCSignalProtocolFor(opts.RemotePeer), func(s network.Stream) {
 		log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
 		go announcer.handleStream(context.WithLogger(context.Background(), log), s)
 	})
-	log = log.With(slog.String("host-id", host.ID().String()))
-	ctx = context.WithLogger(ctx, log)
-	// Bootstrap the DHT.
-	log.Debug("Bootstrapping DHT")
-	dht, err := NewDHT(ctx, host, opts.BootstrapPeers, opts.ConnectTimeout)
-	if err != nil {
-		defer host.Close()
-		return nil, fmt.Errorf("libp2p new dht: %w", err)
-	}
 	// Announce the join protocol with our PSK.
 	log.Debug("Announcing data channel protocol with our PSK")
-	routingDiscovery := drouting.NewRoutingDiscovery(dht)
+	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
 	var discoveryOpts []discovery.Option
 	if opts.AnnounceTTL > 0 {
 		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
 	}
 	dutil.Advertise(ctx, routingDiscovery, opts.Rendezvous, discoveryOpts...)
 	announcer.close = func() error {
-		if err := dht.Close(); err != nil {
-			log.Error("Failed to close DHT", "error", err.Error())
-		}
-		return host.Close()
+		return host.Close(context.Background())
 	}
 	return announcer, nil
 }
@@ -123,8 +92,7 @@ func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOption
 func NewDataChannelAnnouncerWithHost(ctx context.Context, host Host, opts DataChannelAnnounceOptions) *DataChannelAnnouncer {
 	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.Host().ID().String()))
 	announcer := &DataChannelAnnouncer{
-		opts:   opts,
-		closec: make(chan struct{}),
+		opts: opts,
 	}
 	host.Host().SetStreamHandler(WebRTCSignalProtocolFor(opts.RemotePeer), func(s network.Stream) {
 		log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
@@ -147,19 +115,12 @@ func NewDataChannelAnnouncerWithHost(ctx context.Context, host Host, opts DataCh
 }
 
 type DataChannelAnnouncer struct {
-	opts   DataChannelAnnounceOptions
-	closec chan struct{}
-	close  func() error
+	opts  DataChannelAnnounceOptions
+	close func() error
 }
 
 // Close closes the announcer.
 func (a *DataChannelAnnouncer) Close() error {
-	select {
-	case <-a.closec:
-		return nil
-	default:
-	}
-	defer close(a.closec)
 	return a.close()
 }
 
@@ -272,12 +233,17 @@ func (a *DataChannelAnnouncer) handleSignaling(ctx context.Context, stream netwo
 			}
 			data, err := protojson.Marshal(&msg)
 			if err != nil {
-				log.Error("error sending ICE candidate", slog.String("error", err.Error()))
+				log.Error("Error sending ICE candidate", slog.String("error", err.Error()))
 				return
 			}
 			_, err = buf.Write(append(data, '\r'))
 			if err != nil {
-				log.Error("error sending ICE candidate", slog.String("error", err.Error()))
+				log.Error("Error sending ICE candidate", slog.String("error", err.Error()))
+				return
+			}
+			err = buf.Flush()
+			if err != nil {
+				log.Error("Error sending ICE candidate", slog.String("error", err.Error()))
 				return
 			}
 		}
@@ -285,13 +251,13 @@ func (a *DataChannelAnnouncer) handleSignaling(ctx context.Context, stream netwo
 	for {
 		data, err := buf.ReadBytes('\r')
 		if err != nil {
-			log.Error("error reading ICE candidate", slog.String("error", err.Error()))
+			log.Error("Error reading ICE candidate", slog.String("error", err.Error()))
 			return
 		}
 		data = data[:len(data)-1]
 		var msg v1.DataChannelNegotiation
 		if err := protojson.Unmarshal(data, &msg); err != nil {
-			log.Error("error reading ICE candidate", slog.String("error", err.Error()))
+			log.Error("Error reading ICE candidate", slog.String("error", err.Error()))
 			return
 		}
 		if msg.GetCandidate() == "" {

@@ -379,25 +379,42 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 		}(),
 		PreferIPv6: o.Raft.PreferIPv6,
 		Plugins:    plugins,
-		Discovery: &mesh.DiscoveryOptions{
-			BootstrapServers: o.Discovery.BootstrapServers,
-			PSK:              o.Discovery.PSK,
-			DiscoveryTTL:     o.Discovery.AnnounceTTL,
-			Announce:         o.Discovery.Announce,
-			ConnectTimeout:   o.Discovery.ConnectTimeout,
-			LocalAddrs: func() []multiaddr.Multiaddr {
-				out := make([]multiaddr.Multiaddr, 0)
-				for _, addr := range o.Discovery.LocalAddrs {
-					maddr, err := multiaddr.NewMultiaddr(addr)
-					if err != nil {
-						context.LoggerFrom(ctx).Warn("Invalid local multiaddr", slog.String("address", addr))
-						continue
-					}
-					out = append(out, maddr)
-				}
-				return out
-			}(),
-		},
+		Discovery: func() *libp2p.JoinAnnounceOptions {
+			if !o.Discovery.Announce {
+				return nil
+			}
+			return &libp2p.JoinAnnounceOptions{
+				PSK: o.Discovery.PSK,
+				Host: libp2p.HostOptions{
+					ConnectTimeout: o.Discovery.ConnectTimeout,
+					BootstrapPeers: func() []multiaddr.Multiaddr {
+						out := make([]multiaddr.Multiaddr, 0)
+						for _, addr := range o.Discovery.BootstrapServers {
+							maddr, err := multiaddr.NewMultiaddr(addr)
+							if err != nil {
+								context.LoggerFrom(ctx).Warn("Invalid local multiaddr", slog.String("address", addr))
+								continue
+							}
+							out = append(out, maddr)
+						}
+						return out
+					}(),
+					LocalAddrs: func() []multiaddr.Multiaddr {
+						out := make([]multiaddr.Multiaddr, 0)
+						for _, addr := range o.Discovery.LocalAddrs {
+							maddr, err := multiaddr.NewMultiaddr(addr)
+							if err != nil {
+								context.LoggerFrom(ctx).Warn("Invalid local multiaddr", slog.String("address", addr))
+								continue
+							}
+							out = append(out, maddr)
+						}
+						return out
+					}(),
+				},
+				AnnounceTTL: o.Discovery.AnnounceTTL,
+			}
+		}(),
 		NetworkOptions: meshnet.Options{
 			NodeID:                nodeid,
 			InterfaceName:         o.WireGuard.InterfaceName,
@@ -492,9 +509,11 @@ func (o *Config) NewJoinTransport(nodeID string, conn mesh.Mesh) (transport.Join
 			addrs = append(addrs, maddr)
 		}
 		joinTransport = libp2p.NewJoinRoundTripper(libp2p.RoundTripOptions{
-			PSK:            o.Discovery.PSK,
-			BootstrapPeers: addrs,
-			ConnectTimeout: time.Second * 3,
+			PSK: o.Discovery.PSK,
+			Host: libp2p.HostOptions{
+				BootstrapPeers: addrs,
+				ConnectTimeout: time.Second * 5,
+			},
 		})
 	}
 	// A nil transport is technically okay, it means we are a single-node mesh

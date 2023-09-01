@@ -19,9 +19,7 @@ package mesh
 import (
 	"fmt"
 	"log/slog"
-	"time"
 
-	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/metadata"
 
@@ -31,41 +29,10 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
-// DiscoveryOptions are options for performing peer discovery.
-type DiscoveryOptions struct {
-	// BootstrapServers are bootstrap servers for the DHT.
-	BootstrapServers []string
-	// PSK is the pre-shared key to use as a rendezvous point for peer discovery.
-	PSK string
-	// DiscoveryTTL is the time-to-live for the discovery service.
-	DiscoveryTTL time.Duration
-	// Announce is a flag to announce this peer to the discovery service.
-	Announce bool
-	// LocalAddrs are the local addresses to announce to the discovery service.
-	// If empty, the default local addresses will be used.
-	LocalAddrs []multiaddr.Multiaddr
-	// ConnectTimeout is the timeout for connecting to discovered peers.
-	ConnectTimeout time.Duration
-}
-
-func (s *meshStore) AnnounceDHT(ctx context.Context, opts DiscoveryOptions) error {
+func (s *meshStore) AnnounceDHT(ctx context.Context, opts libp2p.JoinAnnounceOptions) error {
 	log := context.LoggerFrom(ctx)
 	log.Info("Announcing peer discovery service")
-	var peers []multiaddr.Multiaddr
-	for _, p := range opts.BootstrapServers {
-		mul, err := multiaddr.NewMultiaddr(p)
-		if err != nil {
-			return fmt.Errorf("new multiaddr: %w", err)
-		}
-		peers = append(peers, mul)
-	}
-	announceOpts := libp2p.JoinAnnounceOptions{
-		PSK:            opts.PSK,
-		BootstrapPeers: peers,
-		AnnounceTTL:    opts.DiscoveryTTL,
-		ConnectTimeout: opts.ConnectTimeout,
-	}
-	discover, err := libp2p.NewJoinAnnouncer(ctx, announceOpts, transport.JoinServerFunc(s.proxyJoinToLeader))
+	discover, err := libp2p.NewJoinAnnouncer(ctx, opts, transport.JoinServerFunc(s.proxyJoinToLeader))
 	if err != nil {
 		return fmt.Errorf("new kad dht announcer: %w", err)
 	}

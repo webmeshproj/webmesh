@@ -28,6 +28,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 )
@@ -44,8 +45,9 @@ type ConnectOptions struct {
 	JoinRoundTripper transport.JoinRoundTripper
 	// NetworkOptions are options for the network manager
 	NetworkOptions net.Options
-	// Discovery are options for using peer discovery
-	Discovery *DiscoveryOptions
+	// Discovery are options for broadcasting to others to join the mesh
+	// via this node. It can be turned on later if needed.
+	Discovery *libp2p.JoinAnnounceOptions
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int
 	// GRPCAdvertisePort is the port to advertise for gRPC connections.
@@ -248,7 +250,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 			}
 		}()
 	}
-	if opts.Discovery != nil && opts.Discovery.Announce {
+	if opts.Discovery != nil {
 		err = s.AnnounceDHT(ctx, *opts.Discovery)
 		if err != nil {
 			return handleErr(fmt.Errorf("announce dht: %w", err))

@@ -107,8 +107,7 @@ type signalTransport struct {
 	remoteDescription webrtc.SessionDescription
 	candidatec        chan webrtc.ICECandidateInit
 	errorc            chan error
-	// cancel            context.CancelFunc
-	mu sync.Mutex
+	mu                sync.Mutex
 }
 
 // Start starts the transport.

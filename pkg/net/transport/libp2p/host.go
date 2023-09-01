@@ -27,6 +27,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -37,6 +38,8 @@ import (
 // peers over libp2p. It can be used to avoid the need for re-creating a libp2p
 // host and bootstrapping the DHT for each new connection.
 type Host interface {
+	// ID returns the peer ID of the host.
+	ID() peer.ID
 	// Host is the underlying libp2p host.
 	Host() host.Host
 	// DHT is the underlying libp2p DHT.
@@ -45,6 +48,8 @@ type Host interface {
 	DataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOptions) *DataChannelAnnouncer
 	// JoinAnnouncer returns a new join announcer using this host.
 	JoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, rt transport.JoinServer) io.Closer
+	// JoinRoundTripper returns a round tripper for executing a join request.
+	JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper
 	// Close closes the host and its DHT.
 	Close(ctx context.Context) error
 }
@@ -75,6 +80,7 @@ func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
 	}
 	dht, err := NewDHT(ctx, host, opts.BootstrapPeers, opts.ConnectTimeout)
 	if err != nil {
+		defer host.Close()
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
 	return &libp2pHost{
@@ -86,6 +92,11 @@ func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
 type libp2pHost struct {
 	host host.Host
 	dht  *dht.IpfsDHT
+}
+
+// ID returns the peer ID of the host.
+func (h *libp2pHost) ID() peer.ID {
+	return h.host.ID()
 }
 
 // Host returns the underlying libp2p host.
@@ -103,6 +114,10 @@ func (h *libp2pHost) DataChannelAnnouncer(ctx context.Context, opts DataChannelA
 
 func (h *libp2pHost) JoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, rt transport.JoinServer) io.Closer {
 	return NewJoinAnnouncerWithHost(ctx, h, opts, rt)
+}
+
+func (h *libp2pHost) JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper {
+	return NewJoinRoundTripperWithHost(h, opts)
 }
 
 func (h *libp2pHost) Close(ctx context.Context) error {

@@ -33,6 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -100,7 +101,7 @@ type Mesh interface {
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
 	// AnnounceDHT announces the peer discovery service via DHT.
-	AnnounceDHT(context.Context, DiscoveryOptions) error
+	AnnounceDHT(context.Context, libp2p.JoinAnnounceOptions) error
 	// LeaveDHT leaves the peer discovery service for the given PSK.
 	LeaveDHT(ctx context.Context, psk string) error
 }
