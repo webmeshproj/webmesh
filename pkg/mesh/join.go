@@ -154,9 +154,14 @@ func (s *meshStore) newJoinRequest(opts ConnectOptions, key wgtypes.Key) *v1.Joi
 		opts.GRPCAdvertisePort = services.DefaultGRPCPort
 	}
 	req := &v1.JoinRequest{
-		Id:              s.ID(),
-		PublicKey:       key.PublicKey().String(),
-		PrimaryEndpoint: opts.PrimaryEndpoint.String(),
+		Id:        s.ID(),
+		PublicKey: key.PublicKey().String(),
+		PrimaryEndpoint: func() string {
+			if opts.PrimaryEndpoint.IsValid() {
+				return opts.PrimaryEndpoint.String()
+			}
+			return ""
+		}(),
 		WireguardEndpoints: func() []string {
 			var eps []string
 			for _, ep := range opts.WireGuardEndpoints {

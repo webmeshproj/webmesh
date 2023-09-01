@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/multiformats/go-multiaddr"
@@ -282,12 +283,23 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 		}
 	}
 	var wireguardEndpoints []netip.AddrPort
+	if primaryEndpoint.IsValid() {
+		// Place it at the top
+		wireguardEndpoints = append(wireguardEndpoints, netip.AddrPortFrom(primaryEndpoint, uint16(o.WireGuard.ListenPort)))
+	}
 	if len(o.WireGuard.Endpoints) > 0 {
-		wireguardEndpoints = make([]netip.AddrPort, len(o.WireGuard.Endpoints))
-		for i, ep := range o.WireGuard.Endpoints {
-			wireguardEndpoints[i], err = netip.ParseAddrPort(ep)
+		for _, ep := range o.WireGuard.Endpoints {
+			if primaryEndpoint.IsValid() && strings.HasPrefix(ep, primaryEndpoint.String()) {
+				// Skip the primary endpoint
+				continue
+			}
+			var addr netip.AddrPort
+			addr, err = netip.ParseAddrPort(ep)
 			if err != nil {
 				return
+			}
+			if addr.IsValid() {
+				wireguardEndpoints = append(wireguardEndpoints, addr)
 			}
 		}
 	}
