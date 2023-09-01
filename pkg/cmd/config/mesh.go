@@ -473,6 +473,7 @@ func (o *Config) NewJoinTransport(nodeID string, conn mesh.Mesh) (transport.Join
 			Credentials:    conn.Credentials(),
 			AddressTimeout: time.Second * 3,
 		})
+		// TODO: Support bootstrap over libp2p
 	} else if o.Mesh.JoinAddress != "" {
 		joinTransport = tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
 			Addrs:          []string{o.Mesh.JoinAddress},

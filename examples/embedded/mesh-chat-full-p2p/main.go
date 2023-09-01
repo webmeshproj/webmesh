@@ -95,9 +95,13 @@ func runServer(loglevel string) error {
 	conf.TLS.Insecure = true
 	conf.Services.Insecure = true
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
+	// We use the same PSK as a rendevous point for a p2p wireguard tunnel
+	conf.Services.WebRTC.Announce = true
+	conf.Services.WebRTC.RendezvousStrings = map[string]string{"client-node": string(psk)}
+	conf.Services.WebRTC.LocalAddrs = []string{"ip6/::1/tcp/61821"} // Local addr to speed up discovery
 	conf.Discovery.Announce = true
 	conf.Discovery.PSK = string(psk)
-	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61820"}
+	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61820"} // Local addr to speed up discovery
 
 	conn, err := embed.NewNode(context.Background(), &conf)
 	if err != nil {
@@ -151,7 +155,10 @@ func runClient(loglevel string, psk string) error {
 	conf.WireGuard.InterfaceName = "meshclient0"
 	conf.Discovery.PSK = psk
 	conf.Discovery.Discover = true
-	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61821"}
+	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61821"} // Local addr to speed up discovery
+	// Rendevous strings are strings where we will contact the peer
+	// over libp2p for a direct wireguard tunnel.
+	conf.Mesh.RendezvousStrings = map[string]string{"server-node": string(psk)}
 	conf.TLS.Insecure = true
 	conf.Services.Insecure = true
 

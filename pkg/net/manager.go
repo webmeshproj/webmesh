@@ -620,7 +620,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (netip.AddrPort, error) {
 	log := context.LoggerFrom(ctx)
 	var endpoint netip.AddrPort
-	if peer.GetIce() || len(peer.WireguardEndpoints) == 0 {
+	if peer.GetIce() || len(peer.WireguardEndpoints) == 0 || peer.GetPrimaryEndpoint() == "" {
 		return m.negotiateICEConn(ctx, peer, iceServers)
 	}
 	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
@@ -736,18 +736,20 @@ func (m *manager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, 
 
 func (m *manager) getSignalingTransport(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (transport.WebRTCSignalTransport, error) {
 	log := context.LoggerFrom(ctx)
-	if rendevous, ok := m.opts.DataChannels.RendezvousStrings[peer.GetId()]; ok {
-		// We are meeting up with the peer over libp2p
-		log.Debug("Using libp2p rendezvous string for peer", slog.String("rendezvous", rendevous), slog.String("peer", peer.GetId()))
-		return libp2p.NewExternalSignalTransport(ctx, libp2p.WebRTCExternalSignalOptions{
-			NodeID:         m.opts.NodeID,
-			Rendevous:      rendevous,
-			BootstrapPeers: m.opts.DataChannels.BootstrapPeers,
-			ConnectTimeout: time.Second * 10,
-			LocalAddrs:     m.opts.DataChannels.LocalAddrs,
-			TargetProto:    "udp",
-			TargetAddr:     netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
-		})
+	if len(m.opts.DataChannels.RendezvousStrings) > 0 {
+		if rendevous, ok := m.opts.DataChannels.RendezvousStrings[peer.GetId()]; ok {
+			// We are meeting up with the peer over libp2p
+			log.Debug("Using libp2p rendezvous string for peer", slog.String("rendezvous", rendevous), slog.String("peer", peer.GetId()))
+			return libp2p.NewExternalSignalTransport(ctx, libp2p.WebRTCExternalSignalOptions{
+				NodeID:         m.opts.NodeID,
+				Rendevous:      rendevous,
+				BootstrapPeers: m.opts.DataChannels.BootstrapPeers,
+				ConnectTimeout: time.Second * 10,
+				LocalAddrs:     m.opts.DataChannels.LocalAddrs,
+				TargetProto:    "udp",
+				TargetAddr:     netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
+			})
+		}
 	}
 	var resolver transport.FeatureResolver
 	if len(iceServers) > 0 {

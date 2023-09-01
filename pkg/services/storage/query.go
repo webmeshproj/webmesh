@@ -67,6 +67,8 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) erro
 		var result v1.QueryResponse
 		result.Error = "EOF"
 		return stream.Send(&result)
+	default:
+		return status.Errorf(codes.InvalidArgument, "unknown query command: %v", req.GetCommand())
 	}
-	return status.Errorf(codes.Unimplemented, "unknown query command: %v", req.GetCommand())
+	return nil
 }

@@ -74,9 +74,7 @@ type WebRTCExternalSignalOptions struct {
 // typically used by clients trying to create a proxy connection to a server.
 func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOptions) (transport.WebRTCSignalTransport, error) {
 	log := context.LoggerFrom(ctx).With("libp2p", "webrtc-signal")
-	// Try to set the maximum read and write buffer sizes.
 	SetBuffers(context.WithLogger(ctx, log))
-	// Create a new libp2p host.
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
 	}
@@ -85,17 +83,11 @@ func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOp
 		return nil, fmt.Errorf("libp2p new host: %w", err)
 	}
 	log = log.With(slog.String("host-id", host.ID().String()))
-	// Bootstrap the DHT.
 	log.Debug("Bootstrapping DHT")
-	kaddht, err := dht.New(ctx, host)
-	if err != nil {
-		return nil, fmt.Errorf("libp2p new dht: %w", err)
-	}
-	err = bootstrapDHT(context.WithLogger(ctx, log), host, kaddht, opts.BootstrapPeers)
+	kaddht, err := NewDHT(ctx, host, opts.BootstrapPeers)
 	if err != nil {
 		defer host.Close()
-		defer kaddht.Close()
-		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
+		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
 	return &externalSignalTransport{
 		WebRTCExternalSignalOptions: opts,

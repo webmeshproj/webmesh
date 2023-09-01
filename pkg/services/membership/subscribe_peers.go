@@ -63,9 +63,9 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 
 	var notifymu sync.Mutex
 	notify := func(_, _ string) {
+		log.Debug("Received node change notification")
 		notifymu.Lock()
 		defer notifymu.Unlock()
-		log.Debug("received node change notification")
 		mdnsServers, err := listDNSServers(ctx, st, peerID)
 		if err != nil {
 			log.Error("failed to get mdns servers", "error", err.Error())
@@ -81,7 +81,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 			log.Error("failed to get wireguard peers", "error", err.Error())
 			return
 		}
-		if lastConfig != nil {
+		if len(lastConfig) > 0 {
 			if slices.Equal(lastConfig, peers) && slices.Equal(iceServers, iceNegServers) && slices.Equal(dnsServers, mdnsServers) {
 				return
 			}
@@ -94,7 +94,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 			IceServers: iceServers,
 			DnsServers: dnsServers,
 		}
-		log.Debug("sending wireguard peers", "peers", config)
+		log.Debug("Sending wireguard peers", "peers", config)
 		err = stream.Send(config)
 		if err != nil {
 			log.Error("failed to send wireguard peers", "error", err.Error())

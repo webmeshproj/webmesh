@@ -116,6 +116,9 @@ func (rt *webrtcExternalSignalTransport) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("resolve signaling server: %w", err)
 	}
+	if len(addrs) == 0 {
+		return errors.New("no signaling servers found")
+	}
 	var conn *grpc.ClientConn
 	for _, addr := range addrs {
 		conn, err = grpc.Dial(addr.String(), rt.Credentials...)

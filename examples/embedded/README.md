@@ -27,12 +27,6 @@ To run the example, you'll either need to be root, or you can use the `setcap` c
 sudo setcap cap_net_raw,cap_net_admin=eip ./chat
 ```
 
-If neither are options, you can use the `Dockerfile` to build a container that you can run with the necessary permissions.
-
-```bash
-docker build -t chat .
-```
-
 Then, you can run the server with just:
 
 ```bash

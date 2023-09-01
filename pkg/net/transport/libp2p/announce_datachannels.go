@@ -85,7 +85,7 @@ func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOption
 		return nil, fmt.Errorf("libp2p new host: %w", err)
 	}
 	announcer.host.SetStreamHandler(JoinProtocol, func(s network.Stream) {
-		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())
+		log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
 		go announcer.handleStream(context.WithLogger(context.Background(), log), s)
 	})
 	log = log.With(slog.String("host-id", announcer.host.ID().String()))
@@ -98,7 +98,7 @@ func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOption
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
 	// Announce the join protocol with our PSK.
-	log.Debug("Announcing join protocol with our PSK")
+	log.Debug("Announcing data channel protocol with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(announcer.dht)
 	var discoveryOpts []discovery.Option
 	if opts.AnnounceTTL > 0 {
@@ -127,17 +127,17 @@ func (a *DataChannelAnnouncer) Close() error {
 func (a *DataChannelAnnouncer) handleStream(ctx context.Context, stream network.Stream) {
 	log := context.LoggerFrom(ctx)
 	defer stream.Close()
-	log.Debug("Handling datachannel protocol stream", "peer", stream.Conn().RemotePeer())
+	log.Debug("Handling data channel protocol stream", "peer", stream.Conn().RemotePeer())
 	// Determine the rendevous point the peer used.
 	rendevous := WebRTCRendevousFrom(stream.Protocol())
 	if rendevous == "" {
-		log.Warn("Received datachannel protocol stream without rendezvous")
+		log.Warn("Received data channel protocol stream without rendezvous")
 		return
 	}
 	// Pull the peer ID from our internal map.
 	expectedPeer := a.opts.RendezvousStrings[rendevous]
 	if expectedPeer == "" {
-		log.Warn("Received datachannel protocol stream with unknown rendezvous", "rendevous", rendevous)
+		log.Warn("Received data channel protocol stream with unknown rendezvous", "rendevous", rendevous)
 		return
 	}
 	// Create a buffer for the stream
@@ -157,7 +157,7 @@ func (a *DataChannelAnnouncer) handleStream(ctx context.Context, stream network.
 	}
 	// Check the peer ID.
 	if req.GetNodeId() != expectedPeer {
-		log.Warn("Received datachannel protocol stream with unexpected peer ID", "expected", expectedPeer, "actual", req.GetNodeId())
+		log.Warn("Received data channel protocol stream with unexpected peer ID", "expected", expectedPeer, "actual", req.GetNodeId())
 		return
 	}
 	// Start the requested data channel.
@@ -166,7 +166,7 @@ func (a *DataChannelAnnouncer) handleStream(ctx context.Context, stream network.
 
 func (a *DataChannelAnnouncer) handleRequest(ctx context.Context, stream network.Stream, req *v1.StartDataChannelRequest) {
 	log := context.LoggerFrom(ctx)
-	log.Debug("Handling datachannel protocol request", "peer", stream.Conn().RemotePeer(), "request", req)
+	log.Debug("Handling data channel protocol request", "peer", stream.Conn().RemotePeer(), "request", req)
 	var conn datachannels.ManagedServerChannel
 	var err error
 	if req.GetProto() == "udp" && req.GetPort() == 0 {

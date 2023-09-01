@@ -806,14 +806,6 @@ github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1Y
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSDJfjId/PEGEShv6ugrt4kYsC5UIDaQ=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
-github.com/webmeshproj/api v0.3.0 h1:6ZqxP6qt1md+VI5FHnNat53eiklcn2LYU1eyyMan+Ec=
-github.com/webmeshproj/api v0.3.0/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
-github.com/webmeshproj/api v0.3.1-0.20230831123043-c27ded75982a h1:R2DzRP8Kq2/lkMn9Ni3oKT9eWm0jFGDe7C2QUb7gvZ8=
-github.com/webmeshproj/api v0.3.1-0.20230831123043-c27ded75982a/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
-github.com/webmeshproj/api v0.3.1-0.20230831135926-8449c8faceba h1:3Z/AigU9tfxxgIHKMc5qVjtpag2lQ/MySvgDbNB+wZY=
-github.com/webmeshproj/api v0.3.1-0.20230831135926-8449c8faceba/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
-github.com/webmeshproj/api v0.3.1-0.20230831141711-eff5f6dbfd98 h1:B5dgN66EziXsZbFYytM5GhpaWyQyJKuY/ExXmqqhULQ=
-github.com/webmeshproj/api v0.3.1-0.20230831141711-eff5f6dbfd98/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/webmeshproj/api v0.3.1-0.20230831144213-b59a49b7a9b1 h1:2wgV6vZ+Z2iU9HCyHK8Q83nJu+bsG9VM7vGIJDrFtNI=
 github.com/webmeshproj/api v0.3.1-0.20230831144213-b59a49b7a9b1/go.mod h1:ymJL82yEGc/xw880DAb65pBJShkBqkKOl3sCOBq7NVk=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=

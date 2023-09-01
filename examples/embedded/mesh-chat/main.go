@@ -118,6 +118,7 @@ func runServer(loglevel string) error {
 					return
 				}
 				fmt.Printf("Error accepting connection: %v\n", err)
+				continue
 			}
 			fmt.Print("New connection from ", conn.RemoteAddr(), "\n")
 			go handleChat(conn)
