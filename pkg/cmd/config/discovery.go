@@ -92,5 +92,13 @@ func (o *DiscoveryOptions) Validate() error {
 			}
 		}
 	}
+	if len(o.BootstrapServers) > 0 {
+		for _, addr := range o.BootstrapServers {
+			_, err := multiaddr.NewMultiaddr(addr)
+			if err != nil {
+				return fmt.Errorf("invalid bootstrap server address: %w", err)
+			}
+		}
+	}
 	return nil
 }

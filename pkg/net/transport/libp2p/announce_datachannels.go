@@ -192,7 +192,8 @@ func (a *DataChannelAnnouncer) handleRequest(ctx context.Context, stream network
 	log.Debug("Sending offer to client", slog.String("offer", conn.Offer()))
 	buf := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 	offer := v1.DataChannelOffer{
-		Offer: conn.Offer(),
+		Offer:       conn.Offer(),
+		StunServers: a.opts.STUNServers,
 	}
 	data, err := protojson.Marshal(&offer)
 	if err != nil {

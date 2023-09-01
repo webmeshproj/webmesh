@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
@@ -145,6 +146,12 @@ func (s *ServiceOptions) Validate() error {
 			return err
 		}
 	}
+	if s.WebRTC.Enabled || s.WebRTC.Announce {
+		err := s.WebRTC.Validate()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -202,6 +209,38 @@ func (w *WebRTCOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.StringSliceVar(&w.BootstrapServers, prefix+"services.webrtc.bootstrap-servers", nil, "Bootstrap servers to use for the DHT.")
 	fl.StringSliceVar(&w.LocalAddrs, prefix+"services.webrtc.local-addrs", nil, "Local addresses to announce to the discovery service.")
 	fl.DurationVar(&w.AnnounceTTL, prefix+"services.webrtc.announce-ttl", time.Minute, "TTL for each announcement.")
+}
+
+// Validate validates the options.
+func (w *WebRTCOptions) Validate() error {
+	if !w.Enabled || !w.Announce {
+		return nil
+	}
+	if w.Announce {
+		if len(w.RendezvousStrings) == 0 {
+			return fmt.Errorf("services.webrtc.rendezvous-strings must be set")
+		}
+		if w.AnnounceTTL == 0 {
+			return fmt.Errorf("services.webrtc.announce-ttl must be set")
+		}
+		if len(w.LocalAddrs) >= 0 {
+			for _, addr := range w.LocalAddrs {
+				_, err := multiaddr.NewMultiaddr(addr)
+				if err != nil {
+					return fmt.Errorf("services.webrtc.local-addrs contains an invalid address: %w", err)
+				}
+			}
+		}
+		if len(w.BootstrapServers) >= 0 {
+			for _, addr := range w.BootstrapServers {
+				_, err := multiaddr.NewMultiaddr(addr)
+				if err != nil {
+					return fmt.Errorf("services.webrtc.bootstrap-servers contains an invalid address: %w", err)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // TURNOptions are the options for the TURN server.
@@ -481,7 +520,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 			Wireguard:   conn.Network().WireGuard(),
 			NodeDialer:  conn,
 			RBAC:        rbacEvaluator,
-			StunServers: o.Services.WebRTC.STUNServers,
+			STUNServers: o.Services.WebRTC.STUNServers,
 		}))
 	}
 	if o.Services.API.MeshEnabled {
@@ -647,6 +686,39 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf se
 			Path:          o.Services.Metrics.Path,
 		})
 		conf.Servers = append(conf.Servers, metricsServer)
+	}
+	if o.Services.WebRTC.Enabled && o.Services.WebRTC.Announce {
+		announcer := webrtc.NewDHTServer(webrtc.DHTOptions{
+			RendezvousStrings: o.Services.WebRTC.RendezvousStrings,
+			BootstrapServers: func() []multiaddr.Multiaddr {
+				var addrs []multiaddr.Multiaddr
+				for _, addr := range o.Services.WebRTC.BootstrapServers {
+					maddr, err := multiaddr.NewMultiaddr(addr)
+					if err != nil {
+						context.LoggerFrom(ctx).Error("Failed to parse bootstrap server address", "error", err.Error())
+						continue
+					}
+					addrs = append(addrs, maddr)
+				}
+				return addrs
+			}(),
+			LocalAddrs: func() []multiaddr.Multiaddr {
+				var addrs []multiaddr.Multiaddr
+				for _, addr := range o.Services.WebRTC.LocalAddrs {
+					maddr, err := multiaddr.NewMultiaddr(addr)
+					if err != nil {
+						context.LoggerFrom(ctx).Error("Failed to parse local server address", "error", err.Error())
+						continue
+					}
+					addrs = append(addrs, maddr)
+				}
+				return addrs
+			}(),
+			AnnounceTTL:   o.Services.WebRTC.AnnounceTTL,
+			STUNServers:   o.Services.WebRTC.STUNServers,
+			WireGuardPort: o.WireGuard.ListenPort,
+		})
+		conf.Servers = append(conf.Servers, announcer)
 	}
 	return
 }

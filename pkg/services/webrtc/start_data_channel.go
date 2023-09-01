@@ -119,7 +119,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get WireGuard listen port: %v", err)
 		}
-		conn, err = datachannels.NewWireGuardProxyServer(stream.Context(), s.opts.StunServers, uint16(port))
+		conn, err = datachannels.NewWireGuardProxyServer(stream.Context(), s.opts.STUNServers, uint16(port))
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 			Proto:       r.GetProto(),
 			SrcAddress:  remoteAddr,
 			DstAddress:  net.JoinHostPort(r.GetDst(), strconv.Itoa(int(r.GetPort()))),
-			STUNServers: s.opts.StunServers,
+			STUNServers: s.opts.STUNServers,
 		})
 		if err != nil {
 			return err
@@ -142,7 +142,7 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 	log.Debug("Sending offer to client", slog.String("offer", conn.Offer()))
 	err = stream.Send(&v1.DataChannelOffer{
 		Offer:       conn.Offer(),
-		StunServers: s.opts.StunServers,
+		StunServers: s.opts.STUNServers,
 	})
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to send offer to client: %s", err.Error())
@@ -240,7 +240,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 		Src:         remoteAddr,
 		Dst:         r.GetDst(),
 		Port:        r.GetPort(),
-		StunServers: s.opts.StunServers,
+		StunServers: s.opts.STUNServers,
 	})
 	if err != nil {
 		return status.Errorf(codes.FailedPrecondition, "failed to send negotiation request to peer: %s", err.Error())
@@ -257,7 +257,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	// Forward the offer to the client
 	err = clientStream.Send(&v1.DataChannelOffer{
 		Offer:       resp.GetOffer(),
-		StunServers: s.opts.StunServers,
+		StunServers: s.opts.STUNServers,
 	})
 	if err != nil {
 		return err

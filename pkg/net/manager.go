@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
@@ -39,6 +40,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -79,6 +81,23 @@ type Options struct {
 	DisableIPv4 bool
 	// DisableIPv6 disables IPv6 on the interface.
 	DisableIPv6 bool
+	// DataChannels are options for when presented with the need to negotiate
+	// p2p data channels.
+	DataChannels DataChannelOptions
+}
+
+// DataChannelOptions are options for when presented with the need to negotiate
+// p2p wireguard connections. Empty values mean to use the defaults.
+type DataChannelOptions struct {
+	// RendevousStrings is a map of peer IDs to rendezvous strings
+	// where peers are accepting signaling via libp2p.
+	RendezvousStrings map[string]string
+	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
+	// If empty or nil, the default bootstrap peers will be used.
+	BootstrapPeers []multiaddr.Multiaddr
+	// LocalAddrs is a list of local addresses to announce the host with.
+	// If empty or nil, the default local addresses will be used.
+	LocalAddrs []multiaddr.Multiaddr
 }
 
 // StartOptions are the options for starting the network manager and configuring
@@ -672,7 +691,7 @@ func (m *manager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, 
 	log := context.LoggerFrom(ctx)
 	if conn, ok := m.iceConns[peer.GetId()]; ok {
 		// We already have an ICE connection for this peer
-		log.Debug("using existing wireguard ICE proxy", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
+		log.Debug("Using existing wireguard ICE proxy", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
 		return conn.localAddr, nil
 	}
 	wgPort, err := m.wg.ListenPort()
@@ -681,33 +700,10 @@ func (m *manager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, 
 	}
 	var endpoint netip.AddrPort
 	log.Debug("Negotiating wireguard ICE proxy", slog.String("peer", peer.GetId()))
-	var resolver transport.FeatureResolver
-	if len(iceServers) > 0 {
-		// We have a hint about ICE servers, we'll use a static resolver
-		resolver = transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
-			var addports []netip.AddrPort
-			for _, server := range iceServers {
-				addr, err := net.ResolveUDPAddr("udp", server)
-				if err != nil {
-					return nil, fmt.Errorf("resolve udp addr: %w", err)
-				}
-				addports = append(addports, addr.AddrPort())
-			}
-			return addports, nil
-		})
-	} else {
-		// We'll use our local storage
-		resolver = peers.New(m.storage).Resolver().FeatureResolver(func(mn peers.MeshNode) bool {
-			return mn.GetId() != m.opts.NodeID
-		})
+	rt, err := m.getSignalingTransport(ctx, peer, iceServers)
+	if err != nil {
+		return endpoint, fmt.Errorf("get signaling transport: %w", err)
 	}
-	rt := tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{
-		Resolver:    resolver,
-		Credentials: m.opts.DialOptions,
-		NodeID:      peer.GetId(),
-		TargetProto: "udp",
-		TargetAddr:  netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
-	})
 	pc, err := datachannels.NewWireGuardProxyClient(ctx, rt, uint16(wgPort))
 	if err != nil {
 		return endpoint, fmt.Errorf("create peer connection: %w", err)
@@ -736,4 +732,50 @@ func (m *manager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, 
 	}
 	m.iceConns[peer.GetId()] = peerconn
 	return peerconn.localAddr, nil
+}
+
+func (m *manager) getSignalingTransport(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (transport.WebRTCSignalTransport, error) {
+	log := context.LoggerFrom(ctx)
+	if rendevous, ok := m.opts.DataChannels.RendezvousStrings[peer.GetId()]; ok {
+		// We are meeting up with the peer over libp2p
+		log.Debug("Using libp2p rendezvous string for peer", slog.String("rendezvous", rendevous), slog.String("peer", peer.GetId()))
+		return libp2p.NewExternalSignalTransport(ctx, libp2p.WebRTCExternalSignalOptions{
+			NodeID:         m.opts.NodeID,
+			Rendevous:      rendevous,
+			BootstrapPeers: m.opts.DataChannels.BootstrapPeers,
+			ConnectTimeout: time.Second * 10,
+			LocalAddrs:     m.opts.DataChannels.LocalAddrs,
+			TargetProto:    "udp",
+			TargetAddr:     netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
+		})
+	}
+	var resolver transport.FeatureResolver
+	if len(iceServers) > 0 {
+		// We have a hint about ICE servers, we'll use a static resolver
+		log.Debug("We have a hint about ICE servers, we'll use a static resolver", slog.Any("servers", iceServers))
+		resolver = transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
+			var addports []netip.AddrPort
+			for _, server := range iceServers {
+				addr, err := net.ResolveUDPAddr("udp", server)
+				if err != nil {
+					return nil, fmt.Errorf("resolve udp addr: %w", err)
+				}
+				addports = append(addports, addr.AddrPort())
+			}
+			return addports, nil
+		})
+	} else {
+		// We'll use our local storage
+		log.Debug("We'll use our local storage for ICE negotiation lookup")
+		resolver = peers.New(m.storage).Resolver().FeatureResolver(func(mn peers.MeshNode) bool {
+			return mn.GetId() != m.opts.NodeID
+		})
+	}
+	return tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{
+		Resolver:    resolver,
+		Credentials: m.opts.DialOptions,
+		NodeID:      peer.GetId(),
+		TargetProto: "udp",
+		TargetAddr:  netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
+	}), nil
 }

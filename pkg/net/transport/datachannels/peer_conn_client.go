@@ -119,7 +119,7 @@ func NewPeerConnectionClient(ctx context.Context, protocol string, rt transport.
 			return
 		}
 		err := pc.rt.SendCandidate(context.Background(), c.ToJSON())
-		if err != nil {
+		if err != nil && !transport.IsSignalTransportClosed(err) {
 			pc.errors <- fmt.Errorf("failed to send ICE candidate: %w", err)
 		}
 	})

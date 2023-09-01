@@ -45,9 +45,13 @@ import (
 
 // WebRTCExternalSignalOptions are options for configuring a WebRTC signaling transport.
 type WebRTCExternalSignalOptions struct {
-	// NodeID is the local node ID to advertise to the peer.
+	// NodeID is the node ID to advertise to the peer. Contrary to other
+	// uses of signaling, this is the node ID of the local node and not
+	// the remote node. The remote node should be expecting this node ID
+	// on the rendevous string.
 	NodeID string
 	// Rendevous is the rendevous string to use for the DHT.
+	// The remote peer should be expecting NodeID on this rendevous string.
 	Rendevous string
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
 	// If empty or nil, the default bootstrap peers will be used.
@@ -94,23 +98,17 @@ func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOp
 		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
 	}
 	return &externalSignalTransport{
-		nodeID:      opts.NodeID,
-		rendevous:   opts.Rendevous,
-		targetProto: opts.TargetProto,
-		targetAddr:  opts.TargetAddr,
-		host:        host,
-		dht:         kaddht,
-		candidatec:  make(chan webrtc.ICECandidateInit, 16),
-		errorc:      make(chan error, 1),
-		cancel:      func() {},
+		WebRTCExternalSignalOptions: opts,
+		host:                        host,
+		dht:                         kaddht,
+		candidatec:                  make(chan webrtc.ICECandidateInit, 16),
+		errorc:                      make(chan error, 1),
+		cancel:                      func() {},
 	}, nil
 }
 
 type externalSignalTransport struct {
-	nodeID            string
-	rendevous         string
-	targetProto       string
-	targetAddr        netip.AddrPort
+	WebRTCExternalSignalOptions
 	host              host.Host
 	dht               *dht.IpfsDHT
 	buf               *bufio.ReadWriter
@@ -131,7 +129,7 @@ func (rt *externalSignalTransport) Start(ctx context.Context) error {
 
 StartSignaling:
 	for {
-		peerChan, err := routingDiscovery.FindPeers(ctx, rt.rendevous)
+		peerChan, err := routingDiscovery.FindPeers(ctx, rt.Rendevous)
 		if err != nil {
 			return fmt.Errorf("libp2p find peers: %w", err)
 		}
@@ -147,8 +145,12 @@ StartSignaling:
 				log := log.With(slog.String("peer-id", peer.ID.String()))
 				// Try to connect to the peer.
 				log.Debug("Connecting to peer")
-				ctx, rt.cancel = context.WithCancel(ctx)
-				stream, err := rt.host.NewStream(ctx, peer.ID, WebRTCSignalProtocolFor(rt.rendevous))
+				if rt.ConnectTimeout > 0 {
+					ctx, rt.cancel = context.WithTimeout(ctx, rt.ConnectTimeout)
+				} else {
+					ctx, rt.cancel = context.WithCancel(ctx)
+				}
+				stream, err := rt.host.NewStream(ctx, peer.ID, WebRTCSignalProtocolFor(rt.Rendevous))
 				if err != nil {
 					log.Debug("Failed to connect to peer", "error", err.Error())
 					continue
@@ -156,10 +158,10 @@ StartSignaling:
 				rt.buf = bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 				// Send the target protocol and address to the peer.
 				data, err := protojson.Marshal(&v1.StartDataChannelRequest{
-					NodeId: rt.nodeID,
-					Proto:  rt.targetProto,
-					Dst:    rt.targetAddr.Addr().String(),
-					Port:   uint32(rt.targetAddr.Port()),
+					NodeId: rt.NodeID,
+					Proto:  rt.TargetProto,
+					Dst:    rt.TargetAddr.Addr().String(),
+					Port:   uint32(rt.TargetAddr.Port()),
 				})
 				if err != nil {
 					return fmt.Errorf("marshal start data channel request: %w", err)

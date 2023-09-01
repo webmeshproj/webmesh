@@ -48,11 +48,14 @@ type Options struct {
 	Wireguard   wireguard.Interface
 	NodeDialer  transport.NodeDialer
 	RBAC        rbac.Evaluator
-	StunServers []string
+	STUNServers []string
 }
 
 // NewServer returns a new Server.
 func NewServer(opts Options) *Server {
+	if len(opts.STUNServers) == 0 {
+		opts.STUNServers = DefaultSTUNServers
+	}
 	return &Server{
 		store:    opts.Storage,
 		wg:       opts.Wireguard,

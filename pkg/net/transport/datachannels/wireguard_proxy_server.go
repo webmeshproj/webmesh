@@ -77,6 +77,9 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 		case <-readyc:
 			return
 		case <-pc.closec:
+			return
+		case <-pc.candidatec:
+			return
 		default:
 		}
 		pc.candidatec <- c.ToJSON().Candidate
@@ -93,14 +96,9 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 				return
 			}
 			log.Debug("ICE connection established", slog.Any("local", candidatePair.Local), slog.Any("remote", candidatePair.Remote))
-			close(readyc)
 		}
-		if state == webrtc.ICEConnectionStateFailed || state == webrtc.ICEConnectionStateClosed || state == webrtc.ICEConnectionStateCompleted {
-			select {
-			case <-pc.closec:
-			default:
-				close(pc.closec)
-			}
+		if state == webrtc.ICEConnectionStateFailed || state == webrtc.ICEConnectionStateCompleted {
+			close(pc.closec)
 		}
 	})
 	dc, err := pc.conn.CreateDataChannel("wireguard-proxy", &webrtc.DataChannelInit{
@@ -112,11 +110,11 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 	}
 	dc.OnClose(func() {
 		log.Debug("Server side WireGuard datachannel closed")
-		close(pc.closec)
 	})
 	dc.OnOpen(func() {
 		log.Debug("Server side datachannel opened")
 		close(pc.candidatec)
+		close(readyc)
 		rw, err := dc.Detach()
 		if err != nil {
 			log.Error("Failed to detach data channel", slog.String("error", err.Error()))

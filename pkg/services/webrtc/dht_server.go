@@ -17,12 +17,12 @@ limitations under the License.
 package webrtc
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/multiformats/go-multiaddr"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
@@ -63,7 +63,13 @@ type DHTServer struct {
 
 // ListenAndServe starts the server and blocks until the server exits.
 func (srv *DHTServer) ListenAndServe() error {
-	announcer, err := libp2p.NewDataChannelAnnouncer(context.Background(), libp2p.DataChannelAnnounceOptions{
+	if len(srv.STUNServers) == 0 {
+		srv.STUNServers = DefaultSTUNServers
+	}
+	ctx := context.Background()
+	log := context.LoggerFrom(ctx).With("service", "dht-webrtc")
+	log.Info("Starting DHT WebRTC signaling server")
+	announcer, err := libp2p.NewDataChannelAnnouncer(context.WithLogger(ctx, log), libp2p.DataChannelAnnounceOptions{
 		RendezvousStrings:  srv.RendezvousStrings,
 		BootstrapPeers:     srv.BootstrapServers,
 		AnnounceTTL:        time.Minute,

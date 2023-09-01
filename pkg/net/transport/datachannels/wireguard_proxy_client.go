@@ -88,7 +88,6 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 	pc.conn.OnICEConnectionStateChange(func(s webrtc.ICEConnectionState) {
 		log.Debug("ICE connection state changed", "state", s.String())
 		if s == webrtc.ICEConnectionStateConnected {
-			close(pc.readyc)
 			candidatePair, err := pc.conn.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 			if err != nil {
 				log.Error("Failed to get selected candidate pair", slog.String("error", err.Error()))
@@ -131,6 +130,7 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 			log.Error("Failed to detach data channel", slog.String("error", err.Error()))
 			return
 		}
+		close(pc.readyc)
 		log.Debug("WireGuard proxy from local to datachannel started")
 		go func() {
 			defer log.Debug("WireGuard proxy from local to datachannel stopped")

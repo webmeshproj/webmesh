@@ -53,6 +53,8 @@ type PeerConnectionServer struct {
 	candidatec chan string
 	// closec is a channel that is closed when the connection is closed.
 	closec chan struct{}
+	// readyc is a channel that is closed when the connection is ready.
+	readyc chan struct{}
 	// dataChannel is the data channel used for the connection.
 	channels *webrtc.DataChannel
 }
@@ -99,6 +101,7 @@ func NewPeerConnectionServer(ctx context.Context, opts *OfferOptions) (*PeerConn
 			slog.String("dst", opts.DstAddress),
 		),
 		candidatec: make(chan string, 16),
+		readyc:     make(chan struct{}),
 		closec:     make(chan struct{}),
 	}
 	pc.OnICEConnectionStateChange(pc.onICEConnectionStateChange)
@@ -163,6 +166,12 @@ func (pc *PeerConnectionServer) Closed() <-chan struct{} {
 	return pc.closec
 }
 
+// Ready returns a channel that will be closed when the peer connection
+// is ready.
+func (pc *PeerConnectionServer) Ready() <-chan struct{} {
+	return pc.readyc
+}
+
 // IsClosed returns true if the peer connection is closed.
 func (pc *PeerConnectionServer) IsClosed() bool {
 	select {
@@ -175,32 +184,9 @@ func (pc *PeerConnectionServer) IsClosed() bool {
 
 func (pc *PeerConnectionServer) onICEConnectionStateChange(state webrtc.ICEConnectionState) {
 	pc.logger.Debug("ICE connection state changed", slog.String("state", state.String()))
-	closeAll := func() {
-		select {
-		case <-pc.candidatec:
-		default:
-			defer close(pc.candidatec)
-		}
-		select {
-		case <-pc.closec:
-		default:
-			defer close(pc.closec)
-		}
-	}
-	if state == webrtc.ICEConnectionStateConnected {
-		defer close(pc.candidatec)
-	}
-	if state == webrtc.ICEConnectionStateFailed {
-		defer closeAll()
-		pc.logger.Info("ICE connection failed, closing peer connection")
-		err := pc.Close()
-		if err != nil {
-			pc.logger.Error("Failed to close peer connection", slog.String("error", err.Error()))
-		}
-	}
-	if state == webrtc.ICEConnectionStateCompleted {
-		defer closeAll()
-		pc.logger.Info("ICE connection completed, closing peer connection")
+	if state == webrtc.ICEConnectionStateFailed || state == webrtc.ICEConnectionStateCompleted {
+		defer close(pc.closec)
+		pc.logger.Info("ICE connection finished, closing peer connection")
 		err := pc.Close()
 		if err != nil {
 			pc.logger.Error("Failed to close peer connection", slog.String("error", err.Error()))
@@ -211,13 +197,6 @@ func (pc *PeerConnectionServer) onICEConnectionStateChange(state webrtc.ICEConne
 func (pc *PeerConnectionServer) onICECandidate(c *webrtc.ICECandidate) {
 	if c == nil {
 		return
-	}
-	select {
-	case <-pc.closec:
-		return
-	case <-pc.candidatec:
-		return
-	default:
 	}
 	pc.logger.Debug("Received ICE candidate", slog.Any("candidate", c))
 	pc.candidatec <- c.ToJSON().Candidate
@@ -240,6 +219,7 @@ func (pc *PeerConnectionServer) onDataChannelOpen() {
 		pc.logger.Error("failed to detach data channel", slog.String("error", err.Error()))
 		return
 	}
+	close(pc.readyc)
 	defer pc.Close()
 	defer rw.Close()
 	for {
