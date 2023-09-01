@@ -115,18 +115,8 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 		})
 	}
 
-	// Wait for all the mesh connections to be ready
-	for _, meshConn := range meshes {
-		select {
-		case <-meshConn.Ready():
-		case <-ctx.Done():
-			return handleErr(fmt.Errorf("failed to start bridge: %w", ctx.Err()))
-		}
-	}
-
-	errs := make(chan error, len(meshes)+1)
-
 	// Start all the mesh services
+	errs := make(chan error, len(meshes)+1)
 	meshSvcs := make(map[string]*services.Server)
 	for meshID, meshConn := range meshes {
 		id := meshID
@@ -150,6 +140,15 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			}
 		}()
 		meshSvcs[id] = srv
+	}
+
+	// Wait for all the mesh connections to be ready
+	for _, meshConn := range meshes {
+		select {
+		case <-meshConn.Ready():
+		case <-ctx.Done():
+			return handleErr(fmt.Errorf("failed to start bridge: %w", ctx.Err()))
+		}
 	}
 
 	// Set up bridge DNS if enabled
