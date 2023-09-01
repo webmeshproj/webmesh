@@ -620,7 +620,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (netip.AddrPort, error) {
 	log := context.LoggerFrom(ctx)
 	var endpoint netip.AddrPort
-	if peer.GetIce() || len(peer.WireguardEndpoints) == 0 || peer.GetPrimaryEndpoint() == "" {
+	if peer.GetIce() || (len(peer.WireguardEndpoints) == 0 && peer.GetPrimaryEndpoint() == "") {
 		return m.negotiateICEConn(ctx, peer, iceServers)
 	}
 	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
