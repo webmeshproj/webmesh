@@ -51,7 +51,13 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	c, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
-			{URLs: stunServers},
+			{
+				URLs: stunServers,
+				// TODO: Authentication
+				Username:       "-",
+				Credential:     "-",
+				CredentialType: webrtc.ICECredentialTypePassword,
+			},
 		},
 	})
 	if err != nil {
@@ -73,6 +79,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 		}
 		log.Debug("Received ICE candidate", slog.Any("candidate", c))
 		mu.Lock()
+		defer mu.Unlock()
 		select {
 		case <-readyc:
 			return
@@ -83,7 +90,6 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 		default:
 		}
 		pc.candidatec <- c.ToJSON().Candidate
-		mu.Unlock()
 	})
 	pc.conn.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		mu.Lock()
@@ -98,6 +104,7 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 			log.Debug("ICE connection established", slog.Any("local", candidatePair.Local), slog.Any("remote", candidatePair.Remote))
 		}
 		if state == webrtc.ICEConnectionStateFailed || state == webrtc.ICEConnectionStateCompleted {
+			close(pc.candidatec)
 			close(pc.closec)
 		}
 	})

@@ -71,6 +71,11 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 		closec:     make(chan struct{}),
 		bufferSize: DefaultWireGuardProxyBuffer,
 	}
+	err = pc.conn.SetRemoteDescription(rt.RemoteDescription())
+	if err != nil {
+		defer pc.Close()
+		return nil, fmt.Errorf("failed to set remote description: %w", err)
+	}
 	errs := make(chan error, 10)
 	pc.conn.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
@@ -163,11 +168,6 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 			log.Error("Failed to copy from datachannel to WireGuard", slog.String("error", err.Error()))
 		}
 	})
-	err = pc.conn.SetRemoteDescription(rt.RemoteDescription())
-	if err != nil {
-		defer pc.Close()
-		return nil, fmt.Errorf("failed to set remote description: %w", err)
-	}
 	// Create and send an answer
 	answer, err := pc.conn.CreateAnswer(nil)
 	if err != nil {
@@ -197,7 +197,7 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 	select {
 	case err := <-errs:
 		return nil, err
-	case <-time.After(15 * time.Second):
+	case <-time.After(time.Second * 30):
 		return nil, fmt.Errorf("timed out waiting for data channel to open")
 	case <-pc.readyc:
 	}

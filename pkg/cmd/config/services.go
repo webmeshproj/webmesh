@@ -518,6 +518,13 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 	}
 	if o.Services.WebRTC.Enabled {
 		log.Debug("Registering WebRTC api")
+		// Check if we are a TURN server, and if so - register the TURN server
+		if o.Services.TURN.Enabled {
+			log.Debug("Registering local TURN server with WebRTC API")
+			turnAddr := net.JoinHostPort(o.Services.TURN.PublicIP, strconv.Itoa(int(o.Services.TURN.ListenPort())))
+			turnAddr = fmt.Sprintf("turn:%s", turnAddr)
+			o.Services.WebRTC.STUNServers = append([]string{turnAddr}, o.Services.WebRTC.STUNServers...)
+		}
 		v1.RegisterWebRTCServer(srv, webrtc.NewServer(webrtc.Options{
 			ID:          conn.ID(),
 			Storage:     conn.Storage(),

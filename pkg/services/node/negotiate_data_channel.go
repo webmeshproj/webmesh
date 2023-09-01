@@ -105,10 +105,10 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 				Candidate: candidate,
 			})
 			if err != nil {
-				if status.Code(err) != codes.Canceled {
+				if status.Code(err) == codes.Canceled {
 					return
 				}
-				log.Error("error sending ICE candidate", slog.String("error", err.Error()))
+				log.Error("Error sending ICE candidate", slog.String("error", err.Error()))
 				return
 			}
 		}

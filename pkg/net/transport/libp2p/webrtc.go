@@ -191,6 +191,10 @@ StartSignaling:
 				for i, server := range msg.GetStunServers() {
 					rt.turnServers[i] = webrtc.ICEServer{
 						URLs: []string{server},
+						// TODO: Authentication
+						Username:       "-",
+						Credential:     "-",
+						CredentialType: webrtc.ICECredentialTypePassword,
 					}
 				}
 				go rt.handleStream(ctx, stream, rt.buf)

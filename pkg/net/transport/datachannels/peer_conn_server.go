@@ -85,7 +85,13 @@ func NewPeerConnectionServer(ctx context.Context, opts *OfferOptions) (*PeerConn
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 	conn, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
-			{URLs: opts.STUNServers},
+			{
+				URLs: opts.STUNServers,
+				// TODO: Authentication
+				Username:       "-",
+				Credential:     "-",
+				CredentialType: webrtc.ICECredentialTypePassword,
+			},
 		},
 	})
 	if err != nil {
@@ -110,6 +116,14 @@ func NewPeerConnectionServer(ctx context.Context, opts *OfferOptions) (*PeerConn
 		mu.Lock()
 		defer mu.Unlock()
 		pc.logger.Debug("ICE connection state changed", slog.String("state", state.String()))
+		if state == webrtc.ICEConnectionStateConnected {
+			select {
+			case <-pc.closec:
+				return
+			default:
+				close(pc.readyc)
+			}
+		}
 		if state == webrtc.ICEConnectionStateFailed || state == webrtc.ICEConnectionStateCompleted {
 			select {
 			case <-pc.closec:
@@ -229,7 +243,6 @@ func (pc *PeerConnectionServer) onDataChannelOpen() {
 		pc.logger.Error("failed to detach data channel", slog.String("error", err.Error()))
 		return
 	}
-	close(pc.readyc)
 	defer pc.Close()
 	defer rw.Close()
 	for {

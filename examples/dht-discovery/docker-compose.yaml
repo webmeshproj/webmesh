@@ -42,7 +42,6 @@ services:
       - --bootstrap.ipv4-network=10.100.10.0/24
       - --bootstrap.disable-rbac
       - --raft.in-memory
-      - --services.api.mesh-enabled
       # Enable the WebRTC API to help nodes with ICE connectivity.
       - --services.webrtc.enabled
       - --services.webrtc.stun-servers=stun:10.40.0.1:3478
@@ -53,9 +52,7 @@ services:
       - --discovery.announce
       - --discovery.psk=superkadsecret
     restart: on-failure
-    ports:
-      - 8443:8443
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    cap_add: ["NET_ADMIN", "NET_RAW"]
 
   site-1-peer:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -72,7 +69,7 @@ services:
       - --discovery.psk=superkadsecret
       - --mesh.direct-peers=site-2-peer,site-3-peer
     restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    cap_add: ["NET_ADMIN", "NET_RAW"]
 
   site-2-peer:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -89,7 +86,7 @@ services:
       - --discovery.psk=superkadsecret
       - --mesh.direct-peers=site-1-peer,site-3-peer
     restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    cap_add: ["NET_ADMIN", "NET_RAW"]
 
   site-3-peer:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -106,4 +103,4 @@ services:
       - --discovery.psk=superkadsecret
       - --mesh.direct-peers=site-1-peer,site-2-peer
     restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    cap_add: ["NET_ADMIN", "NET_RAW"]

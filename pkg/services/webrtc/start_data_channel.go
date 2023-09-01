@@ -84,7 +84,7 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 		return status.Errorf(codes.Internal, "failed to evaluate data channel permissions: %v", err)
 	}
 	if !allowed {
-		log.Warn("not allowed to negotiate data channel")
+		log.Warn("Not allowed to negotiate data channel")
 		return status.Error(codes.PermissionDenied, "not allowed")
 	}
 	// Set defaults.
@@ -314,13 +314,13 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	go func() {
 		nodeCandidate, err := negotiateStream.Recv()
 		if err != nil {
-			if err != io.EOF {
-				log.Error("failed to receive candidate from node", slog.String("error", err.Error()))
+			if status.Code(err) != codes.Canceled || err != io.EOF {
+				log.Error("Failed to receive candidate from node", slog.String("error", err.Error()))
 			}
 			return
 		}
 		if nodeCandidate.GetCandidate() == "" {
-			log.Error("received empty candidate from node")
+			log.Error("Received empty candidate from node")
 			return
 		}
 		log.Debug("Received ICE candidate from node", slog.String("candidate", nodeCandidate.GetCandidate()))
@@ -329,7 +329,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 		})
 		if err != nil {
 			if status.Code(err) != codes.Canceled {
-				log.Error("failed to send candidate to client", slog.String("error", err.Error()))
+				log.Error("Failed to send candidate to client", slog.String("error", err.Error()))
 			}
 			return
 		}

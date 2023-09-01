@@ -36,8 +36,6 @@ services:
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.100.10.0/24
       - --raft.in-memory
-      - --services.api.mesh-enabled
-      - --services.api.admin-enabled
       # Enable the WebRTC API to help nodes with ICE connectivity.
       - --services.webrtc.enabled
       - --services.webrtc.stun-servers=stun:10.30.0.1:3478
@@ -45,7 +43,7 @@ services:
       - --services.turn.enabled
       - --services.turn.public-ip=10.30.0.1
     restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    cap_add: ["NET_ADMIN", "NET_RAW"]
 
   site-1-peer:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -61,7 +59,7 @@ services:
       - --mesh.join-address=10.30.0.1:8443
       - --mesh.direct-peers=site-2-peer
     restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    cap_add: ["NET_ADMIN", "NET_RAW"]
 
   site-2-peer:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -77,4 +75,4 @@ services:
       - --mesh.join-address=10.30.0.1:8443
       - --mesh.direct-peers=site-1-peer
     restart: on-failure
-    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    cap_add: ["NET_ADMIN", "NET_RAW"]
