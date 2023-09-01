@@ -98,6 +98,8 @@ type DataChannelOptions struct {
 	// LocalAddrs is a list of local addresses to announce the host with.
 	// If empty or nil, the default local addresses will be used.
 	LocalAddrs []multiaddr.Multiaddr
+	// ConnectTimeout is the timeout to use when connecting to peers.
+	ConnectTimeout time.Duration
 }
 
 // StartOptions are the options for starting the network manager and configuring
@@ -758,7 +760,7 @@ func (m *manager) getSignalingTransport(ctx context.Context, peer *v1.WireGuardP
 				NodeID:         m.opts.NodeID,
 				Rendevous:      rendevous,
 				BootstrapPeers: m.opts.DataChannels.BootstrapPeers,
-				ConnectTimeout: time.Second * 10,
+				ConnectTimeout: m.opts.DataChannels.ConnectTimeout,
 				LocalAddrs:     m.opts.DataChannels.LocalAddrs,
 				TargetProto:    "udp",
 				TargetAddr:     netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
@@ -784,7 +786,7 @@ func (m *manager) getSignalingTransport(ctx context.Context, peer *v1.WireGuardP
 		// We'll use our local storage
 		log.Debug("We'll use our local storage for ICE negotiation lookup")
 		resolver = peers.New(m.storage).Resolver().FeatureResolver(func(mn peers.MeshNode) bool {
-			return mn.GetId() != m.opts.NodeID
+			return mn.GetId() != peer.GetId()
 		})
 	}
 	return tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{

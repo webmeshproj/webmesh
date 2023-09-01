@@ -308,6 +308,9 @@ func (g *GraphStore) Edge(sourceNode, targetNode string) (graph.Edge[string], er
 	if err != nil {
 		return graph.Edge[string]{}, fmt.Errorf("unmarshal edge: %w", err)
 	}
+	if len(edge.Attributes) == 0 {
+		edge.Attributes = make(map[string]string)
+	}
 	return graph.Edge[string]{
 		Source: sourceNode,
 		Target: targetNode,
@@ -332,6 +335,9 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[string], error) {
 		err = protojson.Unmarshal([]byte(value), &edge)
 		if err != nil {
 			return fmt.Errorf("unmarshal edge: %w", err)
+		}
+		if len(edge.Attributes) == 0 {
+			edge.Attributes = make(map[string]string)
 		}
 		edges = append(edges, graph.Edge[string]{
 			Source: source,

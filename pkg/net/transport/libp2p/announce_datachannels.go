@@ -89,10 +89,12 @@ func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOption
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)
 	}
-	announcer.host.SetStreamHandler(JoinProtocol, func(s network.Stream) {
-		log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
-		go announcer.handleStream(context.WithLogger(context.Background(), log), s)
-	})
+	for _, rendevous := range opts.RendezvousStrings {
+		announcer.host.SetStreamHandler(WebRTCSignalProtocolFor(rendevous), func(s network.Stream) {
+			log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
+			go announcer.handleStream(context.WithLogger(context.Background(), log), s)
+		})
+	}
 	log = log.With(slog.String("host-id", announcer.host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.

@@ -20,6 +20,7 @@ limitations under the License.
 package libp2p
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -42,10 +43,10 @@ func WebRTCSignalProtocolFor(id string) protocol.ID {
 
 // WebRTCRendevousFrom returns the rendevous string from the given protocol ID.
 func WebRTCRendevousFrom(id protocol.ID) string {
-	if len(id) < len(WebRTCSignalProtocol)+1 {
+	if len(id) <= len(WebRTCSignalProtocol)+1 {
 		return ""
 	}
-	return string(id)[len(WebRTCSignalProtocol)+1:]
+	return strings.TrimPrefix(string(id), string(WebRTCSignalProtocol)+"/")
 }
 
 var buffersOnce sync.Once

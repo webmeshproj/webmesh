@@ -441,6 +441,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 					}
 					return out
 				}(),
+				ConnectTimeout: o.Discovery.ConnectTimeout,
 			},
 		},
 	}
