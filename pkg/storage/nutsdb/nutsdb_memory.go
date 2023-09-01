@@ -87,7 +87,7 @@ func (db *nutsInmemStorage) PutValue(ctx context.Context, key, value string, ttl
 	if err != nil {
 		return fmt.Errorf("put value: %w", err)
 	}
-	db.subs.Notify(key, value)
+	db.subs.Notify(ctx, key, value)
 	return nil
 }
 
@@ -97,7 +97,7 @@ func (db *nutsInmemStorage) Delete(ctx context.Context, key string) error {
 	err := db.memstore.Delete(meshStoreBucket, []byte(key))
 	db.meshmu.Unlock()
 	if err == nil {
-		db.subs.Notify(key, "")
+		db.subs.Notify(ctx, key, "")
 	}
 	return ignoreNotFound(err)
 }
@@ -190,7 +190,6 @@ func (db *nutsInmemStorage) Restore(ctx context.Context, r io.Reader) error {
 			if err != nil {
 				return fmt.Errorf("restore: %w", err)
 			}
-			db.subs.Notify(string(entry.Key), "")
 		}
 	}
 	// Now restore the snapshot.
@@ -208,7 +207,6 @@ func (db *nutsInmemStorage) Restore(ctx context.Context, r io.Reader) error {
 		if err != nil {
 			return fmt.Errorf("restore: %w", err)
 		}
-		db.subs.Notify(item.Key, item.Value)
 	}
 	return nil
 }

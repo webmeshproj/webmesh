@@ -28,7 +28,7 @@ import (
 )
 
 func (s *meshStore) onDBUpdate(key, value string) {
-	s.log.Debug("db update trigger", "key", key)
+	s.log.Debug("Store update triggered", "key", key)
 	if s.testStore {
 		return
 	}

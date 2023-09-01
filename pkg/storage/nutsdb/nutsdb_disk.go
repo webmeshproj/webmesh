@@ -130,11 +130,10 @@ func (db *nutsDiskStorage) PutValue(ctx context.Context, key, value string, ttl 
 		return nil
 	})
 	db.meshmu.Unlock()
-	if err != nil {
-		return err
+	if err == nil {
+		db.subs.Notify(ctx, key, value)
 	}
-	db.subs.Notify(key, value)
-	return nil
+	return err
 }
 
 // Delete removes a key.
@@ -149,7 +148,7 @@ func (db *nutsDiskStorage) Delete(ctx context.Context, key string) error {
 	})
 	db.meshmu.Unlock()
 	if err == nil {
-		db.subs.Notify(key, "")
+		db.subs.Notify(ctx, key, "")
 	}
 	return ignoreNotFound(err)
 }
@@ -254,7 +253,6 @@ func (db *nutsDiskStorage) Restore(ctx context.Context, r io.Reader) error {
 				if err != nil {
 					return fmt.Errorf("restore: %w", err)
 				}
-				db.subs.Notify(string(entry.Key), "")
 			}
 		}
 		for _, item := range snapshot.Kv {
@@ -262,7 +260,6 @@ func (db *nutsDiskStorage) Restore(ctx context.Context, r io.Reader) error {
 			if err != nil {
 				return fmt.Errorf("restore: %w", err)
 			}
-			db.subs.Notify(item.Key, item.Value)
 		}
 		return nil
 	})

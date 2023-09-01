@@ -19,12 +19,12 @@ limitations under the License.
 package nutsdb
 
 import (
-	"context"
 	"strings"
 	"sync"
 
 	"github.com/google/uuid"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -57,18 +57,24 @@ func (sm *subscriptionManager) Subscribe(ctx context.Context, prefix string, fn 
 	return cancel, nil
 }
 
-func (sm *subscriptionManager) Notify(key, value string) {
+func (sm *subscriptionManager) Notify(ctx context.Context, key, value string) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
+	log := context.LoggerFrom(ctx)
+	log.Debug("Notifying subscriptions", "key", key)
 	for id, sub := range sm.subs {
 		select {
 		case <-sub.ctx.Done():
+			log.Debug("Subscription context done", "id", id, "prefix", sub.prefix)
 			delete(sm.subs, id)
 			continue
 		default:
 		}
 		if sub.Matches(key) {
+			log.Debug("Notifying subscription", "id", id, "prefix", sub.prefix)
 			sub.Notify(key, value)
+		} else {
+			log.Debug("Skipping subscription", "id", id, "prefix", sub.prefix, "key", key)
 		}
 	}
 }
@@ -93,8 +99,8 @@ func (sub *nutsDBSubscription) Context() context.Context {
 	return sub.ctx
 }
 
-func (sub *nutsDBSubscription) Matches(s string) bool {
-	return strings.HasPrefix(s, sub.prefix)
+func (sub *nutsDBSubscription) Matches(key string) bool {
+	return strings.HasPrefix(key, sub.prefix)
 }
 
 func (sub *nutsDBSubscription) Notify(key, value string) {

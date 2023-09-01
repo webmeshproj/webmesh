@@ -19,6 +19,7 @@ package membership
 import (
 	"log/slog"
 	"sync"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slices"
@@ -57,23 +58,23 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 
 	log.Info("Received subscribe peers request")
 
-	var iceServers []string
-	var dnsServers []string
+	var lastIceServers []string
+	var lastDnsServers []string
 	var lastConfig []*v1.WireGuardPeer
 
 	var notifymu sync.Mutex
 	notify := func(_, _ string) {
-		log.Debug("Received node change notification")
+		log.Debug("Checking for wireguard peers changes for remote peer")
 		notifymu.Lock()
 		defer notifymu.Unlock()
-		mdnsServers, err := listDNSServers(ctx, st, peerID)
-		if err != nil {
-			log.Error("failed to get mdns servers", "error", err.Error())
-			return
-		}
 		iceNegServers, err := listICEServers(ctx, st, peerID)
 		if err != nil {
 			log.Error("failed to get ice negotiation servers", "error", err.Error())
+			return
+		}
+		dnsServers, err := listDNSServers(ctx, st, peerID)
+		if err != nil {
+			log.Error("failed to get mdns servers", "error", err.Error())
 			return
 		}
 		peers, err := mesh.WireGuardPeersFor(ctx, st, peerID)
@@ -81,17 +82,20 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 			log.Error("failed to get wireguard peers", "error", err.Error())
 			return
 		}
+		slices.Sort(iceNegServers)
+		slices.Sort(dnsServers)
 		if len(lastConfig) > 0 {
-			if slices.Equal(lastConfig, peers) && slices.Equal(iceServers, iceNegServers) && slices.Equal(dnsServers, mdnsServers) {
+			if slices.Equal(lastIceServers, iceNegServers) && slices.Equal(lastDnsServers, dnsServers) && mesh.WireGuardPeersEqual(lastConfig, peers) {
+				log.Debug("Skipping wireguard peers notification, no changes")
 				return
 			}
 		}
 		lastConfig = peers
-		iceServers = iceNegServers
-		dnsServers = mdnsServers
+		lastIceServers = iceNegServers
+		lastDnsServers = dnsServers
 		config := &v1.PeerConfigurations{
 			Peers:      peers,
-			IceServers: iceServers,
+			IceServers: iceNegServers,
 			DnsServers: dnsServers,
 		}
 		log.Debug("Sending wireguard peers", "peers", config)
@@ -113,8 +117,16 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	}
 	defer edgeCancel()
 
-	<-stream.Context().Done()
-	return nil
+	t := time.NewTicker(time.Second * 5)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-t.C:
+			notify("", "")
+		}
+	}
 }
 
 func listDNSServers(ctx context.Context, st storage.MeshStorage, peerID string) ([]string, error) {
