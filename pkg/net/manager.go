@@ -33,6 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -104,6 +105,8 @@ type StartOptions struct {
 
 // Manager is the interface for managing the network.
 type Manager interface {
+	transport.Dialer
+
 	// Start starts the network manager.
 	Start(ctx context.Context, opts *StartOptions) error
 	// NetworkV4 returns the current IPv4 network. The returned value may be invalid.
@@ -123,10 +126,6 @@ type Manager interface {
 	// WireGuard returns the wireguard interface.
 	// The wireguard interface is only available after Start has been called.
 	WireGuard() wireguard.Interface
-	// Dial behaves like the standard library DialContext, but uses the
-	// wireguard interface for all connections. The address can be a nodeID
-	// or a network address.
-	Dial(ctx context.Context, network, address string) (net.Conn, error)
 	// Close closes the network manager and cleans up any resources.
 	Close(ctx context.Context) error
 }

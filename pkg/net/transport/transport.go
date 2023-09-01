@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 
 	"github.com/hashicorp/raft"
@@ -28,6 +29,12 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 )
+
+// Dialer is a generic interface for dialing a target address over the given network.
+// It resembles the net.Dialer interface.
+type Dialer interface {
+	Dial(ctx context.Context, network, address string) (net.Conn, error)
+}
 
 // Resolver is the interface for resolving node addresses. Implementations
 // can be pre-baked for specialized cases, such as resolving node addresses
@@ -161,7 +168,7 @@ func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, err
 // NodeDialer is an interface for dialing an arbitrary node. The node ID
 // is optional and if empty, implementations can choose the node to dial.
 type NodeDialer interface {
-	Dial(ctx context.Context, id string) (*grpc.ClientConn, error)
+	DialNode(ctx context.Context, id string) (*grpc.ClientConn, error)
 }
 
 // NodeDialerFunc is the function signature for dialing an arbitrary node.
@@ -170,7 +177,7 @@ type NodeDialer interface {
 type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, error)
 
 // Dial implements NodeDialer.
-func (f NodeDialerFunc) Dial(ctx context.Context, id string) (*grpc.ClientConn, error) {
+func (f NodeDialerFunc) DialNode(ctx context.Context, id string) (*grpc.ClientConn, error) {
 	return f(ctx, id)
 }
 

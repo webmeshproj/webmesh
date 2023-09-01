@@ -226,7 +226,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	var conn *grpc.ClientConn
 	var err error
 	for tries < maxRetries {
-		conn, err = s.opts.NodeDialer.Dial(clientStream.Context(), r.GetNodeId())
+		conn, err = s.opts.NodeDialer.DialNode(clientStream.Context(), r.GetNodeId())
 		if err == nil {
 			break
 		}

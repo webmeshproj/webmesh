@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/netip"
 	"sync"
 	"sync/atomic"
@@ -31,7 +32,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/net"
+	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
@@ -70,6 +71,8 @@ var (
 // Mesh is the connection to the Webmesh. It controls raft consensus, plugins,
 // data storage, and WireGuard connections.
 type Mesh interface {
+	// Dialer is the dialer for all connections.
+	transport.Dialer
 	// NodeDialer is the dialer for node connections.
 	transport.NodeDialer
 	// LeaderDialer is the dialer for leader connections.
@@ -97,7 +100,7 @@ type Mesh interface {
 	// been called.
 	Raft() raft.Raft
 	// Network returns the Network manager.
-	Network() net.Manager
+	Network() meshnet.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
 	// AnnounceDHT announces the peer discovery service via DHT.
@@ -176,7 +179,7 @@ type meshStore struct {
 	raft             raft.Raft
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
-	nw               net.Manager
+	nw               meshnet.Manager
 	peerUpdateGroup  *errgroup.Group
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
@@ -209,7 +212,7 @@ func (s *meshStore) Raft() raft.Raft {
 }
 
 // Network returns the Network manager.
-func (s *meshStore) Network() net.Manager {
+func (s *meshStore) Network() meshnet.Manager {
 	return s.nw
 }
 
@@ -254,6 +257,14 @@ func (s *meshStore) LeaderID() (string, error) {
 	return s.raft.LeaderID()
 }
 
+// Dial is a generic dial method.
+func (s *meshStore) Dial(ctx context.Context, network, address string) (net.Conn, error) {
+	if s.raft == nil || !s.open.Load() {
+		return nil, ErrNotOpen
+	}
+	return s.nw.Dial(ctx, network, address)
+}
+
 // DialLeader opens a new gRPC connection to the current Raft leader.
 func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 	if s.raft == nil || !s.open.Load() {
@@ -263,11 +274,11 @@ func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.Dial(ctx, leader)
+	return s.DialNode(ctx, leader)
 }
 
 // Dial opens a new gRPC connection to the given node.
-func (s *meshStore) Dial(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
+func (s *meshStore) DialNode(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
 	if s.raft == nil || !s.open.Load() {
 		return nil, ErrNotOpen
 	}

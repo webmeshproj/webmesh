@@ -67,7 +67,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 }
 
 func (s *Server) getRemoteNodeStatus(ctx context.Context, nodeID string) (*v1.Status, error) {
-	conn, err := s.NodeDialer.Dial(ctx, nodeID)
+	conn, err := s.NodeDialer.DialNode(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}

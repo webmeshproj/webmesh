@@ -113,7 +113,7 @@ func runServer(loglevel string) error {
 	defer conn.Stop(ctx)
 
 	// Start a chat server on the wireguard interface.
-	addr := conn.Mesh().Network().WireGuard().AddressV6().Addr()
+	addr := conn.AddressV6().Addr()
 	fmt.Printf("Chat server listening on %s:8080\n", addr)
 	l, err := net.Listen("tcp", net.JoinHostPort(addr.String(), "8080"))
 	if err != nil {
@@ -172,7 +172,7 @@ func runClient(loglevel string, psk string) error {
 	defer conn.Stop(ctx)
 
 	// Dial the chat server on the wireguard interface.
-	c, err := conn.Mesh().Network().Dial(ctx, "tcp", "server-node:8080")
+	c, err := conn.Dial(ctx, "tcp", "server-node:8080")
 	if err != nil {
 		return err
 	}

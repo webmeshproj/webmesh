@@ -22,10 +22,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/netip"
+
+	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -35,6 +40,10 @@ import (
 
 // Node is an embedded webmesh node.
 type Node interface {
+	transport.Dialer
+	transport.NodeDialer
+	transport.LeaderDialer
+
 	// Start starts the node.
 	Start(ctx context.Context) error
 	// Stop stops the node.
@@ -55,6 +64,10 @@ type Node interface {
 	// MeshDNS returns the underlying MeshDNS instance
 	// if it is running.
 	MeshDNS() *meshdns.Server
+	// AddressV4 returns the IPv4 address of the node.
+	AddressV4() netip.Prefix
+	// AddressV6 returns the IPv6 address of the node.
+	AddressV6() netip.Prefix
 }
 
 // NewNode creates a new embedded webmesh node.
@@ -135,6 +148,14 @@ func (n *node) Errors() <-chan error {
 	return n.errs
 }
 
+func (n *node) AddressV4() netip.Prefix {
+	return n.mesh.Network().WireGuard().AddressV4()
+}
+
+func (n *node) AddressV6() netip.Prefix {
+	return n.mesh.Network().WireGuard().AddressV6()
+}
+
 func (n *node) Start(ctx context.Context) error {
 	log := n.log
 	ctx = context.WithLogger(ctx, log)
@@ -193,6 +214,18 @@ func (n *node) Start(ctx context.Context) error {
 		}
 	}()
 	return nil
+}
+
+func (s *node) Dial(ctx context.Context, network, address string) (net.Conn, error) {
+	return s.mesh.Dial(ctx, network, address)
+}
+
+func (s *node) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
+	return s.mesh.DialLeader(ctx)
+}
+
+func (s *node) DialNode(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
+	return s.mesh.DialNode(ctx, nodeID)
 }
 
 func (n *node) Stop(ctx context.Context) error {
