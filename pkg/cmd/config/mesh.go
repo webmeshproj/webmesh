@@ -67,7 +67,7 @@ type MeshOptions struct {
 	Routes []string `koanf:"routes,omitempty"`
 	// ICEPeers are peers to request direct edges to over ICE. If the node is not allowed to create edges
 	// and data channels, the node will be unable to join.
-	ICEPeers []string `koanf:"direct-peers,omitempty"`
+	ICEPeers []string `koanf:"ice-peers,omitempty"`
 	// RendevousStrings is a map of peer IDs to libp2p rendezvous strings where peers are accepting edges
 	// over libp2p. If a peer is present in this map, the node will attempt to connect to the peer over
 	// libp2p. If the node is not allowed to create edges and data channels, the node will be unable to join.

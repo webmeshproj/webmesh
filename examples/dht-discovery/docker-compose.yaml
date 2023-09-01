@@ -67,7 +67,7 @@ services:
       - --global.disable-ipv6
       - --discovery.discover
       - --discovery.psk=superkadsecret
-      - --mesh.direct-peers=site-2-peer,site-3-peer
+      - --mesh.ice-peers=site-2-peer,site-3-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]
 
@@ -84,7 +84,7 @@ services:
       - --global.disable-ipv6
       - --discovery.discover
       - --discovery.psk=superkadsecret
-      - --mesh.direct-peers=site-1-peer,site-3-peer
+      - --mesh.ice-peers=site-1-peer,site-3-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]
 
@@ -101,6 +101,6 @@ services:
       - --global.disable-ipv6
       - --discovery.discover
       - --discovery.psk=superkadsecret
-      - --mesh.direct-peers=site-1-peer,site-2-peer
+      - --mesh.ice-peers=site-1-peer,site-2-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]
