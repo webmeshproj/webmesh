@@ -67,8 +67,9 @@ type ConnectOptions struct {
 	RequestObserver bool
 	// Routes are additional routes to broadcast to the mesh.
 	Routes []netip.Prefix
-	// DirectPeers are additional peers to connect to directly.
-	DirectPeers []string
+	// DirectPeers are a map of peers to connect to directly. The values
+	// are the prefered transport to use.
+	DirectPeers map[string]v1.ConnectProtocol
 	// Bootstrap are options for bootstrapping the mesh when connecting for
 	// the first time.
 	Bootstrap *BootstrapOptions

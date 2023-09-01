@@ -40,7 +40,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -531,10 +530,10 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	}
 	endpoint, err := m.determinePeerEndpoint(ctx, peer, iceServers)
 	if err != nil {
-		if !peer.GetIce() {
+		if peer.GetProto() == v1.ConnectProtocol_CONNECT_NATIVE {
 			return fmt.Errorf("determine peer endpoint: %w", err)
 		}
-		// If this is an ICE peer, we'll entertain that they might be able
+		// If this is a p2p peer, we'll entertain that they might be able
 		// to connect to us.
 		log.Warn("Error determining peer endpoint, will wait for incoming connection", "error", err.Error())
 	}
@@ -623,7 +622,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (netip.AddrPort, error) {
 	log := context.LoggerFrom(ctx)
 	var endpoint netip.AddrPort
-	if peer.GetIce() {
+	if peer.GetProto() == v1.ConnectProtocol_CONNECT_ICE {
 		return m.negotiateICEConn(ctx, peer, iceServers)
 	}
 	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
@@ -752,24 +751,6 @@ func (m *manager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, 
 
 func (m *manager) getSignalingTransport(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (transport.WebRTCSignalTransport, error) {
 	log := context.LoggerFrom(ctx)
-	if len(m.opts.DataChannels.RendezvousStrings) > 0 {
-		if rendevous, ok := m.opts.DataChannels.RendezvousStrings[peer.GetId()]; ok {
-			// We are meeting up with the peer over libp2p
-			log.Debug("Using libp2p rendezvous string for peer", slog.String("rendezvous", rendevous), slog.String("peer", peer.GetId()))
-			return libp2p.NewSignalTransport(ctx, libp2p.WebRTCSignalOptions{
-				NodeID:         m.opts.NodeID,
-				Rendevous:      rendevous,
-				BootstrapPeers: m.opts.DataChannels.BootstrapPeers,
-				ConnectTimeout: m.opts.DataChannels.ConnectTimeout,
-				LocalAddrs:     m.opts.DataChannels.LocalAddrs,
-				TargetProto:    "udp",
-				TargetAddr:     netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
-			})
-			// We also need to announce to the peer that we are available
-			// for rendezvous connections
-
-		}
-	}
 	var resolver transport.FeatureResolver
 	if len(iceServers) > 0 {
 		// We have a hint about ICE servers, we'll use a static resolver

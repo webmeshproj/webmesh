@@ -30,6 +30,7 @@ import (
 
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
+	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -64,14 +65,12 @@ type MeshOptions struct {
 	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
 	// If the node is not allowed to put routes in the mesh, the node will be unable to join.
 	Routes []string `koanf:"routes,omitempty"`
-	// DirectPeers are peers to request direct edges to. If the node is not allowed to create edges
+	// ICEPeers are peers to request direct edges to over ICE. If the node is not allowed to create edges
 	// and data channels, the node will be unable to join.
-	DirectPeers []string `koanf:"direct-peers,omitempty"`
-	// RendevousStrings is a map of peer IDs to rendezvous strings
-	// where peers are accepting signaling via libp2p. If a peer is present
-	// in the map and we are peering directly with them, we will use the
-	// rendezvous string via libp2p to signal them. Otherwise we'll fall back
-	// to the webmesh APIs.
+	ICEPeers []string `koanf:"direct-peers,omitempty"`
+	// RendevousStrings is a map of peer IDs to libp2p rendezvous strings where peers are accepting edges
+	// over libp2p. If a peer is present in this map, the node will attempt to connect to the peer over
+	// libp2p. If the node is not allowed to create edges and data channels, the node will be unable to join.
 	RendezvousStrings map[string]string `koanf:"rendezvous-strings,omitempty"`
 	// GRPCAdvertisePort is the port to advertise for gRPC.
 	GRPCAdvertisePort int `koanf:"grpc-advertise-port,omitempty"`
@@ -100,7 +99,6 @@ func NewMeshOptions(nodeID string) MeshOptions {
 		JoinAddress:                 "",
 		MaxJoinRetries:              15,
 		Routes:                      nil,
-		DirectPeers:                 nil,
 		GRPCAdvertisePort:           services.DefaultGRPCPort,
 		MeshDNSAdvertisePort:        meshdns.DefaultAdvertisePort,
 		UseMeshDNS:                  false,
@@ -118,8 +116,8 @@ func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.JoinAddress, prefix+"mesh.join-address", "", "Address of a node to join.")
 	fs.IntVar(&o.MaxJoinRetries, prefix+"mesh.max-join-retries", 15, "Maximum number of join retries.")
 	fs.StringSliceVar(&o.Routes, prefix+"mesh.routes", nil, "Additional routes to advertise to the mesh.")
-	fs.StringSliceVar(&o.DirectPeers, prefix+"mesh.direct-peers", nil, "Peers to request direct edges to.")
-	fs.StringToStringVar(&o.RendezvousStrings, prefix+"mesh.rendezvous-strings", nil, "Map of peer IDs to rendezvous strings.")
+	fs.StringSliceVar(&o.ICEPeers, prefix+"mesh.ice-peers", nil, "Peers to request direct edges to over ICE.")
+	fs.StringToStringVar(&o.RendezvousStrings, prefix+"mesh.rendezvous-strings", nil, "Map of peer IDs to rendezvous strings for edges over libp2p.")
 	fs.IntVar(&o.GRPCAdvertisePort, prefix+"mesh.grpc-advertise-port", services.DefaultGRPCPort, "Port to advertise for gRPC.")
 	fs.IntVar(&o.MeshDNSAdvertisePort, prefix+"mesh.meshdns-advertise-port", meshdns.DefaultAdvertisePort, "Port to advertise for DNS.")
 	fs.BoolVar(&o.UseMeshDNS, prefix+"mesh.use-meshdns", false, "Set mesh DNS servers to the system configuration.")
@@ -370,10 +368,15 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 		RequestVote:          o.Raft.RequestVote,
 		RequestObserver:      o.Raft.RequestObserver,
 		Routes:               routes,
-		DirectPeers: func() []string {
-			peers := o.Mesh.DirectPeers
+		DirectPeers: func() map[string]v1.ConnectProtocol {
+			peers := make(map[string]v1.ConnectProtocol)
+			for _, peer := range o.Mesh.ICEPeers {
+				p := peer
+				peers[p] = v1.ConnectProtocol_CONNECT_ICE
+			}
 			for peer := range o.Mesh.RendezvousStrings {
-				peers = append(peers, peer)
+				p := peer
+				peers[p] = v1.ConnectProtocol_CONNECT_LIBP2P
 			}
 			return peers
 		}(),

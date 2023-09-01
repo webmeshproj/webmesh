@@ -129,7 +129,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			actions = append(actions, canPutRouteAction)
 		}
 		if len(req.GetDirectPeers()) > 0 {
-			for _, peer := range req.GetDirectPeers() {
+			for peer := range req.GetDirectPeers() {
 				actions = append(actions, canPutEdgeAction.For(peer))
 			}
 		}
@@ -288,8 +288,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	if len(req.GetDirectPeers()) > 0 {
-		// Put an ICE edge between the caller and all direct peers
-		for _, peer := range req.GetDirectPeers() {
+		// Put an edge between the caller and all direct peers
+		for peer, proto := range req.GetDirectPeers() {
 			// Check if the peer exists
 			_, err := p.Get(ctx, peer)
 			if err != nil {
@@ -307,12 +307,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 			log.Debug("Adding ICE edge to peer", slog.String("peer", peer))
 			err = p.PutEdge(ctx, &v1.MeshEdge{
-				Source: peer,
-				Target: req.GetId(),
-				Weight: 1,
-				Attributes: map[string]string{
-					v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String(): "true",
-				},
+				Source:     peer,
+				Target:     req.GetId(),
+				Weight:     1,
+				Attributes: peers.EdgeAttrsForProto(proto),
 			})
 			if err != nil {
 				return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
@@ -394,7 +392,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	var requiresICE bool
 	for _, peer := range peers {
-		if peer.PrimaryEndpoint == "" || peer.Ice {
+		if peer.PrimaryEndpoint == "" || peer.Proto == v1.ConnectProtocol_CONNECT_ICE {
 			requiresICE = true
 			break
 		}

@@ -96,17 +96,10 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 				}
 				return ""
 			}(),
+			Proto:         peers.ProtoFromEdgeAttrs(edge.Properties.Attributes),
 			Features:      node.Features,
 			AllowedIps:    []string{},
 			AllowedRoutes: []string{},
-			Ice:           false,
-		}
-		if edge.Properties.Attributes != nil {
-			// Check if the ICE attribute is set
-			ice, ok := edge.Properties.Attributes[v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String()]
-			if ok && ice == "true" {
-				peer.Ice = true
-			}
 		}
 		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, peerID, ourRoutes, &node)
 		if err != nil {

@@ -72,6 +72,34 @@ func IsValidID(id string) bool {
 	return true
 }
 
+// EdgeAttrsForProto returns the edge attributes for the given protocol.
+func EdgeAttrsForProto(proto v1.ConnectProtocol) map[string]string {
+	attrs := map[string]string{}
+	switch proto {
+	case v1.ConnectProtocol_CONNECT_ICE:
+		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_ICE.String()] = "true"
+	case v1.ConnectProtocol_CONNECT_LIBP2P:
+		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_LIBP2P.String()] = "true"
+	default:
+		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_NATIVE.String()] = "true"
+	}
+	return attrs
+}
+
+// ProtoFromEdgeAttrs returns the protocol for the given edge attributes.
+func ProtoFromEdgeAttrs(attrs map[string]string) v1.ConnectProtocol {
+	if attrs == nil {
+		return v1.ConnectProtocol_CONNECT_NATIVE
+	}
+	if _, ok := attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_ICE.String()]; ok {
+		return v1.ConnectProtocol_CONNECT_ICE
+	}
+	if _, ok := attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_LIBP2P.String()]; ok {
+		return v1.ConnectProtocol_CONNECT_LIBP2P
+	}
+	return v1.ConnectProtocol_CONNECT_NATIVE
+}
+
 // Peers is the peers interface.
 type Peers interface {
 	// Resolver returns a resolver backed by the storage

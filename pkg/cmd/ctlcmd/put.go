@@ -55,6 +55,7 @@ var (
 	putEdgeTo     string
 	putEdgeWeight int32
 	putEdgeICE    bool
+	putEdgeLibp2p bool
 )
 
 func init() {
@@ -110,6 +111,7 @@ func init() {
 	putEdgeFlags.StringVar(&putEdgeTo, "to", "", "node to add the edge to")
 	putEdgeFlags.Int32Var(&putEdgeWeight, "weight", 1, "weight of the edge")
 	putEdgeFlags.BoolVar(&putEdgeICE, "ice", false, "whether the edge is negotiated over ICE")
+	putEdgeFlags.BoolVar(&putEdgeICE, "libp2p", false, "whether the edge is negotiated over libp2p")
 	cobra.CheckErr(putEdgeCmd.RegisterFlagCompletionFunc("from", completeNodes(1)))
 	cobra.CheckErr(putEdgeCmd.RegisterFlagCompletionFunc("to", completeNodes(1)))
 	cobra.CheckErr(putEdgeCmd.MarkFlagRequired("from"))
@@ -411,7 +413,10 @@ var putEdgeCmd = &cobra.Command{
 			Attributes: make(map[string]string),
 		}
 		if putEdgeICE {
-			edge.Attributes[v1.EdgeAttributes_EDGE_ATTRIBUTE_ICE.String()] = "true"
+			edge.Attributes[v1.EdgeAttribute_EDGE_ATTRIBUTE_ICE.String()] = "true"
+		}
+		if putEdgeLibp2p {
+			edge.Attributes[v1.EdgeAttribute_EDGE_ATTRIBUTE_LIBP2P.String()] = "true"
 		}
 		_, err = client.PutEdge(cmd.Context(), edge)
 		if err != nil {

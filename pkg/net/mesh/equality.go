@@ -79,7 +79,7 @@ func WireGuardPeerEqual(a, b *v1.WireGuardPeer) bool {
 		a.ZoneAwarenessId == b.ZoneAwarenessId &&
 		a.AddressIpv4 == b.AddressIpv4 &&
 		a.AddressIpv6 == b.AddressIpv6 &&
-		a.Ice == b.Ice &&
+		a.Proto == b.Proto &&
 		FeaturePortsEqual(a.Features, b.Features) &&
 		slices.Equal(a.WireguardEndpoints, b.WireguardEndpoints) &&
 		slices.Equal(a.AllowedIps, b.AllowedIps) &&
