@@ -428,7 +428,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		if err != nil {
 			return fmt.Errorf("parse local mesh dns addr: %w", err)
 		}
-		err = s.nw.AddDNSServers(ctx, []netip.AddrPort{addrport})
+		err = s.nw.DNS().AddServers(ctx, []netip.AddrPort{addrport})
 		if err != nil {
 			return fmt.Errorf("add dns servers: %w", err)
 		}

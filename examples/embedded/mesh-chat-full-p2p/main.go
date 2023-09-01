@@ -99,7 +99,7 @@ func runServer(loglevel string) error {
 	conf.Discovery.Announce = true
 	conf.Discovery.PSK = string(psk)
 	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61820"} // Local addr to speed up discovery
-	conf.Mesh.RendezvousStrings = map[string]string{"client-node": string(psk)}
+	conf.Mesh.LibP2PPeers = map[string]string{"client-node": string(psk)}
 
 	conn, err := embed.NewNode(context.Background(), &conf)
 	if err != nil {
@@ -156,7 +156,7 @@ func runClient(loglevel string, psk string) error {
 	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61821"} // Local addr to speed up discovery
 	// Rendevous strings are strings where we will contact the peer
 	// over libp2p for a direct wireguard tunnel.
-	conf.Mesh.RendezvousStrings = map[string]string{"server-node": string(psk)}
+	conf.Mesh.LibP2PPeers = map[string]string{"server-node": string(psk)}
 	conf.TLS.Insecure = true
 	conf.Services.Insecure = true
 

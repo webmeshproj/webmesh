@@ -238,7 +238,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 						break
 					}
 					s.log.Debug("Received peer updates", slog.Any("peers", peers))
-					err = s.nw.RefreshPeers(subctx, peers.Peers)
+					err = s.nw.Peers().Refresh(subctx, peers.Peers)
 					if err != nil {
 						s.log.Error("Failed to refresh peers", slog.String("error", err.Error()))
 						if subctx.Err() != nil {

@@ -44,8 +44,6 @@ type Host interface {
 	Host() host.Host
 	// DHT is the underlying libp2p DHT.
 	DHT() *dht.IpfsDHT
-	// DataChannelAnnouncer returns a new data channel announcer using this host.
-	DataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOptions) *DataChannelAnnouncer
 	// JoinAnnouncer returns a new join announcer using this host.
 	JoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, rt transport.JoinServer) io.Closer
 	// JoinRoundTripper returns a round tripper for executing a join request.
@@ -106,10 +104,6 @@ func (h *libp2pHost) Host() host.Host {
 
 func (h *libp2pHost) DHT() *dht.IpfsDHT {
 	return h.dht
-}
-
-func (h *libp2pHost) DataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOptions) *DataChannelAnnouncer {
-	return NewDataChannelAnnouncerWithHost(ctx, h, opts)
 }
 
 func (h *libp2pHost) JoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, rt transport.JoinServer) io.Closer {

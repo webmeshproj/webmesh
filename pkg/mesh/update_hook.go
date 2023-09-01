@@ -92,7 +92,7 @@ func (s *meshStore) queuePeersUpdate() {
 			s.log.Error("error getting wireguard peers", slog.String("error", err.Error()))
 			return nil
 		}
-		if err := s.nw.RefreshPeers(ctx, wgpeers); err != nil {
+		if err := s.nw.Peers().Refresh(ctx, wgpeers); err != nil {
 			s.log.Error("refresh wireguard peers failed", slog.String("error", err.Error()))
 		}
 		return nil
@@ -105,7 +105,7 @@ func (s *meshStore) queueMeshDNSUpdate() {
 	s.dnsUpdateGroup.TryGo(func() error {
 		defer cancel()
 		s.log.Debug("applied batch with possible DNS changes, refreshing servers")
-		if err := s.nw.RefreshDNSServers(ctx); err != nil {
+		if err := s.nw.DNS().RefreshServers(ctx); err != nil {
 			s.log.Error("refresh dnd servers failed", slog.String("error", err.Error()))
 		}
 		return nil

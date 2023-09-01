@@ -84,7 +84,7 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get wireguard peers: %w", err)
 	}
-	return s.nw.RefreshPeers(ctx, wgpeers)
+	return s.nw.Peers().Refresh(ctx, wgpeers)
 }
 
 func (s *meshStore) loadWireGuardKey(ctx context.Context) (wgtypes.Key, error) {

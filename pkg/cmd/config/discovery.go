@@ -18,10 +18,14 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 )
 
 // DiscoveryOptions are options for discovering peers.
@@ -66,6 +70,37 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", time.Minute, "TTL for the announcement")
 	fs.StringSliceVar(&o.LocalAddrs, prefix+"discovery.local-addrs", nil, "list of local addresses to announce to the discovery service")
 	fs.DurationVar(&o.ConnectTimeout, prefix+"discovery.connect-timeout", 5*time.Second, "timeout for connecting to a peer")
+}
+
+// NewHostConfig returns a new HostOptions for the discovery config.
+func (o *DiscoveryOptions) HostOptions(ctx context.Context) libp2p.HostOptions {
+	return libp2p.HostOptions{
+		BootstrapPeers: func() []multiaddr.Multiaddr {
+			out := make([]multiaddr.Multiaddr, 0)
+			for _, addr := range o.BootstrapServers {
+				maddr, err := multiaddr.NewMultiaddr(addr)
+				if err != nil {
+					context.LoggerFrom(ctx).Warn("Invalid local multiaddr", slog.String("address", addr))
+					continue
+				}
+				out = append(out, maddr)
+			}
+			return out
+		}(),
+		LocalAddrs: func() []multiaddr.Multiaddr {
+			out := make([]multiaddr.Multiaddr, 0)
+			for _, addr := range o.LocalAddrs {
+				maddr, err := multiaddr.NewMultiaddr(addr)
+				if err != nil {
+					context.LoggerFrom(ctx).Warn("Invalid local multiaddr", slog.String("address", addr))
+					continue
+				}
+				out = append(out, maddr)
+			}
+			return out
+		}(),
+		ConnectTimeout: o.ConnectTimeout,
+	}
 }
 
 // Validate validates the discovery options.

@@ -67,7 +67,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 			if err != nil {
 				log.Warn("failed to get wireguard peers", slog.String("error", err.Error()))
 			} else {
-				if err := s.nw.RefreshPeers(ctx, wgpeers); err != nil {
+				if err := s.nw.Peers().Refresh(ctx, wgpeers); err != nil {
 					log.Warn("wireguard refresh peers", slog.String("error", err.Error()))
 				}
 			}

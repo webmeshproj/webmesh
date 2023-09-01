@@ -117,7 +117,7 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 	}
 	for _, peer := range resp.GetPeers() {
 		log.Debug("Adding peer", slog.Any("peer", peer))
-		err = s.nw.AddPeer(ctx, peer, resp.GetIceServers())
+		err = s.nw.Peers().Add(ctx, peer, resp.GetIceServers())
 		if err != nil {
 			log.Error("Failed to add peer", slog.String("error", err.Error()))
 		}
@@ -140,7 +140,7 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 				servers = append(servers, addr)
 			}
 		}
-		err = s.nw.AddDNSServers(ctx, servers)
+		err = s.nw.DNS().AddServers(ctx, servers)
 		if err != nil {
 			log.Error("Failed to add dns servers", slog.String("error", err.Error()))
 		}
