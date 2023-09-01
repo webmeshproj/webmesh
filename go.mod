@@ -32,7 +32,7 @@ require (
 	github.com/miekg/dns v1.1.55
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/multiformats/go-multiaddr v0.11.0
-	github.com/nutsdb/nutsdb v0.13.1
+	github.com/nutsdb/nutsdb v0.14.0
 	github.com/pelletier/go-toml/v2 v2.0.9
 	github.com/pion/datachannel v1.5.5
 	github.com/pion/logging v0.2.2
@@ -58,6 +58,8 @@ require (
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/antlabs/stl v0.0.1 // indirect
+	github.com/antlabs/timer v0.0.11 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

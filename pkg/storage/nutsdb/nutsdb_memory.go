@@ -190,6 +190,7 @@ func (db *nutsInmemStorage) Restore(ctx context.Context, r io.Reader) error {
 			if err != nil {
 				return fmt.Errorf("restore: %w", err)
 			}
+			db.subs.Notify(string(entry.Key), "")
 		}
 	}
 	// Now restore the snapshot.
@@ -207,6 +208,7 @@ func (db *nutsInmemStorage) Restore(ctx context.Context, r io.Reader) error {
 		if err != nil {
 			return fmt.Errorf("restore: %w", err)
 		}
+		db.subs.Notify(item.Key, item.Value)
 	}
 	return nil
 }

@@ -97,7 +97,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		log.Debug("Sending wireguard peers", "peers", config)
 		err = stream.Send(config)
 		if err != nil {
-			log.Error("failed to send wireguard peers", "error", err.Error())
+			log.Error("Failed to send wireguard peers", "error", err.Error())
 			return
 		}
 	}

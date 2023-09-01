@@ -62,7 +62,7 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 		// However, this could be a place to centralize checking the source address of the request.
 		log := context.LoggerFrom(ctx)
 		if i.raft.IsLeader() {
-			log.Debug("currently the leader, handling request locally", slog.String("method", info.FullMethod))
+			log.Debug("Currently the leader, handling request locally", slog.String("method", info.FullMethod))
 			return handler(ctx, req)
 		}
 		if RouteRequiresInNetworkSource(info.FullMethod) {
@@ -76,12 +76,12 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 		if ok {
 			switch policy {
 			case RequireLocal:
-				log.Debug("request requires local handling", slog.String("method", info.FullMethod))
+				log.Debug("Request requires local handling", slog.String("method", info.FullMethod))
 				return handler(ctx, req)
 			case AllowNonLeader:
-				log.Debug("request allows non-leader handling", slog.String("method", info.FullMethod))
+				log.Debug("Request allows non-leader handling", slog.String("method", info.FullMethod))
 				if HasPreferLeaderMeta(ctx) {
-					log.Debug("requestor prefers leader handling", slog.String("method", info.FullMethod))
+					log.Debug("Requestor prefers leader handling", slog.String("method", info.FullMethod))
 					return i.proxyUnaryToLeader(ctx, req, info, handler)
 				}
 				return handler(ctx, req)
@@ -96,7 +96,7 @@ func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		log := context.LoggerFrom(ss.Context())
 		if i.raft.IsLeader() {
-			log.Debug("currently the leader, handling stream locally", slog.String("method", info.FullMethod))
+			log.Debug("Currently the leader, handling stream locally", slog.String("method", info.FullMethod))
 			return handler(srv, ss)
 		}
 		if RouteRequiresInNetworkSource(info.FullMethod) {
@@ -110,12 +110,12 @@ func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 		if ok {
 			switch policy {
 			case RequireLocal:
-				log.Debug("stream requires local handling", slog.String("method", info.FullMethod))
+				log.Debug("Stream requires local handling", slog.String("method", info.FullMethod))
 				return handler(srv, ss)
 			case AllowNonLeader:
-				log.Debug("stream allows non-leader handling", slog.String("method", info.FullMethod))
+				log.Debug("Stream allows non-leader handling", slog.String("method", info.FullMethod))
 				if HasPreferLeaderMeta(ss.Context()) {
-					log.Debug("requestor prefers leader handling of stream", slog.String("method", info.FullMethod))
+					log.Debug("Requestor prefers leader handling of stream", slog.String("method", info.FullMethod))
 					return i.proxyStreamToLeader(srv, ss, info, handler)
 				}
 				return handler(srv, ss)

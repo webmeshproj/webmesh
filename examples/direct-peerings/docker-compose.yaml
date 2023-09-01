@@ -35,6 +35,7 @@ services:
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.100.10.0/24
+      - --bootstrap.disable-rbac
       - --raft.in-memory
       # Enable the WebRTC API to help nodes with ICE connectivity.
       - --services.webrtc.enabled
@@ -56,6 +57,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
+      - --global.log-level=debug
       - --mesh.join-address=10.30.0.1:8443
       - --mesh.direct-peers=site-2-peer
     restart: on-failure
@@ -72,6 +74,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
+      - --global.log-level=debug
       - --mesh.join-address=10.30.0.1:8443
       - --mesh.direct-peers=site-1-peer
     restart: on-failure
