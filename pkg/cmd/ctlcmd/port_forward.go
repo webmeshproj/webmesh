@@ -26,28 +26,18 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/pion/webrtc/v3"
 	"github.com/spf13/cobra"
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd/portforward"
+	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 )
-
-func init() {
-	s := webrtc.SettingEngine{}
-	s.DetachDataChannels()
-	WebRTC = webrtc.NewAPI(webrtc.WithSettingEngine(s))
-}
 
 var (
 	portForwardProtocol string
 	portForwardAddress  string
-
-	// WebRTC is the WebRTC API.
-	WebRTC *webrtc.API
 )
 
 func init() {
@@ -76,7 +66,7 @@ func portForward(cmd *cobra.Command, nodeID string, portForwardSpec string) erro
 	if err != nil {
 		return fmt.Errorf("failed to get dial options: %w", err)
 	}
-	pc, err := datachannels.NewPeerConnectionClient(cmd.Context(), portForwardProtocol, tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{
+	pc, err := datachannels.NewPeerConnectionClient(cmd.Context(), portForwardProtocol, tcp.NewSignalTransport(tcp.WebRTCSignalOptions{
 		Resolver: transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
 			// Return the server address from our config
 			addrport, err := netip.ParseAddrPort(cliConfig.GetCurrentCluster().Server)

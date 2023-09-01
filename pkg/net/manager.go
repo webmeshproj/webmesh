@@ -33,13 +33,13 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
@@ -756,7 +756,7 @@ func (m *manager) getSignalingTransport(ctx context.Context, peer *v1.WireGuardP
 		if rendevous, ok := m.opts.DataChannels.RendezvousStrings[peer.GetId()]; ok {
 			// We are meeting up with the peer over libp2p
 			log.Debug("Using libp2p rendezvous string for peer", slog.String("rendezvous", rendevous), slog.String("peer", peer.GetId()))
-			return libp2p.NewExternalSignalTransport(ctx, libp2p.WebRTCExternalSignalOptions{
+			return libp2p.NewSignalTransport(ctx, libp2p.WebRTCSignalOptions{
 				NodeID:         m.opts.NodeID,
 				Rendevous:      rendevous,
 				BootstrapPeers: m.opts.DataChannels.BootstrapPeers,
@@ -789,7 +789,7 @@ func (m *manager) getSignalingTransport(ctx context.Context, peer *v1.WireGuardP
 			return mn.GetId() != peer.GetId()
 		})
 	}
-	return tcp.NewExternalSignalTransport(tcp.WebRTCExternalSignalOptions{
+	return tcp.NewSignalTransport(tcp.WebRTCSignalOptions{
 		Resolver:    resolver,
 		Credentials: m.opts.DialOptions,
 		NodeID:      peer.GetId(),

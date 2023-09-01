@@ -43,8 +43,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// WebRTCExternalSignalOptions are options for configuring a WebRTC signaling transport.
-type WebRTCExternalSignalOptions struct {
+// WebRTCSignalOptions are options for configuring a WebRTC signaling transport.
+type WebRTCSignalOptions struct {
 	// NodeID is the node ID to advertise to the peer. Contrary to other
 	// uses of signaling, this is the node ID of the local node and not
 	// the remote node. The remote node should be expecting this node ID
@@ -69,10 +69,10 @@ type WebRTCExternalSignalOptions struct {
 	TargetAddr netip.AddrPort
 }
 
-// NewExternalSignalTransport returns a new WebRTC signaling transport that attempts
-// to negotiate a WebRTC connection using the Webmesh WebRTC signaling server. This is
-// typically used by clients trying to create a proxy connection to a server.
-func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOptions) (transport.WebRTCSignalTransport, error) {
+// NewSignalTransport returns a new WebRTC signaling transport that attempts
+// to negotiate a WebRTC connection using the Webmesh WebRTC signaling protocol.
+// This typically used by clients trying to create a proxy connection to another node.
+func NewSignalTransport(ctx context.Context, opts WebRTCSignalOptions) (transport.WebRTCSignalTransport, error) {
 	log := context.LoggerFrom(ctx).With("libp2p", "webrtc-signal")
 	SetBuffers(context.WithLogger(ctx, log))
 	if len(opts.LocalAddrs) > 0 {
@@ -89,18 +89,18 @@ func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOp
 		defer host.Close()
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
-	return &externalSignalTransport{
-		WebRTCExternalSignalOptions: opts,
-		host:                        host,
-		dht:                         kaddht,
-		candidatec:                  make(chan webrtc.ICECandidateInit, 16),
-		errorc:                      make(chan error, 1),
-		cancel:                      func() {},
+	return &signalTransport{
+		WebRTCSignalOptions: opts,
+		host:                host,
+		dht:                 kaddht,
+		candidatec:          make(chan webrtc.ICECandidateInit, 16),
+		errorc:              make(chan error, 1),
+		cancel:              func() {},
 	}, nil
 }
 
-type externalSignalTransport struct {
-	WebRTCExternalSignalOptions
+type signalTransport struct {
+	WebRTCSignalOptions
 	host              host.Host
 	dht               *dht.IpfsDHT
 	buf               *bufio.ReadWriter
@@ -113,7 +113,7 @@ type externalSignalTransport struct {
 }
 
 // Start starts the transport.
-func (rt *externalSignalTransport) Start(ctx context.Context) error {
+func (rt *signalTransport) Start(ctx context.Context) error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	log := context.LoggerFrom(ctx).With("libp2p", "webrtc-signal")
@@ -206,12 +206,12 @@ StartSignaling:
 }
 
 // TURNServers returns a list of TURN servers configured for the transport.
-func (rt *externalSignalTransport) TURNServers() []webrtc.ICEServer {
+func (rt *signalTransport) TURNServers() []webrtc.ICEServer {
 	return rt.turnServers
 }
 
 // SendDescription sends an SDP description to the remote peer.
-func (rt *externalSignalTransport) SendDescription(ctx context.Context, desc webrtc.SessionDescription) error {
+func (rt *signalTransport) SendDescription(ctx context.Context, desc webrtc.SessionDescription) error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	log := context.LoggerFrom(ctx)
@@ -239,7 +239,7 @@ func (rt *externalSignalTransport) SendDescription(ctx context.Context, desc web
 }
 
 // SendCandidate sends an ICE candidate to the remote peer.
-func (rt *externalSignalTransport) SendCandidate(ctx context.Context, candidate webrtc.ICECandidateInit) error {
+func (rt *signalTransport) SendCandidate(ctx context.Context, candidate webrtc.ICECandidateInit) error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	log := context.LoggerFrom(ctx)
@@ -267,29 +267,29 @@ func (rt *externalSignalTransport) SendCandidate(ctx context.Context, candidate 
 }
 
 // Candidates returns a channel of ICE candidates received from the remote peer.
-func (rt *externalSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
+func (rt *signalTransport) Candidates() <-chan webrtc.ICECandidateInit {
 	return rt.candidatec
 }
 
 // RemoteDescription returns a channel the description received from the remote peer.
-func (rt *externalSignalTransport) RemoteDescription() webrtc.SessionDescription {
+func (rt *signalTransport) RemoteDescription() webrtc.SessionDescription {
 	return rt.remoteDescription
 }
 
 // Error returns a channel that receives any error encountered during signaling.
 // This channel will be closed when the transport is closed.
-func (rt *externalSignalTransport) Error() <-chan error {
+func (rt *signalTransport) Error() <-chan error {
 	return rt.errorc
 }
 
 // Close closes the transport.
-func (rt *externalSignalTransport) Close() error {
+func (rt *signalTransport) Close() error {
 	rt.cancel()
 	defer rt.dht.Close()
 	return rt.host.Close()
 }
 
-func (rt *externalSignalTransport) handleStream(ctx context.Context, stream network.Stream, buf *bufio.ReadWriter) {
+func (rt *signalTransport) handleStream(ctx context.Context, stream network.Stream, buf *bufio.ReadWriter) {
 	log := context.LoggerFrom(ctx)
 	defer close(rt.errorc)
 	defer stream.Close()

@@ -39,15 +39,17 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 )
 
 // DataChannelAnnounceOptions are options for announcing webrtc signaling
 // for data channels to remote peers.
 type DataChannelAnnounceOptions struct {
-	// RendevousStrings is a map of peer IDs to rendezvous strings
-	// for allowing signaling through libp2p.
-	RendezvousStrings map[string]string
+	// RemotePeer is the peer ID of the remote peer to announce the data channel
+	// protocol to.
+	RemotePeer string
+	// Rendevous is the string to use as a rendezvous point for the DHT.
+	Rendezvous string
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
 	// If empty or nil, the default bootstrap peers will be used.
 	BootstrapPeers []multiaddr.Multiaddr
@@ -72,9 +74,6 @@ type DataChannelAnnounceOptions struct {
 // NewDataChannelAnnouncer creates a new announcer on the kadmilia DHT and executes
 // received signaling requests against the local node.
 func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOptions) (*DataChannelAnnouncer, error) {
-	if len(opts.RendezvousStrings) == 0 {
-		return nil, fmt.Errorf("no rendezvous strings provided")
-	}
 	var err error
 	log := context.LoggerFrom(ctx)
 	SetBuffers(ctx)
@@ -89,12 +88,10 @@ func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOption
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)
 	}
-	for _, rendevous := range opts.RendezvousStrings {
-		announcer.host.SetStreamHandler(WebRTCSignalProtocolFor(rendevous), func(s network.Stream) {
-			log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
-			go announcer.handleStream(context.WithLogger(context.Background(), log), s)
-		})
-	}
+	announcer.host.SetStreamHandler(WebRTCSignalProtocolFor(opts.Rendezvous), func(s network.Stream) {
+		log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
+		go announcer.handleStream(context.WithLogger(context.Background(), log), s)
+	})
 	log = log.With(slog.String("host-id", announcer.host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.
@@ -111,9 +108,7 @@ func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOption
 	if opts.AnnounceTTL > 0 {
 		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
 	}
-	for _, rendezvous := range opts.RendezvousStrings {
-		dutil.Advertise(ctx, routingDiscovery, rendezvous, discoveryOpts...)
-	}
+	dutil.Advertise(ctx, routingDiscovery, opts.Rendezvous, discoveryOpts...)
 	return announcer, nil
 }
 
@@ -135,18 +130,6 @@ func (a *DataChannelAnnouncer) handleStream(ctx context.Context, stream network.
 	log := context.LoggerFrom(ctx)
 	defer stream.Close()
 	log.Debug("Handling data channel protocol stream", "peer", stream.Conn().RemotePeer())
-	// Determine the rendevous point the peer used.
-	rendevous := WebRTCRendevousFrom(stream.Protocol())
-	if rendevous == "" {
-		log.Warn("Received data channel protocol stream without rendezvous")
-		return
-	}
-	// Pull the peer ID from our internal map.
-	expectedPeer := a.opts.RendezvousStrings[rendevous]
-	if expectedPeer == "" {
-		log.Warn("Received data channel protocol stream with unknown rendezvous", "rendevous", rendevous)
-		return
-	}
 	// Create a buffer for the stream
 	buf := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 	// Pull the initial request from the stream.
@@ -163,15 +146,15 @@ func (a *DataChannelAnnouncer) handleStream(ctx context.Context, stream network.
 		return
 	}
 	// Check the peer ID.
-	if req.GetNodeId() != expectedPeer {
-		log.Warn("Received data channel protocol stream with unexpected peer ID", "expected", expectedPeer, "actual", req.GetNodeId())
+	if req.GetNodeId() != a.opts.RemotePeer {
+		log.Warn("Received data channel protocol stream with unexpected peer ID", "expected", a.opts.RemotePeer, "actual", req.GetNodeId())
 		return
 	}
-	// Start the requested data channel.
-	a.handleRequest(ctx, stream, &req)
+	// Handle the signaling.
+	a.handleSignaling(ctx, stream, &req)
 }
 
-func (a *DataChannelAnnouncer) handleRequest(ctx context.Context, stream network.Stream, req *v1.StartDataChannelRequest) {
+func (a *DataChannelAnnouncer) handleSignaling(ctx context.Context, stream network.Stream, req *v1.StartDataChannelRequest) {
 	log := context.LoggerFrom(ctx)
 	log.Debug("Handling data channel protocol request", "peer", stream.Conn().RemotePeer(), "request", req)
 	var conn datachannels.ManagedServerChannel

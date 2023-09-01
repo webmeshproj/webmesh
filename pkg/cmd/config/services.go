@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
@@ -146,7 +145,7 @@ func (s *ServiceOptions) Validate() error {
 			return err
 		}
 	}
-	if s.WebRTC.Enabled || s.WebRTC.Announce {
+	if s.WebRTC.Enabled {
 		err := s.WebRTC.Validate()
 		if err != nil {
 			return err
@@ -175,31 +174,13 @@ type WebRTCOptions struct {
 	Enabled bool `koanf:"enabled,omitempty"`
 	// STUNServers is a list of STUN servers to use for the WebRTC API.
 	STUNServers []string `koanf:"stun-servers,omitempty"`
-	// Announce is a flag to announce this service to the libp2p discovery service
-	// on the given rendezvous string.
-	Announce bool `koanf:"announce,omitempty"`
-	// RendevousStrings is a map of peer IDs to rendezvous strings
-	// for allowing signaling through libp2p.
-	RendezvousStrings map[string]string `koanf:"rendezvous-strings,omitempty"`
-	// BootstrapServers is a list of bootstrap servers to use for the DHT.
-	// If empty or nil, the default bootstrap servers will be used.
-	BootstrapServers []string `koanf:"bootstrap-servers,omitempty"`
-	// LocalAddrs is a list of local addresses to announce to the discovery service.
-	// If empty, the default local addresses will be used.
-	LocalAddrs []string `koanf:"local-addrs,omitempty"`
-	// AnnounceTTL is the TTL for each announcement.
-	AnnounceTTL time.Duration `koanf:"announce-ttl,omitempty"`
-	// ConnectTimeout is the timeout for connecting to a peer over libp2p discovery.
-	ConnectTimeout time.Duration `koanf:"connect-timeout,omitempty"`
 }
 
 // NewWebRTCOptions returns a new WebRTCOptions with the default values.
 func NewWebRTCOptions() WebRTCOptions {
 	return WebRTCOptions{
-		Enabled:        false,
-		STUNServers:    webrtc.DefaultSTUNServers,
-		AnnounceTTL:    time.Minute,
-		ConnectTimeout: time.Second * 5,
+		Enabled:     false,
+		STUNServers: webrtc.DefaultSTUNServers,
 	}
 }
 
@@ -207,43 +188,10 @@ func NewWebRTCOptions() WebRTCOptions {
 func (w *WebRTCOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&w.Enabled, prefix+"services.webrtc.enabled", false, "Enable and register the WebRTC API.")
 	fl.StringSliceVar(&w.STUNServers, prefix+"services.webrtc.stun-servers", webrtc.DefaultSTUNServers, "TURN/STUN servers to use for the WebRTC API.")
-	fl.BoolVar(&w.Announce, prefix+"services.webrtc.announce", false, "Announce this service to the libp2p discovery service.")
-	fl.StringToStringVar(&w.RendezvousStrings, prefix+"services.webrtc.rendezvous-strings", nil, "Map of peer IDs to rendezvous strings for allowing signaling through libp2p.")
-	fl.StringSliceVar(&w.BootstrapServers, prefix+"services.webrtc.bootstrap-servers", nil, "Bootstrap servers to use for the DHT.")
-	fl.StringSliceVar(&w.LocalAddrs, prefix+"services.webrtc.local-addrs", nil, "Local addresses to announce to the discovery service.")
-	fl.DurationVar(&w.AnnounceTTL, prefix+"services.webrtc.announce-ttl", time.Minute, "TTL for each announcement.")
-	fl.DurationVar(&w.ConnectTimeout, prefix+"services.webrtc.connect-timeout", time.Second*5, "Timeout for connecting to a peer over libp2p discovery.")
 }
 
 // Validate validates the options.
 func (w *WebRTCOptions) Validate() error {
-	if !w.Enabled || !w.Announce {
-		return nil
-	}
-	if w.Announce {
-		if len(w.RendezvousStrings) == 0 {
-			return fmt.Errorf("services.webrtc.rendezvous-strings must be set")
-		}
-		if w.AnnounceTTL == 0 {
-			return fmt.Errorf("services.webrtc.announce-ttl must be set")
-		}
-		if len(w.LocalAddrs) >= 0 {
-			for _, addr := range w.LocalAddrs {
-				_, err := multiaddr.NewMultiaddr(addr)
-				if err != nil {
-					return fmt.Errorf("services.webrtc.local-addrs contains an invalid address: %w", err)
-				}
-			}
-		}
-		if len(w.BootstrapServers) >= 0 {
-			for _, addr := range w.BootstrapServers {
-				_, err := multiaddr.NewMultiaddr(addr)
-				if err != nil {
-					return fmt.Errorf("services.webrtc.bootstrap-servers contains an invalid address: %w", err)
-				}
-			}
-		}
-	}
 	return nil
 }
 
@@ -693,40 +641,6 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf se
 			Path:          o.Services.Metrics.Path,
 		})
 		conf.Servers = append(conf.Servers, metricsServer)
-	}
-	if o.Services.WebRTC.Enabled && o.Services.WebRTC.Announce {
-		announcer := webrtc.NewDHTServer(webrtc.DHTOptions{
-			RendezvousStrings: o.Services.WebRTC.RendezvousStrings,
-			BootstrapServers: func() []multiaddr.Multiaddr {
-				var addrs []multiaddr.Multiaddr
-				for _, addr := range o.Services.WebRTC.BootstrapServers {
-					maddr, err := multiaddr.NewMultiaddr(addr)
-					if err != nil {
-						context.LoggerFrom(ctx).Error("Failed to parse bootstrap server address", "error", err.Error())
-						continue
-					}
-					addrs = append(addrs, maddr)
-				}
-				return addrs
-			}(),
-			LocalAddrs: func() []multiaddr.Multiaddr {
-				var addrs []multiaddr.Multiaddr
-				for _, addr := range o.Services.WebRTC.LocalAddrs {
-					maddr, err := multiaddr.NewMultiaddr(addr)
-					if err != nil {
-						context.LoggerFrom(ctx).Error("Failed to parse local server address", "error", err.Error())
-						continue
-					}
-					addrs = append(addrs, maddr)
-				}
-				return addrs
-			}(),
-			AnnounceTTL:    o.Services.WebRTC.AnnounceTTL,
-			STUNServers:    o.Services.WebRTC.STUNServers,
-			WireGuardPort:  o.WireGuard.ListenPort,
-			ConnectTimeout: o.Services.WebRTC.ConnectTimeout,
-		})
-		conf.Servers = append(conf.Servers, announcer)
 	}
 	return
 }

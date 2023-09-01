@@ -35,8 +35,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// WebRTCExternalSignalOptions are options for configuring the WebRTC transport.
-type WebRTCExternalSignalOptions struct {
+// WebRTCSignalOptions are options for configuring the WebRTC transport.
+type WebRTCSignalOptions struct {
 	// Resolver is a resolver for looking up nodes with the ICE negotiation feature
 	Resolver transport.FeatureResolver
 	// Credentials are credentials to use for the gRPC connection.
@@ -52,18 +52,18 @@ type WebRTCExternalSignalOptions struct {
 // NewExternalSignalTransport returns a new WebRTC signaling transport that attempts
 // to negotiate a WebRTC connection using the Webmesh WebRTC signaling server. This is
 // typically used by clients trying to create a proxy connection to a server.
-func NewExternalSignalTransport(opts WebRTCExternalSignalOptions) transport.WebRTCSignalTransport {
-	return &webrtcExternalSignalTransport{
-		WebRTCExternalSignalOptions: opts,
-		candidatec:                  make(chan webrtc.ICECandidateInit, 16),
-		errc:                        make(chan error, 1),
-		cancel:                      func() {},
-		closec:                      make(chan struct{}),
+func NewSignalTransport(opts WebRTCSignalOptions) transport.WebRTCSignalTransport {
+	return &webrtcSignalTransport{
+		WebRTCSignalOptions: opts,
+		candidatec:          make(chan webrtc.ICECandidateInit, 16),
+		errc:                make(chan error, 1),
+		cancel:              func() {},
+		closec:              make(chan struct{}),
 	}
 }
 
-type webrtcExternalSignalTransport struct {
-	WebRTCExternalSignalOptions
+type webrtcSignalTransport struct {
+	WebRTCSignalOptions
 
 	stream            v1.WebRTC_StartDataChannelClient
 	turnServers       []webrtc.ICEServer
@@ -76,7 +76,7 @@ type webrtcExternalSignalTransport struct {
 }
 
 // Start starts the transport.
-func (rt *webrtcExternalSignalTransport) Start(ctx context.Context) error {
+func (rt *webrtcSignalTransport) Start(ctx context.Context) error {
 	// Start the negotiation stream.
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
@@ -150,27 +150,27 @@ Connect:
 }
 
 // TURNServers returns a list of TURN servers configured for the transport.
-func (rt *webrtcExternalSignalTransport) TURNServers() []webrtc.ICEServer {
+func (rt *webrtcSignalTransport) TURNServers() []webrtc.ICEServer {
 	return rt.turnServers
 }
 
 // Candidates returns a channel of ICE candidates received from the remote peer.
-func (rt *webrtcExternalSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
+func (rt *webrtcSignalTransport) Candidates() <-chan webrtc.ICECandidateInit {
 	return rt.candidatec
 }
 
 // RemoteDescription returns the SDP description received from the remote peer.
-func (rt *webrtcExternalSignalTransport) RemoteDescription() webrtc.SessionDescription {
+func (rt *webrtcSignalTransport) RemoteDescription() webrtc.SessionDescription {
 	return rt.remoteDescription
 }
 
 // Error returns a channel that receives any error encountered during signaling.
-func (rt *webrtcExternalSignalTransport) Error() <-chan error {
+func (rt *webrtcSignalTransport) Error() <-chan error {
 	return rt.errc
 }
 
 // SendDescription sends an SDP offer or answer to the remote peer.
-func (rt *webrtcExternalSignalTransport) SendDescription(ctx context.Context, desc webrtc.SessionDescription) error {
+func (rt *webrtcSignalTransport) SendDescription(ctx context.Context, desc webrtc.SessionDescription) error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	b, err := json.Marshal(desc)
@@ -196,7 +196,7 @@ func (rt *webrtcExternalSignalTransport) SendDescription(ctx context.Context, de
 
 // SendCandidate sends an ICE candidate to the remote peer. If the peer has
 // disconnected or the transport has been closed, this method returns an error.
-func (rt *webrtcExternalSignalTransport) SendCandidate(ctx context.Context, candidate webrtc.ICECandidateInit) error {
+func (rt *webrtcSignalTransport) SendCandidate(ctx context.Context, candidate webrtc.ICECandidateInit) error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	b, err := json.Marshal(candidate)
@@ -221,7 +221,7 @@ func (rt *webrtcExternalSignalTransport) SendCandidate(ctx context.Context, cand
 }
 
 // Close closes the transport.
-func (rt *webrtcExternalSignalTransport) Close() error {
+func (rt *webrtcSignalTransport) Close() error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	select {
@@ -238,7 +238,7 @@ func (rt *webrtcExternalSignalTransport) Close() error {
 	return rt.stream.CloseSend()
 }
 
-func (rt *webrtcExternalSignalTransport) handleNegotiateStream(ctx context.Context, conn *grpc.ClientConn, stream v1.WebRTC_StartDataChannelClient) {
+func (rt *webrtcSignalTransport) handleNegotiateStream(ctx context.Context, conn *grpc.ClientConn, stream v1.WebRTC_StartDataChannelClient) {
 	log := context.LoggerFrom(ctx)
 	defer close(rt.errc)
 	defer conn.Close()

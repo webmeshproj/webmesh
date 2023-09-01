@@ -96,12 +96,10 @@ func runServer(loglevel string) error {
 	conf.Services.Insecure = true
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 	// We use the same PSK as a rendevous point for a p2p wireguard tunnel
-	conf.Services.WebRTC.Announce = true
-	conf.Services.WebRTC.RendezvousStrings = map[string]string{"client-node": string(psk)}
-	conf.Services.WebRTC.LocalAddrs = []string{"ip6/::1/tcp/61821"} // Local addr to speed up discovery
 	conf.Discovery.Announce = true
 	conf.Discovery.PSK = string(psk)
 	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61820"} // Local addr to speed up discovery
+	conf.Mesh.RendezvousStrings = map[string]string{"client-node": string(psk)}
 
 	conn, err := embed.NewNode(context.Background(), &conf)
 	if err != nil {
