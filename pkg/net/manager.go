@@ -533,7 +533,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 		}
 		// If this is an ICE peer, we'll entertain that they might be able
 		// to connect to us.
-		log.Warn("error determining ICE endpoint, will wait for incoming connection", "error", err.Error())
+		log.Warn("Error determining peer endpoint, will wait for incoming connection", "error", err.Error())
 	}
 	allowedIPs := make([]netip.Prefix, 0)
 	for _, ip := range peer.GetAllowedIps() {
@@ -620,7 +620,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (netip.AddrPort, error) {
 	log := context.LoggerFrom(ctx)
 	var endpoint netip.AddrPort
-	if peer.GetIce() || (len(peer.WireguardEndpoints) == 0 && peer.GetPrimaryEndpoint() == "") {
+	if peer.GetIce() {
 		return m.negotiateICEConn(ctx, peer, iceServers)
 	}
 	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
