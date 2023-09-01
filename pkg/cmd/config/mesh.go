@@ -358,9 +358,15 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 		RequestVote:          o.Raft.RequestVote,
 		RequestObserver:      o.Raft.RequestObserver,
 		Routes:               routes,
-		DirectPeers:          o.Mesh.DirectPeers,
-		PreferIPv6:           o.Raft.PreferIPv6,
-		Plugins:              plugins,
+		DirectPeers: func() []string {
+			peers := o.Mesh.DirectPeers
+			for peer := range o.Mesh.RendezvousStrings {
+				peers = append(peers, peer)
+			}
+			return peers
+		}(),
+		PreferIPv6: o.Raft.PreferIPv6,
+		Plugins:    plugins,
 		Discovery: &mesh.DiscoveryOptions{
 			BootstrapServers: o.Discovery.BootstrapServers,
 			PSK:              o.Discovery.PSK,
