@@ -435,7 +435,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 			LocalDNSAddr:          localDNSAddr,
 			DisableIPv4:           o.Mesh.DisableIPv4,
 			DisableIPv6:           o.Mesh.DisableIPv6,
-			DataChannels: meshnet.DataChannelOptions{
+			Relays: meshnet.RelayOptions{
 				RendezvousStrings: o.Mesh.RendezvousStrings,
 				BootstrapPeers: func() []multiaddr.Multiaddr {
 					out := make([]multiaddr.Multiaddr, 0)

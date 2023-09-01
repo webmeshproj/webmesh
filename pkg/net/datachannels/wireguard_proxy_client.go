@@ -17,9 +17,7 @@ limitations under the License.
 package datachannels
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"sync"
@@ -28,6 +26,7 @@ import (
 	"github.com/pion/webrtc/v3"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/net/relay"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
@@ -124,15 +123,17 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 		defer pc.Close()
 		return nil, fmt.Errorf("create data channel: %w", err)
 	}
-	wgiface, err := net.DialUDP("udp", nil, &net.UDPAddr{
-		IP:   net.IPv4zero,
-		Port: int(targetPort),
+	relay, err := relay.NewLocalUDP(relay.UDPOptions{
+		TargetPort: targetPort,
 	})
 	if err != nil {
 		defer pc.Close()
 		return nil, fmt.Errorf("dial: %w", err)
 	}
-	pc.localAddr = wgiface.LocalAddr().(*net.UDPAddr)
+	pc.localAddr = &net.UDPAddr{
+		IP:   net.IPv6loopback,
+		Port: int(relay.LocalAddr().Port()),
+	}
 	dc.OnClose(func() {
 		log.Debug("Client side WireGuard datachannel closed")
 	})
@@ -145,27 +146,9 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 			return
 		}
 		close(pc.readyc)
-		log.Debug("WireGuard proxy from local to datachannel started")
-		go func() {
-			defer log.Debug("WireGuard proxy from local to datachannel stopped")
-			defer wgiface.Close()
-			_, err := io.CopyBuffer(rw, wgiface, make([]byte, pc.bufferSize))
-			if err != nil {
-				if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
-					return
-				}
-				log.Error("Failed to copy from WireGuard to datachannel", slog.String("error", err.Error()))
-			}
-		}()
-		log.Debug("WireGuard proxy from datachannel to local started")
-		defer log.Debug("WireGuard proxy from datachannel to local stopped")
-		defer pc.Close()
-		_, err = io.CopyBuffer(wgiface, rw, make([]byte, pc.bufferSize))
+		err = relay.Relay(ctx, rw)
 		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
-				return
-			}
-			log.Error("Failed to copy from datachannel to WireGuard", slog.String("error", err.Error()))
+			log.Error("Failed to relay", slog.String("error", err.Error()))
 		}
 	})
 	// Create and send an answer

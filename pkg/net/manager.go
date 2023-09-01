@@ -80,14 +80,14 @@ type Options struct {
 	DisableIPv4 bool
 	// DisableIPv6 disables IPv6 on the interface.
 	DisableIPv6 bool
-	// DataChannels are options for when presented with the need to negotiate
+	// Relays are options for when presented with the need to negotiate
 	// p2p data channels.
-	DataChannels DataChannelOptions
+	Relays RelayOptions
 }
 
-// DataChannelOptions are options for when presented with the need to negotiate
+// RelayOptions are options for when presented with the need to negotiate
 // p2p wireguard connections. Empty values mean to use the defaults.
-type DataChannelOptions struct {
+type RelayOptions struct {
 	// RendevousStrings is a map of peer IDs to rendezvous strings
 	// where peers are accepting signaling via libp2p.
 	RendezvousStrings map[string]string
@@ -623,7 +623,15 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 	log := context.LoggerFrom(ctx)
 	var endpoint netip.AddrPort
 	if peer.GetProto() == v1.ConnectProtocol_CONNECT_ICE {
+		// Setup an ICE relay
 		return m.negotiateICEConn(ctx, peer, iceServers)
+	}
+	if peer.GetProto() == v1.ConnectProtocol_CONNECT_LIBP2P {
+		// Make sure we have a rendevous string for them
+		if _, ok := m.opts.Relays.RendezvousStrings[peer.GetId()]; !ok {
+			return endpoint, fmt.Errorf("no rendezvous string for peer %s", peer.GetId())
+		}
+		// TODO: Set up a libp2p relay
 	}
 	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
 	if peer.GetPrimaryEndpoint() != "" {
