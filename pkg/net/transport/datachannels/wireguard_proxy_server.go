@@ -188,10 +188,13 @@ func (w *WireGuardProxyServer) Candidates() <-chan string {
 }
 
 // AddCandidate adds an ICE candidate to the peer connection.
-func (w *WireGuardProxyServer) AddCandidate(candidate string) error {
-	return w.conn.AddICECandidate(webrtc.ICECandidateInit{
-		Candidate: candidate,
-	})
+func (w *WireGuardProxyServer) AddCandidate(cand string) error {
+	var candidate webrtc.ICECandidateInit
+	err := json.Unmarshal([]byte(cand), &candidate)
+	if err != nil {
+		return err
+	}
+	return w.conn.AddICECandidate(candidate)
 }
 
 // Closed returns a channel that will be closed when the peer connection is closed.

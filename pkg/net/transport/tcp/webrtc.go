@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/netip"
 	"sync"
+	"time"
 
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
@@ -120,10 +121,19 @@ func (rt *webrtcExternalSignalTransport) Start(ctx context.Context) error {
 		return errors.New("no signaling servers found")
 	}
 	var conn *grpc.ClientConn
+Connect:
 	for _, addr := range addrs {
-		conn, err = grpc.Dial(addr.String(), rt.Credentials...)
-		if err == nil {
-			break
+		var tries int
+		maxRetries := 5
+		for tries < maxRetries {
+			conn, err = grpc.Dial(addr.String(), rt.Credentials...)
+			if err == nil {
+				break Connect
+			}
+			tries++
+			if tries < maxRetries {
+				time.Sleep(time.Second)
+			}
 		}
 	}
 	if err != nil {

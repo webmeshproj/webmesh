@@ -22,6 +22,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/pion/webrtc/v3"
@@ -85,7 +86,10 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 			errs <- fmt.Errorf("failed to send ICE candidate: %w", err)
 		}
 	})
+	var mu sync.Mutex
 	pc.conn.OnICEConnectionStateChange(func(s webrtc.ICEConnectionState) {
+		mu.Lock()
+		defer mu.Unlock()
 		log.Debug("ICE connection state changed", "state", s.String())
 		if s == webrtc.ICEConnectionStateConnected {
 			candidatePair, err := pc.conn.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
@@ -99,6 +103,11 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 		if s == webrtc.ICEConnectionStateFailed || s == webrtc.ICEConnectionStateClosed {
 			log.Info("ICE connection has closed", "reason", s.String())
 			defer pc.Close()
+			select {
+			case <-pc.closec:
+				return
+			default:
+			}
 			close(pc.closec)
 		}
 	})

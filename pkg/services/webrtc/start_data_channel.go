@@ -25,6 +25,7 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
@@ -219,10 +220,24 @@ func (s *Server) handleLocalNegotiation(log *slog.Logger, stream v1.WebRTC_Start
 
 func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRTC_StartDataChannelServer, r *v1.StartDataChannelRequest, remoteAddr string) error {
 	// Start a negotiation with the peer.
+	var tries int
+	maxRetries := 5
 	log.Info("Negotiating data channel with remote peer")
-	conn, err := s.opts.NodeDialer.Dial(clientStream.Context(), r.GetNodeId())
+	var conn *grpc.ClientConn
+	var err error
+	for tries < maxRetries {
+		conn, err = s.opts.NodeDialer.Dial(clientStream.Context(), r.GetNodeId())
+		if err == nil {
+			break
+		}
+		log.Error("Failed to dial node", slog.String("error", err.Error()))
+		tries++
+		if tries < maxRetries {
+			time.Sleep(1 * time.Second)
+		}
+	}
 	if err != nil {
-		return err
+		return status.Errorf(codes.FailedPrecondition, "failed to dial node: %s", err.Error())
 	}
 	defer conn.Close()
 	negotiateStream, err := v1.NewNodeClient(conn).NegotiateDataChannel(clientStream.Context())

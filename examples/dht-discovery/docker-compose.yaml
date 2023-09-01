@@ -5,8 +5,8 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 10.30.0.0/24
-          gateway: 10.30.0.100
+        - subnet: 10.40.0.0/24
+          gateway: 10.40.0.100
   site-1:
     ipam:
       driver: default
@@ -17,6 +17,11 @@ networks:
       driver: default
       config:
         - subnet: 10.20.0.0/24
+  site-3:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.30.0.0/24
 
 services:
   # Bootstrap/TURN Node
@@ -25,41 +30,47 @@ services:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       public-net:
-        ipv4_address: 10.30.0.1
+        ipv4_address: 10.40.0.1
     hostname: bootstrap-node
     entrypoint:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --global.primary-endpoint=10.30.0.1
+      - --global.primary-endpoint=10.40.0.1
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.100.10.0/24
+      - --bootstrap.disable-rbac
       - --raft.in-memory
       - --services.api.mesh-enabled
-      - --services.api.admin-enabled
       # Enable the WebRTC API to help nodes with ICE connectivity.
       - --services.webrtc.enabled
-      - --services.webrtc.stun-servers=stun:10.30.0.1:3478
+      - --services.webrtc.stun-servers=stun:10.40.0.1:3478
       # Enable an embedded TURN server. You can optionally use a public one.
       - --services.turn.enabled
-      - --services.turn.public-ip=10.30.0.1
+      - --services.turn.public-ip=10.40.0.1
+      # Announce Peer discovery using KadDHT.
+      - --discovery.announce
+      - --discovery.psk=superkadsecret
     restart: on-failure
+    ports:
+      - 8443:8443
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   site-1-peer:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       public-net:
-        ipv4_address: 10.30.0.2
+        ipv4_address: 10.40.0.2
       site-1:
     hostname: site-1-peer
     entrypoint:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=10.30.0.1:8443
-      - --mesh.direct-peers=site-2-peer
+      - --discovery.discover
+      - --discovery.psk=superkadsecret
+      - --mesh.direct-peers=site-2-peer,site-3-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -67,14 +78,32 @@ services:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       public-net:
-        ipv4_address: 10.30.0.3
+        ipv4_address: 10.40.0.3
       site-2:
     hostname: site-2-peer
     entrypoint:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=10.30.0.1:8443
-      - --mesh.direct-peers=site-1-peer
+      - --discovery.discover
+      - --discovery.psk=superkadsecret
+      - --mesh.direct-peers=site-1-peer,site-3-peer
+    restart: on-failure
+    cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+
+  site-3-peer:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    networks:
+      public-net:
+        ipv4_address: 10.40.0.4
+      site-3:
+    hostname: site-3-peer
+    entrypoint:
+      - /webmesh-node
+      - --global.insecure
+      - --global.disable-ipv6
+      - --discovery.discover
+      - --discovery.psk=superkadsecret
+      - --mesh.direct-peers=site-1-peer,site-2-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

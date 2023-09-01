@@ -527,10 +527,6 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 			STUNServers: o.Services.WebRTC.STUNServers,
 		}))
 	}
-	if o.Services.API.MeshEnabled {
-		log.Debug("Registering mesh api")
-		v1.RegisterMeshServer(srv, meshapi.NewServer(conn.Storage(), conn.Raft()))
-	}
 	return nil
 }
 

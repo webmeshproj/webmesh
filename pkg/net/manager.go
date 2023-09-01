@@ -701,13 +701,26 @@ func (m *manager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, 
 	}
 	var endpoint netip.AddrPort
 	log.Debug("Negotiating wireguard ICE proxy", slog.String("peer", peer.GetId()))
-	rt, err := m.getSignalingTransport(ctx, peer, iceServers)
-	if err != nil {
-		return endpoint, fmt.Errorf("get signaling transport: %w", err)
-	}
-	pc, err := datachannels.NewWireGuardProxyClient(ctx, rt, uint16(wgPort))
-	if err != nil {
-		return endpoint, fmt.Errorf("create peer connection: %w", err)
+	var tries int
+	var maxTries = 5
+	var pc *datachannels.WireGuardProxyClient
+	for tries < maxTries {
+		rt, err := m.getSignalingTransport(ctx, peer, iceServers)
+		if err != nil {
+			return endpoint, fmt.Errorf("get signaling transport: %w", err)
+		}
+		pc, err = datachannels.NewWireGuardProxyClient(ctx, rt, uint16(wgPort))
+		if err == nil {
+			break
+		}
+		if err != nil {
+			tries++
+			if tries >= maxTries {
+				return endpoint, fmt.Errorf("create wireguard proxy client: %w", err)
+			}
+			log.Error("Error creating wireguard proxy client, retrying", slog.String("error", err.Error()))
+			time.Sleep(time.Second * 2)
+		}
 	}
 	go func() {
 		<-pc.Closed()

@@ -44,15 +44,14 @@ services:
       - --raft.in-memory
       - --services.api.mesh-enabled
       # Enable the WebRTC API to help nodes with ICE connectivity.
-      - --services.api.webrtc-enabled
-      - --services.api.stun-servers=stun:10.40.0.1:3478
+      - --services.webrtc.enabled
+      - --services.webrtc.stun-servers=stun:10.40.0.1:3478
       # Enable an embedded TURN server. You can optionally use a public one.
       - --services.turn.enabled
       - --services.turn.public-ip=10.40.0.1
       # Announce Peer discovery using KadDHT.
       - --discovery.announce
-      - --discovery.use-kad-dht
-      - --discovery.psk=superkadsecret
+      - --discovery.psk=superbadsecret
     restart: on-failure
     ports:
       - 8443:8443
@@ -69,8 +68,8 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --discovery.use-kad-dht
-      - --discovery.psk=superkadsecret
+      - --discovery.discover
+      - --discovery.psk=superbadsecret
       - --mesh.direct-peers=site-2-peer,site-3-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -86,8 +85,8 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --discovery.use-kad-dht
-      - --discovery.psk=superkadsecret
+      - --discovery.discover
+      - --discovery.psk=superbadsecret
       - --mesh.direct-peers=site-1-peer,site-3-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -103,8 +102,8 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --discovery.use-kad-dht
-      - --discovery.psk=superkadsecret
+      - --discovery.discover
+      - --discovery.psk=superbadsecret
       - --mesh.direct-peers=site-1-peer,site-2-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

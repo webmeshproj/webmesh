@@ -152,11 +152,7 @@ func (n *node) Start(ctx context.Context) error {
 		}()
 		return fmt.Errorf("failed to open mesh connection: %w", err)
 	}
-	select {
-	case <-n.Mesh().Ready():
-	case <-ctx.Done():
-		return fmt.Errorf("failed to start mesh node: %w", ctx.Err())
-	}
+
 	// If anything goes wrong at this point, make sure we close down cleanly.
 	handleErr := func(cause error) error {
 		if err := n.Mesh().Close(); err != nil {
@@ -164,7 +160,8 @@ func (n *node) Start(ctx context.Context) error {
 		}
 		return fmt.Errorf("failed to start mesh node: %w", cause)
 	}
-	log.Info("Mesh connection is ready, starting services")
+
+	log.Info("Connected to mesh, starting services")
 
 	// Start the mesh services
 	srvOpts, err := n.conf.NewServiceOptions(ctx, n.Mesh())
@@ -179,6 +176,15 @@ func (n *node) Start(ctx context.Context) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to register APIs: %w", err))
 	}
+
+	select {
+	case <-n.Mesh().Ready():
+	case <-ctx.Done():
+		return fmt.Errorf("failed to start mesh node: %w", ctx.Err())
+	}
+
+	log.Info("Webmesh is ready")
+
 	go func() {
 		if err := n.services.ListenAndServe(); err != nil {
 			n.errs <- handleErr(fmt.Errorf("failed to start gRPC server: %w", err))

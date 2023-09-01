@@ -72,6 +72,9 @@ type DataChannelAnnounceOptions struct {
 // NewDataChannelAnnouncer creates a new announcer on the kadmilia DHT and executes
 // received signaling requests against the local node.
 func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOptions) (*DataChannelAnnouncer, error) {
+	if len(opts.RendezvousStrings) == 0 {
+		return nil, fmt.Errorf("no rendezvous strings provided")
+	}
 	var err error
 	log := context.LoggerFrom(ctx)
 	SetBuffers(ctx)

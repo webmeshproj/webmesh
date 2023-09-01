@@ -419,7 +419,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 		if len(resp.IceServers) == 0 {
-			log.Warn("no peers with ICE negotiation feature found, node is on its own")
+			log.Warn("No peers with ICE negotiation feature found, node is on its own")
 		}
 	}
 

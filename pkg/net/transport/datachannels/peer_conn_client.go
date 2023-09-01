@@ -22,6 +22,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"sync"
 	"sync/atomic"
 
 	"github.com/pion/datachannel"
@@ -123,14 +124,21 @@ func NewPeerConnectionClient(ctx context.Context, protocol string, rt transport.
 			pc.errors <- fmt.Errorf("failed to send ICE candidate: %w", err)
 		}
 	})
+	var mu sync.Mutex
 	pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+		mu.Lock()
+		defer mu.Unlock()
 		pc.logger.Debug("Peer connection state has changed", "state", s.String())
 		if s == webrtc.PeerConnectionStateConnected {
 			defer rt.Close()
 		}
 		if s == webrtc.PeerConnectionStateFailed || s == webrtc.PeerConnectionStateClosed {
 			defer pc.Close()
-			close(pc.closed)
+			select {
+			case <-pc.closed:
+			default:
+				close(pc.closed)
+			}
 		}
 	})
 	d.OnOpen(func() {
