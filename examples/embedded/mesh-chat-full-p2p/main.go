@@ -178,7 +178,6 @@ func runClient(loglevel string, psk string) error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
 	go handleChat(c)
 
 	sig := make(chan os.Signal, 1)
@@ -188,9 +187,10 @@ func runClient(loglevel string, psk string) error {
 }
 
 func handleChat(conn net.Conn) {
+	defer conn.Close()
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-	go readData(rw)
 	go writeData(rw)
+	readData(rw)
 }
 
 func readData(rw *bufio.ReadWriter) {

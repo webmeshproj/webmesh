@@ -41,16 +41,19 @@ type DiscoveryOptions struct {
 	// LocalAddrs is a list of local addresses to announce to the discovery service.
 	// If empty, the default local addresses will be used.
 	LocalAddrs []string `koanf:"local-addrs,omitempty"`
+	// ConnectTimeout is the timeout for connecting to a peer.
+	ConnectTimeout time.Duration `koanf:"connect-timeout,omitempty"`
 }
 
 // NewDiscoveryOptions returns a new DiscoveryOptions for the given PSK.
 // Or one ready with sensible defaults if the PSK is empty.
 func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 	return DiscoveryOptions{
-		Announce:    announce,
-		PSK:         psk,
-		Discover:    psk != "",
-		AnnounceTTL: time.Minute,
+		Announce:       announce,
+		PSK:            psk,
+		Discover:       psk != "",
+		AnnounceTTL:    time.Minute,
+		ConnectTimeout: 5 * time.Second,
 	}
 }
 
@@ -62,6 +65,7 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringSliceVar(&o.BootstrapServers, prefix+"discovery.bootstrap-servers", nil, "list of bootstrap servers to use for the DHT")
 	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", time.Minute, "TTL for the announcement")
 	fs.StringSliceVar(&o.LocalAddrs, prefix+"discovery.local-addrs", nil, "list of local addresses to announce to the discovery service")
+	fs.DurationVar(&o.ConnectTimeout, prefix+"discovery.connect-timeout", 5*time.Second, "timeout for connecting to a peer")
 }
 
 // Validate validates the discovery options.

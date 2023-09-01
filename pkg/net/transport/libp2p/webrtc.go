@@ -84,7 +84,7 @@ func NewExternalSignalTransport(ctx context.Context, opts WebRTCExternalSignalOp
 	}
 	log = log.With(slog.String("host-id", host.ID().String()))
 	log.Debug("Bootstrapping DHT")
-	kaddht, err := NewDHT(ctx, host, opts.BootstrapPeers)
+	kaddht, err := NewDHT(ctx, host, opts.BootstrapPeers, opts.ConnectTimeout)
 	if err != nil {
 		defer host.Close()
 		return nil, fmt.Errorf("libp2p new dht: %w", err)

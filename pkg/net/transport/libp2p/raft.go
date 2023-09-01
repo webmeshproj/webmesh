@@ -68,7 +68,7 @@ func NewRaftTransport(ctx context.Context, opts RaftTransportOptions) (raft.Tran
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
-	err = bootstrapDHT(ctx, host, kaddht, opts.BootstrapPeers)
+	err = bootstrapDHT(ctx, host, kaddht, opts.BootstrapPeers, opts.ConnectTimeout)
 	if err != nil {
 		defer host.Close()
 		defer kaddht.Close()

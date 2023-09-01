@@ -88,7 +88,7 @@ func (rt *dhtRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.
 	log.Debug("Bootstrapping DHT")
-	kaddht, err := NewDHT(ctx, host, rt.BootstrapPeers)
+	kaddht, err := NewDHT(ctx, host, rt.BootstrapPeers, rt.ConnectTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}

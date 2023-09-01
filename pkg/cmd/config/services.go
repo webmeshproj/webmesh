@@ -189,14 +189,17 @@ type WebRTCOptions struct {
 	LocalAddrs []string `koanf:"local-addrs,omitempty"`
 	// AnnounceTTL is the TTL for each announcement.
 	AnnounceTTL time.Duration `koanf:"announce-ttl,omitempty"`
+	// ConnectTimeout is the timeout for connecting to a peer over libp2p discovery.
+	ConnectTimeout time.Duration `koanf:"connect-timeout,omitempty"`
 }
 
 // NewWebRTCOptions returns a new WebRTCOptions with the default values.
 func NewWebRTCOptions() WebRTCOptions {
 	return WebRTCOptions{
-		Enabled:     false,
-		STUNServers: webrtc.DefaultSTUNServers,
-		AnnounceTTL: time.Minute,
+		Enabled:        false,
+		STUNServers:    webrtc.DefaultSTUNServers,
+		AnnounceTTL:    time.Minute,
+		ConnectTimeout: time.Second * 5,
 	}
 }
 
@@ -209,6 +212,7 @@ func (w *WebRTCOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.StringSliceVar(&w.BootstrapServers, prefix+"services.webrtc.bootstrap-servers", nil, "Bootstrap servers to use for the DHT.")
 	fl.StringSliceVar(&w.LocalAddrs, prefix+"services.webrtc.local-addrs", nil, "Local addresses to announce to the discovery service.")
 	fl.DurationVar(&w.AnnounceTTL, prefix+"services.webrtc.announce-ttl", time.Minute, "TTL for each announcement.")
+	fl.DurationVar(&w.ConnectTimeout, prefix+"services.webrtc.connect-timeout", time.Second*5, "Timeout for connecting to a peer over libp2p discovery.")
 }
 
 // Validate validates the options.
@@ -714,9 +718,10 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf se
 				}
 				return addrs
 			}(),
-			AnnounceTTL:   o.Services.WebRTC.AnnounceTTL,
-			STUNServers:   o.Services.WebRTC.STUNServers,
-			WireGuardPort: o.WireGuard.ListenPort,
+			AnnounceTTL:    o.Services.WebRTC.AnnounceTTL,
+			STUNServers:    o.Services.WebRTC.STUNServers,
+			WireGuardPort:  o.WireGuard.ListenPort,
+			ConnectTimeout: o.Services.WebRTC.ConnectTimeout,
 		})
 		conf.Servers = append(conf.Servers, announcer)
 	}

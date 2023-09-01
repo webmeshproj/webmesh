@@ -384,6 +384,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 			PSK:              o.Discovery.PSK,
 			DiscoveryTTL:     o.Discovery.AnnounceTTL,
 			Announce:         o.Discovery.Announce,
+			ConnectTimeout:   o.Discovery.ConnectTimeout,
 			LocalAddrs: func() []multiaddr.Multiaddr {
 				out := make([]multiaddr.Multiaddr, 0)
 				for _, addr := range o.Discovery.LocalAddrs {

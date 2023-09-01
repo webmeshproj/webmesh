@@ -21,6 +21,7 @@ package libp2p
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -32,12 +33,12 @@ import (
 
 // NewDHT returns a DHT for given host. If bootstrap peers is empty, the default
 // bootstrap peers will be used.
-func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr) (*dht.IpfsDHT, error) {
+func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr, connectTimeout time.Duration) (*dht.IpfsDHT, error) {
 	kaddht, err := dht.New(ctx, host)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
-	err = bootstrapDHT(ctx, host, kaddht, bootstrapPeers)
+	err = bootstrapDHT(ctx, host, kaddht, bootstrapPeers, connectTimeout)
 	if err != nil {
 		defer kaddht.Close()
 		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
@@ -45,7 +46,7 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 	return kaddht, nil
 }
 
-func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, servers []multiaddr.Multiaddr) error {
+func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, servers []multiaddr.Multiaddr, connectTimeout time.Duration) error {
 	log := context.LoggerFrom(ctx)
 	err := kaddht.Bootstrap(ctx)
 	if err != nil {
@@ -64,6 +65,11 @@ func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, serv
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			if connectTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, connectTimeout)
+				defer cancel()
+			}
 			if err := host.Connect(ctx, *peerinfo); err != nil {
 				log.Warn("Failed to connect to bootstrap peer", "error", err.Error())
 				return

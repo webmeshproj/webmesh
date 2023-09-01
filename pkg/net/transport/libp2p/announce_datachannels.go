@@ -65,6 +65,8 @@ type DataChannelAnnounceOptions struct {
 	DataChannelTimeout time.Duration
 	// WireGuardPort is the port to use for WireGuard connections.
 	WireGuardPort int
+	// ConnectTimeout is the timeout for connecting to peers.
+	ConnectTimeout time.Duration
 }
 
 // NewDataChannelAnnouncer creates a new announcer on the kadmilia DHT and executes
@@ -92,7 +94,7 @@ func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOption
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.
 	log.Debug("Bootstrapping DHT")
-	announcer.dht, err = NewDHT(ctx, announcer.host, opts.BootstrapPeers)
+	announcer.dht, err = NewDHT(ctx, announcer.host, opts.BootstrapPeers, opts.ConnectTimeout)
 	if err != nil {
 		defer announcer.host.Close()
 		return nil, fmt.Errorf("libp2p new dht: %w", err)

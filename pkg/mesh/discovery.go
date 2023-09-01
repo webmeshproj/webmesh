@@ -44,6 +44,8 @@ type DiscoveryOptions struct {
 	// LocalAddrs are the local addresses to announce to the discovery service.
 	// If empty, the default local addresses will be used.
 	LocalAddrs []multiaddr.Multiaddr
+	// ConnectTimeout is the timeout for connecting to discovered peers.
+	ConnectTimeout time.Duration
 }
 
 func (s *meshStore) AnnounceDHT(ctx context.Context, opts DiscoveryOptions) error {
@@ -61,6 +63,7 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts DiscoveryOptions) erro
 		PSK:            opts.PSK,
 		BootstrapPeers: peers,
 		AnnounceTTL:    opts.DiscoveryTTL,
+		ConnectTimeout: opts.ConnectTimeout,
 	}
 	discover, err := libp2p.NewJoinAnnouncer(ctx, announceOpts, transport.JoinServerFunc(s.proxyJoinToLeader))
 	if err != nil {

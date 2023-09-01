@@ -54,6 +54,8 @@ type JoinAnnounceOptions struct {
 	// LocalAddrs is a list of local addresses to announce the host with.
 	// If empty or nil, the default local addresses will be used.
 	LocalAddrs []multiaddr.Multiaddr
+	// ConnectTimeout is the timeout to use when connecting to peers.
+	ConnectTimeout time.Duration
 }
 
 // NewJoinAnnouncer creates a new announcer on the kadmilia DHT and executes
@@ -77,7 +79,7 @@ func NewJoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, join transp
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.
 	log.Debug("Bootstrapping DHT")
-	kaddht, err := NewDHT(ctx, host, opts.BootstrapPeers)
+	kaddht, err := NewDHT(ctx, host, opts.BootstrapPeers, opts.ConnectTimeout)
 	if err != nil {
 		defer host.Close()
 		return nil, fmt.Errorf("libp2p new dht: %w", err)

@@ -45,6 +45,8 @@ type DHTOptions struct {
 	STUNServers []string
 	// WireGuardPort is the port to use for connections targeting WireGuard.
 	WireGuardPort int
+	// ConnectTimeout is the timeout for connecting to a peer.
+	ConnectTimeout time.Duration
 }
 
 // Ensure DHTServer implements services.MeshServer.
@@ -77,6 +79,7 @@ func (srv *DHTServer) ListenAndServe() error {
 		STUNServers:        srv.STUNServers,
 		DataChannelTimeout: time.Minute,
 		WireGuardPort:      srv.WireGuardPort,
+		ConnectTimeout:     srv.ConnectTimeout,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create data channel announcer: %w", err)
