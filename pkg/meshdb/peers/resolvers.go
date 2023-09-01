@@ -144,6 +144,9 @@ func (r *peerResolver) FeatureResolver(filterFn ...FilterFunc) transport.Feature
 			}
 			return nil
 		})
+		if len(addrs) == 0 {
+			err = fmt.Errorf("no nodes found with feature %s", lookup)
+		}
 		return addrs, err
 	})
 }
