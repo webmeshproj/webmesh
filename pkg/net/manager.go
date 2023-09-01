@@ -765,6 +765,9 @@ func (m *manager) getSignalingTransport(ctx context.Context, peer *v1.WireGuardP
 				TargetProto:    "udp",
 				TargetAddr:     netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
 			})
+			// We also need to announce to the peer that we are available
+			// for rendezvous connections
+
 		}
 	}
 	var resolver transport.FeatureResolver

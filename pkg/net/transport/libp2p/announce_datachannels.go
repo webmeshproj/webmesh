@@ -27,10 +27,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/discovery"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
@@ -72,7 +70,8 @@ type DataChannelAnnounceOptions struct {
 }
 
 // NewDataChannelAnnouncer creates a new announcer on the kadmilia DHT and executes
-// received signaling requests against the local node.
+// received signaling requests against the local node. The host and DHT are closed
+// when the announcer is closed.
 func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOptions) (*DataChannelAnnouncer, error) {
 	var err error
 	log := context.LoggerFrom(ctx)
@@ -84,46 +83,84 @@ func NewDataChannelAnnouncer(ctx context.Context, opts DataChannelAnnounceOption
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
 	}
-	announcer.host, err = libp2p.New(opts.Options...)
+	host, err := libp2p.New(opts.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new host: %w", err)
 	}
-	announcer.host.SetStreamHandler(WebRTCSignalProtocolFor(opts.Rendezvous), func(s network.Stream) {
+	host.SetStreamHandler(WebRTCSignalProtocolFor(opts.RemotePeer), func(s network.Stream) {
 		log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
 		go announcer.handleStream(context.WithLogger(context.Background(), log), s)
 	})
-	log = log.With(slog.String("host-id", announcer.host.ID().String()))
+	log = log.With(slog.String("host-id", host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
 	// Bootstrap the DHT.
 	log.Debug("Bootstrapping DHT")
-	announcer.dht, err = NewDHT(ctx, announcer.host, opts.BootstrapPeers, opts.ConnectTimeout)
+	dht, err := NewDHT(ctx, host, opts.BootstrapPeers, opts.ConnectTimeout)
 	if err != nil {
-		defer announcer.host.Close()
+		defer host.Close()
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
 	}
 	// Announce the join protocol with our PSK.
 	log.Debug("Announcing data channel protocol with our PSK")
-	routingDiscovery := drouting.NewRoutingDiscovery(announcer.dht)
+	routingDiscovery := drouting.NewRoutingDiscovery(dht)
 	var discoveryOpts []discovery.Option
 	if opts.AnnounceTTL > 0 {
 		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
 	}
 	dutil.Advertise(ctx, routingDiscovery, opts.Rendezvous, discoveryOpts...)
+	announcer.close = func() error {
+		if err := dht.Close(); err != nil {
+			log.Error("Failed to close DHT", "error", err.Error())
+		}
+		return host.Close()
+	}
 	return announcer, nil
+}
+
+// NewDataChannelAnnouncer creates a new announcer on the kadmilia DHT and executes
+// received signaling requests against the local node. The host remains open after
+// the announcer is closed.
+func NewDataChannelAnnouncerWithHost(ctx context.Context, host Host, opts DataChannelAnnounceOptions) *DataChannelAnnouncer {
+	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.Host().ID().String()))
+	announcer := &DataChannelAnnouncer{
+		opts:   opts,
+		closec: make(chan struct{}),
+	}
+	host.Host().SetStreamHandler(WebRTCSignalProtocolFor(opts.RemotePeer), func(s network.Stream) {
+		log.Debug("Handling data channel protocol stream", "peer", s.Conn().RemotePeer())
+		go announcer.handleStream(context.WithLogger(context.Background(), log), s)
+	})
+	ctx = context.WithLogger(ctx, log)
+	// Announce the join protocol with our PSK.
+	log.Debug("Announcing data channel protocol with our PSK")
+	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
+	var discoveryOpts []discovery.Option
+	if opts.AnnounceTTL > 0 {
+		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
+	}
+	dutil.Advertise(ctx, routingDiscovery, opts.Rendezvous, discoveryOpts...)
+	announcer.close = func() error {
+		host.Host().RemoveStreamHandler(WebRTCSignalProtocolFor(opts.RemotePeer))
+		return nil
+	}
+	return announcer
 }
 
 type DataChannelAnnouncer struct {
 	opts   DataChannelAnnounceOptions
-	dht    *dht.IpfsDHT
-	host   host.Host
 	closec chan struct{}
+	close  func() error
 }
 
 // Close closes the announcer.
 func (a *DataChannelAnnouncer) Close() error {
+	select {
+	case <-a.closec:
+		return nil
+	default:
+	}
 	defer close(a.closec)
-	defer a.host.Close()
-	return a.dht.Close()
+	return a.close()
 }
 
 func (a *DataChannelAnnouncer) handleStream(ctx context.Context, stream network.Stream) {

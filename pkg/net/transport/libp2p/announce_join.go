@@ -99,8 +99,46 @@ func NewJoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, join transp
 		acceptc:             acceptc,
 		closec:              make(chan struct{}),
 	}
+	announcer.close = func() error {
+		if err := kaddht.Close(); err != nil {
+			log.Error("Failed to close DHT", slog.String("error", err.Error()))
+		}
+		return host.Close()
+	}
 	go announcer.handleIncomingStreams(log, join)
 	return announcer, nil
+}
+
+// NewJoinAnnouncerWithHost creates a new announcer on the kadmilia DHT and executes
+// received join requests against the given join Server.
+func NewJoinAnnouncerWithHost(ctx context.Context, host Host, opts JoinAnnounceOptions, join transport.JoinServer) io.Closer {
+	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.Host().ID().String()))
+	acceptc := make(chan network.Stream, 1)
+	host.Host().SetStreamHandler(JoinProtocol, func(s network.Stream) {
+		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())
+		acceptc <- s
+	})
+	// Announce the join protocol with our PSK.
+	log.Debug("Announcing join protocol with our PSK")
+	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
+	var discoveryOpts []discovery.Option
+	if opts.AnnounceTTL > 0 {
+		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
+	}
+	dutil.Advertise(context.Background(), routingDiscovery, opts.PSK, discoveryOpts...)
+	announcer := &dhtJoinAnnouncer{
+		JoinAnnounceOptions: opts,
+		host:                host.Host(),
+		dht:                 host.DHT(),
+		acceptc:             acceptc,
+		closec:              make(chan struct{}),
+		close: func() error {
+			host.Host().RemoveStreamHandler(JoinProtocol)
+			return nil
+		},
+	}
+	go announcer.handleIncomingStreams(log, join)
+	return announcer
 }
 
 type dhtJoinAnnouncer struct {
@@ -109,6 +147,7 @@ type dhtJoinAnnouncer struct {
 	dht     *dht.IpfsDHT
 	acceptc chan network.Stream
 	closec  chan struct{}
+	close   func() error
 }
 
 func (srv *dhtJoinAnnouncer) handleIncomingStreams(log *slog.Logger, joinServer transport.JoinServer) {
@@ -171,7 +210,11 @@ func (srv *dhtJoinAnnouncer) handleIncomingStreams(log *slog.Logger, joinServer 
 }
 
 func (srv *dhtJoinAnnouncer) Close() error {
+	select {
+	case <-srv.closec:
+		return nil
+	default:
+	}
 	defer close(srv.closec)
-	defer srv.host.Close()
-	return srv.dht.Close()
+	return srv.close()
 }

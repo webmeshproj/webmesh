@@ -95,7 +95,6 @@ func NewSignalTransport(ctx context.Context, opts WebRTCSignalOptions) (transpor
 		dht:                 kaddht,
 		candidatec:          make(chan webrtc.ICECandidateInit, 16),
 		errorc:              make(chan error, 1),
-		cancel:              func() {},
 	}, nil
 }
 
@@ -108,8 +107,8 @@ type signalTransport struct {
 	remoteDescription webrtc.SessionDescription
 	candidatec        chan webrtc.ICECandidateInit
 	errorc            chan error
-	cancel            context.CancelFunc
-	mu                sync.Mutex
+	// cancel            context.CancelFunc
+	mu sync.Mutex
 }
 
 // Start starts the transport.
@@ -136,13 +135,16 @@ StartSignaling:
 				}
 				log := log.With(slog.String("peer-id", peer.ID.String()))
 				// Try to connect to the peer.
+				var connectCtx context.Context
+				var cancel context.CancelFunc
 				log.Debug("Connecting to peer")
 				if rt.ConnectTimeout > 0 {
-					ctx, rt.cancel = context.WithTimeout(ctx, rt.ConnectTimeout)
+					connectCtx, cancel = context.WithTimeout(ctx, rt.ConnectTimeout)
 				} else {
-					ctx, rt.cancel = context.WithCancel(ctx)
+					connectCtx, cancel = context.WithCancel(ctx)
 				}
-				stream, err := rt.host.NewStream(ctx, peer.ID, WebRTCSignalProtocolFor(rt.Rendevous))
+				defer cancel()
+				stream, err := rt.host.NewStream(connectCtx, peer.ID, WebRTCSignalProtocolFor(rt.NodeID))
 				if err != nil {
 					log.Debug("Failed to connect to peer", "error", err.Error())
 					continue
@@ -284,7 +286,6 @@ func (rt *signalTransport) Error() <-chan error {
 
 // Close closes the transport.
 func (rt *signalTransport) Close() error {
-	rt.cancel()
 	defer rt.dht.Close()
 	return rt.host.Close()
 }

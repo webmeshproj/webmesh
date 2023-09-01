@@ -65,11 +65,12 @@ func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, serv
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			var connectCtx context.Context = ctx
-			var cancel context.CancelFunc = func() {}
+			var connectCtx context.Context
+			var cancel context.CancelFunc
 			if connectTimeout > 0 {
-				// TODO: Use the parent context to cancel the connection attempt
-				connectCtx, cancel = context.WithTimeout(context.Background(), connectTimeout)
+				connectCtx, cancel = context.WithTimeout(ctx, connectTimeout)
+			} else {
+				connectCtx, cancel = context.WithCancel(ctx)
 			}
 			defer cancel()
 			if err := host.Connect(connectCtx, *peerinfo); err != nil {
