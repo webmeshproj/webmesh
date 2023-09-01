@@ -474,7 +474,7 @@ func (m *manager) RefreshPeers(ctx context.Context, wgpeers []*v1.WireGuardPeer)
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
 
-	log.Debug("current wireguard peers", slog.Any("peers", wgpeers))
+	log.Debug("Current wireguard peers", slog.Any("peers", wgpeers))
 	currentPeers := m.wg.Peers()
 	seenPeers := make(map[string]struct{})
 	errs := make([]error, 0)
@@ -483,13 +483,14 @@ func (m *manager) RefreshPeers(ctx context.Context, wgpeers []*v1.WireGuardPeer)
 		// Ensure the peer is configured
 		err := m.addPeer(ctx, peer, nil)
 		if err != nil {
+			log.Error("Error adding peer", slog.String("error", err.Error()))
 			errs = append(errs, fmt.Errorf("add peer: %w", err))
 		}
 	}
 	// Remove any peers that are no longer in the store
 	for peer := range currentPeers {
 		if _, ok := seenPeers[peer]; !ok {
-			log.Debug("removing peer", slog.String("peer_id", peer))
+			log.Debug("Removing peer", slog.String("peer_id", peer))
 			m.pcmu.Lock()
 			if conn, ok := m.iceConns[peer]; ok {
 				conn.peerConn.Close()
@@ -586,7 +587,7 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 		AllowedIPs:    allowedIPs,
 		AllowedRoutes: allowedRoutes,
 	}
-	log.Debug("ensuring wireguard peer", slog.Any("peer", &wgpeer))
+	log.Debug("Ensuring wireguard peer", slog.Any("peer", &wgpeer))
 	err = m.wg.PutPeer(ctx, &wgpeer)
 	if err != nil {
 		return fmt.Errorf("put wireguard peer: %w", err)
@@ -604,15 +605,15 @@ func (m *manager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 			addr, err = netip.ParsePrefix(peer.AddressIpv6)
 		}
 		if err != nil {
-			log.Warn("could not parse address", slog.String("error", err.Error()))
+			log.Warn("Could not parse peer address", slog.String("error", err.Error()))
 			return
 		}
 		err = netutil.Ping(ctx, addr.Addr())
 		if err != nil {
-			log.Debug("could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
+			log.Debug("Could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
 			return
 		}
-		log.Debug("successfully pinged descendant", slog.String("descendant", peer.Id))
+		log.Debug("Successfully pinged descendant", slog.String("descendant", peer.Id))
 	}()
 	return nil
 }
@@ -642,7 +643,7 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 	}
 	// Check if we are using zone awareness and the peer is in the same zone
 	if m.opts.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() == m.opts.ZoneAwarenessID {
-		log.Debug("using zone awareness, collecting local CIDRs")
+		log.Debug("Using zone awareness, collecting local CIDRs")
 		localCIDRs, err := endpoints.Detect(ctx, endpoints.DetectOpts{
 			DetectPrivate:  true,
 			DetectIPv6:     true,
@@ -651,7 +652,7 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 		if err != nil {
 			return endpoint, fmt.Errorf("detect local cidrs: %w", err)
 		}
-		log.Debug("detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
+		log.Debug("Detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
 		// If the primary endpoint is not in our zone and additional endpoints are available,
 		// check if any of the additional endpoints are in our zone
 		if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetWireguardEndpoints()) > 0 {
@@ -668,14 +669,14 @@ func (m *manager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGuardP
 						Port: addr.Port,
 					}
 				}
-				log.Debug("evalauting zone awareness endpoint",
+				log.Debug("Evalauting zone awareness endpoint",
 					slog.String("endpoint", addr.String()),
 					slog.String("zone", peer.GetZoneAwarenessId()))
 				ep := addr.AddrPort()
 				if localCIDRs.Contains(ep.Addr()) {
 					// We found an additional endpoint that is in one of our local
 					// CIDRs. We'll use this one instead.
-					log.Debug("zone awareness shared with peer, using LAN endpoint", slog.String("endpoint", ep.String()))
+					log.Debug("Zone awareness shared with peer, using LAN endpoint", slog.String("endpoint", ep.String()))
 					endpoint = ep
 					break
 				}
@@ -715,11 +716,11 @@ func (m *manager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, 
 			// the ICE connection is closed and they are still in the store.
 			wgpeers, err := mesh.WireGuardPeersFor(ctx, m.storage, m.opts.NodeID)
 			if err != nil {
-				log.Error("error getting wireguard peers after ICE connection closed", slog.String("error", err.Error()))
+				log.Error("Error getting wireguard peers after ICE connection closed", slog.String("error", err.Error()))
 				return
 			}
 			if err := m.RefreshPeers(context.Background(), wgpeers); err != nil {
-				log.Error("error refreshing peers after ICE connection closed", slog.String("error", err.Error()))
+				log.Error("Error refreshing peers after ICE connection closed", slog.String("error", err.Error()))
 			}
 		}()
 		m.pcmu.Lock()
