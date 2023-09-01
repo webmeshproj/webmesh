@@ -91,7 +91,7 @@ func (s *meshStore) proxyJoinToLeader(ctx context.Context, req *v1.JoinRequest) 
 	log := context.LoggerFrom(ctx)
 	c, err := s.DialLeader(ctx)
 	if err != nil {
-		log.Error("failed to dial leader", slog.String("error", err.Error()))
+		log.Error("Failed to dial leader", slog.String("error", err.Error()))
 		return nil, err
 	}
 	defer c.Close()
@@ -101,7 +101,7 @@ func (s *meshStore) proxyJoinToLeader(ctx context.Context, req *v1.JoinRequest) 
 	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedForMeta, req.GetId())
 	resp, err := v1.NewMembershipClient(c).Join(ctx, req)
 	if err != nil {
-		log.Error("failed to proxy join to cluster", slog.String("error", err.Error()))
+		log.Error("Failed to proxy join to cluster", slog.String("error", err.Error()))
 		return nil, err
 	}
 	return resp, nil

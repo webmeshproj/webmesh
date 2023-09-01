@@ -17,6 +17,7 @@ limitations under the License.
 package logutil
 
 import (
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -24,6 +25,9 @@ import (
 
 // SetupLogging sets up logging for the application.
 func SetupLogging(logLevel string) *slog.Logger {
+	if logLevel == "" {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: func() slog.Level {
 			switch strings.ToLower(logLevel) {

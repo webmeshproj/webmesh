@@ -30,6 +30,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 // Node is an embedded webmesh node.
@@ -61,10 +62,11 @@ func NewNode(ctx context.Context, config *config.Config) (Node, error) {
 	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
 		return nil, fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
+	log := logutil.SetupLogging(config.Global.LogLevel)
 	if config.Global.LogLevel == "" || config.Global.LogLevel == "silent" {
-		ctx = context.WithLogger(ctx, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		log = slog.New(slog.NewTextHandler(io.Discard, nil))
+		ctx = context.WithLogger(ctx, log)
 	}
-	log := context.LoggerFrom(ctx)
 	// Create a new mesh connection
 	meshConfig, err := config.NewMeshConfig(ctx)
 	if err != nil {

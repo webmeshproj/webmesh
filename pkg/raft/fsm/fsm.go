@@ -114,7 +114,7 @@ func (r *RaftFSM) Restore(rdr io.ReadCloser) error {
 // ApplyBatch implements the raft.BatchingFSM interface.
 func (r *RaftFSM) ApplyBatch(logs []*raft.Log) []any {
 	r.mu.Lock()
-	r.log.Debug("applying batch", slog.Int("count", len(logs)))
+	r.log.Debug("Applying batch", slog.Int("count", len(logs)))
 	res := make([]any, len(logs))
 	var cmd *v1.RaftLogEntry
 	for i, l := range logs {
@@ -145,21 +145,21 @@ func (r *RaftFSM) applyLog(l *raft.Log) (cmd *v1.RaftLogEntry, res *v1.RaftApply
 	log.Debug("applying log", "type", l.Type.String())
 	start := time.Now()
 	defer func() {
-		log.Debug("finished applying log", slog.String("took", time.Since(start).String()))
+		log.Debug("Finished applying log", slog.String("took", time.Since(start).String()))
 	}()
 
 	// Validate the term/index of the log entry.
 	dbTerm := r.currentTerm.Load()
 	dbIndex := r.lastAppliedIndex.Load()
-	log.Debug("last applied index", slog.Int("last-term", int(dbTerm)), slog.Int("last-index", int(dbIndex)))
+	log.Debug("Last applied index", slog.Int("last-term", int(dbTerm)), slog.Int("last-index", int(dbIndex)))
 
 	if l.Term < dbTerm {
-		log.Debug("received log from old term")
+		log.Debug("Received log from old term")
 		return nil, &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
 	} else if l.Index <= dbIndex {
-		log.Debug("log already applied to database")
+		log.Debug("Log already applied to database")
 		return nil, &v1.RaftApplyResponse{
 			Time: time.Since(start).String(),
 		}
@@ -180,13 +180,13 @@ func (r *RaftFSM) applyLog(l *raft.Log) (cmd *v1.RaftLogEntry, res *v1.RaftApply
 	if err != nil {
 		// This is a fatal error. We can't apply the log entry if we can't
 		// decode it. This should never happen.
-		log.Error("error decoding raft log entry", slog.String("error", err.Error()))
+		log.Error("Error decoding raft log entry", slog.String("error", err.Error()))
 		return nil, &v1.RaftApplyResponse{
 			Time:  time.Since(start).String(),
 			Error: fmt.Sprintf("decode log entry: %s", err.Error()),
 		}
 	}
-	log.Debug("applying log entry", slog.String("command", cmd.String()))
+	log.Debug("Applying log entry", slog.String("command", cmd.String()))
 
 	var ctx context.Context
 	var cancel context.CancelFunc
