@@ -457,7 +457,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services
 			WireGuard: conn.Network().WireGuard(),
 		}))
 		log.Debug("Registering storage service")
-		v1.RegisterStorageServer(srv, storage.NewServer(ctx, conn.Raft(), rbacEvaluator))
+		v1.RegisterStorageServer(srv, storage.NewServer(ctx, conn.Raft(), rbacEvaluator, conn.Network().WireGuard()))
 	}
 	// Register any other enabled APIs
 	if o.Services.API.MeshEnabled {

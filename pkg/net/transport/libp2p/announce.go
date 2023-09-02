@@ -107,9 +107,13 @@ func newAnnouncerWithHostAndCloseFunc[REQ, RESP any](ctx context.Context, host H
 	if opts.AnnounceTTL > 0 {
 		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
 	}
-	dutil.Advertise(context.Background(), routingDiscovery, opts.Rendezvous, discoveryOpts...)
+	advertise, cancel := context.WithCancel(context.Background())
+	dutil.Advertise(advertise, routingDiscovery, opts.Rendezvous, discoveryOpts...)
 	announcer := &announcer[REQ, RESP]{
-		close: close,
+		close: func() error {
+			cancel()
+			return close()
+		},
 	}
 	return announcer
 }

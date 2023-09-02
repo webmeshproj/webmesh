@@ -360,7 +360,7 @@ func (app *AppDaemon) AnnounceDHT(ctx context.Context, req *v1.AnnounceDHTReques
 		}
 		peers = append(peers, maddr)
 	}
-	err := app.mesh.AnnounceToDHT(ctx, libp2p.AnnounceOptions{
+	err := app.mesh.Discovery().AnnounceToDHT(ctx, libp2p.AnnounceOptions{
 		Rendezvous: req.GetPsk(),
 		HostOptions: libp2p.HostOptions{
 			BootstrapPeers: peers,
@@ -379,7 +379,7 @@ func (app *AppDaemon) LeaveDHT(ctx context.Context, req *v1.LeaveDHTRequest) (*v
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	err := app.mesh.LeaveDHT(ctx, req.GetPsk())
+	err := app.mesh.Discovery().LeaveDHT(ctx, req.GetPsk())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error leaving: %v", err)
 	}

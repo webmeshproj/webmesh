@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"log/slog"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,6 +36,11 @@ var canPublishAction = rbac.Actions{
 }
 
 func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
+	if !context.IsInNetwork(ctx, s.wg) {
+		addr, _ := context.PeerAddrFrom(ctx)
+		s.log.Warn("Received Publish request from out of network", slog.String("peer", addr.String()))
+		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")
+	}
 	if !s.raft.IsVoter() && !s.raft.IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return nil, status.Error(codes.Unavailable, "node not available to publish")

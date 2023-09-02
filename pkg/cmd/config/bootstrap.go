@@ -171,6 +171,9 @@ func (o *BootstrapTransportOptions) Validate() error {
 		if o.Rendezvous == "" {
 			return fmt.Errorf("rendezvous must be set when using libp2p to bootstrap")
 		}
+		if o.RendezvousLinger <= 0 {
+			return fmt.Errorf("rendezvous linger must be greater than 0")
+		}
 		return nil
 	}
 	// Validate TCP options
@@ -193,15 +196,18 @@ func (o *BootstrapTransportOptions) Validate() error {
 
 // NewBootstrapTransport returns the bootstrap transport for the configuration.
 func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn mesh.Mesh) (transport.BootstrapTransport, error) {
+	if !o.Bootstrap.Enabled {
+		return transport.NewNullBootstrapTransport(), nil
+	}
 	t := o.Bootstrap.Transport
-	if len(t.TCPServers) == 0 || (len(t.PSK) == 0 && len(t.Rendezvous) == 0) || !o.Bootstrap.Enabled {
+	if len(t.TCPServers) == 0 && len(t.PSK) == 0 && len(t.Rendezvous) == 0 {
 		return transport.NewNullBootstrapTransport(), nil
 	}
 	if t.PSK != "" && t.Rendezvous != "" {
 		if o.Discovery.ConnectTimeout > o.Raft.ElectionTimeout {
 			return nil, fmt.Errorf("connect timeout must be less than election timeout when using libp2p to bootstrap")
 		}
-		return libp2p.NewBootstrapTransport(ctx, conn, libp2p.BootstrapOptions{
+		return libp2p.NewBootstrapTransport(ctx, conn.Discovery(), libp2p.BootstrapOptions{
 			Rendezvous:      t.Rendezvous,
 			Signer:          crypto.PSK(t.PSK),
 			Host:            o.Discovery.HostOptions(ctx),

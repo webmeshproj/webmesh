@@ -111,11 +111,14 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	}
 	s.raft = opts.Raft
 	// If we still don't have a node id, use raft's node id.
+	// It would be very weird for this to happen at this point.
 	if s.ID() == "" {
 		s.nodeID = s.raft.ID()
+		s.discovery.nodeID = s.nodeID
 		s.log = s.log.With("node-id", s.nodeID)
 	}
 	log := s.log
+
 	// Create the plugin manager
 	var pluginopts plugins.Options
 	pluginopts.Storage = s.Storage()
@@ -252,7 +255,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		}()
 	}
 	if opts.Discovery != nil {
-		err = s.AnnounceToDHT(ctx, *opts.Discovery)
+		err = s.Discovery().AnnounceToDHT(ctx, *opts.Discovery)
 		if err != nil {
 			return handleErr(fmt.Errorf("announce dht: %w", err))
 		}

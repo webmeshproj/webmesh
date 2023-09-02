@@ -21,11 +21,12 @@ package libp2p
 import (
 	"crypto/sha256"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/util/crypto"
@@ -44,9 +45,9 @@ func TestBootstrapTransport(t *testing.T) {
 			Rendezvous:      rendezvous,
 			Signer:          crypto.MustGeneratePSK(),
 			ElectionTimeout: time.Second,
+			Linger:          time.Second,
 			Host: HostOptions{
 				ConnectTimeout: time.Second,
-				LocalAddrs:     []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::1/tcp/0")},
 			},
 		})
 		if err != nil {
@@ -65,12 +66,17 @@ func TestBootstrapTransport(t *testing.T) {
 		if rt != nil {
 			t.Fatalf("expected no round tripper")
 		}
-		if !announcer.announced {
+		if !announcer.announcing.Load() {
 			t.Fatalf("expected to announce")
 		}
 		// The leader UUID should be set to the local
 		if transport.UUID() != transport.LeaderUUID() {
 			t.Fatalf("expected leader uuid to be set to local")
+		}
+		time.Sleep(time.Second * 2)
+		// We should have left the rendezvous
+		if announcer.announcing.Load() {
+			t.Fatalf("expected to leave")
 		}
 	})
 
@@ -78,22 +84,24 @@ func TestBootstrapTransport(t *testing.T) {
 }
 
 type mockAnnouncer struct {
-	opts      AnnounceOptions
-	announced bool
-	left      bool
+	announcing atomic.Bool
+	mu         sync.Mutex
 }
 
 // AnnounceToDHT should announce the join protocol to the DHT,
 // such that it can be used by a libp2p transport.JoinRoundTripper.
 func (m *mockAnnouncer) AnnounceToDHT(ctx context.Context, opts AnnounceOptions) error {
-	m.opts = opts
-	m.announced = true
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.announcing.Store(true)
 	return nil
 }
 
 // LeaveDHT should remove the join protocol from the DHT for the
 // given rendezvous string.
 func (m *mockAnnouncer) LeaveDHT(ctx context.Context, rendezvous string) error {
-	m.left = true
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.announcing.Store(false)
 	return nil
 }

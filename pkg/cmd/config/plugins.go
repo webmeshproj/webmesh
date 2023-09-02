@@ -33,7 +33,7 @@ import (
 // PluginOptions are options for configuring plugins
 type PluginOptions struct {
 	// Configs is a map of plugin names to plugin configurations.
-	Configs map[string]*PluginConfig `koanf:"configs"`
+	Configs map[string]PluginConfig `koanf:"configs"`
 }
 
 // BindFlags binds the flags for the plugin options.
@@ -41,7 +41,7 @@ func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	seen := map[string]struct{}{}
 	if len(os.Args[1:]) > 0 {
 		for _, arg := range os.Args[1:] {
-			flagPrefix := fmt.Sprintf("--%splugins.", prefix)
+			flagPrefix := fmt.Sprintf("--%splugins.configs.", prefix)
 			if strings.HasPrefix(arg, flagPrefix) {
 				arg = strings.TrimPrefix(arg, flagPrefix)
 				split := strings.Split(arg, ".")
@@ -56,23 +56,21 @@ func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	if len(seen) == 0 {
 		return
 	}
-	o.Configs = map[string]*PluginConfig{}
-	pluginConfigs := builtins.NewPluginConfigs()
+	o.Configs = map[string]PluginConfig{}
+	builtInConfigs := builtins.NewPluginConfigs()
 	for pluginName := range seen {
-		conf := &PluginConfig{}
-		flagPrefix := "plugins." + pluginName + "."
+		conf := PluginConfig{}
+		flagPrefix := "plugins.configs." + pluginName + "."
 		if prefix != "" {
 			flagPrefix = prefix + "." + flagPrefix
 		}
-		if pluginConfig, ok := pluginConfigs[pluginName]; ok {
+		if pluginConfig, ok := builtInConfigs[pluginName]; ok {
 			pconf := pluginConfig
-			pconf.BindFlags(flagPrefix, fs)
 			conf.Config = pconf.AsMapStructure()
-			conf.BindFlags(pluginName, fs)
+			pconf.BindFlags(flagPrefix, fs)
 		} else {
-			pconf := PluginMapConfig{}
-			fs.Var(pconf, flagPrefix+"config", "Configuration for the plugin as comma separated key values.")
-			conf.Config = pconf
+			conf.Config = PluginMapConfig{}
+			fs.Var(&conf.Config, flagPrefix+"config", "Configuration for the plugin as comma separated key values.")
 			conf.BindFlags(flagPrefix, fs)
 		}
 		o.Configs[pluginName] = conf

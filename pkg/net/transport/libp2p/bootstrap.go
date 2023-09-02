@@ -64,7 +64,7 @@ type BootstrapOptions struct {
 	// provide an already bootstrapped host to the transport. All sides of
 	// the transport should use the same election timeout.
 	ElectionTimeout time.Duration
-	// Linger is the time to wait for latecomers to join before closing the host.
+	// Linger is the time to wait for non-leaders to join before closing the host.
 	Linger time.Duration
 }
 
@@ -169,6 +169,7 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	var leaderUUID uuid.UUID = b.localUUID
 	var voterCount int
 	var votemu sync.Mutex
+	var votewait sync.WaitGroup
 
 	log.Debug("Starting leader election")
 	electionDone := time.After(b.opts.ElectionTimeout)
@@ -183,7 +184,7 @@ LeaderElect:
 			break LeaderElect
 		case result := <-electionResults:
 			// Verify the signature of the value
-			log.Debug("Found a previous election result", "key", resultKey, "value", hashResult(result))
+			log.Debug("Found a previous election result", "result", hashResult(result))
 			leader, err := signer.verify(result)
 			if err != nil {
 				log.Error("Invalid election result", "error", err.Error())
@@ -201,7 +202,9 @@ LeaderElect:
 			})
 			return false, rt, transport.ErrAlreadyBootstrapped
 		case voter := <-acceptc:
+			votewait.Add(1)
 			go func() {
+				defer votewait.Done()
 				votemu.Lock()
 				defer votemu.Unlock()
 				select {
@@ -211,54 +214,62 @@ LeaderElect:
 					return
 				default:
 				}
-				log.Debug("Received a vote", "remote-host-id", voter.Conn().RemotePeer().String())
+				vlog := log.With("remote-host-id", voter.Conn().RemotePeer().String())
+				vlog.Debug("Received a vote")
 				defer voter.Close()
 				buf := make([]byte, len(vote))
 				_, err := voter.Read(buf)
 				if err != nil {
-					log.Error("Failed to read vote", "error", err.Error())
+					vlog.Error("Failed to read vote", "error", err.Error())
 					return
 				}
 				remoteUUID, err := signer.verify(buf)
 				if err != nil {
-					log.Error("Invalid election vote", "error", err.Error())
+					vlog.Error("Invalid election vote", "error", err.Error())
 					// This is not a valid election vote. Someone might be playing games.
 					// Ignore them.
 					return
 				}
-				log.Debug("Vote is valid", "remote-vote", hashResult(buf))
+				vlog = vlog.With("remote-vote", hashResult(buf))
+				vlog.Debug("Vote is valid")
 				if remoteUUID.String() == leaderUUID.String() {
+					vlog.Debug("Vote is for the current leader, ignoring, but strange...")
 					return
 				}
 				if remoteUUID.String() > leaderUUID.String() {
-					log.Debug("Found a new leader", "remote-vote", hashResult(buf))
+					vlog.Debug("Found a new leader")
 					leaderUUID = remoteUUID
 				}
 				voterCount++
 			}()
 		case voter := <-peerc:
+			vlog := log.With("remote-host-id", voter.ID.String())
 			if voter.ID == b.host.ID() {
+				vlog.Debug("Ignoring ourself")
 				continue
 			}
+			votewait.Add(1)
 			go func() {
-				log.Debug("Found a voter", "remote-host-id", voter.ID.String())
+				defer votewait.Done()
+				vlog.Debug("Found a voter")
 				connectCtx, cancel := context.WithTimeout(ctx, b.opts.Host.ConnectTimeout)
 				defer cancel()
 				conn, err := b.host.Host().NewStream(connectCtx, voter.ID, BootstrapProtocol)
 				if err != nil {
-					log.Error("Failed to create stream", "error", err.Error())
+					vlog.Error("Failed to create stream", "error", err.Error())
 					return
 				}
 				defer conn.Close()
-				log.Debug("Sending vote", "remote-host-id", voter.ID.String())
+				vlog.Debug("Sending vote")
 				_, err = conn.Write(vote)
 				if err != nil {
-					log.Error("Failed to write vote", "error", err.Error())
+					vlog.Error("Failed to write vote", "error", err.Error())
 				}
 			}()
 		}
 	}
 
+	votewait.Wait()
 	advertiseCancel()
 
 	if voterCount == 0 {
@@ -307,17 +318,15 @@ LeaderElect:
 			defer b.close()
 			return false, nil, fmt.Errorf("failed to start announcer: %w", err)
 		}
-		if b.opts.Linger > 0 {
-			go func() {
-				defer b.close()
-				<-time.After(b.opts.Linger)
-				if err := b.announcer.LeaveDHT(ctx, hashResult(joinPSK)); err != nil {
-					log.Error("Failed to close host", "error", err.Error())
-				}
-			}()
-			return
-		}
-		b.close()
+		go func() {
+			defer b.close()
+			log.Debug("Waiting for linger period so people can join")
+			<-time.After(b.opts.Linger)
+			log.Debug("Leaving the rendezvous point")
+			if err := b.announcer.LeaveDHT(ctx, hashResult(joinPSK)); err != nil {
+				log.Error("Failed to leave rendezvous point", "error", err.Error())
+			}
+		}()
 		return
 	}
 	// Create a transport to the leader with the signed rendezvous string.

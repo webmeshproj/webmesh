@@ -25,7 +25,9 @@ services:
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --plugins.basic-auth.htpasswd-file=/etc/htpasswd
+      # TODO: There are issues with plugin configuration parsing on the command
+      # line currently
+      - --plugins.configs.basic-auth.htpasswd-file=/etc/htpasswd
     ports:
       - 8443:8443
     volumes:

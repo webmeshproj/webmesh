@@ -207,10 +207,10 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 		}
 		// Make sure the mTLS plugin is configured
 		if o.Plugins.Configs == nil {
-			o.Plugins.Configs = map[string]*PluginConfig{}
+			o.Plugins.Configs = map[string]PluginConfig{}
 		}
-		if o.Plugins.Configs["mtls"] == nil {
-			o.Plugins.Configs["mtls"] = &PluginConfig{
+		if _, ok := o.Plugins.Configs["mtls"]; !ok {
+			o.Plugins.Configs["mtls"] = PluginConfig{
 				Config: map[string]any{
 					"ca-file": func() string {
 						if global.TLSClientCAFile != "" {

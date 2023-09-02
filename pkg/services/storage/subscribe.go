@@ -17,10 +17,13 @@ limitations under the License.
 package storage
 
 import (
+	"log/slog"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
@@ -33,6 +36,11 @@ var canSubscribeAction = rbac.Actions{
 }
 
 func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Storage_SubscribeServer) error {
+	if !context.IsInNetwork(srv.Context(), s.wg) {
+		addr, _ := context.PeerAddrFrom(srv.Context())
+		s.log.Warn("Received Subscribe request from out of network", slog.String("peer", addr.String()))
+		return status.Errorf(codes.PermissionDenied, "request is not in-network")
+	}
 	if !s.raft.IsVoter() && !s.raft.IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "current node not available to subscribe")

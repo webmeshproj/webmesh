@@ -20,8 +20,10 @@ limitations under the License.
 package ipam
 
 import (
+	"flag"
 	"fmt"
 	"net/netip"
+	"strings"
 	"sync"
 
 	"github.com/mitchellh/mapstructure"
@@ -51,12 +53,42 @@ type Plugin struct {
 // Config contains static address assignments for nodes.
 type Config struct {
 	// StaticIPv4 is a map of node names to IPv4 addresses.
-	StaticIPv4 map[string]string `mapstructure:"static-ipv4,omitempty" koanf:"static-ipv4,omitempty"`
+	StaticIPv4 map[string]any `mapstructure:"static-ipv4,omitempty" koanf:"static-ipv4,omitempty"`
+}
+
+type mapstructureFlag map[string]any
+
+func (f mapstructureFlag) String() string {
+	if f == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", map[string]any(f))
+}
+
+func (f mapstructureFlag) Set(s string) error {
+	if f == nil {
+		f = make(map[string]any)
+	}
+	parts := strings.Split(s, ",")
+	for _, part := range parts {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid key-value pair: %s", part)
+		}
+		f[kv[0]] = kv[1]
+	}
+	return nil
 }
 
 // BindFlags binds the plugin flags to the given flag set.
 func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringToStringVar(&c.StaticIPv4, prefix+"static-ipv4", nil, "Static IPv4 assignments.")
+	fl := mapstructureFlag(c.StaticIPv4)
+	fs.AddGoFlag(&flag.Flag{
+		Name:     prefix + "static-ipv4",
+		Usage:    "Static IPv4 addresses to assign to nodes",
+		Value:    &fl,
+		DefValue: "",
+	})
 }
 
 func (c *Config) AsMapStructure() map[string]any {
@@ -131,7 +163,7 @@ func (p *Plugin) Allocate(ctx context.Context, r *v1.AllocateIPRequest) (*v1.All
 	}
 	if addr, ok := p.config.StaticIPv4[r.GetNodeId()]; ok {
 		return &v1.AllocatedIP{
-			Ip: addr,
+			Ip: addr.(string),
 		}, nil
 	}
 	return p.allocateV4(ctx, r)

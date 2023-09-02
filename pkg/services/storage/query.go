@@ -17,12 +17,21 @@ limitations under the License.
 package storage
 
 import (
+	"log/slog"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) error {
+	if !context.IsInNetwork(stream.Context(), s.wg) {
+		addr, _ := context.PeerAddrFrom(stream.Context())
+		s.log.Warn("Received Query request from out of network", slog.String("peer", addr.String()))
+		return status.Errorf(codes.PermissionDenied, "request is not in-network")
+	}
 	if !s.raft.IsVoter() && !s.raft.IsObserver() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "node not available to query")

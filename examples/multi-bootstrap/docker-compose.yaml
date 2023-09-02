@@ -25,7 +25,8 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.servers=bootstrap-node-2=10.1.0.2:9001,bootstrap-node-3=10.1.0.3:9001
+      - --bootstrap.transport.tcp-servers=bootstrap-node-2=10.1.0.2:9001
+      - --bootstrap.transport.tcp-servers=bootstrap-node-3=10.1.0.3:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.in-memory
       - --services.meshdns.enabled
@@ -47,7 +48,8 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9001,bootstrap-node-3=10.1.0.3:9001
+      - --bootstrap.transport.tcp-servers=bootstrap-node-1=10.1.0.1:9001
+      - --bootstrap.transport.tcp-servers=bootstrap-node-3=10.1.0.3:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -65,7 +67,8 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.servers=bootstrap-node-1=10.1.0.1:9001,bootstrap-node-2=10.1.0.2:9001
+      - --bootstrap.transport.tcp-servers=bootstrap-node-1=10.1.0.1:9001
+      - --bootstrap.transport.tcp-servers=bootstrap-node-2=10.1.0.2:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

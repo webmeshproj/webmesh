@@ -19,11 +19,9 @@ package mesh
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"net/netip"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -73,9 +71,9 @@ var (
 type Mesh interface {
 	// Dialer is the dialer for all connections.
 	transport.Dialer
-	// NodeDialer is the dialer for node connections.
+	// NodeDialer is the dialer for node RPC connections.
 	transport.NodeDialer
-	// LeaderDialer is the dialer for leader connections.
+	// LeaderDialer is the dialer for leader RPC connections.
 	transport.LeaderDialer
 
 	// ID returns the node ID.
@@ -103,10 +101,9 @@ type Mesh interface {
 	Network() meshnet.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
-	// AnnounceToDHT announces the peer discovery service via DHT.
-	AnnounceToDHT(context.Context, libp2p.AnnounceOptions) error
-	// LeaveDHT leaves the peer discovery service for the given PSK.
-	LeaveDHT(ctx context.Context, psk string) error
+	// Discovery returns the interface libp2p.Announcer for announcing
+	// the mesh to the discovery service.
+	Discovery() libp2p.Announcer
 }
 
 // Config contains the configurations for a new mesh connection.
@@ -165,9 +162,9 @@ func NewWithLogger(log *slog.Logger, opts Config) Mesh {
 		dnsUpdateGroup:   &dnsUpdateGroup,
 		log:              log.With(slog.String("node-id", string(opts.NodeID))),
 		kvSubCancel:      func() {},
-		discoveries:      make(map[string]io.Closer),
 		closec:           make(chan struct{}),
 	}
+	st.discovery = newMeshStoreAnnouncer(opts.NodeID, st)
 	return st
 }
 
@@ -179,12 +176,11 @@ type meshStore struct {
 	raft             raft.Raft
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
+	discovery        *meshStoreAnnouncer
 	nw               meshnet.Manager
 	peerUpdateGroup  *errgroup.Group
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
-	discoveries      map[string]io.Closer
-	discovermu       sync.Mutex
 	closec           chan struct{}
 	log              *slog.Logger
 	// a flag set on test stores to indicate skipping certain operations
@@ -220,6 +216,12 @@ func (s *meshStore) Network() meshnet.Manager {
 // may be nil if the store is not open.
 func (s *meshStore) Plugins() plugins.Manager {
 	return s.plugins
+}
+
+// Discovery returns the interface libp2p.Announcer for announcing
+// the mesh to the discovery service.
+func (s *meshStore) Discovery() libp2p.Announcer {
+	return s.discovery
 }
 
 // Ready returns a channel that will be closed when the mesh is ready.

@@ -40,7 +40,10 @@ func RouteRequiresInNetworkSource(route string) bool {
 		route == v1.Membership_Apply_FullMethodName ||
 		route == v1.Membership_SubscribePeers_FullMethodName ||
 		route == v1.Membership_GetRaftConfiguration_FullMethodName ||
-		route == v1.Node_NegotiateDataChannel_FullMethodName
+		route == v1.Node_NegotiateDataChannel_FullMethodName ||
+		route == v1.Storage_Query_FullMethodName ||
+		route == v1.Storage_Publish_FullMethodName ||
+		route == v1.Storage_Subscribe_FullMethodName
 }
 
 // MethodPolicyMap is a map of method names to their MethodPolicy.

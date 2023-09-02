@@ -30,7 +30,6 @@ services:
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --raft.in-memory
-      - --plugins.debug.listen-address=localhost:6060
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
