@@ -360,8 +360,8 @@ func (app *AppDaemon) AnnounceDHT(ctx context.Context, req *v1.AnnounceDHTReques
 		}
 		peers = append(peers, maddr)
 	}
-	err := app.mesh.AnnounceDHT(ctx, libp2p.JoinAnnounceOptions{
-		PSK: req.GetPsk(),
+	err := app.mesh.AnnounceDHT(ctx, libp2p.AnnounceOptions{
+		Rendezvous: req.GetPsk(),
 		Host: libp2p.HostOptions{
 			BootstrapPeers: peers,
 			ConnectTimeout: time.Second * 5,

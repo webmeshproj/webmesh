@@ -313,7 +313,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 	}
 
 	// Create the join transport
-	joinRT, err := o.NewJoinTransport(nodeid, conn)
+	joinRT, err := o.NewJoinTransport(ctx, nodeid, conn)
 	if err != nil {
 		return
 	}
@@ -382,12 +382,12 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 		}(),
 		PreferIPv6: o.Raft.PreferIPv6,
 		Plugins:    plugins,
-		Discovery: func() *libp2p.JoinAnnounceOptions {
+		Discovery: func() *libp2p.AnnounceOptions {
 			if !o.Discovery.Announce {
 				return nil
 			}
-			return &libp2p.JoinAnnounceOptions{
-				PSK:         o.Discovery.PSK,
+			return &libp2p.AnnounceOptions{
+				Rendezvous:  o.Discovery.PSK,
 				AnnounceTTL: o.Discovery.AnnounceTTL,
 				Host:        o.Discovery.HostOptions(ctx),
 			}
@@ -418,8 +418,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 	return
 }
 
-func (o *Config) NewJoinTransport(nodeID string, conn mesh.Mesh) (transport.JoinRoundTripper, error) {
-	var joinTransport transport.JoinRoundTripper
+func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.Mesh) (transport.JoinRoundTripper, error) {
 	if o.Bootstrap.Enabled {
 		// Our join transport is the gRPC transport to other bootstrap nodes
 		var addrs []string
@@ -440,19 +439,21 @@ func (o *Config) NewJoinTransport(nodeID string, conn mesh.Mesh) (transport.Join
 			}
 			addrs = append(addrs, addr)
 		}
-		joinTransport = tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
+		return tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
 			Addrs:          addrs,
 			Credentials:    conn.Credentials(),
 			AddressTimeout: time.Second * 3,
-		})
+		}), nil
 		// TODO: Support bootstrap over libp2p
-	} else if o.Mesh.JoinAddress != "" {
-		joinTransport = tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
+	}
+	if o.Mesh.JoinAddress != "" {
+		return tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
 			Addrs:          []string{o.Mesh.JoinAddress},
 			Credentials:    conn.Credentials(),
 			AddressTimeout: time.Second * 3,
-		})
-	} else if o.Discovery.Discover {
+		}), nil
+	}
+	if o.Discovery.Discover {
 		var addrs []multiaddr.Multiaddr
 		for _, addr := range o.Discovery.BootstrapServers {
 			maddr, err := multiaddr.NewMultiaddr(addr)
@@ -461,14 +462,18 @@ func (o *Config) NewJoinTransport(nodeID string, conn mesh.Mesh) (transport.Join
 			}
 			addrs = append(addrs, maddr)
 		}
-		joinTransport = libp2p.NewJoinRoundTripper(libp2p.RoundTripOptions{
-			PSK: o.Discovery.PSK,
+		joinTransport, err := libp2p.NewJoinRoundTripper(ctx, libp2p.RoundTripOptions{
+			Rendezvous: o.Discovery.PSK,
 			Host: libp2p.HostOptions{
 				BootstrapPeers: addrs,
 				ConnectTimeout: time.Second * 5,
 			},
 		})
+		if err != nil {
+			return nil, fmt.Errorf("create libp2p join transport: %w", err)
+		}
+		return joinTransport, nil
 	}
 	// A nil transport is technically okay, it means we are a single-node mesh
-	return joinTransport, nil
+	return nil, nil
 }

@@ -29,7 +29,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
-func (s *meshStore) AnnounceDHT(ctx context.Context, opts libp2p.JoinAnnounceOptions) error {
+func (s *meshStore) AnnounceDHT(ctx context.Context, opts libp2p.AnnounceOptions) error {
 	log := context.LoggerFrom(ctx)
 	log.Info("Announcing peer discovery service")
 	discover, err := libp2p.NewJoinAnnouncer(ctx, opts, transport.JoinServerFunc(s.proxyJoinToLeader))
@@ -37,7 +37,7 @@ func (s *meshStore) AnnounceDHT(ctx context.Context, opts libp2p.JoinAnnounceOpt
 		return fmt.Errorf("new kad dht announcer: %w", err)
 	}
 	s.discovermu.Lock()
-	s.discoveries[opts.PSK] = discover
+	s.discoveries[opts.Rendezvous] = discover
 	s.discovermu.Unlock()
 	return nil
 }

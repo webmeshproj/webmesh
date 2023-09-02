@@ -45,7 +45,7 @@ type Host interface {
 	// DHT is the underlying libp2p DHT.
 	DHT() *dht.IpfsDHT
 	// JoinAnnouncer returns a new join announcer using this host.
-	JoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, rt transport.JoinServer) io.Closer
+	JoinAnnouncer(ctx context.Context, opts AnnounceOptions, rt transport.JoinServer) io.Closer
 	// JoinRoundTripper returns a round tripper for executing a join request.
 	JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper
 	// Close closes the host and its DHT.
@@ -106,7 +106,7 @@ func (h *libp2pHost) DHT() *dht.IpfsDHT {
 	return h.dht
 }
 
-func (h *libp2pHost) JoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, rt transport.JoinServer) io.Closer {
+func (h *libp2pHost) JoinAnnouncer(ctx context.Context, opts AnnounceOptions, rt transport.JoinServer) io.Closer {
 	return NewJoinAnnouncerWithHost(ctx, h, opts, rt)
 }
 

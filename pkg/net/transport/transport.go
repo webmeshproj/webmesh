@@ -131,7 +131,7 @@ func (f BootstrapTransportFunc) LeaderElect(ctx context.Context) (isLeader bool,
 
 // NewNullBootstrapTransport returns a BootstrapTransport that always returns
 // true for LeaderElect and nil for JoinRoundTripper. This is useful for
-// testing and when no bootstrap transport is needed.
+// testing or when otherwise no bootstrap transport is needed.
 func NewNullBootstrapTransport() BootstrapTransport {
 	return BootstrapTransportFunc(func(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error) {
 		return true, nil, nil

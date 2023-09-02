@@ -47,7 +47,7 @@ type ConnectOptions struct {
 	NetworkOptions net.Options
 	// Discovery are options for broadcasting to others to join the mesh
 	// via this node. It can be turned on later if needed.
-	Discovery *libp2p.JoinAnnounceOptions
+	Discovery *libp2p.AnnounceOptions
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int
 	// GRPCAdvertisePort is the port to advertise for gRPC connections.

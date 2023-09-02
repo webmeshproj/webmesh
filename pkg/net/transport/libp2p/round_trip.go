@@ -36,59 +36,70 @@ import (
 // RoundTripOptions are options for performing a round trip against
 // a libp2p host.
 type RoundTripOptions struct {
-	// PSK is the pre-shared key to use as a rendezvous point for the DHT.
-	PSK string
+	// Rendezvous is the pre-shared key to use as a rendezvous point for the DHT.
+	Rendezvous string
 	// Host are options for configuring the host. These can be left
 	// empty if using a pre-created host.
 	Host HostOptions
+	// Method is the method to try to execute.
+	Method string
 }
 
 // NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
 // The created host is closed when the round tripper is closed.
-func NewRoundTripper[REQ, RESP any](opts RoundTripOptions, method string) transport.RoundTripper[REQ, RESP] {
-	return &dhtRoundTripper[REQ, RESP]{RoundTripOptions: opts, method: method}
+func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) (transport.RoundTripper[REQ, RESP], error) {
+	host, err := NewHost(ctx, opts.Host)
+	if err != nil {
+		return nil, err
+	}
+	return newRoundTripperWithHostAndCloseFunc[REQ, RESP](host, opts, func() {
+		err := host.Close(ctx)
+		if err != nil {
+			context.LoggerFrom(ctx).Error("Failed to close host", "error", err.Error())
+		}
+	}), nil
 }
 
 // NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
-func NewRoundTripperWithHost[REQ, RESP any](host Host, opts RoundTripOptions, method string) transport.RoundTripper[REQ, RESP] {
-	return &dhtRoundTripperWithHost[REQ, RESP]{RoundTripOptions: opts, host: host, method: method}
+func NewRoundTripperWithHost[REQ, RESP any](host Host, opts RoundTripOptions) transport.RoundTripper[REQ, RESP] {
+	return newRoundTripperWithHostAndCloseFunc[REQ, RESP](host, opts, func() {})
 }
 
 // NewJoinRoundTripper returns a round tripper that uses the libp2p kademlia DHT to join a cluster.
 // The created host is closed when the round tripper is closed.
-func NewJoinRoundTripper(opts RoundTripOptions) transport.JoinRoundTripper {
-	return &dhtRoundTripper[v1.JoinRequest, v1.JoinResponse]{
-		RoundTripOptions: opts,
-		method:           v1.Membership_Join_FullMethodName,
-	}
+func NewJoinRoundTripper(ctx context.Context, opts RoundTripOptions) (transport.JoinRoundTripper, error) {
+	opts.Method = v1.Membership_Join_FullMethodName
+	return NewRoundTripper[v1.JoinRequest, v1.JoinResponse](ctx, opts)
 }
 
 // NewJoinRoundTripperHost returns a round tripper that uses the libp2p kademlia DHT to join a cluster.
 func NewJoinRoundTripperWithHost(host Host, opts RoundTripOptions) transport.JoinRoundTripper {
-	return &dhtRoundTripperWithHost[v1.JoinRequest, v1.JoinResponse]{
-		RoundTripOptions: opts,
-		method:           v1.Membership_Join_FullMethodName,
-	}
+	return NewRoundTripperWithHost[v1.JoinRequest, v1.JoinResponse](host, opts)
 }
 
-type dhtRoundTripperWithHost[REQ, RESP any] struct {
+func newRoundTripperWithHostAndCloseFunc[REQ, RESP any](host Host, opts RoundTripOptions, close func()) transport.RoundTripper[REQ, RESP] {
+	return &roundTripper[REQ, RESP]{RoundTripOptions: opts, host: host, close: close}
+}
+
+type roundTripper[REQ, RESP any] struct {
 	RoundTripOptions
-	host   Host
-	method string
+	host  Host
+	close func()
 }
 
-func (rt *dhtRoundTripperWithHost[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
-	log := context.LoggerFrom(ctx).With("method", rt.method)
+func (rt *roundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
+	defer rt.close()
+	log := context.LoggerFrom(ctx).With("method", rt.RoundTripOptions.Method)
 	log = log.With(slog.String("host-id", rt.host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
 	log.Debug("Searching for peers on the DHT with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(rt.host.DHT())
-	peerChan, err := routingDiscovery.FindPeers(ctx, rt.PSK)
+	peerChan, err := routingDiscovery.FindPeers(ctx, rt.Rendezvous)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p find peers: %w", err)
 	}
 	// Marshal the join request
-	joinData, err := proto.Marshal(any(req).(proto.Message))
+	requestData, err := proto.Marshal(any(req).(proto.Message))
 	if err != nil {
 		return nil, fmt.Errorf("marshal join request: %w", err)
 	}
@@ -102,14 +113,14 @@ func (rt *dhtRoundTripperWithHost[REQ, RESP]) RoundTrip(ctx context.Context, req
 			continue
 		}
 		jlog.Debug("Dialing peer")
-		var joinCtx context.Context
+		var connCtx context.Context
 		var cancel context.CancelFunc
 		if rt.Host.ConnectTimeout > 0 {
-			joinCtx, cancel = context.WithTimeout(ctx, rt.Host.ConnectTimeout)
+			connCtx, cancel = context.WithTimeout(ctx, rt.Host.ConnectTimeout)
 		} else {
-			joinCtx, cancel = context.WithCancel(ctx)
+			connCtx, cancel = context.WithCancel(ctx)
 		}
-		stream, err := rt.host.Host().NewStream(joinCtx, peer.ID, JoinProtocol)
+		stream, err := rt.host.Host().NewStream(connCtx, peer.ID, RPCProtocolFor(rt.RoundTripOptions.Method))
 		cancel()
 		if err != nil {
 			// We'll try again with the next peer.
@@ -120,87 +131,7 @@ func (rt *dhtRoundTripperWithHost[REQ, RESP]) RoundTrip(ctx context.Context, req
 		defer stream.Close()
 		// Send a join request to the peer over the stream.
 		jlog.Debug("Sending request to peer")
-		_, err = stream.Write(joinData)
-		if err != nil {
-			return nil, fmt.Errorf("write request: %w", err)
-		}
-		var b [8192]byte
-		n, err := stream.Read(b[:])
-		if err != nil {
-			if errors.Is(err, io.EOF) && n == 0 {
-				return nil, fmt.Errorf("read response: %w", err)
-			} else if !errors.Is(err, io.EOF) {
-				return nil, fmt.Errorf("read response: %w", err)
-			}
-		}
-		jlog.Debug("Received response from peer")
-		if bytes.HasPrefix(b[:n], []byte("ERROR: ")) {
-			return nil, fmt.Errorf("error from remote: %s", string(bytes.TrimPrefix(b[:n], []byte("ERROR: "))))
-		}
-		var resp RESP
-		err = proto.Unmarshal(b[:n], any(&resp).(proto.Message))
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal response: %w", err)
-		}
-		return &resp, nil
-	}
-	return nil, errors.New("no peers found to dial")
-}
-
-type dhtRoundTripper[REQ, RESP any] struct {
-	RoundTripOptions
-	method string
-}
-
-func (rt *dhtRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
-	log := context.LoggerFrom(ctx).With("method", rt.method)
-	host, err := NewHost(ctx, rt.Host)
-	if err != nil {
-		return nil, err
-	}
-	defer host.Close(context.WithLogger(context.Background(), log))
-	log = log.With(slog.String("host-id", host.ID().String()))
-	ctx = context.WithLogger(ctx, log)
-	log.Debug("Searching for peers on the DHT with our PSK")
-	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
-	peerChan, err := routingDiscovery.FindPeers(ctx, rt.PSK)
-	if err != nil {
-		return nil, fmt.Errorf("libp2p find peers: %w", err)
-	}
-	// Marshal the join request
-	joinData, err := proto.Marshal(any(req).(proto.Message))
-	if err != nil {
-		return nil, fmt.Errorf("marshal join request: %w", err)
-	}
-	// Wait for a peer to connect to
-	log.Debug("Waiting for peer to establish connection with")
-	for peer := range peerChan {
-		// Ignore ourselves and hosts with no addresses.
-		jlog := log.With(slog.String("peer-id", peer.ID.String()), slog.Any("peer-addrs", peer.Addrs))
-		if peer.ID == host.ID() || len(peer.Addrs) == 0 {
-			jlog.Debug("Ignoring peer")
-			continue
-		}
-		jlog.Debug("Dialing peer")
-		var joinCtx context.Context
-		var cancel context.CancelFunc
-		if rt.Host.ConnectTimeout > 0 {
-			joinCtx, cancel = context.WithTimeout(ctx, rt.Host.ConnectTimeout)
-		} else {
-			joinCtx, cancel = context.WithCancel(ctx)
-		}
-		stream, err := host.Host().NewStream(joinCtx, peer.ID, JoinProtocol)
-		cancel()
-		if err != nil {
-			// We'll try again with the next peer.
-			jlog.Warn("Failed to connect to peer", slog.String("error", err.Error()))
-			continue
-		}
-		jlog.Debug("Connected to peer")
-		defer stream.Close()
-		// Send a join request to the peer over the stream.
-		jlog.Debug("Sending request to peer")
-		_, err = stream.Write(joinData)
+		_, err = stream.Write(requestData)
 		if err != nil {
 			return nil, fmt.Errorf("write request: %w", err)
 		}

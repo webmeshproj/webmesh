@@ -34,52 +34,53 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// JoinAnnounceOptions are options for announcing the host or discovering peers
+// AnnounceOptions are options for announcing the host or discovering peers
 // on the libp2p kademlia DHT.
-type JoinAnnounceOptions struct {
-	// PSK is the pre-shared key to use as a rendezvous point for the DHT.
-	PSK string
+type AnnounceOptions struct {
+	// Rendezvous is the pre-shared key to use as a rendezvous point for the DHT.
+	Rendezvous string
 	// AnnounceTTL is the TTL to use for the discovery service.
 	AnnounceTTL time.Duration
 	// Host are options for configuring the host. These can be left
 	// empty if using a pre-created host.
 	Host HostOptions
+	// Method is the method to announce.
+	Method string
 }
 
-// NewJoinAnnouncer creates a new announcer on the kadmilia DHT and executes
-// received join requests against the given join Server.
-func NewJoinAnnouncer(ctx context.Context, opts JoinAnnounceOptions, join transport.JoinServer) (io.Closer, error) {
+// NewAnnouncer creates a generic announcer for the given method, request, and response objects.
+func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP]) (io.Closer, error) {
 	host, err := NewHost(ctx, opts.Host)
 	if err != nil {
 		return nil, err
 	}
-	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.ID().String()))
-	host.Host().SetStreamHandler(JoinProtocol, func(s network.Stream) {
-		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())
-		go handleIncomingStream(log, join, s)
-	})
-	log.Debug("Announcing join protocol with our PSK")
-	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
-	var discoveryOpts []discovery.Option
-	if opts.AnnounceTTL > 0 {
-		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
-	}
-	dutil.Advertise(context.Background(), routingDiscovery, opts.PSK, discoveryOpts...)
-	announcer := &dhtJoinAnnouncer{
-		close: func() error {
-			return host.Close(context.Background())
-		},
-	}
-	return announcer, nil
+	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, host, opts, rt, func() error { return host.Close(ctx) }), nil
+}
+
+// NewAnnouncerWithHost creates a generic announcer for the given method, request, and response objects.
+func NewAnnouncerWithHost[REQ, RESP any](ctx context.Context, host Host, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP]) io.Closer {
+	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, host, opts, rt, func() error { return nil })
+}
+
+// NewJoinAnnouncer creates a new announcer on the kadmilia DHT and executes
+// received join requests against the given join Server.
+func NewJoinAnnouncer(ctx context.Context, opts AnnounceOptions, join transport.JoinServer) (io.Closer, error) {
+	opts.Method = v1.Membership_Join_FullMethodName
+	return NewAnnouncer(ctx, opts, join)
 }
 
 // NewJoinAnnouncerWithHost creates a new announcer on the kadmilia DHT and executes
 // received join requests against the given join Server.
-func NewJoinAnnouncerWithHost(ctx context.Context, host Host, opts JoinAnnounceOptions, join transport.JoinServer) io.Closer {
-	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.Host().ID().String()))
-	host.Host().SetStreamHandler(JoinProtocol, func(s network.Stream) {
+func NewJoinAnnouncerWithHost(ctx context.Context, host Host, opts AnnounceOptions, join transport.JoinServer) io.Closer {
+	opts.Method = v1.Membership_Join_FullMethodName
+	return NewAnnouncerWithHost(ctx, host, opts, join)
+}
+
+func newAnnouncerWithHostAndCloseFunc[REQ, RESP any](ctx context.Context, host Host, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP], close func() error) io.Closer {
+	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.ID().String()))
+	host.Host().SetStreamHandler(RPCProtocolFor(opts.Method), func(s network.Stream) {
 		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())
-		go handleIncomingStream(log, join, s)
+		go handleIncomingStream(log, rt, s)
 	})
 	log.Debug("Announcing join protocol with our PSK")
 	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
@@ -87,21 +88,22 @@ func NewJoinAnnouncerWithHost(ctx context.Context, host Host, opts JoinAnnounceO
 	if opts.AnnounceTTL > 0 {
 		discoveryOpts = append(discoveryOpts, discovery.TTL(opts.AnnounceTTL))
 	}
-	dutil.Advertise(context.Background(), routingDiscovery, opts.PSK, discoveryOpts...)
-	announcer := &dhtJoinAnnouncer{
-		close: func() error {
-			host.Host().RemoveStreamHandler(JoinProtocol)
-			return nil
-		},
+	dutil.Advertise(context.Background(), routingDiscovery, opts.Rendezvous, discoveryOpts...)
+	announcer := &announcer[REQ, RESP]{
+		close: close,
 	}
 	return announcer
 }
 
-type dhtJoinAnnouncer struct {
+type announcer[REQ, RESP any] struct {
 	close func() error
 }
 
-func handleIncomingStream(log *slog.Logger, joinServer transport.JoinServer, conn network.Stream) {
+func (srv *announcer[REQ, RESP]) Close() error {
+	return srv.close()
+}
+
+func handleIncomingStream[REQ, RESP any](log *slog.Logger, server transport.UnaryServer[REQ, RESP], conn network.Stream) {
 	returnErr := func(stream network.Stream, err error) {
 		log.Error("Failed to handle join protocol stream", slog.String("error", err.Error()))
 		buf := []byte("ERROR: " + err.Error())
@@ -121,8 +123,8 @@ func handleIncomingStream(log *slog.Logger, joinServer transport.JoinServer, con
 		return
 	}
 	buf := b[:n]
-	var req v1.JoinRequest
-	err = proto.Unmarshal(buf, &req)
+	var req REQ
+	err = proto.Unmarshal(buf, any(&req).(proto.Message))
 	if err != nil {
 		rlog.Error("Failed to unmarshal join request from peer", slog.String("error", err.Error()))
 		returnErr(conn, err)
@@ -132,14 +134,14 @@ func handleIncomingStream(log *slog.Logger, joinServer transport.JoinServer, con
 	rlog.Debug("Executing join request")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15) // TODO: Make this configurable
 	defer cancel()
-	resp, err := joinServer.Serve(context.WithLogger(ctx, rlog), &req)
+	resp, err := server.Serve(context.WithLogger(ctx, rlog), &req)
 	if err != nil {
 		rlog.Error("Failed to execute join request", slog.String("error", err.Error()))
 		returnErr(conn, err)
 		return
 	}
 	// Write the response back to the peer
-	buf, err = proto.Marshal(resp)
+	buf, err = proto.Marshal(any(resp).(proto.Message))
 	if err != nil {
 		rlog.Error("Failed to marshal join response", slog.String("error", err.Error()))
 		returnErr(conn, err)
@@ -149,8 +151,4 @@ func handleIncomingStream(log *slog.Logger, joinServer transport.JoinServer, con
 		rlog.Error("Failed to write join response to peer", slog.String("error", err.Error()))
 		return
 	}
-}
-
-func (srv *dhtJoinAnnouncer) Close() error {
-	return srv.close()
 }

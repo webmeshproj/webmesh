@@ -48,11 +48,15 @@ func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
 	if err != nil {
 		return nil, fmt.Errorf("new host: %w", err)
 	}
-	return NewUDPRelayWithHost(ctx, host, opts)
+	return newUDPRelayWithHostAndCloseFunc(ctx, host, opts, func() error { return host.Close(ctx) })
 }
 
 // NewUDPRelay creates a new UDP relay with the given host.
 func NewUDPRelayWithHost(ctx context.Context, host Host, opts UDPRelayOptions) (*UDPRelay, error) {
+	return newUDPRelayWithHostAndCloseFunc(ctx, host, opts, func() error { return nil })
+}
+
+func newUDPRelayWithHostAndCloseFunc(ctx context.Context, host Host, opts UDPRelayOptions, closef func() error) (*UDPRelay, error) {
 	log := context.LoggerFrom(ctx).With("udp-relay", "libp2p")
 	log = log.With(slog.String("host-id", host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
@@ -122,6 +126,7 @@ func NewUDPRelayWithHost(ctx context.Context, host Host, opts UDPRelayOptions) (
 					if err := rxtxrelay.Relay(ctx, stream); err != nil {
 						log.Error("Relay error", "error", err)
 					}
+					return
 				}
 			}
 		}
@@ -135,6 +140,7 @@ func NewUDPRelayWithHost(ctx context.Context, host Host, opts UDPRelayOptions) (
 		cancel: cancel,
 		errs:   errs,
 		closec: closec,
+		close:  closef,
 	}, nil
 }
 
@@ -145,6 +151,7 @@ type UDPRelay struct {
 	cancel    context.CancelFunc
 	errs      chan error
 	closec    chan struct{}
+	close     func() error
 }
 
 // LocalAddr returns the local address of the relay.
@@ -165,5 +172,5 @@ func (u *UDPRelay) Errors() <-chan error {
 // Close closes the relay.
 func (u *UDPRelay) Close() error {
 	u.cancel()
-	return nil
+	return u.close()
 }

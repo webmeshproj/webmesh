@@ -20,6 +20,7 @@ limitations under the License.
 package libp2p
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -28,14 +29,19 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 )
 
-// JoinProtocol is the protocol used for joining a mesh.
-const JoinProtocol = protocol.ID("/webmesh/join/0.0.1")
+// RPCProtocol is the protocol used for executing RPCs within a mesh.
+const RPCProtocol = protocol.ID("/webmesh/rpc/0.0.1")
 
 // RaftProtocol is the protocol used for webmesh raft.
 const RaftProtocol = protocol.ID("/webmesh/raft/0.0.1")
 
 // RelayProtocol is the protocol used for relaying UDP packets.
 const RelayProtocol = protocol.ID("/webmesh/relay/0.0.1")
+
+// RPCProtocolFor returns the RPCProtocol for the given method.
+func RPCProtocolFor(method string) protocol.ID {
+	return protocol.ID("/webmesh/rpc/0.0.1/" + strings.TrimPrefix(method, "/"))
+}
 
 // RelayProtocolFor returns the RelayProtocol for accepting connections
 // from the given node.
