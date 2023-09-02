@@ -20,6 +20,7 @@ limitations under the License.
 package libp2p
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -29,24 +30,29 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 )
 
-// RPCProtocol is the protocol used for executing RPCs within a mesh.
-const RPCProtocol = protocol.ID("/webmesh/rpc/0.0.1")
-
-// RaftProtocol is the protocol used for webmesh raft.
-const RaftProtocol = protocol.ID("/webmesh/raft/0.0.1")
-
-// RelayProtocol is the protocol used for relaying UDP packets.
-const RelayProtocol = protocol.ID("/webmesh/relay/0.0.1")
+const (
+	// BootstrapProtocol is the protocol used for bootstrapping a mesh.
+	BootstrapProtocol = protocol.ID("/webmesh/bootstrap/0.0.1")
+	// RPCProtocol is the protocol used for executing RPCs against a mesh.
+	// The method should be appended to the end of the protocol.
+	RPCProtocol = protocol.ID("/webmesh/rpc/0.0.1")
+	// RaftProtocol is the protocol used for webmesh raft.
+	// This is not used yet.
+	RaftProtocol = protocol.ID("/webmesh/raft/0.0.1")
+	// UDPRelayProtocol is the protocol used for relaying UDP packets.
+	// The destination node should be appended to the end of the protocol.
+	UDPRelayProtocol = protocol.ID("/webmesh/udp-relay/0.0.1")
+)
 
 // RPCProtocolFor returns the RPCProtocol for the given method.
 func RPCProtocolFor(method string) protocol.ID {
-	return protocol.ID("/webmesh/rpc/0.0.1/" + strings.TrimPrefix(method, "/"))
+	return protocol.ID(fmt.Sprintf("%s/%s", RPCProtocol, strings.TrimPrefix(method, "/")))
 }
 
-// RelayProtocolFor returns the RelayProtocol for accepting connections
+// UDPRelayProtocolFor returns the UDPRelayProtocol for accepting connections
 // from the given node.
-func RelayProtocolFor(node string) protocol.ID {
-	return protocol.ID("/webmesh/relay/0.0.1/" + node)
+func UDPRelayProtocolFor(node string) protocol.ID {
+	return protocol.ID(fmt.Sprintf("%s/%s", UDPRelayProtocol, node))
 }
 
 var buffersOnce sync.Once

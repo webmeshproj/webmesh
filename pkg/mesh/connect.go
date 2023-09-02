@@ -252,7 +252,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		}()
 	}
 	if opts.Discovery != nil {
-		err = s.AnnounceDHT(ctx, *opts.Discovery)
+		err = s.AnnounceToDHT(ctx, *opts.Discovery)
 		if err != nil {
 			return handleErr(fmt.Errorf("announce dht: %w", err))
 		}

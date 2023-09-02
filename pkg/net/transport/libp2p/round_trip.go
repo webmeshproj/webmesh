@@ -38,26 +38,34 @@ import (
 type RoundTripOptions struct {
 	// Rendezvous is the pre-shared key to use as a rendezvous point for the DHT.
 	Rendezvous string
-	// Host are options for configuring the host. These can be left
+	// HostOptions are options for configuring the host. These can be left
 	// empty if using a pre-created host.
-	Host HostOptions
+	HostOptions HostOptions
 	// Method is the method to try to execute.
 	Method string
+	// Host is a pre-started host to use for the round trip
+	Host Host
 }
 
 // NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
 // The created host is closed when the round tripper is closed.
 func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) (transport.RoundTripper[REQ, RESP], error) {
-	host, err := NewHost(ctx, opts.Host)
-	if err != nil {
-		return nil, err
-	}
-	return newRoundTripperWithHostAndCloseFunc[REQ, RESP](host, opts, func() {
-		err := host.Close(ctx)
+	host := opts.Host
+	close := func() {}
+	var err error
+	if host == nil {
+		host, err = NewHost(ctx, opts.HostOptions)
 		if err != nil {
-			context.LoggerFrom(ctx).Error("Failed to close host", "error", err.Error())
+			return nil, err
 		}
-	}), nil
+		close = func() {
+			err := host.Close(ctx)
+			if err != nil {
+				context.LoggerFrom(ctx).Error("Failed to close host", "error", err.Error())
+			}
+		}
+	}
+	return newRoundTripperWithHostAndCloseFunc[REQ, RESP](host, opts, close), nil
 }
 
 // NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
@@ -115,8 +123,8 @@ func (rt *roundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RE
 		jlog.Debug("Dialing peer")
 		var connCtx context.Context
 		var cancel context.CancelFunc
-		if rt.Host.ConnectTimeout > 0 {
-			connCtx, cancel = context.WithTimeout(ctx, rt.Host.ConnectTimeout)
+		if rt.HostOptions.ConnectTimeout > 0 {
+			connCtx, cancel = context.WithTimeout(ctx, rt.HostOptions.ConnectTimeout)
 		} else {
 			connCtx, cancel = context.WithCancel(ctx)
 		}

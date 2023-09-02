@@ -34,6 +34,17 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
+// Announcer is an interface for nodes that can announce themselves to the
+// network.
+type Announcer interface {
+	// AnnounceToDHT should announce the join protocol to the DHT,
+	// such that it can be used by a libp2p transport.JoinRoundTripper.
+	AnnounceToDHT(ctx context.Context, opts AnnounceOptions) error
+	// LeaveDHT should remove the join protocol from the DHT for the
+	// given rendezvous string.
+	LeaveDHT(ctx context.Context, rendezvous string) error
+}
+
 // AnnounceOptions are options for announcing the host or discovering peers
 // on the libp2p kademlia DHT.
 type AnnounceOptions struct {
@@ -41,20 +52,28 @@ type AnnounceOptions struct {
 	Rendezvous string
 	// AnnounceTTL is the TTL to use for the discovery service.
 	AnnounceTTL time.Duration
-	// Host are options for configuring the host. These can be left
+	// HostOptions are options for configuring the host. These can be left
 	// empty if using a pre-created host.
-	Host HostOptions
+	HostOptions HostOptions
 	// Method is the method to announce.
 	Method string
+	// Host is a pre-started host to use for announcing.
+	Host Host
 }
 
 // NewAnnouncer creates a generic announcer for the given method, request, and response objects.
 func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP]) (io.Closer, error) {
-	host, err := NewHost(ctx, opts.Host)
-	if err != nil {
-		return nil, err
+	host := opts.Host
+	close := func() error { return nil }
+	var err error
+	if host == nil {
+		host, err = NewHost(ctx, opts.HostOptions)
+		if err != nil {
+			return nil, err
+		}
+		close = func() error { return host.Close(ctx) }
 	}
-	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, host, opts, rt, func() error { return host.Close(ctx) }), nil
+	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, host, opts, rt, close), nil
 }
 
 // NewAnnouncerWithHost creates a generic announcer for the given method, request, and response objects.

@@ -17,7 +17,13 @@ limitations under the License.
 // Package crypto contains cryptographic utilities.
 package crypto
 
-import "crypto/rand"
+import (
+	"bytes"
+	"crypto/rand"
+	"crypto/sha256"
+	"fmt"
+	"hash"
+)
 
 func init() {
 	// assert we have a crypto/rand source
@@ -30,15 +36,14 @@ func init() {
 // DefaultPSKLength is the default length of a PSK.
 const DefaultPSKLength = 32
 
+// ErrInvalidSignature is returned when a signature is invalid.
+var ErrInvalidSignature = fmt.Errorf("invalid signature")
+
 // ValidPSKChars is the set of valid characters for a PSK.
 var ValidPSKChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 // PSK is a pre-shared key.
 type PSK []byte
-
-func (p PSK) String() string {
-	return string(p)
-}
 
 // GeneratePSK generates a PSK.
 func GeneratePSK() (PSK, error) {
@@ -64,4 +69,52 @@ func MustGeneratePSK() PSK {
 		panic(err)
 	}
 	return psk
+}
+
+func (p PSK) String() string {
+	return string(p)
+}
+
+// Sign creates a signature of the given data using this PSK.
+func (p PSK) Sign(data []byte) ([]byte, error) {
+	return Sign(data, p)
+}
+
+// Verify verifies the given signature against the given data using this PSK.
+func (p PSK) Verify(data, signature []byte) error {
+	return Verify(data, signature, p)
+}
+
+// Sign signs the given data using the given PSK.
+func Sign(data []byte, psk PSK) ([]byte, error) {
+	return SignWithHash(data, psk, sha256.New)
+}
+
+// Verify verifies the given signature against the given data using the given PSK.
+func Verify(data, signature []byte, psk PSK) error {
+	return VerifyWithHash(data, signature, psk, sha256.New)
+}
+
+// VerifyWithHash verifies the given signature against the given data using the given PSK and hash function.
+func VerifyWithHash(data, signature []byte, psk PSK, hash func() hash.Hash) error {
+	sig, err := SignWithHash(data, psk, hash)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(sig, signature) {
+		return ErrInvalidSignature
+	}
+	return nil
+}
+
+// SignWithHash signs the given data using the given PSK and hash function.
+func SignWithHash(data []byte, psk PSK, hash func() hash.Hash) ([]byte, error) {
+	h := hash()
+	if _, err := h.Write(psk); err != nil {
+		return nil, err
+	}
+	if _, err := h.Write(data); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
 }

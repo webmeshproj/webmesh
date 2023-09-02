@@ -103,8 +103,8 @@ type Mesh interface {
 	Network() meshnet.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
-	// AnnounceDHT announces the peer discovery service via DHT.
-	AnnounceDHT(context.Context, libp2p.AnnounceOptions) error
+	// AnnounceToDHT announces the peer discovery service via DHT.
+	AnnounceToDHT(context.Context, libp2p.AnnounceOptions) error
 	// LeaveDHT leaves the peer discovery service for the given PSK.
 	LeaveDHT(ctx context.Context, psk string) error
 }

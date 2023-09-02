@@ -73,7 +73,7 @@ func newUDPRelayWithHostAndCloseFunc(ctx context.Context, host Host, opts UDPRel
 		defer rxrelay.Close()
 		return nil, fmt.Errorf("new local udp relay: %w", err)
 	}
-	host.Host().SetStreamHandler(RelayProtocolFor(opts.LocalNode), func(s network.Stream) {
+	host.Host().SetStreamHandler(UDPRelayProtocolFor(opts.LocalNode), func(s network.Stream) {
 		log.Debug("Handling incoming protocol stream", "peer", s.Conn().RemotePeer())
 		defer s.Close()
 		defer rxrelay.Close()
@@ -85,7 +85,7 @@ func newUDPRelayWithHostAndCloseFunc(ctx context.Context, host Host, opts UDPRel
 	closec := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		defer host.Host().RemoveStreamHandler(RelayProtocolFor(opts.LocalNode))
+		defer host.Host().RemoveStreamHandler(UDPRelayProtocolFor(opts.LocalNode))
 		defer close(closec)
 		defer close(errs)
 		defer rxtxrelay.Close()
@@ -115,7 +115,7 @@ func newUDPRelayWithHostAndCloseFunc(ctx context.Context, host Host, opts UDPRel
 					}
 					log.Debug("Found peer", "peer", peer.ID)
 					connectCtx, connectCancel := context.WithTimeout(context.Background(), opts.Host.ConnectTimeout)
-					stream, err := host.Host().NewStream(connectCtx, peer.ID, RelayProtocolFor(opts.RemoteNode))
+					stream, err := host.Host().NewStream(connectCtx, peer.ID, UDPRelayProtocolFor(opts.RemoteNode))
 					connectCancel()
 					if err != nil {
 						// We'll try the next peer

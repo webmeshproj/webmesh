@@ -29,10 +29,10 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 
-func (s *meshStore) AnnounceDHT(ctx context.Context, opts libp2p.AnnounceOptions) error {
+func (s *meshStore) AnnounceToDHT(ctx context.Context, opts libp2p.AnnounceOptions) error {
 	log := context.LoggerFrom(ctx)
 	log.Info("Announcing peer discovery service")
-	discover, err := libp2p.NewJoinAnnouncer(ctx, opts, transport.JoinServerFunc(s.proxyJoinToLeader))
+	discover, err := libp2p.NewJoinAnnouncer(ctx, opts, transport.JoinServerFunc(s.proxyJoin))
 	if err != nil {
 		return fmt.Errorf("new kad dht announcer: %w", err)
 	}
@@ -54,7 +54,9 @@ func (s *meshStore) LeaveDHT(ctx context.Context, psk string) error {
 	return nil
 }
 
-func (s *meshStore) proxyJoinToLeader(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+func (s *meshStore) proxyJoin(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
+	// We don't need to go through the extra overhead of dialing
+	// ourself if we are the current leader. This is a TODO.
 	log := context.LoggerFrom(ctx)
 	c, err := s.DialLeader(ctx)
 	if err != nil {
