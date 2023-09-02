@@ -57,15 +57,23 @@ func UDPRelayProtocolFor(node string) protocol.ID {
 
 var buffersOnce sync.Once
 
-// SetBuffers sets the buffers to use for libp2p.
-func SetBuffers(ctx context.Context) {
+// MaxBuffer is the maximum buffer size for libp2p.
+const MaxBuffer = 2500000
+
+// SetMaxSystemBuffers sets the system buffers to the maximum size for libp2p.
+func SetMaxSystemBuffers(ctx context.Context) {
+	SetSystemBuffers(ctx, MaxBuffer)
+}
+
+// SetSystemBuffers sets the system buffers to use for libp2p.
+func SetSystemBuffers(ctx context.Context, size int) {
 	buffersOnce.Do(func() {
 		log := context.LoggerFrom(ctx)
-		err := buffers.SetMaximumReadBuffer(2500000)
+		err := buffers.SetMaximumReadBuffer(size)
 		if err != nil {
 			log.Warn("Failed to set maximum read buffer", "error", err.Error())
 		}
-		err = buffers.SetMaximumWriteBuffer(2500000)
+		err = buffers.SetMaximumWriteBuffer(size)
 		if err != nil {
 			log.Warn("Failed to set maximum write buffer", "error", err.Error())
 		}

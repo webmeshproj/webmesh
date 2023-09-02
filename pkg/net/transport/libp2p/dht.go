@@ -34,6 +34,13 @@ import (
 // NewDHT returns a DHT for given host. If bootstrap peers is empty, the default
 // bootstrap peers will be used.
 func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr, connectTimeout time.Duration) (*dht.IpfsDHT, error) {
+	if len(bootstrapPeers) == 0 {
+		bootstrapPeers = dht.DefaultBootstrapPeers
+	}
+	return newDHT(ctx, host, bootstrapPeers, connectTimeout)
+}
+
+func newDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr, connectTimeout time.Duration) (*dht.IpfsDHT, error) {
 	kaddht, err := dht.New(ctx, host)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p new dht: %w", err)
@@ -51,9 +58,6 @@ func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, serv
 	err := kaddht.Bootstrap(ctx)
 	if err != nil {
 		return fmt.Errorf("libp2p dht bootstrap: %w", err)
-	}
-	if len(servers) == 0 {
-		servers = dht.DefaultBootstrapPeers
 	}
 	var wg sync.WaitGroup
 	for _, peerAddr := range servers {

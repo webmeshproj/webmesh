@@ -66,13 +66,22 @@ type HostOptions struct {
 	ConnectTimeout time.Duration
 }
 
-// NewHost creates a new libp2p host with the given options.
-func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
-	SetBuffers(ctx)
+// NewLibP2PHost creates a new libp2p host with the given options.
+func NewLibP2PHost(ctx context.Context, opts HostOptions) (host.Host, error) {
+	SetMaxSystemBuffers(ctx)
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
 	}
 	host, err := libp2p.New(opts.Options...)
+	if err != nil {
+		return nil, fmt.Errorf("new libp2p host: %w", err)
+	}
+	return host, nil
+}
+
+// NewHost creates a new libp2p host connected to the DHT with the given options.
+func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
+	host, err := NewLibP2PHost(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
@@ -82,12 +91,23 @@ func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
 	return &libp2pHost{
+		opts: opts,
 		host: host,
 		dht:  dht,
 	}, nil
 }
 
+// NewFromHostAndDHT creates a new libp2p host from an existing host and DHT.
+// This is primarily used for testing.
+func NewFromHostAndDHT(host host.Host, dht *dht.IpfsDHT) Host {
+	return &libp2pHost{
+		host: host,
+		dht:  dht,
+	}
+}
+
 type libp2pHost struct {
+	opts HostOptions
 	host host.Host
 	dht  *dht.IpfsDHT
 }

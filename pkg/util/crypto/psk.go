@@ -75,6 +75,10 @@ func (p PSK) String() string {
 	return string(p)
 }
 
+func (p PSK) SignatureSize() int {
+	return sha256.New().Size()
+}
+
 // Sign creates a signature of the given data using this PSK.
 func (p PSK) Sign(data []byte) ([]byte, error) {
 	return Sign(data, p)
