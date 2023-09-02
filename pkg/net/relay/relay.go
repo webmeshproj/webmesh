@@ -38,6 +38,8 @@ type Relay interface {
 	Relay(ctx context.Context, from io.ReadWriteCloser) error
 	// LocalAddr returns the local address of the relay.
 	LocalAddr() netip.AddrPort
+	// Closed returns a channel that is closed when the relay is closed.
+	Closed() <-chan struct{}
 	// Close closes the relay.
 	Close() error
 }
@@ -47,8 +49,6 @@ const DefaultUDPBuffer = 1024 * 1024 * 4
 
 // UDPOptions are generic options for a UDP relay.
 type UDPOptions struct {
-	// Port is the port to listen on. If 0, a random port will be chosen.
-	Port uint16
 	// TargetPort is the port to proxy traffic to.
 	TargetPort uint16
 	// BufferSize is the size of the buffer to use for copying data.
@@ -61,18 +61,13 @@ type LocalUDP struct {
 	net.Conn
 	addr    netip.AddrPort
 	bufSize int
+	closec  chan struct{}
 }
 
 // NewLocalUDP creates a new UDP relay listening on the given port
 // and proxying traffic to the listener on the given target port.
 func NewLocalUDP(opts UDPOptions) (Relay, error) {
 	var laddr *net.UDPAddr
-	if opts.Port != 0 {
-		laddr = &net.UDPAddr{
-			IP:   net.IPv4zero,
-			Port: int(opts.Port),
-		}
-	}
 	c, err := net.DialUDP("udp", laddr, &net.UDPAddr{
 		IP:   net.IPv4zero,
 		Port: int(opts.TargetPort),
@@ -81,8 +76,9 @@ func NewLocalUDP(opts UDPOptions) (Relay, error) {
 		return nil, err
 	}
 	return &LocalUDP{
-		Conn: c,
-		addr: c.LocalAddr().(*net.UDPAddr).AddrPort(),
+		Conn:   c,
+		addr:   c.LocalAddr().(*net.UDPAddr).AddrPort(),
+		closec: make(chan struct{}),
 		bufSize: func() int {
 			if opts.BufferSize == 0 {
 				return DefaultUDPBuffer
@@ -98,6 +94,7 @@ func NewLocalUDP(opts UDPOptions) (Relay, error) {
 // Relay copies data from the given stream to and from the UDP connection.
 // The stream will be closed when the relay is closed.
 func (r *LocalUDP) Relay(ctx context.Context, from io.ReadWriteCloser) error {
+	defer close(r.closec)
 	log := context.LoggerFrom(ctx).With("relay", "wireguard", "local-addr", r.LocalAddr())
 	defer log.Debug("Relay has finished")
 	var errg errgroup.Group
@@ -134,6 +131,11 @@ func (r *LocalUDP) Relay(ctx context.Context, from io.ReadWriteCloser) error {
 // LocalAddr returns the local address of the relay.
 func (r *LocalUDP) LocalAddr() netip.AddrPort {
 	return r.addr
+}
+
+// Closed returns a channel that is closed when the relay is closed.
+func (r *LocalUDP) Closed() <-chan struct{} {
+	return r.closec
 }
 
 // Close closes the relay.

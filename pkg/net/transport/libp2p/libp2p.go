@@ -20,7 +20,6 @@ limitations under the License.
 package libp2p
 
 import (
-	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -32,21 +31,16 @@ import (
 // JoinProtocol is the protocol used for joining a mesh.
 const JoinProtocol = protocol.ID("/webmesh/join/0.0.1")
 
-// WebRTCSignalProtocol is the protocol used for webrtc-signaling.
-const WebRTCSignalProtocol = protocol.ID("/webmesh/signal/0.0.1")
+// RaftProtocol is the protocol used for webmesh raft.
+const RaftProtocol = protocol.ID("/webmesh/raft/0.0.1")
 
-// WebRTCSignalProtocolFor returns the protocol used for webrtc-signaling for the given
-// rendevous string or peer ID.
-func WebRTCSignalProtocolFor(id string) protocol.ID {
-	return protocol.ID("/webmesh/signal/0.0.1/" + id)
-}
+// RelayProtocol is the protocol used for relaying UDP packets.
+const RelayProtocol = protocol.ID("/webmesh/relay/0.0.1")
 
-// WebRTCRendevousFrom returns the rendevous string from the given protocol ID.
-func WebRTCRendevousFrom(id protocol.ID) string {
-	if len(id) <= len(WebRTCSignalProtocol)+1 {
-		return ""
-	}
-	return strings.TrimPrefix(string(id), string(WebRTCSignalProtocol)+"/")
+// RelayProtocolFor returns the RelayProtocol for accepting connections
+// from the given node.
+func RelayProtocolFor(node string) protocol.ID {
+	return protocol.ID("/webmesh/relay/0.0.1/" + node)
 }
 
 var buffersOnce sync.Once

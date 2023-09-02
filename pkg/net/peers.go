@@ -19,6 +19,7 @@ package net
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/netip"
@@ -33,7 +34,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/mesh"
+	"github.com/webmeshproj/webmesh/pkg/net/relay"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
@@ -52,20 +55,21 @@ type PeerManager interface {
 
 type peerManager struct {
 	net      *manager
-	iceConns map[string]clientPeerConn
+	p2pConns map[string]clientPeerConn
 	peermu   sync.Mutex
 	pcmu     sync.Mutex
+	p2pmu    sync.Mutex
 }
 
 func newPeerManager(m *manager) *peerManager {
 	return &peerManager{
 		net:      m,
-		iceConns: make(map[string]clientPeerConn),
+		p2pConns: make(map[string]clientPeerConn),
 	}
 }
 
 type clientPeerConn struct {
-	peerConn  *datachannels.WireGuardProxyClient
+	peerConn  io.Closer
 	localAddr netip.AddrPort
 }
 
@@ -107,9 +111,9 @@ func (m *peerManager) Refresh(ctx context.Context, wgpeers []*v1.WireGuardPeer) 
 		if _, ok := seenPeers[peer]; !ok {
 			log.Debug("Removing peer", slog.String("peer_id", peer))
 			m.pcmu.Lock()
-			if conn, ok := m.iceConns[peer]; ok {
+			if conn, ok := m.p2pConns[peer]; ok {
 				conn.peerConn.Close()
-				delete(m.iceConns, peer)
+				delete(m.p2pConns, peer)
 			}
 			m.pcmu.Unlock()
 			if err := m.net.WireGuard().DeletePeer(ctx, peer); err != nil {
@@ -245,7 +249,7 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 		if _, ok := m.net.opts.Relays.RendezvousStrings[peer.GetId()]; !ok {
 			return endpoint, fmt.Errorf("no rendezvous string for peer %s", peer.GetId())
 		}
-		// TODO: Set up a libp2p relay
+		return m.negotiateP2PRelay(ctx, peer, m.net.opts.Relays.RendezvousStrings[peer.GetId()])
 	}
 	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
 	if peer.GetPrimaryEndpoint() != "" {
@@ -309,11 +313,67 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 	return endpoint, nil
 }
 
+func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardPeer, rendezvous string) (netip.AddrPort, error) {
+	log := context.LoggerFrom(ctx)
+	m.p2pmu.Lock()
+	defer m.p2pmu.Unlock()
+	if conn, ok := m.p2pConns[peer.GetId()]; ok {
+		// We already have an ICE connection for this peer
+		log.Debug("Using existing wireguard p2p relay", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
+		return conn.localAddr, nil
+	}
+	wgPort, err := m.net.WireGuard().ListenPort()
+	if err != nil {
+		return netip.AddrPort{}, fmt.Errorf("wireguard listen port: %w", err)
+	}
+	relay, err := libp2p.NewUDPRelay(ctx, libp2p.UDPRelayOptions{
+		LocalNode:  m.net.opts.NodeID,
+		RemoteNode: peer.GetId(),
+		Rendezvous: rendezvous,
+		Relay: relay.UDPOptions{
+			TargetPort: uint16(wgPort),
+		},
+		Host: libp2p.HostOptions{
+			BootstrapPeers: m.net.opts.Relays.Host.BootstrapPeers,
+			Options:        m.net.opts.Relays.Host.Options,
+			LocalAddrs:     m.net.opts.Relays.Host.LocalAddrs,
+			ConnectTimeout: m.net.opts.Relays.Host.ConnectTimeout,
+		},
+	})
+	if err != nil {
+		return netip.AddrPort{}, fmt.Errorf("create udp relay: %w", err)
+	}
+	go func() {
+		<-relay.Closed()
+		defer func() {
+			// This is a hacky way to attempt to reconnect to the peer if
+			// the ICE connection is closed and they are still in the store.
+			wgpeers, err := mesh.WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
+			if err != nil {
+				log.Error("Error getting wireguard peers after p2p connection closed", slog.String("error", err.Error()))
+				return
+			}
+			if err := m.Refresh(context.Background(), wgpeers); err != nil {
+				log.Error("Error refreshing peers after p2p connection closed", slog.String("error", err.Error()))
+			}
+		}()
+		m.p2pmu.Lock()
+		delete(m.p2pConns, peer.GetId())
+		m.p2pmu.Unlock()
+	}()
+	peerconn := clientPeerConn{
+		peerConn:  relay,
+		localAddr: relay.LocalAddr().AddrPort(),
+	}
+	m.p2pConns[peer.GetId()] = peerconn
+	return peerconn.localAddr, nil
+}
+
 func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (netip.AddrPort, error) {
 	m.pcmu.Lock()
 	defer m.pcmu.Unlock()
 	log := context.LoggerFrom(ctx)
-	if conn, ok := m.iceConns[peer.GetId()]; ok {
+	if conn, ok := m.p2pConns[peer.GetId()]; ok {
 		// We already have an ICE connection for this peer
 		log.Debug("Using existing wireguard ICE proxy", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
 		return conn.localAddr, nil
@@ -360,14 +420,14 @@ func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPe
 			}
 		}()
 		m.pcmu.Lock()
-		delete(m.iceConns, peer.GetId())
+		delete(m.p2pConns, peer.GetId())
 		m.pcmu.Unlock()
 	}()
 	peerconn := clientPeerConn{
 		peerConn:  pc,
 		localAddr: pc.LocalAddr().AddrPort(),
 	}
-	m.iceConns[peer.GetId()] = peerconn
+	m.p2pConns[peer.GetId()] = peerconn
 	return peerconn.localAddr, nil
 }
 

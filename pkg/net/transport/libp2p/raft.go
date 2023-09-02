@@ -17,26 +17,21 @@ limitations under the License.
 package libp2p
 
 import (
-	"fmt"
 	"io"
 	"net/netip"
 	"strconv"
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
-
-// RaftProtocol is the protocol used for webmesh raft.
-const RaftProtocol = protocol.ID("/webmesh/raft/0.0.1")
 
 // RaftTransportOptions are options for the TCP transport.
 type RaftTransportOptions struct {
@@ -45,8 +40,11 @@ type RaftTransportOptions struct {
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
 	// If empty or nil, the default bootstrap peers will be used.
 	BootstrapPeers []multiaddr.Multiaddr
+	// LocalAddrs is a list of local addresses to use for the host.
+	// If empty or nil, the default local addresses will be used.
+	LocalAddrs []multiaddr.Multiaddr
 	// Options are options for configuring the libp2p host.
-	Options []libp2p.Option
+	Options []config.Option
 	// DiscoveryTTL is the TTL to use for the discovery service.
 	DiscoveryTTL time.Duration
 	// ConnectTimeout is the timeout to use when connecting to a peer.
@@ -57,27 +55,19 @@ type RaftTransportOptions struct {
 
 // NewRaftTransport creates a new Raft transport over the Kademlia DHT.
 func NewRaftTransport(ctx context.Context, opts RaftTransportOptions) (raft.Transport, error) {
-	log := context.LoggerFrom(ctx)
-	SetBuffers(ctx)
-	host, err := libp2p.New(opts.Options...)
+	host, err := NewHost(ctx, HostOptions{
+		BootstrapPeers: opts.BootstrapPeers,
+		Options:        opts.Options,
+		LocalAddrs:     opts.LocalAddrs,
+		ConnectTimeout: opts.ConnectTimeout,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("libp2p new host: %w", err)
-	}
-	log.Debug("Bootstrapping DHT")
-	kaddht, err := dht.New(ctx, host)
-	if err != nil {
-		return nil, fmt.Errorf("libp2p new dht: %w", err)
-	}
-	err = bootstrapDHT(ctx, host, kaddht, opts.BootstrapPeers, opts.ConnectTimeout)
-	if err != nil {
-		defer host.Close()
-		defer kaddht.Close()
-		return nil, fmt.Errorf("libp2p bootstrap dht: %w", err)
+		return nil, err
 	}
 	return &kadRaftTransport{
 		RaftTransportOptions: opts,
-		Host:                 host,
-		dht:                  kaddht,
+		Host:                 host.Host(),
+		dht:                  host.DHT(),
 		rpcchan:              make(chan raft.RPC, 1),
 	}, nil
 }

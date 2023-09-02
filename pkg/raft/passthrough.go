@@ -39,7 +39,7 @@ var ErrNotRaftMember = errors.New("not a raft member")
 
 // NewPassthrough creates a new raft instance that is a no-op for most methods
 // and uses the given Dialer for storage connections.
-func NewPassthrough(ctx context.Context, nodeID string, dialer transport.LeaderDialer) Raft {
+func NewPassthrough(ctx context.Context, nodeID string, dialer transport.NodeDialer) Raft {
 	return &passthroughRaft{
 		nodeID:     nodeID,
 		dialer:     dialer,
@@ -54,7 +54,7 @@ func NewPassthrough(ctx context.Context, nodeID string, dialer transport.LeaderD
 // It should later be removed in favor of less coupling between the connection
 // and raft interfaces.
 type passthroughRaft struct {
-	dialer     transport.LeaderDialer
+	dialer     transport.NodeDialer
 	nodeID     string
 	subCancels []func()
 	closec     chan struct{}
@@ -127,7 +127,7 @@ func (p *passthroughRaft) Configuration() (raft.Configuration, error) {
 func (p *passthroughRaft) getConfiguration() (*v1.RaftConfigurationResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	c, err := p.dialer.DialLeader(ctx)
+	c, err := p.dialer.DialNode(ctx, "")
 	if err != nil {
 		return nil, err
 	}
@@ -448,7 +448,7 @@ func (p *passthroughStorage) newStorageClient(ctx context.Context) (v1.StorageCl
 		return nil, nil, ErrClosed
 	default:
 	}
-	c, err := p.raft.dialer.DialLeader(ctx)
+	c, err := p.raft.dialer.DialNode(ctx, "")
 	if err != nil {
 		return nil, nil, err
 	}
