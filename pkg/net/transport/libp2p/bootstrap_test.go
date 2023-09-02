@@ -37,6 +37,7 @@ func TestBootstrapTransport(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("SingleNode", func(t *testing.T) {
+		t.Parallel()
 		rendezvous := fmt.Sprintf("%x", sha256.Sum256([]byte(uuid.New().String())))
 		announcer := &mockAnnouncer{}
 		transport, err := NewBootstrapTransport(ctx, announcer, BootstrapOptions{
@@ -45,9 +46,7 @@ func TestBootstrapTransport(t *testing.T) {
 			ElectionTimeout: time.Second,
 			Host: HostOptions{
 				ConnectTimeout: time.Second,
-				LocalAddrs: []multiaddr.Multiaddr{
-					multiaddr.StringCast("/ip6/::1/tcp/0"),
-				},
+				LocalAddrs:     []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::1/tcp/0")},
 			},
 		})
 		if err != nil {
@@ -69,7 +68,13 @@ func TestBootstrapTransport(t *testing.T) {
 		if !announcer.announced {
 			t.Fatalf("expected to announce")
 		}
+		// The leader UUID should be set to the local
+		if transport.UUID() != transport.LeaderUUID() {
+			t.Fatalf("expected leader uuid to be set to local")
+		}
 	})
+
+	// TODO: Test multi-node with offline DHT nodes
 }
 
 type mockAnnouncer struct {

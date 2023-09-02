@@ -21,16 +21,33 @@ package libp2p
 import (
 	"crypto/sha256"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	record "github.com/libp2p/go-libp2p-record"
+	"github.com/libp2p/go-libp2p/core/discovery"
+	"github.com/libp2p/go-libp2p/core/network"
+	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/util/crypto"
 )
+
+// BootstrapTransport implements bootstrap transport and returns the
+// local UUID that was used for voting.
+type BootstrapTransport interface {
+	transport.BootstrapTransport
+
+	// UUID returns the local UUID that was used for voting.
+	UUID() uuid.UUID
+	// LeaderUUID returns the UUID of the leader that was elected.
+	// This is only populated after leader election is complete.
+	LeaderUUID() uuid.UUID
+}
 
 // BootstrapOptions are options for the bootstrap transport.
 type BootstrapOptions struct {
@@ -54,12 +71,16 @@ type BootstrapOptions struct {
 
 // NewBootstrapTransport creates a new bootstrap transport. The host is closed
 // when leader election is complete.
-func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts BootstrapOptions) (transport.BootstrapTransport, error) {
+func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts BootstrapOptions) (BootstrapTransport, error) {
+	uu, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err
+	}
 	host, err := NewHost(ctx, opts.Host)
 	if err != nil {
 		return nil, err
 	}
-	return newBootstrapTransportWithClose(host, announcer, opts, func() {
+	return newBootstrapTransportWithClose(host, announcer, opts, uu, func() {
 		err := host.Close(ctx)
 		if err != nil {
 			context.LoggerFrom(ctx).Error("Failed to close host", "error", err.Error())
@@ -69,69 +90,89 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 
 // NewBootstrapTransportWithHost creates a new bootstrap transport with a host.
 // The host will remain open after leader election is complete.
-func NewBootstrapTransportWithHost(host Host, announcer Announcer, opts BootstrapOptions) transport.BootstrapTransport {
-	return newBootstrapTransportWithClose(host, announcer, opts, func() {})
+func NewBootstrapTransportWithHost(host Host, announcer Announcer, opts BootstrapOptions) (BootstrapTransport, error) {
+	uu, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err
+	}
+	return newBootstrapTransportWithClose(host, announcer, opts, uu, func() {}), nil
 }
 
-func newBootstrapTransportWithClose(host Host, announcer Announcer, opts BootstrapOptions, close func()) transport.BootstrapTransport {
+func newBootstrapTransportWithClose(host Host, announcer Announcer, opts BootstrapOptions, localUUID uuid.UUID, close func()) BootstrapTransport {
 	return &bootstrapTransport{
 		opts:      opts,
 		host:      host,
+		localUUID: localUUID,
 		announcer: announcer,
 		close:     close,
 	}
 }
 
 type bootstrapTransport struct {
-	opts      BootstrapOptions
-	host      Host
-	announcer Announcer
-	close     func()
+	opts                  BootstrapOptions
+	host                  Host
+	localUUID, leaderUUID uuid.UUID
+	announcer             Announcer
+	close                 func()
+}
+
+func (b *bootstrapTransport) UUID() uuid.UUID {
+	return b.localUUID
+}
+
+func (b *bootstrapTransport) LeaderUUID() uuid.UUID {
+	return b.leaderUUID
 }
 
 func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt transport.JoinRoundTripper, err error) {
 	resultKey := fmt.Sprintf("%x", sha256.Sum256([]byte(b.opts.Rendezvous)))
+	log := context.LoggerFrom(ctx).With(
+		"local-id", b.localUUID,
+		"rendezvous", b.opts.Rendezvous,
+		"host-id", b.host.ID(),
+		"result-key", resultKey,
+	)
 	signer := electionSigner{psk: b.opts.PSK}
 	b.host.DHT().Validator = newElectionValidator(signer.verify, b.opts.Rendezvous, resultKey)
 	hashResult := func(value []byte) string {
 		return fmt.Sprintf("%x", sha256.Sum256(value))
 	}
+	routingDiscovery := drouting.NewRoutingDiscovery(b.host.DHT())
 
-	// Generate and sign a uuid to write to the DHT, largest uuid wins
-	ourUUID, err := uuid.NewRandom()
-	if err != nil {
-		defer b.close()
-		return false, nil, fmt.Errorf("failed to generate join PSK: %w", err)
-	}
-	log := context.LoggerFrom(ctx).With("local-id", b.host.ID().String())
-	vote, err := signer.sign(ourUUID[:])
+	vote, err := signer.sign(b.localUUID[:])
 	if err != nil {
 		defer b.close()
 		return false, nil, fmt.Errorf("failed to sign our UUID: %w", err)
 	}
+	log = log.With("vote", hashResult(vote))
 
-	var leaderUUID uuid.UUID = ourUUID
-	var voterCount int
-
-	// Do leader election
-	electionDone := time.After(b.opts.ElectionTimeout)
-	log.Debug("Writing our UUID to the rendezvous", "rendezvous", b.opts.Rendezvous, "value", ourUUID.String())
-	err = b.host.DHT().PutValue(ctx, b.opts.Rendezvous, vote)
+	log.Debug("Advertising leader election and setting up stream handler")
+	acceptc := make(chan network.Stream, 1)
+	b.host.Host().SetStreamHandler(BootstrapProtocol, func(s network.Stream) {
+		go func() { acceptc <- s }()
+	})
+	defer b.host.Host().RemoveStreamHandler(BootstrapProtocol)
+	advertiseCtx, advertiseCancel := context.WithCancel(ctx)
+	dutil.Advertise(advertiseCtx, routingDiscovery, b.opts.Rendezvous, discovery.TTL(b.opts.ElectionTimeout))
+	peerc, err := routingDiscovery.FindPeers(ctx, b.opts.Rendezvous)
 	if err != nil {
 		defer b.close()
-		return false, nil, fmt.Errorf("failed to put our UUID to DHT: %w", err)
+		return false, nil, fmt.Errorf("libp2p find peers: %w", err)
 	}
-	log.Debug("Searching for other values")
-	electionValues, err := b.host.DHT().SearchValue(ctx, b.opts.Rendezvous)
-	if err != nil {
-		defer b.close()
-		return false, nil, fmt.Errorf("failed to search DHT for host IDs: %w", err)
-	}
+	log.Debug("Searching for results from a previous election")
 	electionResults, err := b.host.DHT().SearchValue(ctx, resultKey)
 	if err != nil {
 		defer b.close()
 		return false, nil, fmt.Errorf("failed to search DHT for election results: %w", err)
 	}
+
+	// Do leader election
+	var leaderUUID uuid.UUID = b.localUUID
+	var voterCount int
+	var votemu sync.Mutex
+
+	log.Debug("Starting leader election")
+	electionDone := time.After(b.opts.ElectionTimeout)
 
 LeaderElect:
 	for {
@@ -139,11 +180,12 @@ LeaderElect:
 		case <-ctx.Done():
 			return false, nil, ctx.Err()
 		case <-electionDone:
-			log.Debug("Election timeout", "leader", leaderUUID, "voters", voterCount)
+			log.Debug("Election timeout", "num-voters", voterCount)
 			break LeaderElect
 		case result := <-electionResults:
 			// Verify the signature of the value
-			_, err := signer.verify(result)
+			log.Debug("Found a previous election result", "key", resultKey, "value", hashResult(result))
+			leader, err := signer.verify(result)
 			if err != nil {
 				log.Error("Invalid election result", "error", err.Error())
 				// This is not a valid election result. Someone might be playing games.
@@ -151,53 +193,87 @@ LeaderElect:
 				continue
 			}
 			// This is a valid election result. Use it.
+			b.leaderUUID = leader
+			defer advertiseCancel()
 			defer b.close()
 			rt = NewJoinRoundTripperWithHost(b.host, RoundTripOptions{
 				Rendezvous: hashResult(result),
 				Method:     v1.Membership_Join_FullMethodName,
 			})
 			return false, rt, transport.ErrAlreadyBootstrapped
-		case vote := <-electionValues:
-			if vote == nil {
+		case voter := <-acceptc:
+			go func() {
+				votemu.Lock()
+				defer votemu.Unlock()
+				select {
+				case <-electionDone:
+					return
+				case <-advertiseCtx.Done():
+					return
+				default:
+				}
+				log.Debug("Received a vote", "remote-host-id", voter.Conn().RemotePeer().String())
+				defer voter.Close()
+				buf := make([]byte, len(vote))
+				_, err := voter.Read(buf)
+				if err != nil {
+					log.Error("Failed to read vote", "error", err.Error())
+					return
+				}
+				remoteUUID, err := signer.verify(buf)
+				if err != nil {
+					log.Error("Invalid election vote", "error", err.Error())
+					// This is not a valid election vote. Someone might be playing games.
+					// Ignore them.
+					return
+				}
+				log.Debug("Vote is valid", "remote-vote", hashResult(buf))
+				if remoteUUID.String() == leaderUUID.String() {
+					return
+				}
+				if remoteUUID.String() > leaderUUID.String() {
+					log.Debug("Found a new leader", "remote-vote", hashResult(buf))
+					leaderUUID = remoteUUID
+				}
+				voterCount++
+			}()
+		case voter := <-peerc:
+			if voter.ID == b.host.ID() {
 				continue
 			}
-			remoteUUID, err := signer.verify(vote)
-			if err != nil {
-				log.Error("Invalid election vote", "error", err.Error())
-				// This is not a valid election vote. Someone might be playing games.
-				// Ignore them.
-				continue
-			}
-			if err != nil {
-				log.Error("Invalid election vote", "error", err.Error())
-				continue
-			}
-			if err != nil {
-				log.Error("Failed to unmarshal UUID from DHT", "error", err.Error())
-				continue
-			}
-			log.Debug("Found another host id", "remote-id", remoteUUID.String())
-			if remoteUUID.String() == leaderUUID.String() {
-				continue
-			}
-			if remoteUUID.String() > leaderUUID.String() {
-				log.Debug("Found a new leader", "remote-id", remoteUUID.String())
-				leaderUUID = remoteUUID
-			}
-			voterCount++
-			continue
+			go func() {
+				log.Debug("Found a voter", "remote-host-id", voter.ID.String())
+				connectCtx, cancel := context.WithTimeout(ctx, b.opts.Host.ConnectTimeout)
+				defer cancel()
+				conn, err := b.host.Host().NewStream(connectCtx, voter.ID, BootstrapProtocol)
+				if err != nil {
+					log.Error("Failed to create stream", "error", err.Error())
+					return
+				}
+				defer conn.Close()
+				log.Debug("Sending vote", "remote-host-id", voter.ID.String())
+				_, err = conn.Write(vote)
+				if err != nil {
+					log.Error("Failed to write vote", "error", err.Error())
+				}
+			}()
 		}
 	}
+
+	advertiseCancel()
+
 	if voterCount == 0 {
 		log.Warn("No other voters found within the election period")
 	}
-	if leaderUUID.String() == ourUUID.String() {
+	if leaderUUID.String() == b.localUUID.String() {
 		// Start an announcer for the others to join
 		log.Debug("We are the leader", "voters", voterCount)
 		isLeader = true
 	} else {
 		log.Debug("We were not elected leader", "leader", leaderUUID.String(), "voters", voterCount)
 	}
+
+	b.leaderUUID = leaderUUID
 
 	// The winner signs their UUID and writes it to the DHT at a deterministic
 	// hash of the initial rendezvous string. This is the string that the others
