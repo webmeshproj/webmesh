@@ -57,7 +57,7 @@ func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 		PSK:            psk,
 		Discover:       psk != "",
 		AnnounceTTL:    time.Minute,
-		ConnectTimeout: 5 * time.Second,
+		ConnectTimeout: 3 * time.Second,
 	}
 }
 
@@ -69,7 +69,7 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringSliceVar(&o.BootstrapServers, prefix+"discovery.bootstrap-servers", nil, "list of bootstrap servers to use for the DHT")
 	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", time.Minute, "TTL for the announcement")
 	fs.StringSliceVar(&o.LocalAddrs, prefix+"discovery.local-addrs", nil, "list of local addresses to announce to the discovery service")
-	fs.DurationVar(&o.ConnectTimeout, prefix+"discovery.connect-timeout", 5*time.Second, "timeout for connecting to a peer")
+	fs.DurationVar(&o.ConnectTimeout, prefix+"discovery.connect-timeout", 3*time.Second, "timeout for connecting to a peer")
 }
 
 // NewHostConfig returns a new HostOptions for the discovery config.

@@ -42,7 +42,7 @@ func TestBootstrapTransport(t *testing.T) {
 		announcer := &mockAnnouncer{}
 		transport, err := NewBootstrapTransport(ctx, announcer, BootstrapOptions{
 			Rendezvous:      rendezvous,
-			PSK:             crypto.MustGeneratePSK(),
+			Signer:          crypto.MustGeneratePSK(),
 			ElectionTimeout: time.Second,
 			Host: HostOptions{
 				ConnectTimeout: time.Second,

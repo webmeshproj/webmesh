@@ -54,9 +54,8 @@ type BootstrapOptions struct {
 	// Rendezvous is the rendezvous string to use for the transport.
 	// This should be the same for all sides of the transport.
 	Rendezvous string
-	// PSK a pre-shared key used to sign the results of the election.
-	// This should be the same for all sides of the transport.
-	PSK crypto.PSK
+	// Signer is provided to sign and verify the UUIDs of the voters.
+	Signer crypto.Signer
 	// Host are options for configuring a host if one is not provided.
 	Host HostOptions
 	// ElectionTimeout is the election timeout. The election timeout should
@@ -132,7 +131,7 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		"host-id", b.host.ID(),
 		"result-key", resultKey,
 	)
-	signer := electionSigner{psk: b.opts.PSK}
+	signer := electionSigner{signer: b.opts.Signer}
 	b.host.DHT().Validator = newElectionValidator(signer.verify, b.opts.Rendezvous, resultKey)
 	hashResult := func(value []byte) string {
 		return fmt.Sprintf("%x", sha256.Sum256(value))
@@ -333,11 +332,11 @@ LeaderElect:
 const uuidSize = len(uuid.UUID{})
 
 type electionSigner struct {
-	psk crypto.PSK
+	signer crypto.Signer
 }
 
 func (s *electionSigner) sign(value []byte) ([]byte, error) {
-	sig, err := s.psk.Sign(value)
+	sig, err := s.signer.Sign(value)
 	if err != nil {
 		return nil, err
 	}
@@ -345,13 +344,13 @@ func (s *electionSigner) sign(value []byte) ([]byte, error) {
 }
 
 func (s *electionSigner) verify(value []byte) (uuid.UUID, error) {
-	sigSize := s.psk.SignatureSize()
+	sigSize := s.signer.SignatureSize()
 	if len(value) < uuidSize+sigSize {
 		return uuid.UUID{}, fmt.Errorf("invalid value length")
 	}
 	remoteUUID := value[:len(value)-sigSize]
 	sig := value[len(value)-sigSize:]
-	err := s.psk.Verify(remoteUUID, sig)
+	err := s.signer.Verify(remoteUUID, sig)
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("invalid signature: %w", err)
 	}

@@ -321,15 +321,25 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 	// Configure any bootstrap options
 	var bootstrap *mesh.BootstrapOptions
 	if o.Bootstrap.Enabled {
+		rt, err := o.NewBootstrapTransport(ctx, nodeid, conn)
+		if err != nil {
+			return opts, fmt.Errorf("create bootstrap transport: %w", err)
+		}
 		var bootstrapServers []string
-		for id := range o.Bootstrap.Servers {
+		for id := range o.Bootstrap.Transport.TCPServers {
+			if id == nodeid {
+				continue
+			}
+			bootstrapServers = append(bootstrapServers, id)
+		}
+		for _, id := range o.Bootstrap.Transport.RendezvousNodes {
 			if id == nodeid {
 				continue
 			}
 			bootstrapServers = append(bootstrapServers, id)
 		}
 		bootstrap = &mesh.BootstrapOptions{
-			Transport:            o.NewBootstrapTransport(nodeid, conn),
+			Transport:            rt,
 			IPv4Network:          o.Bootstrap.IPv4Network,
 			MeshDomain:           o.Bootstrap.MeshDomain,
 			Admin:                o.Bootstrap.Admin,
@@ -422,7 +432,7 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 	if o.Bootstrap.Enabled {
 		// Our join transport is the gRPC transport to other bootstrap nodes
 		var addrs []string
-		for id, addr := range o.Bootstrap.Servers {
+		for id, addr := range o.Bootstrap.Transport.TCPServers {
 			if id == nodeID {
 				continue
 			}
@@ -431,8 +441,8 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 				return nil, fmt.Errorf("invalid bootstrap server address: %w", err)
 			}
 			var addr string
-			if len(o.Bootstrap.ServersGRPCPorts) > 0 && o.Bootstrap.ServersGRPCPorts[host] != 0 {
-				addr = net.JoinHostPort(host, fmt.Sprintf("%d", o.Bootstrap.ServersGRPCPorts[host]))
+			if len(o.Bootstrap.Transport.ServerGRPCPorts) > 0 && o.Bootstrap.Transport.ServerGRPCPorts[host] != 0 {
+				addr = net.JoinHostPort(host, fmt.Sprintf("%d", o.Bootstrap.Transport.ServerGRPCPorts[host]))
 			} else {
 				// Assume the default port
 				addr = net.JoinHostPort(host, fmt.Sprintf("%d", services.DefaultGRPCPort))

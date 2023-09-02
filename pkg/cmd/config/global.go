@@ -158,12 +158,12 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 			o.Mesh.PrimaryEndpoint = primaryEndpoint.String()
 		}
 		// If the bootstrap advertise address was not set yet, set it
-		if o.Bootstrap.Enabled && o.Bootstrap.AdvertiseAddress == "" {
-			_, port, err := net.SplitHostPort(o.Bootstrap.ListenAddress)
+		if o.Bootstrap.Enabled && o.Bootstrap.Transport.TCPAdvertiseAddress == "" {
+			_, port, err := net.SplitHostPort(o.Bootstrap.Transport.TCPListenAddress)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse bootstrap listen address: %w", err)
 			}
-			o.Bootstrap.AdvertiseAddress = net.JoinHostPort(primaryEndpoint.String(), port)
+			o.Bootstrap.Transport.TCPAdvertiseAddress = net.JoinHostPort(primaryEndpoint.String(), port)
 		}
 		// Set the wireguard endpoints if they were not configured
 		if len(o.WireGuard.Endpoints) == 0 {
