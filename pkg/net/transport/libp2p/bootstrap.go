@@ -19,6 +19,7 @@ limitations under the License.
 package libp2p
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"sync"
@@ -146,6 +147,7 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		"rendezvous", b.opts.Rendezvous,
 		"host-id", b.host.ID(),
 		"result-key", resultKey,
+		"local-uuid", b.localUUID,
 	)
 
 	vote, err := signer.sign(b.localUUID)
@@ -153,12 +155,11 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		defer b.close()
 		return false, nil, fmt.Errorf("failed to sign our UUID: %w", err)
 	}
-	log = log.With("local-vote", hash(vote))
 
 	log.Debug("Advertising leader election and setting up stream handler")
 	acceptc := make(chan network.Stream, 100)
 	b.host.Host().SetStreamHandler(BootstrapProtocol, func(s network.Stream) {
-		go func() { acceptc <- s }()
+		acceptc <- s
 	})
 	defer b.host.Host().RemoveStreamHandler(BootstrapProtocol)
 
@@ -167,14 +168,13 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	routingDiscovery := drouting.NewRoutingDiscovery(b.host.DHT())
 	dutil.Advertise(advertiseCtx, routingDiscovery, b.opts.Rendezvous, discovery.TTL(b.opts.ElectionTimeout))
 
-	electionTimeout := time.After(b.opts.ElectionTimeout)
 	seenPeers := make(map[peer.ID]struct{})
 	peerc := make(chan peer.AddrInfo, 100)
 	go func(rendezvous string) {
 		defer close(peerc)
 		for {
 			select {
-			case <-electionTimeout:
+			case <-electionContext.Done():
 				return
 			default:
 			}
@@ -211,11 +211,11 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 
 	// Do leader election
 	var votemu sync.Mutex
-	var votewait sync.WaitGroup
 	seenvotes := make(map[uuid.UUID]struct{})
 	seenvotes[b.localUUID] = struct{}{}
 
 	log.Info("Starting leader election")
+	electionTimeout := time.After(b.opts.ElectionTimeout)
 
 LeaderElect:
 	for {
@@ -238,8 +238,6 @@ LeaderElect:
 			leader, err := signer.deterministicVerify(result)
 			if err != nil {
 				log.Warn("Invalid election result", "error", err.Error())
-				// This is not a valid election result. Someone might be playing games.
-				// Ignore them.
 				continue
 			}
 			defer electionCancel()
@@ -251,31 +249,22 @@ LeaderElect:
 			}, b.close)
 			return false, rt, transport.ErrAlreadyBootstrapped
 		case voter := <-acceptc:
-			votewait.Add(1)
-			go func(voter network.Stream) {
-				defer votewait.Done()
-				defer voter.Close()
+			func(conn network.Stream) {
+				defer conn.Close()
 				votemu.Lock()
 				defer votemu.Unlock()
-				vlog := log.With("remote-host-id", voter.Conn().RemotePeer().String())
+				rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+				vlog := log.With("remote-host-id", conn.Conn().RemotePeer().String())
 				vlog.Debug("Received a vote connection from a peer")
-				buf := make([]byte, len(vote))
-				n, err := voter.Read(buf)
+				remoteVote, err := rw.ReadBytes('\x00')
 				if err != nil {
-					if err != io.EOF {
-						vlog.Error("Failed to read vote", "error", err.Error())
-						return
-					}
-					if n == 0 {
-						vlog.Debug("Vote connection closed before receiving vote")
-						return
-					}
+					vlog.Error("Failed to read vote", "error", err.Error())
+					return
 				}
-				remoteUUID, err := signer.verify(buf)
+				remoteVote = remoteVote[:len(remoteVote)-1]
+				remoteUUID, err := signer.verify(remoteVote)
 				if err != nil {
 					vlog.Warn("Invalid election vote", "error", err.Error())
-					// This is not a valid election vote. Someone might be playing games.
-					// Ignore them.
 					return
 				}
 				vlog = vlog.With("remote-vote", remoteUUID.String())
@@ -283,9 +272,14 @@ LeaderElect:
 				seenvotes[remoteUUID] = struct{}{}
 				// Write our vote to the wire
 				vlog.Debug("Sending our vote to remote peer")
-				_, err = voter.Write(vote)
+				_, err = rw.Write(append(vote, '\x00'))
 				if err != nil {
 					vlog.Error("Failed to write vote", "error", err.Error())
+					return
+				}
+				err = rw.Flush()
+				if err != nil {
+					vlog.Error("Failed to flush vote", "error", err.Error())
 					return
 				}
 				vlog.Info("Sent our vote to remote peer")
@@ -295,13 +289,11 @@ LeaderElect:
 				}
 			}(voter)
 		case voter := <-peerc:
-			votewait.Add(1)
-			go func(voter peer.AddrInfo) {
-				defer votewait.Done()
+			func() {
 				votemu.Lock()
 				defer votemu.Unlock()
 				vlog := log.With("remote-host-id", voter.ID)
-				vlog.Debug("Found another voter to dial")
+				vlog.Debug("Found a voter to dial")
 				ctx := context.Background()
 				if b.opts.Host.ConnectTimeout > 0 {
 					var cancel context.CancelFunc
@@ -314,26 +306,31 @@ LeaderElect:
 					return
 				}
 				defer conn.Close()
+				rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 				vlog.Debug("Sending our vote to remote peer")
-				_, err = conn.Write(vote)
+				_, err = rw.Write(append(vote, '\x00'))
 				if err != nil {
 					vlog.Error("Failed to write vote", "error", err.Error())
+					return
+				}
+				err = rw.Flush()
+				if err != nil {
+					vlog.Error("Failed to flush vote", "error", err.Error())
+					return
 				}
 				vlog.Info("Sent our vote to remote peer")
 				// Read their vote off the wire
-				buf := make([]byte, len(vote))
-				n, err := conn.Read(buf)
+				vlog.Debug("Reading vote from remote peer")
+				resp, err := rw.ReadBytes('\x00')
 				if err != nil {
-					if err != io.EOF {
+					if err != io.EOF || len(resp) == 0 {
 						vlog.Error("Failed to read vote", "error", err.Error())
 						return
 					}
-					if n == 0 {
-						vlog.Debug("Vote connection closed before receiving vote")
-						return
-					}
 				}
-				remoteUUID, err := signer.verify(buf)
+				resp = resp[:len(resp)-1]
+				conn.Close()
+				remoteUUID, err := signer.verify(resp)
 				if err != nil {
 					vlog.Warn("Invalid election vote", "error", err.Error())
 					return
@@ -345,11 +342,10 @@ LeaderElect:
 					vlog.Info("All votes received, stopping election early")
 					electionCancel()
 				}
-			}(voter)
+			}()
 		}
 	}
 
-	votewait.Wait()
 	numVotes := len(seenvotes)
 
 	// Determine the leader by who has the largest vote

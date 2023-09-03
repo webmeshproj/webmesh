@@ -23,6 +23,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/relay"
@@ -56,11 +57,10 @@ func NewUDPRelayWithHost(ctx context.Context, host Host, opts UDPRelayOptions) (
 	return newUDPRelayWithHostAndCloseFunc(ctx, host, opts, func() error { return nil })
 }
 
-func newUDPRelayWithHostAndCloseFunc(ctx context.Context, host Host, opts UDPRelayOptions, closef func() error) (*UDPRelay, error) {
-	log := context.LoggerFrom(ctx).With("udp-relay", "libp2p")
+func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDPRelayOptions, closef func() error) (*UDPRelay, error) {
+	log := context.LoggerFrom(logCtx).With("udp-relay", "libp2p")
 	log = log.With(slog.String("host-id", host.ID().String()))
-	ctx = context.WithLogger(ctx, log)
-	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
+	logCtx = context.WithLogger(logCtx, log)
 	log.Debug("Searching for peers on the DHT with our rendezvous string")
 	// We create two relays. One that is just for incoming traffic and one
 	// that we will use for both outgoing and incoming traffic.
@@ -77,13 +77,15 @@ func newUDPRelayWithHostAndCloseFunc(ctx context.Context, host Host, opts UDPRel
 		log.Debug("Handling incoming protocol stream", "peer", s.Conn().RemotePeer())
 		defer s.Close()
 		defer rxrelay.Close()
-		if err := rxrelay.Relay(ctx, s); err != nil {
+		if err := rxrelay.Relay(logCtx, s); err != nil {
 			log.Error("Relay error", "error", err)
 		}
 	})
 	errs := make(chan error, 1)
 	closec := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
+	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
+	dutil.Advertise(ctx, routingDiscovery, opts.Rendezvous)
 	go func() {
 		defer host.Host().RemoveStreamHandler(UDPRelayProtocolFor(opts.LocalNode))
 		defer close(closec)
@@ -114,7 +116,11 @@ func newUDPRelayWithHostAndCloseFunc(ctx context.Context, host Host, opts UDPRel
 						continue
 					}
 					log.Debug("Found peer", "peer", peer.ID)
-					connectCtx, connectCancel := context.WithTimeout(context.Background(), opts.Host.ConnectTimeout)
+					var connectCtx context.Context = context.Background()
+					var connectCancel context.CancelFunc = func() {}
+					if opts.Host.ConnectTimeout > 0 {
+						connectCtx, connectCancel = context.WithTimeout(context.Background(), opts.Host.ConnectTimeout)
+					}
 					stream, err := host.Host().NewStream(connectCtx, peer.ID, UDPRelayProtocolFor(opts.RemoteNode))
 					connectCancel()
 					if err != nil {
