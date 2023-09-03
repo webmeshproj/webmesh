@@ -97,6 +97,7 @@ func (s *meshStoreAnnouncer) proxyJoin(ctx context.Context, req *v1.JoinRequest)
 	// We don't need to go through the extra overhead of dialing
 	// ourself if we are the current leader. This is a TODO.
 	log := context.LoggerFrom(ctx)
+	log.Info("Proxying join to cluster")
 	c, err := s.dialer.DialLeader(ctx)
 	if err != nil {
 		log.Error("Failed to dial leader", slog.String("error", err.Error()))

@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/uuid"
 	record "github.com/libp2p/go-libp2p-record"
+	dcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -112,16 +113,27 @@ func newBootstrapTransportWithClose(host Host, announcer Announcer, opts Bootstr
 		host:      host,
 		localUUID: localUUID,
 		announcer: announcer,
-		close:     close,
+		signer:    &electionSigner{signer: opts.Signer},
+		seenVotes: map[uuid.UUID]struct{}{
+			localUUID: {},
+		},
+		electionCancel: func() {},
+		close:          close,
 	}
 }
 
 type bootstrapTransport struct {
 	opts                  BootstrapOptions
 	host                  Host
+	privKey               dcrypto.PrivKey
 	localUUID, leaderUUID uuid.UUID
 	announcer             Announcer
+	signer                *electionSigner
+	seenVotes             map[uuid.UUID]struct{}
+	voteData              []byte
+	electionCancel        func()
 	close                 func()
+	mu                    sync.Mutex
 }
 
 func (b *bootstrapTransport) UUID() uuid.UUID {
@@ -133,17 +145,22 @@ func (b *bootstrapTransport) LeaderUUID() uuid.UUID {
 }
 
 func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt transport.JoinRoundTripper, err error) {
-	privKey := b.host.Host().Peerstore().PrivKey(b.host.Host().ID())
-	if err != nil {
-		return false, nil, fmt.Errorf("failed to extract public key from host ID: %w", err)
-	}
+	b.privKey = b.host.Host().Peerstore().PrivKey(b.host.Host().ID())
 	hash := func(value []byte) string {
 		return fmt.Sprintf("%x", sha3.Sum224(value))
 	}
 	electionContext, electionCancel := context.WithCancel(ctx)
+	b.electionCancel = electionCancel
+
 	signer := electionSigner{signer: b.opts.Signer}
 	b.host.DHT().Validator = newElectionValidator()
 	resultKey := hash([]byte(b.opts.Rendezvous))
+	vote, err := signer.sign(b.localUUID)
+	if err != nil {
+		defer b.close()
+		return false, nil, fmt.Errorf("failed to sign our UUID: %w", err)
+	}
+	b.voteData = append(vote, '\x00')
 	log := context.LoggerFrom(ctx).With(
 		"rendezvous", b.opts.Rendezvous,
 		"host-id", b.host.ID(),
@@ -151,116 +168,19 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		"local-uuid", b.localUUID,
 	)
 
-	vote, err := signer.sign(b.localUUID)
-	if err != nil {
-		defer b.close()
-		return false, nil, fmt.Errorf("failed to sign our UUID: %w", err)
-	}
-
 	log.Debug("Advertising leader election and setting up stream handler")
 	acceptc := make(chan network.Stream, 100)
 	b.host.Host().SetStreamHandler(BootstrapProtocol, func(s network.Stream) {
 		acceptc <- s
 	})
-	advertiseCtx, advertiseCancel := context.WithCancel(context.Background())
-	defer advertiseCancel()
-	routingDiscovery := drouting.NewRoutingDiscovery(b.host.DHT())
-	dutil.Advertise(advertiseCtx, routingDiscovery, b.opts.Rendezvous, discovery.TTL(b.opts.ElectionTimeout))
-
-	seenPeers := make(map[peer.ID]struct{})
 	listenCtx, listenCancel := context.WithCancel(context.Background())
-	peerc := make(chan peer.AddrInfo, 100)
-	go func(rendezvous string) {
-		defer close(peerc)
-		for {
-			select {
-			case <-listenCtx.Done():
-				return
-			default:
-			}
-			log.Debug("Searching for remote voters")
-			peers, err := routingDiscovery.FindPeers(context.Background(), rendezvous)
-			if err != nil {
-				log.Warn("Failed to find peers", "error", err.Error())
-				return
-			}
-			for p := range peers {
-				if p.ID == "" || len(p.Addrs) == 0 || p.ID == b.host.ID() || p.ID.MatchesPrivateKey(privKey) {
-					continue
-				}
-				for peer := range seenPeers {
-					key, err := p.ID.ExtractPublicKey()
-					if err == nil && peer.MatchesPublicKey(key) {
-						continue
-					} else if err != nil {
-						log.Warn("Failed to extract public key from peer", "error", err.Error())
-					}
-				}
-				seenPeers[p.ID] = struct{}{}
-				peerc <- p
-			}
-		}
-	}(b.opts.Rendezvous)
+	routingDiscovery := drouting.NewRoutingDiscovery(b.host.DHT())
+	dutil.Advertise(listenCtx, routingDiscovery, b.opts.Rendezvous, discovery.TTL(b.opts.ElectionTimeout))
 
-	var votemu sync.Mutex
-	seenvotes := make(map[uuid.UUID]struct{})
-	seenvotes[b.localUUID] = struct{}{}
-	handleIncoming := func(conn network.Stream, result string) {
-		defer conn.Close()
-		votemu.Lock()
-		defer votemu.Unlock()
-		rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-		vlog := log.With("remote-host-id", conn.Conn().RemotePeer().String())
-		vlog.Info("Received a vote connection from a peer")
-		remoteVote, err := rw.ReadBytes('\x00')
-		if err != nil {
-			vlog.Error("Failed to read vote", "error", err.Error())
-			return
-		}
-		remoteVote = remoteVote[:len(remoteVote)-1]
-		remoteUUID, err := signer.verify(remoteVote)
-		if err != nil {
-			vlog.Warn("Invalid election vote", "error", err.Error())
-			return
-		}
-		vlog = vlog.With("remote-vote", remoteUUID.String())
-		vlog.Info("Vote has a valid signature")
-		seenvotes[remoteUUID] = struct{}{}
-		// Write our vote to the wire
-		if result != "" {
-			// There is already an election result
-			vlog.Info("Election already has a result, sending it to remote peer")
-			res := append([]byte("result:"), []byte(result)...)
-			_, err = rw.Write(append(res, '\x00'))
-			if err != nil {
-				vlog.Error("Failed to write election result", "error", err.Error())
-				return
-			}
-			err = rw.Flush()
-			if err != nil {
-				vlog.Error("Failed to flush election result", "error", err.Error())
-				return
-			}
-			vlog.Info("Sent election result to remote peer")
-			return
-		}
-		vlog.Info("Sending our vote to remote peer")
-		_, err = rw.Write(append(vote, '\x00'))
-		if err != nil {
-			vlog.Error("Failed to write vote", "error", err.Error())
-			return
-		}
-		err = rw.Flush()
-		if err != nil {
-			vlog.Error("Failed to flush vote", "error", err.Error())
-			return
-		}
-		vlog.Info("Sent our vote to remote peer")
-		if len(seenvotes) == len(b.opts.NodeIDs)+1 {
-			vlog.Info("All votes received, stopping election early")
-			electionCancel()
-		}
-	}
+	discoveryCtx, discoveryCancel := context.WithCancel(context.Background())
+	peerc := make(chan peer.AddrInfo, 100)
+	go b.discoverPeers(discoveryCtx, routingDiscovery, peerc)
+	defer discoveryCancel()
 
 	// Do leader election
 	log.Info("Starting leader election")
@@ -272,83 +192,22 @@ LeaderElect:
 		case <-ctx.Done():
 			return false, nil, ctx.Err()
 		case <-electionContext.Done():
-			log.Info("Election finished", "num-voters", len(seenvotes))
+			log.Info("Election finished", "num-voters", len(b.seenVotes))
 			break LeaderElect
 		case <-electionTimeout:
 			electionCancel()
-			log.Info("Election timed out", "num-voters", len(seenvotes))
+			log.Info("Election timed out", "num-voters", len(b.seenVotes))
 			break LeaderElect
-		case c := <-acceptc:
-			go handleIncoming(c, "")
+		case stream := <-acceptc:
+			go b.handleIncomingStream(context.WithLogger(ctx, log), stream, "")
 		case voter := <-peerc:
-			rendezvousPoint := func() (location string) {
-				votemu.Lock()
-				defer votemu.Unlock()
-				vlog := log.With("remote-host-id", voter.ID)
-				vlog.Debug("Found a voter to dial")
-				ctx := context.Background()
-				if b.opts.Host.ConnectTimeout > 0 {
-					var cancel context.CancelFunc
-					ctx, cancel = context.WithTimeout(ctx, b.opts.Host.ConnectTimeout)
-					defer cancel()
-				}
-				conn, err := b.host.Host().NewStream(ctx, voter.ID, BootstrapProtocol)
-				if err != nil {
-					vlog.Debug("Failed to create stream to voter", "error", err.Error())
-					return
-				}
-				defer conn.Close()
-				rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-				vlog.Info("Sending our vote to remote peer")
-				_, err = rw.Write(append(vote, '\x00'))
-				if err != nil {
-					vlog.Error("Failed to write vote", "error", err.Error())
-					return
-				}
-				err = rw.Flush()
-				if err != nil {
-					vlog.Error("Failed to flush vote", "error", err.Error())
-					return
-				}
-				vlog.Info("Sent our vote to remote peer")
-				// Read their vote off the wire
-				vlog.Info("Reading vote from remote peer")
-				resp, err := rw.ReadBytes('\x00')
-				if err != nil {
-					if err != io.EOF || len(resp) == 0 {
-						vlog.Error("Failed to read vote", "error", err.Error())
-						return
-					}
-				}
-				if bytes.HasPrefix(resp, []byte("result:")) {
-					// We were too late to the election and there is
-					// already a rendezvous point decided.
-					vlog.Info("Election already has a result, joining the cluster")
-					location = string(resp[len("result:"):])
-					return
-				}
-				resp = resp[:len(resp)-1]
-				conn.Close()
-				remoteUUID, err := signer.verify(resp)
-				if err != nil {
-					vlog.Warn("Invalid election vote", "error", err.Error())
-					return
-				}
-				vlog = vlog.With("remote-vote", remoteUUID.String())
-				vlog.Info("Received vote from peer with a valid signature")
-				seenvotes[remoteUUID] = struct{}{}
-				if len(seenvotes) == len(b.opts.NodeIDs)+1 {
-					vlog.Info("All votes received, stopping election early")
-					electionCancel()
-				}
-				return
-			}()
-			if rendezvousPoint != "" {
+			electionResult := b.handleDiscoveredPeer(context.WithLogger(ctx, log), voter)
+			if electionResult != "" {
 				// Go ahead and use the decided rendezvous point
 				defer listenCancel()
-				log.Info("Joining the cluster", "rendezvous", rendezvousPoint)
+				log.Info("Joining the cluster", "rendezvous", electionResult)
 				rt = newRoundTripperWithHostAndCloseFunc[v1.JoinRequest, v1.JoinResponse](b.host, RoundTripOptions{
-					Rendezvous: rendezvousPoint,
+					Rendezvous: electionResult,
 					Method:     v1.Membership_Join_FullMethodName,
 				}, b.close)
 				return false, rt, transport.ErrAlreadyBootstrapped
@@ -356,14 +215,16 @@ LeaderElect:
 		}
 	}
 
-	numVotes := len(seenvotes)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	numVotes := len(b.seenVotes)
 
 	// Determine the leader by who has the largest vote
 	if numVotes == 0 {
 		log.Warn("No other voters found within the election period")
 	}
 	var leaderUUID uuid.UUID = b.localUUID
-	for vote := range seenvotes {
+	for vote := range b.seenVotes {
 		if vote.String() > leaderUUID.String() {
 			leaderUUID = vote
 		}
@@ -418,7 +279,7 @@ LeaderElect:
 				case <-expired:
 					break Linger
 				case c := <-acceptc:
-					go handleIncoming(c, joinRendezvous)
+					go b.handleIncomingStream(ctx, c, joinRendezvous)
 				}
 			}
 			<-time.After(b.opts.Linger)
@@ -436,6 +297,176 @@ LeaderElect:
 		Method:     v1.Membership_Join_FullMethodName,
 	}, b.close)
 	return
+}
+
+func (b *bootstrapTransport) discoverPeers(ctx context.Context, discovery *drouting.RoutingDiscovery, peerc chan peer.AddrInfo) {
+	log := context.LoggerFrom(ctx)
+	seenPeers := make(map[peer.ID]struct{})
+	defer close(peerc)
+FindPeers:
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		log.Debug("Searching for remote voters")
+		peers, err := discovery.FindPeers(ctx, b.opts.Rendezvous)
+		if err != nil {
+			log.Warn("Failed to find peers", "error", err.Error())
+			return
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case p, ok := <-peers:
+				if !ok {
+					continue FindPeers
+				}
+				key, err := p.ID.ExtractPublicKey()
+				if err != nil {
+					log.Warn("Failed to extract public key from peer", "error", err.Error())
+					continue
+				}
+				if p.ID == "" || len(p.Addrs) == 0 || p.ID == b.host.ID() || key.Equals(b.privKey.GetPublic()) {
+					continue
+				}
+				for peer := range seenPeers {
+					key, err := p.ID.ExtractPublicKey()
+					if err == nil && peer.MatchesPublicKey(key) {
+						continue
+					} else if err != nil {
+						log.Warn("Failed to extract public key from peer", "error", err.Error())
+					}
+				}
+				seenPeers[p.ID] = struct{}{}
+				peerc <- p
+			}
+		}
+	}
+}
+
+func (b *bootstrapTransport) handleIncomingStream(ctx context.Context, stream network.Stream, electionResult string) {
+	defer b.checkFinished(ctx)
+	defer stream.Close()
+	vlog := context.LoggerFrom(ctx).With("remote-host-id", stream.Conn().RemotePeer().String())
+	rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+	vlog.Debug("Received a vote connection from a peer")
+	remoteVote, err := rw.ReadBytes('\x00')
+	if err != nil {
+		if err != io.EOF || len(remoteVote) == 0 {
+			vlog.Error("Failed to read vote", "error", err.Error())
+			return
+		}
+	}
+	remoteVote = remoteVote[:len(remoteVote)-1]
+	remoteUUID, err := b.signer.verify(remoteVote)
+	if err != nil {
+		vlog.Warn("Invalid election vote", "error", err.Error())
+		return
+	}
+	vlog = vlog.With("remote-vote", remoteUUID.String())
+	vlog.Info("Received new vote with a valid signature")
+	if electionResult == "" {
+		// The election is still ongoing, send our vote
+		vlog.Info("Sending our vote to remote peer")
+		_, err = rw.Write(b.voteData)
+		if err != nil {
+			vlog.Error("Failed to write vote", "error", err.Error())
+			return
+		}
+		err = rw.Flush()
+		if err != nil {
+			vlog.Error("Failed to flush vote", "error", err.Error())
+			return
+		}
+		vlog.Debug("Sent our vote to remote peer")
+		b.mu.Lock()
+		b.seenVotes[remoteUUID] = struct{}{}
+		b.mu.Unlock()
+		return
+	}
+	// We already have an election result, notify the remote peer of it.
+	vlog.Info("Election already has a result, sending it to remote peer")
+	res := append([]byte("result:"), []byte(electionResult)...)
+	_, err = rw.Write(append(res, '\x00'))
+	if err != nil {
+		vlog.Error("Failed to write election result", "error", err.Error())
+		return
+	}
+	err = rw.Flush()
+	if err != nil {
+		vlog.Error("Failed to flush election result", "error", err.Error())
+		return
+	}
+	vlog.Info("Sent election result to remote peer")
+}
+
+func (b *bootstrapTransport) handleDiscoveredPeer(ctx context.Context, peer peer.AddrInfo) (electionResult string) {
+	defer b.checkFinished(ctx)
+	vlog := context.LoggerFrom(ctx).With("remote-host-id", peer.ID)
+	connectctx := context.Background()
+	if b.opts.Host.ConnectTimeout > 0 {
+		var cancel context.CancelFunc
+		connectctx, cancel = context.WithTimeout(connectctx, b.opts.Host.ConnectTimeout)
+		defer cancel()
+	}
+	conn, err := b.host.Host().NewStream(connectctx, peer.ID, BootstrapProtocol)
+	if err != nil {
+		vlog.Debug("Failed to create stream to voter", "error", err.Error())
+		return
+	}
+	defer conn.Close()
+	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+	vlog.Info("Sending our vote to remote peer")
+	_, err = rw.Write(b.voteData)
+	if err != nil {
+		vlog.Error("Failed to write vote", "error", err.Error())
+		return
+	}
+	err = rw.Flush()
+	if err != nil {
+		vlog.Error("Failed to flush vote", "error", err.Error())
+		return
+	}
+	vlog.Debug("Sent our vote to remote peer")
+	vlog.Debug("Reading vote from remote peer")
+	resp, err := rw.ReadBytes('\x00')
+	if err != nil {
+		if err != io.EOF || len(resp) == 0 {
+			vlog.Error("Failed to read vote", "error", err.Error())
+			return
+		}
+	}
+	resp = resp[:len(resp)-1]
+	if bytes.HasPrefix(resp, []byte("result:")) {
+		// We were too late to the election and there is
+		// already a rendezvous point decided.
+		vlog.Info("Election already has a result, joining the cluster")
+		return string(resp[len("result:"):])
+	}
+	remoteUUID, err := b.signer.verify(resp)
+	if err != nil {
+		vlog.Warn("Invalid election vote", "error", err.Error())
+		return
+	}
+	vlog = vlog.With("remote-vote", remoteUUID.String())
+	b.mu.Lock()
+	vlog.Info("Received vote from peer with a valid signature")
+	b.seenVotes[remoteUUID] = struct{}{}
+	b.mu.Unlock()
+	return ""
+}
+
+func (b *bootstrapTransport) checkFinished(ctx context.Context) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	vlog := context.LoggerFrom(ctx)
+	if len(b.seenVotes) == len(b.opts.NodeIDs)+1 {
+		vlog.Info("All votes received, cancelling election")
+		b.electionCancel()
+	}
 }
 
 const uuidSize = len(uuid.UUID{})

@@ -29,10 +29,10 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.election-timeout=30s
-      - --bootstrap.transport.rendezvous=our-webmesh-meetup
+      - --bootstrap.election-timeout=${TIMEOUT:-60s}
+      - --bootstrap.transport.rendezvous=${RENDEZVOUS:-supersecret-webmesh-spot}
       - --bootstrap.transport.rendezvous-nodes=node-2
-      - --bootstrap.transport.psk=aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz
+      - --bootstrap.transport.psk=${PSK:-aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz}
       - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW"]
     sysctls:
@@ -51,10 +51,10 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.election-timeout=30s
-      - --bootstrap.transport.rendezvous=our-webmesh-meetup
+      - --bootstrap.election-timeout=${TIMEOUT:-60s}
+      - --bootstrap.transport.rendezvous=${RENDEZVOUS:-supersecret-webmesh-spot}
       - --bootstrap.transport.rendezvous-nodes=node-1
-      - --bootstrap.transport.psk=aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz
+      - --bootstrap.transport.psk=${PSK:-aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz}
       - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW"]
     sysctls:
