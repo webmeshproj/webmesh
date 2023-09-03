@@ -18,6 +18,8 @@ For more information, see the [configuration reference](https://webmeshproj.gith
 This example uses the `--mesh.ice-peers` flag to configure the nodes to connect directly via ICE.
 The `--mesh.ice-peers` flag takes a comma-separated list of peer IDs and ICE URLs.
 
+You can run the example with:
+
 ```bash
 docker-compose up
 ```
