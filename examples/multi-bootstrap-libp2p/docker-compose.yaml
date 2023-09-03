@@ -31,7 +31,7 @@ services:
       - --bootstrap.enabled
       - --bootstrap.election-timeout=${TIMEOUT:-60s}
       - --bootstrap.transport.rendezvous=${RENDEZVOUS:-supersecret-webmesh-spot}
-      - --bootstrap.transport.rendezvous-nodes=node-2
+      - --bootstrap.transport.rendezvous-nodes=node-2,node-3
       - --bootstrap.transport.psk=${PSK:-aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz}
       - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW"]
@@ -53,7 +53,29 @@ services:
       - --bootstrap.enabled
       - --bootstrap.election-timeout=${TIMEOUT:-60s}
       - --bootstrap.transport.rendezvous=${RENDEZVOUS:-supersecret-webmesh-spot}
-      - --bootstrap.transport.rendezvous-nodes=node-1
+      - --bootstrap.transport.rendezvous-nodes=node-1,node-3
+      - --bootstrap.transport.psk=${PSK:-aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz}
+      - --raft.in-memory
+    cap_add: ["NET_ADMIN", "NET_RAW"]
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+
+  node-3:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.3
+        ipv6_address: 2001:db8:3200::3
+    hostname: node-3
+    entrypoint:
+      - /webmesh-node
+      - --global.insecure
+      - --global.detect-endpoints
+      - --global.detect-private-endpoints
+      - --bootstrap.enabled
+      - --bootstrap.election-timeout=${TIMEOUT:-60s}
+      - --bootstrap.transport.rendezvous=${RENDEZVOUS:-supersecret-webmesh-spot}
+      - --bootstrap.transport.rendezvous-nodes=node-1,node-2
       - --bootstrap.transport.psk=${PSK:-aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz}
       - --raft.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW"]

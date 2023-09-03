@@ -1,6 +1,6 @@
 # Bootstrap over Libp2p
 
-This example has two nodes that both start a new cluster as voters.
+This example has three nodes that all start a new cluster as voters.
 They perform their initial leader election over libp2p.
 All sides of the connection share a rendezvous string and a pre-shared key that is used to sign and verify election results and votes.
 
