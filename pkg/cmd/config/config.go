@@ -186,14 +186,17 @@ func (o *Config) NodeID() (string, error) {
 			return "", fmt.Errorf("parse certificate: %w", err)
 		}
 		// Return the subject common name
+		o.Mesh.NodeID = cert.Subject.CommonName
 		return cert.Subject.CommonName, nil
 	}
 	if o.Auth.Basic != (BasicAuthOptions{}) {
 		// Parse the username for the node ID
+		o.Mesh.NodeID = o.Auth.Basic.Username
 		return o.Auth.Basic.Username, nil
 	}
 	if o.Auth.LDAP != (LDAPAuthOptions{}) {
 		// Parse the username for the node ID
+		o.Mesh.NodeID = o.Auth.LDAP.Username
 		return o.Auth.LDAP.Username, nil
 	}
 	// If we got this far, set our nodeID so we don't accidentally
