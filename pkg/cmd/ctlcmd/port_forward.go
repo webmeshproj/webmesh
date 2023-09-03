@@ -30,8 +30,8 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd/portforward"
-	"github.com/webmeshproj/webmesh/pkg/net/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 )
 

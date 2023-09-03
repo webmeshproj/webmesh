@@ -10,7 +10,7 @@ You can run the example with the following command:
 docker-compose up
 ```
 
-Stop it with:
+To shutdown the example, press `Ctrl+C` and then run:
 
 ```bash
 docker-compose down -v

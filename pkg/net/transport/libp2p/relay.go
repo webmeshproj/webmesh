@@ -140,7 +140,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDP
 	return &UDPRelay{
 		UDPRelayOptions: opts,
 		localaddr: &net.UDPAddr{
-			IP:   net.IPv6loopback,
+			IP:   net.IP{127, 0, 0, 1},
 			Port: int(rxtxrelay.LocalAddr().Port()),
 		},
 		cancel: cancel,

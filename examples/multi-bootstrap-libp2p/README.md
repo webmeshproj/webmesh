@@ -17,7 +17,7 @@ export RENDEZVOUS=$(echo "$RANDOM" | md5sum | cut -d ' ' -f1)
 docker-compose up
 ```
 
-Stop it with:
+To shutdown the example, press `Ctrl+C` and then run:
 
 ```bash
 docker-compose down -v

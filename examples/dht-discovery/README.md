@@ -55,3 +55,9 @@ wmctl --insecure --server localhost:8443 get graph | dot -Tpng > graph.png
 The resulting graph should look something like this:
 
 ![Graph](graph.png)
+
+To shutdown the example, press `Ctrl+C` and then run:
+
+```bash
+docker-compose down -v
+```

@@ -59,3 +59,9 @@ PING site-1-node.site-1.internal (fdd9:459:42d:f6f7::): 56 data bytes
 64 bytes from fdd9:459:42d:f6f7::: seq=1 ttl=63 time=0.506 ms
 64 bytes from fdd9:459:42d:f6f7::: seq=2 ttl=63 time=0.530 ms
 ```
+
+To shutdown the example, press `Ctrl+C` and then run:
+
+```bash
+docker-compose down -v
+```
