@@ -528,6 +528,7 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 			addrs = append(addrs, maddr)
 		}
 		joinTransport, err := libp2p.NewJoinRoundTripper(ctx, libp2p.RoundTripOptions{
+			Key:        conn.Key(),
 			Rendezvous: o.Discovery.PSK,
 			HostOptions: libp2p.HostOptions{
 				BootstrapPeers: addrs,

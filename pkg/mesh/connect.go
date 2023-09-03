@@ -120,7 +120,6 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	// It would be very weird for this to happen at this point.
 	if s.ID() == "" {
 		s.nodeID = s.raft.ID()
-		s.discovery.nodeID = s.nodeID
 		s.log = s.log.With("node-id", s.nodeID)
 	}
 	log := s.log
@@ -298,7 +297,7 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get self peer: %w", err)
 	}
-	opts := &net.StartOptions{
+	opts := net.StartOptions{
 		Key: s.key,
 		AddressV4: func() netip.Prefix {
 			if s.opts.DisableIPv4 {

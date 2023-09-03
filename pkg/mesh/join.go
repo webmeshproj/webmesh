@@ -93,7 +93,7 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 	if err != nil {
 		return fmt.Errorf("parse ipv6 network: %w", err)
 	}
-	startopts := &meshnet.StartOptions{
+	startopts := meshnet.StartOptions{
 		Key: s.key,
 		AddressV4: func() netip.Prefix {
 			if !s.opts.DisableIPv4 {

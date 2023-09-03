@@ -26,6 +26,7 @@ import (
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/relay"
 )
 
@@ -41,11 +42,21 @@ type UDPRelayOptions struct {
 	Relay relay.UDPOptions
 	// Host are options for configuring the host
 	Host HostOptions
+	// Key is the host's private key. One will be generated if this is nil.
+	Key crypto.Key
 }
 
 // NewUDPRelay creates a new UDP relay.
 func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
-	host, err := NewHost(ctx, opts.Host)
+	if opts.Key == nil {
+		context.LoggerFrom(ctx).Debug("Generating ephemeral key for UDP relay")
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			return nil, fmt.Errorf("generate key: %w", err)
+		}
+		opts.Key = key
+	}
+	host, err := NewHostWithKey(ctx, opts.Host, opts.Key)
 	if err != nil {
 		return nil, fmt.Errorf("new host: %w", err)
 	}

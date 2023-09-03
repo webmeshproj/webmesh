@@ -31,6 +31,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
@@ -66,22 +67,19 @@ type HostOptions struct {
 	ConnectTimeout time.Duration
 }
 
-// NewLibP2PHost creates a new libp2p host with the given options.
-func NewLibP2PHost(ctx context.Context, opts HostOptions) (host.Host, error) {
-	SetMaxSystemBuffers(ctx)
-	if len(opts.LocalAddrs) > 0 {
-		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
-	}
-	host, err := libp2p.New(opts.Options...)
-	if err != nil {
-		return nil, fmt.Errorf("new libp2p host: %w", err)
-	}
-	return host, nil
-}
-
 // NewHost creates a new libp2p host connected to the DHT with the given options.
 func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
-	host, err := NewLibP2PHost(ctx, opts)
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, fmt.Errorf("generate key: %w", err)
+	}
+	return NewHostWithKey(ctx, opts, key)
+}
+
+// NewHostWithKey creates a new libp2p host connected to the DHT with the given options
+// and keypair.
+func NewHostWithKey(ctx context.Context, opts HostOptions, key crypto.Key) (Host, error) {
+	host, err := NewLibP2PHostWithKey(ctx, opts, key)
 	if err != nil {
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
@@ -97,13 +95,30 @@ func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
 	}, nil
 }
 
-// NewFromHostAndDHT creates a new libp2p host from an existing host and DHT.
-// This is primarily used for testing.
-func NewFromHostAndDHT(host host.Host, dht *dht.IpfsDHT) Host {
-	return &libp2pHost{
-		host: host,
-		dht:  dht,
+// NewLibP2PHost creates a new libp2p host with the given options.
+func NewLibP2PHost(ctx context.Context, opts HostOptions) (host.Host, error) {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, fmt.Errorf("generate key: %w", err)
 	}
+	return NewLibP2PHostWithKey(ctx, opts, key)
+}
+
+// NewLibP2PHostWithKey creates a new libp2p host with the given options and keypair.
+func NewLibP2PHostWithKey(ctx context.Context, opts HostOptions, key crypto.Key) (host.Host, error) {
+	SetMaxSystemBuffers(ctx)
+	opts.Options = append(opts.Options, libp2p.Identity(key.HostKey()))
+	if len(opts.LocalAddrs) > 0 {
+		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
+	}
+	if opts.ConnectTimeout > 0 {
+		opts.Options = append(opts.Options, libp2p.WithDialTimeout(opts.ConnectTimeout))
+	}
+	host, err := libp2p.New(opts.Options...)
+	if err != nil {
+		return nil, fmt.Errorf("new libp2p host: %w", err)
+	}
+	return host, nil
 }
 
 type libp2pHost struct {

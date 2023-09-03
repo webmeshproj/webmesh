@@ -7,16 +7,6 @@ import (
 	"hash"
 )
 
-// Signer is a type that can sign data.
-type Signer interface {
-	// Sign signs the given data.
-	Sign(data []byte) ([]byte, error)
-	// Verify verifies the given signature against the given data.
-	Verify(data, signature []byte) error
-	// SignatureSize returns the size of the signature.
-	SignatureSize() int
-}
-
 // Sign signs the given data using the given PSK.
 func Sign(data []byte, psk PSK) ([]byte, error) {
 	return signWithHash(data, psk, sha256.New)

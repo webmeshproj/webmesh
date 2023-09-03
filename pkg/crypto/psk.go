@@ -45,9 +45,6 @@ var ValidPSKChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
 // PSK is a pre-shared key.
 type PSK []byte
 
-// Ensure PSK implements Signer.
-var _ Signer = PSK(nil)
-
 // IsValidDefaultPSK returns true if the given string is a valid PSK.
 func IsValidDefaultPSK(s string) bool {
 	return IsValidPSK(s, DefaultPSKLength)

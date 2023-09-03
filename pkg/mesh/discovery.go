@@ -33,16 +33,14 @@ import (
 )
 
 type meshStoreAnnouncer struct {
-	nodeID      string
-	dialer      transport.LeaderDialer
+	st          *meshStore
 	discoveries map[string]io.Closer
 	mu          sync.Mutex
 }
 
-func newMeshStoreAnnouncer(nodeID string, dialer transport.LeaderDialer) *meshStoreAnnouncer {
+func newMeshStoreAnnouncer(st *meshStore) *meshStoreAnnouncer {
 	return &meshStoreAnnouncer{
-		nodeID:      nodeID,
-		dialer:      dialer,
+		st:          st,
 		discoveries: make(map[string]io.Closer),
 	}
 }
@@ -68,6 +66,8 @@ func (s *meshStoreAnnouncer) AnnounceToDHT(ctx context.Context, opts libp2p.Anno
 	var discover io.Closer
 	var err error
 	if opts.Host == nil {
+		// Make sure we are using our key
+		opts.Key = s.st.key
 		discover, err = libp2p.NewJoinAnnouncer(ctx, opts, transport.JoinServerFunc(s.proxyJoin))
 		if err != nil {
 			return fmt.Errorf("new kad dht announcer: %w", err)
@@ -98,13 +98,13 @@ func (s *meshStoreAnnouncer) proxyJoin(ctx context.Context, req *v1.JoinRequest)
 	// ourself if we are the current leader. This is a TODO.
 	log := context.LoggerFrom(ctx)
 	log.Info("Proxying join to cluster")
-	c, err := s.dialer.DialLeader(ctx)
+	c, err := s.st.DialLeader(ctx)
 	if err != nil {
 		log.Error("Failed to dial leader", slog.String("error", err.Error()))
 		return nil, err
 	}
 	defer c.Close()
-	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedFromMeta, s.nodeID)
+	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedFromMeta, s.st.ID())
 	// We are not autneticating the request beyond whatever pre-shared key was used to get
 	// here. So for now we'll assume the ID is valid. This is a TODO.
 	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedForMeta, req.GetId())

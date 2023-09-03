@@ -166,7 +166,7 @@ func NewWithLogger(log *slog.Logger, opts Config) Mesh {
 		kvSubCancel:      func() {},
 		closec:           make(chan struct{}),
 	}
-	st.discovery = newMeshStoreAnnouncer(opts.NodeID, st)
+	st.discovery = newMeshStoreAnnouncer(st)
 	return st
 }
 

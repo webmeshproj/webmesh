@@ -31,6 +31,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
@@ -59,6 +60,8 @@ type AnnounceOptions struct {
 	Method string
 	// Host is a pre-started host to use for announcing.
 	Host Host
+	// Key is the host's private key. One will be generated if this is nil.
+	Key crypto.Key
 }
 
 // NewAnnouncer creates a generic announcer for the given method, request, and response objects.
@@ -67,7 +70,13 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 	close := func() error { return nil }
 	var err error
 	if host == nil {
-		host, err = NewHost(ctx, opts.HostOptions)
+		if opts.Key == nil {
+			opts.Key, err = crypto.GenerateKey()
+			if err != nil {
+				return nil, err
+			}
+		}
+		host, err = NewHostWithKey(ctx, opts.HostOptions, opts.Key)
 		if err != nil {
 			return nil, err
 		}

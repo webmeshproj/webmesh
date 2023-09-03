@@ -401,7 +401,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	}
 	// Start network resources
 	s.log.Info("Starting network manager")
-	startopts := &meshnet.StartOptions{
+	startopts := meshnet.StartOptions{
 		Key: s.key,
 		AddressV4: func() netip.Prefix {
 			if !s.opts.DisableIPv4 {

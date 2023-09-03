@@ -108,7 +108,7 @@ type Manager interface {
 	transport.Dialer
 
 	// Start starts the network manager.
-	Start(ctx context.Context, opts *StartOptions) error
+	Start(ctx context.Context, opts StartOptions) error
 	// NetworkV4 returns the current IPv4 network. The returned value may be invalid.
 	NetworkV4() netip.Prefix
 	// NetworkV6 returns the current IPv6 network, even if it is disabled.
@@ -143,6 +143,7 @@ func New(store storage.MeshStorage, opts Options) Manager {
 
 type manager struct {
 	opts                 Options
+	key                  crypto.Key
 	peers                *peerManager
 	dns                  *dnsManager
 	storage              storage.MeshStorage
@@ -179,61 +180,10 @@ func (m *manager) WireGuard() wireguard.Interface {
 	return m.wg
 }
 
-// Dial behaves like the standard library DialContext, but uses the
-// wireguard interface for all connections. The address can be a nodeID
-// or a network address.
-func (m *manager) Dial(ctx context.Context, network, address string) (net.Conn, error) {
+func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.WireGuard() == nil {
-		return nil, fmt.Errorf("wireguard interface is not available")
-	}
-	res := m.dns.Resolver()
-	dialer := &net.Dialer{
-		Resolver: res,
-	}
-	// If the address is a node ID, we'll use storage to lookup it's address
-	// and dial that instead.
-	host, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, fmt.Errorf("split host port: %w", err)
-	}
-	// This is a bit of a hack, but for now we'll check if its a single word
-	// and not an IP address.
-	if net.ParseIP(host) == nil && len(strings.Split(host, ".")) == 1 {
-		// We'll assume it's a node ID
-		currentPeers := m.wg.Peers()
-		// Check if we have them registered already locally
-		if peerInfo, ok := currentPeers[host]; ok {
-			if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
-				address = net.JoinHostPort(peerInfo.PrivateIPv4.Addr().String(), port)
-			} else {
-				address = net.JoinHostPort(peerInfo.PrivateIPv6.Addr().String(), port)
-			}
-		} else {
-			// We gotta hit the database
-			peer, err := peers.New(m.storage).Get(ctx, host)
-			if err != nil {
-				return nil, fmt.Errorf("get peer: %w", err)
-			}
-			// If it's a v4 network use the peer's v4 address
-			if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
-				if !peer.PrivateAddrV4().IsValid() {
-					// We don't have a v4 address for this peer
-					return nil, fmt.Errorf("peer %s does not have a valid v4 address", host)
-				}
-				address = net.JoinHostPort(peer.PrivateAddrV4().Addr().String(), port)
-			} else {
-				address = net.JoinHostPort(peer.PrivateAddrV6().Addr().String(), port)
-			}
-		}
-	}
-	return dialer.DialContext(ctx, network, address)
-}
-
-func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.key = opts.Key
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	handleErr := func(err error) error {
 		if m.wg != nil {
@@ -325,6 +275,58 @@ func (m *manager) Start(ctx context.Context, opts *StartOptions) error {
 		return handleErr(fmt.Errorf("add wireguard forwarding rule: %w", err))
 	}
 	return nil
+}
+
+// Dial behaves like the standard library DialContext, but uses the
+// wireguard interface for all connections. The address can be a nodeID
+// or a network address.
+func (m *manager) Dial(ctx context.Context, network, address string) (net.Conn, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.WireGuard() == nil {
+		return nil, fmt.Errorf("wireguard interface is not available")
+	}
+	res := m.dns.Resolver()
+	dialer := &net.Dialer{
+		Resolver: res,
+	}
+	// If the address is a node ID, we'll use storage to lookup it's address
+	// and dial that instead.
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("split host port: %w", err)
+	}
+	// This is a bit of a hack, but for now we'll check if its a single word
+	// and not an IP address.
+	if net.ParseIP(host) == nil && len(strings.Split(host, ".")) == 1 {
+		// We'll assume it's a node ID
+		currentPeers := m.wg.Peers()
+		// Check if we have them registered already locally
+		if peerInfo, ok := currentPeers[host]; ok {
+			if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
+				address = net.JoinHostPort(peerInfo.PrivateIPv4.Addr().String(), port)
+			} else {
+				address = net.JoinHostPort(peerInfo.PrivateIPv6.Addr().String(), port)
+			}
+		} else {
+			// We gotta hit the database
+			peer, err := peers.New(m.storage).Get(ctx, host)
+			if err != nil {
+				return nil, fmt.Errorf("get peer: %w", err)
+			}
+			// If it's a v4 network use the peer's v4 address
+			if network == "tcp4" || network == "udp4" || m.opts.DisableIPv6 {
+				if !peer.PrivateAddrV4().IsValid() {
+					// We don't have a v4 address for this peer
+					return nil, fmt.Errorf("peer %s does not have a valid v4 address", host)
+				}
+				address = net.JoinHostPort(peer.PrivateAddrV4().Addr().String(), port)
+			} else {
+				address = net.JoinHostPort(peer.PrivateAddrV6().Addr().String(), port)
+			}
+		}
+	}
+	return dialer.DialContext(ctx, network, address)
 }
 
 func (m *manager) StartMasquerade(ctx context.Context) error {

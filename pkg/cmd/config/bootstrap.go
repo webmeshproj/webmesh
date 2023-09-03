@@ -228,6 +228,7 @@ func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn 
 			Linger:          t.RendezvousLinger,
 			NodeID:          nodeID,
 			NodeIDs:         t.RendezvousNodes,
+			Key:             conn.Key(),
 		})
 	}
 	return tcp.NewBootstrapTransport(tcp.BootstrapTransportOptions{

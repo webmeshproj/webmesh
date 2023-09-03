@@ -330,6 +330,7 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 		LocalNode:  m.net.opts.NodeID,
 		RemoteNode: peer.GetId(),
 		Rendezvous: rendezvous,
+		Key:        m.net.key,
 		Relay: relay.UDPOptions{
 			TargetPort: uint16(wgPort),
 		},

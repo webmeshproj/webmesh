@@ -42,6 +42,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
+const LineFeed = '\x00'
+
 // BootstrapTransport implements bootstrap transport and returns the
 // local UUID that was used for voting.
 type BootstrapTransport interface {
@@ -76,6 +78,8 @@ type BootstrapOptions struct {
 	NodeID string
 	// NodeIDs are the other node IDs to use for leader election.
 	NodeIDs []string
+	// Key is the private key of the node. One will be generated if this is nil.
+	Key crypto.Key
 }
 
 // NewBootstrapTransport creates a new bootstrap transport. The host is closed
@@ -85,7 +89,14 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 	if err != nil {
 		return nil, err
 	}
-	host, err := NewHost(ctx, opts.Host)
+	if opts.Key == nil {
+		context.LoggerFrom(ctx).Debug("Generating ephemeral key for bootstrap transport")
+		opts.Key, err = crypto.GenerateKey()
+		if err != nil {
+			return nil, err
+		}
+	}
+	host, err := NewHostWithKey(ctx, opts.Host, opts.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +171,7 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		defer b.close()
 		return false, nil, fmt.Errorf("failed to sign our UUID: %w", err)
 	}
-	b.voteData = append(vote, '\x00')
+	b.voteData = append(vote, LineFeed)
 	log := context.LoggerFrom(ctx).With(
 		"rendezvous", b.opts.Rendezvous,
 		"host-id", b.host.ID(),
@@ -353,7 +364,7 @@ func (b *bootstrapTransport) handleIncomingStream(ctx context.Context, stream ne
 	vlog := context.LoggerFrom(ctx).With("remote-host-id", stream.Conn().RemotePeer().String())
 	rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 	vlog.Debug("Received a vote connection from a peer")
-	remoteVote, err := rw.ReadBytes('\x00')
+	remoteVote, err := rw.ReadBytes(LineFeed)
 	if err != nil {
 		if err != io.EOF || len(remoteVote) == 0 {
 			vlog.Error("Failed to read vote", "error", err.Error())
@@ -390,7 +401,7 @@ func (b *bootstrapTransport) handleIncomingStream(ctx context.Context, stream ne
 	// We already have an election result, notify the remote peer of it.
 	vlog.Info("Election already has a result, sending it to remote peer")
 	res := append([]byte("result:"), []byte(electionResult)...)
-	_, err = rw.Write(append(res, '\x00'))
+	_, err = rw.Write(append(res, LineFeed))
 	if err != nil {
 		vlog.Error("Failed to write election result", "error", err.Error())
 		return
@@ -432,7 +443,7 @@ func (b *bootstrapTransport) handleDiscoveredPeer(ctx context.Context, peer peer
 	}
 	vlog.Debug("Sent our vote to remote peer")
 	vlog.Debug("Reading vote from remote peer")
-	resp, err := rw.ReadBytes('\x00')
+	resp, err := rw.ReadBytes(LineFeed)
 	if err != nil {
 		if err != io.EOF || len(resp) == 0 {
 			vlog.Error("Failed to read vote", "error", err.Error())
@@ -488,12 +499,11 @@ func (s *electionSigner) sign(value uuid.UUID) ([]byte, error) {
 }
 
 func (s *electionSigner) verify(value []byte) (uuid.UUID, error) {
-	sigSize := s.signer.SignatureSize()
-	if len(value) != uuidSize+sigSize {
-		return uuid.UUID{}, fmt.Errorf("invalid data length, got %d bytes, expected %d bytes", len(value), uuidSize+sigSize)
+	if len(value) <= uuidSize {
+		return uuid.UUID{}, fmt.Errorf("invalid vote size: %d", len(value))
 	}
-	remoteUUID := value[:len(value)-sigSize]
-	sig := value[len(value)-sigSize:]
+	remoteUUID := value[:uuidSize]
+	sig := value[uuidSize:]
 	err := s.signer.Verify(remoteUUID, sig)
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("invalid signature: %w", err)
