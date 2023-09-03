@@ -16,6 +16,7 @@ Connections are made into the network via direct links, over ICE (WebRTC) connec
 It differs from other WireGuard™ management solutions in that:
 
 - It is designed to be distributed and extensible, relying on no single controller or database.
+- The network is malleable and topology is governed by the user, not the controller.
 - A plugin API is provided for adding additional functionality, such as a distributed database for storing the mesh state or additional authentication mechanisms.
 - An application API is also provided for interacting with the mesh network, and is used by the CLI and GUI applications.
 
