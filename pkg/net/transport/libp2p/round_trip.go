@@ -95,8 +95,12 @@ type roundTripper[REQ, RESP any] struct {
 	close func()
 }
 
+func (rt *roundTripper[REQ, RESP]) Close() error {
+	rt.close()
+	return nil
+}
+
 func (rt *roundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
-	defer rt.close()
 	log := context.LoggerFrom(ctx).With("method", rt.RoundTripOptions.Method)
 	log = log.With(slog.String("host-id", rt.host.ID().String()))
 	ctx = context.WithLogger(ctx, log)

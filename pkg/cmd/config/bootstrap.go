@@ -38,6 +38,8 @@ type BootstrapOptions struct {
 	// Enabled is the flag to attempt bootstrapping. If true, the node will only bootstrap a new cluster
 	// if no data is found. To force a bootstrap, set Force to true.
 	Enabled bool `koanf:"enabled,omitempty"`
+	// ElectionTimeout is the election timeout to use when bootstrapping a new cluster.
+	ElectionTimeout time.Duration `koanf:"election-timeout,omitempty"`
 	// Transport are the bootstrap transport options
 	Transport BootstrapTransportOptions `koanf:"transport,omitempty"`
 	// IPv4Network is the IPv4 network of the mesh to write to the database when bootstraping a new cluster.
@@ -68,6 +70,10 @@ type BootstrapTransportOptions struct {
 	// list configurations. If any are different then the first node to become leader will pick them. This
 	// can cause bootstrap to fail when using ACLs. Servers should be in the form of <node-id>=<address>.
 	TCPServers map[string]string `koanf:"tcp-servers,omitempty"`
+	// TCPConnectionPool is the maximum number of TCP connections to maintain to other nodes.
+	TCPConnectionPool int `koanf:"tcp-connection-pool,omitempty"`
+	// TCPConnectTimeout is the maximum amount of time to wait for a TCP connection to be established.
+	TCPConnectTimeout time.Duration `koanf:"tcp-connect-timeout,omitempty"`
 	// ServerGRPCPorts is a map of node IDs to gRPC ports to bootstrap with. If empty, the node will use the
 	// advertise address and locally configured gRPC port for every node in bootstrap-servers. Ports should
 	// be in the form of <node-id>=<port>.
@@ -86,6 +92,7 @@ type BootstrapTransportOptions struct {
 func NewBootstrapOptions() BootstrapOptions {
 	return BootstrapOptions{
 		Enabled:              false,
+		ElectionTimeout:      time.Second * 3,
 		Transport:            NewBootstrapTransportOptions(),
 		IPv4Network:          mesh.DefaultIPv4Network,
 		MeshDomain:           mesh.DefaultMeshDomain,
@@ -102,12 +109,15 @@ func NewBootstrapTransportOptions() BootstrapTransportOptions {
 	return BootstrapTransportOptions{
 		TCPAdvertiseAddress: net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", mesh.DefaultBootstrapPort)),
 		TCPListenAddress:    mesh.DefaultBootstrapListenAddress,
+		TCPConnectTimeout:   3 * time.Second,
+		RendezvousLinger:    30 * time.Second,
 	}
 }
 
 // BindFlags binds the bootstrap options to a flag set.
 func (o *BootstrapOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, prefix+"bootstrap.enabled", false, "Attempt to bootstrap a new cluster")
+	fs.DurationVar(&o.ElectionTimeout, prefix+"bootstrap.election-timeout", time.Second*3, "Election timeout to use when bootstrapping a new cluster")
 	fs.StringVar(&o.IPv4Network, prefix+"bootstrap.ipv4-network", mesh.DefaultIPv4Network, "IPv4 network of the mesh to write to the database when bootstraping a new cluster")
 	fs.StringVar(&o.MeshDomain, prefix+"bootstrap.mesh-domain", mesh.DefaultMeshDomain, "Domain of the mesh to write to the database when bootstraping a new cluster")
 	fs.StringVar(&o.Admin, prefix+"bootstrap.admin", mesh.DefaultMeshAdmin, "User and/or node name to assign administrator privileges to when bootstraping a new cluster")
@@ -122,11 +132,14 @@ func (o *BootstrapOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 func (o *BootstrapTransportOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.TCPAdvertiseAddress, prefix+"bootstrap.transport.tcp-advertise-address", "", "Address to advertise for raft consensus")
 	fs.StringVar(&o.TCPListenAddress, prefix+"bootstrap.transport.tcp-listen-address", mesh.DefaultBootstrapListenAddress, "Address to use when using TCP raft consensus to bootstrap")
+	fs.IntVar(&o.TCPConnectionPool, prefix+"bootstrap.transport.tcp-connection-pool", 0, "Maximum number of TCP connections to maintain to other nodes")
+	fs.DurationVar(&o.TCPConnectTimeout, prefix+"bootstrap.transport.tcp-connect-timeout", time.Second*3, "Maximum amount of time to wait for a TCP connection to be established")
 	fs.StringToStringVar(&o.TCPServers, prefix+"bootstrap.transport.tcp-servers", nil, "Map of node IDs to raft addresses to bootstrap with")
 	fs.StringToIntVar(&o.ServerGRPCPorts, prefix+"bootstrap.transport.server-grpc-ports", nil, "Map of node IDs to gRPC ports to bootstrap with")
 	fs.StringVar(&o.Rendezvous, prefix+"bootstrap.transport.rendezvous", "", "Rendezvous string to use when using libp2p to bootstrap")
+	fs.StringSliceVar(&o.RendezvousNodes, prefix+"bootstrap.transport.rendezvous-nodes", nil, "List of node IDs to use when using libp2p to bootstrap")
+	fs.DurationVar(&o.RendezvousLinger, prefix+"bootstrap.transport.rendezvous-linger", time.Minute, "Amount of time to wait for other nodes to join when using libp2p to bootstrap")
 	fs.StringVar(&o.PSK, prefix+"bootstrap.transport.psk", "", "Pre-shared key to use when using libp2p to bootstrap")
-	fs.DurationVar(&o.RendezvousLinger, prefix+"bootstrap.transport.rendezvous-linger", 0, "Amount of time to wait for other nodes to join when using libp2p to bootstrap")
 }
 
 // Validate validates the bootstrap options.
@@ -204,24 +217,26 @@ func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn 
 		return transport.NewNullBootstrapTransport(), nil
 	}
 	if t.PSK != "" && t.Rendezvous != "" {
-		if o.Discovery.ConnectTimeout > o.Raft.ElectionTimeout {
+		if o.Discovery.ConnectTimeout > o.Bootstrap.ElectionTimeout {
 			return nil, fmt.Errorf("connect timeout must be less than election timeout when using libp2p to bootstrap")
 		}
 		return libp2p.NewBootstrapTransport(ctx, conn.Discovery(), libp2p.BootstrapOptions{
 			Rendezvous:      t.Rendezvous,
 			Signer:          crypto.PSK(t.PSK),
 			Host:            o.Discovery.HostOptions(ctx),
-			ElectionTimeout: o.Raft.ElectionTimeout,
+			ElectionTimeout: o.Bootstrap.ElectionTimeout,
 			Linger:          t.RendezvousLinger,
+			NodeID:          nodeID,
+			NodeIDs:         t.RendezvousNodes,
 		})
 	}
 	return tcp.NewBootstrapTransport(tcp.BootstrapTransportOptions{
 		NodeID:          nodeID,
 		Addr:            t.TCPListenAddress,
 		Advertise:       t.TCPAdvertiseAddress,
-		MaxPool:         o.Raft.ConnectionPoolCount,
-		Timeout:         o.Raft.ConnectionTimeout,
-		ElectionTimeout: o.Raft.ElectionTimeout,
+		MaxPool:         t.TCPConnectionPool,
+		Timeout:         t.TCPConnectTimeout,
+		ElectionTimeout: o.Bootstrap.ElectionTimeout,
 		Credentials:     conn.Credentials(),
 		Peers: func() map[string]tcp.BootstrapPeer {
 			if t.TCPServers == nil {

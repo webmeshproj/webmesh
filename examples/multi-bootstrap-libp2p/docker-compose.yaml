@@ -1,0 +1,61 @@
+version: "3"
+
+networks:
+  bootstrap:
+    enable_ipv6: true
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.1.0.0/24
+          gateway: 10.1.0.100
+        - subnet: 2001:db8:3200::/64
+          gateway: 2001:db8:3200::1000
+
+services:
+  node-1:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.1
+        ipv6_address: 2001:db8:3200::1
+    hostname: node-1
+    entrypoint:
+      - /webmesh-node
+      - --global.insecure
+      - --bootstrap.enabled
+      - --bootstrap.election-timeout=30s
+      - --bootstrap.transport.rendezvous=fancy-rendezvous-spotz
+      - --bootstrap.transport.rendezvous-nodes=node-2
+      - --bootstrap.transport.psk=aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz
+      - --raft.in-memory
+      - --mesh.node-id=node-1
+      - --mesh.libp2p-peers=node-2=node2tunnel
+    cap_add: ["NET_ADMIN", "NET_RAW"]
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+
+  node-2:
+    image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
+    networks:
+      bootstrap:
+        ipv4_address: 10.1.0.2
+        ipv6_address: 2001:db8:3200::2
+    hostname: node-2
+    entrypoint:
+      - /webmesh-node
+      - --global.insecure
+      - --bootstrap.enabled
+      - --bootstrap.election-timeout=30s
+      - --bootstrap.transport.rendezvous=fancy-rendezvous-spotz
+      - --bootstrap.transport.rendezvous-nodes=node-1
+      - --bootstrap.transport.psk=aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz
+      - --raft.in-memory
+      - --mesh.node-id=node-2
+      - --mesh.libp2p-peers=node-1=node1tunnel
+    cap_add: ["NET_ADMIN", "NET_RAW"]
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0

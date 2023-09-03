@@ -57,6 +57,8 @@ type grpcRoundTripper[REQ, RESP any] struct {
 	method string
 }
 
+func (rt *grpcRoundTripper[REQ, RESP]) Close() error { return nil }
+
 func (rt *grpcRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
 	var err error
 	cancel := func() {}

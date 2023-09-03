@@ -73,7 +73,7 @@ func TestBootstrapTransport(t *testing.T) {
 		if transport.UUID() != transport.LeaderUUID() {
 			t.Fatalf("expected leader uuid to be set to local")
 		}
-		time.Sleep(time.Second * 2)
+		<-time.After(3 * time.Second)
 		// We should have left the rendezvous
 		if announcer.announcing.Load() {
 			t.Fatalf("expected to leave")

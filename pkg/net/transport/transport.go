@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 
@@ -68,6 +69,8 @@ type FeatureResolverFunc = ResolverFunc[v1.Feature]
 // RoundTripper is a generic interface for executing a request and returning
 // a response.
 type RoundTripper[REQ, RESP any] interface {
+	io.Closer
+
 	RoundTrip(ctx context.Context, req *REQ) (*RESP, error)
 }
 
@@ -77,6 +80,11 @@ type RoundTripperFunc[REQ, RESP any] func(ctx context.Context, req *REQ) (*RESP,
 // RoundTrip implements RoundTripper.
 func (f RoundTripperFunc[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
 	return f(ctx, req)
+}
+
+// RoundTrip implements RoundTripper.
+func (f RoundTripperFunc[REQ, RESP]) Close() error {
+	return nil
 }
 
 // JoinRoundTripper is the interface for joining a cluster.

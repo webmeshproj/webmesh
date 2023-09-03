@@ -65,9 +65,15 @@ func (s *meshStoreAnnouncer) Close() error {
 func (s *meshStoreAnnouncer) AnnounceToDHT(ctx context.Context, opts libp2p.AnnounceOptions) error {
 	log := context.LoggerFrom(ctx)
 	log.Info("Announcing peer discovery service")
-	discover, err := libp2p.NewJoinAnnouncer(ctx, opts, transport.JoinServerFunc(s.proxyJoin))
-	if err != nil {
-		return fmt.Errorf("new kad dht announcer: %w", err)
+	var discover io.Closer
+	var err error
+	if opts.Host == nil {
+		discover, err = libp2p.NewJoinAnnouncer(ctx, opts, transport.JoinServerFunc(s.proxyJoin))
+		if err != nil {
+			return fmt.Errorf("new kad dht announcer: %w", err)
+		}
+	} else {
+		discover = libp2p.NewJoinAnnouncerWithHost(ctx, opts.Host, opts, transport.JoinServerFunc(s.proxyJoin))
 	}
 	s.mu.Lock()
 	s.discoveries[opts.Rendezvous] = discover

@@ -111,7 +111,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if err != nil {
 		return fmt.Errorf("generate ULA: %w", err)
 	}
-	s.log.Info("newly bootstrapped cluster, setting IPv4/IPv6 networks",
+	s.log.Info("Newly bootstrapped cluster, setting IPv4/IPv6 networks",
 		slog.String("ipv4-network", opts.Bootstrap.IPv4Network),
 		slog.String("ipv6-network", meshnetworkv6.String()))
 	err = s.Storage().PutValue(ctx, state.IPv6PrefixKey, meshnetworkv6.String(), 0)
@@ -328,7 +328,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		if id == s.nodeID {
 			continue
 		}
-		s.log.Info("creating node in database for bootstrap server",
+		s.log.Info("Creating node in database for bootstrap server",
 			slog.String("server-id", id),
 		)
 		err = p.Put(ctx, peers.MeshNode{
@@ -344,7 +344,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			if id == peer {
 				continue
 			}
-			s.log.Info("creating edges in database for bootstrap server",
+			s.log.Info("Creating edges in database for bootstrap server",
 				slog.String("server-id", id),
 				slog.String("peer-id", peer),
 			)
@@ -434,11 +434,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		}
 	}
 	// We need to readd ourselves server to the cluster as a voter with the acquired raft address.
-	s.log.Info("re-adding ourselves to the cluster with the acquired wireguard address")
+	s.log.Info("Readmitting ourselves to the cluster with the acquired wireguard address")
 	err = s.raft.AddVoter(ctx, s.ID(), raftAddr)
 	if err != nil {
 		return fmt.Errorf("add voter: %w", err)
 	}
-	s.log.Info("initial bootstrap complete")
+	s.log.Info("Initial network bootstrap complete")
 	return nil
 }

@@ -19,6 +19,7 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
@@ -105,6 +106,10 @@ func (p PSK) IsValid() bool {
 }
 
 func (p PSK) SignatureSize() int {
+	return hmac.New(sha256.New, p).Size()
+}
+
+func (p PSK) DeterministicSignatureSize() int {
 	return sha256.New().Size()
 }
 
@@ -113,7 +118,17 @@ func (p PSK) Sign(data []byte) ([]byte, error) {
 	return Sign(data, p)
 }
 
+// DeterministicSign creates a signature of the given data using this PSK.
+func (p PSK) DeterministicSign(data []byte) ([]byte, error) {
+	return signDeterministicWithHash(data, p, sha256.New)
+}
+
 // Verify verifies the given signature against the given data using this PSK.
 func (p PSK) Verify(data, signature []byte) error {
 	return Verify(data, signature, p)
+}
+
+// DeterministicVerify verifies the given signature against the given data using this PSK.
+func (p PSK) DeterministicVerify(data, signature []byte) error {
+	return verifyDeterministicWithHash(data, signature, p, sha256.New)
 }

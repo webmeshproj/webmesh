@@ -35,6 +35,7 @@ func (s *meshStore) join(ctx context.Context, opts ConnectOptions, key wgtypes.K
 	log := s.log
 	ctx = context.WithLogger(ctx, log)
 	log.Info("Joining webmesh cluster")
+	defer opts.JoinRoundTripper.Close()
 	var tries int
 	for tries <= opts.MaxJoinRetries {
 		if tries > 0 {
@@ -67,7 +68,7 @@ func (s *meshStore) join(ctx context.Context, opts ConnectOptions, key wgtypes.K
 
 func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions, resp *v1.JoinResponse, key wgtypes.Key) error {
 	log := context.LoggerFrom(ctx)
-	log.Debug("Received join response", slog.Any("resp", resp))
+	log.Info("Received join response", slog.Any("resp", resp))
 	s.meshDomain = resp.GetMeshDomain()
 	if !strings.HasSuffix(s.meshDomain, ".") {
 		s.meshDomain += "."

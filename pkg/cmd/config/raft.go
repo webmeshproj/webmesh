@@ -87,13 +87,13 @@ func NewRaftOptions() RaftOptions {
 		DataDir:                 raft.DefaultDataDir,
 		InMemory:                false,
 		ConnectionPoolCount:     0,
-		ConnectionTimeout:       5 * time.Second,
-		HeartbeatTimeout:        time.Second,
-		ElectionTimeout:         time.Second,
+		ConnectionTimeout:       3 * time.Second,
+		HeartbeatTimeout:        time.Second * 2,
+		ElectionTimeout:         time.Second * 2,
 		ApplyTimeout:            10 * time.Second,
 		CommitTimeout:           10 * time.Second,
 		MaxAppendEntries:        64,
-		LeaderLeaseTimeout:      time.Second,
+		LeaderLeaseTimeout:      time.Second * 2,
 		SnapshotInterval:        30 * time.Second,
 		SnapshotThreshold:       8192,
 		SnapshotRetention:       2,
@@ -112,13 +112,13 @@ func (o *RaftOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.DataDir, prefix+"raft.data-dir", raft.DefaultDataDir, "Raft data directory.")
 	fs.BoolVar(&o.InMemory, prefix+"raft.in-memory", false, "Run raft with in-memory storage.")
 	fs.IntVar(&o.ConnectionPoolCount, prefix+"raft.connection-pool-count", 0, "Raft connection pool count.")
-	fs.DurationVar(&o.ConnectionTimeout, prefix+"raft.connection-timeout", 5*time.Second, "Raft connection timeout.")
-	fs.DurationVar(&o.HeartbeatTimeout, prefix+"raft.heartbeat-timeout", time.Second, "Raft heartbeat timeout.")
-	fs.DurationVar(&o.ElectionTimeout, prefix+"raft.election-timeout", time.Second, "Raft election timeout.")
+	fs.DurationVar(&o.ConnectionTimeout, prefix+"raft.connection-timeout", time.Second*3, "Raft connection timeout.")
+	fs.DurationVar(&o.HeartbeatTimeout, prefix+"raft.heartbeat-timeout", time.Second*2, "Raft heartbeat timeout.")
+	fs.DurationVar(&o.ElectionTimeout, prefix+"raft.election-timeout", time.Second*2, "Raft election timeout.")
 	fs.DurationVar(&o.ApplyTimeout, prefix+"raft.apply-timeout", 10*time.Second, "Raft apply timeout.")
 	fs.DurationVar(&o.CommitTimeout, prefix+"raft.commit-timeout", 10*time.Second, "Raft commit timeout.")
 	fs.IntVar(&o.MaxAppendEntries, prefix+"raft.max-append-entries", 64, "Raft max append entries.")
-	fs.DurationVar(&o.LeaderLeaseTimeout, prefix+"raft.leader-lease-timeout", time.Second, "Raft leader lease timeout.")
+	fs.DurationVar(&o.LeaderLeaseTimeout, prefix+"raft.leader-lease-timeout", time.Second*2, "Raft leader lease timeout.")
 	fs.DurationVar(&o.SnapshotInterval, prefix+"raft.snapshot-interval", 30*time.Second, "Raft snapshot interval.")
 	fs.Uint64Var(&o.SnapshotThreshold, prefix+"raft.snapshot-threshold", 8192, "Raft snapshot threshold.")
 	fs.Uint64Var(&o.SnapshotRetention, prefix+"raft.snapshot-retention", 2, "Raft snapshot retention.")
