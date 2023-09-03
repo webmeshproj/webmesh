@@ -26,15 +26,14 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.log-level=debug
+      - --global.detect-endpoints
+      - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.election-timeout=30s
-      - --bootstrap.transport.rendezvous=aqb6zy6txUO8seqQsPkzUqrbl2X8U6js
+      - --bootstrap.transport.rendezvous=our-webmesh-meetup
       - --bootstrap.transport.rendezvous-nodes=node-2
-      - --bootstrap.transport.psk=aqb6zy6txUO8seqQsPkzUqrbl2X8U6js
+      - --bootstrap.transport.psk=aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz
       - --raft.in-memory
-      - --mesh.node-id=node-1
-      - --mesh.libp2p-peers=node-2=webmeshnode12tunnel
     cap_add: ["NET_ADMIN", "NET_RAW"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
@@ -49,15 +48,14 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --global.log-level=debug
+      - --global.detect-endpoints
+      - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.election-timeout=30s
-      - --bootstrap.transport.rendezvous=aqb6zy6txUO8seqQsPkzUqrbl2X8U6js
+      - --bootstrap.transport.rendezvous=our-webmesh-meetup
       - --bootstrap.transport.rendezvous-nodes=node-1
-      - --bootstrap.transport.psk=aqb6zy6txUO8seqQsPkzUqrbl2X8U6js
+      - --bootstrap.transport.psk=aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz
       - --raft.in-memory
-      - --mesh.node-id=node-2
-      - --mesh.libp2p-peers=node-1=webmeshnode12tunnel
     cap_add: ["NET_ADMIN", "NET_RAW"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0

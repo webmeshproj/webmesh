@@ -20,6 +20,7 @@ package libp2p
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"sync"
@@ -161,20 +162,19 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	b.host.Host().SetStreamHandler(BootstrapProtocol, func(s network.Stream) {
 		acceptc <- s
 	})
-	defer b.host.Host().RemoveStreamHandler(BootstrapProtocol)
-
 	advertiseCtx, advertiseCancel := context.WithCancel(context.Background())
 	defer advertiseCancel()
 	routingDiscovery := drouting.NewRoutingDiscovery(b.host.DHT())
 	dutil.Advertise(advertiseCtx, routingDiscovery, b.opts.Rendezvous, discovery.TTL(b.opts.ElectionTimeout))
 
 	seenPeers := make(map[peer.ID]struct{})
+	listenCtx, listenCancel := context.WithCancel(context.Background())
 	peerc := make(chan peer.AddrInfo, 100)
 	go func(rendezvous string) {
 		defer close(peerc)
 		for {
 			select {
-			case <-electionContext.Done():
+			case <-listenCtx.Done():
 				return
 			default:
 			}
@@ -202,18 +202,67 @@ func (b *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		}
 	}(b.opts.Rendezvous)
 
-	log.Debug("Searching for results from a previous election")
-	electionResults, err := b.host.DHT().SearchValue(electionContext, resultKey)
-	if err != nil {
-		defer b.close()
-		return false, nil, fmt.Errorf("failed to search DHT for election results: %w", err)
-	}
-
-	// Do leader election
 	var votemu sync.Mutex
 	seenvotes := make(map[uuid.UUID]struct{})
 	seenvotes[b.localUUID] = struct{}{}
+	handleIncoming := func(conn network.Stream, result string) {
+		defer conn.Close()
+		votemu.Lock()
+		defer votemu.Unlock()
+		rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+		vlog := log.With("remote-host-id", conn.Conn().RemotePeer().String())
+		vlog.Info("Received a vote connection from a peer")
+		remoteVote, err := rw.ReadBytes('\x00')
+		if err != nil {
+			vlog.Error("Failed to read vote", "error", err.Error())
+			return
+		}
+		remoteVote = remoteVote[:len(remoteVote)-1]
+		remoteUUID, err := signer.verify(remoteVote)
+		if err != nil {
+			vlog.Warn("Invalid election vote", "error", err.Error())
+			return
+		}
+		vlog = vlog.With("remote-vote", remoteUUID.String())
+		vlog.Info("Vote has a valid signature")
+		seenvotes[remoteUUID] = struct{}{}
+		// Write our vote to the wire
+		if result != "" {
+			// There is already an election result
+			vlog.Info("Election already has a result, sending it to remote peer")
+			res := append([]byte("result:"), []byte(result)...)
+			_, err = rw.Write(append(res, '\x00'))
+			if err != nil {
+				vlog.Error("Failed to write election result", "error", err.Error())
+				return
+			}
+			err = rw.Flush()
+			if err != nil {
+				vlog.Error("Failed to flush election result", "error", err.Error())
+				return
+			}
+			vlog.Info("Sent election result to remote peer")
+			return
+		}
+		vlog.Info("Sending our vote to remote peer")
+		_, err = rw.Write(append(vote, '\x00'))
+		if err != nil {
+			vlog.Error("Failed to write vote", "error", err.Error())
+			return
+		}
+		err = rw.Flush()
+		if err != nil {
+			vlog.Error("Failed to flush vote", "error", err.Error())
+			return
+		}
+		vlog.Info("Sent our vote to remote peer")
+		if len(seenvotes) == len(b.opts.NodeIDs)+1 {
+			vlog.Info("All votes received, stopping election early")
+			electionCancel()
+		}
+	}
 
+	// Do leader election
 	log.Info("Starting leader election")
 	electionTimeout := time.After(b.opts.ElectionTimeout)
 
@@ -229,67 +278,10 @@ LeaderElect:
 			electionCancel()
 			log.Info("Election timed out", "num-voters", len(seenvotes))
 			break LeaderElect
-		case result := <-electionResults:
-			if len(result) == 0 {
-				continue
-			}
-			// Verify the signature of the value
-			log.Debug("Found a previous election result", "result", hash(result))
-			leader, err := signer.deterministicVerify(result)
-			if err != nil {
-				log.Warn("Invalid election result", "error", err.Error())
-				continue
-			}
-			defer electionCancel()
-			// This is a valid election result. Use it.
-			b.leaderUUID = leader
-			rt = newRoundTripperWithHostAndCloseFunc[v1.JoinRequest, v1.JoinResponse](b.host, RoundTripOptions{
-				Rendezvous: hash(result),
-				Method:     v1.Membership_Join_FullMethodName,
-			}, b.close)
-			return false, rt, transport.ErrAlreadyBootstrapped
-		case voter := <-acceptc:
-			func(conn network.Stream) {
-				defer conn.Close()
-				votemu.Lock()
-				defer votemu.Unlock()
-				rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-				vlog := log.With("remote-host-id", conn.Conn().RemotePeer().String())
-				vlog.Debug("Received a vote connection from a peer")
-				remoteVote, err := rw.ReadBytes('\x00')
-				if err != nil {
-					vlog.Error("Failed to read vote", "error", err.Error())
-					return
-				}
-				remoteVote = remoteVote[:len(remoteVote)-1]
-				remoteUUID, err := signer.verify(remoteVote)
-				if err != nil {
-					vlog.Warn("Invalid election vote", "error", err.Error())
-					return
-				}
-				vlog = vlog.With("remote-vote", remoteUUID.String())
-				vlog.Debug("Vote has a valid signature")
-				seenvotes[remoteUUID] = struct{}{}
-				// Write our vote to the wire
-				vlog.Debug("Sending our vote to remote peer")
-				_, err = rw.Write(append(vote, '\x00'))
-				if err != nil {
-					vlog.Error("Failed to write vote", "error", err.Error())
-					return
-				}
-				err = rw.Flush()
-				if err != nil {
-					vlog.Error("Failed to flush vote", "error", err.Error())
-					return
-				}
-				vlog.Info("Sent our vote to remote peer")
-				if len(seenvotes) == len(b.opts.NodeIDs)+1 {
-					vlog.Info("All votes received, stopping election early")
-					electionCancel()
-				}
-			}(voter)
+		case c := <-acceptc:
+			go handleIncoming(c, "")
 		case voter := <-peerc:
-			func() {
+			rendezvousPoint := func() (location string) {
 				votemu.Lock()
 				defer votemu.Unlock()
 				vlog := log.With("remote-host-id", voter.ID)
@@ -307,7 +299,7 @@ LeaderElect:
 				}
 				defer conn.Close()
 				rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-				vlog.Debug("Sending our vote to remote peer")
+				vlog.Info("Sending our vote to remote peer")
 				_, err = rw.Write(append(vote, '\x00'))
 				if err != nil {
 					vlog.Error("Failed to write vote", "error", err.Error())
@@ -320,13 +312,20 @@ LeaderElect:
 				}
 				vlog.Info("Sent our vote to remote peer")
 				// Read their vote off the wire
-				vlog.Debug("Reading vote from remote peer")
+				vlog.Info("Reading vote from remote peer")
 				resp, err := rw.ReadBytes('\x00')
 				if err != nil {
 					if err != io.EOF || len(resp) == 0 {
 						vlog.Error("Failed to read vote", "error", err.Error())
 						return
 					}
+				}
+				if bytes.HasPrefix(resp, []byte("result:")) {
+					// We were too late to the election and there is
+					// already a rendezvous point decided.
+					vlog.Info("Election already has a result, joining the cluster")
+					location = string(resp[len("result:"):])
+					return
 				}
 				resp = resp[:len(resp)-1]
 				conn.Close()
@@ -342,7 +341,18 @@ LeaderElect:
 					vlog.Info("All votes received, stopping election early")
 					electionCancel()
 				}
+				return
 			}()
+			if rendezvousPoint != "" {
+				// Go ahead and use the decided rendezvous point
+				defer listenCancel()
+				log.Info("Joining the cluster", "rendezvous", rendezvousPoint)
+				rt = newRoundTripperWithHostAndCloseFunc[v1.JoinRequest, v1.JoinResponse](b.host, RoundTripOptions{
+					Rendezvous: rendezvousPoint,
+					Method:     v1.Membership_Join_FullMethodName,
+				}, b.close)
+				return false, rt, transport.ErrAlreadyBootstrapped
+			}
 		}
 	}
 
@@ -375,21 +385,13 @@ LeaderElect:
 	// pre-shared key that is known to all nodes in the cluster.
 	joinPSK, err := signer.deterministicSign(leaderUUID)
 	if err != nil {
+		defer listenCancel()
 		defer b.close()
 		return false, nil, fmt.Errorf("failed to sign leader UUID: %w", err)
 	}
 	joinRendezvous := hash(joinPSK)
 
-	// Everyone writes the signed rendezvous string to the DHT at the result key
-	log.Debug("Writing join PSK to the DHT", "key", resultKey, "hashed", joinRendezvous)
-	err = b.host.DHT().PutValue(ctx, resultKey, joinPSK)
-	if err != nil {
-		defer b.close()
-		return false, nil, fmt.Errorf("failed to put join PSK to DHT: %w", err)
-	}
-
-	// If we were elected leader, we write the join PSK to the DHT and start
-	// an announcer for the others to join.
+	// If we were elected leader, we start an announcer for the others to join
 	if isLeader || numVotes == 0 {
 		log.Info("Starting leader announcer", "rendezvous", joinRendezvous)
 		// Start an announcer for the others to join
@@ -405,7 +407,20 @@ LeaderElect:
 		}
 		go func() {
 			defer b.close()
+			defer listenCancel()
 			log.Info("Waiting for linger period so people can join")
+			expired := time.After(b.opts.Linger)
+		Linger:
+			for {
+				select {
+				case <-ctx.Done():
+					break Linger
+				case <-expired:
+					break Linger
+				case c := <-acceptc:
+					go handleIncoming(c, joinRendezvous)
+				}
+			}
 			<-time.After(b.opts.Linger)
 			log.Info("Leaving the bootstrap rendezvous point")
 			if err := b.announcer.LeaveDHT(ctx, joinRendezvous); err != nil {
@@ -414,6 +429,7 @@ LeaderElect:
 		}()
 		return
 	}
+	defer listenCancel()
 	// Create a transport to the leader with the signed rendezvous string.
 	rt = newRoundTripperWithHostAndCloseFunc[v1.JoinRequest, v1.JoinResponse](b.host, RoundTripOptions{
 		Rendezvous: joinRendezvous,
@@ -430,22 +446,6 @@ type electionSigner struct {
 
 func (s *electionSigner) deterministicSign(value uuid.UUID) ([]byte, error) {
 	return s.signer.DeterministicSign(value[:])
-}
-
-func (s *electionSigner) deterministicVerify(value []byte) (uuid.UUID, error) {
-	sigSize := s.signer.DeterministicSignatureSize()
-	if len(value) != uuidSize+sigSize {
-		return uuid.UUID{}, fmt.Errorf("invalid data length, got %d bytes, expected %d bytes", len(value), uuidSize+sigSize)
-	}
-	remoteUUID := value[:len(value)-sigSize]
-	sig := value[len(value)-sigSize:]
-	err := s.signer.DeterministicVerify(remoteUUID, sig)
-	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("invalid signature: %w", err)
-	}
-	var uu uuid.UUID
-	copy(uu[:], remoteUUID)
-	return uu, nil
 }
 
 func (s *electionSigner) sign(value uuid.UUID) ([]byte, error) {
