@@ -12,7 +12,7 @@ For a more detailed introduction and extended documentation, please see the [pro
 Webmesh is not a VPN, but rather a mesh network.
 It is designed to be used in conjunction with existing network infrastructure, and not as a replacement for it.
 It is also not a replacement for WireGuard™, but rather a way to manage a WireGuard™ mesh network.
-Connections are made into the network via direct links or over ICE (WebRTC) connections.
+Connections are made into the network via direct links, over ICE (WebRTC) connections, or over [LibP2P](https://libp2p.io/) circuit relays.
 It differs from other WireGuard™ management solutions in that:
 
 - It is designed to be distributed and extensible, relying on no single controller or database.
