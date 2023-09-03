@@ -21,9 +21,9 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
@@ -35,7 +35,7 @@ func TestPutEdge(t *testing.T) {
 	// Pre register the nodes
 	p := peers.New(server.store)
 	for _, peer := range []string{"foo", "baz"} {
-		key, err := wgtypes.GeneratePrivateKey()
+		key, err := crypto.GenerateKey()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

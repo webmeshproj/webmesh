@@ -17,19 +17,21 @@ limitations under the License.
 package mesh
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // Close closes the store.
 func (s *meshStore) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if !s.open.Load() {
 		return ErrNotOpen
 	}
-	ctx := context.Background()
+	ctx := context.WithLogger(context.Background(), s.log)
 	defer s.open.Store(false)
 	defer close(s.closec)
 	s.kvSubCancel()

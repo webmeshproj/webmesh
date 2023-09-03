@@ -38,8 +38,8 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/util/crypto"
 )
 
 // BootstrapTransport implements bootstrap transport and returns the

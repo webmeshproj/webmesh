@@ -24,14 +24,13 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
 
-func (s *meshStore) join(ctx context.Context, opts ConnectOptions, key wgtypes.Key) error {
+func (s *meshStore) join(ctx context.Context, opts ConnectOptions) error {
 	log := s.log
 	ctx = context.WithLogger(ctx, log)
 	log.Info("Joining webmesh cluster")
@@ -41,7 +40,7 @@ func (s *meshStore) join(ctx context.Context, opts ConnectOptions, key wgtypes.K
 		if tries > 0 {
 			log.Info("Retrying join request", slog.Int("tries", tries))
 		}
-		req := s.newJoinRequest(opts, key)
+		req := s.newJoinRequest(opts)
 		log.Debug("Sending join request to node", slog.Any("req", req))
 		resp, err := opts.JoinRoundTripper.RoundTrip(ctx, req)
 		if err != nil {
@@ -57,7 +56,7 @@ func (s *meshStore) join(ctx context.Context, opts ConnectOptions, key wgtypes.K
 			time.Sleep(time.Second)
 			continue
 		}
-		err = s.handleJoinResponse(ctx, opts, resp, key)
+		err = s.handleJoinResponse(ctx, opts, resp)
 		if err != nil {
 			return fmt.Errorf("handle join response: %w", err)
 		}
@@ -66,7 +65,7 @@ func (s *meshStore) join(ctx context.Context, opts ConnectOptions, key wgtypes.K
 	return nil
 }
 
-func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions, resp *v1.JoinResponse, key wgtypes.Key) error {
+func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions, resp *v1.JoinResponse) error {
 	log := context.LoggerFrom(ctx)
 	log.Info("Received join response", slog.Any("resp", resp))
 	s.meshDomain = resp.GetMeshDomain()
@@ -95,7 +94,7 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 		return fmt.Errorf("parse ipv6 network: %w", err)
 	}
 	startopts := &meshnet.StartOptions{
-		Key: key,
+		Key: s.key,
 		AddressV4: func() netip.Prefix {
 			if !s.opts.DisableIPv4 {
 				return addressv4
@@ -149,14 +148,14 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 	return nil
 }
 
-func (s *meshStore) newJoinRequest(opts ConnectOptions, key wgtypes.Key) *v1.JoinRequest {
+func (s *meshStore) newJoinRequest(opts ConnectOptions) *v1.JoinRequest {
 	if opts.GRPCAdvertisePort <= 0 {
 		// Assume the default port.
 		opts.GRPCAdvertisePort = services.DefaultGRPCPort
 	}
 	req := &v1.JoinRequest{
 		Id:        s.ID(),
-		PublicKey: key.PublicKey().String(),
+		PublicKey: s.key.PublicKey().String(),
 		PrimaryEndpoint: func() string {
 			if opts.PrimaryEndpoint.IsValid() {
 				return opts.PrimaryEndpoint.String()

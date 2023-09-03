@@ -25,10 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
@@ -92,7 +92,7 @@ type RelayOptions struct {
 // the wireguard interface.
 type StartOptions struct {
 	// Key is the wireguard key to use for the node.
-	Key wgtypes.Key
+	Key crypto.Key
 	// AddressV4 is the IPv4 address to use for the node.
 	AddressV4 netip.Prefix
 	// AddressV6 is the IPv6 address to use for the node.

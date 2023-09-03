@@ -29,7 +29,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/util/crypto"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 // TestBootstrapTransport tests the libp2p bootstrap transport.

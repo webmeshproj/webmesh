@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
@@ -80,6 +82,8 @@ type Mesh interface {
 	ID() string
 	// Domain returns the domain of the mesh network.
 	Domain() string
+	// Key returns the private key used for WireGuard and libp2p connections.
+	Key() crypto.Key
 	// Connect opens the connection to the mesh. This must be called before
 	// other methods can be used.
 	Connect(ctx context.Context, opts ConnectOptions) error
@@ -111,8 +115,13 @@ type Config struct {
 	// NodeID is the node ID to use. If empty, the one from the raft
 	// instance will be used.
 	NodeID string
-	// Credentials are gRPC credentials to use when dialing the mesh.
+	// Credentials are gRPC credentials to use when dialing other nodes
+	// in the mesh.
 	Credentials []grpc.DialOption
+	// Key is the private key to use for WireGuard and libp2p connections.
+	// This can be nil, in which case one will be generated when Connect
+	// is called.
+	Key crypto.Key
 	// HeartbeatPurgeThreshold is the number of failed heartbeats before
 	// assuming a peer is offline. This is only applicable when currently
 	// the leader of the raft group.
@@ -126,14 +135,6 @@ type Config struct {
 	UseMeshDNS bool
 	// LocalMeshDNSAddr is the address MeshDNS is listening on locally.
 	LocalMeshDNSAddr string
-	// WireGuardKeyFile is a location to store and reuse a WireGuard key.
-	// This is optional. If specified and the file does not exist, one will
-	// be generated and stored there.
-	WireGuardKeyFile string
-	// KeyRotationInterval is the interval to rotate WireGuard keys. This is
-	// only applicable when a WireguardKeyFile is specified. Otherwise a new
-	// one will be generated on each startup.
-	KeyRotationInterval time.Duration
 	// DisableIPv4 is true if IPv4 should be disabled.
 	DisableIPv4 bool
 	// DisableIPv6 is true if IPv6 should be disabled.
@@ -157,6 +158,7 @@ func NewWithLogger(log *slog.Logger, opts Config) Mesh {
 	st := &meshStore{
 		opts:             opts,
 		nodeID:           opts.NodeID,
+		key:              opts.Key,
 		peerUpdateGroup:  &peerUpdateGroup,
 		routeUpdateGroup: &routeUpdateGroup,
 		dnsUpdateGroup:   &dnsUpdateGroup,
@@ -173,6 +175,7 @@ type meshStore struct {
 	nodeID           string
 	meshDomain       string
 	opts             Config
+	key              crypto.Key
 	raft             raft.Raft
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
@@ -183,6 +186,7 @@ type meshStore struct {
 	dnsUpdateGroup   *errgroup.Group
 	closec           chan struct{}
 	log              *slog.Logger
+	mu               sync.Mutex
 	// a flag set on test stores to indicate skipping certain operations
 	testStore bool
 }
@@ -190,6 +194,11 @@ type meshStore struct {
 // ID returns the node ID.
 func (s *meshStore) ID() string {
 	return string(s.nodeID)
+}
+
+// Key returns the private key used for WireGuard and libp2p connections.
+func (s *meshStore) Key() crypto.Key {
+	return s.key
 }
 
 // Domain returns the domain of the mesh network.

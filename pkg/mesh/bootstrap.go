@@ -29,7 +29,6 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
@@ -42,7 +41,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
-func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions, key wgtypes.Key) error {
+func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	// Check if the mesh network is defined
 	s.log.Debug("Checking if cluster is already bootstrapped")
 	_, err := s.Storage().GetValue(ctx, state.IPv6PrefixKey)
@@ -58,7 +57,7 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions, key wgty
 	if !firstBootstrap {
 		// We have data, so the cluster is already bootstrapped.
 		s.log.Info("Cluster already bootstrapped, attempting to rejoin as voter")
-		return s.join(ctx, opts, key)
+		return s.join(ctx, opts)
 	}
 	s.log.Debug("Cluster not yet bootstrapped, attempting to bootstrap")
 	isLeader, joinRT, err := opts.Bootstrap.Transport.LeaderElect(ctx)
@@ -66,23 +65,23 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions, key wgty
 		if errors.Is(err, raft.ErrAlreadyBootstrapped) && joinRT != nil {
 			s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 			opts.JoinRoundTripper = joinRT
-			return s.join(ctx, opts, key)
+			return s.join(ctx, opts)
 		}
 		return fmt.Errorf("leader elect: %w", err)
 	}
 	if isLeader {
 		s.log.Info("We were elected leader")
-		return s.initialBootstrapLeader(ctx, opts, key)
+		return s.initialBootstrapLeader(ctx, opts)
 	}
 	if s.testStore {
 		return nil
 	}
 	s.log.Info("We were not elected leader")
 	opts.JoinRoundTripper = joinRT
-	return s.join(ctx, opts, key)
+	return s.join(ctx, opts)
 }
 
-func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOptions, wireguardKey wgtypes.Key) error {
+func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOptions) error {
 	// We'll bootstrap the raft cluster as just ourselves.
 	s.log.Info("Bootstrapping raft cluster")
 	err := s.raft.Bootstrap(ctx)
@@ -286,7 +285,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 	p := peers.New(s.Storage())
-	pubKey := wireguardKey.PublicKey()
+	pubKey := s.key.PublicKey()
 	privatev6 := netutil.AssignToPrefix(meshnetworkv6, pubKey[:])
 	self := peers.MeshNode{
 		MeshNode: &v1.MeshNode{
@@ -300,7 +299,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				return out
 			}(),
 			ZoneAwarenessId: s.opts.ZoneAwarenessID,
-			PublicKey:       wireguardKey.PublicKey().String(),
+			PublicKey:       pubKey.String(),
 			PrivateIpv6:     privatev6.String(),
 			Features:        opts.Features,
 			JoinedAt:        timestamppb.New(time.Now().UTC()),
@@ -403,7 +402,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// Start network resources
 	s.log.Info("Starting network manager")
 	startopts := &meshnet.StartOptions{
-		Key: wireguardKey,
+		Key: s.key,
 		AddressV4: func() netip.Prefix {
 			if !s.opts.DisableIPv4 {
 				return privatev4

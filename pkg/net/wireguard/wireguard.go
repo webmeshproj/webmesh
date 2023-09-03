@@ -32,6 +32,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/system/link"
 	"github.com/webmeshproj/webmesh/pkg/net/system/routes"
@@ -61,7 +62,7 @@ type Interface interface {
 	// NetworkV6 returns the IPv6 network of this interface.
 	NetworkV6() netip.Prefix
 	// Configure configures the wireguard interface to use the given key and listen port.
-	Configure(ctx context.Context, key wgtypes.Key, listenPort int) error
+	Configure(ctx context.Context, key crypto.Key, listenPort int) error
 	// ListenPort returns the current listen port of the wireguard interface.
 	ListenPort() (int, error)
 	// PutPeer updates a peer in the wireguard configuration.
@@ -243,9 +244,10 @@ func (w *wginterface) Close(ctx context.Context) error {
 }
 
 // Configure configures the wireguard interface to use the given key and listen port.
-func (w *wginterface) Configure(ctx context.Context, key wgtypes.Key, listenPort int) error {
+func (w *wginterface) Configure(ctx context.Context, key crypto.Key, listenPort int) error {
+	wgKey := key.PrivateKey()
 	err := w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
-		PrivateKey:   &key,
+		PrivateKey:   &wgKey,
 		ListenPort:   &listenPort,
 		ReplacePeers: false,
 	})

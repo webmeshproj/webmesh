@@ -26,7 +26,11 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
@@ -106,6 +110,8 @@ type BootstrapOptions struct {
 
 // Connect opens the connection to the mesh.
 func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.open.Load() {
 		return ErrOpen
 	}
@@ -118,6 +124,16 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		s.log = s.log.With("node-id", s.nodeID)
 	}
 	log := s.log
+
+	// If our key is still nil, generate an ephemeral key.
+	if s.key == nil {
+		log.Debug("Generating ephemeral key pair")
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			return fmt.Errorf("generate key: %w", err)
+		}
+		s.key = key
+	}
 
 	// Create the plugin manager
 	var pluginopts plugins.Options
@@ -168,18 +184,14 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	s.nw = net.New(s.Storage(), opts.NetworkOptions)
 	// At this point we are open for business.
 	s.open.Store(true)
-	key, err := s.loadWireGuardKey(ctx)
-	if err != nil {
-		return fmt.Errorf("load wireguard key: %w", err)
-	}
 	if opts.Bootstrap != nil {
 		// Attempt bootstrap.
-		if err = s.bootstrap(ctx, opts, key); err != nil {
+		if err = s.bootstrap(ctx, opts); err != nil {
 			return handleErr(fmt.Errorf("bootstrap: %w", err))
 		}
 	} else if opts.JoinRoundTripper != nil {
 		// Attempt to join the cluster.
-		err = s.join(ctx, opts, key)
+		err = s.join(ctx, opts)
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
@@ -261,4 +273,55 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		}
 	}
 	return nil
+}
+
+func (s *meshStore) recoverWireguard(ctx context.Context) error {
+	if s.testStore {
+		return nil
+	}
+	var meshnetworkv4, meshnetworkv6 netip.Prefix
+	var err error
+	if !s.opts.DisableIPv6 {
+		meshnetworkv6, err = state.New(s.Storage()).GetIPv6Prefix(ctx)
+		if err != nil {
+			return fmt.Errorf("get ula prefix: %w", err)
+		}
+	}
+	if !s.opts.DisableIPv4 {
+		meshnetworkv4, err = state.New(s.Storage()).GetIPv4Prefix(ctx)
+		if err != nil {
+			return fmt.Errorf("get ipv4 prefix: %w", err)
+		}
+	}
+	p := peers.New(s.Storage())
+	self, err := p.Get(ctx, s.ID())
+	if err != nil {
+		return fmt.Errorf("get self peer: %w", err)
+	}
+	opts := &net.StartOptions{
+		Key: s.key,
+		AddressV4: func() netip.Prefix {
+			if s.opts.DisableIPv4 {
+				return netip.Prefix{}
+			}
+			return self.PrivateAddrV4()
+		}(),
+		AddressV6: func() netip.Prefix {
+			if s.opts.DisableIPv6 {
+				return netip.Prefix{}
+			}
+			return self.PrivateAddrV6()
+		}(),
+		NetworkV4: meshnetworkv4,
+		NetworkV6: meshnetworkv6,
+	}
+	err = s.nw.Start(ctx, opts)
+	if err != nil {
+		return fmt.Errorf("configure wireguard: %w", err)
+	}
+	wgpeers, err := mesh.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+	if err != nil {
+		return fmt.Errorf("get wireguard peers: %w", err)
+	}
+	return s.nw.Peers().Refresh(ctx, wgpeers)
 }

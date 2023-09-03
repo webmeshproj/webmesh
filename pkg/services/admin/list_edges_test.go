@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
@@ -35,7 +35,7 @@ func TestListEdges(t *testing.T) {
 	// No empty condition
 
 	// Place a dummy peer
-	key, err := wgtypes.GeneratePrivateKey()
+	key, err := crypto.GenerateKey()
 	if err != nil {
 		t.Errorf("GenerateKey() error = %v", err)
 		return

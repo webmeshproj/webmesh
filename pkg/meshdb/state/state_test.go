@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
@@ -249,11 +249,11 @@ func setupTest(t *testing.T) (*state, func()) {
 	return s.(*state), close
 }
 
-func mustGenerateKey(t *testing.T) wgtypes.Key {
+func mustGenerateKey(t *testing.T) crypto.Key {
 	t.Helper()
-	key, err := wgtypes.GeneratePrivateKey()
+	key, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return key.PublicKey()
+	return key
 }
