@@ -89,9 +89,6 @@ type MeshOptions struct {
 // NewMeshOptions returns a new MeshOptions with the default values. If node id
 // is empty it will be assumed from the system or generated.
 func NewMeshOptions(nodeID string) MeshOptions {
-	if nodeID == "" {
-		nodeID = DefaultNodeID
-	}
 	return MeshOptions{
 		NodeID:                      nodeID,
 		PrimaryEndpoint:             "",
