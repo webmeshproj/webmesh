@@ -67,7 +67,7 @@ func (s *meshStoreAnnouncer) AnnounceToDHT(ctx context.Context, opts libp2p.Anno
 	var err error
 	if opts.Host == nil {
 		// Make sure we are using our key
-		opts.Key = s.st.key
+		opts.HostOptions.Key = s.st.key
 		discover, err = libp2p.NewJoinAnnouncer(ctx, opts, transport.JoinServerFunc(s.proxyJoin))
 		if err != nil {
 			return fmt.Errorf("new kad dht announcer: %w", err)

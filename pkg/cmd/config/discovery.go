@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 )
 
@@ -73,8 +74,9 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 }
 
 // NewHostConfig returns a new HostOptions for the discovery config.
-func (o *DiscoveryOptions) HostOptions(ctx context.Context) libp2p.HostOptions {
+func (o *DiscoveryOptions) HostOptions(ctx context.Context, key crypto.Key) libp2p.HostOptions {
 	return libp2p.HostOptions{
+		Key: key,
 		BootstrapPeers: func() []multiaddr.Multiaddr {
 			out := make([]multiaddr.Multiaddr, 0)
 			for _, addr := range o.BootstrapServers {

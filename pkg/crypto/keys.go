@@ -39,8 +39,8 @@ type Key interface {
 }
 
 type key struct {
-	wgkey    wgtypes.Key
 	hostpriv p2pcrypto.PrivKey
+	raw      []byte
 	encoded  string
 }
 
@@ -55,7 +55,7 @@ func MustGenerateKey() Key {
 
 // GenerateKey generates a new private key.
 func GenerateKey() (Key, error) {
-	priv, _, err := p2pcrypto.GenerateKeyPairWithReader(p2pcrypto.Secp256k1, 256, rand.Reader)
+	priv, _, err := p2pcrypto.GenerateKeyPairWithReader(p2pcrypto.ECDSA, 256, rand.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func GenerateKey() (Key, error) {
 		return nil, err
 	}
 	return &key{
-		wgkey:    wgtypes.Key(raw),
+		raw:      raw,
 		hostpriv: priv,
 		encoded:  p2pcrypto.ConfigEncodeKey(marshaled),
 	}, nil
@@ -94,7 +94,7 @@ func ParseKeyFromBytes(data []byte) (Key, error) {
 		return nil, err
 	}
 	return &key{
-		wgkey:    wgtypes.Key(raw),
+		raw:      raw,
 		hostpriv: priv,
 		encoded:  p2pcrypto.ConfigEncodeKey(data),
 	}, nil
@@ -103,12 +103,12 @@ func ParseKeyFromBytes(data []byte) (Key, error) {
 // PrivateKey returns the WireGuard private key derived from the
 // given key.
 func (k *key) PrivateKey() wgtypes.Key {
-	return k.wgkey
+	return wgtypes.Key(k.raw)
 }
 
 // PublicKey returns the public WireGuard key derived from the given key.
 func (k *key) PublicKey() wgtypes.Key {
-	return k.wgkey.PublicKey()
+	return k.PrivateKey().PublicKey()
 }
 
 // HostKey returns a libp2p compatible host key-pair.

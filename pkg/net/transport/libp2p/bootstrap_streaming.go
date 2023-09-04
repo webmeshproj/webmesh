@@ -78,8 +78,6 @@ type BootstrapOptions struct {
 	NodeID string
 	// NodeIDs are the other node IDs to use for leader election.
 	NodeIDs []string
-	// Key is the private key of the node. One will be generated if this is nil.
-	Key crypto.Key
 }
 
 // NewBootstrapTransport creates a new bootstrap transport. The host is closed
@@ -89,14 +87,7 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 	if err != nil {
 		return nil, err
 	}
-	if opts.Key == nil {
-		context.LoggerFrom(ctx).Debug("Generating ephemeral key for bootstrap transport")
-		opts.Key, err = crypto.GenerateKey()
-		if err != nil {
-			return nil, err
-		}
-	}
-	host, err := NewHostWithKey(ctx, opts.Host, opts.Key)
+	host, err := NewHost(ctx, opts.Host)
 	if err != nil {
 		return nil, err
 	}

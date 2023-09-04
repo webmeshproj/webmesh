@@ -223,12 +223,11 @@ func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn 
 		return libp2p.NewBootstrapTransport(ctx, conn.Discovery(), libp2p.BootstrapOptions{
 			Rendezvous:      t.Rendezvous,
 			Signer:          crypto.PSK(t.PSK),
-			Host:            o.Discovery.HostOptions(ctx),
+			Host:            o.Discovery.HostOptions(ctx, conn.Key()),
 			ElectionTimeout: o.Bootstrap.ElectionTimeout,
 			Linger:          t.RendezvousLinger,
 			NodeID:          nodeID,
 			NodeIDs:         t.RendezvousNodes,
-			Key:             conn.Key(),
 		})
 	}
 	return tcp.NewBootstrapTransport(tcp.BootstrapTransportOptions{

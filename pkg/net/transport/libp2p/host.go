@@ -55,6 +55,8 @@ type Host interface {
 
 // HostOptions are options for creating a new libp2p host.
 type HostOptions struct {
+	// Key is the host's private key. One will be generated if this is nil.
+	Key crypto.Key
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
 	// If empty or nil, the default bootstrap peers will be used.
 	BootstrapPeers []multiaddr.Multiaddr
@@ -69,17 +71,7 @@ type HostOptions struct {
 
 // NewHost creates a new libp2p host connected to the DHT with the given options.
 func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		return nil, fmt.Errorf("generate key: %w", err)
-	}
-	return NewHostWithKey(ctx, opts, key)
-}
-
-// NewHostWithKey creates a new libp2p host connected to the DHT with the given options
-// and keypair.
-func NewHostWithKey(ctx context.Context, opts HostOptions, key crypto.Key) (Host, error) {
-	host, err := NewLibP2PHostWithKey(ctx, opts, key)
+	host, err := NewLibP2PHost(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
@@ -97,17 +89,16 @@ func NewHostWithKey(ctx context.Context, opts HostOptions, key crypto.Key) (Host
 
 // NewLibP2PHost creates a new libp2p host with the given options.
 func NewLibP2PHost(ctx context.Context, opts HostOptions) (host.Host, error) {
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		return nil, fmt.Errorf("generate key: %w", err)
-	}
-	return NewLibP2PHostWithKey(ctx, opts, key)
-}
-
-// NewLibP2PHostWithKey creates a new libp2p host with the given options and keypair.
-func NewLibP2PHostWithKey(ctx context.Context, opts HostOptions, key crypto.Key) (host.Host, error) {
 	SetMaxSystemBuffers(ctx)
-	opts.Options = append(opts.Options, libp2p.Identity(key.HostKey()))
+	if opts.Key == nil {
+		context.LoggerFrom(ctx).Debug("Generating ephemeral key for bootstrap transport")
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			return nil, fmt.Errorf("generate key: %w", err)
+		}
+		opts.Key = key
+	}
+	opts.Options = append(opts.Options, libp2p.Identity(opts.Key.HostKey()))
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
 	}

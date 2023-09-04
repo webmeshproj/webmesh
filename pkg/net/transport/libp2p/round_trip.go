@@ -30,7 +30,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
@@ -46,8 +45,6 @@ type RoundTripOptions struct {
 	Method string
 	// Host is a pre-started host to use for the round trip
 	Host Host
-	// Key is the host's private key. One will be generated if this is nil.
-	Key crypto.Key
 }
 
 // NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
@@ -57,14 +54,7 @@ func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) 
 	close := func() {}
 	var err error
 	if host == nil {
-		if opts.Key == nil {
-			context.LoggerFrom(ctx).Debug("Generating ephemeral key for round-trip transport")
-			opts.Key, err = crypto.GenerateKey()
-			if err != nil {
-				return nil, err
-			}
-		}
-		host, err = NewHostWithKey(ctx, opts.HostOptions, opts.Key)
+		host, err = NewHost(ctx, opts.HostOptions)
 		if err != nil {
 			return nil, err
 		}
