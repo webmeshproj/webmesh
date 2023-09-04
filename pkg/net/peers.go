@@ -58,7 +58,6 @@ type peerManager struct {
 	net      *manager
 	p2pConns map[string]clientPeerConn
 	peermu   sync.Mutex
-	pcmu     sync.Mutex
 	p2pmu    sync.Mutex
 }
 
@@ -111,12 +110,12 @@ func (m *peerManager) Refresh(ctx context.Context, wgpeers []*v1.WireGuardPeer) 
 	for peer := range currentPeers {
 		if _, ok := seenPeers[peer]; !ok {
 			log.Debug("Removing peer", slog.String("peer_id", peer))
-			m.pcmu.Lock()
+			m.p2pmu.Lock()
 			if conn, ok := m.p2pConns[peer]; ok {
 				conn.peerConn.Close()
 				delete(m.p2pConns, peer)
 			}
-			m.pcmu.Unlock()
+			m.p2pmu.Unlock()
 			if err := m.net.WireGuard().DeletePeer(ctx, peer); err != nil {
 				errs = append(errs, fmt.Errorf("delete peer: %w", err))
 			}
@@ -312,12 +311,13 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardPeer) (netip.AddrPort, error) {
 	log := context.LoggerFrom(ctx)
 	m.p2pmu.Lock()
-	defer m.p2pmu.Unlock()
 	if conn, ok := m.p2pConns[peer.GetNode().GetId()]; ok {
 		// We already have an ICE connection for this peer
 		log.Debug("Using existing wireguard p2p relay", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetNode().GetId()))
+		m.p2pmu.Unlock()
 		return conn.localAddr, nil
 	}
+	m.p2pmu.Unlock()
 	wgPort, err := m.net.WireGuard().ListenPort()
 	if err != nil {
 		return netip.AddrPort{}, fmt.Errorf("wireguard listen port: %w", err)
@@ -367,6 +367,8 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 		delete(m.p2pConns, peer.GetNode().GetId())
 		m.p2pmu.Unlock()
 	}()
+	m.p2pmu.Lock()
+	defer m.p2pmu.Unlock()
 	peerconn := clientPeerConn{
 		peerConn:  relay,
 		localAddr: relay.LocalAddr().AddrPort(),
@@ -376,14 +378,15 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 }
 
 func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) (netip.AddrPort, error) {
-	m.pcmu.Lock()
-	defer m.pcmu.Unlock()
+	m.p2pmu.Lock()
 	log := context.LoggerFrom(ctx)
 	if conn, ok := m.p2pConns[peer.GetNode().GetId()]; ok {
 		// We already have an ICE connection for this peer
 		log.Debug("Using existing wireguard ICE proxy", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetNode().GetId()))
+		m.p2pmu.Unlock()
 		return conn.localAddr, nil
 	}
+	m.p2pmu.Unlock()
 	wgPort, err := m.net.WireGuard().ListenPort()
 	if err != nil {
 		return netip.AddrPort{}, fmt.Errorf("wireguard listen port: %w", err)
@@ -425,10 +428,12 @@ func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPe
 				log.Error("Error refreshing peers after ICE connection closed", slog.String("error", err.Error()))
 			}
 		}()
-		m.pcmu.Lock()
+		m.p2pmu.Lock()
 		delete(m.p2pConns, peer.GetNode().GetId())
-		m.pcmu.Unlock()
+		m.p2pmu.Unlock()
 	}()
+	m.p2pmu.Lock()
+	defer m.p2pmu.Unlock()
 	peerconn := clientPeerConn{
 		peerConn:  pc,
 		localAddr: pc.LocalAddr().AddrPort(),

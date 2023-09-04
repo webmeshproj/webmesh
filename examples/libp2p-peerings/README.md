@@ -3,9 +3,8 @@
 This example shows a single public bootstrap node and two other nodes that form direct peerings with each other over libp2p relays.
 This is similar to the [ICE Peerings](../ice-peerings/) example, but uses libp2p relays instead of a TURN server.
 
-Nodes that wish to communicate directly over libp2p share a rendezvous point where they will agree to meet.
-This rendezvous point is a string on the Kadmelia DHT.
-Once the circuit relay is created, it is used to establish a WireGuard tunnel between the two nodes.
+Nodes that wish to communicate directly over libp2p create a deterministic hash from their public keys and use it as a rendezvous string.
+Once the circuit relay is created, it is used to establish a WireGuard tunnel between the two nodes after they have verified the other end's public key.
 
 For more information, see the [configuration reference](https://webmeshproj.github.io/documentation/configuration/).
 
