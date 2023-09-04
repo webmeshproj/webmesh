@@ -83,9 +83,6 @@ type Options struct {
 type RelayOptions struct {
 	// Host are the options for a libp2p host.
 	Host libp2p.HostOptions
-	// RendevousStrings is a map of peer IDs to rendezvous strings
-	// where peers are accepting signaling via libp2p.
-	RendezvousStrings map[string]string
 }
 
 // StartOptions are the options for starting the network manager and configuring

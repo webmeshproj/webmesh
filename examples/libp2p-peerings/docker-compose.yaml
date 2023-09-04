@@ -52,8 +52,7 @@ services:
       - --global.disable-ipv6
       - --global.log-level=debug
       - --mesh.join-address=10.30.0.1:8443
-      # TODO: Rendezvous can and should be derived from each node's public key
-      - --mesh.libp2p-peers=site-2-peer=${RENDEZVOUS:-supersecret-webmesh-spot}
+      - --mesh.libp2p-peers=site-2-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]
 
@@ -70,6 +69,6 @@ services:
       - --global.disable-ipv6
       - --mesh.join-address=10.30.0.1:8443
       # TODO: Same as above
-      - --mesh.libp2p-peers=site-1-peer=${RENDEZVOUS:-supersecret-webmesh-spot}
+      - --mesh.libp2p-peers=site-1-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]

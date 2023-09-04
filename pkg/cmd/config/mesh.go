@@ -69,10 +69,9 @@ type MeshOptions struct {
 	// ICEPeers are peers to request direct edges to over ICE. If the node is not allowed to create edges
 	// and data channels, the node will be unable to join.
 	ICEPeers []string `koanf:"ice-peers,omitempty"`
-	// LibP2PPeers is a map of peer IDs to libp2p rendezvous strings where peers are accepting edges
-	// over libp2p. If a peer is present in this map, the node will attempt to connect to the peer over
-	// libp2p. If the node is not allowed to create edges and data channels, the node will be unable to join.
-	LibP2PPeers map[string]string `koanf:"libp2p-peers,omitempty"`
+	// LibP2PPeers are peers to request direct edges to over libp2p. If the node is not allowed to create edges
+	// and data channels, the node will be unable to join.
+	LibP2PPeers []string `koanf:"libp2p-peers,omitempty"`
 	// GRPCAdvertisePort is the port to advertise for gRPC.
 	GRPCAdvertisePort int `koanf:"grpc-advertise-port,omitempty"`
 	// MeshDNSAdvertisePort is the port to advertise for DNS.
@@ -115,7 +114,7 @@ func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.IntVar(&o.MaxJoinRetries, prefix+"mesh.max-join-retries", 15, "Maximum number of join retries.")
 	fs.StringSliceVar(&o.Routes, prefix+"mesh.routes", nil, "Additional routes to advertise to the mesh.")
 	fs.StringSliceVar(&o.ICEPeers, prefix+"mesh.ice-peers", nil, "Peers to request direct edges to over ICE.")
-	fs.StringToStringVar(&o.LibP2PPeers, prefix+"mesh.libp2p-peers", nil, "Map of peer IDs to rendezvous strings for edges over libp2p.")
+	fs.StringSliceVar(&o.LibP2PPeers, prefix+"mesh.libp2p-peers", nil, "Map of peer IDs to rendezvous strings for edges over libp2p.")
 	fs.IntVar(&o.GRPCAdvertisePort, prefix+"mesh.grpc-advertise-port", services.DefaultGRPCPort, "Port to advertise for gRPC.")
 	fs.IntVar(&o.MeshDNSAdvertisePort, prefix+"mesh.meshdns-advertise-port", meshdns.DefaultAdvertisePort, "Port to advertise for DNS.")
 	fs.BoolVar(&o.UseMeshDNS, prefix+"mesh.use-meshdns", false, "Set mesh DNS servers to the system configuration.")
@@ -439,7 +438,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 				p := peer
 				peers[p] = v1.ConnectProtocol_CONNECT_ICE
 			}
-			for peer := range o.Mesh.LibP2PPeers {
+			for _, peer := range o.Mesh.LibP2PPeers {
 				p := peer
 				peers[p] = v1.ConnectProtocol_CONNECT_LIBP2P
 			}
@@ -475,8 +474,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 			DisableIPv4:           o.Mesh.DisableIPv4,
 			DisableIPv6:           o.Mesh.DisableIPv6,
 			Relays: meshnet.RelayOptions{
-				RendezvousStrings: o.Mesh.LibP2PPeers,
-				Host:              o.Discovery.HostOptions(ctx, conn.Key()),
+				Host: o.Discovery.HostOptions(ctx, conn.Key()),
 			},
 		},
 	}

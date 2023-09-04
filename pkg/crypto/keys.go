@@ -63,7 +63,7 @@ func MustGenerateKey() Key {
 
 // GenerateKey generates a new private key.
 func GenerateKey() (Key, error) {
-	priv, pub, err := p2pcrypto.GenerateKeyPairWithReader(p2pcrypto.ECDSA, 256, rand.Reader)
+	priv, pub, err := p2pcrypto.GenerateKeyPairWithReader(p2pcrypto.Secp256k1, 256, rand.Reader)
 	if err != nil {
 		return nil, err
 	}
