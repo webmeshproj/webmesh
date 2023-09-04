@@ -19,6 +19,8 @@ package crypto
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"sort"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -38,6 +40,9 @@ type Key interface {
 	PublicHostString() string
 	// String return the base64 encoded string representation of the key.
 	String() string
+	// Rendezvous generates a rendezvous string for discovering the peers at the given
+	// public wireguard keys.
+	Rendezvous(keys ...wgtypes.Key) string
 }
 
 type key struct {
@@ -146,4 +151,26 @@ func (k *key) PublicHostString() string {
 // String return the base64 encoded string representation of the key.
 func (k *key) String() string {
 	return p2pcrypto.ConfigEncodeKey(k.marshaledPriv)
+}
+
+// Rendezvous generates a rendezvous string for discovering the peers at the given
+// public wireguard keys.
+func (k *key) Rendezvous(keys ...wgtypes.Key) string {
+	keys = append(keys, k.PublicKey())
+	return Rendezvous(keys...)
+}
+
+// Rendezvous generates a rendezvous string for discovering the peers at the given
+// public wireguard keys.
+func Rendezvous(keys ...wgtypes.Key) string {
+	keyStrs := make([]string, len(keys))
+	for i, key := range keys {
+		keyStrs[i] = key.String()
+	}
+	sort.Strings(keyStrs)
+	h := sha256.New()
+	for _, k := range keyStrs {
+		h.Write([]byte(k))
+	}
+	return string(h.Sum(nil))
 }

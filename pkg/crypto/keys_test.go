@@ -49,3 +49,17 @@ func TestKeyMarshaling(t *testing.T) {
 		t.Fatal("parsed public host key does not match")
 	}
 }
+
+func TestRendezvous(t *testing.T) {
+	key1 := MustGenerateKey()
+	key2 := MustGenerateKey()
+	key3 := MustGenerateKey()
+
+	rv1 := key1.Rendezvous(key2.PublicKey(), key3.PublicKey())
+	rv2 := key2.Rendezvous(key1.PublicKey(), key3.PublicKey())
+	rv3 := key3.Rendezvous(key1.PublicKey(), key2.PublicKey())
+
+	if rv1 != rv2 || rv1 != rv3 {
+		t.Fatal("rendezvous strings do not match")
+	}
+}
