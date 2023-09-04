@@ -38,4 +38,14 @@ func TestKeyMarshaling(t *testing.T) {
 	if wgpub.String() != parsed.PublicKey().String() {
 		t.Fatal("public WireGuard keys do not match")
 	}
+	if key.PublicHostString() != parsed.PublicHostString() {
+		t.Fatal("public host keys do not match")
+	}
+	pubkey, err := ParseHostPublicKey(key.PublicHostString())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pubkey.Equals(parsed.HostKey().GetPublic()) {
+		t.Fatal("parsed public host key does not match")
+	}
 }

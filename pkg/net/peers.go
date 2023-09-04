@@ -98,7 +98,7 @@ func (m *peerManager) Refresh(ctx context.Context, wgpeers []*v1.WireGuardPeer) 
 	seenPeers := make(map[string]struct{})
 	errs := make([]error, 0)
 	for _, peer := range wgpeers {
-		seenPeers[peer.GetId()] = struct{}{}
+		seenPeers[peer.GetNode().GetId()] = struct{}{}
 		// Ensure the peer is configured
 		err := m.addPeer(ctx, peer, nil)
 		if err != nil {
@@ -129,19 +129,19 @@ func (m *peerManager) Refresh(ctx context.Context, wgpeers []*v1.WireGuardPeer) 
 
 func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) error {
 	log := context.LoggerFrom(ctx)
-	key, err := wgtypes.ParseKey(peer.GetPublicKey())
+	key, err := wgtypes.ParseKey(peer.GetNode().GetPublicKey())
 	if err != nil {
 		return fmt.Errorf("parse peer key: %w", err)
 	}
 	var priv4, priv6 netip.Prefix
-	if peer.AddressIpv4 != "" {
-		priv4, err = netip.ParsePrefix(peer.AddressIpv4)
+	if peer.GetNode().GetPrivateIpv4() != "" {
+		priv4, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv4())
 		if err != nil {
 			return fmt.Errorf("parse peer ipv4: %w", err)
 		}
 	}
-	if peer.AddressIpv6 != "" {
-		priv6, err = netip.ParsePrefix(peer.AddressIpv6)
+	if peer.GetNode().GetPrivateIpv6() != "" {
+		priv6, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv6())
 		if err != nil {
 			return fmt.Errorf("parse peer ipv6: %w", err)
 		}
@@ -185,7 +185,7 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 	}
 	var rpcPort int
 	var isRaftMember bool
-	for _, feat := range peer.GetFeatures() {
+	for _, feat := range peer.GetNode().GetFeatures() {
 		if feat.Feature == v1.Feature_STORAGE {
 			// They are a raft member
 			isRaftMember = true
@@ -196,7 +196,7 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		}
 	}
 	wgpeer := wireguard.Peer{
-		ID:            peer.GetId(),
+		ID:            peer.GetNode().GetId(),
 		GRPCPort:      rpcPort,
 		RaftMember:    isRaftMember,
 		PublicKey:     key,
@@ -218,10 +218,10 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		defer cancel()
 		var addr netip.Prefix
 		var err error
-		if !m.net.opts.DisableIPv4 && peer.AddressIpv4 != "" {
-			addr, err = netip.ParsePrefix(peer.AddressIpv4)
+		if !m.net.opts.DisableIPv4 && peer.GetNode().GetPrivateIpv4() != "" {
+			addr, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv4())
 		} else {
-			addr, err = netip.ParsePrefix(peer.AddressIpv6)
+			addr, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv6())
 		}
 		if err != nil {
 			log.Warn("Could not parse peer address", slog.String("error", err.Error()))
@@ -229,10 +229,10 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		}
 		err = netutil.Ping(ctx, addr.Addr())
 		if err != nil {
-			log.Debug("Could not ping descendant", slog.String("descendant", peer.Id), slog.String("error", err.Error()))
+			log.Debug("Could not ping descendant", slog.String("descendant", peer.GetNode().GetId()), slog.String("error", err.Error()))
 			return
 		}
-		log.Debug("Successfully pinged descendant", slog.String("descendant", peer.Id))
+		log.Debug("Successfully pinged descendant", slog.String("descendant", peer.GetNode().GetId()))
 	}()
 	return nil
 }
@@ -246,14 +246,15 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 	}
 	if peer.GetProto() == v1.ConnectProtocol_CONNECT_LIBP2P {
 		// Make sure we have a rendevous string for them
-		if _, ok := m.net.opts.Relays.RendezvousStrings[peer.GetId()]; !ok {
-			return endpoint, fmt.Errorf("no rendezvous string for peer %s", peer.GetId())
+		id := peer.GetNode().GetId()
+		if _, ok := m.net.opts.Relays.RendezvousStrings[id]; !ok {
+			return endpoint, fmt.Errorf("no rendezvous string for peer %s", id)
 		}
-		return m.negotiateP2PRelay(ctx, peer, m.net.opts.Relays.RendezvousStrings[peer.GetId()])
+		return m.negotiateP2PRelay(ctx, peer, m.net.opts.Relays.RendezvousStrings[id])
 	}
 	// TODO: We don't honor ipv4/ipv6 preferences currently in this function
-	if peer.GetPrimaryEndpoint() != "" {
-		addr, err := net.ResolveUDPAddr("udp", peer.GetPrimaryEndpoint())
+	if peer.GetNode().GetPrimaryEndpoint() != "" {
+		addr, err := net.ResolveUDPAddr("udp", peer.GetNode().GetPrimaryEndpoint())
 		if err != nil {
 			return endpoint, fmt.Errorf("resolve primary endpoint: %w", err)
 		}
@@ -269,7 +270,7 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 		endpoint = addr.AddrPort()
 	}
 	// Check if we are using zone awareness and the peer is in the same zone
-	if m.net.opts.ZoneAwarenessID != "" && peer.GetZoneAwarenessId() == m.net.opts.ZoneAwarenessID {
+	if m.net.opts.ZoneAwarenessID != "" && peer.GetNode().GetZoneAwarenessId() == m.net.opts.ZoneAwarenessID {
 		log.Debug("Using zone awareness, collecting local CIDRs")
 		localCIDRs, err := endpoints.Detect(ctx, endpoints.DetectOpts{
 			DetectPrivate:  true,
@@ -282,8 +283,8 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 		log.Debug("Detected local CIDRs", slog.Any("cidrs", localCIDRs.Strings()))
 		// If the primary endpoint is not in our zone and additional endpoints are available,
 		// check if any of the additional endpoints are in our zone
-		if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetWireguardEndpoints()) > 0 {
-			for _, additionalEndpoint := range peer.GetWireguardEndpoints() {
+		if !localCIDRs.Contains(endpoint.Addr()) && len(peer.GetNode().GetWireguardEndpoints()) > 0 {
+			for _, additionalEndpoint := range peer.GetNode().GetWireguardEndpoints() {
 				addr, err := net.ResolveUDPAddr("udp", additionalEndpoint)
 				if err != nil {
 					log.Error("could not resolve peer primary endpoint", slog.String("error", err.Error()))
@@ -298,7 +299,7 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 				}
 				log.Debug("Evalauting zone awareness endpoint",
 					slog.String("endpoint", addr.String()),
-					slog.String("zone", peer.GetZoneAwarenessId()))
+					slog.String("zone", peer.GetNode().GetZoneAwarenessId()))
 				ep := addr.AddrPort()
 				if localCIDRs.Contains(ep.Addr()) {
 					// We found an additional endpoint that is in one of our local
@@ -317,9 +318,9 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 	log := context.LoggerFrom(ctx)
 	m.p2pmu.Lock()
 	defer m.p2pmu.Unlock()
-	if conn, ok := m.p2pConns[peer.GetId()]; ok {
+	if conn, ok := m.p2pConns[peer.GetNode().GetId()]; ok {
 		// We already have an ICE connection for this peer
-		log.Debug("Using existing wireguard p2p relay", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
+		log.Debug("Using existing wireguard p2p relay", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetNode().GetId()))
 		return conn.localAddr, nil
 	}
 	wgPort, err := m.net.WireGuard().ListenPort()
@@ -328,7 +329,7 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 	}
 	relay, err := libp2p.NewUDPRelay(ctx, libp2p.UDPRelayOptions{
 		LocalNode:  m.net.opts.NodeID,
-		RemoteNode: peer.GetId(),
+		RemoteNode: peer.GetNode().GetId(),
 		Rendezvous: rendezvous,
 		Relay: relay.UDPOptions{
 			TargetPort: uint16(wgPort),
@@ -359,14 +360,14 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 			}
 		}()
 		m.p2pmu.Lock()
-		delete(m.p2pConns, peer.GetId())
+		delete(m.p2pConns, peer.GetNode().GetId())
 		m.p2pmu.Unlock()
 	}()
 	peerconn := clientPeerConn{
 		peerConn:  relay,
 		localAddr: relay.LocalAddr().AddrPort(),
 	}
-	m.p2pConns[peer.GetId()] = peerconn
+	m.p2pConns[peer.GetNode().GetId()] = peerconn
 	return peerconn.localAddr, nil
 }
 
@@ -374,9 +375,9 @@ func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPe
 	m.pcmu.Lock()
 	defer m.pcmu.Unlock()
 	log := context.LoggerFrom(ctx)
-	if conn, ok := m.p2pConns[peer.GetId()]; ok {
+	if conn, ok := m.p2pConns[peer.GetNode().GetId()]; ok {
 		// We already have an ICE connection for this peer
-		log.Debug("Using existing wireguard ICE proxy", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetId()))
+		log.Debug("Using existing wireguard ICE proxy", slog.String("local-proxy", conn.localAddr.String()), slog.String("peer", peer.GetNode().GetId()))
 		return conn.localAddr, nil
 	}
 	wgPort, err := m.net.WireGuard().ListenPort()
@@ -384,7 +385,7 @@ func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPe
 		return netip.AddrPort{}, fmt.Errorf("wireguard listen port: %w", err)
 	}
 	var endpoint netip.AddrPort
-	log.Debug("Negotiating wireguard ICE proxy", slog.String("peer", peer.GetId()))
+	log.Debug("Negotiating wireguard ICE proxy", slog.String("peer", peer.GetNode().GetId()))
 	var tries int
 	var maxTries = 5
 	var pc *datachannels.WireGuardProxyClient
@@ -421,14 +422,14 @@ func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPe
 			}
 		}()
 		m.pcmu.Lock()
-		delete(m.p2pConns, peer.GetId())
+		delete(m.p2pConns, peer.GetNode().GetId())
 		m.pcmu.Unlock()
 	}()
 	peerconn := clientPeerConn{
 		peerConn:  pc,
 		localAddr: pc.LocalAddr().AddrPort(),
 	}
-	m.p2pConns[peer.GetId()] = peerconn
+	m.p2pConns[peer.GetNode().GetId()] = peerconn
 	return peerconn.localAddr, nil
 }
 
@@ -453,13 +454,13 @@ func (m *peerManager) getSignalingTransport(ctx context.Context, peer *v1.WireGu
 		// We'll use our local storage
 		log.Debug("We'll use our local storage for ICE negotiation lookup")
 		resolver = peers.New(m.net.storage).Resolver().FeatureResolver(func(mn peers.MeshNode) bool {
-			return mn.GetId() != peer.GetId()
+			return mn.GetId() != peer.GetNode().GetId()
 		})
 	}
 	return tcp.NewSignalTransport(tcp.WebRTCSignalOptions{
 		Resolver:    resolver,
 		Credentials: m.net.opts.DialOptions,
-		NodeID:      peer.GetId(),
+		NodeID:      peer.GetNode().GetId(),
 		TargetProto: "udp",
 		TargetAddr:  netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
 	}), nil

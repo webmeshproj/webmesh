@@ -32,7 +32,7 @@ func (s SortedWireGuardPeers) Len() int {
 }
 
 func (s SortedWireGuardPeers) Less(i, j int) bool {
-	return s[i].GetId() < s[j].GetId()
+	return s[i].GetNode().GetId() < s[j].GetNode().GetId()
 }
 
 func (s SortedWireGuardPeers) Swap(i, j int) {
@@ -66,25 +66,39 @@ func WireGuardPeerEqual(a, b *v1.WireGuardPeer) bool {
 	if a == nil && b == nil {
 		return true
 	}
-	sort.Strings(a.WireguardEndpoints)
-	sort.Strings(b.WireguardEndpoints)
 	sort.Strings(a.AllowedIps)
 	sort.Strings(b.AllowedIps)
 	sort.Strings(a.AllowedRoutes)
 	sort.Strings(b.AllowedRoutes)
-
-	return a.Id == b.Id &&
-		a.PublicKey == b.PublicKey &&
-		a.PrimaryEndpoint == b.PrimaryEndpoint &&
-		a.ZoneAwarenessId == b.ZoneAwarenessId &&
-		a.AddressIpv4 == b.AddressIpv4 &&
-		a.AddressIpv6 == b.AddressIpv6 &&
-		a.Proto == b.Proto &&
-		FeaturePortsEqual(a.Features, b.Features) &&
-		slices.Equal(a.WireguardEndpoints, b.WireguardEndpoints) &&
+	return a.Proto == b.Proto &&
+		MeshNodesEqual(a.Node, b.Node) &&
 		slices.Equal(a.AllowedIps, b.AllowedIps) &&
 		slices.Equal(a.AllowedRoutes, b.AllowedRoutes)
 
+}
+
+// MeshNodesEqual compares two mesh nodes for equality.
+func MeshNodesEqual(a, b *v1.MeshNode) bool {
+	if a == nil && b != nil {
+		return false
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b == nil {
+		return true
+	}
+	sort.Strings(a.WireguardEndpoints)
+	sort.Strings(b.WireguardEndpoints)
+	return a.Id == b.Id &&
+		a.PublicKey == b.PublicKey &&
+		a.HostPublicKey == b.HostPublicKey &&
+		a.PrimaryEndpoint == b.PrimaryEndpoint &&
+		a.ZoneAwarenessId == b.ZoneAwarenessId &&
+		a.PrivateIpv4 == b.PrivateIpv4 &&
+		a.PrivateIpv6 == b.PrivateIpv6 &&
+		slices.Equal(a.WireguardEndpoints, b.WireguardEndpoints) &&
+		FeaturePortsEqual(a.Features, b.Features)
 }
 
 // FeaturePortsEqual compares two feature ports for equality.

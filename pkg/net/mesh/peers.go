@@ -79,25 +79,29 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 		}
 		// Each direct adjacent is a peer
 		peer := &v1.WireGuardPeer{
-			Id:                 node.Id,
-			PublicKey:          node.PublicKey,
-			PrimaryEndpoint:    primaryEndpoint,
-			WireguardEndpoints: node.WireguardEndpoints,
-			ZoneAwarenessId:    node.ZoneAwarenessId,
-			AddressIpv4: func() string {
-				if node.PrivateAddrV4().IsValid() {
-					return node.PrivateAddrV4().String()
-				}
-				return ""
-			}(),
-			AddressIpv6: func() string {
-				if node.PrivateAddrV6().IsValid() {
-					return node.PrivateAddrV6().String()
-				}
-				return ""
-			}(),
+			Node: &v1.MeshNode{
+				Id:                 node.Id,
+				PublicKey:          node.PublicKey,
+				HostPublicKey:      node.HostPublicKey,
+				PrimaryEndpoint:    primaryEndpoint,
+				WireguardEndpoints: node.WireguardEndpoints,
+				ZoneAwarenessId:    node.ZoneAwarenessId,
+				PrivateIpv4: func() string {
+					if node.PrivateAddrV4().IsValid() {
+						return node.PrivateAddrV4().String()
+					}
+					return ""
+				}(),
+				PrivateIpv6: func() string {
+					if node.PrivateAddrV6().IsValid() {
+						return node.PrivateAddrV6().String()
+					}
+					return ""
+				}(),
+				Features: node.Features,
+				JoinedAt: node.JoinedAt,
+			},
 			Proto:         peers.ProtoFromEdgeAttrs(edge.Properties.Attributes),
-			Features:      node.Features,
 			AllowedIps:    []string{},
 			AllowedRoutes: []string{},
 		}

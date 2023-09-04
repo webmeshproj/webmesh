@@ -34,14 +34,17 @@ type Key interface {
 	PublicKey() wgtypes.Key
 	// HostKey returns a libp2p compatible host key-pair.
 	HostKey() p2pcrypto.PrivKey
+	// PublicHostString returns the base64 encoded string representation of the full host public key.
+	PublicHostString() string
 	// String return the base64 encoded string representation of the key.
 	String() string
 }
 
 type key struct {
-	hostpriv p2pcrypto.PrivKey
-	raw      []byte
-	encoded  string
+	hostpriv      p2pcrypto.PrivKey
+	raw           []byte
+	marshaledPriv []byte
+	marshaledPub  []byte
 }
 
 // MustGenerateKey generates a new private key or panics.
@@ -55,11 +58,15 @@ func MustGenerateKey() Key {
 
 // GenerateKey generates a new private key.
 func GenerateKey() (Key, error) {
-	priv, _, err := p2pcrypto.GenerateKeyPairWithReader(p2pcrypto.ECDSA, 256, rand.Reader)
+	priv, pub, err := p2pcrypto.GenerateKeyPairWithReader(p2pcrypto.ECDSA, 256, rand.Reader)
 	if err != nil {
 		return nil, err
 	}
-	marshaled, err := p2pcrypto.MarshalPrivateKey(priv)
+	marshaledPriv, err := p2pcrypto.MarshalPrivateKey(priv)
+	if err != nil {
+		return nil, err
+	}
+	marshaledPub, err := p2pcrypto.MarshalPublicKey(pub)
 	if err != nil {
 		return nil, err
 	}
@@ -68,9 +75,10 @@ func GenerateKey() (Key, error) {
 		return nil, err
 	}
 	return &key{
-		raw:      raw,
-		hostpriv: priv,
-		encoded:  p2pcrypto.ConfigEncodeKey(marshaled),
+		raw:           raw,
+		hostpriv:      priv,
+		marshaledPriv: marshaledPriv,
+		marshaledPub:  marshaledPub,
 	}, nil
 }
 
@@ -83,20 +91,34 @@ func ParseKey(s string) (Key, error) {
 	return ParseKeyFromBytes(data)
 }
 
+// ParseHostPublicKey parses the host public key from the given base64 encoded string.
+func ParseHostPublicKey(s string) (p2pcrypto.PubKey, error) {
+	data, err := p2pcrypto.ConfigDecodeKey(s)
+	if err != nil {
+		return nil, err
+	}
+	return p2pcrypto.UnmarshalPublicKey(data)
+}
+
 // ParseKey parses a private key from the given bytes.
 func ParseKeyFromBytes(data []byte) (Key, error) {
 	priv, err := p2pcrypto.UnmarshalPrivateKey(data)
 	if err != nil {
 		return nil, err
 	}
-	raw, err := priv.Raw()
+	privraw, err := priv.Raw()
+	if err != nil {
+		return nil, err
+	}
+	marshaledPub, err := p2pcrypto.MarshalPublicKey(priv.GetPublic())
 	if err != nil {
 		return nil, err
 	}
 	return &key{
-		raw:      raw,
-		hostpriv: priv,
-		encoded:  p2pcrypto.ConfigEncodeKey(data),
+		raw:           privraw,
+		hostpriv:      priv,
+		marshaledPriv: data,
+		marshaledPub:  marshaledPub,
 	}, nil
 }
 
@@ -116,7 +138,12 @@ func (k *key) HostKey() p2pcrypto.PrivKey {
 	return k.hostpriv
 }
 
+// PublicHostString returns the base64 encoded string representation of the full host public key.
+func (k *key) PublicHostString() string {
+	return p2pcrypto.ConfigEncodeKey(k.marshaledPub)
+}
+
 // String return the base64 encoded string representation of the key.
 func (k *key) String() string {
-	return k.encoded
+	return p2pcrypto.ConfigEncodeKey(k.marshaledPriv)
 }

@@ -30,6 +30,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/net/mesh"
@@ -91,6 +92,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				return nil, status.Errorf(codes.InvalidArgument, "route %q overlaps with mesh prefix", route)
 			}
 		}
+	}
+	_, err = crypto.ParseHostPublicKey(req.GetHostPublicKey())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid host public key: %v", err)
 	}
 	publicKey, err := wgtypes.ParseKey(req.GetPublicKey())
 	if err != nil {
@@ -209,6 +214,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
 			WireguardEndpoints: req.GetWireguardEndpoints(),
 			ZoneAwarenessId:    req.GetZoneAwarenessId(),
+			HostPublicKey:      req.GetHostPublicKey(),
 			PublicKey:          publicKey.String(),
 			PrivateIpv4:        leasev4.String(),
 			PrivateIpv6:        leasev6.String(),
@@ -392,7 +398,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	var requiresICE bool
 	for _, peer := range peers {
-		if peer.PrimaryEndpoint == "" || peer.Proto == v1.ConnectProtocol_CONNECT_ICE {
+		if peer.GetNode().GetPrimaryEndpoint() == "" || peer.Proto == v1.ConnectProtocol_CONNECT_ICE {
 			requiresICE = true
 			break
 		}

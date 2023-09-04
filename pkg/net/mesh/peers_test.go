@@ -487,7 +487,7 @@ func TestWireGuardPeers(t *testing.T) {
 				got := make(map[string][]string)
 				for _, p := range peers {
 					sort.Strings(p.AllowedIps)
-					got[p.Id] = p.AllowedIps
+					got[p.Node.Id] = p.AllowedIps
 				}
 				if !reflect.DeepEqual(got, want) {
 					t.Errorf("peer: %s got %v, want %v", peer, got, want)
