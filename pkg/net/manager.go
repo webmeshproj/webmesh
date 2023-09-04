@@ -344,6 +344,7 @@ func (m *manager) Close(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
+	defer m.peers.Close(context.WithLogger(ctx, log))
 	if m.fw != nil {
 		// Clear the firewall rules after wireguard is shutdown
 		defer func() {

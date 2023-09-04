@@ -73,6 +73,18 @@ type clientPeerConn struct {
 	localAddr netip.AddrPort
 }
 
+func (m *peerManager) Close(ctx context.Context) {
+	m.peermu.Lock()
+	defer m.peermu.Unlock()
+	for _, conn := range m.p2pConns {
+		err := conn.peerConn.Close()
+		if err != nil {
+			context.LoggerFrom(ctx).Error("Error closing peer connection", slog.String("error", err.Error()))
+		}
+	}
+	m.p2pConns = make(map[string]clientPeerConn)
+}
+
 func (m *peerManager) Add(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) error {
 	m.peermu.Lock()
 	defer m.peermu.Unlock()
