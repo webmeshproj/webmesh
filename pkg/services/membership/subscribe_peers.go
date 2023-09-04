@@ -28,8 +28,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/util/meshutil"
 )
 
 func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Membership_SubscribePeersServer) error {
@@ -77,7 +77,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 			log.Error("failed to get mdns servers", "error", err.Error())
 			return
 		}
-		peers, err := mesh.WireGuardPeersFor(ctx, st, peerID)
+		peers, err := meshutil.WireGuardPeersFor(ctx, st, peerID)
 		if err != nil {
 			log.Error("failed to get wireguard peers", "error", err.Error())
 			return
@@ -85,7 +85,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		slices.Sort(iceNegServers)
 		slices.Sort(dnsServers)
 		if len(lastConfig) > 0 {
-			if slices.Equal(lastIceServers, iceNegServers) && slices.Equal(lastDnsServers, dnsServers) && mesh.WireGuardPeersEqual(lastConfig, peers) {
+			if slices.Equal(lastIceServers, iceNegServers) && slices.Equal(lastDnsServers, dnsServers) && meshutil.WireGuardPeersEqual(lastConfig, peers) {
 				log.Debug("Skipping wireguard peers notification, no changes")
 				return
 			}

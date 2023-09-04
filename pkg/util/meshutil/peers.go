@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package mesh contains helpers for computing networking information from the mesh.
-package mesh
+// Package meshutil contains helpers for computing networking information from the mesh.
+package meshutil
 
 import (
 	"context"

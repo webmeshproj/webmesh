@@ -33,9 +33,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/util/meshutil"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
@@ -325,7 +325,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// Collect the list of peers we will send to the new node
-	peers, err := mesh.WireGuardPeersFor(ctx, s.raft.Storage(), req.GetId())
+	peers, err := meshutil.WireGuardPeersFor(ctx, s.raft.Storage(), req.GetId())
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
 	}

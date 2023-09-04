@@ -30,11 +30,11 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/net"
-	"github.com/webmeshproj/webmesh/pkg/net/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/util/meshutil"
 )
 
 // ConnectOptions are options for opening the connection to the mesh.
@@ -318,7 +318,7 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
-	wgpeers, err := mesh.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+	wgpeers, err := meshutil.WireGuardPeersFor(ctx, s.Storage(), s.ID())
 	if err != nil {
 		return fmt.Errorf("get wireguard peers: %w", err)
 	}
