@@ -179,6 +179,15 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		toUpdate.ZoneAwarenessId = req.GetZoneAwarenessId()
 		hasChanges = true
 	}
+	// Multiaddrs
+	if len(req.GetMultiaddrs()) > 0 {
+		sort.Strings(req.GetMultiaddrs())
+		sort.Strings(peer.Multiaddrs)
+		if !cmp.Equal(req.GetMultiaddrs(), peer.Multiaddrs) {
+			toUpdate.Multiaddrs = req.GetMultiaddrs()
+			hasChanges = true
+		}
+	}
 	// Features
 	if len(req.GetFeatures()) > 0 {
 		toUpdate.Features = req.GetFeatures()

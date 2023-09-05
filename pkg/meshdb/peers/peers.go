@@ -30,11 +30,13 @@ import (
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
 	"github.com/google/go-cmp/cmp"
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -111,6 +113,8 @@ type Peers interface {
 	Put(ctx context.Context, n MeshNode) error
 	// Get gets a node by ID.
 	Get(ctx context.Context, id string) (MeshNode, error)
+	// GetByHostKey gets a node by their host public key.
+	GetByHostKey(ctx context.Context, key p2pcrypto.PubKey) (MeshNode, error)
 	// Delete deletes a node.
 	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
@@ -211,6 +215,26 @@ func (p *peers) Get(ctx context.Context, id string) (MeshNode, error) {
 		return MeshNode{}, fmt.Errorf("get node: %w", err)
 	}
 	return node, nil
+}
+
+// GetByHostKey gets a node by their host public key.
+func (p *peers) GetByHostKey(ctx context.Context, key p2pcrypto.PubKey) (MeshNode, error) {
+	nodes, err := p.List(ctx)
+	if err != nil {
+		return MeshNode{}, fmt.Errorf("list nodes: %w", err)
+	}
+	for _, node := range nodes {
+		if node.GetHostPublicKey() != "" {
+			key, err := crypto.ParseHostPublicKey(node.GetHostPublicKey())
+			if err != nil {
+				return MeshNode{}, fmt.Errorf("parse host public key: %w", err)
+			}
+			if key.Equals(key) {
+				return node, nil
+			}
+		}
+	}
+	return MeshNode{}, ErrNodeNotFound
 }
 
 func (p *peers) Delete(ctx context.Context, id string) error {

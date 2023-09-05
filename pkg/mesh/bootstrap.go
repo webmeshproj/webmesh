@@ -300,6 +300,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			}(),
 			ZoneAwarenessId: s.opts.ZoneAwarenessID,
 			PublicKey:       pubKey.String(),
+			HostPublicKey:   s.key.PublicHostString(),
 			PrivateIpv6:     privatev6.String(),
 			Features:        opts.Features,
 			JoinedAt:        timestamppb.New(time.Now().UTC()),

@@ -184,6 +184,13 @@ func (s *meshStore) newJoinRequest(opts ConnectOptions) *v1.JoinRequest {
 		}(),
 		DirectPeers: opts.DirectPeers,
 		Features:    opts.Features,
+		Multiaddrs: func() []string {
+			var out []string
+			for _, addr := range opts.Multiaddrs {
+				out = append(out, addr.String())
+			}
+			return out
+		}(),
 	}
 	return req
 }

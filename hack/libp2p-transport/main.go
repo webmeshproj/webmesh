@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
@@ -16,49 +14,47 @@ import (
 )
 
 func main() {
-	host1 := runHost1()
-	host2 := runHost2()
-
+	host1, err := runHost1()
+	if err != nil {
+		panic(err)
+	}
+	host2, err := runHost2()
+	if err != nil {
+		host1.Close()
+		panic(err)
+	}
 	defer host1.Close()
 	defer host2.Close()
-
-	ctx := context.Background()
-
 	host1.SetStreamHandler("/echo/1.0.0", func(stream network.Stream) {
 		defer stream.Close()
 		fmt.Println("hello")
 	})
-
-	host1.Peerstore().AddAddrs(host2.ID(), host2.Addrs(), peerstore.PermanentAddrTTL)
-	host2.Peerstore().AddAddrs(host1.ID(), host1.Addrs(), peerstore.PermanentAddrTTL)
-	stream, err := host2.NewStream(ctx, host1.ID(), "/echo/1.0.0")
+	stream, err := host2.NewStream(context.Background(), host1.ID(), "/echo/1.0.0")
 	if err != nil {
-		log.Println("ERROR: ", err)
+		fmt.Println("ERROR: ", err)
 	} else {
 		defer stream.Close()
 	}
 }
 
-func runHost1() host.Host {
-	conf := config.NewInsecureConfig("")
-	// conf.Global.LogLevel = "info"
+func runHost1() (host.Host, error) {
+	conf := config.NewInsecureConfig("server")
 	conf.Bootstrap.Enabled = true
 	conf.WireGuard.InterfaceName = "webmesh1"
 	host, err := libp2p.New(
 		embed.WithWebmeshTransport(conf),
 		libp2p.ListenAddrs(
-			multiaddr.StringCast("/webmesh/server.webmesh.internal/tcp/8080"),
+			multiaddr.StringCast("/webmesh//tcp/0"),
 		),
 	)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return host
+	return host, nil
 }
 
-func runHost2() host.Host {
-	conf := config.NewInsecureConfig("")
-	// conf.Global.LogLevel = "info"
+func runHost2() (host.Host, error) {
+	conf := config.NewInsecureConfig("client")
 	conf.Mesh.JoinAddress = "localhost:8443"
 	conf.Services.API.Disabled = true
 	conf.WireGuard.ListenPort = 51821
@@ -66,11 +62,11 @@ func runHost2() host.Host {
 	host, err := libp2p.New(
 		embed.WithWebmeshTransport(conf),
 		libp2p.ListenAddrs(
-			multiaddr.StringCast("/webmesh/client.webmesh.internal/tcp/8081"),
+			multiaddr.StringCast("/webmesh//tcp/0"),
 		),
 	)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return host
+	return host, nil
 }

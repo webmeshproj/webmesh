@@ -219,6 +219,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			PrivateIpv4:        leasev4.String(),
 			PrivateIpv6:        leasev6.String(),
 			Features:           req.GetFeatures(),
+			Multiaddrs:         req.GetMultiaddrs(),
 			JoinedAt:           timestamppb.New(time.Now().UTC()),
 		},
 	})

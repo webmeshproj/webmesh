@@ -24,6 +24,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -79,6 +80,8 @@ type ConnectOptions struct {
 	Bootstrap *BootstrapOptions
 	// PreferIPv6 is true if IPv6 should be preferred over IPv4.
 	PreferIPv6 bool
+	// Multiaddrs are the multiaddrs to advertise for this node.
+	Multiaddrs []multiaddr.Multiaddr
 }
 
 // BootstrapOptions are options for bootstrapping the mesh when connecting for
