@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 // Package embed provides a simplified way to run a webmesh node in-process.
-// This will hopefully be completed soon.
 package embed
 
 import (
@@ -48,9 +47,8 @@ type Node interface {
 	Start(ctx context.Context) error
 	// Stop stops the node.
 	Stop(ctx context.Context) error
-	// Errors returns a channel of errors that occur during
-	// the lifetime of the node. At the moment, any error is
-	// fatal and will cause the node to stop.
+	// Errors returns a channel of errors that occur during the lifetime of the node.
+	// At the moment, any error is fatal and will cause the node to stop.
 	Errors() <-chan error
 	// Mesh returns the underlying mesh instance.
 	Mesh() mesh.Mesh
@@ -58,11 +56,9 @@ type Node interface {
 	Raft() raft.Raft
 	// Storage is the underlying storage instance.
 	Storage() storage.MeshStorage
-	// Services returns the underlying services instance
-	// if it is running.
+	// Services returns the underlying services instance if it is running.
 	Services() *services.Server
-	// MeshDNS returns the underlying MeshDNS instance
-	// if it is running.
+	// MeshDNS returns the underlying MeshDNS instance if it is running.
 	MeshDNS() *meshdns.Server
 	// AddressV4 returns the IPv4 address of the node.
 	AddressV4() netip.Prefix
