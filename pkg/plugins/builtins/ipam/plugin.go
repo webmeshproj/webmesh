@@ -144,7 +144,11 @@ func (p *Plugin) InjectQuerier(srv v1.StoragePlugin_InjectQuerierServer) error {
 func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
-	defer close(p.closec)
+	select {
+	case <-p.closec:
+	default:
+		close(p.closec)
+	}
 	if p.data == nil {
 		// Safeguard to make sure we don't get called before the query stream
 		// is opened.
