@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package libp2p provides discovery mechanisms using Kademlia DHT.
+// Package libp2p provides webmesh integration with libp2p.
 package libp2p
 
 import (

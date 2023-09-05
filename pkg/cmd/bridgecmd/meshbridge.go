@@ -129,9 +129,11 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 		}
-		err = meshConfig.RegisterAPIs(ctx, meshConn, srv)
-		if err != nil {
-			return handleErr(fmt.Errorf("failed to register APIs: %w", err))
+		if !meshConfig.Services.API.Disabled {
+			err = meshConfig.RegisterAPIs(ctx, meshConn, srv)
+			if err != nil {
+				return handleErr(fmt.Errorf("failed to register APIs: %w", err))
+			}
 		}
 		go func() {
 			if err := srv.ListenAndServe(); err != nil {

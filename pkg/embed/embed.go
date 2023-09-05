@@ -195,11 +195,12 @@ func (n *node) Start(ctx context.Context) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 	}
-	err = n.conf.RegisterAPIs(ctx, n.Mesh(), n.services)
-	if err != nil {
-		return handleErr(fmt.Errorf("failed to register APIs: %w", err))
+	if !n.conf.Services.API.Disabled {
+		err = n.conf.RegisterAPIs(ctx, n.Mesh(), n.services)
+		if err != nil {
+			return handleErr(fmt.Errorf("failed to register APIs: %w", err))
+		}
 	}
-
 	select {
 	case <-n.Mesh().Ready():
 	case <-ctx.Done():

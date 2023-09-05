@@ -113,7 +113,7 @@ services:
       - --bridge.site-1.raft.in-memory
       - --bridge.site-1.wireguard.listen-port=51821
       - --bridge.site-1.wireguard.interface-name=wgsite1
-      - --bridge.site-1.services.grpc-listen-address=:8443
+      - --bridge.site-1.services.api.listen-address=:8443
       - --bridge.site-1.raft.listen-address=:9443
       - --bridge.site-2.raft.request-observer
       # Site 2 Options
@@ -121,7 +121,7 @@ services:
       - --bridge.site-2.raft.in-memory
       - --bridge.site-2.wireguard.listen-port=51822
       - --bridge.site-2.wireguard.interface-name=wgsite2
-      - --bridge.site-2.services.grpc-listen-address=:8444
+      - --bridge.site-2.services.api.listen-address=:8444
       - --bridge.site-2.raft.listen-address=:9444
       - --bridge.site-2.raft.request-observer
       # Bridged DNS Options. The DNS server will handle queries for both

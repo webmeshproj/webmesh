@@ -200,8 +200,8 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 			CertFile: global.TLSCertFile,
 			KeyFile:  global.TLSKeyFile,
 		}
-		o.Services.TLSCertFile = global.TLSCertFile
-		o.Services.TLSKeyFile = global.TLSKeyFile
+		o.Services.API.TLSCertFile = global.TLSCertFile
+		o.Services.API.TLSKeyFile = global.TLSKeyFile
 		o.TLS = TLSOptions{
 			CAFile: global.TLSCAFile,
 		}
@@ -227,7 +227,7 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 
 	if global.Insecure {
 		o.TLS.Insecure = true
-		o.Services.Insecure = true
+		o.Services.API.Insecure = true
 	}
 	if global.InsecureSkipVerify {
 		o.TLS.InsecureSkipVerify = true
@@ -236,17 +236,17 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 		o.TLS.VerifyChainOnly = true
 	}
 	if global.TLSCertFile != "" {
-		o.Services.TLSCertFile = global.TLSCertFile
+		o.Services.API.TLSCertFile = global.TLSCertFile
 	}
 	if global.TLSKeyFile != "" {
-		o.Services.TLSKeyFile = global.TLSKeyFile
+		o.Services.API.TLSKeyFile = global.TLSKeyFile
 	}
 
 	// Service advertisements
 
 	// Set the gRPC advertise port if it is still zero.
 	if o.Mesh.GRPCAdvertisePort == 0 {
-		_, port, err := net.SplitHostPort(o.Services.GRPCListenAddress)
+		_, port, err := net.SplitHostPort(o.Services.API.ListenAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse gRPC listen address: %w", err)
 		}

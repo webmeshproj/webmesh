@@ -86,14 +86,14 @@ func runServer(loglevel string) error {
 
 	conf := config.NewDefaultConfig("server-node")
 	conf.Global.LogLevel = loglevel
-	conf.Services.GRPCListenAddress = "[::]:8443"
+	conf.Services.API.ListenAddress = "[::]:8443"
+	conf.Services.API.Insecure = true
 	conf.Raft.ListenAddress = "[::]:9000"
 	conf.Raft.InMemory = true
 	conf.WireGuard.ListenPort = 61820
 	conf.WireGuard.InterfaceName = "meshserver0"
 	conf.Bootstrap.Enabled = true
 	conf.TLS.Insecure = true
-	conf.Services.Insecure = true
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 	// We use the same PSK as a rendevous point for a p2p wireguard tunnel
 	conf.Discovery.Announce = true
@@ -148,7 +148,8 @@ func runClient(loglevel string, psk string) error {
 
 	conf := config.NewDefaultConfig("client-node")
 	conf.Global.LogLevel = loglevel
-	conf.Services.GRPCListenAddress = "[::]:8444"
+	conf.Services.API.ListenAddress = "[::]:8444"
+	conf.Services.API.Insecure = true
 	conf.WireGuard.ListenPort = 61821
 	conf.WireGuard.InterfaceName = "meshclient0"
 	conf.Discovery.PSK = psk
@@ -158,7 +159,6 @@ func runClient(loglevel string, psk string) error {
 	// over libp2p for a direct wireguard tunnel.
 	conf.Mesh.LibP2PPeers = []string{"server-node"}
 	conf.TLS.Insecure = true
-	conf.Services.Insecure = true
 
 	conn, err := embed.NewNode(context.Background(), &conf)
 	if err != nil {

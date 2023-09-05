@@ -47,6 +47,8 @@ type MeshServer interface {
 
 // Options contains the configuration for the gRPC server.
 type Options struct {
+	// DisableGRPC disables the gRPC server and only runs the MeshServers.
+	DisableGRPC bool
 	// ListenAddress is the address to start the gRPC server on.
 	ListenAddress string
 	// ServerOptions are options for the server. This should include
@@ -71,13 +73,15 @@ func NewServer(ctx context.Context, o Options) (*Server, error) {
 	log := context.LoggerFrom(ctx).With("component", "mesh-services")
 	server := &Server{
 		opts: o,
-		srv:  grpc.NewServer(o.ServerOptions...),
 		srvs: o.Servers,
 		log:  log,
 	}
 	// Register the reflection service
-	log.Debug("Registering reflection service")
-	reflection.Register(server)
+	if !o.DisableGRPC {
+		server.srv = grpc.NewServer(o.ServerOptions...)
+		log.Debug("Registering reflection service")
+		reflection.Register(server)
+	}
 	return server, nil
 }
 
@@ -96,30 +100,38 @@ func (s *Server) ListenAndServe() error {
 			return nil
 		})
 	}
-	g.Go(func() error {
-		s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
-		lis, err := net.Listen("tcp", s.opts.ListenAddress)
-		if err != nil {
-			s.mu.Unlock()
-			return fmt.Errorf("start TCP listener: %w", err)
-		}
-		defer lis.Close()
-		if err := s.srv.Serve(lis); err != nil {
-			return fmt.Errorf("grpc serve: %w", err)
-		}
-		return nil
-	})
+	if !s.opts.DisableGRPC {
+		g.Go(func() error {
+			s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
+			lis, err := net.Listen("tcp", s.opts.ListenAddress)
+			if err != nil {
+				s.mu.Unlock()
+				return fmt.Errorf("start TCP listener: %w", err)
+			}
+			defer lis.Close()
+			if err := s.srv.Serve(lis); err != nil {
+				return fmt.Errorf("grpc serve: %w", err)
+			}
+			return nil
+		})
+	}
 	s.mu.Unlock()
 	return g.Wait()
 }
 
 // RegisterService implements grpc.RegistrarService.
 func (s *Server) RegisterService(desc *grpc.ServiceDesc, impl any) {
+	if s.opts.DisableGRPC {
+		return
+	}
 	s.srv.RegisterService(desc, impl)
 }
 
 // GetServiceInfo implements reflection.ServiceInfoProvider.
 func (s *Server) GetServiceInfo() map[string]grpc.ServiceInfo {
+	if s.opts.DisableGRPC {
+		return map[string]grpc.ServiceInfo{}
+	}
 	return s.srv.GetServiceInfo()
 }
 

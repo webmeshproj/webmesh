@@ -52,22 +52,6 @@ import (
 
 // ServiceOptions contains the configuration for the mesh services.
 type ServiceOptions struct {
-	// GRPCWebListenAddress is the gRPC address to listen on.
-	GRPCListenAddress string `koanf:"grpc-listen-address,omitempty"`
-	// GRPCWebEnabled enables serving gRPC over HTTP/1.1.
-	GRPCWebEnabled bool `koanf:"grpc-web-enabled,omitempty"`
-	// TLSCertFile is the path to the TLS certificate file.
-	TLSCertFile string `koanf:"tls-cert-file,omitempty"`
-	// TLSCertData is the TLS certificate data.
-	TLSCertData string `koanf:"tls-cert-data,omitempty"`
-	// TLSKeyFile is the path to the TLS key file.
-	TLSKeyFile string `koanf:"tls-key-file,omitempty"`
-	// TLSKeyData is the TLS key data.
-	TLSKeyData string `koanf:"tls-key-data,omitempty"`
-	// Insecure is true if the transport is insecure.
-	Insecure bool `koanf:"insecure,omitempty"`
-	// DisableLeaderProxy is true if the leader proxy should be disabled.
-	DisableLeaderProxy bool `koanf:"disable-leader-proxy,omitempty"`
 	// API options
 	API APIOptions `koanf:"api,omitempty"`
 	// WebRTC options
@@ -83,32 +67,16 @@ type ServiceOptions struct {
 // NewServiceOptions returns a new ServiceOptions with the default values.
 func NewServiceOptions() ServiceOptions {
 	return ServiceOptions{
-		GRPCListenAddress:  services.DefaultGRPCListenAddress,
-		GRPCWebEnabled:     false,
-		TLSCertFile:        "",
-		TLSCertData:        "",
-		TLSKeyFile:         "",
-		TLSKeyData:         "",
-		Insecure:           false,
-		DisableLeaderProxy: false,
-		API:                APIOptions{},
-		WebRTC:             NewWebRTCOptions(),
-		MeshDNS:            NewMeshDNSOptions(),
-		TURN:               NewTURNOptions(),
-		Metrics:            NewMetricsOptions(),
+		API:     NewAPIOptions(),
+		WebRTC:  NewWebRTCOptions(),
+		MeshDNS: NewMeshDNSOptions(),
+		TURN:    NewTURNOptions(),
+		Metrics: NewMetricsOptions(),
 	}
 }
 
 // BindFlags binds the flags.
 func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.StringVar(&s.GRPCListenAddress, prefix+"services.grpc-listen-address", services.DefaultGRPCListenAddress, "gRPC listen address.")
-	fl.BoolVar(&s.GRPCWebEnabled, prefix+"services.grpc-web-enabled", false, "Enable gRPC over HTTP/1.1.")
-	fl.StringVar(&s.TLSCertFile, prefix+"services.tls-cert-file", "", "TLS certificate file.")
-	fl.StringVar(&s.TLSCertData, prefix+"services.tls-cert-data", "", "TLS certificate data.")
-	fl.StringVar(&s.TLSKeyFile, prefix+"services.tls-key-file", "", "TLS key file.")
-	fl.StringVar(&s.TLSKeyData, prefix+"services.tls-key-data", "", "TLS key data.")
-	fl.BoolVar(&s.Insecure, prefix+"services.insecure", false, "Disable TLS.")
-	fl.BoolVar(&s.DisableLeaderProxy, prefix+"services.disable-leader-proxy", false, "Disable the leader proxy.")
 	s.API.BindFlags(prefix, fl)
 	s.WebRTC.BindFlags(prefix, fl)
 	s.TURN.BindFlags(prefix, fl)
@@ -121,17 +89,9 @@ func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 
 // Validate validates the options.
 func (s *ServiceOptions) Validate() error {
-	if s.GRPCListenAddress == "" {
-		return fmt.Errorf("grpc-listen-address must be set")
-	}
-	_, _, err := net.SplitHostPort(s.GRPCListenAddress)
+	err := s.API.Validate()
 	if err != nil {
-		return fmt.Errorf("grpc-listen-address is invalid: %w", err)
-	}
-	if !s.Insecure {
-		if (s.TLSCertFile == "" || s.TLSKeyFile == "") || (s.TLSCertData == "" || s.TLSKeyData == "") {
-			return fmt.Errorf("tls-cert-file and tls-key-file or tls-cert-data and tls-key-data must be set")
-		}
+		return err
 	}
 	if s.TURN.Enabled {
 		err := s.TURN.Validate()
@@ -156,16 +116,72 @@ func (s *ServiceOptions) Validate() error {
 
 // APIOptions are the options for which APIs to register and expose.
 type APIOptions struct {
+	// Disabled is true if the gRPC API should be disabled.
+	// The node will still be able to join a mesh, but will not be able to
+	// serve any APIs or provide proxying services.
+	Disabled bool `koanf:"disabled,omitempty"`
+	// ListenAddress is the gRPC address to listen on.
+	ListenAddress string `koanf:"listen-address,omitempty"`
+	// WebEnabled enables serving gRPC over HTTP/1.1.
+	WebEnabled bool `koanf:"web-enabled,omitempty"`
+	// TLSCertFile is the path to the TLS certificate file.
+	TLSCertFile string `koanf:"tls-cert-file,omitempty"`
+	// TLSCertData is the TLS certificate data.
+	TLSCertData string `koanf:"tls-cert-data,omitempty"`
+	// TLSKeyFile is the path to the TLS key file.
+	TLSKeyFile string `koanf:"tls-key-file,omitempty"`
+	// TLSKeyData is the TLS key data.
+	TLSKeyData string `koanf:"tls-key-data,omitempty"`
+	// Insecure is true if the transport is insecure.
+	Insecure bool `koanf:"insecure,omitempty"`
+	// DisableLeaderProxy is true if the leader proxy should be disabled.
+	DisableLeaderProxy bool `koanf:"disable-leader-proxy,omitempty"`
 	// MeshEnabled is true if the mesh API should be registered.
 	MeshEnabled bool `koanf:"mesh-enabled,omitempty"`
 	// AdminEnabled is true if the admin API should be registered.
 	AdminEnabled bool `koanf:"admin-enabled,omitempty"`
 }
 
+// NewAPIOptions returns a new APIOptions with the default values.
+func NewAPIOptions() APIOptions {
+	return APIOptions{
+		ListenAddress: services.DefaultGRPCListenAddress,
+	}
+}
+
 // BindFlags binds the flags.
 func (a *APIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
+	fl.BoolVar(&a.Disabled, prefix+"services.api.disabled", false, "Disable the API. This is ignored when joining as a Raft member.")
+	fl.StringVar(&a.ListenAddress, prefix+"services.api.listen-address", services.DefaultGRPCListenAddress, "gRPC listen address.")
+	fl.BoolVar(&a.WebEnabled, prefix+"services.api.web-enabled", false, "Enable gRPC over HTTP/1.1.")
+	fl.BoolVar(&a.DisableLeaderProxy, prefix+"services.api.disable-leader-proxy", false, "Disable the leader proxy.")
+	fl.StringVar(&a.TLSCertFile, prefix+"services.api.tls-cert-file", "", "TLS certificate file.")
+	fl.StringVar(&a.TLSCertData, prefix+"services.api.tls-cert-data", "", "TLS certificate data.")
+	fl.StringVar(&a.TLSKeyFile, prefix+"services.api.tls-key-file", "", "TLS key file.")
+	fl.StringVar(&a.TLSKeyData, prefix+"services.api.tls-key-data", "", "TLS key data.")
+	fl.BoolVar(&a.Insecure, prefix+"services.api.insecure", false, "Disable TLS.")
 	fl.BoolVar(&a.MeshEnabled, prefix+"services.api.mesh-enabled", false, "Enable and register the MeshAPI.")
 	fl.BoolVar(&a.AdminEnabled, prefix+"services.api.admin-enabled", false, "Enable and register the AdminAPI.")
+}
+
+// Validate validates the options.
+func (a *APIOptions) Validate() error {
+	if a.Disabled {
+		return nil
+	}
+	if a.ListenAddress == "" {
+		return fmt.Errorf("services.api.listen-address must be set")
+	}
+	_, _, err := net.SplitHostPort(a.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("listen-address is invalid: %w", err)
+	}
+	if !a.Insecure {
+		if (a.TLSCertFile == "" || a.TLSKeyFile == "") || (a.TLSCertData == "" || a.TLSKeyData == "") {
+			return fmt.Errorf("tls-cert-file and tls-key-file or tls-cert-data and tls-key-data must be set")
+		}
+	}
+	return nil
 }
 
 // WebRTCOptions are the options for the WebRTC API.
@@ -492,10 +508,12 @@ func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 	}
 	// We always expose the node API
 	var features []*v1.FeaturePort
-	features = append(features, &v1.FeaturePort{
-		Feature: v1.Feature_NODES,
-		Port:    int32(o.Mesh.GRPCAdvertisePort),
-	})
+	if !o.Services.API.Disabled {
+		features = append(features, &v1.FeaturePort{
+			Feature: v1.Feature_NODES,
+			Port:    int32(o.Mesh.GRPCAdvertisePort),
+		})
+	}
 	// If we are a raft member, we automatically serve storage and membership
 	if o.IsRaftMember() {
 		features = append(features, &v1.FeaturePort{
@@ -511,29 +529,31 @@ func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 			Port:    int32(o.RaftListenPort()),
 		})
 	}
-	if !o.Services.DisableLeaderProxy {
-		features = append(features, &v1.FeaturePort{
-			Feature: v1.Feature_LEADER_PROXY,
-			Port:    int32(o.Mesh.GRPCAdvertisePort),
-		})
-	}
-	if o.Services.API.MeshEnabled {
-		features = append(features, &v1.FeaturePort{
-			Feature: v1.Feature_MESH_API,
-			Port:    int32(o.Mesh.GRPCAdvertisePort),
-		})
-	}
-	if o.Services.API.AdminEnabled {
-		features = append(features, &v1.FeaturePort{
-			Feature: v1.Feature_ADMIN_API,
-			Port:    int32(o.Mesh.GRPCAdvertisePort),
-		})
-	}
-	if o.Services.WebRTC.Enabled {
-		features = append(features, &v1.FeaturePort{
-			Feature: v1.Feature_ICE_NEGOTIATION,
-			Port:    int32(o.Mesh.GRPCAdvertisePort),
-		})
+	if !o.Services.API.Disabled {
+		if !o.Services.API.DisableLeaderProxy {
+			features = append(features, &v1.FeaturePort{
+				Feature: v1.Feature_LEADER_PROXY,
+				Port:    int32(o.Mesh.GRPCAdvertisePort),
+			})
+		}
+		if o.Services.API.MeshEnabled {
+			features = append(features, &v1.FeaturePort{
+				Feature: v1.Feature_MESH_API,
+				Port:    int32(o.Mesh.GRPCAdvertisePort),
+			})
+		}
+		if o.Services.API.AdminEnabled {
+			features = append(features, &v1.FeaturePort{
+				Feature: v1.Feature_ADMIN_API,
+				Port:    int32(o.Mesh.GRPCAdvertisePort),
+			})
+		}
+		if o.Services.WebRTC.Enabled {
+			features = append(features, &v1.FeaturePort{
+				Feature: v1.Feature_ICE_NEGOTIATION,
+				Port:    int32(o.Mesh.GRPCAdvertisePort),
+			})
+		}
 	}
 	if o.Services.TURN.Enabled {
 		features = append(features, &v1.FeaturePort{
@@ -558,49 +578,53 @@ func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 
 // NewServiceOptions returns new options for the webmesh services.
 func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf services.Options, err error) {
-	conf.ListenAddress = o.Services.GRPCListenAddress
-	// Build out the server options
-	if !o.Services.Insecure {
-		// Setup TLS
-		tlsOpts, err := o.NewServerTLSOptions()
-		if err != nil {
-			return conf, err
+	if !o.Services.API.Disabled {
+		conf.ListenAddress = o.Services.API.ListenAddress
+		// Build out the server options
+		if !o.Services.API.Insecure {
+			// Setup TLS
+			tlsOpts, err := o.NewServerTLSOptions()
+			if err != nil {
+				return conf, err
+			}
+			conf.ServerOptions = append(conf.ServerOptions, tlsOpts)
+		} else {
+			// Append insecure options
+			conf.ServerOptions = append(conf.ServerOptions, grpc.Creds(insecure.NewCredentials()))
 		}
-		conf.ServerOptions = append(conf.ServerOptions, tlsOpts)
-	} else {
-		// Append insecure options
-		conf.ServerOptions = append(conf.ServerOptions, grpc.Creds(insecure.NewCredentials()))
-	}
-	// Always append logging middlewares to the server options
-	unarymiddlewares := []grpc.UnaryServerInterceptor{
-		context.LogInjectUnaryServerInterceptor(context.LoggerFrom(ctx)),
-		logging.UnaryServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
-	}
-	streammiddlewares := []grpc.StreamServerInterceptor{
-		context.LogInjectStreamServerInterceptor(context.LoggerFrom(ctx)),
-		logging.StreamServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
-	}
-	// If metrics are enabled, register the metrics interceptor
-	if o.Services.Metrics.Enabled {
-		unarymiddlewares, streammiddlewares, err = metrics.AppendMetricsMiddlewares(context.LoggerFrom(ctx), unarymiddlewares, streammiddlewares)
-		if err != nil {
-			return conf, err
+		// Always append logging middlewares to the server options
+		unarymiddlewares := []grpc.UnaryServerInterceptor{
+			context.LogInjectUnaryServerInterceptor(context.LoggerFrom(ctx)),
+			logging.UnaryServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
 		}
-	}
-	// Register any authentication interceptors
-	if conn.Plugins().HasAuth() {
-		unarymiddlewares = append(unarymiddlewares, conn.Plugins().AuthUnaryInterceptor())
-		streammiddlewares = append(streammiddlewares, conn.Plugins().AuthStreamInterceptor())
-	}
+		streammiddlewares := []grpc.StreamServerInterceptor{
+			context.LogInjectStreamServerInterceptor(context.LoggerFrom(ctx)),
+			logging.StreamServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+		}
 
-	if !o.Services.DisableLeaderProxy {
-		leaderProxy := leaderproxy.New(conn.Raft(), conn, conn.Network().WireGuard())
-		unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
-		streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
-	}
-	conf.ServerOptions = append(conf.ServerOptions, grpc.ChainUnaryInterceptor(unarymiddlewares...))
-	conf.ServerOptions = append(conf.ServerOptions, grpc.ChainStreamInterceptor(streammiddlewares...))
+		// If metrics are enabled, register the metrics interceptor
+		if o.Services.Metrics.Enabled {
+			unarymiddlewares, streammiddlewares, err = metrics.AppendMetricsMiddlewares(context.LoggerFrom(ctx), unarymiddlewares, streammiddlewares)
+			if err != nil {
+				return conf, err
+			}
+		}
 
+		// Register any authentication interceptors
+		if conn.Plugins().HasAuth() {
+			unarymiddlewares = append(unarymiddlewares, conn.Plugins().AuthUnaryInterceptor())
+			streammiddlewares = append(streammiddlewares, conn.Plugins().AuthStreamInterceptor())
+		}
+
+		if !o.Services.API.DisableLeaderProxy {
+			leaderProxy := leaderproxy.New(conn.Raft(), conn, conn.Network().WireGuard())
+			unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
+			streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
+		}
+
+		conf.ServerOptions = append(conf.ServerOptions, grpc.ChainUnaryInterceptor(unarymiddlewares...))
+		conf.ServerOptions = append(conf.ServerOptions, grpc.ChainStreamInterceptor(streammiddlewares...))
+	}
 	// Append the enabled mesh services
 	if o.Services.MeshDNS.Enabled {
 		dnsServer := meshdns.NewServer(ctx, &meshdns.Options{
@@ -648,19 +672,19 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf se
 // NewServerTLSOptions returns new TLS options for the gRPC server.
 func (o *Config) NewServerTLSOptions() (grpc.ServerOption, error) {
 	tlsConfig := &tls.Config{}
-	if o.Services.TLSCertFile != "" && o.Services.TLSKeyFile != "" {
-		cert, err := tls.LoadX509KeyPair(o.Services.TLSCertFile, o.Services.TLSKeyFile)
+	if o.Services.API.TLSCertFile != "" && o.Services.API.TLSKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(o.Services.API.TLSCertFile, o.Services.API.TLSKeyFile)
 		if err != nil {
 			return nil, err
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
-	if o.Services.TLSCertData != "" && o.Services.TLSKeyData != "" {
-		certData, err := base64.StdEncoding.DecodeString(o.Services.TLSCertData)
+	if o.Services.API.TLSCertData != "" && o.Services.API.TLSKeyData != "" {
+		certData, err := base64.StdEncoding.DecodeString(o.Services.API.TLSCertData)
 		if err != nil {
 			return nil, err
 		}
-		keyData, err := base64.StdEncoding.DecodeString(o.Services.TLSKeyData)
+		keyData, err := base64.StdEncoding.DecodeString(o.Services.API.TLSKeyData)
 		if err != nil {
 			return nil, err
 		}
