@@ -23,11 +23,13 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"sync"
 
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -107,6 +109,48 @@ func NewNode(ctx context.Context, config *config.Config) (Node, error) {
 	}, nil
 }
 
+// NewNodeWithKey returns a new node using the given key.
+func NewNodeWithKey(ctx context.Context, config *config.Config, key crypto.Key) (Node, error) {
+	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
+		return nil, fmt.Errorf("cannot disable both IPv4 and IPv6")
+	}
+	log := logutil.SetupLogging(config.Global.LogLevel)
+	if config.Global.LogLevel == "" || config.Global.LogLevel == "silent" {
+		log = slog.New(slog.NewTextHandler(io.Discard, nil))
+		ctx = context.WithLogger(ctx, log)
+	}
+	// Create a new mesh connection
+	meshConfig, err := config.NewMeshConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mesh config: %w", err)
+	}
+	meshConfig.Key = key
+	meshConn := mesh.NewWithLogger(log, meshConfig)
+	// Create a new raft node
+	raftNode, err := config.NewRaftNode(ctx, meshConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create raft node: %w", err)
+	}
+	startOpts, err := config.NewRaftStartOptions(meshConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create raft start options: %w", err)
+	}
+	connectOpts, err := config.NewConnectOptions(ctx, meshConn, raftNode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connect options: %w", err)
+	}
+	return &node{
+		conf:          config,
+		log:           log,
+		mesh:          meshConn,
+		raft:          raftNode,
+		storage:       raftNode.Storage(),
+		raftStartOpts: startOpts,
+		connectOpts:   connectOpts,
+		errs:          make(chan error, 1),
+	}, nil
+}
+
 type node struct {
 	conf          *config.Config
 	log           *slog.Logger
@@ -118,6 +162,7 @@ type node struct {
 	raftStartOpts raft.StartOptions
 	connectOpts   mesh.ConnectOptions
 	errs          chan error
+	mu            sync.Mutex
 }
 
 func (n *node) Mesh() mesh.Mesh {
@@ -153,6 +198,8 @@ func (n *node) AddressV6() netip.Prefix {
 }
 
 func (n *node) Start(ctx context.Context) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	log := n.log
 	ctx = context.WithLogger(ctx, log)
 	// Start the raft node
@@ -204,7 +251,6 @@ func (n *node) Start(ctx context.Context) error {
 	}
 
 	log.Info("Webmesh is ready")
-
 	go func() {
 		if err := n.services.ListenAndServe(); err != nil {
 			n.errs <- handleErr(fmt.Errorf("failed to start gRPC server: %w", err))
@@ -226,6 +272,8 @@ func (s *node) DialNode(ctx context.Context, nodeID string) (*grpc.ClientConn, e
 }
 
 func (n *node) Stop(ctx context.Context) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	// Shutdown the mesh connection last
 	defer func() {
 		n.log.Info("Shutting down mesh connection")
@@ -235,6 +283,8 @@ func (n *node) Stop(ctx context.Context) error {
 	}()
 	// Stop the gRPC server
 	n.log.Info("Shutting down mesh services")
-	n.services.Shutdown(ctx)
+	if n.services != nil {
+		n.services.Shutdown(ctx)
+	}
 	return nil
 }

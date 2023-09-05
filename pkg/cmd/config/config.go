@@ -81,6 +81,29 @@ func NewDefaultConfig(nodeID string) Config {
 	}
 }
 
+// NewInsecureConfig returns a new config with the default options, but with
+// insecure defaults, such as no transport security and in-memory storage.
+// If nodeID is empty, the hostname or a randomly generated one will be used.
+func NewInsecureConfig(nodeID string) *Config {
+	conf := &Config{
+		Global:    GlobalOptions{},
+		Bootstrap: NewBootstrapOptions(),
+		Auth:      AuthOptions{},
+		Mesh:      NewMeshOptions(nodeID),
+		Raft:      NewRaftOptions(),
+		Services:  NewServiceOptions(),
+		TLS:       TLSOptions{},
+		WireGuard: NewWireGuardOptions(),
+		Discovery: NewDiscoveryOptions("", false),
+		Plugins:   PluginOptions{},
+		Bridge:    BridgeOptions{},
+	}
+	conf.Raft.InMemory = true
+	conf.Global.Insecure = true
+	c, _ := conf.Global.ApplyGlobals(conf)
+	return c
+}
+
 // BindFlags binds the flags. The options are returned for convenience.
 func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
 	o.Bootstrap.BindFlags(prefix, fs)
