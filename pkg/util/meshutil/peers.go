@@ -86,6 +86,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 				PrimaryEndpoint:    primaryEndpoint,
 				WireguardEndpoints: node.WireguardEndpoints,
 				ZoneAwarenessId:    node.ZoneAwarenessId,
+				Multiaddrs:         node.Multiaddrs,
 				PrivateIpv4: func() string {
 					if node.PrivateAddrV4().IsValid() {
 						return node.PrivateAddrV4().String()
