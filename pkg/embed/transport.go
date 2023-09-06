@@ -66,27 +66,6 @@ func WithWebmeshTransport(config *config.Config) p2pconfig.Option {
 // NewTransportFunc is the signature of a function that returns a new transport.
 type NewTransportFunc func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey p2pcrypto.PrivKey) (transport.Transport, error)
 
-// NewTransport returns a libp2p compatible transport backed by an embedded node.
-func NewTransport(config *config.Config) NewTransportFunc {
-	return func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey p2pcrypto.PrivKey) (transport.Transport, error) {
-		data, err := p2pcrypto.MarshalPrivateKey(privKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal private key: %w", err)
-		}
-		key, err := crypto.ParseKeyFromBytes(data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key: %w", err)
-		}
-		return &libp2pTransport{
-			config:   config,
-			host:     host,
-			upgrader: upgrader,
-			rcmgr:    rcmgr,
-			key:      key,
-		}, nil
-	}
-}
-
 func newTransportBuilder(config *config.Config) (NewTransportFunc, *libp2pTransport) {
 	t := &libp2pTransport{config: config}
 	return func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey p2pcrypto.PrivKey) (transport.Transport, error) {
@@ -233,22 +212,24 @@ func (l *libp2pTransport) Listen(laddr multiaddr.Multiaddr) (transport.Listener,
 		if err != nil {
 			return nil, fmt.Errorf("failed to subscribe to peers: %w", err)
 		}
-		nodes, err := peers.New(l.node.Mesh().Storage()).List(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to list peers: %w", err)
-		}
-		for _, node := range nodes {
-			if node.Id == l.node.Mesh().ID() {
+		// Automatically add our direct peers
+		ps := l.host.Peerstore()
+		for _, wgpeer := range l.node.Mesh().Network().WireGuard().Peers() {
+			id, err := peer.IDFromPublicKey(wgpeer.PublicHostKey)
+			if err != nil {
+				context.LoggerFrom(ctx).Warn("Failed to get peer id", "error", err.Error())
 				continue
 			}
-			err := l.registerNode(context.Background(), node)
-			if err != nil {
-				context.LoggerFrom(ctx).Debug("Failed to register node to peerstore", "error", err.Error())
+			for _, addr := range wgpeer.Multiaddrs {
+				ps.AddAddr(id, addr, peerstore.PermanentAddrTTL)
 			}
 		}
 		l.started.Store(true)
 	}
-	ip6addr := multiaddr.StringCast(fmt.Sprintf("/ip6/%s", l.node.AddressV6().Addr().String()))
+	ip6addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip6/%s", l.node.AddressV6().Addr().String()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ip6 multiaddr: %w", err)
+	}
 	lis, err := mnet.Listen(multiaddr.Join(ip6addr, listenAddr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen: %w", err)
@@ -257,32 +238,60 @@ func (l *libp2pTransport) Listen(laddr multiaddr.Multiaddr) (transport.Listener,
 	var lisaddr multiaddr.Multiaddr
 	switch v := lis.Addr().(type) {
 	case *net.TCPAddr:
-		lisaddr = multiaddr.StringCast(fmt.Sprintf("/tcp/%d", v.Port))
+		lisaddr, err = multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d", v.Port))
 	case *net.UDPAddr:
-		lisaddr = multiaddr.StringCast(fmt.Sprintf("/udp/%d", v.Port))
+		lisaddr, err = multiaddr.NewMultiaddr(fmt.Sprintf("/udp/%d", v.Port))
+	default:
+		return nil, fmt.Errorf("unknown listener type: %T", lis.Addr())
 	}
-	domaddr := multiaddr.StringCast(fmt.Sprintf("/webmesh/%s.%s", l.node.Mesh().ID(), strings.TrimSuffix(l.node.Mesh().Domain(), ".")))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create listener multiaddr: %w", err)
+	}
+	domaddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/webmesh/%s.%s", l.node.Mesh().ID(), strings.TrimSuffix(l.node.Mesh().Domain(), ".")))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create domain multiaddr: %w", err)
+	}
 	addrs = append(addrs, multiaddr.Join(domaddr, lisaddr))
 	addrs = append(addrs, multiaddr.Join(ip6addr, lisaddr))
 	// Broadcast the multiaddr to the network
-	c, err := l.node.Mesh().DialLeader(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial leader: %w", err)
-	}
-	defer c.Close()
-	_, err = v1.NewMembershipClient(c).Update(context.Background(), &v1.UpdateRequest{
-		Id: l.node.Mesh().ID(),
-		Multiaddrs: func() []string {
+	if !l.node.Mesh().Raft().IsLeader() {
+		c, err := l.node.Mesh().DialLeader(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("failed to dial leader: %w", err)
+		}
+		defer c.Close()
+		_, err = v1.NewMembershipClient(c).Update(context.Background(), &v1.UpdateRequest{
+			Id: l.node.Mesh().ID(),
+			Multiaddrs: func() []string {
+				var straddrs []string
+				for _, addr := range addrs {
+					straddrs = append(straddrs, addr.String())
+				}
+				return straddrs
+			}(),
+		})
+		if err != nil {
+			defer lis.Close()
+			return nil, fmt.Errorf("failed to update membership: %w", err)
+		}
+	} else {
+		// We can write it directly to storage
+		self, err := peers.New(l.node.Mesh().Storage()).Get(context.Background(), l.node.Mesh().ID())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get self: %w", err)
+		}
+		self.Multiaddrs = func() []string {
 			var straddrs []string
 			for _, addr := range addrs {
 				straddrs = append(straddrs, addr.String())
 			}
 			return straddrs
-		}(),
-	})
-	if err != nil {
-		defer lis.Close()
-		return nil, fmt.Errorf("failed to update membership: %w", err)
+		}()
+		err = peers.New(l.node.Mesh().Storage()).Put(context.Background(), self)
+		if err != nil {
+			defer lis.Close()
+			return nil, fmt.Errorf("failed to update self: %w", err)
+		}
 	}
 	return l.upgrader.UpgradeListener(l, lis), nil
 }
@@ -344,7 +353,6 @@ func (l *libp2pTransport) FindPeer(ctx context.Context, peerID peer.ID) (peer.Ad
 		}
 		addrs = append(addrs, a)
 	}
-	fmt.Println(addrs)
 	return peer.AddrInfo{
 		ID:    peerID,
 		Addrs: addrs,

@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
@@ -145,6 +146,10 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 	if err != nil {
 		return fmt.Errorf("parse peer key: %w", err)
 	}
+	hostpub, err := crypto.ParseHostPublicKey(peer.GetNode().GetHostPublicKey())
+	if err != nil {
+		return fmt.Errorf("parse peer host key: %w", err)
+	}
 	var priv4, priv6 netip.Prefix
 	if peer.GetNode().GetPrivateIpv4() != "" {
 		priv4, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv4())
@@ -212,11 +217,18 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		GRPCPort:      rpcPort,
 		RaftMember:    isRaftMember,
 		PublicKey:     key,
+		PublicHostKey: hostpub,
 		Endpoint:      endpoint,
 		PrivateIPv4:   priv4,
 		PrivateIPv6:   priv6,
 		AllowedIPs:    allowedIPs,
 		AllowedRoutes: allowedRoutes,
+	}
+	for _, addr := range peer.GetNode().GetMultiaddrs() {
+		ma, err := multiaddr.NewMultiaddr(addr)
+		if err == nil {
+			wgpeer.Multiaddrs = append(wgpeer.Multiaddrs, ma)
+		}
 	}
 	log.Debug("Ensuring wireguard peer", slog.Any("peer", &wgpeer))
 	err = m.net.WireGuard().PutPeer(ctx, &wgpeer)

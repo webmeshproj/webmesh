@@ -100,6 +100,7 @@ func NewInsecureConfig(nodeID string) *Config {
 	}
 	conf.Raft.InMemory = true
 	conf.Global.Insecure = true
+	conf.Services.API.Insecure = true
 	c, _ := conf.Global.ApplyGlobals(conf)
 	return c
 }

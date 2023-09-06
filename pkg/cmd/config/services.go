@@ -624,6 +624,8 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf se
 
 		conf.ServerOptions = append(conf.ServerOptions, grpc.ChainUnaryInterceptor(unarymiddlewares...))
 		conf.ServerOptions = append(conf.ServerOptions, grpc.ChainStreamInterceptor(streammiddlewares...))
+	} else {
+		conf.DisableGRPC = true
 	}
 	// Append the enabled mesh services
 	if o.Services.MeshDNS.Enabled {

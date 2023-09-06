@@ -25,6 +25,8 @@ import (
 	"net/netip"
 	"time"
 
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/multiformats/go-multiaddr"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/net/system"
@@ -41,6 +43,10 @@ type Peer struct {
 	RaftMember bool `json:"raftMember"`
 	// PublicKey is the public key of the peer.
 	PublicKey wgtypes.Key `json:"publicKey"`
+	// PublicHostKey is the public host key of the peer.
+	PublicHostKey p2pcrypto.PubKey `json:"publicHostKey"`
+	// Multiaddrs is the list of multiaddrs for this peer.
+	Multiaddrs []multiaddr.Multiaddr `json:"multiaddrs"`
 	// Endpoint is the endpoint of this peer, if applicable.
 	Endpoint netip.AddrPort `json:"endpoint"`
 	// PrivateIPv4 is the private IPv4 address of this peer, if applicable.

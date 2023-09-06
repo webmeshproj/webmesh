@@ -238,7 +238,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if proxiedFrom, ok := leaderproxy.ProxiedFrom(ctx); ok {
 		joiningServer = proxiedFrom
 	}
-	log.Debug("adding edge between caller and joining server", slog.String("joining_server", joiningServer))
+	log.Debug("Adding edge between caller and joining server", slog.String("joining_server", joiningServer))
 	err = p.PutEdge(ctx, &v1.MeshEdge{
 		Source: joiningServer,
 		Target: req.GetId(),
