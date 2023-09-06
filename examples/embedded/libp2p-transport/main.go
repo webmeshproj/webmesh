@@ -154,20 +154,16 @@ func runClient(rendezvous string, payloadSize int, opts libp2p.Option) error {
 }
 
 func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
-	var totalWritten atomic.Int64
-	var totalRead atomic.Int64
 	var bytesWritten atomic.Int64
 	var bytesRead atomic.Int64
 	start := time.Now()
 	go func() {
 		for range time.NewTicker(time.Second).C {
-			totalWrite := totalWritten.Load()
-			totalRead := totalRead.Load()
-			written := bytesWritten.Swap(0)
-			read := bytesRead.Swap(0)
+			written := bytesWritten.Load()
+			read := bytesRead.Load()
 			elapsed := time.Since(start)
-			log.Printf("Sent %d bytes in %s (%.2f MB/s)", totalWrite, elapsed, float64(written)/elapsed.Seconds()/1024/1024)
-			log.Printf("Received %d bytes in %s (%.2f MB/s)", totalRead, elapsed, float64(read)/elapsed.Seconds()/1024/1024)
+			log.Printf("Sent %d bytes in %s (%.2f MB/s)", written, elapsed, float64(written)/elapsed.Seconds()/1024/1024)
+			log.Printf("Received %d bytes in %s (%.2f MB/s)", read, elapsed, float64(read)/elapsed.Seconds()/1024/1024)
 		}
 	}()
 	go func() {
@@ -183,7 +179,6 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 					return
 				}
 				bytesWritten.Add(int64(n))
-				totalWritten.Add(int64(n))
 			}
 		}
 	}()
@@ -199,7 +194,6 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 				return
 			}
 			bytesRead.Add(int64(n))
-			totalRead.Add(int64(n))
 		}
 	}
 }
