@@ -122,10 +122,6 @@ func (l *libp2pTransport) Dial(ctx context.Context, raddr multiaddr.Multiaddr, p
 
 // CanDial returns true if this transport knows how to dial the given
 // multiaddr.
-//
-// Returning true does not guarantee that dialing this multiaddr will
-// succeed. This function should *only* be used to preemptively filter
-// out addresses that we can't dial.
 func (l *libp2pTransport) CanDial(addr multiaddr.Multiaddr) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -162,6 +158,7 @@ func (l *libp2pTransport) CanDial(addr multiaddr.Multiaddr) bool {
 func (l *libp2pTransport) Listen(laddr multiaddr.Multiaddr) (transport.Listener, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	ctx := context.Background()
 	spl := multiaddr.Split(laddr)
 	if len(spl) == 1 {
 		// No listening address was provided
@@ -188,41 +185,9 @@ func (l *libp2pTransport) Listen(laddr multiaddr.Multiaddr) (transport.Listener,
 		if err != nil {
 			return nil, fmt.Errorf("invalid configuration: %w", err)
 		}
-		ctx := context.Background()
-		l.node, err = NewNodeWithKey(ctx, l.config, l.key)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create node: %w", err)
-		}
-		err = l.node.Start(ctx)
+		err = l.startNode(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to start node: %w", err)
-		}
-		_, err = l.node.Mesh().Storage().Subscribe(context.Background(), peers.NodesPrefix, func(key string, value string) {
-			nodeID := strings.TrimPrefix(key, peers.NodesPrefix)
-			if nodeID == l.node.Mesh().ID() {
-				return
-			}
-			node := peers.MeshNode{MeshNode: &v1.MeshNode{}}
-			err = protojson.Unmarshal([]byte(value), node.MeshNode)
-			err := l.registerNode(context.Background(), node)
-			if err != nil {
-				context.LoggerFrom(ctx).Debug("Failed to register node to peerstore", "error", err.Error())
-			}
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to subscribe to peers: %w", err)
-		}
-		// Automatically add our direct peers
-		ps := l.host.Peerstore()
-		for _, wgpeer := range l.node.Mesh().Network().WireGuard().Peers() {
-			id, err := peer.IDFromPublicKey(wgpeer.PublicHostKey)
-			if err != nil {
-				context.LoggerFrom(ctx).Warn("Failed to get peer id", "error", err.Error())
-				continue
-			}
-			for _, addr := range wgpeer.Multiaddrs {
-				ps.AddAddr(id, addr, peerstore.PermanentAddrTTL)
-			}
 		}
 		l.started.Store(true)
 	}
@@ -234,94 +199,20 @@ func (l *libp2pTransport) Listen(laddr multiaddr.Multiaddr) (transport.Listener,
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen: %w", err)
 	}
-	var addrs []multiaddr.Multiaddr
-	var lisaddr multiaddr.Multiaddr
-	switch v := lis.Addr().(type) {
-	case *net.TCPAddr:
-		lisaddr, err = multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d", v.Port))
-	case *net.UDPAddr:
-		lisaddr, err = multiaddr.NewMultiaddr(fmt.Sprintf("/udp/%d", v.Port))
-	default:
-		return nil, fmt.Errorf("unknown listener type: %T", lis.Addr())
-	}
+	addrs, err := l.multiaddrsForListener(laddr, lis.Addr())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create listener multiaddr: %w", err)
+		defer lis.Close()
+		return nil, fmt.Errorf("failed to get multiaddrs for listener: %w", err)
 	}
-	domaddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/webmesh/%s.%s", l.node.Mesh().ID(), strings.TrimSuffix(l.node.Mesh().Domain(), ".")))
+	err = l.registerMultiaddrs(context.Background(), addrs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create domain multiaddr: %w", err)
-	}
-	addrs = append(addrs, multiaddr.Join(domaddr, lisaddr))
-	addrs = append(addrs, multiaddr.Join(ip6addr, lisaddr))
-	// Broadcast the multiaddr to the network
-	if !l.node.Mesh().Raft().IsLeader() {
-		c, err := l.node.Mesh().DialLeader(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to dial leader: %w", err)
-		}
-		defer c.Close()
-		_, err = v1.NewMembershipClient(c).Update(context.Background(), &v1.UpdateRequest{
-			Id: l.node.Mesh().ID(),
-			Multiaddrs: func() []string {
-				var straddrs []string
-				for _, addr := range addrs {
-					straddrs = append(straddrs, addr.String())
-				}
-				return straddrs
-			}(),
-		})
-		if err != nil {
-			defer lis.Close()
-			return nil, fmt.Errorf("failed to update membership: %w", err)
-		}
-	} else {
-		// We can write it directly to storage
-		self, err := peers.New(l.node.Mesh().Storage()).Get(context.Background(), l.node.Mesh().ID())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get self: %w", err)
-		}
-		self.Multiaddrs = func() []string {
-			var straddrs []string
-			for _, addr := range addrs {
-				straddrs = append(straddrs, addr.String())
-			}
-			return straddrs
-		}()
-		err = peers.New(l.node.Mesh().Storage()).Put(context.Background(), self)
-		if err != nil {
-			defer lis.Close()
-			return nil, fmt.Errorf("failed to update self: %w", err)
-		}
+		defer lis.Close()
+		return nil, fmt.Errorf("failed to register multiaddrs: %w", err)
 	}
 	return l.upgrader.UpgradeListener(l, lis), nil
 }
 
-func (l *libp2pTransport) registerNode(ctx context.Context, node peers.MeshNode) error {
-	ps := l.host.Peerstore()
-	if node.GetHostPublicKey() == "" {
-		return errors.New("missing public key")
-	}
-	pubkey, err := crypto.ParseHostPublicKey(node.GetHostPublicKey())
-	if err != nil {
-		return fmt.Errorf("failed to parse public key: %w", err)
-	}
-	id, err := peer.IDFromPublicKey(pubkey)
-	if err != nil {
-		return fmt.Errorf("failed to get peer id: %w", err)
-	}
-	for _, addr := range node.GetMultiaddrs() {
-		a, err := multiaddr.NewMultiaddr(addr)
-		if err != nil {
-			continue
-		}
-		ps.AddAddr(id, a, peerstore.PermanentAddrTTL)
-	}
-	return nil
-}
-
 // Protocol returns the set of protocols handled by this transport.
-//
-// See the Network interface for an explanation of how this is used.
 func (l *libp2pTransport) Protocols() []int {
 	return []int{ProtocolCode}
 }
@@ -331,6 +222,7 @@ func (l *libp2pTransport) Proxy() bool {
 	return true
 }
 
+// FindPeer will check mesh storage for a peer with the given ID.
 func (l *libp2pTransport) FindPeer(ctx context.Context, peerID peer.ID) (peer.AddrInfo, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -359,12 +251,136 @@ func (l *libp2pTransport) FindPeer(ctx context.Context, peerID peer.ID) (peer.Ad
 	}, nil
 }
 
+// Close shuts down any listeners and closes any connections.
 func (l *libp2pTransport) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	defer l.started.Store(false)
 	if l.node != nil {
 		return l.node.Stop(context.Background())
+	}
+	return nil
+}
+
+func (l *libp2pTransport) multiaddrsForListener(laddr multiaddr.Multiaddr, listenAddr net.Addr) ([]multiaddr.Multiaddr, error) {
+	var addrs []multiaddr.Multiaddr
+	var lisaddr multiaddr.Multiaddr
+	var err error
+	switch v := listenAddr.(type) {
+	case *net.TCPAddr:
+		lisaddr, err = multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d", v.Port))
+	case *net.UDPAddr:
+		lisaddr, err = multiaddr.NewMultiaddr(fmt.Sprintf("/udp/%d", v.Port))
+	default:
+		return nil, fmt.Errorf("unknown listener type: %T", listenAddr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create listener multiaddr: %w", err)
+	}
+	domaddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/webmesh/%s.%s", l.node.Mesh().ID(), strings.TrimSuffix(l.node.Mesh().Domain(), ".")))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create domain multiaddr: %w", err)
+	}
+	addrs = append(addrs, multiaddr.Join(domaddr, lisaddr))
+	addrs = append(addrs, multiaddr.Join(laddr, lisaddr))
+	return addrs, nil
+}
+
+func (l *libp2pTransport) registerMultiaddrs(ctx context.Context, maddrs []multiaddr.Multiaddr) error {
+	addrs := func() []string {
+		var straddrs []string
+		for _, addr := range maddrs {
+			straddrs = append(straddrs, addr.String())
+		}
+		return straddrs
+	}()
+	if !l.node.Mesh().Raft().IsLeader() {
+		c, err := l.node.Mesh().DialLeader(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to dial leader: %w", err)
+		}
+		defer c.Close()
+		_, err = v1.NewMembershipClient(c).Update(context.Background(), &v1.UpdateRequest{
+			Id:         l.node.Mesh().ID(),
+			Multiaddrs: addrs,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update membership: %w", err)
+		}
+	}
+	// We can write it directly to storage
+	self, err := peers.New(l.node.Mesh().Storage()).Get(context.Background(), l.node.Mesh().ID())
+	if err != nil {
+		return fmt.Errorf("failed to get self: %w", err)
+	}
+	self.Multiaddrs = addrs
+	err = peers.New(l.node.Mesh().Storage()).Put(context.Background(), self)
+	if err != nil {
+		return fmt.Errorf("failed to update self: %w", err)
+	}
+	return nil
+}
+
+func (l *libp2pTransport) startNode(ctx context.Context) error {
+	node, err := NewNodeWithKey(ctx, l.config, l.key)
+	if err != nil {
+		return err
+	}
+	err = node.Start(ctx)
+	if err != nil {
+		return err
+	}
+	// Subscribe to peer updates
+	_, err = node.Mesh().Storage().Subscribe(context.Background(), peers.NodesPrefix, func(key string, value string) {
+		nodeID := strings.TrimPrefix(key, peers.NodesPrefix)
+		if nodeID == node.Mesh().ID() {
+			return
+		}
+		peer := peers.MeshNode{MeshNode: &v1.MeshNode{}}
+		err = protojson.Unmarshal([]byte(value), peer.MeshNode)
+		err := l.registerNode(context.Background(), peer)
+		if err != nil {
+			context.LoggerFrom(ctx).Debug("Failed to register node to peerstore", "error", err.Error())
+		}
+	})
+	if err != nil {
+		defer func() { _ = node.Stop(ctx) }()
+		return fmt.Errorf("failed to subscribe to peers: %w", err)
+	}
+	// Automatically add our direct peers
+	for _, wgpeer := range node.Mesh().Network().WireGuard().Peers() {
+		id, err := peer.IDFromPublicKey(wgpeer.PublicHostKey)
+		if err != nil {
+			context.LoggerFrom(ctx).Warn("Failed to get peer id", "error", err.Error())
+			continue
+		}
+		for _, addr := range wgpeer.Multiaddrs {
+			l.host.Peerstore().AddAddr(id, addr, peerstore.PermanentAddrTTL)
+		}
+	}
+	l.node = node
+	return nil
+}
+
+func (l *libp2pTransport) registerNode(ctx context.Context, node peers.MeshNode) error {
+	ps := l.host.Peerstore()
+	if node.GetHostPublicKey() == "" {
+		return errors.New("missing public key")
+	}
+	pubkey, err := crypto.ParseHostPublicKey(node.GetHostPublicKey())
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+	id, err := peer.IDFromPublicKey(pubkey)
+	if err != nil {
+		return fmt.Errorf("failed to get peer id: %w", err)
+	}
+	for _, addr := range node.GetMultiaddrs() {
+		a, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			continue
+		}
+		ps.AddAddr(id, a, peerstore.PermanentAddrTTL)
 	}
 	return nil
 }
