@@ -167,12 +167,13 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 		}
 	}()
 	go func() {
+		buf := make([]byte, payloadSize)
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				n, err := stream.Write(make([]byte, payloadSize))
+				n, err := stream.Write(buf)
 				if err != nil {
 					log.Println("ERROR: ", err)
 					return
@@ -181,12 +182,13 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 			}
 		}
 	}()
+	buf := make([]byte, payloadSize)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			n, err := stream.Read(make([]byte, payloadSize))
+			n, err := stream.Read(buf)
 			if err != nil {
 				log.Println("ERROR: ", err)
 				return
