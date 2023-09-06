@@ -210,9 +210,16 @@ func (p *passthroughRaft) Barrier(ctx context.Context, timeout time.Duration) (t
 }
 
 func (p *passthroughRaft) Stop(ctx context.Context) error {
-	defer close(p.closec)
-	for _, cancel := range p.subCancels {
-		cancel()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	select {
+	case <-p.closec:
+		return nil
+	default:
+		close(p.closec)
+		for _, cancel := range p.subCancels {
+			cancel()
+		}
 	}
 	return nil
 }
