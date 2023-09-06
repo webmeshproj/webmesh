@@ -294,7 +294,7 @@ func (l *libp2pTransport) registerMultiaddrs(ctx context.Context, maddrs []multi
 		}
 		return straddrs
 	}()
-	if !l.node.Mesh().Raft().IsLeader() {
+	if !l.node.Mesh().Raft().IsVoter() {
 		c, err := l.node.Mesh().DialLeader(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to dial leader: %w", err)
@@ -307,6 +307,7 @@ func (l *libp2pTransport) registerMultiaddrs(ctx context.Context, maddrs []multi
 		if err != nil {
 			return fmt.Errorf("failed to update membership: %w", err)
 		}
+		return nil
 	}
 	// We can write it directly to storage
 	self, err := peers.New(l.node.Mesh().Storage()).Get(context.Background(), l.node.Mesh().ID())
