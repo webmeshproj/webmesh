@@ -130,21 +130,27 @@ func runClient(rendezvous string, payloadSize int, opts libp2p.Option) error {
 	if err != nil {
 		return err
 	}
-	for peer := range peerChan {
-		if peer.ID == host.ID() {
-			continue
+	for {
+		select {
+		case <-sig:
+			return nil
+		case <-ctx.Done():
+			return nil
+		case peer := <-peerChan:
+			if peer.ID == host.ID() {
+				continue
+			}
+			stream, err := host.NewStream(context.Background(), peer.ID, "/echo/1.0.0")
+			if err != nil {
+				continue
+			}
+			defer stream.Close()
+			log.Printf("Connected to server %s, streaming echo\n", stream.Conn().RemoteMultiaddr())
+			runSpeedTest(ctx, stream, payloadSize)
+			<-sig
+			return nil
 		}
-		stream, err := host.NewStream(context.Background(), peer.ID, "/echo/1.0.0")
-		if err != nil {
-			continue
-		}
-		defer stream.Close()
-		log.Printf("Connected to server %s, streaming echo\n", stream.Conn().RemoteMultiaddr())
-		runSpeedTest(ctx, stream, payloadSize)
-		<-sig
-		break
 	}
-	return nil
 }
 
 func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
