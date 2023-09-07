@@ -85,6 +85,15 @@ func MustGenerateKeyV2() PrivateKey {
 	return priv
 }
 
+// DecodePrivateKeyV2 decodes a private key from a base64 encoded string.
+func DecodePrivateKeyV2(s string) (PrivateKey, error) {
+	data, err := p2pcrypto.ConfigDecodeKey(s)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePrivateKeyV2(data)
+}
+
 // ParsePrivateKey parses a private key from a byte slice.
 func ParsePrivateKeyV2(data []byte) (PrivateKey, error) {
 	if len(data) != secp256k1.PrivKeyBytesLen {
@@ -94,12 +103,21 @@ func ParsePrivateKeyV2(data []byte) (PrivateKey, error) {
 	return &privateKey{ecdsa: priv}, nil
 }
 
+// DecodePublicKeyV2 decodes a public key from a base64 encoded string.
+func DecodePublicKeyV2(s string) (PublicKey, error) {
+	data, err := p2pcrypto.ConfigDecodeKey(s)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePublicKeyV2(data)
+}
+
 // ParsePublicKey parses a public key from a byte slice.
 func ParsePublicKeyV2(data []byte) (PublicKey, error) {
 	if len(data) != secp256k1.PubKeyBytesLenCompressed+32 {
 		return nil, fmt.Errorf("expected secp256k1 data size to be %d", secp256k1.PubKeyBytesLenCompressed+32)
 	}
-	pub, err := secp256k1.ParsePubKey(data[secp256k1.PubKeyBytesLenCompressed:])
+	pub, err := secp256k1.ParsePubKey(data[secp256k1.PubKeyBytesLenCompressed-1:])
 	if err != nil {
 		return nil, err
 	}
