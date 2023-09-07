@@ -19,8 +19,7 @@ package crypto
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
+	"errors"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/crypto/pb"
@@ -33,17 +32,17 @@ func init() {
 	crypto.PrivKeyUnmarshallers[WireGuardKeyType] = func(data []byte) (crypto.PrivKey, error) {
 		var priv wgtypes.Key
 		copy(priv[:], data)
-		return &wgKey{priv}, nil
+		return &wgPrivateKey{priv}, nil
 	}
 	crypto.PubKeyUnmarshallers[WireGuardKeyType] = func(data []byte) (crypto.PubKey, error) {
 		var pub wgtypes.Key
 		copy(pub[:], data)
-		return &wgKey{pub}, nil
+		return &wgPublicKey{pub}, nil
 	}
 	crypto.KeyTypes = append(crypto.KeyTypes, WireGuardKeyType)
 }
 
-type wgKey struct {
+type wgPrivateKey struct {
 	wgtypes.Key
 }
 
@@ -53,7 +52,7 @@ func GenerateKeyV2() (crypto.PrivKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &wgKey{priv}, nil
+	return &wgPrivateKey{priv}, nil
 }
 
 // MustGenerateKey generates a new private key or panics.
@@ -66,40 +65,59 @@ func MustGenerateKeyV2() crypto.PrivKey {
 }
 
 // Equals checks whether two PubKeys are the same
-func (w *wgKey) Equals(in crypto.Key) bool {
-	if _, ok := in.(*wgKey); !ok {
+func (w *wgPrivateKey) Equals(in crypto.Key) bool {
+	if _, ok := in.(*wgPrivateKey); !ok {
 		return false
 	}
-	return bytes.Equal(w.Key[:], in.(*wgKey).Key[:])
+	this := w.PublicKey()
+	out := in.(*wgPrivateKey).PublicKey()
+	return bytes.Equal(this[:], out[:])
 }
 
 // Raw returns the raw bytes of the key (not wrapped in the libp2p-crypto protobuf).
-func (w *wgKey) Raw() ([]byte, error) {
+func (w *wgPrivateKey) Raw() ([]byte, error) {
 	return w.Key[:], nil
 }
 
 // Type returns the protobuf key type.
-func (w *wgKey) Type() pb.KeyType {
+func (w *wgPrivateKey) Type() pb.KeyType {
 	return WireGuardKeyType
 }
 
 // Cryptographically sign the given bytes
-func (w *wgKey) Sign(data []byte) ([]byte, error) {
-	pubKey := w.Key.PublicKey()
-	h := hmac.New(sha256.New, pubKey[:])
-	h.Write(data)
-	return h.Sum(nil), nil
+func (w *wgPrivateKey) Sign(data []byte) ([]byte, error) {
+	return nil, errors.New("not implemented")
 }
 
 // Return a public key paired with this private key
-func (w *wgKey) GetPublic() crypto.PubKey {
-	return &wgKey{w.Key.PublicKey()}
+func (w *wgPrivateKey) GetPublic() crypto.PubKey {
+	return &wgPublicKey{w.PublicKey()}
 }
 
-// Verify that the given signature is valid
-func (w *wgKey) Verify(data []byte, sig []byte) (bool, error) {
-	h := hmac.New(sha256.New, w.Key[:])
-	h.Write(data)
-	vsig := h.Sum(nil)
-	return hmac.Equal(vsig, sig), nil
+type wgPublicKey struct {
+	wgtypes.Key
+}
+
+// Equals checks whether two PubKeys are the same
+func (w *wgPublicKey) Equals(in crypto.Key) bool {
+	key, ok := in.(*wgPublicKey)
+	if !ok {
+		return false
+	}
+	return bytes.Equal(w.Key[:], key.Key[:])
+}
+
+// Raw returns the raw bytes of the key (not wrapped in the libp2p-crypto protobuf).
+func (w *wgPublicKey) Raw() ([]byte, error) {
+	return w.Key[:], nil
+}
+
+// Type returns the protobuf key type.
+func (w *wgPublicKey) Type() pb.KeyType {
+	return WireGuardKeyType
+}
+
+// Verify compares a signature against the input data
+func (w *wgPublicKey) Verify(data []byte, sigStr []byte) (success bool, err error) {
+	return false, nil
 }
