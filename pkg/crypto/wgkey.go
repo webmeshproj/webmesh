@@ -19,9 +19,12 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/crypto/pb"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -29,34 +32,30 @@ import (
 const WireGuardKeyType = 99
 
 func init() {
-	crypto.PrivKeyUnmarshallers[WireGuardKeyType] = func(data []byte) (crypto.PrivKey, error) {
-		var priv wgtypes.Key
-		copy(priv[:], data)
-		return &wgPrivateKey{priv}, nil
+	p2pcrypto.PrivKeyUnmarshallers[WireGuardKeyType] = func(data []byte) (p2pcrypto.PrivKey, error) {
+		return ParsePrivateKeyV2(data)
 	}
-	crypto.PubKeyUnmarshallers[WireGuardKeyType] = func(data []byte) (crypto.PubKey, error) {
-		var pub wgtypes.Key
-		copy(pub[:], data)
-		return &wgPublicKey{pub}, nil
+	p2pcrypto.PubKeyUnmarshallers[WireGuardKeyType] = func(data []byte) (p2pcrypto.PubKey, error) {
+		return ParsePublicKeyV2(data)
 	}
-	crypto.KeyTypes = append(crypto.KeyTypes, WireGuardKeyType)
+	p2pcrypto.KeyTypes = append(p2pcrypto.KeyTypes, WireGuardKeyType)
 }
 
-type wgPrivateKey struct {
-	wgtypes.Key
+type PrivateKey struct {
+	ecdsa *secp256k1.PrivateKey
 }
 
 // GenerateKey generates a new private key.
-func GenerateKeyV2() (crypto.PrivKey, error) {
-	priv, err := wgtypes.GeneratePrivateKey()
+func GenerateKeyV2() (p2pcrypto.PrivKey, error) {
+	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		return nil, err
 	}
-	return &wgPrivateKey{priv}, nil
+	return &PrivateKey{ecdsa: priv}, nil
 }
 
 // MustGenerateKey generates a new private key or panics.
-func MustGenerateKeyV2() crypto.PrivKey {
+func MustGenerateKeyV2() p2pcrypto.PrivKey {
 	priv, err := GenerateKeyV2()
 	if err != nil {
 		panic(err)
@@ -64,85 +63,107 @@ func MustGenerateKeyV2() crypto.PrivKey {
 	return priv
 }
 
+// ParsePrivateKey parses a private key from a byte slice.
+func ParsePrivateKeyV2(data []byte) (p2pcrypto.PrivKey, error) {
+	if len(data) != secp256k1.PrivKeyBytesLen {
+		return nil, fmt.Errorf("expected secp256k1 data size to be %d", secp256k1.PrivKeyBytesLen)
+	}
+	priv := secp256k1.PrivKeyFromBytes(data)
+	return &PrivateKey{ecdsa: priv}, nil
+}
+
+// ParsePublicKey parses a public key from a byte slice.
+func ParsePublicKeyV2(data []byte) (p2pcrypto.PubKey, error) {
+	if len(data) != secp256k1.PubKeyBytesLenCompressed+32 {
+		return nil, fmt.Errorf("expected secp256k1 data size to be %d", secp256k1.PubKeyBytesLenCompressed+32)
+	}
+	pub, err := secp256k1.ParsePubKey(data[:secp256k1.PubKeyBytesLenCompressed])
+	if err != nil {
+		return nil, err
+	}
+	return &PublicKey{
+		ecdsa: pub,
+		wgkey: wgtypes.Key(data[secp256k1.PubKeyBytesLenCompressed:]),
+	}, nil
+}
+
 // Equals checks whether two PubKeys are the same
-func (w *wgPrivateKey) Equals(in crypto.Key) bool {
-	if _, ok := in.(*wgPrivateKey); !ok {
+func (w *PrivateKey) Equals(in p2pcrypto.Key) bool {
+	if _, ok := in.(*PrivateKey); !ok {
 		return false
 	}
-	this := w.PublicKey()
-	out := in.(*wgPrivateKey).PublicKey()
+	this := w.ecdsa.Serialize()
+	out := in.(*PrivateKey).ecdsa.Serialize()
 	return bytes.Equal(this[:], out[:])
 }
 
 // Raw returns the raw bytes of the key (not wrapped in the libp2p-crypto protobuf).
-func (w *wgPrivateKey) Raw() ([]byte, error) {
-	return w.Key[:], nil
+func (w *PrivateKey) Raw() ([]byte, error) {
+	return w.ecdsa.Serialize(), nil
 }
 
 // Type returns the protobuf key type.
-func (w *wgPrivateKey) Type() pb.KeyType {
+func (w *PrivateKey) Type() pb.KeyType {
 	return WireGuardKeyType
 }
 
 // Cryptographically sign the given bytes
-func (w *wgPrivateKey) Sign(data []byte) ([]byte, error) {
-	key, err := crypto.UnmarshalSecp256k1PrivateKey(w.Key[:])
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal private key: %w", err)
-	}
-	rawpub, err := key.GetPublic().Raw()
-	if err != nil {
-		return nil, fmt.Errorf("get public key: %w", err)
-	}
-	sig, err := key.Sign(data)
-	if err != nil {
-		return nil, fmt.Errorf("sign data: %w", err)
-	}
-	return append(rawpub, sig...), nil
+func (w *PrivateKey) Sign(data []byte) ([]byte, error) {
+	hash := sha256.Sum256(data)
+	sig := ecdsa.Sign(w.ecdsa, hash[:])
+	return sig.Serialize(), nil
 }
 
 // Return a public key paired with this private key
-func (w *wgPrivateKey) GetPublic() crypto.PubKey {
-	return &wgPublicKey{w.PublicKey()}
-}
-
-type wgPublicKey struct {
-	wgtypes.Key
-}
-
-// Equals checks whether two PubKeys are the same
-func (w *wgPublicKey) Equals(in crypto.Key) bool {
-	key, ok := in.(*wgPublicKey)
-	if !ok {
-		return false
+func (w *PrivateKey) GetPublic() p2pcrypto.PubKey {
+	return &PublicKey{
+		ecdsa: w.ecdsa.PubKey(),
+		wgkey: wgtypes.Key(w.ecdsa.Serialize()).PublicKey(),
 	}
-	return bytes.Equal(w.Key[:], key.Key[:])
 }
 
-// Raw returns the raw bytes of the key (not wrapped in the libp2p-crypto protobuf).
-func (w *wgPublicKey) Raw() ([]byte, error) {
-	return w.Key[:], nil
+// WireGuardKey returns the WireGuard key.
+func (w *PrivateKey) WireGuardKey() wgtypes.Key {
+	return wgtypes.Key(w.ecdsa.Serialize())
+}
+
+type PublicKey struct {
+	ecdsa *secp256k1.PublicKey
+	wgkey wgtypes.Key
+}
+
+// WireGuardKey returns the WireGuard key.
+func (w *PublicKey) WireGuardKey() wgtypes.Key {
+	return w.wgkey
+}
+
+// Verify compares a signature against the input data
+func (w *PublicKey) Verify(data []byte, sigStr []byte) (success bool, err error) {
+	sig, err := ecdsa.ParseDERSignature(sigStr)
+	if err != nil {
+		return false, err
+	}
+	hash := sha256.Sum256(data)
+	return sig.Verify(hash[:], w.ecdsa), nil
 }
 
 // Type returns the protobuf key type.
-func (w *wgPublicKey) Type() pb.KeyType {
+func (w *PublicKey) Type() pb.KeyType {
 	return WireGuardKeyType
 }
 
-const PubKeySize = 32
+// Raw returns the raw bytes of the key (not wrapped in the libp2p-crypto protobuf).
+func (w *PublicKey) Raw() ([]byte, error) {
+	// We append the X25519 public key to the end of the secp256k1 public key
+	return append(w.ecdsa.SerializeCompressed(), w.wgkey[:]...), nil
+}
 
-// Verify compares a signature against the input data
-func (w *wgPublicKey) Verify(data []byte, sigStr []byte) (success bool, err error) {
-	// Pull the full public key off the top of the signature
-	if len(sigStr) < PubKeySize+1 {
-		return false, fmt.Errorf("signature too short")
+// Equals checks whether two PubKeys are the same
+func (w *PublicKey) Equals(in p2pcrypto.Key) bool {
+	if _, ok := in.(*PublicKey); !ok {
+		return false
 	}
-	pub := sigStr[:PubKeySize+1]
-	sigStr = sigStr[PubKeySize+1:]
-	// sig, err := ecdsa.ParseDERSignature(sigStr)
-	key, err := crypto.UnmarshalSecp256k1PublicKey(pub)
-	if err != nil {
-		return false, fmt.Errorf("failed to unmarshal public key: %w", err)
-	}
-	return key.Verify(data, sigStr)
+	this := w.wgkey
+	out := in.(*PublicKey).wgkey
+	return bytes.Equal(this[:], out[:])
 }
