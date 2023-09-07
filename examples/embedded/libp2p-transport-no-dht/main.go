@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -79,7 +78,7 @@ func runServer(payloadSize int, opts libp2p.Option) error {
 		return err
 	}
 	defer conn.Close()
-	log.Println("Received connection from", conn.RemoteMultiaddr())
+	log.Println("Received connection from", conn.RemoteAddr())
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	go runSpeedTest(ctx, conn, payloadSize)
@@ -103,33 +102,13 @@ func runClient(payloadSize int, opts libp2p.Option) error {
 			break
 		}
 	}
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network string, address string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, "udp", "[::1]:6353")
-		},
-	}
-	addr, err := resolver.LookupIP(ctx, "ip6", "server.webmesh.internal")
-	if err != nil {
-		return fmt.Errorf("failed to resolve server address: %w", err)
-	}
-	// We'll use the first address
-	maddr, err := mnet.FromNetAddr(&net.TCPAddr{
-		IP:   addr[0],
-		Port: 8080,
-	})
-	if err != nil {
-		return err
-	}
-	dialer := &mnet.Dialer{
-		LocalAddr: multiaddr.Join(ourIP, multiaddr.StringCast("/tcp/0")),
-	}
-	conn, err := dialer.Dial(maddr)
+	dialer := newDialer(ourIP)
+	conn, err := dialer.Dial(multiaddr.StringCast("/dns6/server.webmesh.internal/tcp/8080"))
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	log.Println("Opened connection to", maddr)
+	log.Println("Opened connection to", conn.RemoteAddr())
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	go runSpeedTest(ctx, conn, payloadSize)
@@ -141,13 +120,22 @@ func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize in
 	var bytesWritten atomic.Int64
 	var bytesRead atomic.Int64
 	start := time.Now()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go func() {
-		for range time.NewTicker(time.Second).C {
-			written := bytesWritten.Load()
-			read := bytesRead.Load()
-			elapsed := time.Since(start)
-			log.Printf("Sent %d bytes in %s (%.2f MB/s)", written, elapsed, float64(written)/elapsed.Seconds()/1024/1024)
-			log.Printf("Received %d bytes in %s (%.2f MB/s)", read, elapsed, float64(read)/elapsed.Seconds()/1024/1024)
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				written := bytesWritten.Load()
+				read := bytesRead.Load()
+				elapsed := time.Since(start)
+				log.Printf("Sent %d bytes in %s (%.2f MB/s)", written, elapsed, float64(written)/elapsed.Seconds()/1024/1024)
+				log.Printf("Received %d bytes in %s (%.2f MB/s)", read, elapsed, float64(read)/elapsed.Seconds()/1024/1024)
+			}
 		}
 	}()
 	go func() {
@@ -160,6 +148,7 @@ func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize in
 				n, err := stream.Write(buf)
 				if err != nil {
 					log.Println("ERROR: ", err)
+					cancel()
 					return
 				}
 				bytesWritten.Add(int64(n))
@@ -188,7 +177,7 @@ func newWebmeshClientOptions(rendezvous string, loglevel string) libp2p.Option {
 	conf.Global.LogLevel = loglevel
 	conf.Discovery.Discover = true
 	conf.Discovery.PSK = rendezvous
-	conf.Discovery.ConnectTimeout = time.Second
+	conf.Discovery.ConnectTimeout = time.Second * 3
 	conf.Services.API.Disabled = true
 	conf.WireGuard.ListenPort = 51821
 	conf.WireGuard.InterfaceName = "webmeshclient0"
@@ -213,7 +202,7 @@ func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
 	conf.Global.LogLevel = loglevel
 	conf.Discovery.Announce = true
 	conf.Discovery.PSK = rendezvous
-	conf.Discovery.ConnectTimeout = time.Second
+	conf.Discovery.ConnectTimeout = time.Second * 3
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 	conf.Bootstrap.Enabled = true
 	conf.Services.MeshDNS.Enabled = true
@@ -228,4 +217,18 @@ func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
 			multiaddr.StringCast("/webmesh/server.webmesh.internal/tcp/0"),
 		),
 	)
+}
+
+func newDialer(laddr multiaddr.Multiaddr) *mnet.Dialer {
+	return &mnet.Dialer{
+		LocalAddr: multiaddr.Join(laddr, multiaddr.StringCast("/tcp/0")),
+		Dialer: net.Dialer{
+			Resolver: &net.Resolver{
+				PreferGo: true,
+				Dial: func(ctx context.Context, network string, address string) (net.Conn, error) {
+					return (&net.Dialer{}).DialContext(ctx, "udp", "[::1]:6353")
+				},
+			},
+		},
+	}
 }

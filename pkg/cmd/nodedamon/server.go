@@ -113,7 +113,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 
 	log.Info("Starting mesh node")
 	// Create a new mesh connection
-	meshConfig, err := conf.NewMeshConfig(ctx)
+	meshConfig, err := conf.NewMeshConfig(ctx, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create mesh config: %v", err)
 	}

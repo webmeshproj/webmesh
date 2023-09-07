@@ -153,7 +153,9 @@ func Execute() error {
 	}
 
 	// We run in "embedded mode"
-	node, err := embed.NewNode(ctx, conf)
+	node, err := embed.NewNode(ctx, embed.Options{
+		Config: conf,
+	})
 	if err != nil {
 		return err
 	}

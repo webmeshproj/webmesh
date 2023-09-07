@@ -99,7 +99,7 @@ func runServer(loglevel string) error {
 	conf.Discovery.PSK = string(psk)
 	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61820"}
 
-	conn, err := embed.NewNode(context.Background(), &conf)
+	conn, err := embed.NewNode(context.Background(), embed.Options{Config: &conf})
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func runClient(loglevel string, psk string) error {
 	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61821"}
 	conf.TLS.Insecure = true
 
-	conn, err := embed.NewNode(context.Background(), &conf)
+	conn, err := embed.NewNode(context.Background(), embed.Options{Config: &conf})
 	if err != nil {
 		return err
 	}

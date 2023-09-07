@@ -59,7 +59,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 		meshConfig.Mesh.UseMeshDNS = false
 		meshConfig.Services.MeshDNS.Enabled = false
 		// Create a new mesh connection
-		meshConfig, err := meshConfig.NewMeshConfig(ctx)
+		meshConfig, err := meshConfig.NewMeshConfig(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create mesh config: %w", err)
 		}

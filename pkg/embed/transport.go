@@ -326,7 +326,11 @@ func (l *libp2pTransport) registerMultiaddrs(ctx context.Context, maddrs []multi
 }
 
 func (l *libp2pTransport) startNode(ctx context.Context) error {
-	node, err := NewNodeWithKey(ctx, l.config, l.key)
+	node, err := NewNode(ctx, Options{
+		Config: l.config,
+		Key:    l.key,
+		// Host:   l.host,
+	})
 	if err != nil {
 		return err
 	}

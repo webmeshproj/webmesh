@@ -147,15 +147,18 @@ func (o *MeshOptions) Validate() error {
 }
 
 // NewMeshConfig return a new Mesh configuration based on the node configuration.
-func (o *Config) NewMeshConfig(ctx context.Context) (conf mesh.Config, err error) {
+// The key is optional and will be taken from the configuration if not provided.
+func (o *Config) NewMeshConfig(ctx context.Context, key crypto.Key) (conf mesh.Config, err error) {
 	log := context.LoggerFrom(ctx)
 	nodeid, err := o.NodeID()
 	if err != nil {
 		return
 	}
-	key, err := o.LoadKey(ctx)
-	if err != nil {
-		return
+	if key == nil {
+		key, err = o.LoadKey(ctx)
+		if err != nil {
+			return
+		}
 	}
 	conf = mesh.Config{
 		NodeID:                  nodeid,
@@ -510,7 +513,6 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 			Credentials:    conn.Credentials(),
 			AddressTimeout: time.Second * 3,
 		}), nil
-		// TODO: Support bootstrap over libp2p
 	}
 	if o.Mesh.JoinAddress != "" {
 		return tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
@@ -534,7 +536,7 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 			HostOptions: libp2p.HostOptions{
 				Key:            conn.Key(),
 				BootstrapPeers: addrs,
-				ConnectTimeout: time.Second * 2,
+				ConnectTimeout: o.Discovery.ConnectTimeout,
 			},
 		})
 		if err != nil {
