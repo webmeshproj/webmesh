@@ -103,9 +103,6 @@ func (m *dnsManager) RefreshServers(ctx context.Context) error {
 		if server.PrivateDNSAddrV4().IsValid() && !m.noIPv4 {
 			seen[server.PrivateDNSAddrV4()] = true
 		}
-		if server.PrivateDNSAddrV6().IsValid() && !m.noIPv6 {
-			seen[server.PrivateDNSAddrV6()] = true
-		}
 	}
 	// Find out which (if any) DNS servers we are removing
 	toRemove := make([]netip.AddrPort, 0)
@@ -121,6 +118,9 @@ func (m *dnsManager) RefreshServers(ctx context.Context) error {
 	// to the system
 	m.dnsservers = make([]netip.AddrPort, 0)
 	toAdd := make([]netip.AddrPort, 0)
+	if m.localdnsaddr.IsValid() {
+		toAdd = append(toAdd, m.localdnsaddr)
+	}
 	for server, needsAdd := range seen {
 		m.dnsservers = append(m.dnsservers, server)
 		if needsAdd {

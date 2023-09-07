@@ -30,12 +30,11 @@ import (
 )
 
 func addServers(_ string, servers []netip.AddrPort) error {
-	// Create a new resolvconf file, appending the new servers to the top
-	current, err := readResolvConf()
+	current, err := readResolvConfHead()
 	if err != nil {
 		return err
 	}
-	f, err := os.Create("/etc/resolv.conf")
+	f, err := os.Create("/etc/resolv.conf.head")
 	if err != nil {
 		return err
 	}
@@ -68,7 +67,7 @@ func removeServers(_ string, servers []netip.AddrPort) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.Create("/etc/resolv.conf")
+	f, err := os.Create("/etc/resolv.conf.head")
 	if err != nil {
 		return err
 	}
@@ -225,6 +224,18 @@ func openResolvConf() (*os.File, error) {
 func readResolvConf() ([]byte, error) {
 	f, err := openResolvConf()
 	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
+}
+
+func readResolvConfHead() ([]byte, error) {
+	f, err := os.Open("/etc/resolv.conf.head")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer f.Close()

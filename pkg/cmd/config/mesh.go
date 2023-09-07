@@ -418,6 +418,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 		if err != nil {
 			return
 		}
+		localDNSAddr = netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), localDNSAddr.Port())
 	}
 
 	opts = mesh.ConnectOptions{

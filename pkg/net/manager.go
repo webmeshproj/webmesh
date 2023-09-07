@@ -130,9 +130,8 @@ type Manager interface {
 // New creates a new network manager.
 func New(store storage.MeshStorage, opts Options) Manager {
 	m := &manager{
-		storage:  store,
-		opts:     opts,
-		iceConns: make(map[string]clientPeerConn),
+		storage: store,
+		opts:    opts,
 	}
 	m.peers = newPeerManager(m)
 	return m
@@ -146,8 +145,6 @@ type manager struct {
 	storage              storage.MeshStorage
 	fw                   firewall.Firewall
 	wg                   wireguard.Interface
-	iceConns             map[string]clientPeerConn
-	dnsservers           []netip.AddrPort
 	networkv4, networkv6 netip.Prefix
 	masquerading         bool
 	mu                   sync.Mutex
@@ -354,11 +351,13 @@ func (m *manager) Close(ctx context.Context) error {
 			}
 		}()
 	}
-	if len(m.dnsservers) > 0 {
-		log.Debug("removing DNS servers", slog.Any("servers", m.dnsservers))
-		err := dns.RemoveServers(m.wg.Name(), m.dnsservers)
-		if err != nil {
-			log.Error("error removing DNS servers", slog.String("error", err.Error()))
+	if m.dns != nil {
+		if len(m.dns.dnsservers) > 0 {
+			log.Debug("removing DNS servers", slog.Any("servers", m.dns.dnsservers))
+			err := dns.RemoveServers(m.wg.Name(), m.dns.dnsservers)
+			if err != nil {
+				log.Error("error removing DNS servers", slog.String("error", err.Error()))
+			}
 		}
 	}
 	if m.wg != nil {
