@@ -37,7 +37,8 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 	if len(bootstrapPeers) == 0 {
 		bootstrapPeers = dht.DefaultBootstrapPeers
 	}
-	return newDHT(ctx, host, bootstrapPeers, connectTimeout)
+	kaddht, err := newDHT(ctx, host, bootstrapPeers, connectTimeout)
+	return kaddht, err
 }
 
 func newDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr, connectTimeout time.Duration) (*dht.IpfsDHT, error) {
@@ -63,7 +64,7 @@ func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, serv
 	for _, peerAddr := range servers {
 		peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
 		if err != nil {
-			log.Warn("Failed to parse bootstrap peer address", "error", err.Error())
+			log.Debug("Failed to parse bootstrap peer address", "error", err.Error())
 			continue
 		}
 		wg.Add(1)
@@ -78,7 +79,7 @@ func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, serv
 			}
 			defer cancel()
 			if err := host.Connect(connectCtx, *peerinfo); err != nil {
-				log.Warn("Failed to connect to DHT bootstrap peer", "error", err.Error())
+				log.Debug("Failed to connect to DHT bootstrap peer", "error", err.Error())
 				return
 			}
 			log.Debug("Connection established with bootstrap node", "node", peerinfo.String())

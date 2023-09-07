@@ -50,6 +50,9 @@ type RoundTripOptions struct {
 // NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
 // The created host is closed when the round tripper is closed.
 func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) (transport.RoundTripper[REQ, RESP], error) {
+	if opts.Method == "" {
+		return nil, errors.New("method must be specified")
+	}
 	host := opts.Host
 	close := func() {}
 	var err error
@@ -68,21 +71,11 @@ func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) 
 	return newRoundTripperWithHostAndCloseFunc[REQ, RESP](host, opts, close), nil
 }
 
-// NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
-func NewRoundTripperWithHost[REQ, RESP any](host Host, opts RoundTripOptions) transport.RoundTripper[REQ, RESP] {
-	return newRoundTripperWithHostAndCloseFunc[REQ, RESP](host, opts, func() {})
-}
-
 // NewJoinRoundTripper returns a round tripper that uses the libp2p kademlia DHT to join a cluster.
 // The created host is closed when the round tripper is closed.
 func NewJoinRoundTripper(ctx context.Context, opts RoundTripOptions) (transport.JoinRoundTripper, error) {
 	opts.Method = v1.Membership_Join_FullMethodName
 	return NewRoundTripper[v1.JoinRequest, v1.JoinResponse](ctx, opts)
-}
-
-// NewJoinRoundTripperHost returns a round tripper that uses the libp2p kademlia DHT to join a cluster.
-func NewJoinRoundTripperWithHost(host Host, opts RoundTripOptions) transport.JoinRoundTripper {
-	return NewRoundTripperWithHost[v1.JoinRequest, v1.JoinResponse](host, opts)
 }
 
 func newRoundTripperWithHostAndCloseFunc[REQ, RESP any](host Host, opts RoundTripOptions, close func()) transport.RoundTripper[REQ, RESP] {
@@ -117,55 +110,66 @@ func (rt *roundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RE
 	}
 	// Wait for a peer to connect to
 	log.Debug("Waiting for peer to establish connection with")
-	for peer := range peerChan {
-		// Ignore ourselves and hosts with no addresses.
-		jlog := log.With(slog.String("peer-id", peer.ID.String()), slog.Any("peer-addrs", peer.Addrs))
-		if peer.ID == rt.host.ID() || len(peer.Addrs) == 0 {
-			jlog.Debug("Ignoring peer")
-			continue
-		}
-		jlog.Debug("Dialing peer")
-		var connCtx context.Context
-		var cancel context.CancelFunc
-		if rt.HostOptions.ConnectTimeout > 0 {
-			connCtx, cancel = context.WithTimeout(ctx, rt.HostOptions.ConnectTimeout)
-		} else {
-			connCtx, cancel = context.WithCancel(ctx)
-		}
-		stream, err := rt.host.Host().NewStream(connCtx, peer.ID, RPCProtocolFor(rt.RoundTripOptions.Method))
-		cancel()
-		if err != nil {
-			// We'll try again with the next peer.
-			jlog.Warn("Failed to connect to peer", slog.String("error", err.Error()))
-			continue
-		}
-		jlog.Debug("Connected to peer")
-		defer stream.Close()
-		// Send a join request to the peer over the stream.
-		jlog.Debug("Sending request to peer")
-		_, err = stream.Write(requestData)
-		if err != nil {
-			return nil, fmt.Errorf("write request: %w", err)
-		}
-		var b [8192]byte
-		n, err := stream.Read(b[:])
-		if err != nil {
-			if errors.Is(err, io.EOF) && n == 0 {
-				return nil, fmt.Errorf("read response: %w", err)
-			} else if !errors.Is(err, io.EOF) {
-				return nil, fmt.Errorf("read response: %w", err)
+SearchPeers:
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("no peers found to dial: %w", ctx.Err())
+		case peer, ok := <-peerChan:
+			if !ok {
+				if ctx.Err() != nil {
+					return nil, fmt.Errorf("no peers found to dial: %w", ctx.Err())
+				}
+				continue SearchPeers
 			}
+			// Ignore ourselves and hosts with no addresses.
+			jlog := log.With(slog.String("peer-id", peer.ID.String()), slog.Any("peer-addrs", peer.Addrs))
+			if peer.ID == rt.host.ID() || len(peer.Addrs) == 0 {
+				jlog.Debug("Ignoring peer")
+				continue
+			}
+			jlog.Debug("Dialing peer")
+			var connCtx context.Context
+			var cancel context.CancelFunc
+			if rt.HostOptions.ConnectTimeout > 0 {
+				connCtx, cancel = context.WithTimeout(ctx, rt.HostOptions.ConnectTimeout)
+			} else {
+				connCtx, cancel = context.WithCancel(ctx)
+			}
+			stream, err := rt.host.Host().NewStream(connCtx, peer.ID, RPCProtocolFor(rt.RoundTripOptions.Method))
+			cancel()
+			if err != nil {
+				// We'll try again with the next peer.
+				jlog.Warn("Failed to connect to peer", slog.String("error", err.Error()))
+				continue
+			}
+			jlog.Debug("Connected to peer")
+			defer stream.Close()
+			// Send a join request to the peer over the stream.
+			jlog.Debug("Sending request to peer")
+			_, err = stream.Write(requestData)
+			if err != nil {
+				return nil, fmt.Errorf("write request: %w", err)
+			}
+			var b [8192]byte
+			n, err := stream.Read(b[:])
+			if err != nil {
+				if errors.Is(err, io.EOF) && n == 0 {
+					return nil, fmt.Errorf("read response: %w", err)
+				} else if !errors.Is(err, io.EOF) {
+					return nil, fmt.Errorf("read response: %w", err)
+				}
+			}
+			jlog.Debug("Received response from peer")
+			if bytes.HasPrefix(b[:n], []byte("ERROR: ")) {
+				return nil, fmt.Errorf("error from remote: %s", string(bytes.TrimPrefix(b[:n], []byte("ERROR: "))))
+			}
+			var resp RESP
+			err = proto.Unmarshal(b[:n], any(&resp).(proto.Message))
+			if err != nil {
+				return nil, fmt.Errorf("unmarshal response: %w", err)
+			}
+			return &resp, nil
 		}
-		jlog.Debug("Received response from peer")
-		if bytes.HasPrefix(b[:n], []byte("ERROR: ")) {
-			return nil, fmt.Errorf("error from remote: %s", string(bytes.TrimPrefix(b[:n], []byte("ERROR: "))))
-		}
-		var resp RESP
-		err = proto.Unmarshal(b[:n], any(&resp).(proto.Message))
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal response: %w", err)
-		}
-		return &resp, nil
 	}
-	return nil, errors.New("no peers found to dial")
 }

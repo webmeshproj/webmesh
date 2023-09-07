@@ -317,8 +317,8 @@ func (o *Config) LoadKey(ctx context.Context) (crypto.Key, error) {
 }
 
 // NewConnectOptions returns new connection options for the configuration. The given raft node must
-// be started it can be used.
-func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raft.Raft) (opts mesh.ConnectOptions, err error) {
+// be started it can be used. Host can be nil and if one is needed it will be created.
+func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raft.Raft, host libp2p.Host) (opts mesh.ConnectOptions, err error) {
 	// Determine our node ID
 	nodeid, err := o.NodeID()
 	if err != nil {
@@ -367,7 +367,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 	}
 
 	// Create the join transport
-	joinRT, err := o.NewJoinTransport(ctx, nodeid, conn)
+	joinRT, err := o.NewJoinTransport(ctx, nodeid, conn, host)
 	if err != nil {
 		return
 	}
@@ -375,7 +375,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 	// Configure any bootstrap options
 	var bootstrap *mesh.BootstrapOptions
 	if o.Bootstrap.Enabled {
-		rt, err := o.NewBootstrapTransport(ctx, nodeid, conn)
+		rt, err := o.NewBootstrapTransport(ctx, nodeid, conn, host)
 		if err != nil {
 			return opts, fmt.Errorf("create bootstrap transport: %w", err)
 		}
@@ -451,6 +451,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 				return nil
 			}
 			return &libp2p.AnnounceOptions{
+				Host:        host,
 				Rendezvous:  o.Discovery.PSK,
 				AnnounceTTL: o.Discovery.AnnounceTTL,
 				HostOptions: o.Discovery.HostOptions(ctx, conn.Key()),
@@ -481,7 +482,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 	return
 }
 
-func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.Mesh) (transport.JoinRoundTripper, error) {
+func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.Mesh, host libp2p.Host) (transport.JoinRoundTripper, error) {
 	if o.Bootstrap.Enabled {
 		// Our join transport is the gRPC transport to other bootstrap nodes
 		var addrs []string
@@ -527,6 +528,7 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 		}
 		joinTransport, err := libp2p.NewJoinRoundTripper(ctx, libp2p.RoundTripOptions{
 			Rendezvous: o.Discovery.PSK,
+			Host:       host,
 			HostOptions: libp2p.HostOptions{
 				Key:            conn.Key(),
 				BootstrapPeers: addrs,

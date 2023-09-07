@@ -87,7 +87,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create raft start options: %w", err))
 		}
-		connectOpts, err := meshConfig.NewConnectOptions(ctx, meshConn, raftNode)
+		connectOpts, err := meshConfig.NewConnectOptions(ctx, meshConn, raftNode, nil)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create connect options: %w", err))
 		}

@@ -119,6 +119,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		return ErrOpen
 	}
 	s.raft = opts.Raft
+
 	// If we still don't have a node id, use raft's node id.
 	// It would be very weird for this to happen at this point.
 	if s.ID() == "" {

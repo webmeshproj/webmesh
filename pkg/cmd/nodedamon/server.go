@@ -127,7 +127,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create raft start options: %v", err)
 	}
-	connectOpts, err := conf.NewConnectOptions(ctx, meshConn, raftNode)
+	connectOpts, err := conf.NewConnectOptions(ctx, meshConn, raftNode, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create connect options: %v", err)
 	}

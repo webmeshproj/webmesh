@@ -46,7 +46,7 @@ func TestBootstrapTransport(t *testing.T) {
 			Signer:          crypto.MustGeneratePSK(),
 			ElectionTimeout: time.Second,
 			Linger:          time.Second,
-			Host: HostOptions{
+			HostOptions: HostOptions{
 				ConnectTimeout: time.Second,
 			},
 		})

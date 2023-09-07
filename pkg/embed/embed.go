@@ -32,6 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -93,7 +94,7 @@ func NewNode(ctx context.Context, config *config.Config) (Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create raft start options: %w", err)
 	}
-	connectOpts, err := config.NewConnectOptions(ctx, meshConn, raftNode)
+	connectOpts, err := config.NewConnectOptions(ctx, meshConn, raftNode, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connect options: %w", err)
 	}
@@ -135,7 +136,50 @@ func NewNodeWithKey(ctx context.Context, config *config.Config, key crypto.Key) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create raft start options: %w", err)
 	}
-	connectOpts, err := config.NewConnectOptions(ctx, meshConn, raftNode)
+	connectOpts, err := config.NewConnectOptions(ctx, meshConn, raftNode, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connect options: %w", err)
+	}
+	return &node{
+		conf:          config,
+		log:           log,
+		mesh:          meshConn,
+		raft:          raftNode,
+		storage:       raftNode.Storage(),
+		raftStartOpts: startOpts,
+		connectOpts:   connectOpts,
+		errs:          make(chan error, 1),
+	}, nil
+}
+
+// NewNodeWithKeyAndHost returns a new node using the given key and pre-created libp2p host.
+// This is mostly intended for use with transports.
+func NewNodeWithKeyAndHost(ctx context.Context, config *config.Config, key crypto.Key, host libp2p.Host) (Node, error) {
+	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
+		return nil, fmt.Errorf("cannot disable both IPv4 and IPv6")
+	}
+	log := logutil.SetupLogging(config.Global.LogLevel)
+	if config.Global.LogLevel == "" || config.Global.LogLevel == "silent" {
+		log = slog.New(slog.NewTextHandler(io.Discard, nil))
+		ctx = context.WithLogger(ctx, log)
+	}
+	// Create a new mesh connection
+	meshConfig, err := config.NewMeshConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mesh config: %w", err)
+	}
+	meshConfig.Key = key
+	meshConn := mesh.NewWithLogger(log, meshConfig)
+	// Create a new raft node
+	raftNode, err := config.NewRaftNode(ctx, meshConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create raft node: %w", err)
+	}
+	startOpts, err := config.NewRaftStartOptions(meshConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create raft start options: %w", err)
+	}
+	connectOpts, err := config.NewConnectOptions(ctx, meshConn, raftNode, host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connect options: %w", err)
 	}

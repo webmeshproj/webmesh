@@ -23,6 +23,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/spf13/pflag"
@@ -99,6 +100,10 @@ func NewInsecureConfig(nodeID string) *Config {
 		Bridge:    BridgeOptions{},
 	}
 	conf.Raft.InMemory = true
+	// Lower the raft timeouts
+	conf.Raft.HeartbeatTimeout = time.Millisecond * 500
+	conf.Raft.ElectionTimeout = time.Millisecond * 500
+	conf.Raft.LeaderLeaseTimeout = time.Millisecond * 500
 	conf.Global.Insecure = true
 	conf.Services.API.Insecure = true
 	c, _ := conf.Global.ApplyGlobals(conf)

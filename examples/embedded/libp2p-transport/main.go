@@ -29,8 +29,8 @@ func main() {
 	webmeshTest := flag.Bool("webmesh", false, "use WebMesh transport")
 	tcpTest := flag.Bool("tcp", false, "use TCP transport")
 	payloadSize := flag.Int("payload", 4096, "payload size")
-	rendezvous := flag.String("rendezvous", "", "rendezvous string")
-	webmeshJoin := flag.String("webmesh-join", "", "join the webmesh network")
+	logLevel := flag.String("loglevel", "", "log level")
+	// join := flag.String("join", "", "rendezvous string to join")
 	flag.Parse()
 
 	if !*quicTest && !*webmeshTest && !*tcpTest {
@@ -38,15 +38,16 @@ func main() {
 		*tcpTest = true
 	}
 
+	var rendezvous string
+	if len(flag.Args()) > 0 {
+		rendezvous = flag.Args()[0]
+	}
+
 	mode := "server"
-	if *rendezvous != "" {
-		if *webmeshTest && *webmeshJoin == "" {
-			log.Println("Can't run webmesh test in client mode without a join address")
-			os.Exit(1)
-		}
+	if rendezvous != "" {
 		mode = "client"
 	} else {
-		*rendezvous = string(crypto.MustGeneratePSK())
+		rendezvous = string(crypto.MustGeneratePSK())
 	}
 
 	var opts libp2p.Option
@@ -56,18 +57,20 @@ func main() {
 		opts = libp2p.ChainOptions(libp2p.Transport(libp2ptcp.NewTCPTransport), libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
 	} else if *webmeshTest {
 		if mode == "server" {
-			opts = newWebmeshServerOptions()
+			// joinRendezvous := string(crypto.MustGeneratePSK())
+			// log.Println("Webmesh Joining rendezvous:", joinRendezvous)
+			opts = newWebmeshServerOptions(rendezvous, *logLevel)
 		} else {
-			opts = newWebmeshClientOptions(*webmeshJoin)
+			opts = newWebmeshClientOptions(rendezvous, *logLevel)
 		}
 	}
 
 	var err error
 	switch mode {
 	case "server":
-		err = runServer(*rendezvous, *payloadSize, opts)
+		err = runServer(rendezvous, *payloadSize, opts)
 	case "client":
-		err = runClient(*rendezvous, *payloadSize, opts)
+		err = runClient(rendezvous, *payloadSize, opts)
 	}
 	if err != nil {
 		panic(err)
@@ -80,14 +83,16 @@ func runServer(rendezvous string, payloadSize int, opts libp2p.Option) error {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 
-	log.Println("Setting up host and bootstrapping the DHT")
-
+	log.Println("Setting up host")
 	host, err := libp2p.New(opts)
 	if err != nil {
 		return err
 	}
 	defer host.Close()
-	dht, err := wlibp2p.NewDHT(context.Background(), host, []multiaddr.Multiaddr{}, time.Second*2)
+	log.Println("Bootstrapping the DHT")
+	dhtctx, dhtcancel := context.WithTimeout(ctx, time.Second*10)
+	defer dhtcancel()
+	dht, err := wlibp2p.NewDHT(dhtctx, host, []multiaddr.Multiaddr{}, time.Second*2)
 	if err != nil {
 		return err
 	}
@@ -112,13 +117,16 @@ func runClient(rendezvous string, payloadSize int, opts libp2p.Option) error {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 
-	log.Println("Setting up host and bootstrapping the DHT")
+	log.Println("Setting up host")
 	host, err := libp2p.New(opts)
 	if err != nil {
 		return err
 	}
 	defer host.Close()
-	dht, err := wlibp2p.NewDHT(context.Background(), host, []multiaddr.Multiaddr{}, time.Second*2)
+	log.Println("Bootstrapping the DHT")
+	dhtctx, dhtcancel := context.WithTimeout(ctx, time.Second*10)
+	defer dhtcancel()
+	dht, err := wlibp2p.NewDHT(dhtctx, host, []multiaddr.Multiaddr{}, time.Second*2)
 	if err != nil {
 		return err
 	}
@@ -147,7 +155,6 @@ func runClient(rendezvous string, payloadSize int, opts libp2p.Option) error {
 			defer stream.Close()
 			log.Printf("Connected to server %s, streaming echo\n", stream.Conn().RemoteMultiaddr())
 			runSpeedTest(ctx, stream, payloadSize)
-			<-sig
 			return nil
 		}
 	}
@@ -198,10 +205,13 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 	}
 }
 
-func newWebmeshClientOptions(joinServer string) libp2p.Option {
+func newWebmeshClientOptions(rendezvous string, loglevel string) libp2p.Option {
 	log.Println("Setting up webmesh transport")
 	conf := config.NewInsecureConfig("client")
-	conf.Mesh.JoinAddress = joinServer
+	conf.Global.LogLevel = loglevel
+	conf.Discovery.Discover = true
+	conf.Discovery.PSK = rendezvous
+	conf.Discovery.ConnectTimeout = time.Second * 2
 	conf.Services.API.Disabled = true
 	conf.WireGuard.ListenPort = 51821
 	conf.WireGuard.InterfaceName = "webmeshclient0"
@@ -209,11 +219,12 @@ func newWebmeshClientOptions(joinServer string) libp2p.Option {
 		embed.WithWebmeshTransport(conf),
 		libp2p.ListenAddrs(
 			multiaddr.StringCast("/webmesh/client.webmesh.internal/tcp/0"),
+			multiaddr.StringCast("/webmesh/client.webmesh.internal/udp/0/quic"),
 		),
 	)
 }
 
-func newWebmeshServerOptions() libp2p.Option {
+func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
 	log.Println("Setting up webmesh transport")
 	eps, err := endpoints.Detect(context.Background(), endpoints.DetectOpts{
 		DetectPrivate: true,
@@ -222,6 +233,10 @@ func newWebmeshServerOptions() libp2p.Option {
 		panic(err)
 	}
 	conf := config.NewInsecureConfig("server")
+	conf.Global.LogLevel = loglevel
+	conf.Discovery.Announce = true
+	conf.Discovery.PSK = rendezvous
+	conf.Discovery.ConnectTimeout = time.Second * 2
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 	conf.Bootstrap.Enabled = true
 	conf.WireGuard.InterfaceName = "webmeshserver0"
@@ -230,6 +245,7 @@ func newWebmeshServerOptions() libp2p.Option {
 		embed.WithWebmeshTransport(conf),
 		libp2p.ListenAddrs(
 			multiaddr.StringCast("/webmesh/server.webmesh.internal/tcp/0"),
+			multiaddr.StringCast("/webmesh/server.webmesh.internal/udp/0/quic"),
 		),
 	)
 }

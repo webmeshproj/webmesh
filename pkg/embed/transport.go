@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
@@ -44,6 +45,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	meshp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 )
 
 type Transport interface {
@@ -158,7 +160,8 @@ func (l *libp2pTransport) CanDial(addr multiaddr.Multiaddr) bool {
 func (l *libp2pTransport) Listen(laddr multiaddr.Multiaddr) (transport.Listener, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
 	spl := multiaddr.Split(laddr)
 	if len(spl) == 1 {
 		// No listening address was provided
@@ -323,7 +326,20 @@ func (l *libp2pTransport) registerMultiaddrs(ctx context.Context, maddrs []multi
 }
 
 func (l *libp2pTransport) startNode(ctx context.Context) error {
-	node, err := NewNodeWithKey(ctx, l.config, l.key)
+	// Wrap the host and use it for libp2p operations on the node
+	var bootstrapServers []multiaddr.Multiaddr
+	for _, addr := range l.config.Discovery.BootstrapServers {
+		a, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return fmt.Errorf("failed to parse bootstrap server: %w", err)
+		}
+		bootstrapServers = append(bootstrapServers, a)
+	}
+	host, err := meshp2p.WrapHost(ctx, l.host, bootstrapServers, l.config.Discovery.ConnectTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to wrap host: %w", err)
+	}
+	node, err := NewNodeWithKeyAndHost(ctx, l.config, l.key, host)
 	if err != nil {
 		return err
 	}

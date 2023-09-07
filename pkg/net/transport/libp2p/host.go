@@ -112,6 +112,23 @@ func NewLibP2PHost(ctx context.Context, opts HostOptions) (host.Host, error) {
 	return host, nil
 }
 
+// WrapHost will wrap a native libp2p Host, bootstrap a DHT alongside it and return a Host.
+func WrapHost(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr, connectTimeout time.Duration) (Host, error) {
+	dht, err := NewDHT(ctx, host, bootstrapPeers, connectTimeout)
+	if err != nil {
+		defer host.Close()
+		return nil, fmt.Errorf("new libp2p host: %w", err)
+	}
+	return &libp2pHost{
+		opts: HostOptions{
+			BootstrapPeers: bootstrapPeers,
+			ConnectTimeout: connectTimeout,
+		},
+		host: host,
+		dht:  dht,
+	}, nil
+}
+
 type libp2pHost struct {
 	opts HostOptions
 	host host.Host
@@ -133,11 +150,15 @@ func (h *libp2pHost) DHT() *dht.IpfsDHT {
 }
 
 func (h *libp2pHost) JoinAnnouncer(ctx context.Context, opts AnnounceOptions, rt transport.JoinServer) io.Closer {
-	return NewJoinAnnouncerWithHost(ctx, h, opts, rt)
+	opts.Host = h
+	c, _ := NewJoinAnnouncer(ctx, opts, rt)
+	return c
 }
 
 func (h *libp2pHost) JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper {
-	return NewJoinRoundTripperWithHost(h, opts)
+	opts.Host = h
+	rt, _ := NewJoinRoundTripper(ctx, opts)
+	return rt
 }
 
 func (h *libp2pHost) Close(ctx context.Context) error {

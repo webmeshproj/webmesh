@@ -64,7 +64,9 @@ type BootstrapOptions struct {
 	// Signer is provided to sign and verify the UUIDs of the voters.
 	Signer crypto.PSK
 	// Host are options for configuring a host if one is not provided.
-	Host HostOptions
+	HostOptions HostOptions
+	// Host is a pre-started host to use for the transport.
+	Host Host
 	// ElectionTimeout is the election timeout. The election timeout should
 	// be larger than the host's connection timeout. Otherwise, chances
 	// of a successful election are low. This does not apply when all sides
@@ -87,7 +89,10 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 	if err != nil {
 		return nil, err
 	}
-	host, err := NewHost(ctx, opts.Host)
+	if opts.Host != nil {
+		return newBootstrapTransportWithClose(opts.Host, announcer, opts, uu, func() {}), nil
+	}
+	host, err := NewHost(ctx, opts.HostOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -409,9 +414,9 @@ func (b *bootstrapTransport) handleDiscoveredPeer(ctx context.Context, peer peer
 	defer b.checkFinished(ctx)
 	vlog := context.LoggerFrom(ctx).With("remote-host-id", peer.ID)
 	connectctx := context.Background()
-	if b.opts.Host.ConnectTimeout > 0 {
+	if b.opts.HostOptions.ConnectTimeout > 0 {
 		var cancel context.CancelFunc
-		connectctx, cancel = context.WithTimeout(connectctx, b.opts.Host.ConnectTimeout)
+		connectctx, cancel = context.WithTimeout(connectctx, b.opts.HostOptions.ConnectTimeout)
 		defer cancel()
 	}
 	conn, err := b.host.Host().NewStream(connectctx, peer.ID, BootstrapProtocol)

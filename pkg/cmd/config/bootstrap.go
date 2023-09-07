@@ -208,7 +208,7 @@ func (o *BootstrapTransportOptions) Validate() error {
 }
 
 // NewBootstrapTransport returns the bootstrap transport for the configuration.
-func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn mesh.Mesh) (transport.BootstrapTransport, error) {
+func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn mesh.Mesh, host libp2p.Host) (transport.BootstrapTransport, error) {
 	if !o.Bootstrap.Enabled {
 		return transport.NewNullBootstrapTransport(), nil
 	}
@@ -223,7 +223,8 @@ func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn 
 		return libp2p.NewBootstrapTransport(ctx, conn.Discovery(), libp2p.BootstrapOptions{
 			Rendezvous:      t.Rendezvous,
 			Signer:          crypto.PSK(t.PSK),
-			Host:            o.Discovery.HostOptions(ctx, conn.Key()),
+			HostOptions:     o.Discovery.HostOptions(ctx, conn.Key()),
+			Host:            host,
 			ElectionTimeout: o.Bootstrap.ElectionTimeout,
 			Linger:          t.RendezvousLinger,
 			NodeID:          nodeID,

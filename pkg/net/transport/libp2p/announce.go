@@ -19,6 +19,7 @@ limitations under the License.
 package libp2p
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"time"
@@ -63,6 +64,9 @@ type AnnounceOptions struct {
 
 // NewAnnouncer creates a generic announcer for the given method, request, and response objects.
 func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP]) (io.Closer, error) {
+	if opts.Method == "" {
+		return nil, errors.New("method must be specified")
+	}
 	host := opts.Host
 	close := func() error { return nil }
 	var err error
@@ -76,23 +80,11 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, host, opts, rt, close), nil
 }
 
-// NewAnnouncerWithHost creates a generic announcer for the given method, request, and response objects.
-func NewAnnouncerWithHost[REQ, RESP any](ctx context.Context, host Host, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP]) io.Closer {
-	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, host, opts, rt, func() error { return nil })
-}
-
 // NewJoinAnnouncer creates a new announcer on the kadmilia DHT and executes
 // received join requests against the given join Server.
 func NewJoinAnnouncer(ctx context.Context, opts AnnounceOptions, join transport.JoinServer) (io.Closer, error) {
 	opts.Method = v1.Membership_Join_FullMethodName
 	return NewAnnouncer(ctx, opts, join)
-}
-
-// NewJoinAnnouncerWithHost creates a new announcer on the kadmilia DHT and executes
-// received join requests against the given join Server.
-func NewJoinAnnouncerWithHost(ctx context.Context, host Host, opts AnnounceOptions, join transport.JoinServer) io.Closer {
-	opts.Method = v1.Membership_Join_FullMethodName
-	return NewAnnouncerWithHost(ctx, host, opts, join)
 }
 
 func newAnnouncerWithHostAndCloseFunc[REQ, RESP any](ctx context.Context, host Host, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP], close func() error) io.Closer {
