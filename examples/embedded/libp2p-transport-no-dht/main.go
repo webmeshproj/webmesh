@@ -61,20 +61,28 @@ func runServer(payloadSize int, opts libp2p.Option) error {
 		return err
 	}
 	defer host.Close()
-	l, err := mnet.Listen(multiaddr.StringCast("/ip6/::/tcp/8080"))
+	var lisIP multiaddr.Multiaddr
+	for _, addr := range host.Addrs() {
+		if val, err := addr.ValueForProtocol(multiaddr.P_IP6); err == nil {
+			lisIP = multiaddr.StringCast("/ip6/" + val)
+			break
+		}
+	}
+	l, err := mnet.Listen(multiaddr.Join(lisIP, multiaddr.StringCast("/tcp/8080")))
 	if err != nil {
 		return err
 	}
 	defer l.Close()
-	log.Println("Listening for libp2p connections at rendezvous")
-	c, err := l.Accept()
+	log.Println("Listening for libp2p connections on", l.Multiaddr())
+	conn, err := l.Accept()
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer conn.Close()
+	log.Println("Received connection from", conn.RemoteMultiaddr())
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	go runSpeedTest(ctx, c, payloadSize)
+	go runSpeedTest(ctx, conn, payloadSize)
 	<-sig
 	return nil
 }
@@ -88,6 +96,13 @@ func runClient(payloadSize int, opts libp2p.Option) error {
 		return err
 	}
 	defer host.Close()
+	var ourIP multiaddr.Multiaddr
+	for _, addr := range host.Addrs() {
+		if val, err := addr.ValueForProtocol(multiaddr.P_IP6); err == nil {
+			ourIP = multiaddr.StringCast("/ip6/" + val)
+			break
+		}
+	}
 	resolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network string, address string) (net.Conn, error) {
@@ -106,11 +121,15 @@ func runClient(payloadSize int, opts libp2p.Option) error {
 	if err != nil {
 		return err
 	}
-	conn, err := mnet.Dial(maddr)
+	dialer := &mnet.Dialer{
+		LocalAddr: multiaddr.Join(ourIP, multiaddr.StringCast("/tcp/0")),
+	}
+	conn, err := dialer.Dial(maddr)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
+	log.Println("Opened connection to", maddr)
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	go runSpeedTest(ctx, conn, payloadSize)
