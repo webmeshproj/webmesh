@@ -289,6 +289,7 @@ func (l *libp2pTransport) multiaddrsForListener(laddr multiaddr.Multiaddr, liste
 }
 
 func (l *libp2pTransport) registerMultiaddrs(ctx context.Context, maddrs []multiaddr.Multiaddr) error {
+	// TODO: This needs to include already registered multiaddrs
 	addrs := func() []string {
 		var straddrs []string
 		for _, addr := range maddrs {
