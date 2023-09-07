@@ -19,7 +19,7 @@ package crypto
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/crypto/pb"
@@ -86,7 +86,19 @@ func (w *wgPrivateKey) Type() pb.KeyType {
 
 // Cryptographically sign the given bytes
 func (w *wgPrivateKey) Sign(data []byte) ([]byte, error) {
-	return nil, errors.New("not implemented")
+	key, err := crypto.UnmarshalSecp256k1PrivateKey(w.Key[:])
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal private key: %w", err)
+	}
+	rawpub, err := key.GetPublic().Raw()
+	if err != nil {
+		return nil, fmt.Errorf("get public key: %w", err)
+	}
+	sig, err := key.Sign(data)
+	if err != nil {
+		return nil, fmt.Errorf("sign data: %w", err)
+	}
+	return append(rawpub, sig...), nil
 }
 
 // Return a public key paired with this private key
@@ -117,7 +129,20 @@ func (w *wgPublicKey) Type() pb.KeyType {
 	return WireGuardKeyType
 }
 
+const PubKeySize = 32
+
 // Verify compares a signature against the input data
 func (w *wgPublicKey) Verify(data []byte, sigStr []byte) (success bool, err error) {
-	return false, nil
+	// Pull the full public key off the top of the signature
+	if len(sigStr) < PubKeySize+1 {
+		return false, fmt.Errorf("signature too short")
+	}
+	pub := sigStr[:PubKeySize+1]
+	sigStr = sigStr[PubKeySize+1:]
+	// sig, err := ecdsa.ParseDERSignature(sigStr)
+	key, err := crypto.UnmarshalSecp256k1PublicKey(pub)
+	if err != nil {
+		return false, fmt.Errorf("failed to unmarshal public key: %w", err)
+	}
+	return key.Verify(data, sigStr)
 }
