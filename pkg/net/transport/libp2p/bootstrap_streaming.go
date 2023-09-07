@@ -30,6 +30,7 @@ import (
 	record "github.com/libp2p/go-libp2p-record"
 	dcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/discovery"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
@@ -66,7 +67,7 @@ type BootstrapOptions struct {
 	// Host are options for configuring a host if one is not provided.
 	HostOptions HostOptions
 	// Host is a pre-started host to use for the transport.
-	Host Host
+	Host host.Host
 	// ElectionTimeout is the election timeout. The election timeout should
 	// be larger than the host's connection timeout. Otherwise, chances
 	// of a successful election are low. This does not apply when all sides
@@ -90,7 +91,21 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 		return nil, err
 	}
 	if opts.Host != nil {
-		return newBootstrapTransportWithClose(opts.Host, announcer, opts, uu, func() {}), nil
+		dht, err := NewDHT(ctx, opts.Host, opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
+		if err != nil {
+			return nil, err
+		}
+		h := &libp2pHost{
+			opts: opts.HostOptions,
+			host: opts.Host,
+			dht:  dht,
+		}
+		return newBootstrapTransportWithClose(h, announcer, opts, uu, func() {
+			err := dht.Close()
+			if err != nil {
+				context.LoggerFrom(ctx).Error("Failed to close DHT", "error", err.Error())
+			}
+		}), nil
 	}
 	host, err := NewHost(ctx, opts.HostOptions)
 	if err != nil {
@@ -267,7 +282,7 @@ LeaderElect:
 			Rendezvous:  joinRendezvous,
 			AnnounceTTL: b.opts.Linger,
 			Method:      v1.Membership_Join_FullMethodName,
-			Host:        b.host,
+			Host:        b.host.Host(),
 		})
 		if err != nil {
 			defer b.close()

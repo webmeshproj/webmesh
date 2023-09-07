@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/discovery"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
@@ -59,7 +60,7 @@ type AnnounceOptions struct {
 	// Method is the method to announce.
 	Method string
 	// Host is a pre-started host to use for announcing.
-	Host Host
+	Host host.Host
 }
 
 // NewAnnouncer creates a generic announcer for the given method, request, and response objects.
@@ -67,17 +68,30 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 	if opts.Method == "" {
 		return nil, errors.New("method must be specified")
 	}
-	host := opts.Host
-	close := func() error { return nil }
+	var h Host
 	var err error
-	if host == nil {
-		host, err = NewHost(ctx, opts.HostOptions)
+	var close func() error
+	if opts.Host != nil {
+		dht, err := NewDHT(ctx, opts.Host, opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
 		if err != nil {
 			return nil, err
 		}
-		close = func() error { return host.Close(ctx) }
+		h = &libp2pHost{
+			opts: opts.HostOptions,
+			host: opts.Host,
+			dht:  dht,
+		}
+		close = func() error {
+			return dht.Close()
+		}
+	} else {
+		h, err = NewHost(ctx, opts.HostOptions)
+		if err != nil {
+			return nil, err
+		}
+		close = func() error { return h.Close(ctx) }
 	}
-	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, host, opts, rt, close), nil
+	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, h, opts, rt, close), nil
 }
 
 // NewJoinAnnouncer creates a new announcer on the kadmilia DHT and executes

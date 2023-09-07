@@ -45,7 +45,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	meshp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 )
 
 type Transport interface {
@@ -326,20 +325,7 @@ func (l *libp2pTransport) registerMultiaddrs(ctx context.Context, maddrs []multi
 }
 
 func (l *libp2pTransport) startNode(ctx context.Context) error {
-	// Wrap the host and use it for libp2p operations on the node
-	var bootstrapServers []multiaddr.Multiaddr
-	for _, addr := range l.config.Discovery.BootstrapServers {
-		a, err := multiaddr.NewMultiaddr(addr)
-		if err != nil {
-			return fmt.Errorf("failed to parse bootstrap server: %w", err)
-		}
-		bootstrapServers = append(bootstrapServers, a)
-	}
-	host, err := meshp2p.WrapHost(ctx, l.host, bootstrapServers, l.config.Discovery.ConnectTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to wrap host: %w", err)
-	}
-	node, err := NewNodeWithKeyAndHost(ctx, l.config, l.key, host)
+	node, err := NewNodeWithKey(ctx, l.config, l.key)
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,7 @@ func main() {
 	tcpTest := flag.Bool("tcp", false, "use TCP transport")
 	payloadSize := flag.Int("payload", 4096, "payload size")
 	logLevel := flag.String("loglevel", "", "log level")
-	// join := flag.String("join", "", "rendezvous string to join")
+	join := flag.String("join", "", "rendezvous string to join")
 	flag.Parse()
 
 	if !*quicTest && !*webmeshTest && !*tcpTest {
@@ -57,11 +57,11 @@ func main() {
 		opts = libp2p.ChainOptions(libp2p.Transport(libp2ptcp.NewTCPTransport), libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
 	} else if *webmeshTest {
 		if mode == "server" {
-			// joinRendezvous := string(crypto.MustGeneratePSK())
-			// log.Println("Webmesh Joining rendezvous:", joinRendezvous)
-			opts = newWebmeshServerOptions(rendezvous, *logLevel)
+			joinRendezvous := string(crypto.MustGeneratePSK())
+			log.Println("Webmesh Joining rendezvous:", joinRendezvous)
+			opts = newWebmeshServerOptions(joinRendezvous, *logLevel)
 		} else {
-			opts = newWebmeshClientOptions(rendezvous, *logLevel)
+			opts = newWebmeshClientOptions(*join, *logLevel)
 		}
 	}
 

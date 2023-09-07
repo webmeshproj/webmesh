@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -208,7 +209,7 @@ func (o *BootstrapTransportOptions) Validate() error {
 }
 
 // NewBootstrapTransport returns the bootstrap transport for the configuration.
-func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn mesh.Mesh, host libp2p.Host) (transport.BootstrapTransport, error) {
+func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn mesh.Mesh, host host.Host) (transport.BootstrapTransport, error) {
 	if !o.Bootstrap.Enabled {
 		return transport.NewNullBootstrapTransport(), nil
 	}

@@ -25,6 +25,7 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/proto"
@@ -44,7 +45,7 @@ type RoundTripOptions struct {
 	// Method is the method to try to execute.
 	Method string
 	// Host is a pre-started host to use for the round trip
-	Host Host
+	Host host.Host
 }
 
 // NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
@@ -53,22 +54,38 @@ func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) 
 	if opts.Method == "" {
 		return nil, errors.New("method must be specified")
 	}
-	host := opts.Host
-	close := func() {}
+	var h Host
 	var err error
-	if host == nil {
-		host, err = NewHost(ctx, opts.HostOptions)
+	var close func()
+	if opts.Host != nil {
+		dht, err := NewDHT(ctx, opts.Host, opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
+		if err != nil {
+			return nil, err
+		}
+		h = &libp2pHost{
+			host: opts.Host,
+			dht:  dht,
+			opts: opts.HostOptions,
+		}
+		close = func() {
+			err := dht.Close()
+			if err != nil {
+				context.LoggerFrom(ctx).Error("Failed to close DHT", "error", err.Error())
+			}
+		}
+	} else {
+		h, err = NewHost(ctx, opts.HostOptions)
 		if err != nil {
 			return nil, err
 		}
 		close = func() {
-			err := host.Close(ctx)
+			err := h.Close(ctx)
 			if err != nil {
 				context.LoggerFrom(ctx).Error("Failed to close host", "error", err.Error())
 			}
 		}
 	}
-	return newRoundTripperWithHostAndCloseFunc[REQ, RESP](host, opts, close), nil
+	return newRoundTripperWithHostAndCloseFunc[REQ, RESP](h, opts, close), nil
 }
 
 // NewJoinRoundTripper returns a round tripper that uses the libp2p kademlia DHT to join a cluster.

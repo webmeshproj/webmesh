@@ -150,13 +150,13 @@ func (h *libp2pHost) DHT() *dht.IpfsDHT {
 }
 
 func (h *libp2pHost) JoinAnnouncer(ctx context.Context, opts AnnounceOptions, rt transport.JoinServer) io.Closer {
-	opts.Host = h
+	opts.Host = h.Host()
 	c, _ := NewJoinAnnouncer(ctx, opts, rt)
 	return c
 }
 
 func (h *libp2pHost) JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper {
-	opts.Host = h
+	opts.Host = h.Host()
 	rt, _ := NewJoinRoundTripper(ctx, opts)
 	return rt
 }

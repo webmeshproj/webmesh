@@ -27,12 +27,12 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -154,7 +154,7 @@ func NewNodeWithKey(ctx context.Context, config *config.Config, key crypto.Key) 
 
 // NewNodeWithKeyAndHost returns a new node using the given key and pre-created libp2p host.
 // This is mostly intended for use with transports.
-func NewNodeWithKeyAndHost(ctx context.Context, config *config.Config, key crypto.Key, host libp2p.Host) (Node, error) {
+func NewNodeWithKeyAndHost(ctx context.Context, config *config.Config, key crypto.Key, host host.Host) (Node, error) {
 	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
 		return nil, fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
