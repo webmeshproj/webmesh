@@ -167,7 +167,6 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		}
 	})
 	// Start serving storage queries for plugins.
-	go s.plugins.ServeStorage(s.raft.Storage())
 	handleErr := func(cause error) error {
 		s.kvSubCancel()
 		log.Error("failed to open store", slog.String("error", err.Error()))

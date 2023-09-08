@@ -48,18 +48,18 @@ var _ sec.SecureConn = (*SecureConn)(nil)
 type SecureTransportBuilder func(id protocol.ID, privkey p2pcrypto.PrivKey) (*SecureTransport, error)
 
 // NewSecurity creates a new secure transport using the given wireguard interface.
-func New() SecureTransportBuilder {
+func New() (SecureTransportBuilder, *SecureTransport) {
+	s := &SecureTransport{}
 	return func(id protocol.ID, privkey p2pcrypto.PrivKey) (*SecureTransport, error) {
 		key, ok := privkey.(crypto.PrivateKey)
 		if !ok {
 			return nil, errors.New("private key is not a crypto.PrivateKey")
 		}
-		return &SecureTransport{
-			protocolID: id,
-			localID:    key.ID(),
-			privateKey: key,
-		}, nil
-	}
+		s.protocolID = id
+		s.localID = key.ID()
+		s.privateKey = key
+		return s, nil
+	}, s
 }
 
 // SecureTransport implements a libp2p secure transport using the local node's private key and wireguard allowed IPs.

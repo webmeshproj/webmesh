@@ -61,6 +61,7 @@ func runServer(payloadSize int, opts libp2p.Option) error {
 	}
 	defer host.Close()
 	var lisIP multiaddr.Multiaddr
+	log.Println("Listening on the following addrs:", host.Addrs())
 	for _, addr := range host.Addrs() {
 		if val, err := addr.ValueForProtocol(multiaddr.P_IP6); err == nil {
 			lisIP = multiaddr.StringCast("/ip6/" + val)
@@ -173,8 +174,8 @@ func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize in
 
 func newWebmeshClientOptions(rendezvous string, loglevel string) libp2p.Option {
 	log.Println("Setting up webmesh transport")
-	conf := config.NewInsecureConfig("client")
-	conf.Global.LogLevel = loglevel
+	conf := config.NewInsecureConfig("")
+	// conf.Global.LogLevel = loglevel
 	conf.Discovery.Discover = true
 	conf.Discovery.PSK = rendezvous
 	conf.Discovery.ConnectTimeout = time.Second * 3
@@ -182,12 +183,11 @@ func newWebmeshClientOptions(rendezvous string, loglevel string) libp2p.Option {
 	conf.WireGuard.ListenPort = 51821
 	conf.WireGuard.InterfaceName = "webmeshclient0"
 	conf.WireGuard.ForceInterfaceName = true
-	return libp2p.ChainOptions(
-		embed.WithWebmeshTransport(conf),
-		libp2p.ListenAddrs(
-			multiaddr.StringCast("/webmesh/client.webmesh.internal/tcp/0"),
-		),
-	)
+	return embed.WithWebmeshTransport(embed.TransportOptions{
+		Config:   conf,
+		Laddrs:   []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::/tcp/0")},
+		LogLevel: loglevel,
+	})
 }
 
 func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
@@ -198,25 +198,28 @@ func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
 	if err != nil {
 		panic(err)
 	}
-	conf := config.NewInsecureConfig("server")
+	conf := config.NewInsecureConfig("")
 	conf.Global.LogLevel = loglevel
 	conf.Discovery.Announce = true
 	conf.Discovery.PSK = rendezvous
 	conf.Discovery.ConnectTimeout = time.Second * 3
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 	conf.Bootstrap.Enabled = true
-	conf.Services.MeshDNS.Enabled = true
-	conf.Services.MeshDNS.ListenUDP = "[::]:6353"
-	conf.Services.MeshDNS.ListenTCP = "[::]:6353"
 	conf.WireGuard.InterfaceName = "webmeshserver0"
 	conf.WireGuard.ListenPort = 51820
 	conf.WireGuard.ForceInterfaceName = true
-	return libp2p.ChainOptions(
-		embed.WithWebmeshTransport(conf),
-		libp2p.ListenAddrs(
-			multiaddr.StringCast("/webmesh/server.webmesh.internal/tcp/0"),
-		),
-	)
+	conf.Plugins.Configs = map[string]config.PluginConfig{
+		"debug": {
+			Config: map[string]any{
+				"enable-db-querier": true,
+			},
+		},
+	}
+	return embed.WithWebmeshTransport(embed.TransportOptions{
+		Config:   conf,
+		Laddrs:   []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::/tcp/0")},
+		LogLevel: loglevel,
+	})
 }
 
 func newDialer(laddr multiaddr.Multiaddr) *mnet.Dialer {

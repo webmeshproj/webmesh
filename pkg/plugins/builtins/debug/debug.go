@@ -41,7 +41,7 @@ import (
 // Plugin is the debug plugin.
 type Plugin struct {
 	v1.UnimplementedPluginServer
-	v1.UnimplementedIPAMPluginServer
+	v1.UnimplementedStoragePluginServer
 
 	data    storage.MeshStorage
 	datamux sync.Mutex
@@ -107,6 +107,9 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Name:        "debug",
 		Version:     version.Version,
 		Description: "Debug server plugin",
+		Capabilities: []v1.PluginInfo_PluginCapability{
+			v1.PluginInfo_STORAGE,
+		},
 	}, nil
 }
 

@@ -32,11 +32,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/sec"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/transport"
 	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -67,12 +68,14 @@ type Transport interface {
 }
 
 // TransportBuilder is the signature of a function that builds a webmesh transport.
-type TransportBuilder func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, st sec.SecureTransport, mux network.Multiplexer, privKey pcrypto.PrivKey) (Transport, error)
+type TransportBuilder func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey pcrypto.PrivKey) (Transport, error)
 
 // Options are the options for the webmesh transport.
 type Options struct {
 	// Config is the webmesh config.
 	Config *config.Config
+	// LogLevel is the log level for the webmesh transport.
+	LogLevel string
 	// StartTimeout is the timeout for starting the webmesh node.
 	StartTimeout time.Duration
 	// StopTimeout is the timeout for stopping the webmesh node.
@@ -82,18 +85,14 @@ type Options struct {
 }
 
 // New returns a new webmesh transport builder.
-func New(opts Options) TransportBuilder {
+func New(opts Options, sec *security.SecureTransport) TransportBuilder {
 	if opts.Config == nil {
 		panic("config is required")
 	}
-	return func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, st sec.SecureTransport, mux network.Multiplexer, privKey pcrypto.PrivKey) (Transport, error) {
-		sec, ok := st.(*security.SecureTransport)
-		if !ok {
-			return nil, ErrInvalidSecureTransport
-		}
+	return func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey pcrypto.PrivKey) (Transport, error) {
 		key, ok := privKey.(crypto.PrivateKey)
 		if !ok {
-			return nil, ErrInvalidSecureTransport
+			return nil, fmt.Errorf("%w: invalid private key type: %T", ErrInvalidSecureTransport, privKey)
 		}
 		return &WebmeshTransport{
 			opts:  opts,
@@ -101,10 +100,9 @@ func New(opts Options) TransportBuilder {
 			host:  host,
 			key:   key,
 			sec:   sec,
-			mux:   mux,
 			tu:    tu,
 			rcmgr: rcmgr,
-			log:   logutil.NewLogger(opts.Config.Global.LogLevel).With("component", "webmesh-transport"),
+			log:   logutil.NewLogger(opts.LogLevel).With("component", "webmesh-transport"),
 		}, nil
 	}
 }
@@ -118,7 +116,6 @@ type WebmeshTransport struct {
 	host    host.Host
 	key     crypto.PrivateKey
 	sec     *security.SecureTransport
-	mux     network.Multiplexer
 	tu      transport.Upgrader
 	rcmgr   network.ResourceManager
 	log     *slog.Logger
@@ -134,6 +131,7 @@ func (t *WebmeshTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.
 	if !t.started.Load() {
 		return nil, ErrNotStarted
 	}
+	ctx = context.WithLogger(ctx, t.log)
 	var dialer mnet.Dialer
 	// If we are dialing a webmesh address, we can compute the IP from their ID
 	if _, err := raddr.ValueForProtocol(protocol.P_WEBMESH); err == nil {
@@ -217,7 +215,7 @@ func (t *WebmeshTransport) CanDial(addr ma.Multiaddr) bool {
 func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	ctx := context.Background()
+	ctx := context.WithLogger(context.Background(), t.log)
 	if t.opts.ListenTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t.opts.ListenTimeout)
@@ -226,7 +224,8 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 	if !t.started.Load() {
 		// We use the background context to not let the listen timeout
 		// interfere with the start timeout
-		node, err := t.startNode(context.Background())
+		logLevel := t.opts.Config.Global.LogLevel
+		node, err := t.startNode(context.WithLogger(context.Background(), logutil.NewLogger(logLevel)), laddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to start node: %w", err)
 		}
@@ -263,6 +262,7 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 		defer lis.Close()
 		return nil, fmt.Errorf("failed to register multiaddrs: %w", err)
 	}
+	t.host.Peerstore().AddAddrs(t.host.ID(), addrs, peerstore.PermanentAddrTTL)
 	return t.tu.UpgradeListener(t, lis), nil
 }
 
@@ -273,6 +273,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 	if !t.started.Load() {
 		return nil, ErrNotStarted
 	}
+	ctx = context.WithLogger(ctx, t.log)
 	// If it's a DNS address, we can try using our local MeshDNS to resolve it.
 	value, err := maddr.ValueForProtocol(ma.P_DNS6)
 	if err == nil {
@@ -347,7 +348,7 @@ func (t *WebmeshTransport) Close() error {
 	return t.node.Close(ctx)
 }
 
-func (t *WebmeshTransport) startNode(ctx context.Context) (mesh.Node, error) {
+func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (mesh.Node, error) {
 	if t.opts.StartTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t.opts.StartTimeout)
@@ -438,6 +439,33 @@ func (t *WebmeshTransport) startNode(ctx context.Context) (mesh.Node, error) {
 	case <-ctx.Done():
 		return nil, handleErr(fmt.Errorf("failed to start mesh node: %w", ctx.Err()))
 	}
+
+	// Subscribe to peer updates
+	t.log.Debug("Subscribing to peer updates")
+	_, err = node.Storage().Subscribe(context.Background(), peers.NodesPrefix, func(key string, value string) {
+		nodeID := strings.TrimPrefix(key, peers.NodesPrefix)
+		if nodeID == node.ID() {
+			return
+		}
+		peer := peers.MeshNode{MeshNode: &v1.MeshNode{}}
+		err = protojson.Unmarshal([]byte(value), peer.MeshNode)
+		err := t.registerNode(context.Background(), peer)
+		if err != nil {
+			context.LoggerFrom(ctx).Debug("Failed to register node to peerstore", "error", err.Error())
+		}
+	})
+	if err != nil {
+		return nil, handleErr(fmt.Errorf("failed to subscribe to peers: %w", err))
+	}
+	// Automatically add our direct peers
+	t.log.Debug("Adding direct peers to peerstore")
+	for _, wgpeer := range node.Network().WireGuard().Peers() {
+		id := wgpeer.PublicKey.ID()
+		t.log.Debug("Adding peer to peerstore", "peer", id, "multiaddrs", wgpeer.Multiaddrs)
+		for _, addr := range wgpeer.Multiaddrs {
+			t.host.Peerstore().AddAddr(id, addr, peerstore.PermanentAddrTTL)
+		}
+	}
 	t.log.Info("Webmesh node is ready")
 	return node, nil
 }
@@ -469,7 +497,6 @@ func (t *WebmeshTransport) multiaddrsForListener(listenAddr net.Addr) ([]ma.Mult
 	if err != nil {
 		return nil, fmt.Errorf("failed to create security multiaddr: %w", err)
 	}
-	// Produces: /tcp/1234/webmesh/<node-id>/<rendezvous>
 	var addrs []ma.Multiaddr
 	if ip.Is4() {
 		ip4addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s", ip))
@@ -496,6 +523,23 @@ func (t *WebmeshTransport) multiaddrsForListener(listenAddr net.Addr) ([]ma.Mult
 	}
 	addrs = append(addrs, ma.Join(dnsaddr, lisaddr, secaddr))
 	return addrs, nil
+}
+
+func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode) error {
+	ps := t.host.Peerstore()
+	pubkey, err := crypto.DecodePublicKey(node.GetPublicKey())
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+	id := pubkey.ID()
+	for _, addr := range node.GetMultiaddrs() {
+		a, err := ma.NewMultiaddr(addr)
+		if err != nil {
+			continue
+		}
+		ps.AddAddr(id, a, peerstore.PermanentAddrTTL)
+	}
+	return nil
 }
 
 func (t *WebmeshTransport) registerMultiaddrs(ctx context.Context, maddrs []ma.Multiaddr) error {

@@ -18,7 +18,6 @@ limitations under the License.
 package protocol
 
 import (
-	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -84,14 +83,13 @@ func RendezvousFromWebmeshAddr(addr multiaddr.Multiaddr) (string, error) {
 }
 
 func protocolStrToBytes(s string) ([]byte, error) {
-	return base64.RawURLEncoding.DecodeString(s)
+	return []byte(s), nil
 }
 
 func protocolBytesToStr(b []byte) (string, error) {
-	return base64.RawURLEncoding.EncodeToString(b), nil
+	return string(b), nil
 }
 
 func validateBytes(b []byte) error {
-	_, err := base64.RawURLEncoding.DecodeString(string(b))
-	return err
+	return nil
 }

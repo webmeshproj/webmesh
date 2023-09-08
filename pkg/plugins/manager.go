@@ -64,8 +64,6 @@ func (p *Plugin) hasCapability(cap v1.PluginInfo_PluginCapability) bool {
 type Manager interface {
 	// Get returns the plugin with the given name.
 	Get(name string) (clients.PluginClient, bool)
-	// ServeStorage handles queries from plugins against the given storage backend.
-	ServeStorage(db storage.MeshStorage)
 	// HasAuth returns true if the manager has an auth plugin.
 	HasAuth() bool
 	// HasWatchers returns true if the manager has any watch plugins.
@@ -176,6 +174,7 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 		ipamv4:  ipamv4,
 		log:     log,
 	}
+	go m.handleQueries(opts.Storage)
 	return m, nil
 }
 
@@ -191,11 +190,6 @@ type manager struct {
 func (m *manager) Get(name string) (clients.PluginClient, bool) {
 	p, ok := m.plugins[name]
 	return p.Client, ok
-}
-
-// ServeStorage handles queries from plugins against the given storage backend.
-func (m *manager) ServeStorage(db storage.MeshStorage) {
-	m.handleQueries(db)
 }
 
 // HasAuth returns true if the manager has an auth plugin.
@@ -369,17 +363,18 @@ func (m *manager) Close() error {
 func (m *manager) handleQueries(db storage.MeshStorage) {
 	for plugin, client := range m.plugins {
 		if !client.hasCapability(v1.PluginInfo_STORAGE) {
-			continue
+			return
 		}
 		ctx := context.Background()
+		m.log.Info("Starting plugin query stream", "plugin", plugin)
 		q, err := client.Client.Storage().InjectQuerier(ctx)
 		if err != nil {
 			if status.Code(err) == codes.Unimplemented {
 				m.log.Debug("plugin does not implement queries", "plugin", plugin)
-				continue
+				return
 			}
-			m.log.Error("start query stream", "plugin", plugin, "error", err)
-			continue
+			m.log.Error("Start query stream", "plugin", plugin, "error", err)
+			return
 		}
 		go m.handleQueryClient(plugin, db, q)
 	}
