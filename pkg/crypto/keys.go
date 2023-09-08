@@ -29,7 +29,7 @@ import (
 )
 
 // WireGuardKeyType is the protobuf key type for WireGuard keys.
-const WireGuardKeyType pb.KeyType = p2pcrypto.Secp256k1 + 1
+const WireGuardKeyType pb.KeyType = 613
 
 // PrivateKey is a private key used for encryption and identity over libp2p
 type PrivateKey interface {
@@ -214,7 +214,11 @@ func (w *publicKey) Type() pb.KeyType {
 // Raw returns the raw bytes of the key (not wrapped in the libp2p-crypto protobuf).
 // We only return the public key bytes, not the wireguard key bytes.
 func (w *publicKey) Raw() ([]byte, error) {
-	return w.ecdsa.Raw()
+	marshaled, err := p2pcrypto.MarshalPublicKey(w.ecdsa)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal secp256k1 public key: %w", err)
+	}
+	return append(w.wgkey[:], marshaled...), nil
 }
 
 // Equals checks whether two PubKeys are the same
@@ -229,11 +233,11 @@ func (w *publicKey) Equals(in p2pcrypto.Key) bool {
 
 // Encode returns the base64 encoded string representation of the key.
 func (w *publicKey) Encode() (string, error) {
-	marshaled, err := p2pcrypto.MarshalPublicKey(w.ecdsa)
+	raw, err := w.Raw()
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal secp256k1 public key: %w", err)
+		return "", err
 	}
-	return p2pcrypto.ConfigEncodeKey(append(w.wgkey[:], marshaled...)), nil
+	return p2pcrypto.ConfigEncodeKey(raw), nil
 }
 
 // Rendezvous generates a rendezvous string for discovering the peers at the given
