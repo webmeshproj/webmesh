@@ -32,9 +32,10 @@ import (
 
 // TransportOptions are options for configuring a libp2p transport.
 type TransportOptions struct {
-	Config   *config.Config
-	Laddrs   []ma.Multiaddr
-	LogLevel string
+	Config     *config.Config
+	Laddrs     []ma.Multiaddr
+	Rendezvous string
+	LogLevel   string
 }
 
 // WithWebmeshTransport returns a libp2p option that configures the transport to use the embedded node.
@@ -57,8 +58,8 @@ func WithWebmeshTransport(topts TransportOptions) p2pconfig.Option {
 		}, sec)),
 	}
 	webmeshSec := ma.StringCast(fmt.Sprintf("%s/%s", security.SecurityProtocol, key.ID()))
-	if topts.Config.Discovery.Announce || topts.Config.Discovery.Discover {
-		webmeshSec = ma.StringCast(fmt.Sprintf("%s/%s", webmeshSec.String(), topts.Config.Discovery.PSK))
+	if topts.Rendezvous != "" {
+		webmeshSec = ma.StringCast(fmt.Sprintf("%s/%s", webmeshSec.String(), topts.Rendezvous))
 	}
 	if len(topts.Laddrs) > 0 {
 		// Append our webmesh IDs to the listen addresses.

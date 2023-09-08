@@ -111,6 +111,7 @@ func New(opts Options, sec *security.SecureTransport) TransportBuilder {
 type WebmeshTransport struct {
 	started atomic.Bool
 	opts    Options
+	conf    *config.Config
 	node    mesh.Node
 	svcs    *services.Server
 	host    host.Host
@@ -355,8 +356,28 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 		defer cancel()
 	}
 	conf := t.opts.Config.ShallowCopy()
-	conf.Mesh.NodeID = t.key.ID().String()
-	err := conf.Validate()
+	t.conf = conf
+
+	// Force our node ID to our key ID
+
+	// Check if our listen address is trying to discover a mesh or announce one
+	_, err := laddr.ValueForProtocol(protocol.P_WEBMESH)
+	if err == nil {
+		rendezvous, err := protocol.RendezvousFromWebmeshAddr(laddr)
+		if err == nil {
+			t.log.Debug("Starting webmesh node in discovery mode", "rendezvous", rendezvous)
+			if conf.Bootstrap.Enabled || conf.Discovery.Announce {
+				conf.Discovery.Announce = true
+				conf.Discovery.PSK = rendezvous
+			} else {
+				conf.Discovery.Discover = true
+				conf.Discovery.PSK = rendezvous
+			}
+		}
+	}
+
+	// Validate the config
+	err = conf.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
@@ -488,12 +509,7 @@ func (t *WebmeshTransport) multiaddrsForListener(listenAddr net.Addr) ([]ma.Mult
 		return nil, fmt.Errorf("failed to create listener multiaddr: %w", err)
 	}
 	// Append the webmesh protocol ID and arguments to the listener address
-	secPath := fmt.Sprintf("/webmesh/%s", t.node.ID())
-	if t.opts.Config.Discovery.Announce {
-		// Append the rendezvous string to the listener address
-		secPath += fmt.Sprintf("/%s", t.opts.Config.Discovery.PSK)
-	}
-	secaddr, err := ma.NewMultiaddr(secPath)
+	secaddr, err := ma.NewMultiaddr(fmt.Sprintf("/webmesh/%s", t.key.ID()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create security multiaddr: %w", err)
 	}
@@ -544,7 +560,6 @@ func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode
 
 func (t *WebmeshTransport) registerMultiaddrs(ctx context.Context, maddrs []ma.Multiaddr) error {
 	t.laddrs = append(t.laddrs, maddrs...)
-	// TODO: This needs to include already registered multiaddrs
 	addrstrs := func() []string {
 		var straddrs []string
 		for _, addr := range t.laddrs {

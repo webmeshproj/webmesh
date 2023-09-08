@@ -61,7 +61,6 @@ func runServer(payloadSize int, opts libp2p.Option) error {
 	}
 	defer host.Close()
 	var lisIP multiaddr.Multiaddr
-	log.Println("Listening on the following addrs:", host.Addrs())
 	for _, addr := range host.Addrs() {
 		if val, err := addr.ValueForProtocol(multiaddr.P_IP6); err == nil {
 			lisIP = multiaddr.StringCast("/ip6/" + val)
@@ -173,35 +172,30 @@ func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize in
 }
 
 func newWebmeshClientOptions(rendezvous string, loglevel string) libp2p.Option {
-	log.Println("Setting up webmesh transport")
-	conf := config.NewInsecureConfig("")
-	// conf.Global.LogLevel = loglevel
-	conf.Discovery.Discover = true
-	conf.Discovery.PSK = rendezvous
+	conf := config.NewInsecureConfig("client")
+	conf.Global.LogLevel = loglevel
 	conf.Discovery.ConnectTimeout = time.Second * 3
 	conf.Services.API.Disabled = true
 	conf.WireGuard.ListenPort = 51821
 	conf.WireGuard.InterfaceName = "webmeshclient0"
 	conf.WireGuard.ForceInterfaceName = true
 	return embed.WithWebmeshTransport(embed.TransportOptions{
-		Config:   conf,
-		Laddrs:   []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::/tcp/0")},
-		LogLevel: loglevel,
+		Config:     conf,
+		Rendezvous: rendezvous,
+		Laddrs:     []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::/tcp/0")},
+		LogLevel:   loglevel,
 	})
 }
 
 func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
-	log.Println("Setting up webmesh transport")
 	eps, err := endpoints.Detect(context.Background(), endpoints.DetectOpts{
 		DetectPrivate: true,
 	})
 	if err != nil {
 		panic(err)
 	}
-	conf := config.NewInsecureConfig("")
+	conf := config.NewInsecureConfig("server")
 	conf.Global.LogLevel = loglevel
-	conf.Discovery.Announce = true
-	conf.Discovery.PSK = rendezvous
 	conf.Discovery.ConnectTimeout = time.Second * 3
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 	conf.Bootstrap.Enabled = true
@@ -216,9 +210,10 @@ func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
 		},
 	}
 	return embed.WithWebmeshTransport(embed.TransportOptions{
-		Config:   conf,
-		Laddrs:   []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::/tcp/0")},
-		LogLevel: loglevel,
+		Config:     conf,
+		Rendezvous: rendezvous,
+		Laddrs:     []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::/tcp/0")},
+		LogLevel:   loglevel,
 	})
 }
 
