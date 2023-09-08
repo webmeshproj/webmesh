@@ -21,17 +21,18 @@ import (
 	"log/slog"
 
 	v1 "github.com/webmeshproj/api/v1"
+
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // Close closes the store.
-func (s *meshStore) Close() error {
+func (s *meshStore) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.open.Load() {
 		return ErrNotOpen
 	}
-	ctx := context.WithLogger(context.Background(), s.log)
+	ctx = context.WithLogger(ctx, s.log)
 	defer s.open.Store(false)
 	defer close(s.closec)
 	s.kvSubCancel()

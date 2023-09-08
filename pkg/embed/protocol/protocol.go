@@ -32,8 +32,8 @@ func init() {
 	}
 }
 
-// ProtocolCode is the code for the webmesh libp2p protocol.
-const ProtocolCode = 613
+// Code is the code for the webmesh libp2p protocol.
+const Code = 613
 
 // ErrNoPeerID is returned when a webmesh multiaddr does not contain a peer ID.
 var ErrNoPeerID = fmt.Errorf("no peer ID in webmesh multiaddr")
@@ -44,8 +44,8 @@ var ErrNoRedezvous = fmt.Errorf("no rendezvous in webmesh multiaddr")
 // Protocol is the webmesh libp2p protocol.
 var Protocol = multiaddr.Protocol{
 	Name:       "webmesh",
-	Code:       ProtocolCode,
-	VCode:      multiaddr.CodeToVarint(ProtocolCode),
+	Code:       Code,
+	VCode:      multiaddr.CodeToVarint(Code),
 	Size:       -1,
 	Path:       true,
 	Transcoder: multiaddr.NewTranscoderFromFunctions(protocolStrToBytes, protocolBytesToStr, validateBytes),
@@ -53,7 +53,7 @@ var Protocol = multiaddr.Protocol{
 
 // PeerIDFromWebmeshAddr returns the peer ID argument from a webmesh multiaddr.
 func PeerIDFromWebmeshAddr(addr multiaddr.Multiaddr) (peer.ID, error) {
-	pid, err := addr.ValueForProtocol(ProtocolCode)
+	pid, err := addr.ValueForProtocol(Code)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrNoPeerID, err)
 	}
@@ -66,7 +66,7 @@ func PeerIDFromWebmeshAddr(addr multiaddr.Multiaddr) (peer.ID, error) {
 
 // RendezvousFromWebmeshAddr returns the rendezvous argument from a webmesh multiaddr.
 func RendezvousFromWebmeshAddr(addr multiaddr.Multiaddr) (string, error) {
-	rendezvous, err := addr.ValueForProtocol(ProtocolCode)
+	rendezvous, err := addr.ValueForProtocol(Code)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrNoRedezvous, err)
 	}

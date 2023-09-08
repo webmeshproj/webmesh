@@ -37,7 +37,7 @@ func newTestServer(t *testing.T) *Server {
 		t.Fatal(fmt.Errorf("error creating test store: %w", err))
 	}
 	t.Cleanup(func() {
-		store.Close()
+		store.Close(ctx)
 	})
 	return New(store.Storage(), store.Raft(), rbac.NewNoopEvaluator())
 }

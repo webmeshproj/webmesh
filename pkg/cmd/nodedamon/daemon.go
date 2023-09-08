@@ -120,7 +120,7 @@ func Run(ctx context.Context, conf Config) error {
 			srv.mu.Lock()
 			defer srv.mu.Unlock()
 			if srv.mesh != nil {
-				err := srv.mesh.Close()
+				err := srv.mesh.Close(ctx)
 				if err != nil {
 					log.Error("Error disconnecting from the mesh", "err", err)
 				}
@@ -147,7 +147,7 @@ func Run(ctx context.Context, conf Config) error {
 		srv.mu.Lock()
 		defer srv.mu.Unlock()
 		if srv.mesh != nil {
-			err := srv.mesh.Close()
+			err := srv.mesh.Close(ctx)
 			if err != nil {
 				log.Error("Error disconnecting from the mesh", "err", err)
 			}

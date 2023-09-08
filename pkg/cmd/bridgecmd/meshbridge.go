@@ -108,7 +108,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			return handleErr(fmt.Errorf("failed to open mesh connection: %w", err))
 		}
 		cleanFuncs = append(cleanFuncs, func() {
-			err := meshConn.Close()
+			err := meshConn.Close(ctx)
 			if err != nil {
 				log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
 			}
@@ -288,7 +288,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	defer func() {
 		for id, meshConn := range meshes {
 			log.Info("Shutting down mesh connection", slog.String("mesh-id", id))
-			err := meshConn.Close()
+			err := meshConn.Close(ctx)
 			if err != nil {
 				log.Error("Failed to shutdown mesh connection", slog.String("error", err.Error()))
 			}

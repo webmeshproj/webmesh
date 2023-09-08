@@ -155,7 +155,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 
 	// If anything goes wrong at this point, make sure we close down cleanly.
 	handleErr := func(cause error) error {
-		if err := meshConn.Close(); err != nil {
+		if err := meshConn.Close(ctx); err != nil {
 			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
 		}
 		return cause
@@ -200,7 +200,7 @@ func (app *AppDaemon) Disconnect(ctx context.Context, _ *v1.DisconnectRequest) (
 	}
 	app.svcs.Shutdown(ctx)
 	app.svcs = nil
-	err := app.mesh.Close()
+	err := app.mesh.Close(ctx)
 	app.mesh = nil
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error while disconnecting from mesh: %v", err)

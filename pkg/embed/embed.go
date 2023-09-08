@@ -189,7 +189,7 @@ func (n *node) Start(ctx context.Context) error {
 
 	// If anything goes wrong at this point, make sure we close down cleanly.
 	handleErr := func(cause error) error {
-		if err := n.Mesh().Close(); err != nil {
+		if err := n.Mesh().Close(ctx); err != nil {
 			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
 		}
 		return fmt.Errorf("failed to start mesh node: %w", cause)
@@ -215,13 +215,13 @@ func (n *node) Start(ctx context.Context) error {
 	select {
 	case <-n.Mesh().Ready():
 	case <-ctx.Done():
-		return fmt.Errorf("failed to start mesh node: %w", ctx.Err())
+		return handleErr(fmt.Errorf("failed to start mesh node: %w", ctx.Err()))
 	}
 
 	log.Info("Webmesh is ready")
 	go func() {
 		if err := n.services.ListenAndServe(); err != nil {
-			n.errs <- handleErr(fmt.Errorf("failed to start gRPC server: %w", err))
+			n.errs <- fmt.Errorf("failed to start gRPC server: %w", err)
 		}
 	}()
 	return nil
@@ -245,7 +245,7 @@ func (n *node) Stop(ctx context.Context) error {
 	// Shutdown the mesh connection last
 	defer func() {
 		n.log.Info("Shutting down mesh connection")
-		if err := n.Mesh().Close(); err != nil {
+		if err := n.Mesh().Close(ctx); err != nil {
 			n.log.Error("failed to shutdown mesh connection", slog.String("error", err.Error()))
 		}
 	}()

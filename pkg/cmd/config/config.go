@@ -129,6 +129,23 @@ func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
 	return o
 }
 
+// ShallowCopy returns a shallow copy of the config.
+func (o *Config) ShallowCopy() *Config {
+	return &Config{
+		Global:    o.Global,
+		Bootstrap: o.Bootstrap,
+		Auth:      o.Auth,
+		Mesh:      o.Mesh,
+		Raft:      o.Raft,
+		Services:  o.Services,
+		TLS:       o.TLS,
+		WireGuard: o.WireGuard,
+		Discovery: o.Discovery,
+		Plugins:   o.Plugins,
+		Bridge:    o.Bridge,
+	}
+}
+
 // ErrNoMesh is returned when no mesh is configured to be bootstrapped or joined.
 var ErrNoMesh = fmt.Errorf("no mesh configured")
 

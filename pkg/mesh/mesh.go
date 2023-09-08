@@ -91,7 +91,7 @@ type Node interface {
 	// Ready is defined as having a leader and knowing its address.
 	Ready() <-chan struct{}
 	// Close closes the connection to the mesh and shuts down the storage.
-	Close() error
+	Close(ctx context.Context) error
 	// Credentials returns the gRPC credentials to use for dialing the mesh.
 	Credentials() []grpc.DialOption
 	// LeaderID returns the current Raft leader ID.

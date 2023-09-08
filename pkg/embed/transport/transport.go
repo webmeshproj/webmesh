@@ -18,7 +18,6 @@ limitations under the License.
 package transport
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -35,14 +34,20 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
 	"github.com/webmeshproj/webmesh/pkg/embed/security"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 // ErrInvalidSecureTransport is returned when the transport is not used with a webmesh keypair and security transport.
 var ErrInvalidSecureTransport = fmt.Errorf("transport must be used with a webmesh keypair and security transport")
+
+// ErrNotStarted is returned when the transport is not started.
+var ErrNotStarted = fmt.Errorf("transport is not started")
 
 // Transport is the webmesh transport.
 type Transport interface {
@@ -82,15 +87,13 @@ func New(opts Options) TransportBuilder {
 			return nil, ErrInvalidSecureTransport
 		}
 		return &WebmeshTransport{
-			started: atomic.Bool{},
-			opts:    opts,
-			node:    nil,
-			host:    host,
-			key:     key,
-			sec:     sec,
-			mux:     mux,
-			log:     logutil.NewLogger(opts.Config.Global.LogLevel).With("component", "webmesh-transport"),
-			mu:      sync.Mutex{},
+			opts: opts,
+			node: nil,
+			host: host,
+			key:  key,
+			sec:  sec,
+			mux:  mux,
+			log:  logutil.NewLogger(opts.Config.Global.LogLevel).With("component", "webmesh-transport"),
 		}, nil
 	}
 }
@@ -100,6 +103,7 @@ type WebmeshTransport struct {
 	started atomic.Bool
 	opts    Options
 	node    mesh.Node
+	svcs    *services.Server
 	host    host.Host
 	key     crypto.PrivateKey
 	sec     *security.SecureTransport
@@ -111,6 +115,12 @@ type WebmeshTransport struct {
 // Dial dials a remote peer. It should try to reuse local listener
 // addresses if possible, but it may choose not to.
 func (t *WebmeshTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.started.Load() {
+		return nil, ErrNotStarted
+	}
+	// TODO: Implement
 	return nil, nil
 }
 
@@ -121,23 +131,42 @@ func (t *WebmeshTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.
 // succeed. This function should *only* be used to preemptively filter
 // out addresses that we can't dial.
 func (t *WebmeshTransport) CanDial(addr ma.Multiaddr) bool {
-	return true
+	// TODO: Implement
+	return t.started.Load()
 }
 
 // Listen listens on the passed multiaddr.
 func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.started.Load() {
+		node, err := t.startNode()
+		if err != nil {
+			return nil, fmt.Errorf("failed to start node: %w", err)
+		}
+		t.node = node
+		t.sec.SetInterface(node.Network().WireGuard())
+		t.started.Store(true)
+	}
+	// TODO: Implement
 	return nil, nil
 }
 
 // Resolve attempts to resolve the given multiaddr to a list of
 // addresses.
 func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.started.Load() {
+		return nil, ErrNotStarted
+	}
+	// TODO: Implement
 	return nil, nil
 }
 
 // Protocol returns the set of protocols handled by this transport.
 func (t *WebmeshTransport) Protocols() []int {
-	return nil
+	return []int{protocol.Code}
 }
 
 // Proxy returns true if this is a proxy transport.
@@ -147,5 +176,116 @@ func (t *WebmeshTransport) Proxy() bool {
 
 // Close closes the transport.
 func (t *WebmeshTransport) Close() error {
-	return nil
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.started.Load() {
+		return ErrNotStarted
+	}
+	defer t.started.Store(false)
+	ctx := context.Background()
+	if t.opts.StopTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, t.opts.StopTimeout)
+		defer cancel()
+	}
+	if t.svcs != nil {
+		defer t.svcs.Shutdown(ctx)
+	}
+	return t.node.Close(ctx)
+}
+
+func (t *WebmeshTransport) startNode() (mesh.Node, error) {
+	ctx := context.WithLogger(context.Background(), t.log)
+	if t.opts.StartTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, t.opts.StartTimeout)
+		defer cancel()
+	}
+	conf := t.opts.Config.ShallowCopy()
+	conf.Mesh.NodeID = t.key.ID().String()
+	err := conf.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate config: %w", err)
+	}
+
+	// Build out everything we need for a new node
+	meshConfig, err := conf.NewMeshConfig(ctx, t.key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mesh config: %w", err)
+	}
+	node := mesh.NewWithLogger(t.log, meshConfig)
+	startOpts, err := conf.NewRaftStartOptions(node)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create raft start options: %w", err)
+	}
+	raft, err := conf.NewRaftNode(ctx, node)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create raft node: %w", err)
+	}
+	connectOpts, err := conf.NewConnectOptions(ctx, node, raft, t.host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connect options: %w", err)
+	}
+
+	// Define cleanup handlers
+	var cleanFuncs []func() error
+	handleErr := func(cause error) error {
+		for _, clean := range cleanFuncs {
+			if err := clean(); err != nil {
+				t.log.Warn("failed to clean up", "error", err.Error())
+			}
+		}
+		return cause
+	}
+
+	t.log.Info("Starting webmesh node")
+	err = raft.Start(ctx, startOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start raft node: %w", err)
+	}
+	cleanFuncs = append(cleanFuncs, func() error {
+		return raft.Stop(ctx)
+	})
+	err = node.Connect(ctx, connectOpts)
+	if err != nil {
+		return nil, handleErr(fmt.Errorf("failed to connect to mesh: %w", err))
+	}
+	cleanFuncs = append(cleanFuncs, func() error {
+		return node.Close(ctx)
+	})
+
+	// Start any mesh services
+	srvOpts, err := conf.NewServiceOptions(ctx, node)
+	if err != nil {
+		return nil, handleErr(fmt.Errorf("failed to create service options: %w", err))
+	}
+	t.svcs, err = services.NewServer(ctx, srvOpts)
+	if err != nil {
+		return nil, handleErr(fmt.Errorf("failed to create mesh services: %w", err))
+	}
+	if !conf.Services.API.Disabled {
+		err = conf.RegisterAPIs(ctx, node, t.svcs)
+		if err != nil {
+			return nil, handleErr(fmt.Errorf("failed to register APIs: %w", err))
+		}
+	}
+	errs := make(chan error, 1)
+	go func() {
+		t.log.Info("Starting webmesh services")
+		if err := t.svcs.ListenAndServe(); err != nil {
+			errs <- fmt.Errorf("start mesh services %w", err)
+		}
+	}()
+
+	// Wait for the node to be ready
+	t.log.Info("Waiting for webmesh node to be ready")
+	select {
+	case <-node.Ready():
+	case err := <-errs:
+		return nil, handleErr(err)
+	case <-ctx.Done():
+		return nil, handleErr(fmt.Errorf("failed to start mesh node: %w", ctx.Err()))
+	}
+	t.log.Info("Webmesh node is ready")
+	return node, nil
 }
