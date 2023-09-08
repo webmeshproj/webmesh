@@ -49,7 +49,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	log := context.LoggerFrom(ctx)
 
 	// Build all the mesh objects.
-	meshes := make(map[string]mesh.Mesh)
+	meshes := make(map[string]mesh.Node)
 	for meshID, meshConfig := range config.Meshes {
 		id := meshID
 		// For now we only allow IPv6 on bridged meshes.

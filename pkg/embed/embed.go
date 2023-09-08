@@ -54,7 +54,7 @@ type Node interface {
 	// At the moment, any error is fatal and will cause the node to stop.
 	Errors() <-chan error
 	// Mesh returns the underlying mesh instance.
-	Mesh() mesh.Mesh
+	Mesh() mesh.Node
 	// Raft is the underlying Raft instance.
 	Raft() raft.Raft
 	// Storage is the underlying storage instance.
@@ -116,7 +116,7 @@ type node struct {
 	opts     Options
 	conf     *config.Config
 	log      *slog.Logger
-	mesh     mesh.Mesh
+	mesh     mesh.Node
 	raft     raft.Raft
 	storage  storage.MeshStorage
 	services *services.Server
@@ -125,7 +125,7 @@ type node struct {
 	mu       sync.Mutex
 }
 
-func (n *node) Mesh() mesh.Mesh {
+func (n *node) Mesh() mesh.Node {
 	return n.mesh
 }
 

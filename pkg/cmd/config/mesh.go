@@ -331,7 +331,7 @@ func (o *Config) LoadKey(ctx context.Context) (crypto.PrivateKey, error) {
 
 // NewConnectOptions returns new connection options for the configuration. The given raft node must
 // be started it can be used. Host can be nil and if one is needed it will be created.
-func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raft.Raft, host host.Host) (opts mesh.ConnectOptions, err error) {
+func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Node, raft raft.Raft, host host.Host) (opts mesh.ConnectOptions, err error) {
 	// Determine our node ID
 	nodeid, err := o.NodeID()
 	if err != nil {
@@ -496,7 +496,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Mesh, raft raf
 	return
 }
 
-func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.Mesh, host host.Host) (transport.JoinRoundTripper, error) {
+func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.Node, host host.Host) (transport.JoinRoundTripper, error) {
 	if o.Bootstrap.Enabled {
 		// Our join transport is the gRPC transport to other bootstrap nodes
 		var addrs []string

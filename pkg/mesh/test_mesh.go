@@ -32,7 +32,7 @@ import (
 
 // NewTestMesh creates a new test mesh and waits for it to be ready.
 // The context is used to enforce startup timeouts.
-func NewTestMesh(ctx context.Context) (Mesh, error) {
+func NewTestMesh(ctx context.Context) (Node, error) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 	st := New(Config{
 		NodeID: uuid.NewString(),

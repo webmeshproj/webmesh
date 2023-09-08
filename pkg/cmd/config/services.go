@@ -429,7 +429,7 @@ func (m *MetricsOptions) Validate() error {
 }
 
 // RegisterAPIs registers the configured APIs to the given server.
-func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Mesh, srv *services.Server) error {
+func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Node, srv *services.Server) error {
 	log := context.LoggerFrom(ctx)
 	var rbacDisabled bool
 	var err error
@@ -577,7 +577,7 @@ func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 }
 
 // NewServiceOptions returns new options for the webmesh services.
-func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Mesh) (conf services.Options, err error) {
+func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Node) (conf services.Options, err error) {
 	if !o.Services.API.Disabled {
 		conf.ListenAddress = o.Services.API.ListenAddress
 		// Build out the server options

@@ -25,7 +25,15 @@ import (
 
 // SetupLogging sets up logging for the application.
 func SetupLogging(logLevel string) *slog.Logger {
-	if logLevel == "" {
+	log := NewLogger(logLevel)
+	slog.SetDefault(log)
+	return log
+}
+
+// NewLogger returns a new logger with the given log level.
+// If log level is empty or "silent" then the logger will be silent.
+func NewLogger(logLevel string) *slog.Logger {
+	if logLevel == "" || strings.ToLower(logLevel) == "silent" {
 		return slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
@@ -40,11 +48,10 @@ func SetupLogging(logLevel string) *slog.Logger {
 			case "error":
 				return slog.LevelError
 			default:
-				slog.Default().Warn("Invalid log level specified, defaulting to info", "logLevel", logLevel)
+				slog.Default().Warn("Invalid log level specified, defaulting to info", "log-level", logLevel)
 			}
 			return slog.LevelInfo
 		}(),
 	}))
-	slog.SetDefault(log)
 	return log
 }

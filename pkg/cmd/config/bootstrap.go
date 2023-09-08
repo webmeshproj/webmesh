@@ -209,7 +209,7 @@ func (o *BootstrapTransportOptions) Validate() error {
 }
 
 // NewBootstrapTransport returns the bootstrap transport for the configuration.
-func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn mesh.Mesh, host host.Host) (transport.BootstrapTransport, error) {
+func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn mesh.Node, host host.Host) (transport.BootstrapTransport, error) {
 	if !o.Bootstrap.Enabled {
 		return transport.NewNullBootstrapTransport(), nil
 	}

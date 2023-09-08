@@ -16,12 +16,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package libp2p
+// Package security defines a libp2p webmesh security transport.
+package security
 
 import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -46,7 +48,7 @@ var _ sec.SecureConn = (*SecureConn)(nil)
 type SecureTransportBuilder func(id protocol.ID, privkey p2pcrypto.PrivKey) (*SecureTransport, error)
 
 // NewSecurity creates a new secure transport using the given wireguard interface.
-func NewSecurity(iface wireguard.Interface) SecureTransportBuilder {
+func New() SecureTransportBuilder {
 	return func(id protocol.ID, privkey p2pcrypto.PrivKey) (*SecureTransport, error) {
 		key, ok := privkey.(crypto.PrivateKey)
 		if !ok {
@@ -56,23 +58,34 @@ func NewSecurity(iface wireguard.Interface) SecureTransportBuilder {
 			protocolID: id,
 			localID:    key.ID(),
 			privateKey: key,
-			iface:      iface,
 		}, nil
 	}
 }
 
-// SecureTransport implements a libp2p secure transport using
-// the local node's private key and wireguard allowed IPs.
+// SecureTransport implements a libp2p secure transport using the local node's private key and wireguard allowed IPs.
 type SecureTransport struct {
 	protocolID protocol.ID
 	localID    peer.ID
 	privateKey crypto.PrivateKey
 	iface      wireguard.Interface
+	mu         sync.Mutex
 }
 
-// SecureInbound secures an inbound connection.
-// If p is empty, connections from any peer are accepted.
+// SetInterface sets the wireguard interface. The security transport will only accept connections
+// from peers in the wireguard network.
+func (s *SecureTransport) SetInterface(iface wireguard.Interface) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.iface = iface
+}
+
+// SecureInbound secures an inbound connection. If p is empty, connections from any peer are accepted.
 func (s *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.iface == nil {
+		return nil, errors.New("wireguard interface not set")
+	}
 	var remotePub p2pcrypto.PubKey
 	if p != "" {
 		var err error
@@ -99,6 +112,11 @@ func (s *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, 
 
 // SecureOutbound secures an outbound connection.
 func (s *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.iface == nil {
+		return nil, errors.New("wireguard interface not set")
+	}
 	var remotePub p2pcrypto.PubKey
 	if p != "" {
 		var err error
@@ -151,17 +169,6 @@ func (s *SecureTransport) IsInNetwork(c net.Conn) (bool, error) {
 	}
 }
 
-func getConnTransport(c net.Conn) string {
-	switch c.(type) {
-	case *net.TCPConn:
-		return "tcp"
-	case *net.UDPConn:
-		return "udp"
-	default:
-		return "unknown"
-	}
-}
-
 // SecureConn is a secure connection.
 type SecureConn struct {
 	net.Conn
@@ -192,5 +199,16 @@ func (s *SecureConn) ConnState() network.ConnectionState {
 		Security:                  SecurityProtocol,
 		Transport:                 s.transport,
 		UsedEarlyMuxerNegotiation: false,
+	}
+}
+
+func getConnTransport(c net.Conn) string {
+	switch c.(type) {
+	case *net.TCPConn:
+		return "tcp"
+	case *net.UDPConn:
+		return "udp"
+	default:
+		return "unknown"
 	}
 }

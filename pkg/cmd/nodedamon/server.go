@@ -45,7 +45,7 @@ type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
 
 	config     Config
-	mesh       mesh.Mesh
+	mesh       mesh.Node
 	svcs       *services.Server
 	connecting atomic.Bool
 	mu         sync.Mutex

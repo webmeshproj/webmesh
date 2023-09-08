@@ -68,9 +68,9 @@ var (
 	ErrNoLeader = fmt.Errorf("no leader")
 )
 
-// Mesh is the connection to the Webmesh. It controls raft consensus, plugins,
+// Node is the connection to the Webmesh. It controls raft consensus, plugins,
 // data storage, and WireGuard connections.
-type Mesh interface {
+type Node interface {
 	// Dialer is the dialer for all connections.
 	transport.Dialer
 	// NodeDialer is the dialer for node RPC connections.
@@ -143,13 +143,13 @@ type Config struct {
 
 // New creates a new Mesh. You must call Open() on the returned mesh
 // before it can be used.
-func New(opts Config) Mesh {
+func New(opts Config) Node {
 	return NewWithLogger(slog.Default(), opts)
 }
 
 // NewWithLogger creates a new Mesh with the given logger. You must call
 // Open() on the returned mesh before it can be used.
-func NewWithLogger(log *slog.Logger, opts Config) Mesh {
+func NewWithLogger(log *slog.Logger, opts Config) Node {
 	log = log.With(slog.String("component", "mesh"))
 	var peerUpdateGroup, routeUpdateGroup, dnsUpdateGroup errgroup.Group
 	peerUpdateGroup.SetLimit(1)
