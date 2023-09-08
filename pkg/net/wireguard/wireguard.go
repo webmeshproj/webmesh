@@ -61,6 +61,8 @@ type Interface interface {
 	NetworkV4() netip.Prefix
 	// NetworkV6 returns the IPv6 network of this interface.
 	NetworkV6() netip.Prefix
+	// InNetwork returns true if the given address is in the network of this interface.
+	InNetwork(addr netip.Addr) bool
 	// Configure configures the wireguard interface to use the given key and listen port.
 	Configure(ctx context.Context, key crypto.PrivateKey, listenPort int) error
 	// ListenPort returns the current listen port of the wireguard interface.
@@ -210,6 +212,11 @@ func (w *wginterface) NetworkV4() netip.Prefix {
 
 func (w *wginterface) NetworkV6() netip.Prefix {
 	return w.opts.NetworkV6
+}
+
+// InNetwork returns true if the given address is in the network of this interface.
+func (w *wginterface) InNetwork(addr netip.Addr) bool {
+	return w.opts.NetworkV4.Contains(addr) || w.opts.NetworkV6.Contains(addr)
 }
 
 // ListenPort returns the current listen port of the wireguard interface.

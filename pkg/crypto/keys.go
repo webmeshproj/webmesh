@@ -25,6 +25,8 @@ import (
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/crypto/pb"
+	"github.com/libp2p/go-libp2p/core/peer"
+	mh "github.com/multiformats/go-multihash"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -34,6 +36,10 @@ const WireGuardKeyType pb.KeyType = 613
 // Key is a cryptographic key.
 type Key interface {
 	p2pcrypto.Key
+
+	// ID returns the peer ID corresponding to the key.
+	// On private keys, this is the peer ID of the public key.
+	ID() peer.ID
 
 	// WireGuardKey returns the WireGuard key.
 	WireGuardKey() wgtypes.Key
@@ -136,12 +142,30 @@ func ParsePublicKey(data []byte) (PublicKey, error) {
 	}, nil
 }
 
+// ExtractPublicKey extracts the public key from the given peer ID.
+func ExtractPublicKey(id peer.ID) (PublicKey, error) {
+	decoded, err := mh.Decode([]byte(id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode peer ID: %w", err)
+	}
+	if decoded.Code != mh.IDENTITY {
+		return nil, fmt.Errorf("peer ID is not an identity hash")
+	}
+	return ParsePublicKey(decoded.Digest)
+}
+
 type privateKey struct {
 	ecdsa *p2pcrypto.Secp256k1PrivateKey
 }
 
 func (w *privateKey) Native() p2pcrypto.PrivKey {
 	return w.ecdsa
+}
+
+// ID returns the peer ID corresponding to the key.
+// On private keys, this is the peer ID of the public key.
+func (w *privateKey) ID() peer.ID {
+	return w.PublicKey().ID()
 }
 
 // Equals checks whether two PubKeys are the same
@@ -210,6 +234,20 @@ type publicKey struct {
 
 func (w *publicKey) Native() p2pcrypto.PubKey {
 	return w.ecdsa
+}
+
+// ID returns the peer ID corresponding to the key.
+// On private keys, this is the peer ID of the public key.
+func (w *publicKey) ID() peer.ID {
+	raw, err := w.Raw()
+	if err != nil {
+		panic(err)
+	}
+	hash, err := mh.Sum(raw, mh.IDENTITY, -1)
+	if err != nil {
+		panic(err)
+	}
+	return peer.ID(hash)
 }
 
 // WireGuardKey returns the WireGuard key.

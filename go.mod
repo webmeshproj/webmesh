@@ -33,6 +33,7 @@ require (
 	github.com/miekg/dns v1.1.55
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/multiformats/go-multiaddr v0.11.0
+	github.com/multiformats/go-multihash v0.2.3
 	github.com/nutsdb/nutsdb v0.14.0
 	github.com/pelletier/go-toml/v2 v2.0.9
 	github.com/pion/datachannel v1.5.5
@@ -144,7 +145,6 @@ require (
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.2.0 // indirect
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
-	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onsi/ginkgo/v2 v2.11.0 // indirect

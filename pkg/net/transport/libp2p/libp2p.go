@@ -33,8 +33,6 @@ import (
 )
 
 const (
-	// SecurityProtocol is the protocol used for security.
-	SecurityProtocol = protocol.ID("/webmesh/security/0.0.1")
 	// BootstrapProtocol is the protocol used for bootstrapping a mesh.
 	BootstrapProtocol = protocol.ID("/webmesh/bootstrap/0.0.1")
 	// RPCProtocol is the protocol used for executing RPCs against a mesh.

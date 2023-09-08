@@ -73,3 +73,22 @@ func TestKeySignatures(t *testing.T) {
 		t.Fatal("signature verification failed: signature was not valid")
 	}
 }
+
+func TestKeyIDs(t *testing.T) {
+	key := MustGenerateKey()
+	id := key.ID()
+	if id == "" {
+		t.Fatal("key ID is empty")
+	}
+	if id != key.PublicKey().ID() {
+		t.Fatal("key ID does not match public key ID")
+	}
+
+	extracted, err := ExtractPublicKey(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !extracted.Equals(key.PublicKey()) {
+		t.Fatal("extracted public key does not match original public key")
+	}
+}
