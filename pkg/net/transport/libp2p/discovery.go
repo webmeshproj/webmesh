@@ -20,7 +20,6 @@ package libp2p
 
 import (
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -31,7 +30,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
 // DiscoveryHost is an interface that provides facilities for discovering and connecting
@@ -44,10 +42,6 @@ type DiscoveryHost interface {
 	Host() host.Host
 	// DHT is the underlying libp2p DHT.
 	DHT() *dht.IpfsDHT
-	// JoinAnnouncer returns a new join announcer using this host.
-	JoinAnnouncer(ctx context.Context, opts AnnounceOptions, rt transport.JoinServer) io.Closer
-	// JoinRoundTripper returns a round tripper for executing a join request.
-	JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper
 	// Close closes the host and its DHT.
 	Close(ctx context.Context) error
 }
@@ -136,18 +130,6 @@ func (h *discoveryHost) Host() host.Host {
 
 func (h *discoveryHost) DHT() *dht.IpfsDHT {
 	return h.dht
-}
-
-func (h *discoveryHost) JoinAnnouncer(ctx context.Context, opts AnnounceOptions, rt transport.JoinServer) io.Closer {
-	opts.Host = h.Host()
-	c, _ := NewJoinAnnouncer(ctx, opts, rt)
-	return c
-}
-
-func (h *discoveryHost) JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper {
-	opts.Host = h.Host()
-	rt, _ := NewJoinRoundTripper(ctx, opts)
-	return rt
 }
 
 func (h *discoveryHost) Close(ctx context.Context) error {
