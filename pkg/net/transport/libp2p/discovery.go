@@ -31,14 +31,13 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 )
 
-// Host is an interface that provides facilities for discovering and connecting to
-// peers over libp2p. It can be used to avoid the need for re-creating a libp2p
+// DiscoveryHost is an interface that provides facilities for discovering and connecting
+// to peers over libp2p. It can be used to avoid the need for re-creating a libp2p
 // host and bootstrapping the DHT for each new connection.
-type Host interface {
+type DiscoveryHost interface {
 	// ID returns the peer ID of the host.
 	ID() peer.ID
 	// Host is the underlying libp2p host.
@@ -55,8 +54,6 @@ type Host interface {
 
 // HostOptions are options for creating a new libp2p host.
 type HostOptions struct {
-	// Key is the host's private key. One will be generated if this is nil.
-	Key crypto.PrivateKey
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
 	// If empty or nil, the default bootstrap peers will be used.
 	BootstrapPeers []multiaddr.Multiaddr
@@ -69,8 +66,8 @@ type HostOptions struct {
 	ConnectTimeout time.Duration
 }
 
-// NewHostAndDHT creates a new libp2p host connected to the DHT with the given options.
-func NewHostAndDHT(ctx context.Context, opts HostOptions) (Host, error) {
+// NewDiscoveryHost creates a new libp2p host connected to the DHT with the given options.
+func NewDiscoveryHost(ctx context.Context, opts HostOptions) (DiscoveryHost, error) {
 	host, err := NewHost(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("new libp2p host: %w", err)
@@ -80,7 +77,7 @@ func NewHostAndDHT(ctx context.Context, opts HostOptions) (Host, error) {
 		defer host.Close()
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
-	return &libp2pHost{
+	return &discoveryHost{
 		opts: opts,
 		host: host,
 		dht:  dht,
@@ -90,15 +87,6 @@ func NewHostAndDHT(ctx context.Context, opts HostOptions) (Host, error) {
 // NewHost creates a new libp2p host with the given options.
 func NewHost(ctx context.Context, opts HostOptions) (host.Host, error) {
 	SetMaxSystemBuffers()
-	if opts.Key == nil {
-		context.LoggerFrom(ctx).Debug("Generating ephemeral key for bootstrap transport")
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			return nil, fmt.Errorf("generate key: %w", err)
-		}
-		opts.Key = key
-	}
-	opts.Options = append(opts.Options, Identity(opts.Key))
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
 	}
@@ -113,14 +101,14 @@ func NewHost(ctx context.Context, opts HostOptions) (host.Host, error) {
 	return host, nil
 }
 
-// WrapHost will wrap a native libp2p Host, bootstrap a DHT alongside it and return a Host.
-func WrapHost(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr, connectTimeout time.Duration) (Host, error) {
+// WrapHostWithDiscovery will wrap a native libp2p Host, bootstrap a DHT alongside it and return a DiscoveryHost.
+func WrapHostWithDiscovery(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr, connectTimeout time.Duration) (DiscoveryHost, error) {
 	dht, err := NewDHT(ctx, host, bootstrapPeers, connectTimeout)
 	if err != nil {
 		defer host.Close()
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
-	return &libp2pHost{
+	return &discoveryHost{
 		opts: HostOptions{
 			BootstrapPeers: bootstrapPeers,
 			ConnectTimeout: connectTimeout,
@@ -130,39 +118,39 @@ func WrapHost(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mu
 	}, nil
 }
 
-type libp2pHost struct {
+type discoveryHost struct {
 	opts HostOptions
 	host host.Host
 	dht  *dht.IpfsDHT
 }
 
 // ID returns the peer ID of the host.
-func (h *libp2pHost) ID() peer.ID {
+func (h *discoveryHost) ID() peer.ID {
 	return h.host.ID()
 }
 
 // Host returns the underlying libp2p host.
-func (h *libp2pHost) Host() host.Host {
+func (h *discoveryHost) Host() host.Host {
 	return h.host
 }
 
-func (h *libp2pHost) DHT() *dht.IpfsDHT {
+func (h *discoveryHost) DHT() *dht.IpfsDHT {
 	return h.dht
 }
 
-func (h *libp2pHost) JoinAnnouncer(ctx context.Context, opts AnnounceOptions, rt transport.JoinServer) io.Closer {
+func (h *discoveryHost) JoinAnnouncer(ctx context.Context, opts AnnounceOptions, rt transport.JoinServer) io.Closer {
 	opts.Host = h.Host()
 	c, _ := NewJoinAnnouncer(ctx, opts, rt)
 	return c
 }
 
-func (h *libp2pHost) JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper {
+func (h *discoveryHost) JoinRoundTripper(ctx context.Context, opts RoundTripOptions) transport.JoinRoundTripper {
 	opts.Host = h.Host()
 	rt, _ := NewJoinRoundTripper(ctx, opts)
 	return rt
 }
 
-func (h *libp2pHost) Close(ctx context.Context) error {
+func (h *discoveryHost) Close(ctx context.Context) error {
 	if err := h.dht.Close(); err != nil {
 		context.LoggerFrom(ctx).Error("Error shutting down DHT", "error", err.Error())
 	}

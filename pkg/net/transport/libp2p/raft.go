@@ -55,7 +55,7 @@ type RaftTransportOptions struct {
 
 // NewRaftTransport creates a new Raft transport over the Kademlia DHT.
 func NewRaftTransport(ctx context.Context, opts RaftTransportOptions) (raft.Transport, error) {
-	host, err := NewHostAndDHT(ctx, HostOptions{
+	host, err := NewDiscoveryHost(ctx, HostOptions{
 		BootstrapPeers: opts.BootstrapPeers,
 		Options:        opts.Options,
 		LocalAddrs:     opts.LocalAddrs,

@@ -54,7 +54,7 @@ func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) 
 	if opts.Method == "" {
 		return nil, errors.New("method must be specified")
 	}
-	var h Host
+	var h DiscoveryHost
 	var err error
 	var close func()
 	if opts.Host != nil {
@@ -62,7 +62,7 @@ func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) 
 		if err != nil {
 			return nil, err
 		}
-		h = &libp2pHost{
+		h = &discoveryHost{
 			host: opts.Host,
 			dht:  dht,
 			opts: opts.HostOptions,
@@ -74,7 +74,7 @@ func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) 
 			}
 		}
 	} else {
-		h, err = NewHostAndDHT(ctx, opts.HostOptions)
+		h, err = NewDiscoveryHost(ctx, opts.HostOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -95,13 +95,13 @@ func NewJoinRoundTripper(ctx context.Context, opts RoundTripOptions) (transport.
 	return NewRoundTripper[v1.JoinRequest, v1.JoinResponse](ctx, opts)
 }
 
-func newRoundTripperWithHostAndCloseFunc[REQ, RESP any](host Host, opts RoundTripOptions, close func()) transport.RoundTripper[REQ, RESP] {
+func newRoundTripperWithHostAndCloseFunc[REQ, RESP any](host DiscoveryHost, opts RoundTripOptions, close func()) transport.RoundTripper[REQ, RESP] {
 	return &roundTripper[REQ, RESP]{RoundTripOptions: opts, host: host, close: close}
 }
 
 type roundTripper[REQ, RESP any] struct {
 	RoundTripOptions
-	host  Host
+	host  DiscoveryHost
 	close func()
 }
 

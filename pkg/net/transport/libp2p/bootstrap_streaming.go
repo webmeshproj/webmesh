@@ -95,7 +95,7 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 		if err != nil {
 			return nil, err
 		}
-		h := &libp2pHost{
+		h := &discoveryHost{
 			opts: opts.HostOptions,
 			host: opts.Host,
 			dht:  dht,
@@ -107,7 +107,7 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 			}
 		}), nil
 	}
-	host, err := NewHostAndDHT(ctx, opts.HostOptions)
+	host, err := NewDiscoveryHost(ctx, opts.HostOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 
 // NewBootstrapTransportWithHost creates a new bootstrap transport with a host.
 // The host will remain open after leader election is complete.
-func NewBootstrapTransportWithHost(host Host, announcer Announcer, opts BootstrapOptions) (BootstrapTransport, error) {
+func NewBootstrapTransportWithHost(host DiscoveryHost, announcer Announcer, opts BootstrapOptions) (BootstrapTransport, error) {
 	uu, err := uuid.NewRandom()
 	if err != nil {
 		return nil, err
@@ -129,7 +129,7 @@ func NewBootstrapTransportWithHost(host Host, announcer Announcer, opts Bootstra
 	return newBootstrapTransportWithClose(host, announcer, opts, uu, func() {}), nil
 }
 
-func newBootstrapTransportWithClose(host Host, announcer Announcer, opts BootstrapOptions, localUUID uuid.UUID, close func()) BootstrapTransport {
+func newBootstrapTransportWithClose(host DiscoveryHost, announcer Announcer, opts BootstrapOptions, localUUID uuid.UUID, close func()) BootstrapTransport {
 	return &bootstrapTransport{
 		opts:      opts,
 		host:      host,
@@ -146,7 +146,7 @@ func newBootstrapTransportWithClose(host Host, announcer Announcer, opts Bootstr
 
 type bootstrapTransport struct {
 	opts                  BootstrapOptions
-	host                  Host
+	host                  DiscoveryHost
 	privKey               dcrypto.PrivKey
 	localUUID, leaderUUID uuid.UUID
 	announcer             Announcer

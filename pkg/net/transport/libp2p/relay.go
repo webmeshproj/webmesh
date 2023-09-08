@@ -32,6 +32,9 @@ import (
 
 // UDPRelayOptions are the options for negotiating a UDP relay.
 type UDPRelayOptions struct {
+	// PrivateKey is the private key to use for the host.
+	// This is required.
+	PrivateKey crypto.PrivateKey
 	// RemotePubKey is the public key of the remote node to negotiate a UDP relay with.
 	RemotePubKey crypto.PublicKey
 	// Relay are options for the relay
@@ -43,10 +46,8 @@ type UDPRelayOptions struct {
 // NewUDPRelay creates a new UDP relay.
 func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
 	// Make sure we use the correct key.
-	if opts.Host.Key == nil {
-		return nil, fmt.Errorf("host key is required")
-	}
-	host, err := NewHostAndDHT(ctx, opts.Host)
+	opts.Host.Options = append(opts.Host.Options, Identity(opts.PrivateKey))
+	host, err := NewDiscoveryHost(ctx, opts.Host)
 	if err != nil {
 		return nil, fmt.Errorf("new host: %w", err)
 	}
@@ -54,15 +55,15 @@ func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
 }
 
 // NewUDPRelay creates a new UDP relay with the given host.
-func NewUDPRelayWithHost(ctx context.Context, host Host, opts UDPRelayOptions) (*UDPRelay, error) {
+func NewUDPRelayWithHost(ctx context.Context, host DiscoveryHost, opts UDPRelayOptions) (*UDPRelay, error) {
 	return newUDPRelayWithHostAndCloseFunc(ctx, host, opts, func() error { return nil })
 }
 
-func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDPRelayOptions, closef func() error) (*UDPRelay, error) {
+func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost, opts UDPRelayOptions, closef func() error) (*UDPRelay, error) {
 	log := context.LoggerFrom(logCtx).With(slog.String("udp-relay", "libp2p"))
 	log = log.With(slog.String("host-id", host.ID().String()))
 	logCtx = context.WithLogger(logCtx, log)
-	rendezvous := opts.Host.Key.Rendezvous(opts.RemotePubKey)
+	rendezvous := opts.PrivateKey.Rendezvous(opts.RemotePubKey)
 	log = log.With(slog.String("rendezvous", rendezvous))
 	// We create two relays. One that is just for incoming traffic and one
 	// that we will use for both outgoing and incoming traffic.
@@ -75,7 +76,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDP
 		defer rxrelay.Close()
 		return nil, fmt.Errorf("new local udp relay: %w", err)
 	}
-	localProto := UDPRelayProtocolFor(opts.Host.Key.PublicKey())
+	localProto := UDPRelayProtocolFor(opts.PrivateKey.PublicKey())
 	log.Debug("Registering protocol handler", "protocol", localProto)
 	host.Host().SetStreamHandler(localProto, func(s network.Stream) {
 		log.Debug("Handling incoming protocol stream", "peer", s.Conn().RemotePeer())

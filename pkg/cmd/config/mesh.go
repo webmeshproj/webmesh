@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
@@ -542,7 +543,7 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 			Rendezvous: o.Discovery.PSK,
 			Host:       host,
 			HostOptions: libp2p.HostOptions{
-				Key:            conn.Key(),
+				Options:        []config.Option{libp2p.Identity(conn.Key())},
 				BootstrapPeers: addrs,
 				ConnectTimeout: o.Discovery.ConnectTimeout,
 			},

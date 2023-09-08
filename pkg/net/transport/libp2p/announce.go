@@ -68,7 +68,7 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 	if opts.Method == "" {
 		return nil, errors.New("method must be specified")
 	}
-	var h Host
+	var h DiscoveryHost
 	var err error
 	var close func() error
 	if opts.Host != nil {
@@ -76,7 +76,7 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 		if err != nil {
 			return nil, err
 		}
-		h = &libp2pHost{
+		h = &discoveryHost{
 			opts: opts.HostOptions,
 			host: opts.Host,
 			dht:  dht,
@@ -85,7 +85,7 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 			return dht.Close()
 		}
 	} else {
-		h, err = NewHostAndDHT(ctx, opts.HostOptions)
+		h, err = NewDiscoveryHost(ctx, opts.HostOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +101,7 @@ func NewJoinAnnouncer(ctx context.Context, opts AnnounceOptions, join transport.
 	return NewAnnouncer(ctx, opts, join)
 }
 
-func newAnnouncerWithHostAndCloseFunc[REQ, RESP any](ctx context.Context, host Host, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP], close func() error) io.Closer {
+func newAnnouncerWithHostAndCloseFunc[REQ, RESP any](ctx context.Context, host DiscoveryHost, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP], close func() error) io.Closer {
 	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.ID().String()))
 	host.Host().SetStreamHandler(RPCProtocolFor(opts.Method), func(s network.Stream) {
 		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())

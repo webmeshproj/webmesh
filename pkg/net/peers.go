@@ -344,12 +344,12 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 		return netip.AddrPort{}, fmt.Errorf("parse peer host key: %w", err)
 	}
 	relay, err := libp2p.NewUDPRelay(ctx, libp2p.UDPRelayOptions{
+		PrivateKey:   m.net.key,
 		RemotePubKey: remotePub,
 		Relay: relay.UDPOptions{
 			TargetPort: uint16(wgPort),
 		},
 		Host: libp2p.HostOptions{
-			Key:            m.net.key,
 			BootstrapPeers: m.net.opts.Relays.Host.BootstrapPeers,
 			Options:        m.net.opts.Relays.Host.Options,
 			LocalAddrs:     m.net.opts.Relays.Host.LocalAddrs,

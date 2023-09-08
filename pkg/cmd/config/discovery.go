@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/libp2p/go-libp2p/config"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
 
@@ -76,7 +77,7 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 // NewHostConfig returns a new HostOptions for the discovery config.
 func (o *DiscoveryOptions) HostOptions(ctx context.Context, key crypto.PrivateKey) libp2p.HostOptions {
 	return libp2p.HostOptions{
-		Key: key,
+		Options: []config.Option{libp2p.Identity(key)},
 		BootstrapPeers: func() []multiaddr.Multiaddr {
 			out := make([]multiaddr.Multiaddr, 0)
 			for _, addr := range o.BootstrapServers {
