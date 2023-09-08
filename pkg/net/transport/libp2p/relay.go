@@ -32,12 +32,10 @@ import (
 
 // UDPRelayOptions are the options for negotiating a UDP relay.
 type UDPRelayOptions struct {
-	// LocalNode is the local node to negotiate a UDP relay with.
-	LocalPubKey crypto.PublicKey
-	// RemoteNode is the remote node to negotiate a UDP relay with.
+	// LocalKey is the private key of the local node to negotiate a UDP relay with.
+	LocalKey crypto.PrivateKey
+	// RemotePubKey is the public key of the remote node to negotiate a UDP relay with.
 	RemotePubKey crypto.PublicKey
-	// Rendezvous is the rendezvous string to use for negotiating a UDP relay.
-	Rendezvous string
 	// Relay are options for the relay
 	Relay relay.UDPOptions
 	// Host are options for configuring the host
@@ -46,6 +44,8 @@ type UDPRelayOptions struct {
 
 // NewUDPRelay creates a new UDP relay.
 func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
+	// Make sure we use the correct key.
+	opts.Host.Key = opts.LocalKey
 	host, err := NewHost(ctx, opts.Host)
 	if err != nil {
 		return nil, fmt.Errorf("new host: %w", err)
@@ -62,6 +62,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDP
 	log := context.LoggerFrom(logCtx).With("udp-relay", "libp2p")
 	log = log.With(slog.String("host-id", host.ID().String()))
 	logCtx = context.WithLogger(logCtx, log)
+	rendezvous := opts.LocalKey.Rendezvous(opts.RemotePubKey)
 	log.Debug("Searching for peers on the DHT with our rendezvous string")
 	// We create two relays. One that is just for incoming traffic and one
 	// that we will use for both outgoing and incoming traffic.
@@ -74,7 +75,8 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDP
 		defer rxrelay.Close()
 		return nil, fmt.Errorf("new local udp relay: %w", err)
 	}
-	host.Host().SetStreamHandler(UDPRelayProtocolFor(opts.LocalPubKey.WireGuardKey().String()), func(s network.Stream) {
+	localProto := UDPRelayProtocolFor(opts.LocalKey.PublicKey().WireGuardKey().String())
+	host.Host().SetStreamHandler(localProto, func(s network.Stream) {
 		log.Debug("Handling incoming protocol stream", "peer", s.Conn().RemotePeer())
 		info := s.Conn().RemotePeer()
 		key, err := info.ExtractPublicKey()
@@ -83,7 +85,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDP
 			return
 		}
 		if !key.Equals(opts.RemotePubKey) {
-			log.Error("Peer public key does not match expected public key", "peer", info, "expected", opts.RemotePubKey, "actual", key)
+			log.Error("Peer public key does not match expected public key")
 			return
 		}
 		defer s.Close()
@@ -96,9 +98,9 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDP
 	closec := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
-	dutil.Advertise(ctx, routingDiscovery, opts.Rendezvous)
+	dutil.Advertise(ctx, routingDiscovery, rendezvous)
 	go func() {
-		defer host.Host().RemoveStreamHandler(UDPRelayProtocolFor(opts.LocalPubKey.WireGuardKey().String()))
+		defer host.Host().RemoveStreamHandler(localProto)
 		defer close(closec)
 		defer close(errs)
 		defer rxtxrelay.Close()
@@ -109,7 +111,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDP
 				return
 			default:
 			}
-			peerChan, err := routingDiscovery.FindPeers(ctx, opts.Rendezvous)
+			peerChan, err := routingDiscovery.FindPeers(ctx, rendezvous)
 			if err != nil {
 				errs <- fmt.Errorf("libp2p find peers: %w", err)
 				return
@@ -132,7 +134,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host Host, opts UDP
 						continue
 					}
 					if !peerKey.Equals(opts.RemotePubKey) {
-						log.Error("Peer public key does not match expected public key", "peer", peer.ID, "expected", opts.RemotePubKey, "actual", peerKey)
+						log.Error("Peer public key does not match expected public key")
 						continue
 					}
 					log.Debug("Found peer", "peer", peer.ID)

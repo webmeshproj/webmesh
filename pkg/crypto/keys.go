@@ -31,15 +31,12 @@ import (
 // WireGuardKeyType is the protobuf key type for WireGuard keys.
 const WireGuardKeyType pb.KeyType = 613
 
-// PrivateKey is a private key used for encryption and identity over libp2p
-type PrivateKey interface {
-	p2pcrypto.PrivKey
+// Key is a cryptographic key.
+type Key interface {
+	p2pcrypto.Key
 
 	// WireGuardKey returns the WireGuard key.
 	WireGuardKey() wgtypes.Key
-
-	// PublicKey returns the PublicKey as a PublicKey interface.
-	PublicKey() PublicKey
 
 	// Encode returns the base64 encoded string representation of the key.
 	Encode() (string, error)
@@ -49,15 +46,19 @@ type PrivateKey interface {
 	Rendezvous(keys ...PublicKey) string
 }
 
+// PrivateKey is a private key used for encryption and identity over libp2p
+type PrivateKey interface {
+	Key
+	p2pcrypto.PrivKey
+
+	// PublicKey returns the PublicKey as a PublicKey interface.
+	PublicKey() PublicKey
+}
+
 // PublicKey is a public key used for encryption and identity over libp2p
 type PublicKey interface {
+	Key
 	p2pcrypto.PubKey
-
-	// WireGuardKey returns the WireGuard key.
-	WireGuardKey() wgtypes.Key
-
-	// Encode returns the base64 encoded string representation of the key.
-	Encode() (string, error)
 }
 
 func init() {
@@ -187,8 +188,7 @@ func (w *privateKey) Encode() (string, error) {
 // Rendezvous generates a rendezvous string for discovering the peers at the given
 // public wireguard keys.
 func (k *privateKey) Rendezvous(keys ...PublicKey) string {
-	keys = append(keys, k.PublicKey())
-	return Rendezvous(keys...)
+	return k.PublicKey().Rendezvous(keys...)
 }
 
 type publicKey struct {
@@ -238,6 +238,13 @@ func (w *publicKey) Encode() (string, error) {
 		return "", err
 	}
 	return p2pcrypto.ConfigEncodeKey(raw), nil
+}
+
+// Rendezvous generates a rendezvous string for discovering the peers at the given
+// public wireguard keys.
+func (k *publicKey) Rendezvous(keys ...PublicKey) string {
+	keys = append(keys, k)
+	return Rendezvous(keys...)
 }
 
 // Rendezvous generates a rendezvous string for discovering the peers at the given
