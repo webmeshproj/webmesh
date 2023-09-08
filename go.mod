@@ -3,7 +3,6 @@ module github.com/webmeshproj/webmesh
 go 1.21
 
 require (
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0
 	github.com/dominikbraun/graph v0.23.0
 	github.com/go-ldap/ldap/v3 v3.4.5
 	github.com/go-ping/ping v1.1.0
@@ -46,7 +45,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.1.0
-	github.com/webmeshproj/api v0.3.1-0.20230905201523-37e3048721f7
+	github.com/webmeshproj/api v0.3.1-0.20230907223336-3b5954437dab
 	golang.org/x/crypto v0.12.0
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
 	golang.org/x/sync v0.3.0
@@ -73,6 +72,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect

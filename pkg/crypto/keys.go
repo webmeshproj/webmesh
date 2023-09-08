@@ -18,154 +18,230 @@ limitations under the License.
 package crypto
 
 import (
-	"crypto/rand"
+	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"sort"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/crypto/pb"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-// Key is a private key used for encryption and identity over libp2p
-// and WireGuard tunnels.
-type Key interface {
-	// PrivateKey returns the WireGuard private key derived from the
-	// given key.
-	PrivateKey() wgtypes.Key
-	// PublicKey returns the public WireGuard key derived from the given key.
-	PublicKey() wgtypes.Key
-	// HostKey returns a libp2p compatible host key-pair.
-	HostKey() p2pcrypto.PrivKey
-	// PublicHostString returns the base64 encoded string representation of the full host public key.
-	PublicHostString() string
-	// String return the base64 encoded string representation of the key.
-	String() string
+// WireGuardKeyType is the protobuf key type for WireGuard keys.
+const WireGuardKeyType pb.KeyType = p2pcrypto.Secp256k1 + 1
+
+// PrivateKey is a private key used for encryption and identity over libp2p
+type PrivateKey interface {
+	p2pcrypto.PrivKey
+
+	// WireGuardKey returns the WireGuard key.
+	WireGuardKey() wgtypes.Key
+
+	// PublicKey returns the PublicKey as a PublicKey interface.
+	PublicKey() PublicKey
+
+	// Encode returns the base64 encoded string representation of the key.
+	Encode() (string, error)
+
 	// Rendezvous generates a rendezvous string for discovering the peers at the given
 	// public wireguard keys.
-	Rendezvous(keys ...wgtypes.Key) string
+	Rendezvous(keys ...PublicKey) string
 }
 
-type key struct {
-	hostpriv      p2pcrypto.PrivKey
-	raw           []byte
-	marshaledPriv []byte
-	marshaledPub  []byte
+// PublicKey is a public key used for encryption and identity over libp2p
+type PublicKey interface {
+	p2pcrypto.PubKey
+
+	// WireGuardKey returns the WireGuard key.
+	WireGuardKey() wgtypes.Key
+
+	// Encode returns the base64 encoded string representation of the key.
+	Encode() (string, error)
 }
 
-// MustGenerateKey generates a new private key or panics.
-func MustGenerateKey() Key {
-	k, err := GenerateKey()
-	if err != nil {
-		panic(err)
+func init() {
+	p2pcrypto.PrivKeyUnmarshallers[WireGuardKeyType] = func(data []byte) (p2pcrypto.PrivKey, error) {
+		return ParsePrivateKey(data)
 	}
-	return k
+	p2pcrypto.PubKeyUnmarshallers[WireGuardKeyType] = func(data []byte) (p2pcrypto.PubKey, error) {
+		return ParsePublicKey(data)
+	}
+	p2pcrypto.KeyTypes = append(p2pcrypto.KeyTypes, int(WireGuardKeyType.Number()))
 }
 
 // GenerateKey generates a new private key.
-func GenerateKey() (Key, error) {
-	priv, pub, err := p2pcrypto.GenerateKeyPairWithReader(p2pcrypto.Secp256k1, 256, rand.Reader)
+func GenerateKey() (PrivateKey, error) {
+	priv, _, err := p2pcrypto.GenerateKeyPair(p2pcrypto.Secp256k1, 256)
 	if err != nil {
 		return nil, err
 	}
-	marshaledPriv, err := p2pcrypto.MarshalPrivateKey(priv)
+	return &privateKey{ecdsa: priv.(*p2pcrypto.Secp256k1PrivateKey)}, nil
+}
+
+// MustGenerateKey generates a new private key or panics.
+func MustGenerateKey() PrivateKey {
+	priv, err := GenerateKey()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	marshaledPub, err := p2pcrypto.MarshalPublicKey(pub)
+	return priv
+}
+
+// DecodePrivateKey decodes a private key from a base64 encoded string.
+func DecodePrivateKey(s string) (PrivateKey, error) {
+	data, err := p2pcrypto.ConfigDecodeKey(s)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode key: %w", err)
 	}
-	raw, err := priv.Raw()
+	return ParsePrivateKey(data)
+}
+
+// ParsePrivateKey parses a private key from a byte slice.
+func ParsePrivateKey(data []byte) (PrivateKey, error) {
+	unmarshaled, err := p2pcrypto.UnmarshalPrivateKey(data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal key: %w", err)
 	}
-	return &key{
-		raw:           raw,
-		hostpriv:      priv,
-		marshaledPriv: marshaledPriv,
-		marshaledPub:  marshaledPub,
+	return &privateKey{ecdsa: unmarshaled.(*p2pcrypto.Secp256k1PrivateKey)}, nil
+}
+
+// DecodePublicKey decodes a public key from a base64 encoded string.
+func DecodePublicKey(s string) (PublicKey, error) {
+	data, err := p2pcrypto.ConfigDecodeKey(s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode key: %w", err)
+	}
+	return ParsePublicKey(data)
+}
+
+// ParsePublicKey parses a public key from a byte slice.
+func ParsePublicKey(data []byte) (PublicKey, error) {
+	pub, err := p2pcrypto.UnmarshalPublicKey(data[wgtypes.KeyLen:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal secp256k1 public key: %w", err)
+	}
+	return &publicKey{
+		ecdsa: pub.(*p2pcrypto.Secp256k1PublicKey),
+		wgkey: wgtypes.Key(data[:wgtypes.KeyLen]),
 	}, nil
 }
 
-// ParseKeyFromString parses the key from the given base64 encoded string.
-func ParseKey(s string) (Key, error) {
-	data, err := p2pcrypto.ConfigDecodeKey(s)
-	if err != nil {
-		return nil, err
+type privateKey struct {
+	ecdsa *p2pcrypto.Secp256k1PrivateKey
+}
+
+// Equals checks whether two PubKeys are the same
+func (w *privateKey) Equals(in p2pcrypto.Key) bool {
+	if _, ok := in.(*privateKey); !ok {
+		return false
 	}
-	return ParseKeyFromBytes(data)
+	this, _ := w.ecdsa.Raw()
+	out, _ := in.(*privateKey).ecdsa.Raw()
+	return bytes.Equal(this[:], out[:])
 }
 
-// ParseHostPublicKey parses the host public key from the given base64 encoded string.
-func ParseHostPublicKey(s string) (p2pcrypto.PubKey, error) {
-	data, err := p2pcrypto.ConfigDecodeKey(s)
-	if err != nil {
-		return nil, err
+// Raw returns the raw bytes of the key (not wrapped in the libp2p-crypto protobuf).
+func (w *privateKey) Raw() ([]byte, error) {
+	return w.ecdsa.Raw()
+}
+
+// Type returns the protobuf key type.
+func (w *privateKey) Type() pb.KeyType {
+	return WireGuardKeyType
+}
+
+// Cryptographically sign the given bytes
+func (w *privateKey) Sign(data []byte) ([]byte, error) {
+	return w.ecdsa.Sign(data)
+}
+
+// Return a public key paired with this private key
+func (w *privateKey) GetPublic() p2pcrypto.PubKey {
+	return &publicKey{
+		ecdsa: w.ecdsa.GetPublic().(*p2pcrypto.Secp256k1PublicKey),
+		wgkey: w.WireGuardKey().PublicKey(),
 	}
-	return p2pcrypto.UnmarshalPublicKey(data)
 }
 
-// ParseKey parses a private key from the given bytes.
-func ParseKeyFromBytes(data []byte) (Key, error) {
-	priv, err := p2pcrypto.UnmarshalPrivateKey(data)
+// PublicKey returns the PublicKey as a PublicKey interface.
+func (w *privateKey) PublicKey() PublicKey {
+	return w.GetPublic().(*publicKey)
+}
+
+// WireGuardKey returns the WireGuard key.
+func (w *privateKey) WireGuardKey() wgtypes.Key {
+	raw, _ := w.ecdsa.Raw()
+	return wgtypes.Key(raw)
+}
+
+// String returns the base64 encoded string representation of the key.
+func (w *privateKey) Encode() (string, error) {
+	marshaled, err := p2pcrypto.MarshalPrivateKey(w.ecdsa)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to marshal secp256k1 private key: %w", err)
 	}
-	privraw, err := priv.Raw()
-	if err != nil {
-		return nil, err
-	}
-	marshaledPub, err := p2pcrypto.MarshalPublicKey(priv.GetPublic())
-	if err != nil {
-		return nil, err
-	}
-	return &key{
-		raw:           privraw,
-		hostpriv:      priv,
-		marshaledPriv: data,
-		marshaledPub:  marshaledPub,
-	}, nil
-}
-
-// PrivateKey returns the WireGuard private key derived from the
-// given key.
-func (k *key) PrivateKey() wgtypes.Key {
-	return wgtypes.Key(k.raw)
-}
-
-// PublicKey returns the public WireGuard key derived from the given key.
-func (k *key) PublicKey() wgtypes.Key {
-	return k.PrivateKey().PublicKey()
-}
-
-// HostKey returns a libp2p compatible host key-pair.
-func (k *key) HostKey() p2pcrypto.PrivKey {
-	return k.hostpriv
-}
-
-// PublicHostString returns the base64 encoded string representation of the full host public key.
-func (k *key) PublicHostString() string {
-	return p2pcrypto.ConfigEncodeKey(k.marshaledPub)
-}
-
-// String return the base64 encoded string representation of the key.
-func (k *key) String() string {
-	return p2pcrypto.ConfigEncodeKey(k.marshaledPriv)
+	return p2pcrypto.ConfigEncodeKey(marshaled), nil
 }
 
 // Rendezvous generates a rendezvous string for discovering the peers at the given
 // public wireguard keys.
-func (k *key) Rendezvous(keys ...wgtypes.Key) string {
+func (k *privateKey) Rendezvous(keys ...PublicKey) string {
 	keys = append(keys, k.PublicKey())
 	return Rendezvous(keys...)
 }
 
+type publicKey struct {
+	ecdsa *p2pcrypto.Secp256k1PublicKey
+	wgkey wgtypes.Key
+}
+
+// WireGuardKey returns the WireGuard key.
+func (w *publicKey) WireGuardKey() wgtypes.Key {
+	return w.wgkey
+}
+
+// Verify compares a signature against the input data
+func (w *publicKey) Verify(data []byte, sigStr []byte) (success bool, err error) {
+	return w.ecdsa.Verify(data, sigStr)
+}
+
+// Type returns the protobuf key type.
+func (w *publicKey) Type() pb.KeyType {
+	return WireGuardKeyType
+}
+
+// Raw returns the raw bytes of the key (not wrapped in the libp2p-crypto protobuf).
+// We only return the public key bytes, not the wireguard key bytes.
+func (w *publicKey) Raw() ([]byte, error) {
+	return w.ecdsa.Raw()
+}
+
+// Equals checks whether two PubKeys are the same
+func (w *publicKey) Equals(in p2pcrypto.Key) bool {
+	if _, ok := in.(*publicKey); !ok {
+		return false
+	}
+	this := w.wgkey
+	out := in.(*publicKey).wgkey
+	return bytes.Equal(this[:], out[:])
+}
+
+// Encode returns the base64 encoded string representation of the key.
+func (w *publicKey) Encode() (string, error) {
+	marshaled, err := p2pcrypto.MarshalPublicKey(w.ecdsa)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal secp256k1 public key: %w", err)
+	}
+	return p2pcrypto.ConfigEncodeKey(append(w.wgkey[:], marshaled...)), nil
+}
+
 // Rendezvous generates a rendezvous string for discovering the peers at the given
 // public wireguard keys.
-func Rendezvous(keys ...wgtypes.Key) string {
+func Rendezvous(keys ...PublicKey) string {
 	keyStrs := make([]string, len(keys))
 	for i, key := range keys {
-		keyStrs[i] = key.String()
+		keyStrs[i] = key.WireGuardKey().String()
 	}
 	sort.Strings(keyStrs)
 	h := sha256.New()

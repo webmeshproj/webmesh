@@ -56,7 +56,7 @@ type Host interface {
 // HostOptions are options for creating a new libp2p host.
 type HostOptions struct {
 	// Key is the host's private key. One will be generated if this is nil.
-	Key crypto.Key
+	Key crypto.PrivateKey
 	// BootstrapPeers is a list of bootstrap peers to use for the DHT.
 	// If empty or nil, the default bootstrap peers will be used.
 	BootstrapPeers []multiaddr.Multiaddr
@@ -98,7 +98,7 @@ func NewLibP2PHost(ctx context.Context, opts HostOptions) (host.Host, error) {
 		}
 		opts.Key = key
 	}
-	opts.Options = append(opts.Options, libp2p.Identity(opts.Key.HostKey()))
+	opts.Options = append(opts.Options, libp2p.Identity(opts.Key))
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
 	}

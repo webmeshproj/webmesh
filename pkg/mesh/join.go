@@ -36,11 +36,15 @@ func (s *meshStore) join(ctx context.Context, opts ConnectOptions) error {
 	log.Info("Joining webmesh cluster")
 	defer opts.JoinRoundTripper.Close()
 	var tries int
+	encoded, err := s.key.PublicKey().Encode()
+	if err != nil {
+		return fmt.Errorf("encode public key: %w", err)
+	}
 	for tries <= opts.MaxJoinRetries {
 		if tries > 0 {
 			log.Info("Retrying join request", slog.Int("tries", tries))
 		}
-		req := s.newJoinRequest(opts)
+		req := s.newJoinRequest(opts, encoded)
 		log.Debug("Sending join request to node", slog.Any("req", req))
 		resp, err := opts.JoinRoundTripper.RoundTrip(ctx, req)
 		if err != nil {
@@ -148,15 +152,14 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 	return nil
 }
 
-func (s *meshStore) newJoinRequest(opts ConnectOptions) *v1.JoinRequest {
+func (s *meshStore) newJoinRequest(opts ConnectOptions, encodedKey string) *v1.JoinRequest {
 	if opts.GRPCAdvertisePort <= 0 {
 		// Assume the default port.
 		opts.GRPCAdvertisePort = services.DefaultGRPCPort
 	}
 	req := &v1.JoinRequest{
-		Id:            s.ID(),
-		PublicKey:     s.key.PublicKey().String(),
-		HostPublicKey: s.key.PublicHostString(),
+		Id:        s.ID(),
+		PublicKey: encodedKey,
 		PrimaryEndpoint: func() string {
 			if opts.PrimaryEndpoint.IsValid() {
 				return opts.PrimaryEndpoint.String()

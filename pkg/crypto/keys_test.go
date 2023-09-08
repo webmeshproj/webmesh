@@ -1,65 +1,75 @@
-/*
-Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package crypto
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
-func TestKeyMarshaling(t *testing.T) {
-	key := MustGenerateKey()
-	marshaled := key.String()
+func TestEncodedKeysRoundTrip(t *testing.T) {
+	privkey := MustGenerateKey()
+	pubkey := privkey.PublicKey()
+	wgprivkey := privkey.WireGuardKey()
+	wgpubkey := pubkey.WireGuardKey()
 
-	wgpriv := key.PrivateKey()
-	wgpub := key.PublicKey()
+	if privkey.Type() != WireGuardKeyType {
+		t.Fatal("private key type is not WireGuardKeyType")
+	}
+	if pubkey.Type() != WireGuardKeyType {
+		t.Fatal("public key type is not WireGuardKeyType")
+	}
 
-	parsed, err := ParseKey(marshaled)
+	encodedPriv, err := privkey.Encode()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !key.HostKey().Equals(parsed.HostKey()) {
-		t.Fatal("host keys do not match")
-	}
-	if wgpriv.String() != parsed.PrivateKey().String() {
-		t.Fatal("private WireGuard keys do not match")
-	}
-	if wgpub.String() != parsed.PublicKey().String() {
-		t.Fatal("public WireGuard keys do not match")
-	}
-	if key.PublicHostString() != parsed.PublicHostString() {
-		t.Fatal("public host keys do not match")
-	}
-	pubkey, err := ParseHostPublicKey(key.PublicHostString())
+	decodedPriv, err := DecodePrivateKey(encodedPriv)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !pubkey.Equals(parsed.HostKey().GetPublic()) {
-		t.Fatal("parsed public host key does not match")
+	if !decodedPriv.Equals(privkey) {
+		t.Fatal("decoded private key not equal to original private key")
+	}
+	if decodedPriv.Type() != WireGuardKeyType {
+		t.Fatal("decoded private key type is not WireGuardKeyType")
+	}
+	decodedWg := decodedPriv.WireGuardKey()
+	if !bytes.Equal(decodedWg[:], wgprivkey[:]) {
+		t.Fatal("decoded private key wireguard key not equal to original private key wireguard key")
+	}
+
+	encodedPub, err := pubkey.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decodedPub, err := DecodePublicKey(encodedPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !decodedPub.Equals(pubkey) {
+		t.Fatal("decoded public key not equal to original public key")
+	}
+	if decodedPub.Type() != WireGuardKeyType {
+		t.Fatal("decoded public key type is not WireGuardKeyType")
+	}
+	decodedWg = decodedPub.WireGuardKey()
+	if !bytes.Equal(decodedWg[:], wgpubkey[:]) {
+		t.Fatal("decoded public key wireguard key not equal to original public key wireguard key")
 	}
 }
 
-func TestRendezvous(t *testing.T) {
-	key1 := MustGenerateKey()
-	key2 := MustGenerateKey()
-	key3 := MustGenerateKey()
+func TestKeySignatures(t *testing.T) {
+	key := MustGenerateKey()
+	data := []byte("hello world")
 
-	rv1 := key1.Rendezvous(key2.PublicKey(), key3.PublicKey())
-	rv2 := key2.Rendezvous(key1.PublicKey(), key3.PublicKey())
-	rv3 := key3.Rendezvous(key1.PublicKey(), key2.PublicKey())
+	sig, err := key.Sign(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if rv1 != rv2 || rv1 != rv3 {
-		t.Fatal("rendezvous strings do not match")
+	pubkey := key.PublicKey()
+	if ok, err := pubkey.Verify(data, sig); err != nil {
+		t.Fatal("signature verification failed:", err)
+	} else if !ok {
+		t.Fatal("signature verification failed: signature was not valid")
 	}
 }

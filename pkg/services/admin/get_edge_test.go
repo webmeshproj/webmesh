@@ -23,7 +23,6 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
@@ -34,27 +33,17 @@ func TestGetEdge(t *testing.T) {
 	server := newTestServer(t)
 
 	// Place a dummy peer
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		t.Errorf("GenerateKey() error = %v", err)
-		return
-	}
-	pub := key.PublicKey()
-	err = peers.New(server.store).Put(ctx, peers.MeshNode{
-		MeshNode: &v1.MeshNode{
-			Id:        "foo",
-			PublicKey: pub.String(),
-		},
+	err := peers.New(server.store).Put(ctx, &v1.MeshNode{
+		Id:        "foo",
+		PublicKey: newEncodedPubKey(t),
 	})
 	if err != nil {
 		t.Errorf("Put() error = %v", err)
 		return
 	}
-	err = peers.New(server.store).Put(ctx, peers.MeshNode{
-		MeshNode: &v1.MeshNode{
-			Id:        "bar",
-			PublicKey: pub.String(),
-		},
+	err = peers.New(server.store).Put(ctx, &v1.MeshNode{
+		Id:        "bar",
+		PublicKey: newEncodedPubKey(t),
 	})
 	if err != nil {
 		t.Errorf("Put() error = %v", err)

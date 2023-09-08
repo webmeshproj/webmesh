@@ -70,13 +70,9 @@ type NewTransportFunc func(upgrader transport.Upgrader, host host.Host, rcmgr ne
 func newTransportBuilder(config *config.Config) (NewTransportFunc, *libp2pTransport) {
 	t := &libp2pTransport{config: config}
 	return func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey p2pcrypto.PrivKey) (transport.Transport, error) {
-		data, err := p2pcrypto.MarshalPrivateKey(privKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal private key: %w", err)
-		}
-		key, err := crypto.ParseKeyFromBytes(data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key: %w", err)
+		key, ok := privKey.(crypto.PrivateKey)
+		if !ok {
+			return nil, errors.New("invalid private key type")
 		}
 		t.host = host
 		t.upgrader = upgrader
@@ -91,7 +87,7 @@ type libp2pTransport struct {
 	host     host.Host
 	upgrader transport.Upgrader
 	rcmgr    network.ResourceManager
-	key      crypto.Key
+	key      crypto.PrivateKey
 	node     Node
 	started  atomic.Bool
 	mu       sync.Mutex
@@ -318,7 +314,7 @@ func (l *libp2pTransport) registerMultiaddrs(ctx context.Context, maddrs []multi
 		return fmt.Errorf("failed to get self: %w", err)
 	}
 	self.Multiaddrs = addrs
-	err = peers.New(l.node.Mesh().Storage()).Put(context.Background(), self)
+	err = peers.New(l.node.Mesh().Storage()).Put(context.Background(), self.MeshNode)
 	if err != nil {
 		return fmt.Errorf("failed to update self: %w", err)
 	}
@@ -357,7 +353,7 @@ func (l *libp2pTransport) startNode(ctx context.Context) error {
 	}
 	// Automatically add our direct peers
 	for _, wgpeer := range node.Mesh().Network().WireGuard().Peers() {
-		id, err := peer.IDFromPublicKey(wgpeer.PublicHostKey)
+		id, err := peer.IDFromPublicKey(wgpeer.PublicKey)
 		if err != nil {
 			context.LoggerFrom(ctx).Warn("Failed to get peer id", "error", err.Error())
 			continue
@@ -372,10 +368,7 @@ func (l *libp2pTransport) startNode(ctx context.Context) error {
 
 func (l *libp2pTransport) registerNode(ctx context.Context, node peers.MeshNode) error {
 	ps := l.host.Peerstore()
-	if node.GetHostPublicKey() == "" {
-		return errors.New("missing public key")
-	}
-	pubkey, err := crypto.ParseHostPublicKey(node.GetHostPublicKey())
+	pubkey, err := crypto.DecodePublicKey(node.GetPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
 	}

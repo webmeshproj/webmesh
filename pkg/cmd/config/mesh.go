@@ -148,7 +148,7 @@ func (o *MeshOptions) Validate() error {
 
 // NewMeshConfig return a new Mesh configuration based on the node configuration.
 // The key is optional and will be taken from the configuration if not provided.
-func (o *Config) NewMeshConfig(ctx context.Context, key crypto.Key) (conf mesh.Config, err error) {
+func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf mesh.Config, err error) {
 	log := context.LoggerFrom(ctx)
 	nodeid, err := o.NodeID()
 	if err != nil {
@@ -267,7 +267,7 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.Key) (conf mesh.C
 }
 
 // LoadKey loads the key from the given configuration.
-func (o *Config) LoadKey(ctx context.Context) (crypto.Key, error) {
+func (o *Config) LoadKey(ctx context.Context) (crypto.PrivateKey, error) {
 	log := context.LoggerFrom(ctx)
 	if o.WireGuard.KeyFile == "" {
 		// Generate an ephemeral key
@@ -285,7 +285,11 @@ func (o *Config) LoadKey(ctx context.Context) (crypto.Key, error) {
 		if err != nil {
 			return nil, fmt.Errorf("generate new key: %w", err)
 		}
-		if err := os.WriteFile(o.WireGuard.KeyFile, []byte(key.String()+"\n"), 0600); err != nil {
+		encoded, err := key.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode key: %w", err)
+		}
+		if err := os.WriteFile(o.WireGuard.KeyFile, []byte(encoded), 0600); err != nil {
 			return nil, fmt.Errorf("write key file: %w", err)
 		}
 		return key, nil
@@ -306,7 +310,11 @@ func (o *Config) LoadKey(ctx context.Context) (crypto.Key, error) {
 		if err != nil {
 			return nil, fmt.Errorf("generate new key: %w", err)
 		}
-		if err := os.WriteFile(o.WireGuard.KeyFile, []byte(key.String()+"\n"), 0600); err != nil {
+		encoded, err := key.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode key: %w", err)
+		}
+		if err := os.WriteFile(o.WireGuard.KeyFile, []byte(encoded), 0600); err != nil {
 			return nil, fmt.Errorf("write key file: %w", err)
 		}
 		return key, nil
@@ -317,7 +325,7 @@ func (o *Config) LoadKey(ctx context.Context) (crypto.Key, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read key file: %w", err)
 	}
-	return crypto.ParseKey(strings.TrimSpace(string(keyData)))
+	return crypto.DecodePrivateKey(strings.TrimSpace(string(keyData)))
 }
 
 // NewConnectOptions returns new connection options for the configuration. The given raft node must

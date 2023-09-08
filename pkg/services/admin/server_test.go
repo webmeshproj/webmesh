@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
@@ -39,6 +40,16 @@ func newTestServer(t *testing.T) *Server {
 		store.Close()
 	})
 	return New(store.Storage(), store.Raft(), rbac.NewNoopEvaluator())
+}
+
+func newEncodedPubKey(t *testing.T) string {
+	t.Helper()
+	key := crypto.MustGenerateKey()
+	encoded, err := key.PublicKey().Encode()
+	if err != nil {
+		t.Fatal(fmt.Errorf("error encoding public key: %w", err))
+	}
+	return encoded
 }
 
 type testCase[REQ any] struct {

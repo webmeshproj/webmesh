@@ -83,7 +83,7 @@ type Mesh interface {
 	// Domain returns the domain of the mesh network.
 	Domain() string
 	// Key returns the private key used for WireGuard and libp2p connections.
-	Key() crypto.Key
+	Key() crypto.PrivateKey
 	// Connect opens the connection to the mesh. This must be called before
 	// other methods can be used.
 	Connect(ctx context.Context, opts ConnectOptions) error
@@ -121,7 +121,7 @@ type Config struct {
 	// Key is the private key to use for WireGuard and libp2p connections.
 	// This can be nil, in which case one will be generated when Connect
 	// is called.
-	Key crypto.Key
+	Key crypto.PrivateKey
 	// HeartbeatPurgeThreshold is the number of failed heartbeats before
 	// assuming a peer is offline. This is only applicable when currently
 	// the leader of the raft group.
@@ -175,7 +175,7 @@ type meshStore struct {
 	nodeID           string
 	meshDomain       string
 	opts             Config
-	key              crypto.Key
+	key              crypto.PrivateKey
 	raft             raft.Raft
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
@@ -197,7 +197,7 @@ func (s *meshStore) ID() string {
 }
 
 // Key returns the private key used for WireGuard and libp2p connections.
-func (s *meshStore) Key() crypto.Key {
+func (s *meshStore) Key() crypto.PrivateKey {
 	return s.key
 }
 

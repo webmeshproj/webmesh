@@ -62,7 +62,7 @@ type Interface interface {
 	// NetworkV6 returns the IPv6 network of this interface.
 	NetworkV6() netip.Prefix
 	// Configure configures the wireguard interface to use the given key and listen port.
-	Configure(ctx context.Context, key crypto.Key, listenPort int) error
+	Configure(ctx context.Context, key crypto.PrivateKey, listenPort int) error
 	// ListenPort returns the current listen port of the wireguard interface.
 	ListenPort() (int, error)
 	// PutPeer updates a peer in the wireguard configuration.
@@ -244,8 +244,8 @@ func (w *wginterface) Close(ctx context.Context) error {
 }
 
 // Configure configures the wireguard interface to use the given key and listen port.
-func (w *wginterface) Configure(ctx context.Context, key crypto.Key, listenPort int) error {
-	wgKey := key.PrivateKey()
+func (w *wginterface) Configure(ctx context.Context, key crypto.PrivateKey, listenPort int) error {
+	wgKey := key.WireGuardKey()
 	err := w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 		PrivateKey:   &wgKey,
 		ListenPort:   &listenPort,

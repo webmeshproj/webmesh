@@ -74,7 +74,7 @@ type Options struct {
 	// Config is the configuration for the node.
 	Config *config.Config
 	// Key is the key for the node.
-	Key crypto.Key
+	Key crypto.PrivateKey
 	// Host is the libp2p host for the node.
 	Host host.Host
 }

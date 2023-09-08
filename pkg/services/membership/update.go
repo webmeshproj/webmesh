@@ -26,11 +26,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
@@ -74,9 +74,10 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 			}
 		}
 	}
-	var publicKey wgtypes.Key
+
+	var publicKey crypto.PublicKey
 	if req.GetPublicKey() != "" {
-		publicKey, err = wgtypes.ParseKey(req.GetPublicKey())
+		publicKey, err = crypto.DecodePublicKey(req.GetPublicKey())
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 		}
@@ -157,9 +158,16 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	var hasChanges bool
 	toUpdate := &peer
 	// Check the public key
-	if publicKey != (wgtypes.Key{}) && publicKey.String() != peer.PublicKey {
-		toUpdate.PublicKey = publicKey.String()
-		hasChanges = true
+
+	if publicKey != nil {
+		encoded, err := publicKey.Encode()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to encode public key: %v", err)
+		}
+		if encoded != peer.PublicKey {
+			toUpdate.PublicKey = encoded
+			hasChanges = true
+		}
 	}
 	// Check endpoints
 	if req.GetPrimaryEndpoint() != "" && req.GetPrimaryEndpoint() != peer.PrimaryEndpoint {
@@ -197,7 +205,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	// Apply any node changes
 	if hasChanges {
 		log.Debug("updating peer", slog.Any("peer", toUpdate))
-		err = p.Put(ctx, *toUpdate)
+		err = p.Put(ctx, toUpdate.MeshNode)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
 		}

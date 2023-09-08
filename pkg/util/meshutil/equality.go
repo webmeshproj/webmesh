@@ -91,7 +91,6 @@ func MeshNodesEqual(a, b *v1.MeshNode) bool {
 	sort.Strings(b.WireguardEndpoints)
 	return a.Id == b.Id &&
 		a.PublicKey == b.PublicKey &&
-		a.HostPublicKey == b.HostPublicKey &&
 		a.PrimaryEndpoint == b.PrimaryEndpoint &&
 		a.ZoneAwarenessId == b.ZoneAwarenessId &&
 		a.PrivateIpv4 == b.PrivateIpv4 &&

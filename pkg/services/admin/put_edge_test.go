@@ -23,7 +23,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 
-	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
@@ -35,15 +34,9 @@ func TestPutEdge(t *testing.T) {
 	// Pre register the nodes
 	p := peers.New(server.store)
 	for _, peer := range []string{"foo", "baz"} {
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		err = p.Put(context.Background(), peers.MeshNode{
-			MeshNode: &v1.MeshNode{
-				Id:        peer,
-				PublicKey: key.PublicKey().String(),
-			},
+		err := p.Put(context.Background(), &v1.MeshNode{
+			Id:        peer,
+			PublicKey: newEncodedPubKey(t),
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

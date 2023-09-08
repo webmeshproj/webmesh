@@ -18,7 +18,6 @@ limitations under the License.
 package meshutil
 
 import (
-	"context"
 	"fmt"
 	"net/netip"
 	"slices"
@@ -26,6 +25,8 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -64,6 +65,11 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 		if node.PublicKey == "" {
 			continue
 		}
+		_, err = crypto.DecodePublicKey(node.PublicKey)
+		if err != nil {
+			context.LoggerFrom(ctx).Error("Node has invalid public key, ignoring", "node", node.Id, "public_key", node.PublicKey)
+			continue
+		}
 		// Determine the preferred wireguard endpoint
 		var primaryEndpoint string
 		if node.PrimaryEndpoint != "" {
@@ -82,7 +88,6 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 			Node: &v1.MeshNode{
 				Id:                 node.Id,
 				PublicKey:          node.PublicKey,
-				HostPublicKey:      node.HostPublicKey,
 				PrimaryEndpoint:    primaryEndpoint,
 				WireguardEndpoints: node.WireguardEndpoints,
 				ZoneAwarenessId:    node.ZoneAwarenessId,

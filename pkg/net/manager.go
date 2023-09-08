@@ -89,7 +89,7 @@ type RelayOptions struct {
 // the wireguard interface.
 type StartOptions struct {
 	// Key is the wireguard key to use for the node.
-	Key crypto.Key
+	Key crypto.PrivateKey
 	// AddressV4 is the IPv4 address to use for the node.
 	AddressV4 netip.Prefix
 	// AddressV6 is the IPv6 address to use for the node.
@@ -139,7 +139,7 @@ func New(store storage.MeshStorage, opts Options) Manager {
 
 type manager struct {
 	opts                 Options
-	key                  crypto.Key
+	key                  crypto.PrivateKey
 	peers                *peerManager
 	dns                  *dnsManager
 	storage              storage.MeshStorage

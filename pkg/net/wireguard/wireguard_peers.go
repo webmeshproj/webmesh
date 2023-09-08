@@ -25,10 +25,10 @@ import (
 	"net/netip"
 	"time"
 
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 )
 
@@ -42,9 +42,7 @@ type Peer struct {
 	// RaftMember indicates if the peer is a raft member.
 	RaftMember bool `json:"raftMember"`
 	// PublicKey is the public key of the peer.
-	PublicKey wgtypes.Key `json:"publicKey"`
-	// PublicHostKey is the public host key of the peer.
-	PublicHostKey p2pcrypto.PubKey `json:"publicHostKey"`
+	PublicKey crypto.PublicKey `json:"publicKey"`
 	// Multiaddrs is the list of multiaddrs for this peer.
 	Multiaddrs []multiaddr.Multiaddr `json:"multiaddrs"`
 	// Endpoint is the endpoint of this peer, if applicable.
@@ -60,11 +58,24 @@ type Peer struct {
 }
 
 func (p Peer) MarshalJSON() ([]byte, error) {
+	encoded, err := p.PublicKey.Encode()
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(map[string]any{
 		"id":         p.ID,
-		"publicKey":  p.PublicKey.String(),
+		"publicKey":  encoded,
 		"endpoint":   p.Endpoint.String(),
 		"allowedIPs": p.AllowedIPs,
+		"allowedRoutes": func() []string {
+			var routes []string
+			for _, route := range p.AllowedRoutes {
+				if route.IsValid() {
+					routes = append(routes, route.String())
+				}
+			}
+			return routes
+		}(),
 	})
 }
 
@@ -74,7 +85,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	// Check if we already have the peer under a different key
 	// and remove it if so.
 	if peerKey, ok := w.peerKeyByID(peer.ID); ok {
-		if peerKey.String() != peer.PublicKey.String() {
+		if peerKey.WireGuardKey().String() != peer.PublicKey.WireGuardKey().String() {
 			// Remove the peer first
 			if err := w.DeletePeer(ctx, peer.ID); err != nil {
 				return fmt.Errorf("remove peer: %w", err)
@@ -133,7 +144,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		allowedRoutes = append(allowedRoutes, ipnet)
 	}
 	peerCfg := wgtypes.PeerConfig{
-		PublicKey:                   peer.PublicKey,
+		PublicKey:                   peer.PublicKey.WireGuardKey(),
 		AllowedIPs:                  append(allowedIPs, allowedRoutes...),
 		PersistentKeepaliveInterval: keepAlive,
 		ReplaceAllowedIPs:           true,
@@ -154,7 +165,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	if err != nil {
 		return err
 	}
-	w.registerPeer(peerCfg.PublicKey, peer)
+	w.registerPeer(peer)
 	// Add routes to the allowed IPs
 	for _, ip := range append(allowedIPs, allowedRoutes...) {
 		addr, _ := netip.AddrFromSlice(ip.IP)
@@ -201,11 +212,11 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 // DeletePeer removes a peer from the wireguard configuration.
 func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
 	if key, ok := w.popPeerKey(id); ok {
-		w.log.Debug("deleting peer", slog.String("id", id), slog.String("key", key.String()))
+		w.log.Debug("deleting peer", slog.String("id", id), slog.String("key", key.WireGuardKey().String()))
 		return w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 			Peers: []wgtypes.PeerConfig{
 				{
-					PublicKey: key,
+					PublicKey: key.WireGuardKey(),
 					Remove:    true,
 				},
 			},
@@ -215,14 +226,14 @@ func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
 }
 
 // registerPeer adds a peer to the peer map.
-func (w *wginterface) registerPeer(key wgtypes.Key, peer *Peer) {
+func (w *wginterface) registerPeer(peer *Peer) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
 	w.peers[peer.ID] = *peer
 }
 
 // popPeerKey removes a peer from the peer map and returns the key.
-func (w *wginterface) popPeerKey(id string) (wgtypes.Key, bool) {
+func (w *wginterface) popPeerKey(id string) (crypto.PublicKey, bool) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
 	for peerID, peer := range w.peers {
@@ -231,15 +242,15 @@ func (w *wginterface) popPeerKey(id string) (wgtypes.Key, bool) {
 			return peer.PublicKey, true
 		}
 	}
-	return wgtypes.Key{}, false
+	return nil, false
 }
 
 // peerByPublicKey returns the peer with the given public key.
-func (w *wginterface) peerByPublicKey(lookup string) (string, bool) {
+func (w *wginterface) peerByPublicKey(lookup crypto.PublicKey) (string, bool) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
 	for peerID, peer := range w.peers {
-		if peer.PublicKey.String() == lookup {
+		if peer.PublicKey.WireGuardKey().String() == lookup.WireGuardKey().String() {
 			return peerID, true
 		}
 	}
@@ -247,10 +258,13 @@ func (w *wginterface) peerByPublicKey(lookup string) (string, bool) {
 }
 
 // peerKeyByID returns the public key of the peer with the given id.
-func (w *wginterface) peerKeyByID(id string) (wgtypes.Key, bool) {
+func (w *wginterface) peerKeyByID(id string) (crypto.PublicKey, bool) {
 	w.peersMux.Lock()
 	defer w.peersMux.Unlock()
 	peer, ok := w.peers[id]
+	if !ok {
+		return nil, false
+	}
 	return peer.PublicKey, ok
 }
 

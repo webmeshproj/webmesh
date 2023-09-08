@@ -28,7 +28,6 @@ import (
 
 	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -105,7 +104,6 @@ func (m *peerManager) Refresh(ctx context.Context, wgpeers []*v1.WireGuardPeer) 
 	}
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
-
 	log.Debug("Current wireguard peers", slog.Any("peers", wgpeers))
 	currentPeers := m.net.WireGuard().Peers()
 	seenPeers := make(map[string]struct{})
@@ -142,13 +140,9 @@ func (m *peerManager) Refresh(ctx context.Context, wgpeers []*v1.WireGuardPeer) 
 
 func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) error {
 	log := context.LoggerFrom(ctx)
-	key, err := wgtypes.ParseKey(peer.GetNode().GetPublicKey())
+	key, err := crypto.DecodePublicKey(peer.GetNode().GetPublicKey())
 	if err != nil {
 		return fmt.Errorf("parse peer key: %w", err)
-	}
-	hostpub, err := crypto.ParseHostPublicKey(peer.GetNode().GetHostPublicKey())
-	if err != nil {
-		return fmt.Errorf("parse peer host key: %w", err)
 	}
 	var priv4, priv6 netip.Prefix
 	if peer.GetNode().GetPrivateIpv4() != "" {
@@ -217,7 +211,6 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		GRPCPort:      rpcPort,
 		RaftMember:    isRaftMember,
 		PublicKey:     key,
-		PublicHostKey: hostpub,
 		Endpoint:      endpoint,
 		PrivateIPv4:   priv4,
 		PrivateIPv6:   priv6,
@@ -346,19 +339,14 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 	if err != nil {
 		return netip.AddrPort{}, fmt.Errorf("wireguard listen port: %w", err)
 	}
-	remotePub, err := wgtypes.ParseKey(peer.GetNode().GetPublicKey())
-	if err != nil {
-		return netip.AddrPort{}, fmt.Errorf("parse peer key: %w", err)
-	}
-	remoteHostPub, err := crypto.ParseHostPublicKey(peer.GetNode().GetHostPublicKey())
+	remotePub, err := crypto.DecodePublicKey(peer.GetNode().GetPublicKey())
 	if err != nil {
 		return netip.AddrPort{}, fmt.Errorf("parse peer host key: %w", err)
 	}
 	relay, err := libp2p.NewUDPRelay(ctx, libp2p.UDPRelayOptions{
-		LocalPubKey:      m.net.key.PublicKey(),
-		RemotePubKey:     remotePub,
-		RemoteHostPubKey: remoteHostPub,
-		Rendezvous:       m.net.key.Rendezvous(remotePub),
+		LocalPubKey:  m.net.key.PublicKey(),
+		RemotePubKey: remotePub,
+		Rendezvous:   m.net.key.Rendezvous(remotePub),
 		Relay: relay.UDPOptions{
 			TargetPort: uint16(wgPort),
 		},

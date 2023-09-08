@@ -74,7 +74,7 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 }
 
 // NewHostConfig returns a new HostOptions for the discovery config.
-func (o *DiscoveryOptions) HostOptions(ctx context.Context, key crypto.Key) libp2p.HostOptions {
+func (o *DiscoveryOptions) HostOptions(ctx context.Context, key crypto.PrivateKey) libp2p.HostOptions {
 	return libp2p.HostOptions{
 		Key: key,
 		BootstrapPeers: func() []multiaddr.Multiaddr {

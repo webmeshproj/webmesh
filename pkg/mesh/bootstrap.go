@@ -285,26 +285,27 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 	p := peers.New(s.Storage())
-	pubKey := s.key.PublicKey()
+	pubKey := s.key.PublicKey().WireGuardKey()
+	encoded, err := s.key.PublicKey().Encode()
+	if err != nil {
+		return fmt.Errorf("encode public key: %w", err)
+	}
 	privatev6 := netutil.AssignToPrefix(meshnetworkv6, pubKey[:])
-	self := peers.MeshNode{
-		MeshNode: &v1.MeshNode{
-			Id:              s.ID(),
-			PrimaryEndpoint: opts.PrimaryEndpoint.String(),
-			WireguardEndpoints: func() []string {
-				out := make([]string, 0)
-				for _, ep := range opts.WireGuardEndpoints {
-					out = append(out, ep.String())
-				}
-				return out
-			}(),
-			ZoneAwarenessId: s.opts.ZoneAwarenessID,
-			PublicKey:       pubKey.String(),
-			HostPublicKey:   s.key.PublicHostString(),
-			PrivateIpv6:     privatev6.String(),
-			Features:        opts.Features,
-			JoinedAt:        timestamppb.New(time.Now().UTC()),
-		},
+	self := &v1.MeshNode{
+		Id:              s.ID(),
+		PrimaryEndpoint: opts.PrimaryEndpoint.String(),
+		WireguardEndpoints: func() []string {
+			out := make([]string, 0)
+			for _, ep := range opts.WireGuardEndpoints {
+				out = append(out, ep.String())
+			}
+			return out
+		}(),
+		ZoneAwarenessId: s.opts.ZoneAwarenessID,
+		PublicKey:       encoded,
+		PrivateIpv6:     privatev6.String(),
+		Features:        opts.Features,
+		JoinedAt:        timestamppb.New(time.Now().UTC()),
 	}
 	// Allocate addresses
 	var privatev4 netip.Prefix
@@ -316,7 +317,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		if err != nil {
 			return fmt.Errorf("allocate IPv4 address: %w", err)
 		}
-		self.MeshNode.PrivateIpv4 = privatev4.String()
+		self.PrivateIpv4 = privatev4.String()
 	}
 	s.log.Debug("Creating ourself in the database", slog.Any("params", self))
 	err = p.Put(ctx, self)
@@ -331,9 +332,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		s.log.Info("Creating node in database for bootstrap server",
 			slog.String("server-id", id),
 		)
-		err = p.Put(ctx, peers.MeshNode{
-			MeshNode: &v1.MeshNode{Id: id},
-		})
+		err = p.Put(ctx, &v1.MeshNode{Id: id})
 		if err != nil {
 			return fmt.Errorf("create node: %w", err)
 		}
@@ -372,9 +371,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			if peer == s.ID() {
 				continue
 			}
-			err = p.Put(ctx, peers.MeshNode{
-				MeshNode: &v1.MeshNode{Id: peer},
-			})
+			err = p.Put(ctx, &v1.MeshNode{Id: peer})
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)
 			}

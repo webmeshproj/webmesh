@@ -24,7 +24,6 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -93,11 +92,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 	}
-	_, err = crypto.ParseHostPublicKey(req.GetHostPublicKey())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid host public key: %v", err)
-	}
-	publicKey, err := wgtypes.ParseKey(req.GetPublicKey())
+	publicKey, err := crypto.DecodePublicKey(req.GetPublicKey())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
@@ -192,7 +187,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	var leasev4, leasev6 netip.Prefix
 	// We always generate an IPv6 address for the peer from their public key
-	leasev6 = netutil.AssignToPrefix(s.ipv6Prefix, publicKey[:])
+	pubwg := publicKey.WireGuardKey()
+	leasev6 = netutil.AssignToPrefix(s.ipv6Prefix, pubwg[:])
 	log.Debug("Assigned IPv6 address to peer", slog.String("ipv6", leasev6.String()))
 	// Acquire an IPv4 address for the peer only if requested
 	if req.GetAssignIpv4() {
@@ -208,20 +204,17 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	// Write the peer to the database
 	p := peers.New(s.raft.Storage())
-	err = p.Put(ctx, peers.MeshNode{
-		MeshNode: &v1.MeshNode{
-			Id:                 req.GetId(),
-			PrimaryEndpoint:    req.GetPrimaryEndpoint(),
-			WireguardEndpoints: req.GetWireguardEndpoints(),
-			ZoneAwarenessId:    req.GetZoneAwarenessId(),
-			HostPublicKey:      req.GetHostPublicKey(),
-			PublicKey:          publicKey.String(),
-			PrivateIpv4:        leasev4.String(),
-			PrivateIpv6:        leasev6.String(),
-			Features:           req.GetFeatures(),
-			Multiaddrs:         req.GetMultiaddrs(),
-			JoinedAt:           timestamppb.New(time.Now().UTC()),
-		},
+	err = p.Put(ctx, &v1.MeshNode{
+		Id:                 req.GetId(),
+		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
+		WireguardEndpoints: req.GetWireguardEndpoints(),
+		ZoneAwarenessId:    req.GetZoneAwarenessId(),
+		PublicKey:          req.GetPublicKey(),
+		PrivateIpv4:        leasev4.String(),
+		PrivateIpv6:        leasev6.String(),
+		Features:           req.GetFeatures(),
+		Multiaddrs:         req.GetMultiaddrs(),
+		JoinedAt:           timestamppb.New(time.Now().UTC()),
 	})
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to raft log: %v", err))
@@ -305,9 +298,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 				// The peer doesn't exist, so create a placeholder for it
 				log.Debug("Registering empty peer", slog.String("peer", peer))
-				err = p.Put(ctx, peers.MeshNode{
-					MeshNode: &v1.MeshNode{Id: peer},
-				})
+				err = p.Put(ctx, &v1.MeshNode{Id: peer})
 				if err != nil {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to register peer: %v", err))
 				}

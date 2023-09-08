@@ -27,6 +27,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -64,6 +65,13 @@ func (g *GraphStore) AddVertex(nodeID string, node MeshNode, props graph.VertexP
 	defer g.mu.Unlock()
 	if nodeID == "" {
 		return fmt.Errorf("node ID must not be empty")
+	}
+	if node.PublicKey != "" {
+		// Make sure it's a valid public key.
+		_, err := crypto.DecodePublicKey(node.PublicKey)
+		if err != nil {
+			return fmt.Errorf("invalid public key: %w", err)
+		}
 	}
 	data, err := protojson.Marshal(node.MeshNode)
 	if err != nil {

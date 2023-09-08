@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/netip"
 	"slices"
 	"strings"
 	"time"
@@ -32,7 +31,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -110,7 +108,7 @@ type Peers interface {
 	// Graph returns the graph of nodes.
 	Graph() Graph
 	// Put creates or updates a node.
-	Put(ctx context.Context, n MeshNode) error
+	Put(ctx context.Context, n *v1.MeshNode) error
 	// Get gets a node by ID.
 	Get(ctx context.Context, id string) (MeshNode, error)
 	// GetByHostKey gets a node by their host public key.
@@ -135,38 +133,6 @@ type Peers interface {
 	DrawGraph(ctx context.Context, w io.Writer) error
 }
 
-// PutOptions are options for creating or updating a node.
-type PutOptions struct {
-	// ID is the node's ID.
-	ID string
-	// PublicKey is the node's public key.
-	PublicKey wgtypes.Key
-	// PrimaryEndpoint is the primary public endpoint of the node.
-	PrimaryEndpoint string
-	// WireGuardEndpoints are the available wireguard endpoints of the node.
-	WireGuardEndpoints []string
-	// ZoneAwarenessID is the node's zone awareness ID.
-	ZoneAwarenessID string
-	// GRPCPort is the node's GRPC port.
-	GRPCPort int
-	// RaftPort is the node's Raft port.
-	RaftPort int
-	// DNSPort is the node's DNS port.
-	DNSPort int
-	// Features are the node's features.
-	Features []v1.Feature
-}
-
-// PutLeaseOptions are options for creating or updating a node lease.
-type PutLeaseOptions struct {
-	// ID is the node's ID.
-	ID string
-	// IPv4 is the node's IPv4 address.
-	IPv4 netip.Prefix
-	// IPv6 is the node's IPv6 network.
-	IPv6 netip.Prefix
-}
-
 // New returns a new Peers interface.
 func New(db storage.MeshStorage) Peers {
 	return &peers{
@@ -186,7 +152,7 @@ func (p *peers) Resolver() Resolver {
 
 func (p *peers) Graph() Graph { return p.graph }
 
-func (p *peers) Put(ctx context.Context, node MeshNode) error {
+func (p *peers) Put(ctx context.Context, node *v1.MeshNode) error {
 	// Dedup the wireguard endpoints.
 	seen := make(map[string]struct{})
 	var wgendpoints []string
@@ -199,7 +165,7 @@ func (p *peers) Put(ctx context.Context, node MeshNode) error {
 	}
 	node.WireguardEndpoints = wgendpoints
 	node.JoinedAt = timestamppb.New(time.Now().UTC())
-	err := p.graph.AddVertex(node)
+	err := p.graph.AddVertex(MeshNode{node})
 	if err != nil {
 		return fmt.Errorf("put node: %w", err)
 	}
@@ -224,8 +190,8 @@ func (p *peers) GetByHostKey(ctx context.Context, key p2pcrypto.PubKey) (MeshNod
 		return MeshNode{}, fmt.Errorf("list nodes: %w", err)
 	}
 	for _, node := range nodes {
-		if node.GetHostPublicKey() != "" {
-			key, err := crypto.ParseHostPublicKey(node.GetHostPublicKey())
+		if node.GetPublicKey() != "" {
+			key, err := crypto.DecodePublicKey(node.GetPublicKey())
 			if err != nil {
 				return MeshNode{}, fmt.Errorf("parse host public key: %w", err)
 			}

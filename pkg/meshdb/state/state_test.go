@@ -203,21 +203,19 @@ func setupTest(t *testing.T) (*state, func()) {
 	}
 	p := peers.New(db)
 	// Node with public address
-	err = p.Put(ctx, peers.MeshNode{
-		MeshNode: &v1.MeshNode{
-			Id:              publicNode,
-			PublicKey:       mustGenerateKey(t).String(),
-			PrimaryEndpoint: publicNodePublicAddr,
-			PrivateIpv4:     publicNodePrivateAddr,
-			Features: []*v1.FeaturePort{
-				{
-					Feature: v1.Feature_NODES,
-					Port:    int32(rpcPort),
-				},
-				{
-					Feature: v1.Feature_STORAGE,
-					Port:    2,
-				},
+	err = p.Put(ctx, &v1.MeshNode{
+		Id:              publicNode,
+		PublicKey:       mustGenerateKey(t),
+		PrimaryEndpoint: publicNodePublicAddr,
+		PrivateIpv4:     publicNodePrivateAddr,
+		Features: []*v1.FeaturePort{
+			{
+				Feature: v1.Feature_NODES,
+				Port:    int32(rpcPort),
+			},
+			{
+				Feature: v1.Feature_STORAGE,
+				Port:    2,
 			},
 		},
 	})
@@ -225,20 +223,18 @@ func setupTest(t *testing.T) (*state, func()) {
 		t.Fatal(err)
 	}
 	// Node with private address
-	err = p.Put(ctx, peers.MeshNode{
-		MeshNode: &v1.MeshNode{
-			Id:          privateNode,
-			PublicKey:   mustGenerateKey(t).String(),
-			PrivateIpv4: privateNodePrivateAddr,
-			Features: []*v1.FeaturePort{
-				{
-					Feature: v1.Feature_NODES,
-					Port:    int32(rpcPort),
-				},
-				{
-					Feature: v1.Feature_STORAGE,
-					Port:    2,
-				},
+	err = p.Put(ctx, &v1.MeshNode{
+		Id:          privateNode,
+		PublicKey:   mustGenerateKey(t),
+		PrivateIpv4: privateNodePrivateAddr,
+		Features: []*v1.FeaturePort{
+			{
+				Feature: v1.Feature_NODES,
+				Port:    int32(rpcPort),
+			},
+			{
+				Feature: v1.Feature_STORAGE,
+				Port:    2,
 			},
 		},
 	})
@@ -249,11 +245,15 @@ func setupTest(t *testing.T) (*state, func()) {
 	return s.(*state), close
 }
 
-func mustGenerateKey(t *testing.T) crypto.Key {
+func mustGenerateKey(t *testing.T) string {
 	t.Helper()
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return key
+	encoded, err := key.PublicKey().Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
 }

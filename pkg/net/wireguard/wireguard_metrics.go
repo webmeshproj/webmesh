@@ -29,6 +29,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 // Peer Metrics
@@ -181,7 +182,11 @@ func (m *MetricsRecorder) updateMetrics() error {
 	// Update peer metrics.
 	seen := make(map[string]struct{})
 	for _, peer := range metrics.GetPeers() {
-		peerID, ok := m.wg.peerByPublicKey(peer.PublicKey)
+		key, err := crypto.DecodePublicKey(peer.PublicKey)
+		if err != nil {
+			return fmt.Errorf("decode public key: %w", err)
+		}
+		peerID, ok := m.wg.peerByPublicKey(key)
 		if !ok {
 			continue
 		}

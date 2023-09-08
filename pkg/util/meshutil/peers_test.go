@@ -452,13 +452,11 @@ func TestWireGuardPeers(t *testing.T) {
 				t.Fatalf("put network acl: %v", err)
 			}
 			for peerID, addrs := range tc.peers {
-				err = peerdb.Put(ctx, peers.MeshNode{
-					MeshNode: &v1.MeshNode{
-						Id:          peerID,
-						PublicKey:   mustGenerateKey(t).PublicKey().String(),
-						PrivateIpv4: netip.MustParsePrefix(addrs[0]).String(),
-						PrivateIpv6: netip.MustParsePrefix(addrs[1]).String(),
-					},
+				err = peerdb.Put(ctx, &v1.MeshNode{
+					Id:          peerID,
+					PublicKey:   mustGenerateEncodedKey(t),
+					PrivateIpv4: netip.MustParsePrefix(addrs[0]).String(),
+					PrivateIpv6: netip.MustParsePrefix(addrs[1]).String(),
 				})
 				if err != nil {
 					t.Fatalf("put peer %q: %v", peerID, err)
@@ -497,11 +495,15 @@ func TestWireGuardPeers(t *testing.T) {
 	}
 }
 
-func mustGenerateKey(t *testing.T) crypto.Key {
+func mustGenerateEncodedKey(t *testing.T) string {
 	t.Helper()
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return key
+	encoded, err := key.PublicKey().Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
 }

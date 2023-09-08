@@ -145,7 +145,7 @@ func mustGenerateWireguardKey(t *testing.T) []byte {
 	if err != nil {
 		t.Fatalf("failed to generate WireGuard key: %s", err)
 	}
-	pubkey := key.PublicKey()
+	pubkey := key.PublicKey().WireGuardKey()
 	return pubkey[:]
 }
 
@@ -155,6 +155,6 @@ func mustGenerateSeedKey(t *testing.F) []byte {
 	if err != nil {
 		t.Fatalf("failed to generate WireGuard key: %s", err)
 	}
-	pubkey := key.PublicKey()
+	pubkey := key.PublicKey().WireGuardKey()
 	return pubkey[:]
 }
