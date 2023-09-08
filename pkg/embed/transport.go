@@ -34,7 +34,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
 	"github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
@@ -54,13 +53,10 @@ type Transport interface {
 
 // WithWebmeshTransport returns a libp2p option that configures the transport to use the embedded node.
 func WithWebmeshTransport(config *config.Config) p2pconfig.Option {
-	builder, transport := newTransportBuilder(config)
+	builder, _ := newTransportBuilder(config)
 	return libp2p.ChainOptions(
 		libp2p.DefaultTransports,
 		libp2p.Transport(builder),
-		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			return transport, nil
-		}),
 	)
 }
 
@@ -218,35 +214,6 @@ func (l *libp2pTransport) Protocols() []int {
 // Proxy returns true if this is a proxy transport.
 func (l *libp2pTransport) Proxy() bool {
 	return true
-}
-
-// FindPeer will check mesh storage for a peer with the given ID.
-func (l *libp2pTransport) FindPeer(ctx context.Context, peerID peer.ID) (peer.AddrInfo, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if !l.started.Load() {
-		return peer.AddrInfo{}, errors.New("transport not started")
-	}
-	pubKey, err := peerID.ExtractPublicKey()
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("failed to extract public key: %w", err)
-	}
-	node, err := peers.New(l.node.Mesh().Storage()).GetByHostKey(ctx, pubKey)
-	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("failed to get peer: %w", err)
-	}
-	var addrs []multiaddr.Multiaddr
-	for _, addr := range node.GetMultiaddrs() {
-		a, err := multiaddr.NewMultiaddr(addr)
-		if err != nil {
-			return peer.AddrInfo{}, fmt.Errorf("failed to parse multiaddr: %w", err)
-		}
-		addrs = append(addrs, a)
-	}
-	return peer.AddrInfo{
-		ID:    peerID,
-		Addrs: addrs,
-	}, nil
 }
 
 // Close shuts down any listeners and closes any connections.

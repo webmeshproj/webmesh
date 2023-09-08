@@ -29,7 +29,6 @@ import (
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
 	"github.com/google/go-cmp/cmp"
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -111,8 +110,8 @@ type Peers interface {
 	Put(ctx context.Context, n *v1.MeshNode) error
 	// Get gets a node by ID.
 	Get(ctx context.Context, id string) (MeshNode, error)
-	// GetByHostKey gets a node by their host public key.
-	GetByHostKey(ctx context.Context, key p2pcrypto.PubKey) (MeshNode, error)
+	// GetByPubKey gets a node by their public key.
+	GetByPubKey(ctx context.Context, key crypto.PublicKey) (MeshNode, error)
 	// Delete deletes a node.
 	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
@@ -183,8 +182,8 @@ func (p *peers) Get(ctx context.Context, id string) (MeshNode, error) {
 	return node, nil
 }
 
-// GetByHostKey gets a node by their host public key.
-func (p *peers) GetByHostKey(ctx context.Context, key p2pcrypto.PubKey) (MeshNode, error) {
+// GetByPubKey gets a node by their public key.
+func (p *peers) GetByPubKey(ctx context.Context, key crypto.PublicKey) (MeshNode, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
 		return MeshNode{}, fmt.Errorf("list nodes: %w", err)

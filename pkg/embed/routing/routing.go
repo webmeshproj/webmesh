@@ -72,7 +72,7 @@ func (rt *PeerRouting) FindPeer(ctx context.Context, peerID peer.ID) (peer.AddrI
 	if err != nil {
 		return peer.AddrInfo{}, fmt.Errorf("failed to extract public key: %w", err)
 	}
-	node, err := peers.New(rt.storage).GetByHostKey(ctx, pubKey)
+	node, err := peers.New(rt.storage).GetByPubKey(ctx, pubKey)
 	if err != nil {
 		return peer.AddrInfo{}, fmt.Errorf("failed to get peer: %w", err)
 	}

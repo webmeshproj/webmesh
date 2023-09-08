@@ -35,6 +35,9 @@ func init() {
 // Code is the code for the webmesh libp2p protocol.
 const Code = 613
 
+// P_WEBMESH is the code for the webmesh libp2p protocol.
+const P_WEBMESH = Code
+
 // ErrNoPeerID is returned when a webmesh multiaddr does not contain a peer ID.
 var ErrNoPeerID = fmt.Errorf("no peer ID in webmesh multiaddr")
 
