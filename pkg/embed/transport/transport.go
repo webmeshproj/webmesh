@@ -24,13 +24,14 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/sec"
 	"github.com/libp2p/go-libp2p/core/transport"
-	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
@@ -54,11 +55,24 @@ type Transport interface {
 }
 
 // TransportBuilder is the signature of a function that builds a webmesh transport.
-type TransportBuilder func(upgrader transport.Upgrader, host host.Host, st sec.SecureTransport, mux yamux.Transport, privKey pcrypto.PrivKey) (Transport, error)
+type TransportBuilder func(upgrader transport.Upgrader, host host.Host, st sec.SecureTransport, mux network.Multiplexer, privKey pcrypto.PrivKey) (Transport, error)
+
+// Options are the options for the webmesh transport.
+type Options struct {
+	// Config is the webmesh config.
+	Config *config.Config
+	// StartTimeout is the timeout for starting the webmesh node.
+	StartTimeout time.Duration
+	// StopTimeout is the timeout for stopping the webmesh node.
+	StopTimeout time.Duration
+}
 
 // New returns a new webmesh transport builder.
-func New(conf *config.Config) TransportBuilder {
-	return func(upgrader transport.Upgrader, host host.Host, st sec.SecureTransport, mux yamux.Transport, privKey pcrypto.PrivKey) (Transport, error) {
+func New(opts Options) TransportBuilder {
+	if opts.Config == nil {
+		panic("config is required")
+	}
+	return func(upgrader transport.Upgrader, host host.Host, st sec.SecureTransport, mux network.Multiplexer, privKey pcrypto.PrivKey) (Transport, error) {
 		sec, ok := st.(*security.SecureTransport)
 		if !ok {
 			return nil, ErrInvalidSecureTransport
@@ -69,12 +83,13 @@ func New(conf *config.Config) TransportBuilder {
 		}
 		return &WebmeshTransport{
 			started: atomic.Bool{},
+			opts:    opts,
 			node:    nil,
 			host:    host,
 			key:     key,
 			sec:     sec,
 			mux:     mux,
-			log:     logutil.NewLogger(conf.Global.LogLevel).With("component", "webmesh-transport"),
+			log:     logutil.NewLogger(opts.Config.Global.LogLevel).With("component", "webmesh-transport"),
 			mu:      sync.Mutex{},
 		}, nil
 	}
@@ -83,11 +98,12 @@ func New(conf *config.Config) TransportBuilder {
 // WebmeshTransport is the webmesh libp2p transport. It must be used with a webmesh keypair and security transport.
 type WebmeshTransport struct {
 	started atomic.Bool
+	opts    Options
 	node    mesh.Node
 	host    host.Host
 	key     crypto.PrivateKey
 	sec     *security.SecureTransport
-	mux     yamux.Transport
+	mux     network.Multiplexer
 	log     *slog.Logger
 	mu      sync.Mutex
 }
@@ -113,6 +129,8 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 	return nil, nil
 }
 
+// Resolve attempts to resolve the given multiaddr to a list of
+// addresses.
 func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	return nil, nil
 }

@@ -19,7 +19,10 @@ package protocol
 
 import (
 	"encoding/base64"
+	"fmt"
+	"strings"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -32,6 +35,12 @@ func init() {
 // ProtocolCode is the code for the webmesh libp2p protocol.
 const ProtocolCode = 613
 
+// ErrNoPeerID is returned when a webmesh multiaddr does not contain a peer ID.
+var ErrNoPeerID = fmt.Errorf("no peer ID in webmesh multiaddr")
+
+// ErrNoRedezvous is returned when a webmesh multiaddr does not contain a rendezvous.
+var ErrNoRedezvous = fmt.Errorf("no rendezvous in webmesh multiaddr")
+
 // Protocol is the webmesh libp2p protocol.
 var Protocol = multiaddr.Protocol{
 	Name:       "webmesh",
@@ -40,6 +49,35 @@ var Protocol = multiaddr.Protocol{
 	Size:       -1,
 	Path:       true,
 	Transcoder: multiaddr.NewTranscoderFromFunctions(protocolStrToBytes, protocolBytesToStr, validateBytes),
+}
+
+// PeerIDFromWebmeshAddr returns the peer ID argument from a webmesh multiaddr.
+func PeerIDFromWebmeshAddr(addr multiaddr.Multiaddr) (peer.ID, error) {
+	pid, err := addr.ValueForProtocol(ProtocolCode)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", ErrNoPeerID, err)
+	}
+	if pid == "" {
+		return "", fmt.Errorf("%w: %s", ErrNoPeerID, addr)
+	}
+	parts := strings.SplitN(strings.TrimPrefix(pid, "/"), "/", 2)
+	return peer.ID(parts[0]), nil
+}
+
+// RendezvousFromWebmeshAddr returns the rendezvous argument from a webmesh multiaddr.
+func RendezvousFromWebmeshAddr(addr multiaddr.Multiaddr) (string, error) {
+	rendezvous, err := addr.ValueForProtocol(ProtocolCode)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", ErrNoRedezvous, err)
+	}
+	if rendezvous == "" {
+		return "", fmt.Errorf("%w: %s", ErrNoRedezvous, addr)
+	}
+	parts := strings.SplitN(strings.TrimPrefix(rendezvous, "/"), "/", 2)
+	if len(parts) < 2 {
+		return "", fmt.Errorf("%w: %s", ErrNoRedezvous, addr)
+	}
+	return parts[1], nil
 }
 
 func protocolStrToBytes(s string) ([]byte, error) {
