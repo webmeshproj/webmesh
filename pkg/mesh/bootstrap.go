@@ -285,12 +285,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
 	p := peers.New(s.Storage())
-	pubKey := s.key.PublicKey().WireGuardKey()
 	encoded, err := s.key.PublicKey().Encode()
 	if err != nil {
 		return fmt.Errorf("encode public key: %w", err)
 	}
-	privatev6 := netutil.AssignToPrefix(meshnetworkv6, pubKey[:])
+	privatev6 := netutil.AssignToPrefix(meshnetworkv6, s.key.PublicKey().WireGuardKey())
 	self := &v1.MeshNode{
 		Id:              s.ID(),
 		PrimaryEndpoint: opts.PrimaryEndpoint.String(),

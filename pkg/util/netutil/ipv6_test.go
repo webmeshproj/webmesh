@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 const defaultTestCount = 10
@@ -139,14 +140,13 @@ func mustGenerateULA(t *testing.F) netip.Prefix {
 	return ula
 }
 
-func mustGenerateWireguardKey(t *testing.T) []byte {
+func mustGenerateWireguardKey(t *testing.T) wgtypes.Key {
 	t.Helper()
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatalf("failed to generate WireGuard key: %s", err)
 	}
-	pubkey := key.PublicKey().WireGuardKey()
-	return pubkey[:]
+	return key.PublicKey().WireGuardKey()
 }
 
 func mustGenerateSeedKey(t *testing.F) []byte {
