@@ -46,7 +46,7 @@ type UDPRelayOptions struct {
 func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
 	// Make sure we use the correct key.
 	opts.Host.Key = opts.LocalKey
-	host, err := NewHost(ctx, opts.Host)
+	host, err := NewHostAndDHT(ctx, opts.Host)
 	if err != nil {
 		return nil, fmt.Errorf("new host: %w", err)
 	}

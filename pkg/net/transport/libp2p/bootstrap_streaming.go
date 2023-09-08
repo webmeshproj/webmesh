@@ -107,7 +107,7 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 			}
 		}), nil
 	}
-	host, err := NewHost(ctx, opts.HostOptions)
+	host, err := NewHostAndDHT(ctx, opts.HostOptions)
 	if err != nil {
 		return nil, err
 	}

@@ -21,12 +21,12 @@ package libp2p
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/protocol"
 
-	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 )
 
@@ -61,21 +61,20 @@ var buffersOnce sync.Once
 const MaxBuffer = 2500000
 
 // SetMaxSystemBuffers sets the system buffers to the maximum size for libp2p.
-func SetMaxSystemBuffers(ctx context.Context) {
-	SetSystemBuffers(ctx, MaxBuffer)
+func SetMaxSystemBuffers() {
+	SetSystemBuffers(MaxBuffer)
 }
 
 // SetSystemBuffers sets the system buffers to use for libp2p.
-func SetSystemBuffers(ctx context.Context, size int) {
+func SetSystemBuffers(size int) {
 	buffersOnce.Do(func() {
-		log := context.LoggerFrom(ctx)
 		err := buffers.SetMaximumReadBuffer(size)
 		if err != nil {
-			log.Warn("Failed to set maximum read buffer", "error", err.Error())
+			slog.Default().Warn("Failed to set maximum read buffer", "error", err.Error())
 		}
 		err = buffers.SetMaximumWriteBuffer(size)
 		if err != nil {
-			log.Warn("Failed to set maximum write buffer", "error", err.Error())
+			slog.Default().Warn("Failed to set maximum write buffer", "error", err.Error())
 		}
 	})
 }

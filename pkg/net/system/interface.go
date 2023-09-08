@@ -31,10 +31,8 @@ import (
 )
 
 // DefaultMTU is the default MTU for wireguard interfaces.
+// TODO: Try to determine this automatically.
 const DefaultMTU = 1350
-
-// MaxMTU is the maximum MTU for wireguard interfaces.
-const MaxMTU = 1500
 
 // Interface represents an underlying machine network interface for
 // use with wireguard.

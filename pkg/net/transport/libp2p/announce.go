@@ -85,7 +85,7 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 			return dht.Close()
 		}
 	} else {
-		h, err = NewHost(ctx, opts.HostOptions)
+		h, err = NewHostAndDHT(ctx, opts.HostOptions)
 		if err != nil {
 			return nil, err
 		}

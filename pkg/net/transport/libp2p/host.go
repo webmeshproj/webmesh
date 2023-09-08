@@ -69,9 +69,9 @@ type HostOptions struct {
 	ConnectTimeout time.Duration
 }
 
-// NewHost creates a new libp2p host connected to the DHT with the given options.
-func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
-	host, err := NewLibP2PHost(ctx, opts)
+// NewHostAndDHT creates a new libp2p host connected to the DHT with the given options.
+func NewHostAndDHT(ctx context.Context, opts HostOptions) (Host, error) {
+	host, err := NewHost(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
@@ -87,9 +87,9 @@ func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
 	}, nil
 }
 
-// NewLibP2PHost creates a new libp2p host with the given options.
-func NewLibP2PHost(ctx context.Context, opts HostOptions) (host.Host, error) {
-	SetMaxSystemBuffers(ctx)
+// NewHost creates a new libp2p host with the given options.
+func NewHost(ctx context.Context, opts HostOptions) (host.Host, error) {
+	SetMaxSystemBuffers()
 	if opts.Key == nil {
 		context.LoggerFrom(ctx).Debug("Generating ephemeral key for bootstrap transport")
 		key, err := crypto.GenerateKey()

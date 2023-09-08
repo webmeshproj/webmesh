@@ -74,7 +74,7 @@ func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) 
 			}
 		}
 	} else {
-		h, err = NewHost(ctx, opts.HostOptions)
+		h, err = NewHostAndDHT(ctx, opts.HostOptions)
 		if err != nil {
 			return nil, err
 		}

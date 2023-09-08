@@ -47,6 +47,7 @@ func TestBootstrapTransport(t *testing.T) {
 			ElectionTimeout: time.Second,
 			Linger:          time.Second,
 			HostOptions: HostOptions{
+				Key:            crypto.MustGenerateKey(),
 				ConnectTimeout: time.Second,
 			},
 		})
