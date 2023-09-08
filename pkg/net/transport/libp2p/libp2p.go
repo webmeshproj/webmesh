@@ -25,12 +25,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
 )
 
 const (
+	// SecurityProtocol is the protocol used for security.
+	SecurityProtocol = protocol.ID("/webmesh/security/0.0.1")
 	// BootstrapProtocol is the protocol used for bootstrapping a mesh.
 	BootstrapProtocol = protocol.ID("/webmesh/bootstrap/0.0.1")
 	// RPCProtocol is the protocol used for executing RPCs against a mesh.
@@ -44,15 +48,22 @@ const (
 	UDPRelayProtocol = protocol.ID("/webmesh/udp-relay/0.0.1")
 )
 
+// Identity returns a libp2p option for using the given crypto.PrivateKey
+// for identity.
+func Identity(key crypto.PrivateKey) libp2p.Option {
+	id := libp2p.Identity(key.Native())
+	return id
+}
+
 // RPCProtocolFor returns the RPCProtocol for the given method.
 func RPCProtocolFor(method string) protocol.ID {
 	return protocol.ID(fmt.Sprintf("%s/%s", RPCProtocol, strings.TrimPrefix(method, "/")))
 }
 
 // UDPRelayProtocolFor returns the UDPRelayProtocol for accepting connections
-// from the given node.
-func UDPRelayProtocolFor(node string) protocol.ID {
-	return protocol.ID(fmt.Sprintf("%s/%s", UDPRelayProtocol, node))
+// from the given public key.
+func UDPRelayProtocolFor(pubkey crypto.PublicKey) protocol.ID {
+	return protocol.ID(fmt.Sprintf("%s/%s", UDPRelayProtocol, pubkey.WireGuardKey().String()))
 }
 
 var buffersOnce sync.Once

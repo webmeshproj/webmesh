@@ -98,13 +98,14 @@ func NewHost(ctx context.Context, opts HostOptions) (host.Host, error) {
 		}
 		opts.Key = key
 	}
-	opts.Options = append(opts.Options, libp2p.Identity(opts.Key))
+	opts.Options = append(opts.Options, Identity(opts.Key))
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
 	}
 	if opts.ConnectTimeout > 0 {
 		opts.Options = append(opts.Options, libp2p.WithDialTimeout(opts.ConnectTimeout))
 	}
+	opts.Options = append(opts.Options, libp2p.FallbackDefaults)
 	host, err := libp2p.New(opts.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("new libp2p host: %w", err)

@@ -53,12 +53,20 @@ type PrivateKey interface {
 
 	// PublicKey returns the PublicKey as a PublicKey interface.
 	PublicKey() PublicKey
+
+	// Native returns the native underlying secp256k1 key for use
+	// with security libraries that require it.
+	Native() p2pcrypto.PrivKey
 }
 
 // PublicKey is a public key used for encryption and identity over libp2p
 type PublicKey interface {
 	Key
 	p2pcrypto.PubKey
+
+	// Native returns the native underlying secp256k1 key for use
+	// with security libraries that require it.
+	Native() p2pcrypto.PubKey
 }
 
 func init() {
@@ -132,6 +140,10 @@ type privateKey struct {
 	ecdsa *p2pcrypto.Secp256k1PrivateKey
 }
 
+func (w *privateKey) Native() p2pcrypto.PrivKey {
+	return w.ecdsa
+}
+
 // Equals checks whether two PubKeys are the same
 func (w *privateKey) Equals(in p2pcrypto.Key) bool {
 	if _, ok := in.(*privateKey); !ok {
@@ -194,6 +206,10 @@ func (k *privateKey) Rendezvous(keys ...PublicKey) string {
 type publicKey struct {
 	ecdsa *p2pcrypto.Secp256k1PublicKey
 	wgkey wgtypes.Key
+}
+
+func (w *publicKey) Native() p2pcrypto.PubKey {
+	return w.ecdsa
 }
 
 // WireGuardKey returns the WireGuard key.
@@ -259,5 +275,5 @@ func Rendezvous(keys ...PublicKey) string {
 	for _, k := range keyStrs {
 		h.Write([]byte(k))
 	}
-	return string(h.Sum(nil))
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
