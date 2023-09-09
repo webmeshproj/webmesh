@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -32,6 +33,15 @@ import (
 type DualStorage interface {
 	MeshStorage
 	RaftStorage
+	DropStorage
+}
+
+// DropStorage is a storage interface that can be dropped entirely.
+// This is primarily used for testing.
+type DropStorage interface {
+	// DropAll drops all data from the storage. This is primarily used
+	// for testing.
+	DropAll(ctx context.Context) error
 }
 
 // RaftStorage is the interface for storing and retrieving data about the state of the mesh.
@@ -39,11 +49,14 @@ type DualStorage interface {
 type RaftStorage interface {
 	raft.LogStore
 	raft.StableStore
+	DropStorage
 	io.Closer
 }
 
 // MeshStorage is the interface for storing and retrieving data about the state of the mesh.
 type MeshStorage interface {
+	DropStorage
+
 	// GetValue returns the value of a key.
 	GetValue(ctx context.Context, key string) (string, error)
 	// PutValue sets the value of a key. TTL is optional and can be set to 0.
@@ -84,4 +97,19 @@ func NewKeyNotFoundError(key string) error {
 // IsKeyNotFoundError returns true if the given error is a ErrKeyNotFound error.
 func IsKeyNotFoundError(err error) bool {
 	return errors.Is(err, ErrKeyNotFound)
+}
+
+var reservedPrefixes = []string{
+	"/registry/",
+	"/raft/",
+}
+
+// IsReservedPrefix returns true if the given key is reserved.
+func IsReservedPrefix(key string) bool {
+	for _, prefix := range reservedPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }

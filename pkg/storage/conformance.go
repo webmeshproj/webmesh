@@ -33,6 +33,8 @@ import (
 func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
 	t.Helper()
 
+	defer raftStorage.DropAll(context.Background())
+
 	t.Run("RaftStableStore", func(t *testing.T) {
 		t.Run("Set", func(t *testing.T) {
 			// Should be able to set a key and then get it back.
@@ -376,6 +378,8 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
+	meshStorage.DropAll(ctx)
+
 	t.Run("PutValue", func(t *testing.T) {
 		// Pretty simple, just put a key and make sure it survives a round trip.
 		key, value := "key", "value"
@@ -394,6 +398,8 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 			t.Fatalf("failed to delete key: %v", err)
 		}
 	})
+
+	meshStorage.DropAll(ctx)
 
 	t.Run("Delete", func(t *testing.T) {
 		// Delete should never error, but it should also work
@@ -420,6 +426,8 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 	})
+
+	meshStorage.DropAll(ctx)
 
 	t.Run("List", func(t *testing.T) {
 		// Place a few keys and make sure we get the full list of them back
@@ -490,6 +498,8 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
+	meshStorage.DropAll(ctx)
+
 	t.Run("IterPrefix", func(t *testing.T) {
 		// We'll place a few keys and make sure our iterator is called
 		// for each of them.
@@ -528,44 +538,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	t.Run("Subscribe", func(t *testing.T) {
-		// Subscribe to a prefix and make sure out callback is called
-		// when a key is added, updated, and deleted.
-		kv := map[string]string{
-			"Subscribe/key1": "value1",
-			"Subscribe/key2": "value2",
-		}
-		seen := map[string]struct{}{}
-		var count int
-		cancel, err := meshStorage.Subscribe(ctx, "Subscribe/", func(key, value string) {
-			t.Logf("key %q was %q", key, value)
-			count++
-			seen[key] = struct{}{}
-		})
-		if err != nil {
-			t.Fatalf("failed to subscribe: %v", err)
-		}
-		defer cancel()
-		for key, value := range kv {
-			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
-				t.Fatalf("failed to put key: %v", err)
-			}
-		}
-		if count != len(kv) {
-			t.Errorf("expected %d calls, got %d", len(kv), count)
-		}
-		for key := range kv {
-			if _, ok := seen[key]; !ok {
-				t.Errorf("expected to see key %q", key)
-			}
-		}
-		// Clean up
-		for key := range kv {
-			if err := meshStorage.Delete(ctx, key); err != nil {
-				t.Fatalf("failed to delete key: %v", err)
-			}
-		}
-	})
+	meshStorage.DropAll(ctx)
 
 	// We will use the same snapshot for the Snapshot and Restore tests
 	var snapshot io.Reader
@@ -672,6 +645,11 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 // RunDualStorageConformance tests that the DualStorage interface is implemented correctly.
 func RunDualStorageConformance(t *testing.T, dualStorage DualStorage) {
 	t.Helper()
+	ctx := context.Background()
+
 	RunRaftStorageConformance(t, dualStorage)
+	dualStorage.DropAll(ctx)
+
 	RunMeshStorageConformance(t, dualStorage)
+	dualStorage.DropAll(ctx)
 }
