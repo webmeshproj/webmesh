@@ -63,6 +63,17 @@ type subscription struct {
 	cancel context.CancelFunc
 }
 
+func (st *meshStorage) DropAll(ctx context.Context) error {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.data = make(map[string]dataItem)
+	for _, sub := range st.subs {
+		sub.cancel()
+	}
+	st.subs = make(map[string]subscription)
+	return nil
+}
+
 // GetValue returns the value of a key.
 func (st *meshStorage) GetValue(ctx context.Context, key string) (string, error) {
 	st.mu.RLock()
