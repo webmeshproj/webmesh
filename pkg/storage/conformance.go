@@ -543,8 +543,8 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 	// We will use the same snapshot for the Snapshot and Restore tests
 	var snapshot io.Reader
 	snapshotKV := map[string]string{
-		"Snapshot/key1": "value1",
-		"Snapshot/key2": "value2",
+		"/registry/Snapshot/key1": "value1",
+		"/registry/Snapshot/key2": "value2",
 	}
 
 	t.Run("Snapshot", func(t *testing.T) {
@@ -596,8 +596,8 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		// Place some keys that we don't want to see return
 		// after the snapshot is restored.
 		restoreKV := map[string]string{
-			"Restore/key1": "value1",
-			"Restore/key2": "value2",
+			"/registry/Restore/key1": "value1",
+			"/registry/Restore/key2": "value2",
 		}
 		for key, value := range restoreKV {
 			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {

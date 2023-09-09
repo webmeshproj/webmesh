@@ -106,12 +106,12 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		}
 	}
 
-	nodeCancel, err := st.Subscribe(ctx, peers.NodesPrefix, notify)
+	nodeCancel, err := st.Subscribe(ctx, peers.NodesPrefix.String(), notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to node changes: %v", err)
 	}
 	defer nodeCancel()
-	edgeCancel, err := st.Subscribe(ctx, peers.EdgesPrefix, notify)
+	edgeCancel, err := st.Subscribe(ctx, peers.EdgesPrefix.String(), notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to edge changes: %v", err)
 	}

@@ -569,7 +569,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 
 	// Subscribe to peer updates
 	t.log.Debug("Subscribing to peer updates")
-	_, err = node.Storage().Subscribe(context.Background(), peers.NodesPrefix, func(key string, value string) {
+	_, err = node.Storage().Subscribe(context.Background(), peers.NodesPrefix.String(), func(key string, value string) {
 		log := context.LoggerFrom(ctx)
 		peer := peers.MeshNode{MeshNode: &v1.MeshNode{}}
 		err = protojson.Unmarshal([]byte(value), peer.MeshNode)

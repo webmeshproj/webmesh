@@ -39,10 +39,10 @@ const (
 	// BootstrapVotersRoleBinding is the name of the bootstrap voters rolebinding.
 	BootstrapVotersRoleBinding = "bootstrap-voters"
 
-	rolesPrefix        = "/registry/roles"
-	rolebindingsPrefix = "/registry/rolebindings"
-	groupsPrefix       = "/registry/groups"
-	rbacDisabledKey    = "/registry/rbac-disabled"
+	rolesPrefix        = storage.RegistryPrefix + "roles"
+	rolebindingsPrefix = storage.RegistryPrefix + "rolebindings"
+	groupsPrefix       = storage.RegistryPrefix + "groups"
+	rbacDisabledKey    = storage.RegistryPrefix + "rbac-disabled"
 )
 
 // IsSystemRole returns true if the role is a system role.
@@ -131,7 +131,7 @@ type rbac struct {
 
 // Disable disables RBAC.
 func (r *rbac) Disable(ctx context.Context) error {
-	err := r.PutValue(ctx, rbacDisabledKey, "true", 0)
+	err := r.PutValue(ctx, rbacDisabledKey.String(), "true", 0)
 	if err != nil {
 		return fmt.Errorf("put rbac disabled: %w", err)
 	}
@@ -140,7 +140,7 @@ func (r *rbac) Disable(ctx context.Context) error {
 
 // IsDisabled returns true if RBAC is disabled.
 func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
-	_, err := r.GetValue(ctx, rbacDisabledKey)
+	_, err := r.GetValue(ctx, rbacDisabledKey.String())
 	if err != nil {
 		if storage.IsKeyNotFoundError(err) {
 			return false, nil
@@ -152,7 +152,7 @@ func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
 
 // Enable enables RBAC.
 func (r *rbac) Enable(ctx context.Context) error {
-	err := r.Delete(ctx, rbacDisabledKey)
+	err := r.Delete(ctx, rbacDisabledKey.String())
 	if err != nil {
 		return fmt.Errorf("delete rbac disabled: %w", err)
 	}
@@ -212,7 +212,7 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 	if IsSystemRole(name) {
 		return fmt.Errorf("%w %q", ErrIsSystemRole, name)
 	}
-	key := fmt.Sprintf("%s/%s", rolesPrefix, name)
+	key := fmt.Sprintf("%s/%s", rolesPrefix.String(), name)
 	err := r.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("delete role: %w", err)
@@ -223,8 +223,8 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 // ListRoles returns a list of all roles.
 func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
 	out := make(RolesList, 0)
-	err := r.IterPrefix(ctx, rolesPrefix, func(key, value string) error {
-		if key == rolesPrefix {
+	err := r.IterPrefix(ctx, rolesPrefix.String(), func(key, value string) error {
+		if key == rolesPrefix.String() {
 			return nil
 		}
 		role := &v1.Role{}
@@ -305,8 +305,8 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 // ListRoleBindings returns a list of all rolebindings.
 func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) {
 	out := make([]*v1.RoleBinding, 0)
-	err := r.IterPrefix(ctx, rolebindingsPrefix, func(key, value string) error {
-		if key == rolebindingsPrefix {
+	err := r.IterPrefix(ctx, rolebindingsPrefix.String(), func(key, value string) error {
+		if key == rolebindingsPrefix.String() {
 			return nil
 		}
 		rolebinding := &v1.RoleBinding{}
@@ -374,8 +374,8 @@ func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 // ListGroups returns a list of all groups.
 func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
 	out := make([]*v1.Group, 0)
-	err := r.IterPrefix(ctx, groupsPrefix, func(key, value string) error {
-		if key == groupsPrefix {
+	err := r.IterPrefix(ctx, groupsPrefix.String(), func(key, value string) error {
+		if key == groupsPrefix.String() {
 			return nil
 		}
 		group := &v1.Group{}

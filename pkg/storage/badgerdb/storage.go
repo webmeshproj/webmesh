@@ -46,6 +46,8 @@ type Options struct {
 	InMemory bool
 	// DiskPath is the path to use for disk storage.
 	DiskPath string
+	// Debug specifies whether to enable debug logging.
+	Debug bool
 }
 
 type badgerDB struct {
@@ -60,6 +62,10 @@ func New(opts Options) (storage.DualStorage, error) {
 	badgeropts := badger.DefaultOptions(opts.DiskPath)
 	if opts.InMemory {
 		badgeropts = badgeropts.WithInMemory(true)
+	}
+	badgeropts.WithLoggingLevel(badger.ERROR)
+	if opts.Debug {
+		badgeropts.WithLoggingLevel(badger.DEBUG)
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {
@@ -226,6 +232,7 @@ func (db *badgerDB) Snapshot(ctx context.Context) (io.Reader, error) {
 	}
 	err := db.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
+		opts.Prefix = []byte(storage.RegistryPrefix)
 		it := txn.NewIterator(opts)
 		defer it.Close()
 		for it.Rewind(); it.Valid(); it.Next() {
@@ -316,7 +323,7 @@ func (db *badgerDB) Close() error {
 
 // Raft Log Storage Operations
 
-const RaftLogPrefix = "/raft/log/"
+var RaftLogPrefix = storage.RaftPrefix.For("/log/")
 
 // FirstIndex returns the first index written. 0 for no entries.
 func (db *badgerDB) FirstIndex() (uint64, error) {
@@ -439,7 +446,7 @@ func (db *badgerDB) DeleteRange(min, max uint64) error {
 
 // Raft Stable Storage Operations
 
-const StableStorePrefix = "/raft/stable/"
+var StableStorePrefix = storage.RaftPrefix.For("/stable/")
 
 func (db *badgerDB) Set(key []byte, val []byte) error {
 	db.mu.Lock()

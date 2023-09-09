@@ -49,12 +49,12 @@ func (s *meshStore) onDBUpdate(key, value string) {
 }
 
 func isNodeChangeKey(key string) bool {
-	return strings.HasPrefix(key, peers.NodesPrefix) ||
-		strings.HasPrefix(key, peers.EdgesPrefix)
+	return strings.HasPrefix(key, peers.NodesPrefix.String()) ||
+		strings.HasPrefix(key, peers.EdgesPrefix.String())
 }
 
 func isRouteChangeKey(key string) bool {
-	return strings.HasPrefix(key, networking.RoutesPrefix)
+	return strings.HasPrefix(key, networking.RoutesPrefix.String())
 }
 
 // TODO: Make all waits and timeouts below configurable

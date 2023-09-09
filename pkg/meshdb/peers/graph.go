@@ -40,12 +40,12 @@ type GraphStore struct {
 
 // NodesPrefix is where nodes are stored in the database.
 // nodes are indexed by their ID in the format /registry/nodes/<id>.
-const NodesPrefix = "/registry/nodes"
+const NodesPrefix = storage.RegistryPrefix + "nodes"
 
 // EdgesPrefix is where edges are stored in the database.
 // edges are indexed by their source and target node IDs
 // in the format /registry/edges/<source>/<target>.
-const EdgesPrefix = "/registry/edges"
+const EdgesPrefix = storage.RegistryPrefix + "edges"
 
 // NewGraph creates a new Graph instance.
 func NewGraph(st storage.MeshStorage) Graph {
@@ -127,12 +127,12 @@ func (g *GraphStore) RemoveVertex(nodeID string) error {
 		return err
 	}
 	// Check if the node has edges.
-	keys, err := g.List(context.Background(), EdgesPrefix)
+	keys, err := g.List(context.Background(), EdgesPrefix.String())
 	if err != nil {
 		return fmt.Errorf("list edges: %w", err)
 	}
 	for _, key := range keys {
-		key = strings.TrimPrefix(key, EdgesPrefix+"/")
+		key = strings.TrimPrefix(key, EdgesPrefix.String()+"/")
 		parts := strings.Split(key, "/")
 		if len(parts) != 2 {
 			// Should never happen.
@@ -152,13 +152,13 @@ func (g *GraphStore) RemoveVertex(nodeID string) error {
 func (g *GraphStore) ListVertices() ([]string, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	keys, err := g.List(context.Background(), NodesPrefix)
+	keys, err := g.List(context.Background(), NodesPrefix.String())
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 	out := make([]string, len(keys))
 	for i, key := range keys {
-		out[i] = strings.TrimPrefix(key, NodesPrefix+"/")
+		out[i] = strings.TrimPrefix(key, NodesPrefix.String()+"/")
 	}
 	return out, nil
 }
@@ -185,17 +185,17 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 	// We diverge from the suggested implementation and only check that one of the nodes
 	// exists. This is so joiners can add edges to nodes that are not yet in the graph.
 	// If this ends up causing problems, we can change it.
-	nodeKeys, err := g.List(context.Background(), NodesPrefix)
+	nodeKeys, err := g.List(context.Background(), NodesPrefix.String())
 	if err != nil {
 		return fmt.Errorf("list nodes: %w", err)
 	}
-	edgeKeys, err := g.List(context.Background(), EdgesPrefix)
+	edgeKeys, err := g.List(context.Background(), EdgesPrefix.String())
 	if err != nil {
 		return fmt.Errorf("list edges: %w", err)
 	}
 	var vertexExists bool
 	for _, key := range nodeKeys {
-		key = strings.TrimPrefix(key, NodesPrefix+"/")
+		key = strings.TrimPrefix(key, NodesPrefix.String()+"/")
 		if key == sourceNode || key == targetNode {
 			vertexExists = true
 			break
@@ -206,7 +206,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode string, edge graph.Edge[stri
 	}
 	var edgeExists bool
 	for _, key := range edgeKeys {
-		key = strings.TrimPrefix(key, EdgesPrefix+"/")
+		key = strings.TrimPrefix(key, EdgesPrefix.String()+"/")
 		parts := strings.Split(key, "/")
 		if len(parts) != 2 {
 			// Should never happen.
@@ -334,7 +334,7 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[string], error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	edges := make([]graph.Edge[string], 0)
-	err := g.IterPrefix(context.Background(), EdgesPrefix, func(key, value string) error {
+	err := g.IterPrefix(context.Background(), EdgesPrefix.String(), func(key, value string) error {
 		source, target, err := parseEdgeKey(key)
 		if err != nil {
 			return fmt.Errorf("parse edge path: %w", err)
@@ -365,7 +365,7 @@ func newEdgeKey(source, target string) string {
 }
 
 func parseEdgeKey(key string) (source, target string, err error) {
-	edgeParts := strings.TrimPrefix(key, EdgesPrefix+"/")
+	edgeParts := strings.TrimPrefix(key, EdgesPrefix.String()+"/")
 	parts := strings.Split(edgeParts, "/")
 	if len(parts) != 2 {
 		err = fmt.Errorf("invalid edge path: %s", key)

@@ -35,9 +35,9 @@ const (
 	// BootstrapNodesNetworkACLName is the name of the bootstrap nodes NetworkACL.
 	BootstrapNodesNetworkACLName = "bootstrap-nodes"
 	// NetworkACLsPrefix is where NetworkACLs are stored in the database.
-	NetworkACLsPrefix = "/registry/network-acls"
+	NetworkACLsPrefix = storage.RegistryPrefix + "network-acls"
 	// RoutesPrefix is where Routes are stored in the database.
-	RoutesPrefix = "/registry/routes"
+	RoutesPrefix = storage.RegistryPrefix + "routes"
 )
 
 // IsSystemNetworkACL returns true if the NetworkACL is a system NetworkACL.
@@ -154,8 +154,8 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 // ListNetworkACLs returns a list of NetworkACLs.
 func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 	out := make(ACLs, 0)
-	err := n.IterPrefix(ctx, NetworkACLsPrefix, func(key, value string) error {
-		if key == NetworkACLsPrefix {
+	err := n.IterPrefix(ctx, NetworkACLsPrefix.String(), func(key, value string) error {
+		if key == NetworkACLsPrefix.String() {
 			return nil
 		}
 		acl := &v1.NetworkACL{}
@@ -252,8 +252,8 @@ func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 // ListRoutes returns a list of Routes.
 func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
 	out := make([]*v1.Route, 0)
-	err := n.IterPrefix(ctx, RoutesPrefix, func(key, value string) error {
-		if key == RoutesPrefix {
+	err := n.IterPrefix(ctx, RoutesPrefix.String(), func(key, value string) error {
+		if key == RoutesPrefix.String() {
 			return nil
 		}
 		route := &v1.Route{}

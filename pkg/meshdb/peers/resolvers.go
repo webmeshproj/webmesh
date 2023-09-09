@@ -77,8 +77,8 @@ func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 func (r *peerResolver) FeatureResolver(filterFn ...FilterFunc) transport.FeatureResolver {
 	return transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
 		var addrs []netip.AddrPort
-		err := r.st.IterPrefix(ctx, NodesPrefix, func(key string, val string) error {
-			if key == NodesPrefix {
+		err := r.st.IterPrefix(ctx, NodesPrefix.String(), func(key string, val string) error {
+			if key == NodesPrefix.String() {
 				return nil
 			}
 			mnode := &v1.MeshNode{}

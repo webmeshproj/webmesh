@@ -229,8 +229,8 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 
 func (p *peers) List(ctx context.Context) ([]MeshNode, error) {
 	out := make([]MeshNode, 0)
-	err := p.db.IterPrefix(ctx, NodesPrefix, func(key, value string) error {
-		if key == NodesPrefix {
+	err := p.db.IterPrefix(ctx, NodesPrefix.String(), func(key, value string) error {
+		if key == NodesPrefix.String() {
 			return nil
 		}
 		node := MeshNode{&v1.MeshNode{}}
@@ -245,13 +245,13 @@ func (p *peers) List(ctx context.Context) ([]MeshNode, error) {
 }
 
 func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
-	keys, err := p.db.List(ctx, NodesPrefix)
+	keys, err := p.db.List(ctx, NodesPrefix.String())
 	if err != nil {
 		return nil, fmt.Errorf("list keys: %w", err)
 	}
 	ids := make([]string, 0)
 	for _, key := range keys {
-		ids = append(ids, strings.TrimPrefix(key, NodesPrefix+"/"))
+		ids = append(ids, strings.TrimPrefix(key, NodesPrefix.String()+"/"))
 	}
 	return ids, nil
 }

@@ -32,6 +32,7 @@ func TestInMemoryBadgerStorage(t *testing.T) {
 	}
 	defer st.Close()
 	storage.RunRaftStorageConformance(t, st)
+	storage.RunMeshStorageConformance(t, st)
 }
 
 func TestDiskBadgerStorage(t *testing.T) {

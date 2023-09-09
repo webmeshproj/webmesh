@@ -99,15 +99,42 @@ func IsKeyNotFoundError(err error) bool {
 	return errors.Is(err, ErrKeyNotFound)
 }
 
-var reservedPrefixes = []string{
-	"/registry/",
-	"/raft/",
+// Prefix is a prefix in the storage.
+type Prefix string
+
+const (
+	// RegistryPrefix is the prefix for all data stored in the mesh registry.
+	RegistryPrefix Prefix = "/registry/"
+
+	// RaftPrefix is the prefix for all data stored in the raft storage.
+	RaftPrefix Prefix = "/raft/"
+)
+
+// String returns the string representation of the prefix.
+func (p Prefix) String() string {
+	return string(p)
+}
+
+// Contains returns true if the given key is contained in the prefix.
+func (p Prefix) Contains(key string) bool {
+	return strings.HasPrefix(key, p.String())
+}
+
+// For is a helper method for creating a key for the prefix.
+func (p Prefix) For(key string) Prefix {
+	return Prefix(p.String() + strings.TrimSuffix(key, "/"))
+}
+
+// ReservedPrefixes is a list of all reserved prefixes.
+var ReservedPrefixes = []Prefix{
+	RegistryPrefix,
+	RaftPrefix,
 }
 
 // IsReservedPrefix returns true if the given key is reserved.
 func IsReservedPrefix(key string) bool {
-	for _, prefix := range reservedPrefixes {
-		if strings.HasPrefix(key, prefix) {
+	for _, prefix := range ReservedPrefixes {
+		if prefix.Contains(key) {
 			return true
 		}
 	}
