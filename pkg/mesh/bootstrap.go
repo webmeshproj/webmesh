@@ -289,7 +289,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if err != nil {
 		return fmt.Errorf("encode public key: %w", err)
 	}
-	privatev6 := netutil.AssignToPrefix(meshnetworkv6, s.key.PublicKey().WireGuardKey())
+	privatev6 := netutil.AssignToPrefix(meshnetworkv6, s.key.PublicKey())
 	self := &v1.MeshNode{
 		Id:              s.ID(),
 		PrimaryEndpoint: opts.PrimaryEndpoint.String(),

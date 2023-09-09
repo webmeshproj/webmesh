@@ -114,7 +114,7 @@ func (rt *roundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RE
 	log := context.LoggerFrom(ctx).With("method", rt.RoundTripOptions.Method)
 	log = log.With(slog.String("host-id", rt.host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
-	log.Debug("Searching for peers on the DHT with our PSK")
+	log.Debug("Searching for peers on the DHT with our PSK", slog.String("psk", rt.Rendezvous))
 	routingDiscovery := drouting.NewRoutingDiscovery(rt.host.DHT())
 	peerChan, err := routingDiscovery.FindPeers(ctx, rt.Rendezvous)
 	if err != nil {

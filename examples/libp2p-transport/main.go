@@ -2,23 +2,23 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"io"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"sync/atomic"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	mnet "github.com/multiformats/go-multiaddr/net"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
-	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 )
 
 func main() {
@@ -54,34 +54,21 @@ func main() {
 func runServer(payloadSize int, opts libp2p.Option) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	log.Println("Setting up host")
+	log.Println("Setting up libp2p host and webmesh node")
 	host, err := libp2p.New(opts)
 	if err != nil {
 		return err
 	}
 	defer host.Close()
-	var lisIP multiaddr.Multiaddr
 	for _, addr := range host.Addrs() {
-		if val, err := addr.ValueForProtocol(multiaddr.P_IP6); err == nil {
-			lisIP = multiaddr.StringCast("/ip6/" + val)
-			break
-		}
+		log.Println("Listening for libp2p connections on:", addr)
 	}
-	l, err := mnet.Listen(multiaddr.Join(lisIP, multiaddr.StringCast("/tcp/8080")))
-	if err != nil {
-		return err
-	}
-	defer l.Close()
-	log.Println("Listening for libp2p connections on", l.Multiaddr())
-	conn, err := l.Accept()
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	log.Println("Received connection from", conn.RemoteAddr())
+	host.SetStreamHandler("", func(stream network.Stream) {
+		log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
+		go runSpeedTest(ctx, stream, payloadSize)
+	})
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	go runSpeedTest(ctx, conn, payloadSize)
 	<-sig
 	return nil
 }
@@ -89,26 +76,33 @@ func runServer(payloadSize int, opts libp2p.Option) error {
 func runClient(payloadSize int, opts libp2p.Option) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	log.Println("Setting up host")
+	log.Println("Setting up libp2p host and webmesh node")
 	host, err := libp2p.New(opts)
 	if err != nil {
 		return err
 	}
-	defer host.Close()
-	var ourIP multiaddr.Multiaddr
 	for _, addr := range host.Addrs() {
-		if val, err := addr.ValueForProtocol(multiaddr.P_IP6); err == nil {
-			ourIP = multiaddr.StringCast("/ip6/" + val)
+		log.Println("Listening for libp2p connections on:", addr)
+	}
+	defer host.Close()
+	var toDial peer.ID
+	for _, peer := range host.Peerstore().PeersWithAddrs() {
+		if peer != host.ID() {
+			log.Println("Found peer:", peer)
+			log.Println("Peer addrs:", host.Peerstore().Addrs(peer))
+			toDial = peer
 			break
 		}
 	}
-	dialer := newDialer(ourIP)
-	conn, err := dialer.Dial(multiaddr.StringCast("/dns6/server.webmesh.internal/tcp/8080"))
+	if toDial == "" {
+		return errors.New("no peers to dial")
+	}
+	conn, err := host.Network().NewStream(ctx, toDial)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	log.Println("Opened connection to", conn.RemoteAddr())
+	log.Println("Opened connection to", conn.Conn().RemoteMultiaddr())
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	go runSpeedTest(ctx, conn, payloadSize)
@@ -173,8 +167,6 @@ func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize in
 
 func newWebmeshClientOptions(rendezvous string, loglevel string) libp2p.Option {
 	conf := config.NewInsecureConfig("client")
-	conf.Global.LogLevel = loglevel
-	conf.Discovery.ConnectTimeout = time.Second * 3
 	conf.Services.API.Disabled = true
 	conf.WireGuard.ListenPort = 51821
 	conf.WireGuard.InterfaceName = "webmeshclient0"
@@ -188,16 +180,9 @@ func newWebmeshClientOptions(rendezvous string, loglevel string) libp2p.Option {
 }
 
 func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
-	eps, err := endpoints.Detect(context.Background(), endpoints.DetectOpts{
-		DetectPrivate: true,
-	})
-	if err != nil {
-		panic(err)
-	}
 	conf := config.NewInsecureConfig("server")
-	conf.Global.LogLevel = loglevel
-	conf.Discovery.ConnectTimeout = time.Second * 3
-	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
+	conf.Global.DetectEndpoints = true
+	conf.Global.DetectPrivateEndpoints = true
 	conf.Bootstrap.Enabled = true
 	conf.WireGuard.InterfaceName = "webmeshserver0"
 	conf.WireGuard.ListenPort = 51820
@@ -215,18 +200,4 @@ func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
 		Laddrs:     []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::/tcp/0")},
 		LogLevel:   loglevel,
 	})
-}
-
-func newDialer(laddr multiaddr.Multiaddr) *mnet.Dialer {
-	return &mnet.Dialer{
-		LocalAddr: multiaddr.Join(laddr, multiaddr.StringCast("/tcp/0")),
-		Dialer: net.Dialer{
-			Resolver: &net.Resolver{
-				PreferGo: true,
-				Dial: func(ctx context.Context, network string, address string) (net.Conn, error) {
-					return (&net.Dialer{}).DialContext(ctx, "udp", "[::1]:6353")
-				},
-			},
-		},
-	}
 }

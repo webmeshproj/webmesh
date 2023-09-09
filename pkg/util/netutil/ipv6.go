@@ -27,7 +27,7 @@ import (
 	"net/netip"
 	"time"
 
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 // GenerateULA generates a unique local address with a /32 prefix
@@ -59,12 +59,13 @@ func GenerateULAWithPSK(psk []byte) netip.Prefix {
 
 // AssignToPrefix assigns a /112 prefix within a /32 prefix using a public key.
 // It does not check that the given prefix is a valid /32 prefix.
-func AssignToPrefix(prefix netip.Prefix, publicKey wgtypes.Key) netip.Prefix {
+func AssignToPrefix(prefix netip.Prefix, publicKey crypto.PublicKey) netip.Prefix {
 	// Convert the prefix to a slice
 	ip := prefix.Addr().AsSlice()
 	// Take a hash of the public key
+	pubKey := publicKey.WireGuardKey()
 	sha := sha256.New()
-	sha.Write(publicKey[:])
+	sha.Write(pubKey[:])
 	data := sha.Sum(nil)
 	// Set the client ID to the first 8 bytes of the hash
 	copy(ip[6:], data[:8])

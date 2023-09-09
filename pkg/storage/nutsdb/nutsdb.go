@@ -53,7 +53,8 @@ const (
 	stableStoreBucket = "raft-stable"
 )
 
-func isNotFoundErr(err error) bool {
+// IsNotFound returns true if the error is a not found error.
+func IsNotFound(err error) bool {
 	// These guys need help with their error management.
 	return nutsdb.IsBucketNotFound(err) ||
 		nutsdb.IsBucketEmpty(err) ||
@@ -67,11 +68,12 @@ func isNotFoundErr(err error) bool {
 		strings.Contains(err.Error(), "not found")
 }
 
-func ignoreNotFound(err error) error {
+// IgnoreNotFound returns nil if the error is a not found error.
+func IgnoreNotFound(err error) error {
 	if err == nil {
 		return nil
 	}
-	if isNotFoundErr(err) {
+	if IsNotFound(err) {
 		return nil
 	}
 	return err

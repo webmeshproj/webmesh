@@ -22,13 +22,16 @@ package security
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	p2pproto "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/sec"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -36,8 +39,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 )
 
-// SecurityProtocol is the protocol ID of the security protocol.
-const SecurityProtocol = "/webmesh"
+// ID is the protocol ID of the security protocol.
+const ID = "/webmesh/id/1.0.0"
 
 // Ensure we implement the interfaces.
 var _ sec.SecureTransport = (*SecureTransport)(nil)
@@ -45,29 +48,41 @@ var _ sec.SecureConn = (*SecureConn)(nil)
 
 // SecureTransportBuilder is the function signature returned from New
 // for creating a secure transport.
-type SecureTransportBuilder func(id protocol.ID, privkey p2pcrypto.PrivKey) (*SecureTransport, error)
+type SecureTransportBuilder func(id p2pproto.ID, privkey p2pcrypto.PrivKey, host host.Host) (*SecureTransport, error)
 
 // NewSecurity creates a new secure transport using the given wireguard interface.
-func New() (SecureTransportBuilder, *SecureTransport) {
-	s := &SecureTransport{}
-	return func(id protocol.ID, privkey p2pcrypto.PrivKey) (*SecureTransport, error) {
-		key, ok := privkey.(crypto.PrivateKey)
-		if !ok {
-			return nil, errors.New("private key is not a crypto.PrivateKey")
-		}
+func New(key crypto.PrivateKey, log *slog.Logger) (SecureTransportBuilder, *SecureTransport) {
+	s := &SecureTransport{
+		protocolID: ID,
+		privateKey: key,
+		log:        log,
+	}
+	return func(id p2pproto.ID, _ p2pcrypto.PrivKey, host host.Host) (*SecureTransport, error) {
+		s.host = host
+		s.ps = host.Peerstore()
 		s.protocolID = id
-		s.localID = key.ID()
 		s.privateKey = key
+		// s.host.SetStreamHandler(s.protocolID, func(conn network.Stream) {
+		// 	defer conn.Close()
+		// 	// TODO: handle stream
+		// 	s.log.Error("Security stream handler not implemented")
+		// })
+		err := s.ps.AddProtocols(s.host.ID(), s.protocolID)
+		if err != nil {
+			return nil, fmt.Errorf("add protocol to peerstore: %w", err)
+		}
 		return s, nil
 	}, s
 }
 
 // SecureTransport implements a libp2p secure transport using the local node's private key and wireguard allowed IPs.
 type SecureTransport struct {
-	protocolID protocol.ID
-	localID    peer.ID
+	host       host.Host
+	ps         peerstore.Peerstore
+	protocolID p2pproto.ID
 	privateKey crypto.PrivateKey
 	iface      wireguard.Interface
+	log        *slog.Logger
 	mu         sync.Mutex
 }
 
@@ -87,9 +102,9 @@ func (s *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, 
 		return nil, errors.New("wireguard interface not set")
 	}
 	var remotePub p2pcrypto.PubKey
+	var err error
 	if p != "" {
-		var err error
-		remotePub, err = crypto.ExtractPublicKey(p)
+		remotePub, err = crypto.ExtractPublicKeyFromID(p)
 		if err != nil {
 			return nil, fmt.Errorf("extract public key from peer ID: %w", err)
 		}
@@ -101,9 +116,15 @@ func (s *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, 
 	if !inNw {
 		return nil, fmt.Errorf("connection from %s not in wireguard network", insecure.RemoteAddr())
 	}
+	if p != "" {
+		err := s.ps.AddProtocols(p, s.protocolID)
+		if err != nil {
+			return nil, fmt.Errorf("add protocol to peerstore: %w", err)
+		}
+	}
 	return &SecureConn{
 		Conn:         insecure,
-		localID:      s.localID,
+		localID:      s.privateKey.ID(),
 		remoteID:     p,
 		remotePubkey: remotePub,
 		transport:    getConnTransport(insecure),
@@ -117,13 +138,9 @@ func (s *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn,
 	if s.iface == nil {
 		return nil, errors.New("wireguard interface not set")
 	}
-	var remotePub p2pcrypto.PubKey
-	if p != "" {
-		var err error
-		remotePub, err = crypto.ExtractPublicKey(p)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
-		}
+	remotePub, err := crypto.ExtractPublicKeyFromID(p)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
 	}
 	inNw, err := s.IsInNetwork(insecure)
 	if err != nil {
@@ -132,9 +149,12 @@ func (s *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn,
 	if !inNw {
 		return nil, fmt.Errorf("connection to %s not in wireguard network", insecure.RemoteAddr())
 	}
+	if err := s.ps.AddProtocols(p, s.protocolID); err != nil {
+		return nil, fmt.Errorf("add protocol to peerstore: %w", err)
+	}
 	return &SecureConn{
 		Conn:         insecure,
-		localID:      s.localID,
+		localID:      s.privateKey.ID(),
 		remoteID:     p,
 		remotePubkey: remotePub,
 		transport:    getConnTransport(insecure),
@@ -142,7 +162,7 @@ func (s *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn,
 }
 
 // ID is the protocol ID of the security protocol.
-func (s *SecureTransport) ID() protocol.ID {
+func (s *SecureTransport) ID() p2pproto.ID {
 	return s.protocolID
 }
 
@@ -196,7 +216,7 @@ func (s *SecureConn) RemotePublicKey() p2pcrypto.PubKey {
 // ConnState returns information about the connection state.
 func (s *SecureConn) ConnState() network.ConnectionState {
 	return network.ConnectionState{
-		Security:                  SecurityProtocol,
+		Security:                  ID,
 		Transport:                 s.transport,
 		UsedEarlyMuxerNegotiation: false,
 	}

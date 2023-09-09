@@ -19,7 +19,6 @@ package raft
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -35,21 +34,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/raft/fsm"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-)
-
-var (
-	// ErrStarted is returned when the Raft node is already started.
-	ErrStarted = errors.New("raft node already started")
-	// ErrClosed is returned when the Raft node is already closed.
-	ErrClosed = errors.New("raft node is closed")
-	// ErrNoLeader is returned when there is no leader.
-	ErrNoLeader = errors.New("no leader")
-	// ErrAlreadyBootstrapped is returned when the Raft node is already bootstrapped.
-	ErrAlreadyBootstrapped = transport.ErrAlreadyBootstrapped
-	// ErrNotLeader is returned when the Raft node is not the leader.
-	ErrNotLeader = raft.ErrNotLeader
-	// ErrNotVoter is returned when the Raft node is not a voter.
-	ErrNotVoter = raft.ErrNotVoter
 )
 
 type (

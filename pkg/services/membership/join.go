@@ -187,7 +187,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	var leasev4, leasev6 netip.Prefix
 	// We always generate an IPv6 address for the peer from their public key
-	leasev6 = netutil.AssignToPrefix(s.ipv6Prefix, publicKey.WireGuardKey())
+	leasev6 = netutil.AssignToPrefix(s.ipv6Prefix, publicKey)
 	log.Debug("Assigned IPv6 address to peer", slog.String("ipv6", leasev6.String()))
 	// Acquire an IPv4 address for the peer only if requested
 	if req.GetAssignIpv4() {

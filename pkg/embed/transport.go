@@ -17,7 +17,6 @@ limitations under the License.
 package embed
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -26,8 +25,12 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/embed/connmgr"
+	"github.com/webmeshproj/webmesh/pkg/embed/peerstore"
+	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
 	"github.com/webmeshproj/webmesh/pkg/embed/security"
 	"github.com/webmeshproj/webmesh/pkg/embed/transport"
+	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 // TransportOptions are options for configuring a libp2p transport.
@@ -45,21 +48,27 @@ func WithWebmeshTransport(topts TransportOptions) p2pconfig.Option {
 	if err != nil {
 		panic(err)
 	}
-	builder, sec := security.New()
+	log := logutil.NewLogger(topts.LogLevel)
+	secBuilder, sec := security.New(key, log.With("component", "sec-manager"))
+	rtBuilder, rt := transport.New(transport.Options{
+		Config:        topts.Config.ShallowCopy(),
+		LogLevel:      topts.LogLevel,
+		StartTimeout:  time.Second * 30,
+		StopTimeout:   time.Second * 30,
+		ListenTimeout: time.Second * 30,
+	}, sec)
 	opts := []p2pconfig.Option{
+		libp2p.ProtocolVersion(security.ID),
+		libp2p.Security(security.ID, secBuilder),
+		libp2p.Transport(rtBuilder),
 		libp2p.Identity(key),
-		libp2p.Security(security.SecurityProtocol, builder),
-		libp2p.Transport(transport.New(transport.Options{
-			Config:        topts.Config.ShallowCopy(),
-			LogLevel:      topts.LogLevel,
-			StartTimeout:  time.Second * 30,
-			StopTimeout:   time.Second * 30,
-			ListenTimeout: time.Second * 30,
-		}, sec)),
+		libp2p.Peerstore(peerstore.New(log.With("component", "peerstore"))),
+		libp2p.ConnectionManager(connmgr.New(logutil.NewLogger(topts.LogLevel).With("component", "conn-manager"))),
+		libp2p.DisableMetrics(),
 	}
-	webmeshSec := ma.StringCast(fmt.Sprintf("%s/%s", security.SecurityProtocol, key.ID()))
+	webmeshSec := protocol.WithPeerID(key.ID())
 	if topts.Rendezvous != "" {
-		webmeshSec = ma.StringCast(fmt.Sprintf("%s/%s", webmeshSec.String(), topts.Rendezvous))
+		webmeshSec = protocol.WithPeerIDAndRendezvous(key.ID(), topts.Rendezvous)
 	}
 	if len(topts.Laddrs) > 0 {
 		// Append our webmesh IDs to the listen addresses.
@@ -68,5 +77,7 @@ func WithWebmeshTransport(topts TransportOptions) p2pconfig.Option {
 		}
 		opts = append(opts, libp2p.ListenAddrs(topts.Laddrs...))
 	}
+	opts = append(opts, libp2p.AddrsFactory(rt.ConvertAddrs))
+	opts = append(opts, libp2p.FallbackDefaults)
 	return libp2p.ChainOptions(opts...)
 }

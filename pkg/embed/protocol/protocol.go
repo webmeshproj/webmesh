@@ -31,6 +31,9 @@ func init() {
 	}
 }
 
+// ID is the ID for the webmesh libp2p protocol.
+const ID = "webmesh"
+
 // Code is the code for the webmesh libp2p protocol.
 const Code = 613
 
@@ -45,12 +48,22 @@ var ErrNoRedezvous = fmt.Errorf("no rendezvous in webmesh multiaddr")
 
 // Protocol is the webmesh libp2p protocol.
 var Protocol = multiaddr.Protocol{
-	Name:       "webmesh",
+	Name:       ID,
 	Code:       Code,
 	VCode:      multiaddr.CodeToVarint(Code),
 	Size:       -1,
 	Path:       true,
 	Transcoder: multiaddr.NewTranscoderFromFunctions(protocolStrToBytes, protocolBytesToStr, validateBytes),
+}
+
+// WithPeerID returns a webmesh multiaddr with the given peer ID.
+func WithPeerID(pid peer.ID) multiaddr.Multiaddr {
+	return multiaddr.StringCast(fmt.Sprintf("/%s/%s", ID, pid.String()))
+}
+
+// WithPeerIDAndRendezvous returns a webmesh multiaddr with the given peer ID and rendezvous.
+func WithPeerIDAndRendezvous(pid peer.ID, rendezvous string) multiaddr.Multiaddr {
+	return multiaddr.StringCast(fmt.Sprintf("/%s/%s/%s", ID, pid.String(), rendezvous))
 }
 
 // PeerIDFromWebmeshAddr returns the peer ID argument from a webmesh multiaddr.
@@ -62,8 +75,16 @@ func PeerIDFromWebmeshAddr(addr multiaddr.Multiaddr) (peer.ID, error) {
 	if pid == "" {
 		return "", fmt.Errorf("%w: %s", ErrNoPeerID, addr)
 	}
-	parts := strings.SplitN(strings.TrimPrefix(pid, "/"), "/", 2)
-	return peer.ID(parts[0]), nil
+	parts := strings.Split(strings.TrimPrefix(pid, "/"), "/")
+	if len(parts) < 1 || parts[0] == "" {
+		return "", fmt.Errorf("%w: %s", ErrNoPeerID, addr)
+	}
+	// The ID is base58 encoded, so it's length is not fixed.
+	decoded, err := peer.Decode(parts[0])
+	if err != nil {
+		return "", fmt.Errorf("%w: %w: %s", ErrNoPeerID, err, addr)
+	}
+	return peer.ID(decoded), nil
 }
 
 // RendezvousFromWebmeshAddr returns the rendezvous argument from a webmesh multiaddr.
@@ -75,8 +96,8 @@ func RendezvousFromWebmeshAddr(addr multiaddr.Multiaddr) (string, error) {
 	if rendezvous == "" {
 		return "", fmt.Errorf("%w: %s", ErrNoRedezvous, addr)
 	}
-	parts := strings.SplitN(strings.TrimPrefix(rendezvous, "/"), "/", 2)
-	if len(parts) < 2 {
+	parts := strings.Split(strings.TrimPrefix(rendezvous, "/"), "/")
+	if len(parts) < 2 || parts[1] == "" {
 		return "", fmt.Errorf("%w: %s", ErrNoRedezvous, addr)
 	}
 	return parts[1], nil

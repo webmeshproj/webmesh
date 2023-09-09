@@ -71,7 +71,7 @@ func (db *nutsInmemStorage) GetValue(ctx context.Context, key string) (string, e
 	defer db.meshmu.RUnlock()
 	value, err := db.memstore.Get(meshStoreBucket, []byte(key))
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return "", storage.NewKeyNotFoundError(key)
 		}
 		return "", fmt.Errorf("get value: %w", err)
@@ -99,7 +99,7 @@ func (db *nutsInmemStorage) Delete(ctx context.Context, key string) error {
 	if err == nil {
 		db.subs.Notify(ctx, key, "")
 	}
-	return ignoreNotFound(err)
+	return IgnoreNotFound(err)
 }
 
 // List returns all keys with a given prefix.
@@ -108,7 +108,7 @@ func (db *nutsInmemStorage) List(ctx context.Context, prefix string) ([]string, 
 	defer db.meshmu.RUnlock()
 	entries, _, err := db.memstore.PrefixScan(meshStoreBucket, []byte(prefix), 0, math.MaxInt)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("list: %w", err)
@@ -128,7 +128,7 @@ func (db *nutsInmemStorage) IterPrefix(ctx context.Context, prefix string, fn st
 	defer db.meshmu.RUnlock()
 	entries, _, err := db.memstore.PrefixScan(meshStoreBucket, []byte(prefix), 0, math.MaxInt)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("iter prefix: %w", err)
@@ -151,7 +151,7 @@ func (db *nutsInmemStorage) Snapshot(ctx context.Context) (io.Reader, error) {
 	}
 	entries, _, err := db.memstore.PrefixScan(meshStoreBucket, []byte(""), 0, math.MaxInt)
 	if err != nil {
-		if !isNotFoundErr(err) {
+		if !IsNotFound(err) {
 			return nil, fmt.Errorf("snapshot: %w", err)
 		}
 	} else {
@@ -181,7 +181,7 @@ func (db *nutsInmemStorage) Restore(ctx context.Context, r io.Reader) error {
 	// First delete the storage to clear it out.
 	entries, _, err := db.memstore.PrefixScan(meshStoreBucket, []byte(""), 0, math.MaxInt)
 	if err != nil {
-		if !isNotFoundErr(err) {
+		if !IsNotFound(err) {
 			return fmt.Errorf("restore: %w", err)
 		}
 	} else {
@@ -249,7 +249,7 @@ func (db *nutsInmemStorage) GetLog(index uint64, log *raft.Log) error {
 	binary.BigEndian.PutUint64(key[:], index)
 	entry, err := db.memstore.Get(logStoreBucket, key[:])
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return raft.ErrLogNotFound
 		}
 		return fmt.Errorf("get log: %w", err)
@@ -308,7 +308,7 @@ func (db *nutsInmemStorage) DeleteRange(min, max uint64) error {
 	defer db.raftlogmu.Unlock()
 	entries, _, err := db.memstore.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("delete range: %w", err)
@@ -343,7 +343,7 @@ func (db *nutsInmemStorage) Get(key []byte) ([]byte, error) {
 	defer db.raftstbmu.RUnlock()
 	val, err := db.memstore.Get(stableStoreBucket, key)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("get stable store: %w", err)
@@ -369,7 +369,7 @@ func (db *nutsInmemStorage) GetUint64(key []byte) (uint64, error) {
 	defer db.raftstbmu.RUnlock()
 	val, err := db.memstore.Get(stableStoreBucket, key)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return 0, nil
 		}
 		return 0, fmt.Errorf("get stable store: %w", err)

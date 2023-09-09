@@ -24,14 +24,19 @@ import (
 	"sort"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/crypto/pb"
+	cryptopb "github.com/libp2p/go-libp2p/core/crypto/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mh "github.com/multiformats/go-multihash"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+func init() {
+	cryptopb.KeyType_name[int32(WireGuardKeyType)] = "WireGuard"
+	cryptopb.KeyType_value["WireGuard"] = int32(WireGuardKeyType)
+}
+
 // WireGuardKeyType is the protobuf key type for WireGuard keys.
-const WireGuardKeyType pb.KeyType = 613
+const WireGuardKeyType cryptopb.KeyType = 613
 
 // Key is a cryptographic key.
 type Key interface {
@@ -55,6 +60,7 @@ type Key interface {
 // PrivateKey is a private key used for encryption and identity over libp2p
 type PrivateKey interface {
 	Key
+
 	p2pcrypto.PrivKey
 
 	// PublicKey returns the PublicKey as a PublicKey interface.
@@ -68,6 +74,7 @@ type PrivateKey interface {
 // PublicKey is a public key used for encryption and identity over libp2p
 type PublicKey interface {
 	Key
+
 	p2pcrypto.PubKey
 
 	// Native returns the native underlying secp256k1 key for use
@@ -132,6 +139,9 @@ func DecodePublicKey(s string) (PublicKey, error) {
 
 // ParsePublicKey parses a public key from a byte slice.
 func ParsePublicKey(data []byte) (PublicKey, error) {
+	if len(data) <= wgtypes.KeyLen {
+		return nil, fmt.Errorf("invalid key length")
+	}
 	pub, err := p2pcrypto.UnmarshalPublicKey(data[wgtypes.KeyLen:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal secp256k1 public key: %w", err)
@@ -142,8 +152,8 @@ func ParsePublicKey(data []byte) (PublicKey, error) {
 	}, nil
 }
 
-// ExtractPublicKey extracts the public key from the given peer ID.
-func ExtractPublicKey(id peer.ID) (PublicKey, error) {
+// ExtractPublicKeyFromID extracts the public key from the given peer ID.
+func ExtractPublicKeyFromID(id peer.ID) (PublicKey, error) {
 	decoded, err := mh.Decode([]byte(id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode peer ID: %w", err)
@@ -184,21 +194,13 @@ func (w *privateKey) Raw() ([]byte, error) {
 }
 
 // Type returns the protobuf key type.
-func (w *privateKey) Type() pb.KeyType {
+func (w *privateKey) Type() cryptopb.KeyType {
 	return WireGuardKeyType
 }
 
 // Cryptographically sign the given bytes
 func (w *privateKey) Sign(data []byte) ([]byte, error) {
 	return w.ecdsa.Sign(data)
-}
-
-// Return a public key paired with this private key
-func (w *privateKey) GetPublic() p2pcrypto.PubKey {
-	return &publicKey{
-		ecdsa: w.ecdsa.GetPublic().(*p2pcrypto.Secp256k1PublicKey),
-		wgkey: w.WireGuardKey().PublicKey(),
-	}
 }
 
 // PublicKey returns the PublicKey as a PublicKey interface.
@@ -210,6 +212,14 @@ func (w *privateKey) PublicKey() PublicKey {
 func (w *privateKey) WireGuardKey() wgtypes.Key {
 	raw, _ := w.ecdsa.Raw()
 	return wgtypes.Key(raw)
+}
+
+// Return a public key paired with this private key
+func (w *privateKey) GetPublic() p2pcrypto.PubKey {
+	return &publicKey{
+		ecdsa: w.ecdsa.GetPublic().(*p2pcrypto.Secp256k1PublicKey),
+		wgkey: w.WireGuardKey().PublicKey(),
+	}
 }
 
 // String returns the base64 encoded string representation of the key.
@@ -261,7 +271,7 @@ func (w *publicKey) Verify(data []byte, sigStr []byte) (success bool, err error)
 }
 
 // Type returns the protobuf key type.
-func (w *publicKey) Type() pb.KeyType {
+func (w *publicKey) Type() cryptopb.KeyType {
 	return WireGuardKeyType
 }
 

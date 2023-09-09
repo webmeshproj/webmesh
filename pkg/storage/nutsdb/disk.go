@@ -76,7 +76,7 @@ func getFirstAndLastIndex(db *nutsdb.DB) (first, last uint64, err error) {
 	err = db.View(func(tx *nutsdb.Tx) error {
 		entries, err := tx.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
 		if err != nil {
-			if !isNotFoundErr(err) {
+			if !IsNotFound(err) {
 				return fmt.Errorf("get first, last raft index: %w", err)
 			}
 			return nil
@@ -111,7 +111,7 @@ func (db *nutsDiskStorage) GetValue(ctx context.Context, key string) (string, er
 		return nil
 	})
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return "", storage.NewKeyNotFoundError(key)
 		}
 		return "", err
@@ -150,7 +150,7 @@ func (db *nutsDiskStorage) Delete(ctx context.Context, key string) error {
 	if err == nil {
 		db.subs.Notify(ctx, key, "")
 	}
-	return ignoreNotFound(err)
+	return IgnoreNotFound(err)
 }
 
 // List returns all keys with a given prefix.
@@ -168,7 +168,7 @@ func (db *nutsDiskStorage) List(ctx context.Context, prefix string) ([]string, e
 		}
 		return nil
 	})
-	return keys, ignoreNotFound(err)
+	return keys, IgnoreNotFound(err)
 }
 
 // IterPrefix iterates over all keys with a given prefix. It is important
@@ -190,7 +190,7 @@ func (db *nutsDiskStorage) IterPrefix(ctx context.Context, prefix string, fn sto
 		}
 		return nil
 	})
-	return ignoreNotFound(err)
+	return IgnoreNotFound(err)
 }
 
 // Snapshot returns a snapshot of the storage.
@@ -218,7 +218,7 @@ func (db *nutsDiskStorage) Snapshot(ctx context.Context) (io.Reader, error) {
 		}
 		return nil
 	})
-	if err != nil && !isNotFoundErr(err) {
+	if err != nil && IsNotFound(err) {
 		return nil, err
 	}
 	data, err := proto.Marshal(snapshot)
@@ -244,7 +244,7 @@ func (db *nutsDiskStorage) Restore(ctx context.Context, r io.Reader) error {
 	err = db.store.Update(func(tx *nutsdb.Tx) error {
 		// Do a full prefix scan and delete everything
 		entries, err := tx.PrefixScan(meshStoreBucket, []byte(""), 0, math.MaxInt)
-		if ignoreNotFound(err) != nil {
+		if !IsNotFound(err) {
 			return fmt.Errorf("restore: %w", err)
 		}
 		if err == nil {
@@ -314,7 +314,7 @@ func (db *nutsDiskStorage) GetLog(index uint64, log *raft.Log) error {
 		return nil
 	})
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return raft.ErrLogNotFound
 		}
 		return err
@@ -379,7 +379,7 @@ func (db *nutsDiskStorage) DeleteRange(min, max uint64) error {
 	err := db.store.Update(func(tx *nutsdb.Tx) error {
 		entries, err := tx.PrefixScan(logStoreBucket, []byte(""), 0, math.MaxInt)
 		if err != nil {
-			if isNotFoundErr(err) {
+			if IsNotFound(err) {
 				return nil
 			}
 			return fmt.Errorf("delete range: %w", err)
@@ -396,7 +396,7 @@ func (db *nutsDiskStorage) DeleteRange(min, max uint64) error {
 		return nil
 	})
 	if err != nil {
-		if isNotFoundErr(err) {
+		if IsNotFound(err) {
 			return nil
 		}
 	}
@@ -431,7 +431,7 @@ func (db *nutsDiskStorage) Get(key []byte) ([]byte, error) {
 		val = entry.Value
 		return nil
 	})
-	return val, ignoreNotFound(err)
+	return val, IgnoreNotFound(err)
 }
 
 func (db *nutsDiskStorage) SetUint64(key []byte, val uint64) error {
@@ -462,5 +462,5 @@ func (db *nutsDiskStorage) GetUint64(key []byte) (uint64, error) {
 		copy(val[:], entry.Value)
 		return nil
 	})
-	return binary.BigEndian.Uint64(val[:]), ignoreNotFound(err)
+	return binary.BigEndian.Uint64(val[:]), IgnoreNotFound(err)
 }

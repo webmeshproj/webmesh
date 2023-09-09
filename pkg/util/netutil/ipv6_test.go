@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 const defaultTestCount = 10
@@ -91,7 +90,7 @@ func FuzzAssignToPrefix(f *testing.F) {
 		// Make sure we also consumed the fuzz data
 		c := io.NopCloser(strings.NewReader(key))
 		defer c.Close()
-		keybytes := mustGenerateWireguardKey(t)
+		pubkey := mustGenerateKey(t)
 		if _, ok := seenKeys.Load(key); ok {
 			t.SkipNow()
 			t.Logf("skipping duplicate key %q", key)
@@ -99,7 +98,7 @@ func FuzzAssignToPrefix(f *testing.F) {
 		}
 		seenKeys.Store(key, struct{}{})
 		// Make sure we get a valid prefix
-		prefix := AssignToPrefix(ula, keybytes)
+		prefix := AssignToPrefix(ula, pubkey)
 		if !prefix.IsValid() {
 			t.Fatalf("generated invalid prefix: %s", prefix)
 		}
@@ -121,7 +120,7 @@ func FuzzAssignToPrefix(f *testing.F) {
 			return true
 		})
 		// Make sure we generate the same prefix for the same key
-		toCheck := AssignToPrefix(ula, keybytes)
+		toCheck := AssignToPrefix(ula, pubkey)
 		if toCheck.String() != prefix.String() {
 			t.Fatalf("generated different prefix for same key: %s", prefix)
 		}
@@ -140,13 +139,13 @@ func mustGenerateULA(t *testing.F) netip.Prefix {
 	return ula
 }
 
-func mustGenerateWireguardKey(t *testing.T) wgtypes.Key {
+func mustGenerateKey(t *testing.T) crypto.PublicKey {
 	t.Helper()
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatalf("failed to generate WireGuard key: %s", err)
 	}
-	return key.PublicKey().WireGuardKey()
+	return key.PublicKey()
 }
 
 func mustGenerateSeedKey(t *testing.F) []byte {

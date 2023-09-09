@@ -46,9 +46,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/embed/security"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // ErrInvalidSecureTransport is returned when the transport is not used with a webmesh keypair and security transport.
@@ -66,6 +66,8 @@ type Transport interface {
 	// Resolver is a resolver that uses the mesh storage to lookup peers.
 	transport.Resolver
 }
+
+var _ Transport = (*WebmeshTransport)(nil)
 
 // TransportBuilder is the signature of a function that builds a webmesh transport.
 type TransportBuilder func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey pcrypto.PrivKey) (Transport, error)
@@ -85,26 +87,27 @@ type Options struct {
 }
 
 // New returns a new webmesh transport builder.
-func New(opts Options, sec *security.SecureTransport) TransportBuilder {
+func New(opts Options, sec *security.SecureTransport) (TransportBuilder, *WebmeshTransport) {
 	if opts.Config == nil {
 		panic("config is required")
+	}
+	rt := &WebmeshTransport{
+		opts: opts,
+		sec:  sec,
+		conf: opts.Config.ShallowCopy(),
+		log:  logutil.NewLogger(opts.LogLevel).With("component", "webmesh-transport"),
 	}
 	return func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey pcrypto.PrivKey) (Transport, error) {
 		key, ok := privKey.(crypto.PrivateKey)
 		if !ok {
 			return nil, fmt.Errorf("%w: invalid private key type: %T", ErrInvalidSecureTransport, privKey)
 		}
-		return &WebmeshTransport{
-			opts:  opts,
-			node:  nil,
-			host:  host,
-			key:   key,
-			sec:   sec,
-			tu:    tu,
-			rcmgr: rcmgr,
-			log:   logutil.NewLogger(opts.LogLevel).With("component", "webmesh-transport"),
-		}, nil
-	}
+		rt.key = key
+		rt.host = host
+		rt.tu = tu
+		rt.rcmgr = rcmgr
+		return rt, nil
+	}, rt
 }
 
 // WebmeshTransport is the webmesh libp2p transport. It must be used with a webmesh keypair and security transport.
@@ -124,6 +127,48 @@ type WebmeshTransport struct {
 	mu      sync.Mutex
 }
 
+// ConvertAddrs implements AddrsFactory on top of this transport. It automatically appends
+// our webmesh ID and any DNS addresses we have to the list of addresses.
+func (t *WebmeshTransport) ConvertAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	webmeshSec := protocol.WithPeerID(t.key.ID())
+	if t.conf.Discovery.Announce {
+		webmeshSec = protocol.WithPeerIDAndRendezvous(t.key.ID(), t.conf.Discovery.PSK)
+	}
+	var out []ma.Multiaddr
+	for _, addr := range addrs {
+		out = append(out, ma.Join(addr, webmeshSec))
+	}
+	if t.started.Load() {
+		// Add our DNS addresses
+		for _, addr := range addrs {
+			var proto string
+			port, err := addr.ValueForProtocol(ma.P_TCP)
+			if err != nil {
+				port, err = addr.ValueForProtocol(ma.P_UDP)
+				if err != nil {
+					continue
+				}
+				proto = "udp"
+			} else {
+				proto = "tcp"
+			}
+			dnsaddr, err := ma.NewMultiaddr(fmt.Sprintf("/dns6/%s.%s", t.node.ID(), strings.TrimSuffix(t.node.Domain(), ".")))
+			if err != nil {
+				continue
+			}
+			addrs = append(addrs, ma.Join(dnsaddr, ma.StringCast(fmt.Sprintf("/%s/%s", proto, port)), webmeshSec))
+			dnsaddr, err = ma.NewMultiaddr(fmt.Sprintf("/dns4/%s.%s", t.node.ID(), strings.TrimSuffix(t.node.Domain(), ".")))
+			if err != nil {
+				continue
+			}
+			addrs = append(addrs, ma.Join(dnsaddr, ma.StringCast(fmt.Sprintf("/%s/%s", proto, port)), webmeshSec))
+		}
+	}
+	return out
+}
+
 // Dial dials a remote peer. It should try to reuse local listener
 // addresses if possible, but it may choose not to.
 func (t *WebmeshTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
@@ -133,34 +178,49 @@ func (t *WebmeshTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.
 		return nil, ErrNotStarted
 	}
 	ctx = context.WithLogger(ctx, t.log)
-	var dialer mnet.Dialer
-	// If we are dialing a webmesh address, we can compute the IP from their ID
-	if _, err := raddr.ValueForProtocol(protocol.P_WEBMESH); err == nil {
-		// If we can extract the public key from the peer ID, we know their webmesh address
-		// and can dial them directly.
-		pubKey, err := crypto.ExtractPublicKey(p)
-		if err == nil {
-			dport, err := raddr.ValueForProtocol(ma.P_TCP)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get port from remote address: %w", err)
-			}
-			rip6 := netutil.AssignToPrefix(t.node.Network().NetworkV6(), pubKey.WireGuardKey()).Addr()
-			raddr, err = ma.NewMultiaddr(fmt.Sprintf("/ip6/%s/tcp/%s", rip6, dport))
-			if err != nil {
-				return nil, fmt.Errorf("failed to create remote address: %w", err)
-			}
-		}
-	}
-	c, err := dialer.DialContext(ctx, raddr)
+	ipver := "ip4"
+	proto := "tcp"
+	var localAddr netip.Addr
+	_, err := raddr.ValueForProtocol(ma.P_TCP)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial: %w", err)
+		_, err = raddr.ValueForProtocol(ma.P_UDP)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get L4 protocol from dial address: %w", err)
+		}
+		proto = "udp"
 	}
+	_, err = raddr.ValueForProtocol(ma.P_IP6)
+	if err == nil {
+		ipver = "ip6"
+	}
+	_, err = raddr.ValueForProtocol(ma.P_DNS6)
+	if err == nil {
+		ipver = "ip6"
+	}
+	switch ipver {
+	case "ip4":
+		localAddr = t.node.Network().WireGuard().AddressV4().Addr()
+	case "ip6":
+		localAddr = t.node.Network().WireGuard().AddressV6().Addr()
+	}
+	dialer := mnet.Dialer{
+		LocalAddr: ma.StringCast(fmt.Sprintf("/%s/%s/%s/0", ipver, localAddr.String(), proto)),
+	}
+	t.log.Debug("Dialing remote peer", "peer", p.String(), "raddr", raddr.String())
 	connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, false, raddr)
 	if err != nil {
+		t.log.Error("Failed to open connection", "error", err.Error(), "peer", p.String(), "raddr", raddr.String())
 		return nil, fmt.Errorf("failed to open connection: %w", err)
+	}
+	defer connScope.Done()
+	c, err := dialer.DialContext(ctx, raddr)
+	if err != nil {
+		t.log.Error("Failed to dial remote peer", "error", err.Error(), "peer", p.String(), "raddr", raddr.String())
+		return nil, fmt.Errorf("failed to dial: %w", err)
 	}
 	u, err := t.tu.Upgrade(ctx, t, c, network.DirOutbound, p, connScope)
 	if err != nil {
+		t.log.Error("Failed to upgrade connection", "error", err.Error(), "peer", p.String(), "raddr", raddr.String())
 		return nil, fmt.Errorf("failed to upgrade connection: %w", err)
 	}
 	return u, nil
@@ -240,12 +300,19 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 		return nil, fmt.Errorf("failed to get port from listener address: %w", err)
 	}
 	// We automatically set the listening address to our local IPv6 address
-	lnetaddr := t.node.Network().WireGuard().AddressV6().Addr()
-	laddr, err = ma.NewMultiaddr(fmt.Sprintf("/ip6/%s/tcp/%s", lnetaddr, port))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create listener address: %w", err)
+	if _, err := laddr.ValueForProtocol(ma.P_IP6); err == nil {
+		lnetaddr := t.node.Network().WireGuard().AddressV6().Addr()
+		laddr, err = ma.NewMultiaddr(fmt.Sprintf("/ip6/%s/tcp/%s", lnetaddr, port))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create listener address: %w", err)
+		}
+	} else {
+		lnetaddr := t.node.Network().WireGuard().AddressV4().Addr()
+		laddr, err = ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", lnetaddr, port))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create listener address: %w", err)
+		}
 	}
-	// TODO: Support IPv4
 	t.log.Info("Listening for webmesh connections", "address", laddr.String())
 	lis, err := mnet.Listen(laddr)
 	if err != nil {
@@ -253,17 +320,11 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 	}
 	// Register our listeners to the webmesh cluster so they can help
 	// others find us
-	addrs, err := t.multiaddrsForListener(lis.Addr())
-	if err != nil {
-		defer lis.Close()
-		return nil, fmt.Errorf("failed to get multiaddrs for listener: %w", err)
-	}
-	err = t.registerMultiaddrs(ctx, addrs)
+	err = t.registerMultiaddrsForListener(ctx, lis)
 	if err != nil {
 		defer lis.Close()
 		return nil, fmt.Errorf("failed to register multiaddrs: %w", err)
 	}
-	t.host.Peerstore().AddAddrs(t.host.ID(), addrs, peerstore.PermanentAddrTTL)
 	return t.tu.UpgradeListener(t, lis), nil
 }
 
@@ -275,16 +336,43 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		return nil, ErrNotStarted
 	}
 	ctx = context.WithLogger(ctx, t.log)
+	t.log.Debug("Resolving multiaddr", "multiaddr", maddr.String())
+	if value, err := maddr.ValueForProtocol(ma.P_IP4); err == nil {
+		// Already resolved if in network
+		val, err := netip.ParseAddr(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse ip4 address: %w", err)
+		}
+		if t.node.Network().WireGuard().InNetwork(val) {
+			return []ma.Multiaddr{maddr}, nil
+		}
+		return nil, fmt.Errorf("ipv4 address not in network")
+	}
+	if value, err := maddr.ValueForProtocol(ma.P_IP6); err == nil {
+		// Already resolved if in network
+		val, err := netip.ParseAddr(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse ip6 address: %w", err)
+		}
+		if t.node.Network().WireGuard().InNetwork(val) {
+			return []ma.Multiaddr{maddr}, nil
+		}
+		return nil, fmt.Errorf("ipv6 address not in network")
+	}
 	// If it's a DNS address, we can try using our local MeshDNS to resolve it.
 	value, err := maddr.ValueForProtocol(ma.P_DNS6)
 	if err == nil {
 		fqdn := strings.TrimSuffix(value, ".")
-		nodeID := strings.TrimSuffix(fqdn, "."+t.node.Domain())
+		dom := strings.TrimSuffix(t.node.Domain(), ".")
+		nodeID := strings.TrimSuffix(strings.TrimSuffix(fqdn, dom), ".")
 		if nodeID == t.node.ID() {
+			t.log.Warn("Cannot resolve self")
 			return nil, fmt.Errorf("cannot resolve self")
 		}
+		t.log.Debug("Resolving DNS6 address", "fqdn", fqdn, "nodeID", nodeID)
 		peer, err := peers.New(t.node.Storage()).Get(ctx, nodeID)
 		if err != nil {
+			t.log.Error("Failed to get peer", "error", err.Error(), "nodeID", nodeID)
 			return nil, fmt.Errorf("failed to get peer: %w", err)
 		}
 		return peerToIPMultiaddrs(peer, maddr)
@@ -293,12 +381,16 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 	value, err = maddr.ValueForProtocol(ma.P_DNS4)
 	if err == nil {
 		fqdn := strings.TrimSuffix(value, ".")
-		nodeID := strings.TrimSuffix(fqdn, "."+t.node.Domain())
+		dom := strings.TrimSuffix(t.node.Domain(), ".")
+		nodeID := strings.TrimSuffix(strings.TrimSuffix(fqdn, dom), ".")
 		if nodeID == t.node.ID() {
+			t.log.Warn("Cannot resolve self")
 			return nil, fmt.Errorf("cannot resolve self")
 		}
+		t.log.Debug("Resolving DNS4 address", "fqdn", fqdn, "nodeID", nodeID)
 		peer, err := peers.New(t.node.Storage()).Get(ctx, nodeID)
 		if err != nil {
+			t.log.Error("Failed to get peer", "error", err.Error(), "nodeID", nodeID)
 			return nil, fmt.Errorf("failed to get peer: %w", err)
 		}
 		return peerToIPMultiaddrs(peer, maddr)
@@ -308,12 +400,14 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 	if err != nil {
 		return nil, fmt.Errorf("failed to get any webmesh protocol value: %w", err)
 	}
-	pubkey, err := crypto.ExtractPublicKey(id)
+	pubkey, err := crypto.ExtractPublicKeyFromID(id)
 	if err != nil {
+		t.log.Error("Failed to extract public key from id", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to extract public key: %w", err)
 	}
 	peer, err := peers.New(t.node.Storage()).GetByPubKey(ctx, pubkey)
 	if err != nil {
+		t.log.Error("Failed to lookup peer by their public key", "error", err.Error(), "id", id)
 		return nil, fmt.Errorf("failed to get peer: %w", err)
 	}
 	return peerToIPMultiaddrs(peer, maddr)
@@ -334,7 +428,7 @@ func (t *WebmeshTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if !t.started.Load() {
-		return ErrNotStarted
+		return nil
 	}
 	defer t.started.Store(false)
 	ctx := context.Background()
@@ -346,7 +440,17 @@ func (t *WebmeshTransport) Close() error {
 	if t.svcs != nil {
 		defer t.svcs.Shutdown(ctx)
 	}
-	return t.node.Close(ctx)
+	err := t.node.Close(ctx)
+	if err != nil {
+		if raft.IsNoLeaderErr(err) {
+			// This error could possibly mean we were a single node cluster.
+			// Silently ignore it.
+			t.log.Debug("failed to close node", "error", err.Error())
+			return nil
+		}
+		return fmt.Errorf("failed to close node: %w", err)
+	}
+	return nil
 }
 
 func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (mesh.Node, error) {
@@ -355,13 +459,14 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 		ctx, cancel = context.WithTimeout(ctx, t.opts.StartTimeout)
 		defer cancel()
 	}
-	conf := t.opts.Config.ShallowCopy()
+	conf, err := t.opts.Config.Global.ApplyGlobals(t.opts.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply global config: %w", err)
+	}
 	t.conf = conf
 
-	// Force our node ID to our key ID
-
 	// Check if our listen address is trying to discover a mesh or announce one
-	_, err := laddr.ValueForProtocol(protocol.P_WEBMESH)
+	_, err = laddr.ValueForProtocol(protocol.P_WEBMESH)
 	if err == nil {
 		rendezvous, err := protocol.RendezvousFromWebmeshAddr(laddr)
 		if err == nil {
@@ -387,7 +492,8 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mesh config: %w", err)
 	}
-	node := mesh.NewWithLogger(t.log, meshConfig)
+	meshConfig.Key = t.key
+	node := mesh.NewWithLogger(logutil.NewLogger(conf.Global.LogLevel).With("component", "webmesh-node"), meshConfig)
 	startOpts, err := conf.NewRaftStartOptions(node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create raft start options: %w", err)
@@ -396,7 +502,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	if err != nil {
 		return nil, fmt.Errorf("failed to create raft node: %w", err)
 	}
-	connectOpts, err := conf.NewConnectOptions(ctx, node, raft, t.host)
+	connectOpts, err := conf.NewConnectOptions(ctx, node, raft, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connect options: %w", err)
 	}
@@ -483,83 +589,18 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	for _, wgpeer := range node.Network().WireGuard().Peers() {
 		id := wgpeer.PublicKey.ID()
 		t.log.Debug("Adding peer to peerstore", "peer", id, "multiaddrs", wgpeer.Multiaddrs)
-		for _, addr := range wgpeer.Multiaddrs {
-			t.host.Peerstore().AddAddr(id, addr, peerstore.PermanentAddrTTL)
-		}
+		t.host.Peerstore().AddAddrs(id, wgpeer.Multiaddrs, peerstore.PermanentAddrTTL)
 	}
 	t.log.Info("Webmesh node is ready")
 	return node, nil
 }
 
-func (t *WebmeshTransport) multiaddrsForListener(listenAddr net.Addr) ([]ma.Multiaddr, error) {
-	var lisaddr ma.Multiaddr
-	var ip netip.Addr
-	var err error
-	switch v := listenAddr.(type) {
-	case *net.TCPAddr:
-		ip = v.AddrPort().Addr()
-		lisaddr, err = ma.NewMultiaddr(fmt.Sprintf("/tcp/%d", v.Port))
-	case *net.UDPAddr:
-		ip = v.AddrPort().Addr()
-		lisaddr, err = ma.NewMultiaddr(fmt.Sprintf("/udp/%d", v.Port))
-	default:
-		err = fmt.Errorf("unknown listener type: %T", listenAddr)
-	}
+func (t *WebmeshTransport) registerMultiaddrsForListener(ctx context.Context, lis mnet.Listener) error {
+	addrs, err := t.multiaddrsForLocalListenAddr(lis.Addr())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create listener multiaddr: %w", err)
+		return fmt.Errorf("failed to get multiaddrs for listener: %w", err)
 	}
-	// Append the webmesh protocol ID and arguments to the listener address
-	secaddr, err := ma.NewMultiaddr(fmt.Sprintf("/webmesh/%s", t.key.ID()))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create security multiaddr: %w", err)
-	}
-	var addrs []ma.Multiaddr
-	if ip.Is4() {
-		ip4addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s", ip))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ip4 multiaddr: %w", err)
-		}
-		addrs = append(addrs, ma.Join(ip4addr, lisaddr, secaddr))
-	}
-	if ip.Is6() {
-		ip6addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip6/%s", ip))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ip6 multiaddr: %w", err)
-		}
-		addrs = append(addrs, ma.Join(ip6addr, lisaddr, secaddr))
-	}
-	dnsaddr, err := ma.NewMultiaddr(fmt.Sprintf("/dns6/%s.%s", t.node.ID(), strings.TrimSuffix(t.node.Domain(), ".")))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create domain multiaddr: %w", err)
-	}
-	addrs = append(addrs, ma.Join(dnsaddr, lisaddr, secaddr))
-	dnsaddr, err = ma.NewMultiaddr(fmt.Sprintf("/dns4/%s.%s", t.node.ID(), strings.TrimSuffix(t.node.Domain(), ".")))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create domain multiaddr: %w", err)
-	}
-	addrs = append(addrs, ma.Join(dnsaddr, lisaddr, secaddr))
-	return addrs, nil
-}
-
-func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode) error {
-	ps := t.host.Peerstore()
-	pubkey, err := crypto.DecodePublicKey(node.GetPublicKey())
-	if err != nil {
-		return fmt.Errorf("failed to parse public key: %w", err)
-	}
-	id := pubkey.ID()
-	for _, addr := range node.GetMultiaddrs() {
-		a, err := ma.NewMultiaddr(addr)
-		if err != nil {
-			continue
-		}
-		ps.AddAddr(id, a, peerstore.PermanentAddrTTL)
-	}
-	return nil
-}
-
-func (t *WebmeshTransport) registerMultiaddrs(ctx context.Context, maddrs []ma.Multiaddr) error {
-	t.laddrs = append(t.laddrs, maddrs...)
+	t.laddrs = append(t.laddrs, addrs...)
 	addrstrs := func() []string {
 		var straddrs []string
 		for _, addr := range t.laddrs {
@@ -591,6 +632,70 @@ func (t *WebmeshTransport) registerMultiaddrs(ctx context.Context, maddrs []ma.M
 	err = peers.New(t.node.Storage()).Put(ctx, self.MeshNode)
 	if err != nil {
 		return fmt.Errorf("failed to update self: %w", err)
+	}
+	return nil
+}
+
+func (t *WebmeshTransport) multiaddrsForLocalListenAddr(listenAddr net.Addr) ([]ma.Multiaddr, error) {
+	var lisaddr ma.Multiaddr
+	var ip netip.Addr
+	var err error
+	switch v := listenAddr.(type) {
+	case *net.TCPAddr:
+		ip = v.AddrPort().Addr()
+		lisaddr, err = ma.NewMultiaddr(fmt.Sprintf("/tcp/%d", v.Port))
+	case *net.UDPAddr:
+		ip = v.AddrPort().Addr()
+		lisaddr, err = ma.NewMultiaddr(fmt.Sprintf("/udp/%d", v.Port))
+	default:
+		err = fmt.Errorf("unknown listener type: %T", listenAddr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create listener multiaddr: %w", err)
+	}
+	// Append the webmesh protocol ID and arguments to the listener address
+	// secaddr := protocol.WithPeerID(t.key.ID())
+	var addrs []ma.Multiaddr
+	if ip.Is4() {
+		ip4addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s", ip))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ip4 multiaddr: %w", err)
+		}
+		addrs = append(addrs, ma.Join(ip4addr, lisaddr))
+		dnsaddr, err := ma.NewMultiaddr(fmt.Sprintf("/dns4/%s.%s", t.node.ID(), strings.TrimSuffix(t.node.Domain(), ".")))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create domain multiaddr: %w", err)
+		}
+		addrs = append(addrs, ma.Join(dnsaddr, lisaddr))
+	}
+	if ip.Is6() {
+		ip6addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip6/%s", ip))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ip6 multiaddr: %w", err)
+		}
+		addrs = append(addrs, ma.Join(ip6addr, lisaddr))
+		dnsaddr, err := ma.NewMultiaddr(fmt.Sprintf("/dns6/%s.%s", t.node.ID(), strings.TrimSuffix(t.node.Domain(), ".")))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create domain multiaddr: %w", err)
+		}
+		addrs = append(addrs, ma.Join(dnsaddr, lisaddr))
+	}
+	return addrs, nil
+}
+
+func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode) error {
+	ps := t.host.Peerstore()
+	pubkey, err := crypto.DecodePublicKey(node.GetPublicKey())
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+	id := pubkey.ID()
+	for _, addr := range node.GetMultiaddrs() {
+		a, err := ma.NewMultiaddr(addr)
+		if err != nil {
+			continue
+		}
+		ps.AddAddr(id, a, peerstore.PermanentAddrTTL)
 	}
 	return nil
 }

@@ -84,7 +84,7 @@ func TestKeyIDs(t *testing.T) {
 		t.Fatal("key ID does not match public key ID")
 	}
 
-	extracted, err := ExtractPublicKey(id)
+	extracted, err := ExtractPublicKeyFromID(id)
 	if err != nil {
 		t.Fatal(err)
 	}

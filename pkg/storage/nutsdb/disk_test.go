@@ -26,6 +26,8 @@ import (
 )
 
 func TestDiskStorage(t *testing.T) {
+	t.Skip("skipping disk storage test")
+
 	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)

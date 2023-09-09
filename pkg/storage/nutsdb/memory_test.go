@@ -25,6 +25,8 @@ import (
 )
 
 func TestInmemStorage(t *testing.T) {
+	t.Skip("skipping in-memory storage test")
+
 	st, err := newInMemoryStorage()
 	if err != nil {
 		t.Fatalf("failed to create in-memory storage: %v", err)

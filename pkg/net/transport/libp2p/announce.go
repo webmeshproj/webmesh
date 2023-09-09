@@ -107,7 +107,7 @@ func newAnnouncerWithHostAndCloseFunc[REQ, RESP any](ctx context.Context, host D
 		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())
 		go handleIncomingStream(log, rt, s)
 	})
-	log.Debug("Announcing join protocol with our PSK")
+	log.Debug("Announcing protocol with our PSK", "protocol", opts.Method, "psk", opts.Rendezvous)
 	routingDiscovery := drouting.NewRoutingDiscovery(host.DHT())
 	var discoveryOpts []discovery.Option
 	if opts.AnnounceTTL > 0 {
