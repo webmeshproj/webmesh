@@ -63,7 +63,7 @@ func runServer(payloadSize int, opts libp2p.Option) error {
 	for _, addr := range host.Addrs() {
 		log.Println("Listening for libp2p connections on:", addr)
 	}
-	host.SetStreamHandler("", func(stream network.Stream) {
+	host.SetStreamHandler("/speedtest", func(stream network.Stream) {
 		log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
 		go runSpeedTest(ctx, stream, payloadSize)
 	})
@@ -97,7 +97,8 @@ func runClient(payloadSize int, opts libp2p.Option) error {
 	if toDial == "" {
 		return errors.New("no peers to dial")
 	}
-	conn, err := host.Network().NewStream(ctx, toDial)
+	log.Println("Dialing peer:", toDial)
+	conn, err := host.NewStream(ctx, toDial, "/speedtest")
 	if err != nil {
 		return err
 	}
@@ -187,13 +188,6 @@ func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
 	conf.WireGuard.InterfaceName = "webmeshserver0"
 	conf.WireGuard.ListenPort = 51820
 	conf.WireGuard.ForceInterfaceName = true
-	conf.Plugins.Configs = map[string]config.PluginConfig{
-		"debug": {
-			Config: map[string]any{
-				"enable-db-querier": true,
-			},
-		},
-	}
 	return embed.WithWebmeshTransport(embed.TransportOptions{
 		Config:     conf,
 		Rendezvous: rendezvous,

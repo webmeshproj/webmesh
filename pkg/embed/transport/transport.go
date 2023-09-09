@@ -570,15 +570,20 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	// Subscribe to peer updates
 	t.log.Debug("Subscribing to peer updates")
 	_, err = node.Storage().Subscribe(context.Background(), peers.NodesPrefix, func(key string, value string) {
-		nodeID := strings.TrimPrefix(key, peers.NodesPrefix)
-		if nodeID == node.ID() {
-			return
-		}
+		log := context.LoggerFrom(ctx)
 		peer := peers.MeshNode{MeshNode: &v1.MeshNode{}}
 		err = protojson.Unmarshal([]byte(value), peer.MeshNode)
+		if err != nil {
+			log.Error("Failed to unmarshal peer", "error", err.Error())
+			return
+		}
+		if peer.Id == node.ID() {
+			log.Debug("Ignoring self")
+			return
+		}
 		err := t.registerNode(context.Background(), peer)
 		if err != nil {
-			context.LoggerFrom(ctx).Debug("Failed to register node to peerstore", "error", err.Error())
+			log.Error("Failed to register node to peerstore", "error", err.Error())
 		}
 	})
 	if err != nil {

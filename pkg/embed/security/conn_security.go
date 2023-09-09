@@ -62,11 +62,6 @@ func New(key crypto.PrivateKey, log *slog.Logger) (SecureTransportBuilder, *Secu
 		s.ps = host.Peerstore()
 		s.protocolID = id
 		s.privateKey = key
-		// s.host.SetStreamHandler(s.protocolID, func(conn network.Stream) {
-		// 	defer conn.Close()
-		// 	// TODO: handle stream
-		// 	s.log.Error("Security stream handler not implemented")
-		// })
 		err := s.ps.AddProtocols(s.host.ID(), s.protocolID)
 		if err != nil {
 			return nil, fmt.Errorf("add protocol to peerstore: %w", err)
