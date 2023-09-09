@@ -24,8 +24,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var canSubscribeAction = rbac.Actions{
@@ -45,7 +45,7 @@ func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Storage_SubscribeSer
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "current node not available to subscribe")
 	}
-	if !meshdb.IsReservedPrefix(req.GetPrefix()) {
+	if !storage.IsReservedPrefix(req.GetPrefix()) {
 		// Don't allow subscriptions to generic prefixes without permissions
 		allowed, err := s.rbac.Evaluate(srv.Context(), canSubscribeAction.For(req.GetPrefix()))
 		if err != nil {

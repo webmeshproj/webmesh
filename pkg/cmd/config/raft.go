@@ -32,8 +32,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/memory"
-	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
 )
 
 // RaftOptions are options for the raft backend.
@@ -228,7 +228,7 @@ func (o *Config) NewDualStorage() (storage.DualStorage, error) {
 		return memory.New(), nil
 	}
 	if o.Raft.InMemory {
-		st, err := nutsdb.New(nutsdb.Options{InMemory: true})
+		st, err := badgerdb.New(badgerdb.Options{InMemory: true})
 		if err != nil {
 			return nil, fmt.Errorf("create in-memory storage: %w", err)
 		}
@@ -245,7 +245,7 @@ func (o *Config) NewDualStorage() (storage.DualStorage, error) {
 			return nil, fmt.Errorf("remove data directory: %w", err)
 		}
 	}
-	st, err := nutsdb.New(nutsdb.Options{
+	st, err := badgerdb.New(badgerdb.Options{
 		DiskPath: dataDir,
 	})
 	if err != nil {

@@ -27,7 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/raft"
-	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 )
 
 // NewTestMesh creates a new test mesh and waits for it to be ready.
@@ -39,7 +39,7 @@ func NewTestMesh(ctx context.Context) (Node, error) {
 	})
 	stor := st.(*meshStore)
 	stor.testStore = true
-	storage, err := nutsdb.New(nutsdb.Options{InMemory: true})
+	storage, err := badgerdb.New(badgerdb.Options{InMemory: true})
 	if err != nil {
 		return nil, err
 	}

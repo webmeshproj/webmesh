@@ -33,7 +33,7 @@ import (
 func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
 	t.Helper()
 
-	defer raftStorage.DropAll(context.Background())
+	defer func() { _ = raftStorage.DropAll(context.Background()) }()
 
 	t.Run("RaftStableStore", func(t *testing.T) {
 		t.Run("Set", func(t *testing.T) {
@@ -378,7 +378,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	meshStorage.DropAll(ctx)
+	_ = meshStorage.DropAll(ctx)
 
 	t.Run("PutValue", func(t *testing.T) {
 		// Pretty simple, just put a key and make sure it survives a round trip.
@@ -399,7 +399,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	meshStorage.DropAll(ctx)
+	_ = meshStorage.DropAll(ctx)
 
 	t.Run("Delete", func(t *testing.T) {
 		// Delete should never error, but it should also work
@@ -427,7 +427,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	meshStorage.DropAll(ctx)
+	_ = meshStorage.DropAll(ctx)
 
 	t.Run("List", func(t *testing.T) {
 		// Place a few keys and make sure we get the full list of them back
@@ -498,7 +498,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	meshStorage.DropAll(ctx)
+	_ = meshStorage.DropAll(ctx)
 
 	t.Run("IterPrefix", func(t *testing.T) {
 		// We'll place a few keys and make sure our iterator is called
@@ -538,7 +538,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	meshStorage.DropAll(ctx)
+	_ = meshStorage.DropAll(ctx)
 
 	// We will use the same snapshot for the Snapshot and Restore tests
 	var snapshot io.Reader
@@ -648,8 +648,8 @@ func RunDualStorageConformance(t *testing.T, dualStorage DualStorage) {
 	ctx := context.Background()
 
 	RunRaftStorageConformance(t, dualStorage)
-	dualStorage.DropAll(ctx)
+	_ = dualStorage.DropAll(ctx)
 
 	RunMeshStorageConformance(t, dualStorage)
-	dualStorage.DropAll(ctx)
+	_ = dualStorage.DropAll(ctx)
 }

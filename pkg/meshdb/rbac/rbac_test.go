@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 )
 
 const admin = "admin"
@@ -91,7 +91,7 @@ var groupSeeds = []*v1.Group{
 func setupTest(t *testing.T) (*rbac, func()) {
 	t.Helper()
 	ctx := context.Background()
-	st, err := nutsdb.New(nutsdb.Options{InMemory: true})
+	st, err := badgerdb.New(badgerdb.Options{InMemory: true})
 	if err != nil {
 		t.Fatalf("create test db: %v", err)
 	}

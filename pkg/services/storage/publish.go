@@ -24,8 +24,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var canPublishAction = rbac.Actions{
@@ -53,7 +53,7 @@ func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.Publi
 		s.log.Warn("caller not allowed to publish")
 		return nil, status.Error(codes.PermissionDenied, "not allowed")
 	}
-	if meshdb.IsReservedPrefix(req.GetKey()) {
+	if storage.IsReservedPrefix(req.GetKey()) {
 		return nil, status.Errorf(codes.InvalidArgument, "key %q is reserved", req.GetKey())
 	}
 	// TODO: Validate key and value and check for overlaps and other issues.

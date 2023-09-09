@@ -155,3 +155,8 @@ func (p *pluginDB) Subscribe(ctx context.Context, prefix string, fn storage.Subs
 func (p *pluginDB) Close() error {
 	return nil
 }
+
+// DropAll deletes all keys in the storage.
+func (p *pluginDB) DropAll(ctx context.Context) error {
+	return errors.New("drop all not implemented")
+}

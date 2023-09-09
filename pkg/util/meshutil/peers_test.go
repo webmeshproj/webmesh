@@ -28,7 +28,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 )
 
 func TestWireGuardPeers(t *testing.T) {
@@ -432,7 +432,7 @@ func TestWireGuardPeers(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			db, err := nutsdb.New(nutsdb.Options{InMemory: true})
+			db, err := badgerdb.New(badgerdb.Options{InMemory: true})
 			if err != nil {
 				t.Fatalf("create test db: %v", err)
 			}

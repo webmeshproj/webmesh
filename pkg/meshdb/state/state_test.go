@@ -24,7 +24,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage/nutsdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 )
 
 var (
@@ -178,7 +178,7 @@ func TestListPeerPrivateRPCAddresses(t *testing.T) {
 
 func setupTest(t *testing.T) (*state, func()) {
 	t.Helper()
-	db, err := nutsdb.New(nutsdb.Options{InMemory: true})
+	db, err := badgerdb.New(badgerdb.Options{InMemory: true})
 	if err != nil {
 		t.Fatalf("create test db: %v", err)
 	}
