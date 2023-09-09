@@ -63,9 +63,9 @@ func New(opts Options) (storage.DualStorage, error) {
 	if opts.InMemory {
 		badgeropts = badgeropts.WithInMemory(true)
 	}
-	badgeropts.WithLoggingLevel(badger.ERROR)
+	badgeropts = badgeropts.WithLoggingLevel(badger.ERROR)
 	if opts.Debug {
-		badgeropts.WithLoggingLevel(badger.DEBUG)
+		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG)
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {
