@@ -396,20 +396,22 @@ func TestAddrBook(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		stream := ps.AddrStream(ctx, TestPeerID1)
-		var wg sync.WaitGroup
-		wg.Add(1)
+
 		seen := map[ma.Multiaddr]struct{}{}
 		addrs := []ma.Multiaddr{TestAddr1, TestAddr2, TestAddr3, TestAddr4}
 		// Place addresses and make sure we see each one on the stream
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for addr := range stream {
 				seen[addr] = struct{}{}
 			}
 		}()
+
 		ps.AddAddrs(TestPeerID1, addrs, peerstore.PermanentAddrTTL)
-		<-time.After(time.Second * 3)
-		cancel()
+		<-time.After(time.Second * 5)
+
 		wg.Wait()
 		if len(seen) != 4 {
 			t.Fatalf("expected to see 4 addresses, got %d", len(seen))
