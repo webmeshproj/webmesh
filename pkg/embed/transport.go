@@ -65,7 +65,7 @@ func WithWebmeshTransport(topts TransportOptions) p2pconfig.Option {
 			Logger: log.With("component", "peerstore"),
 		})),
 		// libp2p.ConnectionManager(connmgr.New(logutil.NewLogger(topts.LogLevel).With("component", "conn-manager"))),
-		// libp2p.DisableMetrics(),
+		libp2p.DisableMetrics(),
 	}
 	webmeshSec := protocol.WithPeerID(key.ID())
 	if topts.Rendezvous != "" {
