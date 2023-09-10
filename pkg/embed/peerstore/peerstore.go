@@ -294,9 +294,10 @@ func (st *Peerstore) UpdateAddrs(p peer.ID, oldTTL time.Duration, newTTL time.Du
 		prefix := Multiaddrs.PathFor(p).Key()
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = false
+		opts.Prefix = prefix
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		for it.Rewind(); it.Valid(); it.Next() {
 			entry := it.Item()
 			if entry.ExpiresAt() == 0 {
 				if oldTTL == 0 {
@@ -317,6 +318,7 @@ func (st *Peerstore) UpdateAddrs(p peer.ID, oldTTL time.Duration, newTTL time.Du
 			// Check if we are updating the TTL
 			t := time.Unix(int64(entry.ExpiresAt()), 0)
 			ttl := time.Until(t)
+			// It's not documented upstream, but we'll allow for some skew in the TTL.
 			if ttlInRange(ttl, oldTTL-time.Second, oldTTL+time.Second) {
 				// Update the TTL.
 				st.log.Debug("Updating address", "peer", p.String(),
