@@ -14,30 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package peerstore
+package connmgr
 
 import (
-	"strings"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // StorageKey is a key prefix for values in the database.
 type StorageKey string
 
-// Prefixes used in the database. All get prepended with the
-// peer ID to produce paths such as /<peer ID>/private-key.
+// Prefixes used in the database. All get appended with the
+// peer ID to produce paths such as /tags/<peer ID>.
 const (
-	// PrivateKeys is the key prefix for private keys.
-	PrivateKeys StorageKey = "/private-key"
-	// PublicKeys is the key prefix for public keys.
-	PublicKeys StorageKey = "/public-key"
-	// Multiaddrs is the key prefix for multiaddrs.
-	Multiaddrs StorageKey = "/multiaddrs"
-	// Protocols is the key prefix for protocols.
-	Protocols StorageKey = "/protocols"
-	// Observations is the key prefix for observations.
-	Observations StorageKey = "/observations"
+	// Tags is the key prefix for tags.
+	Tags StorageKey = "/tags"
+	// Connections is the key prefix for connections
+	Connections StorageKey = "/connections"
+	// Listeners is the key prefix for listeners.
+	Listeners StorageKey = "/listeners"
 )
 
 // Key returns this key as a byte slice.
@@ -48,20 +45,29 @@ func (p StorageKey) String() string { return string(p) }
 
 // PathFor computes the path for this key based on the given peer ID.
 func (p StorageKey) PathFor(peer peer.ID) StorageKey {
-	return StorageKey("/" + peer.String() + p.String())
+	return StorageKey(p.String() + "/" + peer.String())
 }
 
-// KeyFor computes the key for this key based on the given value.
-func (p StorageKey) KeyFor(value string) StorageKey {
+// TagFor computes the key for the tag based on the given value.
+func (p StorageKey) TagFor(value string) StorageKey {
 	return StorageKey(p.String() + "/" + value)
+}
+
+// TimeFor computes the key for a connection time based on the given value.
+func (p StorageKey) TimeFor(value time.Time) StorageKey {
+	return StorageKey(p.String() + "/" + value.Format(time.RFC3339Nano))
+}
+
+// AddrFor computes the key for a listener address based on the given value.
+func (p StorageKey) AddrFor(value ma.Multiaddr) StorageKey {
+	// Strip the leading slash from the address so we can
+	// parse cleanly on return.
+	addr := value.String()[1:]
+	return StorageKey(p.String() + "/" + addr)
 }
 
 // Trim strips the prefix from the given key.
 func (p StorageKey) Trim(key []byte) []byte {
 	len := len(p)
-	if strings.Contains(string(p), string(Multiaddrs)) || strings.Contains(string(p), string(Protocols)) {
-		// We need to trim the leading slash.
-		len++
-	}
 	return key[len:]
 }

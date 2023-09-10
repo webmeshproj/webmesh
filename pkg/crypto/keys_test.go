@@ -69,6 +69,15 @@ func TestNativeIdentity(t *testing.T) {
 	if _, ok := nativepub.(*p2pcrypto.Ed25519PublicKey); !ok {
 		t.Fatal("native identity is not an ed25519 public key")
 	}
+	raw, err = nativepub.Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubRaw, _ := pubkey.Raw()
+	// Hacky check, but we should _not_ have the same public key back.
+	if bytes.Equal(raw, pubRaw) {
+		t.Fatal("native identity raw bytes match original public key raw bytes")
+	}
 }
 
 func TestEncodeWireGuardKeys(t *testing.T) {
@@ -182,8 +191,18 @@ func TestWireGuardKeyIDs(t *testing.T) {
 	if !extracted.Equals(key.PublicKey()) {
 		t.Fatal("extracted public key does not match original public key")
 	}
+	// The public key should be truncated
 	if !extracted.(*WireGuardPublicKey).IsTruncated() {
 		t.Fatal("extracted public key is not truncated")
+	}
+	// It should be truncated to the bytes of the wireguard public key.
+	raw, err := extracted.Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedBytes := key.WireGuardKey().PublicKey()
+	if !bytes.Equal(raw, expectedBytes[:]) {
+		t.Fatal("extracted public key raw bytes do not match wireguard public key bytes")
 	}
 	matches := extracted.Equals(key.PublicKey())
 	if !matches {

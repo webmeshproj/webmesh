@@ -128,6 +128,7 @@ type PeerRecord struct {
 func (st *Peerstore) SetStorage(store storage.MeshStorage) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	st.log.Debug("Setting mesh storage for peerstore")
 	st.meshstore = store
 }
 
@@ -135,11 +136,18 @@ func (st *Peerstore) SetStorage(store storage.MeshStorage) {
 func (st *Peerstore) SetInterface(iface wireguard.Interface) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	st.log.Debug("Setting WireGuard interface for peerstore")
 	st.iface = iface
 }
 
 // Close closes the peerstore. This is a no-op.
 func (st *Peerstore) Close() error {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.log.Debug("Closing peerstore")
+	if st.db == nil {
+		return nil
+	}
 	return st.db.Close()
 }
 
