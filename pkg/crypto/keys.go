@@ -212,7 +212,7 @@ func (w *WireGuardKey) Sign(data []byte) ([]byte, error) {
 // Return a public key paired with this private key
 func (w *WireGuardKey) GetPublic() p2pcrypto.PubKey {
 	return &WireGuardPublicKey{
-		native: w.pubKeyNative(),
+		native: w.native.Public().(ed25519.PublicKey),
 		wgkey:  w.WireGuardKey().PublicKey(),
 	}
 }
@@ -220,11 +220,6 @@ func (w *WireGuardKey) GetPublic() p2pcrypto.PubKey {
 // PublicKey returns the PublicKey as a PublicKey interface.
 func (w *WireGuardKey) PublicKey() PublicKey {
 	return w.GetPublic().(*WireGuardPublicKey)
-}
-
-func (w *WireGuardKey) pubKeyNative() ed25519.PublicKey {
-	raw := w.native[ed25519.PrivateKeySize-ed25519.PublicKeySize:]
-	return ed25519.PublicKey(raw)
 }
 
 // Marshal returns the protobuf marshaled key.
