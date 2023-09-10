@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -44,6 +45,23 @@ const (
 	// The destination node should be appended to the end of the protocol.
 	UDPRelayProtocol = protocol.ID("/webmesh/udp-relay/0.0.1")
 )
+
+// NativeIdentity turns the given crypto.PrivateKey into a native ed25519 identity.
+// This is used for mesh discovery mechanisms and is not compatible with the larger
+// webmesh transport.
+func NativeIdentity(key crypto.PrivateKey) libp2p.Option {
+	wgkey, ok := key.(*crypto.WireGuardKey)
+	if !ok {
+		// Caller's fault
+		panic(fmt.Errorf("native identity requires a wireguard key"))
+	}
+	id, err := wgkey.ToNativeIdentity()
+	if err != nil {
+		// This should never happen, it's a valid key.
+		panic(fmt.Errorf("wireguard key to native identity: %w", err))
+	}
+	return libp2p.Identity(id)
+}
 
 // RPCProtocolFor returns the RPCProtocol for the given method.
 func RPCProtocolFor(method string) protocol.ID {

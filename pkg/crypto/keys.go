@@ -78,6 +78,11 @@ type PrivateKey interface {
 
 	p2pcrypto.PrivKey
 
+	// ToNativeIdentity marshals this key back and forth into a native
+	// libp2p ed25519 identity. This is used for mesh discovery mechanisms
+	// and is not compatible with the larger webmesh transport.
+	ToNativeIdentity() (p2pcrypto.PrivKey, error)
+
 	// PublicKey returns the PublicKey as a PublicKey interface.
 	PublicKey() PublicKey
 }
@@ -87,6 +92,12 @@ type PublicKey interface {
 	Key
 
 	p2pcrypto.PubKey
+
+	// ToNativeIdentity marshals this key back and forth into a native
+	// libp2p ed25519 identity. This is used for mesh discovery mechanisms
+	// and is not compatible with the larger webmesh transport. This cannot
+	// be called on truncated public keys.
+	ToNativeIdentity() (p2pcrypto.PubKey, error)
 
 	// IsTruncated returns true if this is a truncated public key.
 	// A truncated public key has taken a round trip or three through
@@ -181,6 +192,26 @@ type WireGuardKey struct {
 	native ed25519.PrivateKey
 }
 
+// ToNativeIdentity returns the libp2p private key as a full ed25519
+// identity. This is used for mesh discovery mechanisms and is not compatible
+// with the larger webmesh transport.
+func (w *WireGuardKey) ToNativeIdentity() (p2pcrypto.PrivKey, error) {
+	// We marshal and unmarshal back.
+	raw, err := w.Raw()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal ed25519 private key: %w", err)
+	}
+	pb := cryptopb.PrivateKey{
+		Type: util.Pointer(cryptopb.KeyType_Ed25519),
+		Data: raw,
+	}
+	marshaled, err := proto.Marshal(&pb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal private key: %w", err)
+	}
+	return p2pcrypto.UnmarshalPrivateKey(marshaled)
+}
+
 // ID returns the peer ID corresponding to the key.
 func (w *WireGuardKey) ID() peer.ID {
 	return w.PublicKey().ID()
@@ -269,6 +300,25 @@ func (k *WireGuardKey) Rendezvous(keys ...PublicKey) string {
 type WireGuardPublicKey struct {
 	native ed25519.PublicKey
 	wgkey  wgtypes.Key
+}
+
+// ToNativeIdentity returns the libp2p private key as a full ed25519
+// identity. This is used for mesh discovery mechanisms and is not compatible
+// with the larger webmesh transport.
+func (w *WireGuardPublicKey) ToNativeIdentity() (p2pcrypto.PubKey, error) {
+	// We marshal and unmarshal back.
+	if w.IsTruncated() {
+		return nil, fmt.Errorf("cannot convert truncated public key to native identity")
+	}
+	pb := cryptopb.PublicKey{
+		Type: util.Pointer(cryptopb.KeyType_Ed25519),
+		Data: w.native,
+	}
+	marshaled, err := proto.Marshal(&pb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal private key: %w", err)
+	}
+	return p2pcrypto.UnmarshalPublicKey(marshaled)
 }
 
 // ID returns the peer ID corresponding to the key.

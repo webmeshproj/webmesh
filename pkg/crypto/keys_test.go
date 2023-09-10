@@ -34,6 +34,43 @@ func TestWireGuardKeys(t *testing.T) {
 	}
 }
 
+func TestNativeIdentity(t *testing.T) {
+	privkey := MustGenerateKey()
+	pubkey := privkey.PublicKey()
+	native, err := privkey.(*WireGuardKey).ToNativeIdentity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Ensure the native identity is valid and that the raw bytes
+	// match the original private key.
+	if native == nil {
+		t.Fatal("native identity is nil")
+	}
+	if _, ok := native.(*p2pcrypto.Ed25519PrivateKey); !ok {
+		t.Fatal("native identity is not an ed25519 private key")
+	}
+	raw, err := native.Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	privRaw, _ := privkey.Raw()
+	if !bytes.Equal(raw, privRaw) {
+		t.Fatal("native identity raw bytes do not match original private key raw bytes")
+	}
+
+	// Same test for the public key
+	nativepub, err := pubkey.(*WireGuardPublicKey).ToNativeIdentity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nativepub == nil {
+		t.Fatal("native identity is nil")
+	}
+	if _, ok := nativepub.(*p2pcrypto.Ed25519PublicKey); !ok {
+		t.Fatal("native identity is not an ed25519 public key")
+	}
+}
+
 func TestEncodeWireGuardKeys(t *testing.T) {
 	privkey := MustGenerateKey()
 	pubkey := privkey.PublicKey()
