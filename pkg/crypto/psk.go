@@ -25,14 +25,6 @@ import (
 	"fmt"
 )
 
-func init() {
-	// assert we have a crypto/rand source
-	b := make([]byte, 1)
-	if _, err := rand.Read(b); err != nil {
-		panic("crypto/rand is unavailable")
-	}
-}
-
 // DefaultPSKLength is the default length of a PSK.
 const DefaultPSKLength = 32
 
