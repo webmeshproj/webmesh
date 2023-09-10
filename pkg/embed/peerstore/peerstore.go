@@ -67,9 +67,7 @@ func New(opts Options) *Peerstore {
 		badger.DefaultOptions("").
 			WithInMemory(true).
 			WithMetricsEnabled(opts.EnableMetrics).
-			WithNumGoroutines(numRoutines). // TODO: Set this to an optimal/configurable value.
-			// Set the namespace offset to the length of a peer ID.
-			WithNamespaceOffset(len(peer.ID(crypto.MustGenerateKey().ID()).String()) + 1).
+			WithNumGoroutines(numRoutines).
 			WithLogger(wmbadger.NewLogAdapter(opts.Logger)),
 	)
 	if err != nil {
