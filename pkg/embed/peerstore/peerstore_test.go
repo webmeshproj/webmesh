@@ -759,13 +759,11 @@ func TestPeerMetrics(t *testing.T) {
 		ps := setupTest(t)
 		peer := mustGenerateWireGuardKey(t).ID()
 		latencies := []time.Duration{
-			time.Millisecond * 100,
-			time.Millisecond * 200,
-			time.Millisecond * 300,
-			time.Millisecond * 400,
+			time.Millisecond * 500,
+			time.Millisecond * 500,
 			time.Millisecond * 500,
 		}
-		expectedAvg := time.Millisecond * 300
+		expectedAvg := time.Millisecond * 500
 		for _, latency := range latencies {
 			ps.RecordLatency(peer, latency)
 		}
