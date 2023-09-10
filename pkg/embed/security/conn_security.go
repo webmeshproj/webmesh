@@ -55,7 +55,7 @@ func New(key crypto.PrivateKey, log *slog.Logger) (SecureTransportBuilder, *Secu
 	s := &SecureTransport{
 		protocolID: ID,
 		privateKey: key,
-		log:        log,
+		log:        log.With("protocol", ID),
 	}
 	return func(id p2pproto.ID, _ p2pcrypto.PrivKey, host host.Host) (*SecureTransport, error) {
 		s.host = host
@@ -98,6 +98,8 @@ func (s *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, 
 	if s.iface == nil {
 		return nil, errors.New("wireguard interface not set")
 	}
+	log := s.log.With("raddr", insecure.RemoteAddr(), "peer-id", p.String())
+	log.Debug("Secure inbound connection")
 	var remotePub p2pcrypto.PubKey
 	var err error
 	if p != "" {
@@ -108,12 +110,16 @@ func (s *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, 
 	}
 	inNw, err := s.IsInNetwork(insecure)
 	if err != nil {
+		log.Error("Unable to check inbound connection in network", "error", err.Error())
 		return nil, fmt.Errorf("check inbound connection in network: %w", err)
 	}
 	if !inNw {
+		log.Debug("Connection from peer not in wireguard network")
 		return nil, fmt.Errorf("connection from %s not in wireguard network", insecure.RemoteAddr())
 	}
+	log.Debug("Connection is in network")
 	if p != "" {
+		log.Debug("Adding protocol to peerstore", "peer", p)
 		err := s.ps.AddProtocols(p, s.protocolID)
 		if err != nil {
 			return nil, fmt.Errorf("add protocol to peerstore: %w", err)
@@ -135,17 +141,23 @@ func (s *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn,
 	if s.iface == nil {
 		return nil, errors.New("wireguard interface not set")
 	}
+	log := s.log.With("raddr", insecure.RemoteAddr(), "peer-id", p.String())
+	log.Debug("Secure outbound connection")
 	remotePub, err := crypto.ExtractPublicKeyFromID(p)
 	if err != nil {
+		log.Error("Unable to extract public key from peer ID", "error", err.Error())
 		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
 	}
 	inNw, err := s.IsInNetwork(insecure)
 	if err != nil {
+		log.Error("Unable to check outbound connection in network", "error", err.Error())
 		return nil, fmt.Errorf("check outbound connection in network: %w", err)
 	}
 	if !inNw {
+		log.Debug("Connection to peer not in wireguard network")
 		return nil, fmt.Errorf("connection to %s not in wireguard network", insecure.RemoteAddr())
 	}
+	log.Debug("Connection is in network, adding protocol to peerstore")
 	if err := s.ps.AddProtocols(p, s.protocolID); err != nil {
 		return nil, fmt.Errorf("add protocol to peerstore: %w", err)
 	}
