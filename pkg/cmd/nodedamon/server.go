@@ -95,8 +95,8 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		conf.Bootstrap.Enabled = false
 		conf.Mesh.JoinAddress = ""
 		conf.Discovery = config.DiscoveryOptions{
-			PSK:      req.GetJoinPsk(),
-			Discover: true,
+			Rendezvous: req.GetJoinPsk(),
+			Discover:   true,
 		}
 	}
 	err = conf.Validate()

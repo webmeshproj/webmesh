@@ -466,7 +466,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Node, raft raf
 			}
 			return &libp2p.AnnounceOptions{
 				Host:        host,
-				Rendezvous:  o.Discovery.PSK,
+				Rendezvous:  o.Discovery.Rendezvous,
 				AnnounceTTL: o.Discovery.AnnounceTTL,
 				HostOptions: o.Discovery.HostOptions(ctx, conn.Key()),
 			}
@@ -540,7 +540,7 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 			addrs = append(addrs, maddr)
 		}
 		joinTransport, err := libp2p.NewJoinRoundTripper(ctx, libp2p.RoundTripOptions{
-			Rendezvous: o.Discovery.PSK,
+			Rendezvous: o.Discovery.Rendezvous,
 			Host:       host,
 			HostOptions: libp2p.HostOptions{
 				Options:        []config.Option{libp2p.Identity(conn.Key())},

@@ -134,7 +134,7 @@ func (t *WebmeshTransport) ConvertAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 	defer t.mu.Unlock()
 	webmeshSec := protocol.WithPeerID(t.key.ID())
 	if t.conf.Discovery.Announce {
-		webmeshSec = protocol.WithPeerIDAndRendezvous(t.key.ID(), t.conf.Discovery.PSK)
+		webmeshSec = protocol.WithPeerIDAndRendezvous(t.key.ID(), t.conf.Discovery.Rendezvous)
 	}
 	var out []ma.Multiaddr
 	for _, addr := range addrs {
@@ -473,10 +473,10 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 			t.log.Debug("Starting webmesh node in discovery mode", "rendezvous", rendezvous)
 			if conf.Bootstrap.Enabled || conf.Discovery.Announce {
 				conf.Discovery.Announce = true
-				conf.Discovery.PSK = rendezvous
+				conf.Discovery.Rendezvous = rendezvous
 			} else {
 				conf.Discovery.Discover = true
-				conf.Discovery.PSK = rendezvous
+				conf.Discovery.Rendezvous = rendezvous
 			}
 		}
 	}

@@ -96,7 +96,7 @@ func runServer(loglevel string) error {
 	conf.TLS.Insecure = true
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 	conf.Discovery.Announce = true
-	conf.Discovery.PSK = string(psk)
+	conf.Discovery.Rendezvous = string(psk)
 	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61820"}
 
 	conn, err := embed.NewNode(context.Background(), embed.Options{Config: &conf})
@@ -150,7 +150,7 @@ func runClient(loglevel string, psk string) error {
 	conf.Services.API.Insecure = true
 	conf.WireGuard.ListenPort = 61821
 	conf.WireGuard.InterfaceName = "meshclient0"
-	conf.Discovery.PSK = psk
+	conf.Discovery.Rendezvous = psk
 	conf.Discovery.Discover = true
 	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61821"}
 	conf.TLS.Insecure = true

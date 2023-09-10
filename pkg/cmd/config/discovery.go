@@ -37,8 +37,8 @@ type DiscoveryOptions struct {
 	Announce bool `koanf:"announce,omitempty"`
 	// Discover is a flag to use the libp2p kademlia DHT for discovery.
 	Discover bool `koanf:"discover,omitempty"`
-	// PSK is the pre-shared key to use as a rendezvous point for peer discovery.
-	PSK string `koanf:"psk,omitempty"`
+	// Rendezvous is the pre-shared key string to use as a rendezvous point for peer discovery.
+	Rendezvous string `koanf:"rendezvous,omitempty"`
 	// BootstrapServers is a list of bootstrap servers to use for the DHT.
 	// If empty or nil, the default bootstrap servers will be used.
 	BootstrapServers []string `koanf:"bootstrap-servers,omitempty"`
@@ -56,7 +56,7 @@ type DiscoveryOptions struct {
 func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 	return DiscoveryOptions{
 		Announce:       announce,
-		PSK:            psk,
+		Rendezvous:     psk,
 		Discover:       psk != "",
 		AnnounceTTL:    time.Minute,
 		ConnectTimeout: 5 * time.Second,
@@ -66,7 +66,7 @@ func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 // BindFlags binds the flags for the discovery options.
 func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Announce, prefix+"discovery.announce", false, "announce this peer to the discovery service")
-	fs.StringVar(&o.PSK, prefix+"discovery.psk", "", "pre-shared key to use as a rendezvous point for peer discovery")
+	fs.StringVar(&o.Rendezvous, prefix+"discovery.rendezvous", "", "pre-shared key to use as a rendezvous point for peer discovery")
 	fs.BoolVar(&o.Discover, prefix+"discovery.discover", false, "use the libp2p kademlia DHT for discovery")
 	fs.StringSliceVar(&o.BootstrapServers, prefix+"discovery.bootstrap-servers", nil, "list of bootstrap servers to use for the DHT")
 	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", time.Minute, "TTL for the announcement")
@@ -118,8 +118,8 @@ func (o *DiscoveryOptions) Validate() error {
 		}
 	}
 	if o.Discover || o.Announce {
-		if o.PSK == "" {
-			return fmt.Errorf("pre-shared key must be set when using the kademlia DHT")
+		if o.Rendezvous == "" {
+			return fmt.Errorf("rendezvous must be set when using the kademlia DHT")
 		}
 		if o.Announce && o.AnnounceTTL <= 0 {
 			return fmt.Errorf("announce TTL must be greater than zero")

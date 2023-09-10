@@ -70,7 +70,9 @@ func New(key crypto.PrivateKey, log *slog.Logger) (SecureTransportBuilder, *Secu
 	}, s
 }
 
-// SecureTransport implements a libp2p secure transport using the local node's private key and wireguard allowed IPs.
+// SecureTransport implements a libp2p secure transport using the local node's private key and WireGuard interface.
+// It doesn't do much, but it's enough to make libp2p happy. WireGuard will not work if both sides haven't configured
+// the same keys and allowed IPs.
 type SecureTransport struct {
 	host       host.Host
 	ps         peerstore.Peerstore
