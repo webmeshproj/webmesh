@@ -21,7 +21,7 @@ import (
 	"log/slog"
 	"net"
 
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
@@ -42,25 +42,14 @@ type UDPRelayOptions struct {
 	Relay relay.UDPOptions
 	// Host are options for configuring the host
 	Host HostOptions
-
-	nativePrivate p2pcrypto.PrivKey
-	nativePublic  p2pcrypto.PubKey
 }
 
 // NewUDPRelay creates a new UDP relay.
 func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
 	// Make sure we use the correct key.
-	opts.Host.Options = append(opts.Host.Options, NativeIdentity(opts.PrivateKey))
+	opts.Host.Options = append(opts.Host.Options, libp2p.Identity(opts.PrivateKey))
 	// Parse the arguments to their native types.
 	var err error
-	opts.nativePrivate, err = opts.PrivateKey.ToNativeIdentity()
-	if err != nil {
-		return nil, fmt.Errorf("private key to native identity: %w", err)
-	}
-	opts.nativePublic, err = opts.RemotePubKey.ToNativeIdentity()
-	if err != nil {
-		return nil, fmt.Errorf("remote public key to native identity: %w", err)
-	}
 	host, err := NewDiscoveryHost(ctx, opts.Host)
 	if err != nil {
 		return nil, fmt.Errorf("new host: %w", err)
@@ -100,7 +89,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost,
 			log.Error("Failed to extract public key from peer", "peer", info, "error", err.Error())
 			return
 		}
-		if !key.Equals(opts.nativePublic) {
+		if !key.Equals(opts.RemotePubKey) {
 			log.Error("Peer public key does not match expected public key")
 			return
 		}
@@ -160,7 +149,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost,
 						log.Error("Failed to extract public key from peer", "peer", peer.ID.String(), "error", err.Error())
 						continue
 					}
-					if !peerKey.Equals(opts.nativePublic) {
+					if !peerKey.Equals(opts.RemotePubKey) {
 						log.Error("Peer public key does not match expected public key")
 						continue
 					}

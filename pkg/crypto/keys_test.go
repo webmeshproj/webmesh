@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 func TestWireGuardKeys(t *testing.T) {
@@ -26,57 +25,11 @@ func TestWireGuardKeys(t *testing.T) {
 		t.Fatal("private key wireguard key does not match public key wireguard key")
 	}
 
-	if privkey.Type() != WireGuardKeyType {
+	if privkey.Type() != WebmeshKeyType {
 		t.Fatal("private key type is not WireGuardKeyType")
 	}
-	if pubkey.Type() != WireGuardKeyType {
+	if pubkey.Type() != WebmeshKeyType {
 		t.Fatal("public key type is not WireGuardKeyType")
-	}
-}
-
-func TestNativeIdentity(t *testing.T) {
-	privkey := MustGenerateKey()
-	pubkey := privkey.PublicKey()
-	native, err := privkey.(*WireGuardKey).ToNativeIdentity()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Ensure the native identity is valid and that the raw bytes
-	// match the original private key.
-	if native == nil {
-		t.Fatal("native identity is nil")
-	}
-	if _, ok := native.(*p2pcrypto.Ed25519PrivateKey); !ok {
-		t.Fatal("native identity is not an ed25519 private key")
-	}
-	raw, err := native.Raw()
-	if err != nil {
-		t.Fatal(err)
-	}
-	privRaw, _ := privkey.Raw()
-	if !bytes.Equal(raw, privRaw) {
-		t.Fatal("native identity raw bytes do not match original private key raw bytes")
-	}
-
-	// Same test for the public key
-	nativepub, err := pubkey.(*WireGuardPublicKey).ToNativeIdentity()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if nativepub == nil {
-		t.Fatal("native identity is nil")
-	}
-	if _, ok := nativepub.(*p2pcrypto.Ed25519PublicKey); !ok {
-		t.Fatal("native identity is not an ed25519 public key")
-	}
-	raw, err = nativepub.Raw()
-	if err != nil {
-		t.Fatal(err)
-	}
-	pubRaw, _ := pubkey.Raw()
-	// Hacky check, but we should _not_ have the same public key back.
-	if bytes.Equal(raw, pubRaw) {
-		t.Fatal("native identity raw bytes match original public key raw bytes")
 	}
 }
 
@@ -98,7 +51,7 @@ func TestEncodeWireGuardKeys(t *testing.T) {
 	if !decodedPriv.Equals(privkey) {
 		t.Fatal("decoded private key not equal to original private key")
 	}
-	if decodedPriv.Type() != WireGuardKeyType {
+	if decodedPriv.Type() != WebmeshKeyType {
 		t.Fatal("decoded private key type is not WireGuardKeyType")
 	}
 	decodedWg := decodedPriv.WireGuardKey()
@@ -117,7 +70,7 @@ func TestEncodeWireGuardKeys(t *testing.T) {
 	if !decodedPub.Equals(pubkey) {
 		t.Fatal("decoded public key not equal to original public key")
 	}
-	if decodedPub.Type() != WireGuardKeyType {
+	if decodedPub.Type() != WebmeshKeyType {
 		t.Fatal("decoded public key type is not WireGuardKeyType")
 	}
 	decodedWg = decodedPub.WireGuardKey()
@@ -190,32 +143,5 @@ func TestWireGuardKeyIDs(t *testing.T) {
 	}
 	if !extracted.Equals(key.PublicKey()) {
 		t.Fatal("extracted public key does not match original public key")
-	}
-	// The public key should be truncated
-	if !extracted.(*WireGuardPublicKey).IsTruncated() {
-		t.Fatal("extracted public key is not truncated")
-	}
-	// It should be truncated to the bytes of the wireguard public key.
-	raw, err := extracted.Raw()
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedBytes := key.WireGuardKey().PublicKey()
-	if !bytes.Equal(raw, expectedBytes[:]) {
-		t.Fatal("extracted public key raw bytes do not match wireguard public key bytes")
-	}
-	matches := extracted.Equals(key.PublicKey())
-	if !matches {
-		t.Fatal("IDMatchesPublicKey returned false")
-	}
-	id, err = peer.IDFromPrivateKey(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id == "" {
-		t.Fatal("key ID is empty")
-	}
-	if id != key.ID() {
-		t.Fatal("key ID does not match private key ID")
 	}
 }

@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"log"
+	"math"
+	"net"
 	"os"
 	"os/signal"
 	"sync/atomic"
@@ -16,7 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
-	"github.com/webmeshproj/webmesh/pkg/cmd/config"
+	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
 )
@@ -55,21 +58,29 @@ func runServer(payloadSize int, opts libp2p.Option) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	log.Println("Setting up libp2p host and webmesh node")
+	log.Println("Payload size:", prettyByteSize(float64(payloadSize)))
 	host, err := libp2p.New(opts)
 	if err != nil {
 		return err
 	}
 	defer host.Close()
+	log.Println("Listening for libp2p connections on:")
 	for _, addr := range host.Addrs() {
-		log.Println("Listening for libp2p connections on:", addr)
+		log.Println("\t-", addr)
 	}
 	host.SetStreamHandler("/speedtest", func(stream network.Stream) {
 		log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
-		go runSpeedTest(ctx, stream, payloadSize)
+		go func() {
+			defer cancel()
+			runSpeedTest(ctx, stream, payloadSize)
+		}()
 	})
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	<-sig
+	select {
+	case <-ctx.Done():
+	case <-sig:
+	}
 	return nil
 }
 
@@ -77,12 +88,14 @@ func runClient(payloadSize int, opts libp2p.Option) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	log.Println("Setting up libp2p host and webmesh node")
+	log.Println("Payload size:", prettyByteSize(float64(payloadSize)))
 	host, err := libp2p.New(opts)
 	if err != nil {
 		return err
 	}
+	log.Println("Listening for libp2p connections on:")
 	for _, addr := range host.Addrs() {
-		log.Println("Listening for libp2p connections on:", addr)
+		log.Println("\t-", addr)
 	}
 	defer host.Close()
 	var toDial peer.ID
@@ -111,7 +124,7 @@ func runClient(payloadSize int, opts libp2p.Option) error {
 	return nil
 }
 
-func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize int) {
+func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 	var bytesWritten atomic.Int64
 	var bytesRead atomic.Int64
 	start := time.Now()
@@ -128,12 +141,15 @@ func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize in
 				written := bytesWritten.Load()
 				read := bytesRead.Load()
 				elapsed := time.Since(start)
-				log.Printf("Sent %d bytes in %s (%.2f MB/s)", written, elapsed, float64(written)/elapsed.Seconds()/1024/1024)
-				log.Printf("Received %d bytes in %s (%.2f MB/s)", read, elapsed, float64(read)/elapsed.Seconds()/1024/1024)
+				sent := prettyByteSize(float64(written) / elapsed.Seconds())
+				received := prettyByteSize(float64(read) / elapsed.Seconds())
+				fmt.Printf("Sent %d bytes in %s (%s/s)\n", written, elapsed, sent)
+				fmt.Printf("Received %d bytes in %s (%s/s)\n", read, elapsed, received)
 			}
 		}
 	}()
 	go func() {
+		defer cancel()
 		buf := make([]byte, payloadSize)
 		for {
 			select {
@@ -142,8 +158,9 @@ func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize in
 			default:
 				n, err := stream.Write(buf)
 				if err != nil {
-					log.Println("ERROR: ", err)
-					cancel()
+					if !errors.Is(err, net.ErrClosed) {
+						log.Println("ERROR: ", err)
+					}
 					return
 				}
 				bytesWritten.Add(int64(n))
@@ -156,9 +173,22 @@ func runSpeedTest(ctx context.Context, stream io.ReadWriteCloser, payloadSize in
 		case <-ctx.Done():
 			return
 		default:
+			err := stream.SetReadDeadline(time.Now().Add(time.Second))
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					log.Println("ERROR: ", err)
+				}
+				return
+			}
 			n, err := stream.Read(buf)
 			if err != nil {
-				log.Println("ERROR: ", err)
+				// Check if it's a network timeout error
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue
+				}
+				if !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
+					log.Println("ERROR: ", err)
+				}
 				return
 			}
 			bytesRead.Add(int64(n))
@@ -194,4 +224,14 @@ func newWebmeshServerOptions(rendezvous string, loglevel string) libp2p.Option {
 		Laddrs:     []multiaddr.Multiaddr{multiaddr.StringCast("/ip6/::/tcp/0")},
 		LogLevel:   loglevel,
 	})
+}
+
+func prettyByteSize(b float64) string {
+	for _, unit := range []string{"", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"} {
+		if math.Abs(b) < 1024.0 {
+			return fmt.Sprintf("%3.1f%sB", b, unit)
+		}
+		b /= 1024.0
+	}
+	return fmt.Sprintf("%.1fYiB", b)
 }

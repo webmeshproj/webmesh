@@ -31,6 +31,9 @@ func init() {
 	}
 }
 
+// SecurityID is the protocol ID of the security protocol.
+const SecurityID = "/webmesh/id/1.0.0"
+
 // ID is the ID for the webmesh libp2p protocol.
 const ID = "webmesh"
 

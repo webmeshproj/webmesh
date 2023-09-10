@@ -34,6 +34,7 @@ require (
 	github.com/miekg/dns v1.1.55
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/multiformats/go-multiaddr v0.11.0
+	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e
 	github.com/pelletier/go-toml/v2 v2.0.9
 	github.com/pion/datachannel v1.5.5
 	github.com/pion/logging v0.2.2

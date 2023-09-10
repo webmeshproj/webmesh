@@ -34,7 +34,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 
-	"github.com/webmeshproj/webmesh/pkg/cmd/config"
+	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"

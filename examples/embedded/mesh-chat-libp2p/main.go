@@ -27,7 +27,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/webmeshproj/webmesh/pkg/cmd/config"
+	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"

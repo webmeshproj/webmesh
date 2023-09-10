@@ -28,7 +28,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"google.golang.org/grpc"
 
-	"github.com/webmeshproj/webmesh/pkg/cmd/config"
+	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/mesh"

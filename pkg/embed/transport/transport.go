@@ -39,12 +39,10 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/webmeshproj/webmesh/pkg/cmd/config"
+	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	wmps "github.com/webmeshproj/webmesh/pkg/embed/peerstore"
 	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
-	"github.com/webmeshproj/webmesh/pkg/embed/security"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -85,23 +83,41 @@ type Options struct {
 	StopTimeout time.Duration
 	// ListenTimeout is the timeout for starting a listener on the webmesh node.
 	ListenTimeout time.Duration
+	// Logger is the logger to use for the webmesh transport.
+	// If nil, an empty logger will be used.
+	Logger *slog.Logger
 }
 
 // New returns a new webmesh transport builder.
-func New(opts Options, sec *security.SecureTransport) (TransportBuilder, *WebmeshTransport) {
+func New(opts Options) (TransportBuilder, *WebmeshTransport) {
 	if opts.Config == nil {
 		panic("config is required")
 	}
+	if opts.Logger == nil {
+		opts.Logger = logutil.NewLogger("")
+	}
 	rt := &WebmeshTransport{
 		opts: opts,
-		sec:  sec,
 		conf: opts.Config.ShallowCopy(),
-		log:  logutil.NewLogger(opts.LogLevel).With("component", "webmesh-transport"),
+		log:  opts.Logger.With("component", "webmesh-transport"),
 	}
 	return func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey pcrypto.PrivKey) (Transport, error) {
-		key, ok := privKey.(crypto.PrivateKey)
+		var raw []byte
+		privkey, ok := privKey.(*pcrypto.Ed25519PrivateKey)
 		if !ok {
-			return nil, fmt.Errorf("%w: invalid private key type: %T", ErrInvalidSecureTransport, privKey)
+			// Check if its already a webmesh key
+			wmkey, ok := privKey.(crypto.PrivateKey)
+			if !ok {
+				return nil, fmt.Errorf("%w: invalid private key type: %T", ErrInvalidSecureTransport, privKey)
+			}
+			raw, _ = wmkey.Raw()
+		} else {
+			raw, _ = privkey.Raw()
+		}
+		// Pack the key into a webmesh key
+		key, err := crypto.PrivateKeyFromBytes(raw)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create webmesh private key: %w", err)
 		}
 		rt.key = key
 		rt.host = host
@@ -120,7 +136,6 @@ type WebmeshTransport struct {
 	svcs    *services.Server
 	host    host.Host
 	key     crypto.PrivateKey
-	sec     *security.SecureTransport
 	tu      transport.Upgrader
 	rcmgr   network.ResourceManager
 	log     *slog.Logger
@@ -292,14 +307,6 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 			return nil, fmt.Errorf("failed to start node: %w", err)
 		}
 		t.node = node
-		t.log.Debug("Configuring security transport with wireguard interface")
-		t.sec.SetInterface(node.Network().WireGuard())
-		// If we are using the webmesh peerstore, add the storage and wireguard to it as well.
-		if ps, ok := t.host.Peerstore().(*wmps.Peerstore); ok {
-			t.log.Debug("Configuring peerstore with storage and wireguard interface")
-			ps.SetStorage(node.Storage())
-			ps.SetInterface(node.Network().WireGuard())
-		}
 		t.started.Store(true)
 	}
 	// Find the port requested in the listener address
@@ -413,7 +420,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		t.log.Error("Failed to extract public key from id", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to extract public key: %w", err)
 	}
-	wgkey, ok := pubkey.(*crypto.WireGuardPublicKey)
+	wgkey, ok := pubkey.(*crypto.WebmeshPublicKey)
 	if !ok {
 		t.log.Error("Failed to cast public key to wireguard public key", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to cast public key to wireguard public key")

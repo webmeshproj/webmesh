@@ -23,12 +23,9 @@ import (
 	p2pconfig "github.com/libp2p/go-libp2p/config"
 	ma "github.com/multiformats/go-multiaddr"
 
-	"github.com/webmeshproj/webmesh/pkg/cmd/config"
+	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/embed/connmgr"
-	"github.com/webmeshproj/webmesh/pkg/embed/peerstore"
 	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
-	"github.com/webmeshproj/webmesh/pkg/embed/security"
 	"github.com/webmeshproj/webmesh/pkg/embed/transport"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
@@ -48,40 +45,30 @@ func WithWebmeshTransport(topts TransportOptions) p2pconfig.Option {
 	if err != nil {
 		panic(err)
 	}
-	log := logutil.NewLogger(topts.LogLevel)
-	secBuilder, sec := security.New(key, log.With("component", "sec-manager"))
 	rtBuilder, rt := transport.New(transport.Options{
 		Config:        topts.Config.ShallowCopy(),
 		LogLevel:      topts.LogLevel,
 		StartTimeout:  time.Second * 30,
 		StopTimeout:   time.Second * 30,
 		ListenTimeout: time.Second * 30,
-	}, sec)
+		Logger:        logutil.NewLogger(topts.LogLevel),
+	})
 	opts := []p2pconfig.Option{
-		libp2p.Peerstore(peerstore.New(peerstore.Options{
-			Logger: log.With("component", "peerstore"),
-		})),
-		libp2p.ProtocolVersion(security.ID),
-		libp2p.Security(security.ID, secBuilder),
+		libp2p.ProtocolVersion(protocol.SecurityID),
 		libp2p.Transport(rtBuilder),
 		libp2p.Identity(key),
-		libp2p.ConnectionManager(connmgr.New(connmgr.Options{
-			Logger: log.With("component", "conn-manager"),
-		})),
-		libp2p.DisableMetrics(),
-	}
-	webmeshSec := protocol.WithPeerID(key.ID())
-	if topts.Rendezvous != "" {
-		webmeshSec = protocol.WithPeerIDAndRendezvous(key.ID(), topts.Rendezvous)
+		libp2p.AddrsFactory(rt.ConvertAddrs),
 	}
 	if len(topts.Laddrs) > 0 {
 		// Append our webmesh IDs to the listen addresses.
+		webmeshSec := protocol.WithPeerID(key.ID())
+		if topts.Rendezvous != "" {
+			webmeshSec = protocol.WithPeerIDAndRendezvous(key.ID(), topts.Rendezvous)
+		}
 		for i, laddr := range topts.Laddrs {
 			topts.Laddrs[i] = ma.Join(laddr, webmeshSec)
 		}
 		opts = append(opts, libp2p.ListenAddrs(topts.Laddrs...))
 	}
-	opts = append(opts, libp2p.AddrsFactory(rt.ConvertAddrs))
-	opts = append(opts, libp2p.FallbackDefaults)
-	return libp2p.ChainOptions(opts...)
+	return libp2p.ChainOptions(append(opts, libp2p.FallbackDefaults)...)
 }

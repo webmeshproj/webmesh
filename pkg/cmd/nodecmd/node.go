@@ -29,8 +29,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/bridgecmd"
-	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	nodedaemon "github.com/webmeshproj/webmesh/pkg/cmd/nodedamon"
+	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/embed"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
