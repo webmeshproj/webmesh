@@ -19,6 +19,7 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"sort"
@@ -89,12 +90,12 @@ type PublicKey interface {
 
 // GenerateKey generates a new private key.
 func GenerateKey() (PrivateKey, error) {
-	priv, _, err := p2pcrypto.GenerateKeyPair(p2pcrypto.Secp256k1, 256)
+	priv, _, err := p2pcrypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
 	return &WireGuardKey{
-		native: priv.(*p2pcrypto.Secp256k1PrivateKey),
+		native: priv.(*p2pcrypto.Ed25519PrivateKey),
 	}, nil
 }
 
@@ -152,7 +153,7 @@ func ParsePrivateKey(data []byte) (PrivateKey, error) {
 		return nil, fmt.Errorf("failed to unmarshal key: %w", err)
 	}
 	return &WireGuardKey{
-		native: unmarshaled.(*p2pcrypto.Secp256k1PrivateKey),
+		native: unmarshaled.(*p2pcrypto.Ed25519PrivateKey),
 	}, nil
 }
 
@@ -163,14 +164,14 @@ func ParsePublicKey(data []byte) (PublicKey, error) {
 		return nil, fmt.Errorf("failed to unmarshal secp256k1 public key: %w", err)
 	}
 	return &WireGuardPublicKey{
-		native: pub.(*p2pcrypto.Secp256k1PublicKey),
+		native: pub.(*p2pcrypto.Ed25519PublicKey),
 		wgkey:  wgtypes.Key(data[:wgtypes.KeyLen]),
 	}, nil
 }
 
 // WireGuardKey represents a private WireGuard key as a libp2p key.
 type WireGuardKey struct {
-	native *p2pcrypto.Secp256k1PrivateKey
+	native *p2pcrypto.Ed25519PrivateKey
 }
 
 func (w *WireGuardKey) Native() p2pcrypto.PrivKey {
@@ -209,7 +210,7 @@ func (w *WireGuardKey) Sign(data []byte) ([]byte, error) {
 // Return a public key paired with this private key
 func (w *WireGuardKey) GetPublic() p2pcrypto.PubKey {
 	return &WireGuardPublicKey{
-		native: w.native.GetPublic().(*p2pcrypto.Secp256k1PublicKey),
+		native: w.native.GetPublic().(*p2pcrypto.Ed25519PublicKey),
 		wgkey:  w.WireGuardKey().PublicKey(),
 	}
 }
@@ -242,7 +243,7 @@ func (k *WireGuardKey) Rendezvous(keys ...PublicKey) string {
 
 // WireGuardPublicKey represents a public WireGuard key as a libp2p key.
 type WireGuardPublicKey struct {
-	native *p2pcrypto.Secp256k1PublicKey
+	native *p2pcrypto.Ed25519PublicKey
 	wgkey  wgtypes.Key
 }
 
