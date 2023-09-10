@@ -89,6 +89,12 @@ type PublicKey interface {
 	Key
 
 	p2pcrypto.PubKey
+
+	// IsTruncated returns true if this is a truncated public key.
+	// A truncated public key has taken a round trip or three through
+	// the libp2p libraries and has lost its ed25519 public key bytes.
+	// Only the WireGuard key bytes remain.
+	IsTruncated() bool
 }
 
 // GenerateKey generates a new private key.
@@ -281,8 +287,8 @@ func (w *WireGuardPublicKey) WireGuardKey() wgtypes.Key {
 
 // Verify compares a signature against the input data
 func (w *WireGuardPublicKey) Verify(data []byte, sig []byte) (success bool, err error) {
-	if len(w.native) == 0 {
-		return false, fmt.Errorf("cannot verify signature with empty ed25519 bytes")
+	if w.IsTruncated() {
+		return false, fmt.Errorf("cannot verify signature with truncated public key")
 	}
 	return ed25519.Verify(w.native, data, sig), nil
 }
@@ -309,6 +315,14 @@ func (w *WireGuardPublicKey) Raw() ([]byte, error) {
 // raw returns the actual raw data for use in encoding and marshaling.
 func (w *WireGuardPublicKey) fullRaw() []byte {
 	return append(w.wgkey[:], w.native...)
+}
+
+// IsTruncated returns true if this is a truncated public key.
+// A truncated public key has taken a round trip or three through
+// the libp2p libraries and has lost its ed25519 public key bytes.
+// Only the WireGuard key bytes remain.
+func (w *WireGuardPublicKey) IsTruncated() bool {
+	return len(w.native) == 0
 }
 
 // Equals checks whether two PubKeys are the same

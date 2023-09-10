@@ -42,6 +42,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/cmd/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	wmps "github.com/webmeshproj/webmesh/pkg/embed/peerstore"
 	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
 	"github.com/webmeshproj/webmesh/pkg/embed/security"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
@@ -291,7 +292,14 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 			return nil, fmt.Errorf("failed to start node: %w", err)
 		}
 		t.node = node
+		t.log.Debug("Configuring security transport with wireguard interface")
 		t.sec.SetInterface(node.Network().WireGuard())
+		// If we are using the webmesh peerstore, add the storage and wireguard to it as well.
+		if ps, ok := t.host.Peerstore().(*wmps.Peerstore); ok {
+			t.log.Debug("Configuring peerstore with storage and wireguard interface")
+			ps.SetStorage(node.Storage())
+			ps.SetInterface(node.Network().WireGuard())
+		}
 		t.started.Store(true)
 	}
 	// Find the port requested in the listener address
@@ -600,6 +608,10 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 		id := wgpeer.PublicKey.ID()
 		t.log.Debug("Adding peer to peerstore", "peer", id, "multiaddrs", wgpeer.Multiaddrs)
 		t.host.Peerstore().AddAddrs(id, wgpeer.Multiaddrs, peerstore.PermanentAddrTTL)
+		err := t.host.Peerstore().AddPubKey(id, wgpeer.PublicKey)
+		if err != nil {
+			return nil, handleErr(fmt.Errorf("failed to add public key to peerstore: %w", err))
+		}
 	}
 	t.log.Info("Webmesh node is ready")
 	return node, nil
@@ -703,9 +715,14 @@ func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode
 	for _, addr := range node.GetMultiaddrs() {
 		a, err := ma.NewMultiaddr(addr)
 		if err != nil {
+			t.log.Error("Failed to parse multiaddr", "error", err.Error(), "multiaddr", addr)
 			continue
 		}
 		ps.AddAddr(id, a, peerstore.PermanentAddrTTL)
+	}
+	err = t.host.Peerstore().AddPubKey(id, pubkey)
+	if err != nil {
+		return fmt.Errorf("failed to add public key to peerstore: %w", err)
 	}
 	return nil
 }

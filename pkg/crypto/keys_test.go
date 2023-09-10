@@ -145,6 +145,9 @@ func TestWireGuardKeyIDs(t *testing.T) {
 	if !extracted.Equals(key.PublicKey()) {
 		t.Fatal("extracted public key does not match original public key")
 	}
+	if !extracted.(*WireGuardPublicKey).IsTruncated() {
+		t.Fatal("extracted public key is not truncated")
+	}
 	matches := extracted.Equals(key.PublicKey())
 	if !matches {
 		t.Fatal("IDMatchesPublicKey returned false")

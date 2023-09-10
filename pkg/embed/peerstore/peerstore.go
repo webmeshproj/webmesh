@@ -38,6 +38,9 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	wmbadger "github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/util"
 )
@@ -56,7 +59,9 @@ type Options struct {
 	Logger *slog.Logger
 }
 
-// New returns a new peerstore.
+// New returns a new peerstore. When coupled with a webmesh transport,
+// it will use the mesh storage and wireguard interface to resolve
+// unknown or truncated keys.
 func New(opts Options) *Peerstore {
 	numRoutines := 8
 	if opts.NumGoroutines > 0 {
@@ -85,6 +90,8 @@ type Peerstore struct {
 	db          *badger.DB
 	peermeta    map[peer.ID]map[string]any
 	peerRecords map[peer.ID]PeerRecord
+	meshstore   storage.MeshStorage
+	iface       wireguard.Interface
 	log         *slog.Logger
 	mu          sync.RWMutex
 }
@@ -115,6 +122,20 @@ type PeerRecord struct {
 	Seq uint64
 	// The time the record expires
 	Expires time.Time
+}
+
+// SetStorage sets the mesh storage.
+func (st *Peerstore) SetStorage(store storage.MeshStorage) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.meshstore = store
+}
+
+// SetInterface sets the wireguard interface.
+func (st *Peerstore) SetInterface(iface wireguard.Interface) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.iface = iface
 }
 
 // Close closes the peerstore. This is a no-op.
@@ -463,7 +484,8 @@ func (st *Peerstore) PeersWithAddrs() peer.IDSlice {
 func (st *Peerstore) PubKey(p peer.ID) p2pcrypto.PubKey {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
-	st.log.Debug("Getting public key for peer", "peer", p.String())
+	log := st.log.With("peer-id", p.String())
+	log.Debug("Getting public key for peer")
 	var keyData Key
 	err := st.db.View(func(txn *badger.Txn) error {
 		key := PublicKeys.PathFor(p).Key()
@@ -483,10 +505,10 @@ func (st *Peerstore) PubKey(p peer.ID) p2pcrypto.PubKey {
 	})
 	if err != nil {
 		if !errors.Is(err, badger.ErrKeyNotFound) {
-			st.log.Error("Failed to get public key from database", "error", err.Error())
+			log.Error("Failed to get public key from database", "error", err.Error())
 			return nil
 		}
-		st.log.Warn("Lookup for public key not in database", "peer", p.String())
+		log.Warn("Lookup for public key not in database")
 		return nil
 	}
 	switch keyData.Type {
@@ -498,6 +520,41 @@ func (st *Peerstore) PubKey(p peer.ID) p2pcrypto.PubKey {
 			return nil
 		}
 		st.log.Debug("Decoded WireGuardKey", "public-key", decoded.WireGuardKey().String())
+		if decoded.IsTruncated() {
+			// If this is a truncated key and we have access to mesh storage or wireguard
+			// we may be able to untruncate it.
+			// Try wireguard first for the fast path.
+			if st.iface != nil {
+				log.Debug("Looking up peer in wireguard interface")
+				peers := st.iface.Peers()
+				for _, peer := range peers {
+					if peer.PublicKey.Equals(decoded) {
+						log.Debug("Found untruncated key in wireguard interface")
+						return decoded
+					}
+				}
+			}
+			// Check mesh storage with a reasonable timeout (only applies when dialing another member)
+			if st.meshstore != nil {
+				log.Debug("Looking up peer in mesh storage")
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+				defer cancel()
+				node, err := peers.New(st.meshstore).GetByPubKey(ctx, decoded)
+				if err != nil {
+					log.Error("Failed to get peer from mesh storage", "error", err.Error())
+				} else {
+					// See if we can unpack the key from storage
+					if node.GetPublicKey() != "" {
+						key, err := crypto.DecodePublicKey(node.GetPublicKey())
+						if err == nil {
+							log.Debug("Found untruncated key in mesh storage")
+							return key
+						}
+						log.Error("Failed to decode public key from mesh storage", "error", err.Error())
+					}
+				}
+			}
+		}
 		return decoded
 	default:
 		st.log.Debug("Public key is a libp2p key")
