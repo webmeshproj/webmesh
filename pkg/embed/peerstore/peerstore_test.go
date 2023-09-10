@@ -411,7 +411,7 @@ func TestAddrBook(t *testing.T) {
 
 		ps.AddAddrs(TestPeerID1, addrs, peerstore.PermanentAddrTTL)
 		<-time.After(time.Second * 5)
-
+		cancel()
 		wg.Wait()
 		if len(seen) != 4 {
 			t.Fatalf("expected to see 4 addresses, got %d", len(seen))
