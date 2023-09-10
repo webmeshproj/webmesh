@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
@@ -90,10 +89,12 @@ type Peerstore struct {
 	mu          sync.RWMutex
 }
 
-// Key is the data stored for a private or public key.
+// Key is the data structure stored for a private or public key.
 type Key struct {
+	// Encoded is the encoded key.
 	Encoded string
-	Type    cryptopb.KeyType
+	// Type is the type of key.
+	Type cryptopb.KeyType
 }
 
 // Observation is a latency observation.
@@ -106,42 +107,14 @@ type Observation struct {
 
 // PeerRecord is a record of a peer.
 type PeerRecord struct {
+	// The sealed envelope of the record
 	Envelope *record.Envelope
-	Record   *peer.PeerRecord
-	Seq      uint64
-	Expires  time.Time
-}
-
-// StorageKey is a key prefix for values in the database.
-type StorageKey string
-
-const (
-	PrivateKeys  StorageKey = "/private-key"
-	PublicKeys   StorageKey = "/public-key"
-	Multiaddrs   StorageKey = "/multiaddrs"
-	Protocols    StorageKey = "/protocols"
-	Observations StorageKey = "/observations"
-)
-
-func (p StorageKey) Key() []byte { return []byte(p) }
-
-func (p StorageKey) String() string { return string(p) }
-
-func (p StorageKey) PathFor(peer peer.ID) StorageKey {
-	return StorageKey("/" + peer.String() + p.String())
-}
-
-func (p StorageKey) KeyFor(value string) StorageKey {
-	return StorageKey(p.String() + "/" + value)
-}
-
-func (p StorageKey) Trim(key []byte) []byte {
-	len := len(p)
-	if strings.Contains(string(p), string(Multiaddrs)) || strings.Contains(string(p), string(Protocols)) {
-		// We need to trim the leading slash.
-		len++
-	}
-	return key[len:]
+	// The unsealed record
+	Record *peer.PeerRecord
+	// The sequence number of the record
+	Seq uint64
+	// The time the record expires
+	Expires time.Time
 }
 
 // Close closes the peerstore. This is a no-op.
