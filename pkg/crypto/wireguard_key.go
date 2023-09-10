@@ -110,6 +110,14 @@ func ParsePublicKey(data []byte) (PublicKey, error) {
 	return WireGuardPublicKey(pmes.GetData()), nil
 }
 
+func IDMatchesPublicKey(id peer.ID, key PublicKey) (bool, error) {
+	extraced, err := ExtractPublicKeyFromID(id)
+	if err != nil {
+		return false, err
+	}
+	return key.Equals(extraced), nil
+}
+
 // ExtractPublicKeyFromID extracts the public key from the given peer ID.
 func ExtractPublicKeyFromID(id peer.ID) (PublicKey, error) {
 	decoded, err := mh.Decode([]byte(id))

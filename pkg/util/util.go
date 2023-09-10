@@ -26,6 +26,28 @@ func Pointer[T any](t T) *T {
 	return &t
 }
 
+// Contains returns true if the given slice contains the given item.
+func Contains[T comparable](sl []T, item T) bool {
+	for _, v := range sl {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
+
+// UpsertSlice with insert the given item into a slice if it does not exist,
+// otherwise it will update the existing item and return the updated slice.
+func UpsertSlice[T comparable](sl []T, item T) []T {
+	for i, v := range sl {
+		if v == item {
+			sl[i] = item
+			return sl
+		}
+	}
+	return append(sl, item)
+}
+
 // PrettyByteSize returns a human-readable string of the given byte size.
 func PrettyByteSize(b int64) string {
 	bf := float64(b)

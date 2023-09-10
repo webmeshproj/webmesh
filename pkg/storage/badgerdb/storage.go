@@ -38,6 +38,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 // Options are the options for creating a new NutsDB storage.
@@ -46,6 +47,8 @@ type Options struct {
 	InMemory bool
 	// DiskPath is the path to use for disk storage.
 	DiskPath string
+	// SyncWrites specifies whether to sync writes to disk.
+	SyncWrites bool
 	// Debug specifies whether to enable debug logging.
 	Debug bool
 }
@@ -59,13 +62,18 @@ type badgerDB struct {
 
 // New creates a new NutsDB storage.
 func New(opts Options) (storage.DualStorage, error) {
-	badgeropts := badger.DefaultOptions(opts.DiskPath)
+	badgeropts := badger.DefaultOptions(opts.DiskPath).
+		WithNumGoroutines(16) // TODO: make this configurable
 	if opts.InMemory {
 		badgeropts = badgeropts.WithInMemory(true)
+	} else {
+		if opts.SyncWrites {
+			badgeropts = badgeropts.WithSyncWrites(true)
+		}
 	}
-	badgeropts = badgeropts.WithLoggingLevel(badger.ERROR)
+	badgeropts = badgeropts.WithLogger(NewLogAdapter(logutil.NewLogger("")))
 	if opts.Debug {
-		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG)
+		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(NewLogAdapter(logutil.NewLogger("debug")))
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {
