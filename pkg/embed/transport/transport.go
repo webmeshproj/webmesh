@@ -400,12 +400,17 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 	if err != nil {
 		return nil, fmt.Errorf("failed to get any webmesh protocol value: %w", err)
 	}
-	pubkey, err := crypto.ExtractPublicKeyFromID(id)
+	pubkey, err := id.ExtractPublicKey()
 	if err != nil {
 		t.log.Error("Failed to extract public key from id", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to extract public key: %w", err)
 	}
-	peer, err := peers.New(t.node.Storage()).GetByPubKey(ctx, pubkey)
+	wgkey, ok := pubkey.(*crypto.WireGuardPublicKey)
+	if !ok {
+		t.log.Error("Failed to cast public key to wireguard public key", "error", err.Error(), "id", string(id))
+		return nil, fmt.Errorf("failed to cast public key to wireguard public key")
+	}
+	peer, err := peers.New(t.node.Storage()).GetByPubKey(ctx, wgkey)
 	if err != nil {
 		t.log.Error("Failed to lookup peer by their public key", "error", err.Error(), "id", id)
 		return nil, fmt.Errorf("failed to get peer: %w", err)

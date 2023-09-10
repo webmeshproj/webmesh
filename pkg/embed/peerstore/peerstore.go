@@ -973,25 +973,16 @@ func (st *Peerstore) ConsumePeerRecord(s *record.Envelope, ttl time.Duration) (a
 	if !ok {
 		return false, fmt.Errorf("unable to process envelope: not a PeerRecord")
 	}
-	st.log.Debug("Consuming peer record", "peer", rec.PeerID, "seq", rec.Seq)
-	switch v := s.PublicKey.(type) {
-	case *crypto.WireGuardPublicKey:
-		st.log.Debug("Peer record signed by wireguard key")
-		// matches, err := crypto.IDMatchesPublicKey(rec.PeerID, v)
-		// if err != nil {
-		// 	st.log.Error("Failed to check if peer record signed by wireguard key matches PeerID in PeerRecord", "error", err.Error())
-		// 	return false, err
-		// }
-		// if !matches {
-		// 	st.log.Error("Peer record signed by wireguard key does not match PeerID in PeerRecord",
-		// 		"peer", rec.PeerID, "key", v.WireGuardKey().String())
-		// 	return false, fmt.Errorf("signing key does not match PeerID in PeerRecord")
-		// }
-	case p2pcrypto.PubKey:
-		st.log.Debug("Peer record signed by libp2p key")
-		if !rec.PeerID.MatchesPublicKey(v) {
-			return false, fmt.Errorf("signing key does not match PeerID in PeerRecord")
-		}
+	log := st.log.With("peer", rec.PeerID, "seq", rec.Seq)
+	log.Debug("Consuming peer record")
+	if !rec.PeerID.MatchesPublicKey(s.PublicKey) {
+		st.log.Debug("Rejecting peer record", "reason", "signing key does not match peer id")
+		return false, fmt.Errorf("signing key does not match PeerID in PeerRecord")
+	}
+	if _, ok := s.PublicKey.(*crypto.WireGuardPublicKey); ok {
+		log.Debug("Peer record signed by wireguard key")
+	} else {
+		log.Debug("Peer record signed by libp2p key")
 	}
 	// Check if we have a record and ensure new seq is higher or equal to.
 	if existing, ok := st.peerRecords[rec.PeerID]; ok && existing.Expires.After(time.Now()) {
@@ -1005,7 +996,7 @@ func (st *Peerstore) ConsumePeerRecord(s *record.Envelope, ttl time.Duration) (a
 		}
 	}
 	// Replace the existing record
-	st.log.Debug("Accepting peer record", "peer", rec.PeerID, "seq", rec.Seq, "addrs", rec.Addrs)
+	log.Debug("Accepting peer record", "addrs", rec.Addrs)
 	st.peerRecords[rec.PeerID] = PeerRecord{
 		Envelope: s,
 		Record:   rec,

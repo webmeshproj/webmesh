@@ -86,7 +86,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost,
 			log.Error("Failed to extract public key from peer", "peer", info, "error", err.Error())
 			return
 		}
-		if !key.Equals(opts.RemotePubKey.Native()) {
+		if !key.Equals(opts.RemotePubKey) {
 			log.Error("Peer public key does not match expected public key")
 			return
 		}
@@ -146,7 +146,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost,
 						log.Error("Failed to extract public key from peer", "peer", peer.ID.String(), "error", err.Error())
 						continue
 					}
-					if !peerKey.Equals(opts.RemotePubKey.Native()) {
+					if !peerKey.Equals(opts.RemotePubKey) {
 						log.Error("Peer public key does not match expected public key")
 						continue
 					}

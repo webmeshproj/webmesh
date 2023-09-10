@@ -50,7 +50,7 @@ const (
 // for identity. The returned identity does not support using webmesh as
 // the security transport.
 func Identity(key crypto.PrivateKey) libp2p.Option {
-	id := libp2p.Identity(key.Native())
+	id := libp2p.Identity(key)
 	return id
 }
 

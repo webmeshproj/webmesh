@@ -103,9 +103,13 @@ func (s *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, 
 	var remotePub p2pcrypto.PubKey
 	var err error
 	if p != "" {
-		remotePub, err = crypto.ExtractPublicKeyFromID(p)
+		remotePub, err = p.ExtractPublicKey()
 		if err != nil {
 			return nil, fmt.Errorf("extract public key from peer ID: %w", err)
+		}
+		// Ensure this a wireguard key
+		if _, ok := remotePub.(*crypto.WireGuardPublicKey); !ok {
+			return nil, fmt.Errorf("peer %s public key is not a wireguard key", p)
 		}
 	}
 	inNw, err := s.IsInNetwork(insecure)
@@ -143,10 +147,14 @@ func (s *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn,
 	}
 	log := s.log.With("raddr", insecure.RemoteAddr(), "peer-id", p.String())
 	log.Debug("Secure outbound connection")
-	remotePub, err := crypto.ExtractPublicKeyFromID(p)
+	remotePub, err := p.ExtractPublicKey()
 	if err != nil {
 		log.Error("Unable to extract public key from peer ID", "error", err.Error())
 		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
+	}
+	// Ensure this a wireguard key
+	if _, ok := remotePub.(*crypto.WireGuardPublicKey); !ok {
+		return nil, fmt.Errorf("peer %s public key is not a wireguard key", p)
 	}
 	inNw, err := s.IsInNetwork(insecure)
 	if err != nil {
