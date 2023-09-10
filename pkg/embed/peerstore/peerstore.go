@@ -497,6 +497,7 @@ func (st *Peerstore) PubKey(p peer.ID) p2pcrypto.PubKey {
 			st.log.Error("Failed to decode public key", "error", err.Error())
 			return nil
 		}
+		st.log.Debug("Decoded WireGuardKey", "public-key", decoded.WireGuardKey().String())
 		return decoded
 	default:
 		st.log.Debug("Public key is a libp2p key")
@@ -523,7 +524,7 @@ func (st *Peerstore) AddPubKey(p peer.ID, pubkey p2pcrypto.PubKey) error {
 	keyData.Type = pubkey.Type()
 	// If this is a wireguard key, we'll use it's encode method.
 	if key, ok := pubkey.(crypto.PublicKey); ok {
-		st.log.Debug("Public key is a wireguard key")
+		st.log.Debug("Public key is a wireguard key", "public-key", key.WireGuardKey().String())
 		encoded, err := key.Encode()
 		if err != nil {
 			return err
@@ -594,6 +595,7 @@ func (st *Peerstore) PrivKey(p peer.ID) p2pcrypto.PrivKey {
 			st.log.Error("Failed to decode private key", "error", err.Error())
 			return nil
 		}
+		st.log.Debug("Decoded WireGuardKey", "public-key", decoded.PublicKey().WireGuardKey().String())
 		return decoded
 	default:
 		st.log.Debug("Private key is a libp2p key")
@@ -620,7 +622,7 @@ func (st *Peerstore) AddPrivKey(p peer.ID, privkey p2pcrypto.PrivKey) error {
 	keyData.Type = privkey.Type()
 	// If this is a wireguard key, we'll use it's encode method.
 	if key, ok := privkey.(crypto.PrivateKey); ok {
-		st.log.Debug("Private key is a wireguard key")
+		st.log.Debug("Private key is a wireguard key", "public-key", key.PublicKey().WireGuardKey().String())
 		encoded, err := key.Encode()
 		if err != nil {
 			return err
@@ -980,6 +982,8 @@ func (st *Peerstore) ConsumePeerRecord(s *record.Envelope, ttl time.Duration) (a
 			return false, err
 		}
 		if !matches {
+			st.log.Error("Peer record signed by wireguard key does not match PeerID in PeerRecord",
+				"peer", rec.PeerID, "key", v.WireGuardKey().String())
 			return false, fmt.Errorf("signing key does not match PeerID in PeerRecord")
 		}
 	case p2pcrypto.PubKey:
@@ -988,7 +992,6 @@ func (st *Peerstore) ConsumePeerRecord(s *record.Envelope, ttl time.Duration) (a
 			return false, fmt.Errorf("signing key does not match PeerID in PeerRecord")
 		}
 	}
-
 	// Check if we have a record and ensure new seq is higher or equal to.
 	if existing, ok := st.peerRecords[rec.PeerID]; ok && existing.Expires.After(time.Now()) {
 		if existing.Seq > rec.Seq {
