@@ -28,9 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
@@ -531,22 +529,10 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.
 		}), nil
 	}
 	if o.Discovery.Discover {
-		var addrs []multiaddr.Multiaddr
-		for _, addr := range o.Discovery.BootstrapServers {
-			maddr, err := multiaddr.NewMultiaddr(addr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid bootstrap peer address: %w", err)
-			}
-			addrs = append(addrs, maddr)
-		}
 		joinTransport, err := libp2p.NewJoinRoundTripper(ctx, libp2p.RoundTripOptions{
-			Rendezvous: o.Discovery.Rendezvous,
-			Host:       host,
-			HostOptions: libp2p.HostOptions{
-				Options:        []config.Option{libp2p.Identity(conn.Key())},
-				BootstrapPeers: addrs,
-				ConnectTimeout: o.Discovery.ConnectTimeout,
-			},
+			Rendezvous:  o.Discovery.Rendezvous,
+			Host:        host,
+			HostOptions: o.Discovery.HostOptions(ctx, conn.Key()),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("create libp2p join transport: %w", err)

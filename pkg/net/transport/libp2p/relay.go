@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"net"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
@@ -46,7 +47,7 @@ type UDPRelayOptions struct {
 // NewUDPRelay creates a new UDP relay.
 func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
 	// Make sure we use the correct key.
-	opts.Host.Options = append(opts.Host.Options, Identity(opts.PrivateKey))
+	opts.Host.Options = append(opts.Host.Options, libp2p.Identity(opts.PrivateKey))
 	host, err := NewDiscoveryHost(ctx, opts.Host)
 	if err != nil {
 		return nil, fmt.Errorf("new host: %w", err)

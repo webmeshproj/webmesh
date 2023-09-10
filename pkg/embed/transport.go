@@ -57,13 +57,13 @@ func WithWebmeshTransport(topts TransportOptions) p2pconfig.Option {
 		ListenTimeout: time.Second * 30,
 	}, sec)
 	opts := []p2pconfig.Option{
+		libp2p.Peerstore(peerstore.New(peerstore.Options{
+			Logger: log.With("component", "peerstore"),
+		})),
 		libp2p.ProtocolVersion(security.ID),
 		libp2p.Security(security.ID, secBuilder),
 		libp2p.Transport(rtBuilder),
 		libp2p.Identity(key),
-		libp2p.Peerstore(peerstore.New(peerstore.Options{
-			Logger: log.With("component", "peerstore"),
-		})),
 		// libp2p.ConnectionManager(connmgr.New(logutil.NewLogger(topts.LogLevel).With("component", "conn-manager"))),
 		libp2p.DisableMetrics(),
 	}

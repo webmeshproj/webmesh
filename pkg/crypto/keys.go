@@ -38,8 +38,6 @@ import (
 // WireGuardKeyType is the protobuf key type for WireGuard keys.
 const WireGuardKeyType cryptopb.KeyType = 5
 
-const CompressedPubKeyLength = 42
-
 func init() {
 	cryptopb.KeyType_name[int32(WireGuardKeyType)] = "WireGuard"
 	cryptopb.KeyType_value["WireGuard"] = int32(WireGuardKeyType)
@@ -304,9 +302,9 @@ func (w *WireGuardPublicKey) Raw() ([]byte, error) {
 	// This function is called during the ID generation process.
 	// Currently libp2p will not use an ID derevation algorithm
 	// unless the raw data is capped at 42 bytes. So we'll just return
-	// the bytes of the wireguard key. This means that on certain
-	// round trips of the public key through the libp2p library, you
-	// may lose the ec public key and be unable to verify signatures.
+	// the bytes of the wireguard key and the first half of the ed25519 key.
+	// This means that on certain round trips of the public key through the
+	// libp2p library, you may lose the ec public key and be unable to verify signatures.
 	data := make([]byte, wgtypes.KeyLen)
 	copy(data, w.wgkey[:])
 	return data, nil
@@ -322,7 +320,7 @@ func (w *WireGuardPublicKey) fullRaw() []byte {
 // the libp2p libraries and has lost its ed25519 public key bytes.
 // Only the WireGuard key bytes remain.
 func (w *WireGuardPublicKey) IsTruncated() bool {
-	return len(w.native) == 0
+	return len(w.native) < ed25519.PublicKeySize
 }
 
 // Equals checks whether two PubKeys are the same

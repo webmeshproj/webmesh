@@ -519,8 +519,9 @@ func (st *Peerstore) PubKey(p peer.ID) p2pcrypto.PubKey {
 			st.log.Error("Failed to decode public key", "error", err.Error())
 			return nil
 		}
-		st.log.Debug("Decoded WireGuardKey", "public-key", decoded.WireGuardKey().String())
+		st.log.Debug("Decoded WireGuard key", "public-key", decoded.WireGuardKey().String())
 		if decoded.IsTruncated() {
+			st.log.Debug("Decoded key is truncated, attempting to untruncate")
 			// If this is a truncated key and we have access to mesh storage or wireguard
 			// we may be able to untruncate it.
 			// Try wireguard first for the fast path.
@@ -541,7 +542,9 @@ func (st *Peerstore) PubKey(p peer.ID) p2pcrypto.PubKey {
 				defer cancel()
 				node, err := peers.New(st.meshstore).GetByPubKey(ctx, decoded)
 				if err != nil {
-					log.Error("Failed to get peer from mesh storage", "error", err.Error())
+					if !errors.Is(err, peers.ErrNodeNotFound) {
+						log.Error("Failed to get peer from mesh storage", "error", err.Error())
+					}
 				} else {
 					// See if we can unpack the key from storage
 					if node.GetPublicKey() != "" {
@@ -554,6 +557,7 @@ func (st *Peerstore) PubKey(p peer.ID) p2pcrypto.PubKey {
 					}
 				}
 			}
+			log.Debug("Failed to find untruncated key")
 		}
 		return decoded
 	default:

@@ -25,7 +25,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -45,14 +44,6 @@ const (
 	// The destination node should be appended to the end of the protocol.
 	UDPRelayProtocol = protocol.ID("/webmesh/udp-relay/0.0.1")
 )
-
-// Identity returns a libp2p option for using the given crypto.PrivateKey
-// for identity. The returned identity does not support using webmesh as
-// the security transport.
-func Identity(key crypto.PrivateKey) libp2p.Option {
-	id := libp2p.Identity(key)
-	return id
-}
 
 // RPCProtocolFor returns the RPCProtocol for the given method.
 func RPCProtocolFor(method string) protocol.ID {
