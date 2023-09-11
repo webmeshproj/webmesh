@@ -32,7 +32,7 @@ import (
 
 // DefaultMTU is the default MTU for wireguard interfaces.
 // TODO: Try to determine this automatically.
-const DefaultMTU = 1350
+const DefaultMTU = 1420
 
 // Interface represents an underlying machine network interface for
 // use with wireguard.

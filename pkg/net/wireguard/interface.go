@@ -263,3 +263,44 @@ func (w *wginterface) Configure(ctx context.Context, key crypto.PrivateKey, list
 	}
 	return nil
 }
+
+// Metrics returns the metrics for the wireguard interface.
+func (w *wginterface) Metrics() (*v1.InterfaceMetrics, error) {
+	device, err := w.cli.Device(w.Name())
+	if err != nil {
+		return nil, err
+	}
+	metrics := &v1.InterfaceMetrics{
+		DeviceName:         device.Name,
+		PublicKey:          device.PublicKey.String(),
+		AddressV4:          w.Interface.AddressV4().String(),
+		AddressV6:          w.Interface.AddressV6().String(),
+		Type:               device.Type.String(),
+		ListenPort:         int32(device.ListenPort),
+		TotalReceiveBytes:  0,
+		TotalTransmitBytes: 0,
+		NumPeers:           int32(len(device.Peers)),
+		Peers:              make([]*v1.PeerMetrics, len(device.Peers)),
+	}
+	for i, peer := range device.Peers {
+		metrics.TotalReceiveBytes += uint64(peer.ReceiveBytes)
+		metrics.TotalTransmitBytes += uint64(peer.TransmitBytes)
+		metrics.Peers[i] = &v1.PeerMetrics{
+			PublicKey:           peer.PublicKey.String(),
+			Endpoint:            peer.Endpoint.String(),
+			PersistentKeepAlive: peer.PersistentKeepaliveInterval.String(),
+			LastHandshakeTime:   peer.LastHandshakeTime.UTC().Format(time.RFC3339),
+			AllowedIps: func() []string {
+				var ips []string
+				for _, ip := range peer.AllowedIPs {
+					ips = append(ips, ip.String())
+				}
+				return ips
+			}(),
+			ProtocolVersion: int64(peer.ProtocolVersion),
+			ReceiveBytes:    uint64(peer.ReceiveBytes),
+			TransmitBytes:   uint64(peer.TransmitBytes),
+		}
+	}
+	return metrics, nil
+}

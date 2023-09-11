@@ -59,6 +59,14 @@ func (a PrefixList) AddrStrings() []string {
 	return out
 }
 
+func (a PrefixList) AddrPorts(port uint16) []netip.AddrPort {
+	var out []netip.AddrPort
+	for _, addr := range a {
+		out = append(out, netip.AddrPortFrom(addr.Addr(), port))
+	}
+	return out
+}
+
 func (a PrefixList) Len() int      { return len(a) }
 func (a PrefixList) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 

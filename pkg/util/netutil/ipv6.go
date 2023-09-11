@@ -37,12 +37,12 @@ func GenerateULA() (netip.Prefix, error) {
 	if err != nil {
 		return netip.Prefix{}, fmt.Errorf("failed to generate local secret: %w", err)
 	}
-	return GenerateULAWithPSK(secret), nil
+	return GenerateULAWithSeed(secret), nil
 }
 
-// GenerateULAWithSecret generates a unique local address with a /32 prefix
-// using a pre-shared key. The network is returned as a netip.Prefix.
-func GenerateULAWithPSK(psk []byte) netip.Prefix {
+// GenerateULAWithSeed generates a unique local address with a /32 prefix
+// using a seed value. The network is returned as a netip.Prefix.
+func GenerateULAWithSeed(psk []byte) netip.Prefix {
 	sha := sha256.New()
 	sha.Write(psk)
 	var ip []byte
@@ -55,6 +55,16 @@ func GenerateULAWithPSK(psk []byte) netip.Prefix {
 	ip = append(ip, make([]byte, 10)...)
 	addr, _ := netip.AddrFromSlice(ip)
 	return netip.PrefixFrom(addr, 32)
+}
+
+// GenerateULAWithKey generates a unique local address with a /32 prefix
+// using the key bytes as a seed. The network is returned as a netip.Prefix.
+// It then computes another /112 prefix for the given public key's wireguard key.
+// It returns the /112 prefix as the first /128 address within it.
+func GenerateULAWithKey(key crypto.PublicKey) (netip.Prefix, netip.Addr) {
+	prefix := GenerateULAWithSeed(key.Bytes())
+	addr := AssignToPrefix(prefix, key)
+	return prefix, addr.Addr()
 }
 
 // AssignToPrefix assigns a /112 prefix within a /32 prefix using a public key.
@@ -71,6 +81,23 @@ func AssignToPrefix(prefix netip.Prefix, publicKey crypto.PublicKey) netip.Prefi
 	copy(ip[6:], data[:8])
 	addr, _ := netip.AddrFromSlice(ip)
 	return netip.PrefixFrom(addr, 112)
+}
+
+// RandomAddress returns a random /128 address within a /112 prefix.
+// This is typically used for picking local dialing addresses, but can
+// also be used to assign relay addresses. The function does not check
+// that the prefix is a valid /112 prefix.
+func RandomAddress(prefix netip.Prefix) netip.Addr {
+	// We have the last two bytes to play with
+	ip := prefix.Addr().AsSlice()
+	// Generate a random number
+	r := mrand.New(mrand.NewSource(time.Now().UnixNano()))
+	var data [2]byte
+	binary.BigEndian.PutUint16(data[:], uint16(r.Intn(65535)))
+	// Set the last two bytes to the random number
+	copy(ip[14:], data[:])
+	addr, _ := netip.AddrFromSlice(ip)
+	return addr
 }
 
 func generateLocalSecret() ([]byte, error) {

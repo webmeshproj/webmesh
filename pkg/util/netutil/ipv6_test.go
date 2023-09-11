@@ -19,6 +19,8 @@ package netutil
 import (
 	"io"
 	"net/netip"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -27,11 +29,21 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
-const defaultTestCount = 10
+func defaultTestCount(t *testing.F) int {
+	t.Helper()
+	const defaultTestCount = 10
+	// Let this be overriden by an environment variable
+	if count := os.Getenv("NETUTIL_FUZZ_SEED_COUNT"); count != "" {
+		if c, err := strconv.Atoi(count); err == nil {
+			return c
+		}
+	}
+	return defaultTestCount
+}
 
 // FuzzGenerateULA is just for checking that we consistently generate valid /32 ULAs.
 func FuzzGenerateULA(t *testing.F) {
-	for i := 0; i <= defaultTestCount; i++ {
+	for i := 0; i <= defaultTestCount(t); i++ {
 		t.Add(i)
 	}
 	t.Fuzz(func(t *testing.T, _ int) {
@@ -49,17 +61,18 @@ func FuzzGenerateULA(t *testing.F) {
 	})
 }
 
-// FuzzGenerateULAWithPSK is for checking that given a PSK we consistently generate
+// FuzzGenerateULAWithSeed is for checking that given a seed we consistently generate
 // the same /32 ULA.
-func FuzzGenerateULAWithPSK(t *testing.F) {
-	for i := 0; i <= defaultTestCount; i++ {
+func FuzzGenerateULAWithSeed(t *testing.F) {
+	tc := defaultTestCount(t)
+	for i := 0; i <= tc; i++ {
 		t.Add(crypto.MustGeneratePSK().String())
 	}
 	t.Fuzz(func(t *testing.T, psk string) {
 		t.Parallel()
-		lastPrefix := GenerateULAWithPSK([]byte(psk))
-		for i := 0; i <= defaultTestCount; i++ {
-			prefix := GenerateULAWithPSK([]byte(psk))
+		lastPrefix := GenerateULAWithSeed([]byte(psk))
+		for i := 0; i <= tc; i++ {
+			prefix := GenerateULAWithSeed([]byte(psk))
 			if !prefix.IsValid() {
 				t.Fatalf("generated invalid ULA: %s", prefix)
 			}
@@ -78,8 +91,9 @@ func FuzzGenerateULAWithPSK(t *testing.F) {
 func FuzzAssignToPrefix(f *testing.F) {
 	// Generate a ULA for this test iteration
 	ula := mustGenerateULA(f)
+	tc := defaultTestCount(f)
 	// Seed dummy data we aren't actually going to use
-	for i := 0; i <= 5; i++ {
+	for i := 0; i <= tc; i++ {
 		f.Add(string(mustGenerateSeedKey(f)))
 	}
 	var seen sync.Map
@@ -130,6 +144,40 @@ func FuzzAssignToPrefix(f *testing.F) {
 	})
 }
 
+func FuzzRandomAddress(t *testing.F) {
+	ula := mustGenerateULA(t)
+	seed := mustGenerateSeedKey(t)
+	key, err := crypto.ParsePublicKey(seed)
+	if err != nil {
+		t.Fatalf("failed to parse public key: %s", err)
+	}
+	prefix := AssignToPrefix(ula, key)
+	// We're good to go, seed some data.
+	for i := 0; i <= defaultTestCount(t); i++ {
+		t.Add(string(mustGenerateSeedKey(t)))
+	}
+	var seen sync.Map
+	var count atomic.Uint64
+	t.Fuzz(func(t *testing.T, a string) {
+		// We ignore the fuzz data, but we need to consume it
+		c := io.NopCloser(strings.NewReader(a))
+		defer c.Close()
+		addr := RandomAddress(prefix)
+		if !addr.IsValid() {
+			t.Fatalf("generated invalid address: %s", addr)
+		}
+		if !prefix.Contains(addr) {
+			t.Fatalf("generated address %q not contained in prefix %q", addr.String(), prefix.String())
+		}
+		if _, ok := seen.Load(addr); ok {
+			t.Fatalf("generated duplicate address %q after %d runs", addr.String(), count.Load())
+		}
+		// Add the address to the seen map
+		seen.Store(addr, struct{}{})
+		count.Add(1)
+	})
+}
+
 func mustGenerateULA(t *testing.F) netip.Prefix {
 	t.Helper()
 	ula, err := GenerateULA()
@@ -154,6 +202,6 @@ func mustGenerateSeedKey(t *testing.F) []byte {
 	if err != nil {
 		t.Fatalf("failed to generate WireGuard key: %s", err)
 	}
-	pubkey := key.PublicKey().WireGuardKey()
+	pubkey := key.PublicKey().Bytes()
 	return pubkey[:]
 }

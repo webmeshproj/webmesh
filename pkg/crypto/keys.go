@@ -58,6 +58,10 @@ type Key interface {
 	// On private keys, this is the peer ID of the public key.
 	ID() peer.ID
 
+	// Bytes returns the raw bytes of the key. This is the same as Key.Raw
+	// without needing to do an error check.
+	Bytes() []byte
+
 	// WireGuardKey returns the WireGuard key.
 	WireGuardKey() wgtypes.Key
 
@@ -112,11 +116,6 @@ func MustGenerateKey() PrivateKey {
 		panic(err)
 	}
 	return priv
-}
-
-// PrivateKeyFromBytes parses a private key from raw bytes.
-func PrivateKeyFromBytes(data []byte) (PrivateKey, error) {
-	return ParsePrivateKey(data)
 }
 
 // DecodePrivateKey decodes a private key from a base64 string.
@@ -213,6 +212,13 @@ func (w *WebmeshPrivateKey) Type() cryptopb.KeyType {
 	return w.typ
 }
 
+// Bytes returns the raw bytes of the key. This is the same as Key.Raw
+// without needing to do an error check.
+func (w *WebmeshPrivateKey) Bytes() []byte {
+	r, _ := w.Raw()
+	return r
+}
+
 // Raw returns the raw bytes of the private key.
 func (w *WebmeshPrivateKey) Raw() ([]byte, error) {
 	out := make([]byte, 64)
@@ -299,6 +305,13 @@ func (w *WebmeshPublicKey) Type() cryptopb.KeyType {
 	return w.typ
 }
 
+// Bytes returns the raw bytes of the key. This is the same as Key.Raw
+// without needing to do an error check.
+func (w *WebmeshPublicKey) Bytes() []byte {
+	r, _ := w.Raw()
+	return r
+}
+
 // Raw returns the raw bytes of the private key.
 func (w *WebmeshPublicKey) Raw() ([]byte, error) {
 	out := make([]byte, 32)
@@ -322,7 +335,10 @@ func (w *WebmeshPublicKey) Verify(data []byte, sig []byte) (success bool, err er
 // WireGuardKey computes the private key's wireguard key.
 func (w *WebmeshPublicKey) WireGuardKey() wgtypes.Key {
 	key := oasised25519.PublicKey(w.raw[:])
-	wgkey, _ := x25519.EdPublicKeyToX25519(key)
+	wgkey, ok := x25519.EdPublicKeyToX25519(key)
+	if !ok {
+		panic("WireGuardKey called on invalid ed25519 public key")
+	}
 	return wgtypes.Key(wgkey)
 }
 

@@ -50,9 +50,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
-// ErrInvalidSecureTransport is returned when the transport is not used with a webmesh keypair and security transport.
-var ErrInvalidSecureTransport = fmt.Errorf("transport must be used with a webmesh keypair and security transport")
-
 // ErrNotStarted is returned when the transport is not started.
 var ErrNotStarted = fmt.Errorf("transport is not started")
 
@@ -102,22 +99,9 @@ func New(opts Options) (TransportBuilder, *WebmeshTransport) {
 		log:  opts.Logger.With("component", "webmesh-transport"),
 	}
 	return func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey pcrypto.PrivKey) (Transport, error) {
-		var raw []byte
-		privkey, ok := privKey.(*pcrypto.Ed25519PrivateKey)
-		if !ok {
-			// Check if its already a webmesh key
-			wmkey, ok := privKey.(crypto.PrivateKey)
-			if !ok {
-				return nil, fmt.Errorf("%w: invalid private key type: %T", ErrInvalidSecureTransport, privKey)
-			}
-			raw, _ = wmkey.Raw()
-		} else {
-			raw, _ = privkey.Raw()
-		}
-		// Pack the key into a webmesh key
-		key, err := crypto.PrivateKeyFromBytes(raw)
+		key, err := toWebmeshPrivateKey(privKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create webmesh private key: %w", err)
+			return nil, err
 		}
 		rt.key = key
 		rt.host = host
@@ -143,9 +127,9 @@ type WebmeshTransport struct {
 	mu      sync.Mutex
 }
 
-// ConvertAddrs implements AddrsFactory on top of this transport. It automatically appends
+// BroadcastAddrs implements AddrsFactory on top of this transport. It automatically appends
 // our webmesh ID and any DNS addresses we have to the list of addresses.
-func (t *WebmeshTransport) ConvertAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
+func (t *WebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	webmeshSec := protocol.WithPeerID(t.key.ID())
@@ -196,7 +180,6 @@ func (t *WebmeshTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.
 	ctx = context.WithLogger(ctx, t.log)
 	ipver := "ip4"
 	proto := "tcp"
-	var localAddr netip.Addr
 	_, err := raddr.ValueForProtocol(ma.P_TCP)
 	if err != nil {
 		_, err = raddr.ValueForProtocol(ma.P_UDP)
@@ -213,6 +196,7 @@ func (t *WebmeshTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.
 	if err == nil {
 		ipver = "ip6"
 	}
+	var localAddr netip.Addr
 	switch ipver {
 	case "ip4":
 		localAddr = t.node.Network().WireGuard().AddressV4().Addr()
