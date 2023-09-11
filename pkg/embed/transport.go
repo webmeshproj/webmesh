@@ -83,12 +83,10 @@ func WithLiteWebmeshTransport(opts transport.LiteOptions, laddrs ...ma.Multiaddr
 		laddrs[i] = ma.Join(laddr, ma.StringCast("/webmesh/Cg=="))
 	}
 	if len(laddrs) == 0 {
-		// Make sure we have an empty webmesh ID
+		// Make sure we have at least one webmesh TCP address
 		laddrs = append(laddrs, ma.Join(ma.StringCast("/ip6/::/tcp/0/webmesh/Cg==")))
 	}
 	// Append a quic address for endpoint negotiation
-	laddrs = append(laddrs, ma.Join(ma.StringCast("/ip6/::/udp/0/quic-v1")))
-	laddrs = append(laddrs, ma.Join(ma.StringCast("/ip4/0.0.0.0/udp/0/quic-v1")))
 	transportConstructor, securityConstructor, transport := transport.NewLite(opts)
 	chainopts := libp2p.ChainOptions(
 		libp2p.ProtocolVersion(protocol.SecurityID),
@@ -97,6 +95,7 @@ func WithLiteWebmeshTransport(opts transport.LiteOptions, laddrs ...ma.Multiaddr
 		libp2p.Transport(p2pquic.NewTransport),
 		libp2p.AddrsFactory(transport.BroadcastAddrs),
 		libp2p.ListenAddrs(laddrs...),
+		libp2p.DefaultListenAddrs,
 		libp2p.FallbackDefaults,
 	)
 	return chainopts

@@ -18,14 +18,11 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
-	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
-	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
 	"github.com/webmeshproj/webmesh/pkg/embed/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
@@ -166,27 +163,18 @@ FindPeers:
 					continue
 				}
 				log.Println("Found peer:", peer.ID)
-				// Check for the peer's webmesh address
-				for _, addr := range peer.Addrs {
-					_, err := addr.ValueForProtocol(protocol.P_WEBMESH)
-					if err == nil {
-						// This is the one we'll try
-						host.Peerstore().SetAddrs(peer.ID, []ma.Multiaddr{addr}, peerstore.PermanentAddrTTL)
-						conn, err := host.NewStream(ctx, peer.ID, "/speedtest")
-						if err != nil {
-							log.Println("Failed to dial peer:", err)
-							continue
-						}
-						log.Println("Opened connection to", conn.Conn().RemoteMultiaddr())
-						go runSpeedTest(ctx, conn, payloadSize)
-						select {
-						case <-ctx.Done():
-						case <-sig:
-						}
-						return nil
-					}
+				conn, err := host.NewStream(ctx, peer.ID, "/speedtest")
+				if err != nil {
+					log.Println("Failed to dial peer:", err)
+					continue
 				}
-				log.Println("Peer has no webmesh addresses", peer.Addrs)
+				log.Println("Opened connection to", conn.Conn().RemoteMultiaddr())
+				go runSpeedTest(ctx, conn, payloadSize)
+				select {
+				case <-ctx.Done():
+				case <-sig:
+				}
+				return nil
 			}
 		}
 	}
