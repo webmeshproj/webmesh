@@ -270,20 +270,6 @@ func (t *LiteWebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p 
 	}
 
 	log := t.log.With("peer", p.ShortString(), "insecure-multiaddr", rmaddr.String())
-	// Figure out the remote protocol/port we are dialing
-	log.Debug("Dialing remote peer")
-	var proto, port string
-	port, err = rmaddr.ValueForProtocol(ma.P_TCP)
-	if err != nil {
-		port, err = rmaddr.ValueForProtocol(ma.P_UDP)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get protocol from dial address: %w", err)
-		}
-		proto = "udp"
-	} else {
-		proto = "tcp"
-	}
-	log.Debug("Determined connection protocol", "proto", proto, "port", port)
 	// If this is not a webmesh connection, pass it through to the host.
 	// I think this needs to be done with an embedded transport.
 	_, noWebmesh := rmaddr.ValueForProtocol(protocol.P_WEBMESH)
@@ -309,6 +295,20 @@ func (t *LiteWebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p 
 		}
 		return u, nil
 	}
+	// Figure out the remote protocol/port we are dialing
+	log.Debug("Dialing webmesh peer")
+	var proto, port string
+	port, err = rmaddr.ValueForProtocol(ma.P_TCP)
+	if err != nil {
+		port, err = rmaddr.ValueForProtocol(ma.P_UDP)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get protocol from dial address: %w", err)
+		}
+		proto = "udp"
+	} else {
+		proto = "tcp"
+	}
+	log.Debug("Determined connection protocol", "proto", proto, "port", port)
 	laddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip6/%s/%s/0", t.laddr.String(), proto))
 	if err != nil {
 		log.Error("Failed to create local multiaddr", "error", err.Error())
@@ -320,14 +320,7 @@ func (t *LiteWebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p 
 	}
 	// Check if we can extract a wireguard key from the peer ID.
 	log.Debug("Extracting public key from peer ID")
-	key, err := p.ExtractPublicKey()
-	if err != nil {
-		// This might be an outbound connection to a peer that doesn't know about us yet.
-		// We pass it through to the host to see if it can dial it.
-		log.Warn("Failed to extract public key from peer ID", "error", err.Error())
-		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
-	}
-	wmkey, err := toWebmeshPublicKey(key)
+	wmkey, err := extractWebmeshPublicKey(ctx, p)
 	if err != nil {
 		log.Error("Failed to convert public key to webmesh key", "error", err.Error())
 		return nil, fmt.Errorf("failed to convert public key to webmesh key: %w", err)
@@ -411,6 +404,7 @@ func (t *LiteWebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, e
 	}
 	// Append webmeh security to the address
 	laddr = ma.Join(laddr, protocol.WithPeerID(t.host.ID()))
+
 	log := t.log.With("laddr", laddr.String())
 	ctx := context.WithLogger(context.Background(), log)
 	log.Info("Listening for webmesh connections")
@@ -473,7 +467,8 @@ func (l *LiteSecureTransport) SecureInbound(ctx context.Context, insecure net.Co
 		l.log.Error("SecureInbound called before WireGuard interface was set")
 		return nil, fmt.Errorf("wireguard interface is not set")
 	}
-	l.log.Debug("Securing inbound connection", "remote-peer", p.ShortString())
+	log := l.log.With("remote-peer", p.ShortString())
+	log.Debug("Securing inbound connection", "remote-peer", p.ShortString())
 	// If the peer ID is empty, we don't know who this is, so we can't do anything
 	// substantial for now.
 	if p == "" {
@@ -487,16 +482,10 @@ func (l *LiteSecureTransport) SecureInbound(ctx context.Context, insecure net.Co
 		}, nil
 	}
 	// Extract the public key from the peer ID.
-	log := l.log.With("remote-peer", p.ShortString())
 	log.Debug("Extracting public key from peer ID")
-	key, err := p.ExtractPublicKey()
+	wmkey, err := extractWebmeshPublicKey(ctx, p)
 	if err != nil {
-		l.log.Error("Failed to extract public key from peer ID", "error", err.Error())
-		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
-	}
-	wmkey, err := toWebmeshPublicKey(key)
-	if err != nil {
-		l.log.Error("Failed to convert public key to webmesh key", "error", err.Error())
+		log.Error("Failed to convert public key to webmesh key", "error", err.Error())
 		return nil, fmt.Errorf("failed to convert public key to webmesh key: %w", err)
 	}
 	// Configure wireguard for the peer.
@@ -534,15 +523,9 @@ func (l *LiteSecureTransport) SecureOutbound(ctx context.Context, insecure net.C
 	// Extract the peers public key from the peer ID.
 	log := l.log.With("remote-peer", p.ShortString())
 	log.Info("Securing outbound connection")
-	log.Debug("Extracting public key from peer ID")
-	key, err := p.ExtractPublicKey()
+	wmkey, err := extractWebmeshPublicKey(ctx, p)
 	if err != nil {
-		l.log.Error("Failed to extract public key from peer ID", "error", err.Error())
-		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
-	}
-	wmkey, err := toWebmeshPublicKey(key)
-	if err != nil {
-		l.log.Error("Failed to convert public key to webmesh key", "error", err.Error())
+		log.Error("Failed to convert public key to webmesh key", "error", err.Error())
 		return nil, fmt.Errorf("failed to convert public key to webmesh key: %w", err)
 	}
 	log.Debug("Attempting endpoint negotiation")
@@ -601,7 +584,7 @@ func (l *LiteSecureConn) ConnState() network.ConnectionState {
 func handleEndpointNegotiation(ctx context.Context, iface wireguard.Interface, key crypto.PrivateKey, endpoints []string) func(network.Stream) error {
 	return func(stream network.Stream) error {
 		defer stream.Close()
-		log := context.LoggerFrom(ctx).With("remote-peer", stream.Conn().RemotePeer().String())
+		log := context.LoggerFrom(ctx)
 		log.Info("Received inbound webmesh connection, negotiating endpoints")
 		rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 		// Make sure the peer has already been put in wireguard

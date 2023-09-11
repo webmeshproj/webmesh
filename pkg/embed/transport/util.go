@@ -21,12 +21,29 @@ import (
 	"net"
 
 	pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 // ErrInvalidSecureTransport is returned when the transport is not used with a webmesh keypair and security transport.
 var ErrInvalidSecureTransport = fmt.Errorf("transport must be used with a webmesh keypair and security transport")
+
+func extractWebmeshPublicKey(ctx context.Context, p peer.ID) (crypto.PublicKey, error) {
+	log := context.LoggerFrom(ctx)
+	key, err := p.ExtractPublicKey()
+	if err != nil {
+		log.Warn("Failed to extract public key from peer ID", "error", err.Error())
+		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
+	}
+	wmkey, err := toWebmeshPublicKey(key)
+	if err != nil {
+		log.Error("Failed to convert public key to webmesh key", "error", err.Error())
+		return nil, fmt.Errorf("failed to convert public key to webmesh key: %w", err)
+	}
+	return wmkey, nil
+}
 
 func toWebmeshPrivateKey(in pcrypto.PrivKey) (crypto.PrivateKey, error) {
 	if v, ok := in.(crypto.PrivateKey); ok {
