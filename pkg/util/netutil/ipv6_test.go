@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/netip"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -145,6 +146,9 @@ func FuzzAssignToPrefix(f *testing.F) {
 }
 
 func FuzzRandomAddress(t *testing.F) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
 	ula := mustGenerateULA(t)
 	seed := mustGenerateSeedKey(t)
 	key, err := crypto.ParsePublicKey(seed)
