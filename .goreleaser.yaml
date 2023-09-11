@@ -131,7 +131,7 @@ archives:
 nfpms:
   - id: webmesh
     maintainer: Avi Zimmerman <avi.zimmerman@gmail.com>
-    description: WebMesh is a service mesh for the web
+    description: Webmesh is a service mesh for the web
     homepage: https://webmeshproj.github.io
     license: Apache 2.0
     builds:
@@ -158,7 +158,7 @@ brews:
   - ids: [webmesh]
     folder: Formula
     homepage: https://webmeshproj.github.io
-    description: WebMesh is a service mesh for the web
+    description: Webmesh is a service mesh for the web
     license: Apache 2.0
     url_template: "https://github.com/webmeshproj/webmesh/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     skip_upload: auto
@@ -173,7 +173,6 @@ brews:
     install: |
       bin.install "webmesh-node"
       bin.install "wmctl"
-      bin.install "webmesh-turn"
       system "mkdir -p #{bash_completion} #{zsh_completion} #{fish_completion}"
       system "#{bin}/wmctl completion bash > #{bash_completion}/wmctl"
       system "#{bin}/wmctl completion zsh > #{zsh_completion}/_wmctl"
