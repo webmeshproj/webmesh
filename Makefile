@@ -83,10 +83,7 @@ test: ## Run unit tests.
 
 test-junit: ## Run unit tests and output junit xml
 	$(GO) install github.com/jstemmer/go-junit-report/v2@latest
-	$(GO) install github.com/kyoh86/richgo@latest
 	$(GO) test $(TEST_ARGS) ./... 2>&1 \
-		| tee >($(GOBIN)/richgo testfilter) \
-		| tee /dev/tty \
 		| $(GOBIN)/go-junit-report -set-exit-code > junit-report.xml
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
