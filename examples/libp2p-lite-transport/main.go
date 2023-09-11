@@ -37,7 +37,7 @@ func main() {
 	wireguardPort := flag.Int("wgport", wireguard.DefaultListenPort, "wireguard port")
 	ifaceName := flag.String("ifname", wireguard.DefaultInterfaceName, "wireguard interface name")
 	mtu := flag.Int("mtu", system.DefaultMTU, "wireguard interface MTU")
-	logLevel := flag.String("loglevel", "", "log level")
+	logLevel := flag.String("loglevel", "error", "log level")
 	flag.Parse()
 
 	mode := "server"
@@ -70,7 +70,6 @@ func main() {
 				},
 				Logger: logutil.NewLogger(*logLevel),
 			}),
-			libp2p.DefaultListenAddrs,
 			libp2p.FallbackDefaults,
 		)
 	}
@@ -173,6 +172,9 @@ FindPeers:
 					continue
 				}
 				log.Println("Found peer:", peer.ID)
+				for _, addr := range peer.Addrs {
+					log.Println("\t-", addr)
+				}
 				conn, err := host.NewStream(ctx, peer.ID, "/speedtest")
 				if err != nil {
 					log.Println("Failed to dial peer:", err)

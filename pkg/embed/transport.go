@@ -21,7 +21,6 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
-	p2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/config"
@@ -72,7 +71,7 @@ func WithWebmeshTransport(topts TransportOptions) p2pconfig.Option {
 		}
 		opts = append(opts, libp2p.ListenAddrs(topts.Laddrs...))
 	}
-	return libp2p.ChainOptions(append(opts, libp2p.FallbackDefaults)...)
+	return libp2p.ChainOptions(append(opts, libp2p.DefaultTransports)...)
 }
 
 // WithLiteWebmeshTransport returns a libp2p option that configures the transport to use
@@ -92,9 +91,11 @@ func WithLiteWebmeshTransport(opts transport.LiteOptions, laddrs ...ma.Multiaddr
 		libp2p.ProtocolVersion(protocol.SecurityID),
 		libp2p.Security(protocol.SecurityID, securityConstructor),
 		libp2p.Transport(transportConstructor),
-		libp2p.Transport(p2pquic.NewTransport),
 		libp2p.AddrsFactory(transport.BroadcastAddrs),
 		libp2p.ListenAddrs(laddrs...),
+		libp2p.DefaultListenAddrs,
+		libp2p.DefaultSecurity,
+		libp2p.DefaultTransports,
 	)
 	return chainopts
 }

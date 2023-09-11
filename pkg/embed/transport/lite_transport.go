@@ -224,14 +224,14 @@ func (t *LiteWebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiad
 	webmeshSec := wmproto.WithPeerID(t.host.ID())
 	var out []ma.Multiaddr
 	for _, addr := range addrs {
-		// Alter the address if it is IPv6/TCP
-		_, noIPv6 := addr.ValueForProtocol(ma.P_IP6)
-		_, noTCP := addr.ValueForProtocol(ma.P_TCP)
-		if noIPv6 == nil && noTCP == nil {
-			out = append(out, ma.Join(addr, webmeshSec))
-		} else {
-			out = append(out, addr)
+		// Ignore addresses that already contain a security protocol
+		if _, err := addr.ValueForProtocol(ma.P_CERTHASH); err == nil {
+			continue
 		}
+		if _, err := addr.ValueForProtocol(ma.P_NOISE); err == nil {
+			continue
+		}
+		out = append(out, ma.Join(addr, webmeshSec))
 	}
 	return out
 }
@@ -283,18 +283,18 @@ func (t *LiteWebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p 
 		// Dial the remote address
 		connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, false, rmaddr)
 		if err != nil {
-			log.Warn("Failed to open connection", "error", err.Error())
+			log.Warn("Failed to start open connection span", "error", err.Error())
 			return nil, fmt.Errorf("failed to open connection: %w", err)
 		}
-		defer connScope.Done()
+		// defer connScope.Done()
 		c, err := dialer.DialContext(ctx, rmaddr)
 		if err != nil {
-			t.log.Warn("Failed to dial remote peer", "error", err.Error())
+			t.log.Warn("Failed to open insecure connection", "error", err.Error())
 			return nil, fmt.Errorf("failed to dial remote peer: %w", err)
 		}
 		u, err := t.tu.Upgrade(ctx, t, c, network.DirOutbound, p, connScope)
 		if err != nil {
-			t.log.Warn("Failed to upgrade connection", "error", err.Error())
+			t.log.Warn("Failed to upgrade insecure connection", "error", err.Error())
 			return nil, fmt.Errorf("failed to upgrade connection: %w", err)
 		}
 		return u, nil
