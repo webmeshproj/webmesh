@@ -4,3 +4,4 @@ bin/
 .vscode
 coverage.out
 */testdata/*
+junit-report.xml

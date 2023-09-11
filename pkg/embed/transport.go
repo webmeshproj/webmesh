@@ -95,8 +95,6 @@ func WithLiteWebmeshTransport(opts transport.LiteOptions, laddrs ...ma.Multiaddr
 		libp2p.Transport(p2pquic.NewTransport),
 		libp2p.AddrsFactory(transport.BroadcastAddrs),
 		libp2p.ListenAddrs(laddrs...),
-		libp2p.DefaultListenAddrs,
-		libp2p.FallbackDefaults,
 	)
 	return chainopts
 }

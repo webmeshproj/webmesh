@@ -7,6 +7,7 @@ DISTROLESS_IMAGE ?= $(REPO)/$(NAME)-distroless:latest
 GO    ?= go
 ARCH  ?= $(shell $(GO) env GOARCH)
 OS    ?= $(shell $(GO) env GOOS)
+GOBIN ?= $(shell $(GO) env GOPATH)/bin
 
 ifeq ($(OS),Windows_NT)
 	OS := windows
@@ -67,12 +68,24 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 COVERAGE_FILE := coverage.out
 TEST_PARALLEL ?= $(shell nproc)
 ifndef ($(TEST_PARALLEL))
-	TEST_PARALLEL = 4
+	TEST_PARALLEL = 8
 endif
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
-test: fmt vet ## Run unit tests.
-	$(GO) test $(TEST_ARGS) ./...
+ci: fmt vet test-junit lint ## Run all CI tests.
+
+test: ## Run unit tests.
+	$(GO) install github.com/kyoh86/richgo@latest
+	$(GOBIN)/richgo test $(TEST_ARGS) ./...
+	$(GO) tool cover -func=$(COVERAGE_FILE)
+
+test-junit: ## Run unit tests and output junit xml
+	$(GO) install github.com/jstemmer/go-junit-report/v2@latest
+	$(GO) install github.com/kyoh86/richgo@latest
+	$(GO) test $(TEST_ARGS) ./... 2>&1 \
+		| tee >($(GOBIN)/richgo testfilter) \
+		| tee /dev/tty \
+		| $(GOBIN)/go-junit-report -set-exit-code > junit-report.xml
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 lint: ## Run linters.

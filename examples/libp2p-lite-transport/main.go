@@ -51,18 +51,25 @@ func main() {
 	var opts libp2p.Option
 	switch *quic {
 	case true:
-		opts = libp2p.ChainOptions(libp2p.ListenAddrStrings("/ip6/::/udp/0/quic-v1"), libp2p.FallbackDefaults)
+		opts = libp2p.ChainOptions(
+			libp2p.ListenAddrStrings("/ip6/::/udp/0/quic-v1"),
+			libp2p.FallbackDefaults,
+		)
 	case false:
-		opts = embed.WithLiteWebmeshTransport(transport.LiteOptions{
-			Config: transport.WireGuardOptions{
-				ListenPort:         uint16(*wireguardPort),
-				InterfaceName:      *ifaceName,
-				ForceInterfaceName: true,
-				MTU:                *mtu,
-			},
-			EndpointDetection: &endpoints.DetectOpts{},
-			Logger:            logutil.NewLogger(*logLevel),
-		})
+		opts = libp2p.ChainOptions(
+			embed.WithLiteWebmeshTransport(transport.LiteOptions{
+				Config: transport.WireGuardOptions{
+					ListenPort:         uint16(*wireguardPort),
+					InterfaceName:      *ifaceName,
+					ForceInterfaceName: true,
+					MTU:                *mtu,
+				},
+				EndpointDetection: &endpoints.DetectOpts{},
+				Logger:            logutil.NewLogger(*logLevel),
+			}),
+			libp2p.DefaultListenAddrs,
+			libp2p.FallbackDefaults,
+		)
 	}
 
 	var err error

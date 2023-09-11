@@ -586,7 +586,7 @@ func (l *LiteSecureConn) ConnState() network.ConnectionState {
 }
 
 func handleEndpointNegotiation(ctx context.Context, stream network.Stream, iface wireguard.Interface, key wmcrypto.PrivateKey, endpoints []string) error {
-	defer stream.Reset()
+	defer func() { _ = stream.Reset() }()
 	log := context.LoggerFrom(ctx)
 	log.Info("Received inbound webmesh connection, negotiating endpoints")
 	rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
