@@ -65,9 +65,6 @@ type Transport interface {
 
 var _ Transport = (*WebmeshTransport)(nil)
 
-// TransportBuilder is the signature of a function that builds a webmesh transport.
-type TransportBuilder func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey pcrypto.PrivKey) (Transport, error)
-
 // Options are the options for the webmesh transport.
 type Options struct {
 	// Config is the webmesh config.

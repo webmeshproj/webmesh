@@ -28,19 +28,19 @@ import (
 	"sync"
 	"sync/atomic"
 
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	p2pproto "github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/sec"
 	"github.com/libp2p/go-libp2p/core/transport"
 	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
+	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
+	wmproto "github.com/webmeshproj/webmesh/pkg/embed/protocol"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
@@ -109,6 +109,10 @@ func (w *WireGuardOptions) Default() {
 	}
 }
 
+// TransportBuilder is the signature of a function that builds a webmesh transport.
+type TransportBuilder func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey crypto.PrivKey) (Transport, error)
+
+// SecurityTransportBuilder is the signature of a function that builds a webmesh secure transport.
 type SecurityTransportBuilder func() sec.SecureTransport
 
 // New returns a new lite webmesh transport builder.
@@ -124,7 +128,7 @@ func NewLite(opts LiteOptions) (TransportBuilder, SecurityTransportBuilder, *Lit
 	}
 	var secTransport LiteSecureTransport
 	secTransport.log = opts.Logger.With("component", "webmesh-lite-secure-transport")
-	transportConstructor := func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey p2pcrypto.PrivKey) (Transport, error) {
+	transportConstructor := func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey crypto.PrivKey) (Transport, error) {
 		ctx := context.WithLogger(context.Background(), rt.log)
 		key, err := toWebmeshPrivateKey(privKey)
 		if err != nil {
@@ -193,7 +197,7 @@ type LiteWebmeshTransport struct {
 	opts    LiteOptions
 	conf    WireGuardOptions
 	host    host.Host
-	key     crypto.PrivateKey
+	key     wmcrypto.PrivateKey
 	tu      transport.Upgrader
 	rcmgr   network.ResourceManager
 	log     *slog.Logger
@@ -209,7 +213,7 @@ func (t *LiteWebmeshTransport) Close() error {
 	defer t.mu.Unlock()
 	defer t.started.Store(false)
 	if t.started.Load() {
-		t.host.RemoveStreamHandler(protocol.SecurityID)
+		t.host.RemoveStreamHandler(wmproto.SecurityID)
 	}
 	return t.iface.Close(context.WithLogger(context.Background(), t.log))
 }
@@ -217,7 +221,7 @@ func (t *LiteWebmeshTransport) Close() error {
 // BroadcastAddrs implements AddrsFactory on top of this transport. It automatically appends
 // our webmesh ID to the addresses.
 func (t *LiteWebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
-	webmeshSec := protocol.WithPeerID(t.host.ID())
+	webmeshSec := wmproto.WithPeerID(t.host.ID())
 	var out []ma.Multiaddr
 	for _, addr := range addrs {
 		// Alter the address if it is IPv6/TCP
@@ -240,7 +244,7 @@ func (t *LiteWebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiad
 // out addresses that we can't dial.
 func (t *LiteWebmeshTransport) CanDial(addr ma.Multiaddr) bool {
 	// For now we say we can dial any webmesh or IPv6 address
-	_, noWebmesh := addr.ValueForProtocol(protocol.P_WEBMESH)
+	_, noWebmesh := addr.ValueForProtocol(wmproto.P_WEBMESH)
 	_, noIPv6 := addr.ValueForProtocol(ma.P_IP6)
 	return noWebmesh == nil || noIPv6 == nil
 }
@@ -272,7 +276,7 @@ func (t *LiteWebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p 
 	log := t.log.With("peer", p.ShortString(), "insecure-multiaddr", rmaddr.String())
 	// If this is not a webmesh connection, pass it through to the host.
 	// I think this needs to be done with an embedded transport.
-	_, noWebmesh := rmaddr.ValueForProtocol(protocol.P_WEBMESH)
+	_, noWebmesh := rmaddr.ValueForProtocol(wmproto.P_WEBMESH)
 	if noWebmesh != nil {
 		log.Debug("Dialing non-webmesh address, passing through to host")
 		var dialer mnet.Dialer
@@ -403,7 +407,7 @@ func (t *LiteWebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, e
 		return nil, fmt.Errorf("failed to create listener address: %w", err)
 	}
 	// Append webmeh security to the address
-	laddr = ma.Join(laddr, protocol.WithPeerID(t.host.ID()))
+	laddr = ma.Join(laddr, wmproto.WithPeerID(t.host.ID()))
 
 	log := t.log.With("laddr", laddr.String())
 	ctx := context.WithLogger(context.Background(), log)
@@ -415,7 +419,7 @@ func (t *LiteWebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, e
 	if !t.started.Load() {
 		// Set a stream handler for negotiating endpoints on inbound connections.
 		// This will be used to exchange our public endpoints with peers.
-		t.host.SetStreamHandler(protocol.SecurityID, func(s network.Stream) {
+		t.host.SetStreamHandler(wmproto.SecurityID, func(s network.Stream) {
 			err := handleEndpointNegotiation(ctx, t.iface, t.key, t.eps)(s)
 			if err != nil {
 				log.Error("Failed to handle endpoint negotiation", "error", err.Error())
@@ -439,7 +443,7 @@ func (t *LiteWebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) 
 
 // Protocol returns the set of protocols handled by this transport.
 func (t *LiteWebmeshTransport) Protocols() []int {
-	return []int{protocol.Code}
+	return []int{wmproto.Code}
 }
 
 // Proxy returns true if this is a proxy transport.
@@ -451,7 +455,7 @@ func (t *LiteWebmeshTransport) Proxy() bool {
 // routes and compute addresses for peers as connections are opened.
 type LiteSecureTransport struct {
 	host  host.Host
-	key   crypto.PrivateKey
+	key   wmcrypto.PrivateKey
 	iface wireguard.Interface
 	eps   []string
 	log   *slog.Logger
@@ -531,7 +535,7 @@ func (l *LiteSecureTransport) SecureOutbound(ctx context.Context, insecure net.C
 	log.Debug("Attempting endpoint negotiation")
 	// We now need to try to negotiate endpoints with the remote peer via another
 	// transport.
-	conn, err := l.host.NewStream(ctx, p, protocol.SecurityID)
+	conn, err := l.host.NewStream(ctx, p, wmproto.SecurityID)
 	if err != nil {
 		log.Error("Failed to dial remote peer for endpoint negotiation", "error", err.Error())
 		return nil, fmt.Errorf("failed to dial remote peer for endpoint negotiation: %w", err)
@@ -551,7 +555,7 @@ func (l *LiteSecureTransport) SecureOutbound(ctx context.Context, insecure net.C
 }
 
 // ID is the protocol ID of the security protocol.
-func (l *LiteSecureTransport) ID() p2pproto.ID { return protocol.SecurityID }
+func (l *LiteSecureTransport) ID() protocol.ID { return wmproto.SecurityID }
 
 // LiteSecureConn is a simple wrapper around a sec.SecureConn that just holds the
 // peer information.
@@ -559,7 +563,7 @@ type LiteSecureConn struct {
 	net.Conn
 	lpeer     peer.ID
 	rpeer     peer.ID
-	rkey      p2pcrypto.PubKey
+	rkey      crypto.PubKey
 	transport string
 }
 
@@ -570,18 +574,18 @@ func (l *LiteSecureConn) LocalPeer() peer.ID { return l.lpeer }
 func (l *LiteSecureConn) RemotePeer() peer.ID { return l.rpeer }
 
 // RemotePublicKey returns the public key of the remote peer.
-func (l *LiteSecureConn) RemotePublicKey() p2pcrypto.PubKey { return l.rkey }
+func (l *LiteSecureConn) RemotePublicKey() crypto.PubKey { return l.rkey }
 
 // ConnState returns information about the connection state.
 func (l *LiteSecureConn) ConnState() network.ConnectionState {
 	return network.ConnectionState{
-		Security:                  protocol.SecurityID,
+		Security:                  wmproto.SecurityID,
 		Transport:                 l.transport,
 		UsedEarlyMuxerNegotiation: true,
 	}
 }
 
-func handleEndpointNegotiation(ctx context.Context, iface wireguard.Interface, key crypto.PrivateKey, endpoints []string) func(network.Stream) error {
+func handleEndpointNegotiation(ctx context.Context, iface wireguard.Interface, key wmcrypto.PrivateKey, endpoints []string) func(network.Stream) error {
 	return func(stream network.Stream) error {
 		defer stream.Close()
 		log := context.LoggerFrom(ctx)

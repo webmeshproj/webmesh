@@ -20,17 +20,17 @@ import (
 	"fmt"
 	"net"
 
-	pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/crypto"
+	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 // ErrInvalidSecureTransport is returned when the transport is not used with a webmesh keypair and security transport.
 var ErrInvalidSecureTransport = fmt.Errorf("transport must be used with a webmesh keypair and security transport")
 
-func extractWebmeshPublicKey(ctx context.Context, p peer.ID) (crypto.PublicKey, error) {
+func extractWebmeshPublicKey(ctx context.Context, p peer.ID) (wmcrypto.PublicKey, error) {
 	log := context.LoggerFrom(ctx)
 	key, err := p.ExtractPublicKey()
 	if err != nil {
@@ -45,36 +45,36 @@ func extractWebmeshPublicKey(ctx context.Context, p peer.ID) (crypto.PublicKey, 
 	return wmkey, nil
 }
 
-func toWebmeshPrivateKey(in pcrypto.PrivKey) (crypto.PrivateKey, error) {
-	if v, ok := in.(crypto.PrivateKey); ok {
+func toWebmeshPrivateKey(in crypto.PrivKey) (wmcrypto.PrivateKey, error) {
+	if v, ok := in.(wmcrypto.PrivateKey); ok {
 		return v, nil
 	}
 	var raw []byte
-	privkey, ok := in.(*pcrypto.Ed25519PrivateKey)
+	privkey, ok := in.(*crypto.Ed25519PrivateKey)
 	if !ok {
 		return nil, fmt.Errorf("%w: invalid private key type: %T", ErrInvalidSecureTransport, in)
 	}
 	raw, _ = privkey.Raw()
 	// Pack the key into a webmesh key
-	key, err := crypto.ParsePrivateKey(raw)
+	key, err := wmcrypto.ParsePrivateKey(raw)
 	if err != nil {
 		return nil, err
 	}
 	return key, nil
 }
 
-func toWebmeshPublicKey(in pcrypto.PubKey) (crypto.PublicKey, error) {
-	if v, ok := in.(crypto.PublicKey); ok {
+func toWebmeshPublicKey(in crypto.PubKey) (wmcrypto.PublicKey, error) {
+	if v, ok := in.(wmcrypto.PublicKey); ok {
 		return v, nil
 	}
 	var raw []byte
-	privkey, ok := in.(*pcrypto.Ed25519PublicKey)
+	privkey, ok := in.(*crypto.Ed25519PublicKey)
 	if !ok {
 		return nil, fmt.Errorf("%w: invalid private key type: %T", ErrInvalidSecureTransport, in)
 	}
 	raw, _ = privkey.Raw()
 	// Pack the key into a webmesh key
-	key, err := crypto.ParsePublicKey(raw)
+	key, err := wmcrypto.ParsePublicKey(raw)
 	if err != nil {
 		return nil, err
 	}
