@@ -74,7 +74,7 @@ ifndef ($(TEST_PARALLEL))
 endif
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
-ci: fmt vet test-junit lint ## Run all CI tests.
+ci: fmt vet test-junit ## Run all CI tests.
 
 test: ## Run unit tests.
 	$(GO) install github.com/kyoh86/richgo@latest

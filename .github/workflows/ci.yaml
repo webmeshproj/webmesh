@@ -51,7 +51,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     permissions:
-      contents: "read"
+      contents: "write"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3

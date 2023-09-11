@@ -64,8 +64,11 @@ func main() {
 					ForceInterfaceName: true,
 					MTU:                *mtu,
 				},
-				EndpointDetection: &endpoints.DetectOpts{},
-				Logger:            logutil.NewLogger(*logLevel),
+				EndpointDetection: &endpoints.DetectOpts{
+					DetectIPv6:    true,
+					DetectPrivate: true,
+				},
+				Logger: logutil.NewLogger(*logLevel),
 			}),
 			libp2p.DefaultListenAddrs,
 			libp2p.FallbackDefaults,
