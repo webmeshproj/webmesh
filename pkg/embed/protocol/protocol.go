@@ -52,11 +52,103 @@ var ErrNoRedezvous = fmt.Errorf("no rendezvous in webmesh multiaddr")
 // Protocol is the webmesh libp2p protocol.
 var Protocol = multiaddr.Protocol{
 	Name:       ID,
-	Code:       Code,
+	Code:       P_WEBMESH,
 	VCode:      multiaddr.CodeToVarint(Code),
-	Size:       -1,
-	Path:       true,
+	Size:       0,
+	Path:       false,
 	Transcoder: multiaddr.NewTranscoderFromFunctions(protocolStrToBytes, protocolBytesToStr, validateBytes),
+}
+
+// ToWebmeshAddr appends the webmesh protocol to the given address.
+func ToWebmeshAddr(addr multiaddr.Multiaddr) multiaddr.Multiaddr {
+	return multiaddr.Join(addr, multiaddr.StringCast("/webmesh"))
+}
+
+// IsWebmeshCapableAddr returns true if the given multiaddr is a webmesh-capable multiaddr.
+func IsWebmeshCapableAddr(addr multiaddr.Multiaddr) bool {
+	return (IsWebmeshAddr(addr) || IsUnencryptedAddr(addr)) &&
+		(!IsWebtransportAddr(addr) && !IsQUICAddr(addr))
+}
+
+// IsWebmeshAddr returns true if the given multiaddr is a webmesh multiaddr.
+func IsWebmeshAddr(addr multiaddr.Multiaddr) bool {
+	var hasWebmesh bool
+	multiaddr.ForEach(addr, func(c multiaddr.Component) bool {
+		switch c.Protocol().Code {
+		case P_WEBMESH:
+			hasWebmesh = true
+			return false
+		}
+		return true
+	})
+	return hasWebmesh
+}
+
+// IsWebtransportAddr returns true if the given multiaddr is a webtransport multiaddr.
+func IsWebtransportAddr(addr multiaddr.Multiaddr) bool {
+	var hasWebTransport bool
+	multiaddr.ForEach(addr, func(c multiaddr.Component) bool {
+		switch c.Protocol().Code {
+		case multiaddr.P_WEBTRANSPORT:
+			hasWebTransport = true
+			return false
+		}
+		return true
+	})
+	return hasWebTransport
+}
+
+// IsQUICAddr returns true if the given multiaddr is a QUIC multiaddr.
+func IsQUICAddr(addr multiaddr.Multiaddr) bool {
+	var hasQuicTransport bool
+	multiaddr.ForEach(addr, func(c multiaddr.Component) bool {
+		switch c.Protocol().Code {
+		case multiaddr.P_QUIC:
+			hasQuicTransport = true
+			return false
+		case multiaddr.P_QUIC_V1:
+			hasQuicTransport = true
+			return false
+		}
+		return true
+	})
+	return hasQuicTransport
+}
+
+// IsUnencryptedAddr returns true if the given multiaddr is an unencrypted multiaddr.
+func IsUnencryptedAddr(addr multiaddr.Multiaddr) bool {
+	var hasEncryption bool
+	multiaddr.ForEach(addr, func(c multiaddr.Component) bool {
+		switch c.Protocol().Code {
+		case multiaddr.P_CERTHASH:
+			hasEncryption = true
+		case multiaddr.P_NOISE:
+			hasEncryption = true
+		}
+		return true
+	})
+	return !hasEncryption
+}
+
+// DecapsulateAddr returns the protocol and port from the multiaddr
+func DecapsulateAddr(addr multiaddr.Multiaddr) (protocol string, port string, err error) {
+	multiaddr.ForEach(addr, func(c multiaddr.Component) bool {
+		switch c.Protocol().Code {
+		case multiaddr.P_TCP:
+			protocol = "tcp"
+			port = c.Value()
+			return false
+		case multiaddr.P_UDP:
+			protocol = "udp"
+			port = c.Value()
+			return false
+		}
+		return true
+	})
+	if protocol == "" && port == "" {
+		return "", "", fmt.Errorf("no protocol or port in multiaddr")
+	}
+	return protocol, port, nil
 }
 
 // WithPeerID returns a webmesh multiaddr with the given peer ID.

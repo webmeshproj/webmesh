@@ -28,7 +28,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -41,7 +41,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/crypto"
+	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
@@ -49,6 +49,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
+
+// TransportBuilder is the signature of a function that builds a webmesh transport.
+type TransportBuilder func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey crypto.PrivKey) (Transport, error)
 
 // ErrNotStarted is returned when the transport is not started.
 var ErrNotStarted = fmt.Errorf("transport is not started")
@@ -95,7 +98,7 @@ func New(opts Options) (TransportBuilder, *WebmeshTransport) {
 		conf: opts.Config.ShallowCopy(),
 		log:  opts.Logger.With("component", "webmesh-transport"),
 	}
-	return func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey pcrypto.PrivKey) (Transport, error) {
+	return func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey crypto.PrivKey) (Transport, error) {
 		key, err := toWebmeshPrivateKey(privKey)
 		if err != nil {
 			return nil, err
@@ -116,7 +119,7 @@ type WebmeshTransport struct {
 	node    mesh.Node
 	svcs    *services.Server
 	host    host.Host
-	key     crypto.PrivateKey
+	key     wmcrypto.PrivateKey
 	tu      transport.Upgrader
 	rcmgr   network.ResourceManager
 	log     *slog.Logger
@@ -401,7 +404,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		t.log.Error("Failed to extract public key from id", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to extract public key: %w", err)
 	}
-	wgkey, ok := pubkey.(*crypto.WebmeshPublicKey)
+	wgkey, ok := pubkey.(*wmcrypto.WebmeshPublicKey)
 	if !ok {
 		t.log.Error("Failed to cast public key to wireguard public key", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to cast public key to wireguard public key")
@@ -695,7 +698,7 @@ func (t *WebmeshTransport) multiaddrsForLocalListenAddr(listenAddr net.Addr) ([]
 
 func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode) error {
 	ps := t.host.Peerstore()
-	pubkey, err := crypto.DecodePublicKey(node.GetPublicKey())
+	pubkey, err := wmcrypto.DecodePublicKey(node.GetPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
 	}

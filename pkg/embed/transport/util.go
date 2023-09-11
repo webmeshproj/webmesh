@@ -34,15 +34,33 @@ func extractWebmeshPublicKey(ctx context.Context, p peer.ID) (wmcrypto.PublicKey
 	log := context.LoggerFrom(ctx)
 	key, err := p.ExtractPublicKey()
 	if err != nil {
-		log.Warn("Failed to extract public key from peer ID", "error", err.Error())
+		log.Debug("Failed to extract public key from peer ID", "error", err.Error())
 		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
 	}
 	wmkey, err := toWebmeshPublicKey(key)
 	if err != nil {
-		log.Error("Failed to convert public key to webmesh key", "error", err.Error())
+		log.Warn("Failed to convert public key to webmesh key", "error", err.Error())
 		return nil, fmt.Errorf("failed to convert public key to webmesh key: %w", err)
 	}
 	return wmkey, nil
+}
+
+func toWebmeshPublicKey(in crypto.PubKey) (wmcrypto.PublicKey, error) {
+	if v, ok := in.(wmcrypto.PublicKey); ok {
+		return v, nil
+	}
+	var raw []byte
+	pubKey, ok := in.(*crypto.Ed25519PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("%w: invalid public key type: %T", ErrInvalidSecureTransport, in)
+	}
+	raw, _ = pubKey.Raw()
+	// Pack the key into a webmesh key
+	key, err := wmcrypto.ParsePublicKey(raw)
+	if err != nil {
+		return nil, err
+	}
+	return key, nil
 }
 
 func toWebmeshPrivateKey(in crypto.PrivKey) (wmcrypto.PrivateKey, error) {
@@ -57,24 +75,6 @@ func toWebmeshPrivateKey(in crypto.PrivKey) (wmcrypto.PrivateKey, error) {
 	raw, _ = privkey.Raw()
 	// Pack the key into a webmesh key
 	key, err := wmcrypto.ParsePrivateKey(raw)
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
-}
-
-func toWebmeshPublicKey(in crypto.PubKey) (wmcrypto.PublicKey, error) {
-	if v, ok := in.(wmcrypto.PublicKey); ok {
-		return v, nil
-	}
-	var raw []byte
-	privkey, ok := in.(*crypto.Ed25519PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("%w: invalid private key type: %T", ErrInvalidSecureTransport, in)
-	}
-	raw, _ = privkey.Raw()
-	// Pack the key into a webmesh key
-	key, err := wmcrypto.ParsePublicKey(raw)
 	if err != nil {
 		return nil, err
 	}

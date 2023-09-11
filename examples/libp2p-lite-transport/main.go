@@ -11,7 +11,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -22,7 +21,7 @@ import (
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/embed"
+	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
 	"github.com/webmeshproj/webmesh/pkg/embed/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
@@ -40,54 +39,56 @@ func main() {
 	logLevel := flag.String("loglevel", "error", "log level")
 	flag.Parse()
 
-	mode := "server"
-	rendezvous := string(crypto.MustGeneratePSK())
+	var rendezvous string
 	if len(flag.Args()) >= 1 {
-		mode = "client"
 		rendezvous = flag.Args()[0]
 	}
-	log.Println("Discover rendezvous string:", rendezvous)
 
 	var opts libp2p.Option
 	switch *quic {
 	case true:
 		opts = libp2p.ChainOptions(
 			libp2p.ListenAddrStrings("/ip6/::/udp/0/quic-v1"),
-			libp2p.FallbackDefaults,
+			libp2p.DefaultTransports,
 		)
 	case false:
+		transport, security, addrFactory := transport.NewLite(transport.LiteOptions{
+			Config: transport.WireGuardOptions{
+				ListenPort:         uint16(*wireguardPort),
+				InterfaceName:      *ifaceName,
+				ForceInterfaceName: true,
+				MTU:                *mtu,
+			},
+			EndpointDetection: &endpoints.DetectOpts{
+				DetectIPv6:    true,
+				DetectPrivate: true,
+			},
+			Logger: logutil.NewLogger(*logLevel),
+		})
 		opts = libp2p.ChainOptions(
-			embed.WithLiteWebmeshTransport(transport.LiteOptions{
-				Config: transport.WireGuardOptions{
-					ListenPort:         uint16(*wireguardPort),
-					InterfaceName:      *ifaceName,
-					ForceInterfaceName: true,
-					MTU:                *mtu,
-				},
-				EndpointDetection: &endpoints.DetectOpts{
-					DetectIPv6:    true,
-					DetectPrivate: true,
-				},
-				Logger: logutil.NewLogger(*logLevel),
-			}),
-			libp2p.FallbackDefaults,
+			libp2p.Transport(transport),
+			libp2p.Security(protocol.SecurityID, security),
+			libp2p.AddrsFactory(addrFactory),
+			libp2p.DefaultListenAddrs,
+			libp2p.DefaultTransports,
+			// libp2p.FallbackDefaults,
 		)
 	}
 
-	var err error
-	switch mode {
-	case "server":
-		err = runServer(*payloadSize, opts, rendezvous)
-	case "client":
-		err = runClient(*payloadSize, opts, rendezvous)
-	}
+	err := run(*payloadSize, opts, rendezvous)
 	if err != nil {
-		debug.PrintStack()
 		log.Println("ERROR:", err.Error())
 	}
 }
 
-func runServer(payloadSize int, opts libp2p.Option, rendezvous string) error {
+func run(payloadSize int, opts libp2p.Option, rendezvous string) error {
+	var announcer bool
+	if rendezvous == "" {
+		// We are running in announce mode
+		announcer = true
+		rendezvous = string(crypto.MustGeneratePSK())
+		log.Println("Discover rendezvous string:", rendezvous)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	log.Println("Setting up libp2p host")
@@ -107,57 +108,31 @@ func runServer(payloadSize int, opts libp2p.Option, rendezvous string) error {
 	}
 	defer dht.Close()
 	routingDiscovery := drouting.NewRoutingDiscovery(dht)
-	dutil.Advertise(ctx, routingDiscovery, rendezvous, discovery.TTL(time.Minute))
-	log.Println("Advertised our PSK:", rendezvous)
-	host.SetStreamHandler("/speedtest", func(stream network.Stream) {
-		log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
-		go func() {
-			defer cancel()
-			runSpeedTest(ctx, stream, payloadSize)
-		}()
-	})
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	select {
-	case <-ctx.Done():
-	case <-sig:
+	if announcer {
+		dutil.Advertise(ctx, routingDiscovery, rendezvous, discovery.TTL(time.Minute))
+		log.Println("Advertised our PSK:", rendezvous)
+		host.SetStreamHandler("/speedtest", func(stream network.Stream) {
+			log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
+			go func() {
+				defer cancel()
+				runSpeedTest(ctx, stream, payloadSize)
+			}()
+		})
+		select {
+		case <-ctx.Done():
+		case <-sig:
+		}
+		return nil
 	}
-	return nil
-}
-
-func runClient(payloadSize int, opts libp2p.Option, rendezvous string) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	log.Println("Setting up libp2p host")
-	log.Println("Payload size:", prettyByteSize(float64(payloadSize)))
-	host, err := libp2p.New(opts)
-	if err != nil {
-		return err
-	}
-	defer host.Close()
-	log.Println("Listening for libp2p connections on:")
-	for _, addr := range host.Addrs() {
-		log.Println("\t-", addr)
-	}
-	dht, err := wmp2p.NewDHT(ctx, host, nil, time.Second*3)
-	if err != nil {
-		return err
-	}
-	defer dht.Close()
-
-	routingDiscovery := drouting.NewRoutingDiscovery(dht)
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
-
-	log.Println("Searching for peers on the DHT with our PSK", rendezvous)
+	log.Println("Searching for peers at our PSK", rendezvous)
 FindPeers:
 	for {
 		peerChan, err := routingDiscovery.FindPeers(ctx, rendezvous)
 		if err != nil {
 			return err
 		}
-
 		for {
 			select {
 			case <-sig:

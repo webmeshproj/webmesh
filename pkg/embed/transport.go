@@ -73,29 +73,3 @@ func WithWebmeshTransport(topts TransportOptions) p2pconfig.Option {
 	}
 	return libp2p.ChainOptions(append(opts, libp2p.DefaultTransports)...)
 }
-
-// WithLiteWebmeshTransport returns a libp2p option that configures the transport to use
-// the lite webmesh transport.
-func WithLiteWebmeshTransport(opts transport.LiteOptions, laddrs ...ma.Multiaddr) p2pconfig.Option {
-	// Append an empty webmesh ID to each one
-	for i, laddr := range laddrs {
-		laddrs[i] = ma.Join(laddr, ma.StringCast("/webmesh/Cg=="))
-	}
-	if len(laddrs) == 0 {
-		// Make sure we have at least one webmesh TCP address
-		laddrs = append(laddrs, ma.Join(ma.StringCast("/ip6/::/tcp/0/webmesh/Cg==")))
-	}
-	// Append a quic address for endpoint negotiation
-	transportConstructor, securityConstructor, transport := transport.NewLite(opts)
-	chainopts := libp2p.ChainOptions(
-		libp2p.ProtocolVersion(protocol.SecurityID),
-		libp2p.Security(protocol.SecurityID, securityConstructor),
-		libp2p.Transport(transportConstructor),
-		libp2p.AddrsFactory(transport.BroadcastAddrs),
-		libp2p.ListenAddrs(laddrs...),
-		libp2p.DefaultListenAddrs,
-		libp2p.DefaultSecurity,
-		libp2p.DefaultTransports,
-	)
-	return chainopts
-}

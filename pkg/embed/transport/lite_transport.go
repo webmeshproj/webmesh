@@ -26,15 +26,19 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
-	"sync/atomic"
 
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/sec"
 	"github.com/libp2p/go-libp2p/core/transport"
+	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
 	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 
@@ -109,14 +113,14 @@ func (w *WireGuardOptions) Default() {
 	}
 }
 
-// TransportBuilder is the signature of a function that builds a webmesh transport.
-type TransportBuilder func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey crypto.PrivKey) (Transport, error)
+// LiteTransportBuilder is the signature of a function that builds a webmesh lite transport.
+type LiteTransportBuilder func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, connManager *quicreuse.ConnManager, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error)
 
 // SecurityTransportBuilder is the signature of a function that builds a webmesh secure transport.
 type SecurityTransportBuilder func() sec.SecureTransport
 
 // New returns a new lite webmesh transport builder.
-func NewLite(opts LiteOptions) (TransportBuilder, SecurityTransportBuilder, *LiteWebmeshTransport) {
+func NewLite(opts LiteOptions) (LiteTransportBuilder, SecurityTransportBuilder, basichost.AddrsFactory) {
 	opts.Config.Default()
 	if opts.Logger == nil {
 		opts.Logger = logutil.NewLogger("")
@@ -128,9 +132,15 @@ func NewLite(opts LiteOptions) (TransportBuilder, SecurityTransportBuilder, *Lit
 	}
 	var secTransport LiteSecureTransport
 	secTransport.log = opts.Logger.With("component", "webmesh-lite-secure-transport")
-	transportConstructor := func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey crypto.PrivKey) (Transport, error) {
+
+	transportConstructor := func(tu transport.Upgrader, host host.Host, privkey crypto.PrivKey, psk pnet.PSK, connManager *quicreuse.ConnManager, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error) {
+		if len(psk) > 0 {
+			rt.log.Error("Webmesh doesn't support private networks yet.")
+			// But we definitely could in the future.
+			return nil, fmt.Errorf("webmesh doesn't support private networks yet")
+		}
 		ctx := context.WithLogger(context.Background(), rt.log)
-		key, err := toWebmeshPrivateKey(privKey)
+		key, err := toWebmeshPrivateKey(privkey)
 		if err != nil {
 			return nil, err
 		}
@@ -152,6 +162,17 @@ func NewLite(opts LiteOptions) (TransportBuilder, SecurityTransportBuilder, *Lit
 		secTransport.host = host
 		rt.tu = tu
 		rt.rcmgr = rcmgr
+		rt.connmgr = connManager
+		rt.gater = gater
+
+		err = rt.host.Peerstore().AddProtocols(rt.host.ID(), wmproto.SecurityID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add protocols to peerstore: %w", err)
+		}
+		err = rt.host.Peerstore().AddPrivKey(rt.host.ID(), privkey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add private key to peerstore: %w", err)
+		}
 
 		// We set our local network to be a ULA network derived from our public key.
 		// This is a /32 network (roughly the number of IPv4 addresses in the world).
@@ -161,6 +182,8 @@ func NewLite(opts LiteOptions) (TransportBuilder, SecurityTransportBuilder, *Lit
 		// negotiating what our allowed IP addresses should be on both sides.
 		rt.lula, rt.laddr = netutil.GenerateULAWithKey(key.PublicKey())
 		rt.log = rt.log.With("local-ula", rt.lula.String(), "local-addr", rt.laddr.String())
+		rt.log.Info("Generated local ULA network, configuring WireGuard",
+			"local-ula", rt.lula.String(), "local-addr", rt.laddr.String())
 		wgopts := wireguard.Options{
 			NodeID:      host.ID().ShortString(),
 			ListenPort:  int(rt.conf.ListenPort),
@@ -183,23 +206,33 @@ func NewLite(opts LiteOptions) (TransportBuilder, SecurityTransportBuilder, *Lit
 		}
 		rt.iface = iface
 		secTransport.iface = iface
+		rt.host.SetStreamHandler(wmproto.SecurityID, func(s network.Stream) {
+			err := handleEndpointNegotiation(context.WithLogger(context.Background(), secTransport.log), s, rt.iface, rt.key, rt.eps)
+			if err != nil {
+				rt.log.Error("Failed to handle endpoint negotiation", "error", err.Error())
+				_ = s.Reset()
+				return
+			}
+		})
+		rt.log.Debug("Webmesh transport initialized")
 		return rt, nil
 	}
 	securityConstructor := func() sec.SecureTransport {
 		return &secTransport
 	}
-	return transportConstructor, securityConstructor, rt
+	return transportConstructor, securityConstructor, rt.BroadcastAddrs
 }
 
 // LiteWebmeshTransport is the lite webmesh transport.
 type LiteWebmeshTransport struct {
-	started atomic.Bool
 	opts    LiteOptions
 	conf    WireGuardOptions
 	host    host.Host
 	key     wmcrypto.PrivateKey
 	tu      transport.Upgrader
 	rcmgr   network.ResourceManager
+	connmgr *quicreuse.ConnManager
+	gater   connmgr.ConnectionGater
 	log     *slog.Logger
 	iface   wireguard.Interface
 	lula    netip.Prefix
@@ -208,32 +241,14 @@ type LiteWebmeshTransport struct {
 	mu      sync.Mutex
 }
 
+// Close shuts down the wireguard interface.
 func (t *LiteWebmeshTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	defer t.started.Store(false)
-	if t.started.Load() {
-		t.host.RemoveStreamHandler(wmproto.SecurityID)
+	if t.iface == nil {
+		return nil
 	}
 	return t.iface.Close(context.WithLogger(context.Background(), t.log))
-}
-
-// BroadcastAddrs implements AddrsFactory on top of this transport. It automatically appends
-// our webmesh ID to the addresses.
-func (t *LiteWebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
-	webmeshSec := wmproto.WithPeerID(t.host.ID())
-	var out []ma.Multiaddr
-	for _, addr := range addrs {
-		// Ignore addresses that already contain a security protocol
-		if _, err := addr.ValueForProtocol(ma.P_CERTHASH); err == nil {
-			continue
-		}
-		if _, err := addr.ValueForProtocol(ma.P_NOISE); err == nil {
-			continue
-		}
-		out = append(out, ma.Join(addr, webmeshSec))
-	}
-	return out
 }
 
 // CanDial returns true if this transport knows how to dial the given
@@ -243,10 +258,8 @@ func (t *LiteWebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiad
 // succeed. This function should *only* be used to preemptively filter
 // out addresses that we can't dial.
 func (t *LiteWebmeshTransport) CanDial(addr ma.Multiaddr) bool {
-	// For now we say we can dial any webmesh or IPv6 address
-	_, noWebmesh := addr.ValueForProtocol(wmproto.P_WEBMESH)
-	_, noIPv6 := addr.ValueForProtocol(ma.P_IP6)
-	return noWebmesh == nil || noIPv6 == nil
+	// For now we say we can dial any webmesh address.
+	return wmproto.IsWebmeshCapableAddr(addr)
 }
 
 // Dial dials a remote peer. It should try to reuse local listener
@@ -254,135 +267,24 @@ func (t *LiteWebmeshTransport) CanDial(addr ma.Multiaddr) bool {
 func (t *LiteWebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-
-	// Bail out early if this is a loopback address.
-	addr, err := mnet.ToNetAddr(rmaddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert multiaddr to net address: %w", err)
-	}
-	switch v := addr.(type) {
-	case *net.TCPAddr:
-		if v.IP.IsLoopback() {
-			return nil, fmt.Errorf("loopback addresses are not supported")
-		}
-	case *net.UDPAddr:
-		if v.IP.IsLoopback() {
-			return nil, fmt.Errorf("loopback addresses are not supported")
-		}
-		// TODO: Check if this is any of our local addresses.
-	default:
-	}
-
 	log := t.log.With("peer", p.ShortString(), "insecure-multiaddr", rmaddr.String())
-	// If this is not a webmesh connection, pass it through to the host.
-	// I think this needs to be done with an embedded transport.
-	_, noWebmesh := rmaddr.ValueForProtocol(wmproto.P_WEBMESH)
-	if noWebmesh != nil {
-		log.Debug("Dialing non-webmesh address, passing through to host")
-		var dialer mnet.Dialer
-		// Dial the remote address
-		connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, false, rmaddr)
-		if err != nil {
-			log.Warn("Failed to start open connection span", "error", err.Error())
-			return nil, fmt.Errorf("failed to open connection: %w", err)
-		}
-		// defer connScope.Done()
-		c, err := dialer.DialContext(ctx, rmaddr)
-		if err != nil {
-			t.log.Warn("Failed to open insecure connection", "error", err.Error())
-			return nil, fmt.Errorf("failed to dial remote peer: %w", err)
-		}
-		u, err := t.tu.Upgrade(ctx, t, c, network.DirOutbound, p, connScope)
-		if err != nil {
-			t.log.Warn("Failed to upgrade insecure connection", "error", err.Error())
-			return nil, fmt.Errorf("failed to upgrade connection: %w", err)
-		}
-		return u, nil
-	}
-	// Figure out the remote protocol/port we are dialing
-	log.Debug("Dialing webmesh peer")
-	var proto, port string
-	port, err = rmaddr.ValueForProtocol(ma.P_TCP)
-	if err != nil {
-		port, err = rmaddr.ValueForProtocol(ma.P_UDP)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get protocol from dial address: %w", err)
-		}
-		proto = "udp"
-	} else {
-		proto = "tcp"
-	}
-	log.Debug("Determined connection protocol", "proto", proto, "port", port)
-	laddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip6/%s/%s/0", t.laddr.String(), proto))
-	if err != nil {
-		log.Error("Failed to create local multiaddr", "error", err.Error())
-		return nil, fmt.Errorf("failed to create local multiaddr: %w", err)
-	}
-	log.Debug("Using multiaddr from wireguard interface", "local-multiaddr", laddr.String())
-	dialer := mnet.Dialer{
-		LocalAddr: laddr,
-	}
-	// Check if we can extract a wireguard key from the peer ID.
-	log.Debug("Extracting public key from peer ID")
-	wmkey, err := extractWebmeshPublicKey(ctx, p)
-	if err != nil {
-		log.Error("Failed to convert public key to webmesh key", "error", err.Error())
-		return nil, fmt.Errorf("failed to convert public key to webmesh key: %w", err)
-	}
-	log.Debug("Extracted webmesh key from peer ID")
-	// Calculate the remote peers ULA and local address
-	rula, raddr := netutil.GenerateULAWithKey(wmkey)
-	rmaddr, err = ma.NewMultiaddr(fmt.Sprintf("/ip6/%s/%s/%s", raddr.String(), proto, port))
-	if err != nil {
-		log.Error("Failed to create remote multiaddr", "error", err.Error())
-		return nil, fmt.Errorf("failed to create remote multiaddr: %w", err)
-	}
-	log.Debug("Calculated remote ULA, address, and wireguard key",
-		"remote-ula", rula.String(),
-		"remote-addr", raddr.String(),
-		"remote-multiaddr", rmaddr.String(),
-		"remote-wireguard-key", wmkey.WireGuardKey().String(),
-	)
-	// With most of the small things that can go wrong out of the way, try to get wireguard
-	// ready for the connection. For now, we just add the peer's ULA and public key. PutPeer
-	// current handles setting system routes as well.
-	err = t.iface.PutPeer(context.WithLogger(ctx, log), &wireguard.Peer{
-		ID:         p.ShortString(),
-		PublicKey:  wmkey,
-		Multiaddrs: append(t.host.Peerstore().Addrs(p), rmaddr),
-		// Endpoint negotiation will happen during SecureOutbound.
-		Endpoint:    netip.AddrPort{},
-		PrivateIPv6: netip.PrefixFrom(raddr, PrefixSize),
-		AllowedIPs:  []netip.Prefix{rula},
-	})
-	if err != nil {
-		log.Error("Failed to add peer to wireguard interface", "error", err.Error())
-		return nil, fmt.Errorf("failed to add peer to wireguard interface: %w", err)
-	}
-	handleErr := func(cause error) error {
-		err = t.iface.DeletePeer(context.WithLogger(ctx, log), p.ShortString())
-		if err != nil {
-			log.Error("Failed to delete peer from wireguard interface", "error", err.Error())
-		}
-		return cause
-	}
-	log.Info("Added peer to wireguard interface, attempting endpoint negotiation")
-	// Dial the remote address
+	log.Debug("Dialing remote peer")
+	var dialer mnet.Dialer
 	connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, false, rmaddr)
 	if err != nil {
-		log.Error("Failed to open connection", "error", err.Error())
-		return nil, handleErr(fmt.Errorf("failed to open connection: %w", err))
+		log.Debug("Failed to open connection", "error", err.Error())
+		return nil, fmt.Errorf("failed to open connection: %w", err)
 	}
 	defer connScope.Done()
 	c, err := dialer.DialContext(ctx, rmaddr)
 	if err != nil {
-		t.log.Error("Failed to dial remote peer", "error", err.Error())
-		return nil, handleErr(fmt.Errorf("failed to dial remote peer: %w", err))
+		t.log.Debug("Failed to dial remote peer", "error", err.Error())
+		return nil, fmt.Errorf("failed to dial remote peer: %w", err)
 	}
 	u, err := t.tu.Upgrade(ctx, t, c, network.DirOutbound, p, connScope)
 	if err != nil {
-		t.log.Error("Failed to upgrade connection", "error", err.Error())
-		return nil, handleErr(fmt.Errorf("failed to upgrade connection: %w", err))
+		t.log.Debug("Failed to upgrade connection", "error", err.Error())
+		return nil, fmt.Errorf("failed to upgrade connection: %w", err)
 	}
 	return u, nil
 }
@@ -391,43 +293,14 @@ func (t *LiteWebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p 
 func (t *LiteWebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	// Make sure we are specifying an IPv6 transport.
-	_, err := laddr.ValueForProtocol(ma.P_IP6)
-	if err != nil {
-		return nil, fmt.Errorf("listener address must be IPv6: %w", err)
+	if !wmproto.IsWebmeshCapableAddr(laddr) {
+		return nil, fmt.Errorf("multiaddr is not webmesh capable")
 	}
-	// Find the port requested in the listener address
-	port, err := laddr.ValueForProtocol(ma.P_TCP)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get port from listener address: %w", err)
-	}
-	// The laddr will be our local wireguard address with the port we want to listen on.
-	laddr, err = ma.NewMultiaddr(fmt.Sprintf("/ip6/%s/tcp/%s", t.laddr.String(), port))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create listener address: %w", err)
-	}
-	// Append webmeh security to the address
-	laddr = ma.Join(laddr, wmproto.WithPeerID(t.host.ID()))
-
-	log := t.log.With("laddr", laddr.String())
-	ctx := context.WithLogger(context.Background(), log)
-	log.Info("Listening for webmesh connections")
+	// Append webmesh security to the address
+	t.log.Debug("Listening for webmesh connections", "laddr", laddr.String())
 	lis, err := mnet.Listen(laddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen: %w", err)
-	}
-	if !t.started.Load() {
-		// Set a stream handler for negotiating endpoints on inbound connections.
-		// This will be used to exchange our public endpoints with peers.
-		t.host.SetStreamHandler(wmproto.SecurityID, func(s network.Stream) {
-			err := handleEndpointNegotiation(ctx, s, t.iface, t.key, t.eps)
-			if err != nil {
-				log.Error("Failed to handle endpoint negotiation", "error", err.Error())
-				_ = s.Reset()
-				return
-			}
-		})
-		t.started.Store(true)
 	}
 	return t.tu.UpgradeListener(t, lis), nil
 }
@@ -436,9 +309,24 @@ func (t *LiteWebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, e
 func (t *LiteWebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	_ = context.WithLogger(ctx, t.log)
-	// TODO: Implement this by ids that we can resolve to known peers.
-	return []ma.Multiaddr{maddr}, nil
+	return nil, fmt.Errorf("not implemented")
+}
+
+// BroadcastAddrs implements AddrsFactory on top of this transport. It automatically appends
+// our webmesh ID and any DNS addresses we have to the list of addresses.
+func (t *LiteWebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var out []ma.Multiaddr
+	for _, addr := range addrs {
+		if wmproto.IsWebmeshCapableAddr(addr) {
+			// Add webmesh security
+			addr = wmproto.ToWebmeshAddr(addr)
+		}
+		out = append(out, addr)
+	}
+	t.host.Peerstore().SetAddrs(t.host.ID(), addrs, peerstore.PermanentAddrTTL)
+	return out
 }
 
 // Protocol returns the set of protocols handled by this transport.
@@ -472,7 +360,7 @@ func (l *LiteSecureTransport) SecureInbound(ctx context.Context, insecure net.Co
 		return nil, fmt.Errorf("wireguard interface is not set")
 	}
 	log := l.log.With("remote-peer", p.ShortString())
-	log.Debug("Securing inbound connection", "remote-peer", p.ShortString())
+	log.Info("Securing inbound connection", "remote-peer", p.ShortString())
 	// If the peer ID is empty, we don't know who this is, so we can't do anything
 	// substantial for now.
 	if p == "" {
@@ -507,6 +395,7 @@ func (l *LiteSecureTransport) SecureInbound(ctx context.Context, insecure net.Co
 		l.log.Error("Failed to add peer to wireguard interface", "error", err.Error())
 		return nil, fmt.Errorf("failed to add peer to wireguard interface: %w", err)
 	}
+	log.Info("Added peer to wireguard interface, waiting for endpoint negotiation")
 	return &LiteSecureConn{
 		Conn:      insecure,
 		lpeer:     l.host.ID(),
@@ -532,9 +421,25 @@ func (l *LiteSecureTransport) SecureOutbound(ctx context.Context, insecure net.C
 		log.Error("Failed to convert public key to webmesh key", "error", err.Error())
 		return nil, fmt.Errorf("failed to convert public key to webmesh key: %w", err)
 	}
-	log.Debug("Attempting endpoint negotiation")
+	rula, raddr := netutil.GenerateULAWithKey(wmkey)
+	// With most of the small things that can go wrong out of the way, try to get wireguard
+	// ready for the connection. For now, we just add the peer's ULA and public key. PutPeer
+	// current handles setting system routes as well.
+	log.Debug("Adding peer to wireguard interface")
+	err = l.iface.PutPeer(context.WithLogger(ctx, log), &wireguard.Peer{
+		ID:          p.ShortString(),
+		PublicKey:   wmkey,
+		Endpoint:    netip.AddrPort{},
+		PrivateIPv6: netip.PrefixFrom(raddr, PrefixSize),
+		AllowedIPs:  []netip.Prefix{rula},
+	})
+	if err != nil {
+		log.Error("Failed to add peer to wireguard interface", "error", err.Error())
+		return nil, fmt.Errorf("failed to add peer to wireguard interface: %w", err)
+	}
 	// We now need to try to negotiate endpoints with the remote peer via another
 	// transport.
+	log.Debug("Attempting endpoint negotiation")
 	conn, err := l.host.NewStream(ctx, p, wmproto.SecurityID)
 	if err != nil {
 		log.Error("Failed to dial remote peer for endpoint negotiation", "error", err.Error())
