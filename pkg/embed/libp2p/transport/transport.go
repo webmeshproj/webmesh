@@ -130,9 +130,14 @@ type WebmeshTransport struct {
 func (t *WebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	webmeshSec := protocol.WithPeerID(t.key.ID())
+	id, err := peer.IDFromPrivateKey(t.key)
+	if err != nil {
+		t.log.Error("Failed to get peer ID from private key", "error", err.Error())
+		return addrs
+	}
+	webmeshSec := protocol.WithPeerID(id)
 	if t.conf.Discovery.Announce {
-		webmeshSec = protocol.WithPeerIDAndRendezvous(t.key.ID(), t.conf.Discovery.Rendezvous)
+		webmeshSec = protocol.WithPeerIDAndRendezvous(id, t.conf.Discovery.Rendezvous)
 	}
 	var out []ma.Multiaddr
 	for _, addr := range addrs {
@@ -594,10 +599,13 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	// Automatically add our direct peers
 	t.log.Debug("Adding direct peers to peerstore")
 	for _, wgpeer := range node.Network().WireGuard().Peers() {
-		id := wgpeer.PublicKey.ID()
+		id, err := peer.IDFromPublicKey(wgpeer.PublicKey)
+		if err != nil {
+			return nil, handleErr(fmt.Errorf("failed to get peer ID from public key: %w", err))
+		}
 		t.log.Debug("Adding peer to peerstore", "peer", id, "multiaddrs", wgpeer.Multiaddrs)
 		t.host.Peerstore().AddAddrs(id, wgpeer.Multiaddrs, peerstore.PermanentAddrTTL)
-		err := t.host.Peerstore().AddPubKey(id, wgpeer.PublicKey)
+		err = t.host.Peerstore().AddPubKey(id, wgpeer.PublicKey)
 		if err != nil {
 			return nil, handleErr(fmt.Errorf("failed to add public key to peerstore: %w", err))
 		}
@@ -700,7 +708,10 @@ func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
 	}
-	id := pubkey.ID()
+	id, err := peer.IDFromPublicKey(pubkey)
+	if err != nil {
+		return fmt.Errorf("failed to get peer ID from public key: %w", err)
+	}
 	for _, addr := range node.GetMultiaddrs() {
 		a, err := ma.NewMultiaddr(addr)
 		if err != nil {

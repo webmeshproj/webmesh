@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 func TestWireGuardKeys(t *testing.T) {
@@ -130,12 +131,9 @@ func TestWireGuardKeySignatures(t *testing.T) {
 
 func TestWireGuardKeyIDs(t *testing.T) {
 	key := MustGenerateKey()
-	id := key.ID()
-	if id == "" {
-		t.Fatal("key ID is empty")
-	}
-	if id != key.PublicKey().ID() {
-		t.Fatal("key ID does not match public key ID")
+	id, err := peer.IDFromPrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
 	}
 	extracted, err := id.ExtractPublicKey()
 	if err != nil {

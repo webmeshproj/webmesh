@@ -43,6 +43,12 @@ const Code = 613
 // P_WEBMESH is the code for the webmesh libp2p protocol.
 const P_WEBMESH = Code
 
+// SignalingPort is the port assumed for signaling.
+const SignalingPort = 61820
+
+// PrefixSize is the size of the remote local address prefix.
+const PrefixSize = 112
+
 // ErrNoPeerID is returned when a webmesh multiaddr does not contain a peer ID.
 var ErrNoPeerID = fmt.Errorf("no peer ID in webmesh multiaddr")
 

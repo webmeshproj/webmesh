@@ -28,13 +28,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
 )
-
-// SignalingPort is the port assumed for signaling.
-const SignalingPort = 61820
-
-// PrefixSize is the size of the remote local address prefix.
-const PrefixSize = 112
 
 // ErrNotStarted is returned when the transport is not started.
 var ErrNotStarted = fmt.Errorf("transport is not started")
@@ -47,8 +42,8 @@ func AddrToSignalMultiaddrs(addr netip.Addr) []ma.Multiaddr {
 	switch {
 	case addr.Is6():
 		return []ma.Multiaddr{
-			ma.StringCast(fmt.Sprintf("/ip6/%s/udp/%d", addr.String(), SignalingPort)),
-			ma.StringCast(fmt.Sprintf("/ip6/%s/tcp/%d", addr.String(), SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip6/%s/udp/%d", addr.String(), protocol.SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip6/%s/tcp/%d", addr.String(), protocol.SignalingPort)),
 		}
 	case addr.Is4In6():
 		// For now we pack the IPv6 address back into an IPv4 address. There is a good
@@ -56,13 +51,13 @@ func AddrToSignalMultiaddrs(addr netip.Addr) []ma.Multiaddr {
 		addrBytes := addr.As4()
 		ipv4 := net.IP(addrBytes[:])
 		return []ma.Multiaddr{
-			ma.StringCast(fmt.Sprintf("/ip4/%s/udp/%d", ipv4.String(), SignalingPort)),
-			ma.StringCast(fmt.Sprintf("/ip4/%s/tcp/%d", ipv4.String(), SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip4/%s/udp/%d", ipv4.String(), protocol.SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip4/%s/tcp/%d", ipv4.String(), protocol.SignalingPort)),
 		}
 	case addr.Is4():
 		return []ma.Multiaddr{
-			ma.StringCast(fmt.Sprintf("/ip4/%s/udp/%d", addr.String(), SignalingPort)),
-			ma.StringCast(fmt.Sprintf("/ip4/%s/tcp/%d", addr.String(), SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip4/%s/udp/%d", addr.String(), protocol.SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip4/%s/tcp/%d", addr.String(), protocol.SignalingPort)),
 		}
 	default:
 		return nil

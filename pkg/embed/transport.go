@@ -17,10 +17,12 @@ limitations under the License.
 package embed
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/config"
+	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
 	wmconfig "github.com/webmeshproj/webmesh/pkg/config"
@@ -61,10 +63,14 @@ func WithWebmeshTransport(topts TransportOptions) config.Option {
 		libp2p.AddrsFactory(rt.BroadcastAddrs),
 	}
 	if len(topts.Laddrs) > 0 {
+		id, err := peer.IDFromPrivateKey(key)
+		if err != nil {
+			panic(fmt.Errorf("failed to get peer ID from private key: %w", err))
+		}
 		// Append our webmesh IDs to the listen addresses.
-		webmeshSec := p2pproto.WithPeerID(key.ID())
+		webmeshSec := p2pproto.WithPeerID(id)
 		if topts.Rendezvous != "" {
-			webmeshSec = p2pproto.WithPeerIDAndRendezvous(key.ID(), topts.Rendezvous)
+			webmeshSec = p2pproto.WithPeerIDAndRendezvous(id, topts.Rendezvous)
 		}
 		for i, laddr := range topts.Laddrs {
 			topts.Laddrs[i] = ma.Join(laddr, webmeshSec)

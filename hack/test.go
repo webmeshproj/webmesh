@@ -1,13 +1,11 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"net"
 	"os"
 	"os/signal"
@@ -19,90 +17,72 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/config"
 	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/routing"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/transport"
+	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/wgsecurity"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	wmp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
+var conf = config.Options{
+	Config: config.WireGuardOptions{
+		ListenPort:         wireguard.DefaultListenPort,
+		InterfaceName:      wireguard.DefaultInterfaceName,
+		ForceInterfaceName: true,
+		MTU:                system.DefaultMTU,
+	},
+	EndpointDetection: &endpoints.DetectOpts{
+		DetectIPv6:           true,
+		DetectPrivate:        true,
+		AllowRemoteDetection: false,
+	},
+}
+
+var payloadSize = 4096
+
 func main() {
-	quic := flag.Bool("quic", false, "use QUIC transport")
-	payloadSize := flag.Int("payload", 4096, "payload size")
-	wireguardPort := flag.Int("wgport", wireguard.DefaultListenPort, "wireguard port")
-	ifaceName := flag.String("ifname", wireguard.DefaultInterfaceName, "wireguard interface name")
-	mtu := flag.Int("mtu", system.DefaultMTU, "wireguard interface MTU")
-	logLevel := flag.String("loglevel", "error", "log level")
+	// Bind flags to the configurations
+	var logLevel string
+	flag.IntVar(&payloadSize, "payload", payloadSize, "payload size")
+	flag.IntVar(&conf.Config.ListenPort, "wgport", conf.Config.ListenPort, "wireguard port")
+	flag.StringVar(&conf.Config.InterfaceName, "ifname", conf.Config.InterfaceName, "wireguard interface name")
+	flag.IntVar(&conf.Config.MTU, "mtu", conf.Config.MTU, "wireguard interface MTU")
+	flag.StringVar(&logLevel, "loglevel", "error", "log level")
 	flag.Parse()
-
-	var rendezvous string
-	if len(flag.Args()) >= 1 {
-		rendezvous = flag.Args()[0]
-	}
-
-	var opts libp2p.Option
-	switch *quic {
-	case true:
-		opts = libp2p.ChainOptions(
-			libp2p.ListenAddrStrings("/ip6/::/udp/0/quic-v1"),
-			libp2p.DefaultTransports,
-		)
-	case false:
-		transport, security, addrFactory := transport.NewLite(config.Options{
-			Config: config.WireGuardOptions{
-				ListenPort:         *wireguardPort,
-				InterfaceName:      *ifaceName,
-				ForceInterfaceName: true,
-				MTU:                *mtu,
-			},
-			EndpointDetection: &endpoints.DetectOpts{
-				DetectIPv6:    true,
-				DetectPrivate: true,
-			},
-			Logger: logutil.NewLogger(*logLevel),
-		})
-		opts = libp2p.ChainOptions(
-			libp2p.Transport(transport),
-			libp2p.ProtocolVersion(protocol.SecurityID),
-			libp2p.Security(protocol.SecurityID, security),
-			libp2p.AddrsFactory(addrFactory),
-			libp2p.ListenAddrStrings(
-				"/ip4/127.0.0.1/tcp/0/webmesh",
-				"/ip6/::/tcp/0/webmesh",
-				"/ip4/127.0.0.1/udp/0/quic-v1",
-				"/ip6/::/udp/0/quic-v1",
-			),
-			libp2p.Routing(routing.PublicKeyRouter),
-			libp2p.DefaultSecurity,
-			libp2p.DefaultTransports,
-		)
-	}
-
-	err := run(*payloadSize, opts, rendezvous)
+	conf.Logger = logutil.NewLogger(logLevel)
+	err := run()
 	if err != nil {
-		log.Println("ERROR:", err.Error())
+		panic(err)
 	}
 }
 
-func run(payloadSize int, opts libp2p.Option, rendezvous string) error {
+func run() error {
+	var rendezvous string
 	var announcer bool
-	if rendezvous == "" {
-		// We are running in announce mode
+	if flag.NArg() > 0 {
+		rendezvous = flag.Arg(0)
+	} else {
 		announcer = true
-		rendezvous = string(crypto.MustGeneratePSK())
-		log.Println("Discover rendezvous string:", rendezvous)
+		rendezvous = crypto.MustGeneratePSK().String()
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	log.Println("Setting up libp2p host")
-	log.Println("Payload size:", prettyByteSize(float64(payloadSize)))
-	host, err := libp2p.New(opts)
+	host, err := libp2p.New(libp2p.ChainOptions(
+		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.ProtocolVersion(protocol.SecurityID),
+		libp2p.Security(protocol.SecurityID, wgsecurity.NewTransport(conf)),
+		libp2p.Muxer(protocol.SecurityID, wgsecurity.Multiplexer),
+		libp2p.DefaultSecurity,
+		libp2p.DefaultMuxers,
+		libp2p.DefaultListenAddrs,
+		// libp2p.FallbackDefaults,
+	))
 	if err != nil {
 		return err
 	}
@@ -112,24 +92,35 @@ func run(payloadSize int, opts libp2p.Option, rendezvous string) error {
 	for _, addr := range host.Addrs() {
 		log.Println("\t-", addr)
 	}
+
+	// Setup the speed test handler
+	ctx := context.WithLogger(context.Background(), conf.Logger)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	host.SetStreamHandler("/speedtest", func(stream network.Stream) {
+		log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
+		go func() {
+			defer cancel()
+			runSpeedTest(ctx, stream, payloadSize)
+		}()
+	})
+
 	dht, err := wmp2p.NewDHT(ctx, host, nil, time.Second*3)
 	if err != nil {
 		return err
 	}
 	defer dht.Close()
-	routingDiscovery := drouting.NewRoutingDiscovery(dht)
+
+	// Setup signal handlers
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
+
+	// Announce or search for peers
+
+	routingDiscovery := drouting.NewRoutingDiscovery(dht)
 	if announcer {
+		log.Println("Announcing for peers at our PSK", rendezvous)
 		dutil.Advertise(ctx, routingDiscovery, rendezvous, discovery.TTL(time.Minute))
-		log.Println("Advertised our PSK:", rendezvous)
-		host.SetStreamHandler("/speedtest", func(stream network.Stream) {
-			log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
-			go func() {
-				defer cancel()
-				runSpeedTest(ctx, stream, payloadSize)
-			}()
-		})
 		select {
 		case <-ctx.Done():
 		case <-sig:
@@ -194,8 +185,8 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 				written := bytesWritten.Load()
 				read := bytesRead.Load()
 				elapsed := time.Since(start)
-				sent := prettyByteSize(float64(written) / elapsed.Seconds())
-				received := prettyByteSize(float64(read) / elapsed.Seconds())
+				sent := util.PrettyByteSize(float64(written) / elapsed.Seconds())
+				received := util.PrettyByteSize(float64(read) / elapsed.Seconds())
 				fmt.Printf("Sent %d bytes in %s (%s/s)\n", written, elapsed, sent)
 				fmt.Printf("Received %d bytes in %s (%s/s)\n", read, elapsed, received)
 			}
@@ -247,14 +238,4 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 			bytesRead.Add(int64(n))
 		}
 	}
-}
-
-func prettyByteSize(b float64) string {
-	for _, unit := range []string{"", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"} {
-		if math.Abs(b) < 1024.0 {
-			return fmt.Sprintf("%3.1f%sB", b, unit)
-		}
-		b /= 1024.0
-	}
-	return fmt.Sprintf("%.1fYiB", b)
 }

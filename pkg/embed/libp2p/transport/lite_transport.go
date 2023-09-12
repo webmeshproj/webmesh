@@ -38,21 +38,17 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
+	wmconfig "github.com/webmeshproj/webmesh/pkg/embed/libp2p/config"
 	wmproto "github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/security"
 	p2putil "github.com/webmeshproj/webmesh/pkg/embed/libp2p/util"
+	wgsecurity "github.com/webmeshproj/webmesh/pkg/embed/libp2p/wgsecurity"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
-	"github.com/webmeshproj/webmesh/pkg/net/system"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // Make sure we implement the interface.
 var _ LiteTransport = (*LiteWebmeshTransport)(nil)
-
-// PrefixSize is the local prefix size assigned to each peer.
-const PrefixSize = 112
 
 // LiteTransport is the lite webmesh transport. This transport does not run a
 // full mesh node, but rather utilizes libp2p streams to perform an authenticated
@@ -66,47 +62,6 @@ type LiteTransport interface {
 	transport.Resolver
 }
 
-// LiteOptions are the options for the lite webmesh transport.
-type LiteOptions struct {
-	// Config is the configuration for the WireGuard interface.
-	Config WireGuardOptions
-	// EndpointDetection are options for doing public endpoint
-	// detection for the wireguard interface.
-	EndpointDetection *endpoints.DetectOpts
-	// Logger is the logger to use for the webmesh transport.
-	// If nil, an empty logger will be used.
-	Logger *slog.Logger
-}
-
-// WireGuardOptions are options for configuring the WireGuard interface on
-// the transport.
-type WireGuardOptions struct {
-	// ListenPort is the port to listen on.
-	// If 0, a default port of 51820 will be used.
-	ListenPort uint16
-	// InterfaceName is the name of the interface to use.
-	// If empty, a default platform dependent name will be used.
-	InterfaceName string
-	// ForceInterfaceName forces the interface name to be used.
-	// If false, the interface name will be changed if it already exists.
-	ForceInterfaceName bool
-	// MTU is the MTU to use for the interface.
-	// If 0, a default MTU of 1420 will be used.
-	MTU int
-}
-
-func (w *WireGuardOptions) Default() {
-	if w.ListenPort == 0 {
-		w.ListenPort = wireguard.DefaultListenPort
-	}
-	if w.InterfaceName == "" {
-		w.InterfaceName = wireguard.DefaultInterfaceName
-	}
-	if w.MTU == 0 {
-		w.MTU = system.DefaultMTU
-	}
-}
-
 // LiteTransportBuilder is the signature of a function that builds a webmesh lite transport.
 type LiteTransportBuilder func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, connManager *quicreuse.ConnManager, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error)
 
@@ -114,17 +69,14 @@ type LiteTransportBuilder func(tu transport.Upgrader, host host.Host, key crypto
 type SecurityTransportBuilder func() sec.SecureTransport
 
 // New returns a new lite webmesh transport builder.
-func NewLite(opts LiteOptions) (LiteTransportBuilder, SecurityTransportBuilder, basichost.AddrsFactory) {
-	opts.Config.Default()
-	if opts.Logger == nil {
-		opts.Logger = logutil.NewLogger("")
-	}
+func NewLite(opts wmconfig.Options) (LiteTransportBuilder, SecurityTransportBuilder, basichost.AddrsFactory) {
+	opts.Default()
 	rt := &LiteWebmeshTransport{
 		opts: opts,
 		conf: opts.Config,
 		log:  opts.Logger.With("component", "webmesh-lite-transport"),
 	}
-	var secTransport security.SecureTransport
+	var secTransport wgsecurity.SecureTransport
 	transportConstructor := func(tu transport.Upgrader, host host.Host, privkey crypto.PrivKey, psk pnet.PSK, connManager *quicreuse.ConnManager, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error) {
 		if len(psk) > 0 {
 			rt.log.Error("Webmesh doesn't support private networks yet.")
@@ -139,17 +91,14 @@ func NewLite(opts LiteOptions) (LiteTransportBuilder, SecurityTransportBuilder, 
 		secTransport.SetKey(key)
 
 		// Check if we are detecting public endpoints that we'll exchange with peers.
+		var eps endpoints.PrefixList
 		if rt.opts.EndpointDetection != nil {
-			eps, err := endpoints.Detect(ctx, *rt.opts.EndpointDetection)
+			eps, err = endpoints.Detect(ctx, *rt.opts.EndpointDetection)
 			if err != nil {
 				return nil, fmt.Errorf("failed to detect public endpoints: %w", err)
 			}
-			addrports := eps.AddrPorts(rt.opts.Config.ListenPort)
-			for _, addrport := range addrports {
-				rt.eps = append(rt.eps, addrport.String())
-			}
 		}
-		secTransport.SetEndpoints(rt.eps)
+		secTransport.SetEndpoints(eps)
 
 		rt.key = key
 		rt.host = host
@@ -157,11 +106,6 @@ func NewLite(opts LiteOptions) (LiteTransportBuilder, SecurityTransportBuilder, 
 		rt.rcmgr = rcmgr
 		rt.connmgr = connManager
 		rt.gater = gater
-
-		err = rt.host.Peerstore().AddProtocols(rt.host.ID(), wmproto.SecurityID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add protocols to peerstore: %w", err)
-		}
 
 		// We set our local network to be a ULA network derived from our public key.
 		// This is a /32 network (roughly the number of IPv4 addresses in the world).
@@ -171,8 +115,7 @@ func NewLite(opts LiteOptions) (LiteTransportBuilder, SecurityTransportBuilder, 
 		// negotiating what our allowed IP addresses should be on both sides.
 		rt.lula, rt.laddr = netutil.GenerateULAWithKey(key.PublicKey())
 		rt.log = rt.log.With("local-ula", rt.lula.String(), "local-addr", rt.laddr.String())
-		rt.log.Info("Generated local ULA network, configuring WireGuard",
-			"local-ula", rt.lula.String(), "local-addr", rt.laddr.String())
+		rt.log.Info("Generated local ULA network, configuring WireGuard")
 		wgopts := wireguard.Options{
 			NodeID:      host.ID().String(),
 			ListenPort:  int(rt.conf.ListenPort),
@@ -180,7 +123,7 @@ func NewLite(opts LiteOptions) (LiteTransportBuilder, SecurityTransportBuilder, 
 			ForceName:   rt.conf.ForceInterfaceName,
 			MTU:         rt.conf.MTU,
 			NetworkV6:   rt.lula,
-			AddressV6:   netip.PrefixFrom(rt.laddr, PrefixSize),
+			AddressV6:   netip.PrefixFrom(rt.laddr, wmproto.PrefixSize),
 			DisableIPv4: true,
 		}
 		iface, err := wireguard.New(ctx, &wgopts)
@@ -207,8 +150,8 @@ func NewLite(opts LiteOptions) (LiteTransportBuilder, SecurityTransportBuilder, 
 
 // LiteWebmeshTransport is the lite webmesh transport.
 type LiteWebmeshTransport struct {
-	opts    LiteOptions
-	conf    WireGuardOptions
+	opts    wmconfig.Options
+	conf    wmconfig.WireGuardOptions
 	host    host.Host
 	key     wmcrypto.PrivateKey
 	tu      transport.Upgrader
@@ -219,7 +162,6 @@ type LiteWebmeshTransport struct {
 	iface   wireguard.Interface
 	lula    netip.Prefix
 	laddr   netip.Addr
-	eps     []string
 	mu      sync.Mutex
 }
 

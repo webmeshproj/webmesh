@@ -49,8 +49,7 @@ func UpsertSlice[T comparable](sl []T, item T) []T {
 }
 
 // PrettyByteSize returns a human-readable string of the given byte size.
-func PrettyByteSize(b int64) string {
-	bf := float64(b)
+func PrettyByteSize(bf float64) string {
 	for _, unit := range []string{"", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"} {
 		if math.Abs(bf) < 1024.0 {
 			return fmt.Sprintf("%3.1f%sB", bf, unit)
