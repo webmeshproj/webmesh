@@ -32,7 +32,7 @@ func init() {
 }
 
 // SecurityID is the protocol ID of the security protocol.
-const SecurityID = "/webmesh/id/1.0.0"
+const SecurityID = "/webmesh/1.0.0"
 
 // ID is the ID for the webmesh libp2p protocol.
 const ID = "webmesh"
@@ -53,7 +53,7 @@ var ErrNoRedezvous = fmt.Errorf("no rendezvous in webmesh multiaddr")
 var Protocol = multiaddr.Protocol{
 	Name:       ID,
 	Code:       P_WEBMESH,
-	VCode:      multiaddr.CodeToVarint(Code),
+	VCode:      multiaddr.CodeToVarint(P_WEBMESH),
 	Size:       0,
 	Path:       false,
 	Transcoder: multiaddr.NewTranscoderFromFunctions(protocolStrToBytes, protocolBytesToStr, validateBytes),

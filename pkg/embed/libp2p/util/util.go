@@ -14,30 +14,70 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package transport
+// Package util provides utility functions for the webmesh libp2p integrations.
+package util
 
 import (
 	"fmt"
 	"net"
+	"net/netip"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
+// SignalingPort is the port assumed for signaling.
+const SignalingPort = 61820
+
+// PrefixSize is the size of the remote local address prefix.
+const PrefixSize = 112
+
+// ErrNotStarted is returned when the transport is not started.
+var ErrNotStarted = fmt.Errorf("transport is not started")
+
 // ErrInvalidSecureTransport is returned when the transport is not used with a webmesh keypair and security transport.
 var ErrInvalidSecureTransport = fmt.Errorf("transport must be used with a webmesh keypair and security transport")
 
-func extractWebmeshPublicKey(ctx context.Context, p peer.ID) (wmcrypto.PublicKey, error) {
+// AddrToSignalMultiaddr converts a netip.Addr to a multiaddr intended for signaling.
+func AddrToSignalMultiaddrs(addr netip.Addr) []ma.Multiaddr {
+	switch {
+	case addr.Is6():
+		return []ma.Multiaddr{
+			ma.StringCast(fmt.Sprintf("/ip6/%s/udp/%d", addr.String(), SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip6/%s/tcp/%d", addr.String(), SignalingPort)),
+		}
+	case addr.Is4In6():
+		// For now we pack the IPv6 address back into an IPv4 address. There is a good
+		// chance this was not provided by the user and rather parsed as such by the runtime.
+		addrBytes := addr.As4()
+		ipv4 := net.IP(addrBytes[:])
+		return []ma.Multiaddr{
+			ma.StringCast(fmt.Sprintf("/ip4/%s/udp/%d", ipv4.String(), SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip4/%s/tcp/%d", ipv4.String(), SignalingPort)),
+		}
+	case addr.Is4():
+		return []ma.Multiaddr{
+			ma.StringCast(fmt.Sprintf("/ip4/%s/udp/%d", addr.String(), SignalingPort)),
+			ma.StringCast(fmt.Sprintf("/ip4/%s/tcp/%d", addr.String(), SignalingPort)),
+		}
+	default:
+		return nil
+	}
+}
+
+// ExtractWebmeshPublicKey extracts the webmesh public key from a peer ID.
+func ExtractWebmeshPublicKey(ctx context.Context, p peer.ID) (wmcrypto.PublicKey, error) {
 	log := context.LoggerFrom(ctx)
 	key, err := p.ExtractPublicKey()
 	if err != nil {
 		log.Debug("Failed to extract public key from peer ID", "error", err.Error())
 		return nil, fmt.Errorf("failed to extract public key from peer ID: %w", err)
 	}
-	wmkey, err := toWebmeshPublicKey(key)
+	wmkey, err := ToWebmeshPublicKey(key)
 	if err != nil {
 		log.Warn("Failed to convert public key to webmesh key", "error", err.Error())
 		return nil, fmt.Errorf("failed to convert public key to webmesh key: %w", err)
@@ -45,7 +85,8 @@ func extractWebmeshPublicKey(ctx context.Context, p peer.ID) (wmcrypto.PublicKey
 	return wmkey, nil
 }
 
-func toWebmeshPublicKey(in crypto.PubKey) (wmcrypto.PublicKey, error) {
+// ToWebmeshPublicKey converts a libp2p public key to a webmesh public key.
+func ToWebmeshPublicKey(in crypto.PubKey) (wmcrypto.PublicKey, error) {
 	if v, ok := in.(wmcrypto.PublicKey); ok {
 		return v, nil
 	}
@@ -63,7 +104,8 @@ func toWebmeshPublicKey(in crypto.PubKey) (wmcrypto.PublicKey, error) {
 	return key, nil
 }
 
-func toWebmeshPrivateKey(in crypto.PrivKey) (wmcrypto.PrivateKey, error) {
+// ToWebmeshPrivateKey converts a libp2p private key to a webmesh private key.
+func ToWebmeshPrivateKey(in crypto.PrivKey) (wmcrypto.PrivateKey, error) {
 	if v, ok := in.(wmcrypto.PrivateKey); ok {
 		return v, nil
 	}
@@ -81,7 +123,8 @@ func toWebmeshPrivateKey(in crypto.PrivKey) (wmcrypto.PrivateKey, error) {
 	return key, nil
 }
 
-func getTransport(c net.Conn) (proto string) {
+// GetTransport returns the transport type of a connection.
+func GetTransport(c net.Conn) (proto string) {
 	switch c.(type) {
 	case *net.TCPConn:
 		proto = "tcp"

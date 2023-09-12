@@ -42,7 +42,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
+	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
+	p2putil "github.com/webmeshproj/webmesh/pkg/embed/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -52,9 +53,6 @@ import (
 
 // TransportBuilder is the signature of a function that builds a webmesh transport.
 type TransportBuilder func(upgrader transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey crypto.PrivKey) (Transport, error)
-
-// ErrNotStarted is returned when the transport is not started.
-var ErrNotStarted = fmt.Errorf("transport is not started")
 
 // Transport is the webmesh transport.
 type Transport interface {
@@ -99,7 +97,7 @@ func New(opts Options) (TransportBuilder, *WebmeshTransport) {
 		log:  opts.Logger.With("component", "webmesh-transport"),
 	}
 	return func(tu transport.Upgrader, host host.Host, rcmgr network.ResourceManager, privKey crypto.PrivKey) (Transport, error) {
-		key, err := toWebmeshPrivateKey(privKey)
+		key, err := p2putil.ToWebmeshPrivateKey(privKey)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +173,7 @@ func (t *WebmeshTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if !t.started.Load() {
-		return nil, ErrNotStarted
+		return nil, p2putil.ErrNotStarted
 	}
 	ctx = context.WithLogger(ctx, t.log)
 	ipver := "ip4"
@@ -332,7 +330,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if !t.started.Load() {
-		return nil, ErrNotStarted
+		return nil, p2putil.ErrNotStarted
 	}
 	ctx = context.WithLogger(ctx, t.log)
 	t.log.Debug("Resolving multiaddr", "multiaddr", maddr.String())

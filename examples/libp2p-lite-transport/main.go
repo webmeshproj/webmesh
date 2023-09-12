@@ -21,8 +21,9 @@ import (
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/embed/protocol"
-	"github.com/webmeshproj/webmesh/pkg/embed/transport"
+	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
+	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/routing"
+	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	wmp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
@@ -67,11 +68,18 @@ func main() {
 		})
 		opts = libp2p.ChainOptions(
 			libp2p.Transport(transport),
+			libp2p.ProtocolVersion(protocol.SecurityID),
 			libp2p.Security(protocol.SecurityID, security),
 			libp2p.AddrsFactory(addrFactory),
-			libp2p.DefaultListenAddrs,
+			libp2p.ListenAddrStrings(
+				"/ip4/127.0.0.1/tcp/0/webmesh",
+				"/ip6/::/tcp/0/webmesh",
+				"/ip4/127.0.0.1/udp/0/quic-v1",
+				"/ip6/::/udp/0/quic-v1",
+			),
+			libp2p.Routing(routing.PublicKeyRouter),
+			libp2p.DefaultSecurity,
 			libp2p.DefaultTransports,
-			// libp2p.FallbackDefaults,
 		)
 	}
 
@@ -98,6 +106,7 @@ func run(payloadSize int, opts libp2p.Option, rendezvous string) error {
 		return err
 	}
 	defer host.Close()
+	log.Println("Host ID:", host.ID())
 	log.Println("Listening for libp2p connections on:")
 	for _, addr := range host.Addrs() {
 		log.Println("\t-", addr)
