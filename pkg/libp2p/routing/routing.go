@@ -25,7 +25,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 
-	p2putil "github.com/webmeshproj/webmesh/pkg/embed/libp2p/util"
+	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 

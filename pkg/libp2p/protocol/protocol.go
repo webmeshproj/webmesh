@@ -31,23 +31,20 @@ func init() {
 	}
 }
 
-// SecurityID is the protocol ID of the security protocol.
-const SecurityID = "/webmesh/1.0.0"
-
-// ID is the ID for the webmesh libp2p protocol.
-const ID = "webmesh"
-
-// Code is the code for the webmesh libp2p protocol.
-const Code = 613
-
-// P_WEBMESH is the code for the webmesh libp2p protocol.
-const P_WEBMESH = Code
-
-// SignalingPort is the port assumed for signaling.
-const SignalingPort = 61820
-
-// PrefixSize is the size of the remote local address prefix.
-const PrefixSize = 112
+const (
+	// SecurityID is the protocol ID of the security protocol.
+	SecurityID = "/webmesh/1.0.0"
+	// ID is the ID for the webmesh libp2p transport protocol.
+	ProtocolID = "webmesh"
+	// ProtocolCode is the code for the webmesh libp2p transport protocol.
+	ProtocolCode = 613
+	// P_WEBMESH is the code for the webmesh libp2p protocol.
+	P_WEBMESH = ProtocolCode
+	// SignalingPort is the port assumed for signaling.
+	SignalingPort = 61820
+	// PrefixSize is the size of the remote local address prefix.
+	PrefixSize = 112
+)
 
 // ErrNoPeerID is returned when a webmesh multiaddr does not contain a peer ID.
 var ErrNoPeerID = fmt.Errorf("no peer ID in webmesh multiaddr")
@@ -57,7 +54,7 @@ var ErrNoRedezvous = fmt.Errorf("no rendezvous in webmesh multiaddr")
 
 // Protocol is the webmesh libp2p protocol.
 var Protocol = multiaddr.Protocol{
-	Name:       ID,
+	Name:       ProtocolID,
 	Code:       P_WEBMESH,
 	VCode:      multiaddr.CodeToVarint(P_WEBMESH),
 	Size:       0,
@@ -65,8 +62,13 @@ var Protocol = multiaddr.Protocol{
 	Transcoder: multiaddr.NewTranscoderFromFunctions(protocolStrToBytes, protocolBytesToStr, validateBytes),
 }
 
-// ToWebmeshAddr appends the webmesh protocol to the given address.
-func ToWebmeshAddr(addr multiaddr.Multiaddr) multiaddr.Multiaddr {
+// Decapsulate strips the webmesh component from the given multiaddr.
+func Decapsulate(addr multiaddr.Multiaddr) multiaddr.Multiaddr {
+	return addr.Decapsulate(multiaddr.StringCast("/webmesh"))
+}
+
+// Encapsulate appends the webmesh protocol to the given address.
+func Encapsulate(addr multiaddr.Multiaddr) multiaddr.Multiaddr {
 	return multiaddr.Join(addr, multiaddr.StringCast("/webmesh"))
 }
 
@@ -159,17 +161,17 @@ func DecapsulateAddr(addr multiaddr.Multiaddr) (protocol string, port string, er
 
 // WithPeerID returns a webmesh multiaddr with the given peer ID.
 func WithPeerID(pid peer.ID) multiaddr.Multiaddr {
-	return multiaddr.StringCast(fmt.Sprintf("/%s/%s", ID, pid.String()))
+	return multiaddr.StringCast(fmt.Sprintf("/%s/%s", ProtocolID, pid.String()))
 }
 
 // WithPeerIDAndRendezvous returns a webmesh multiaddr with the given peer ID and rendezvous.
 func WithPeerIDAndRendezvous(pid peer.ID, rendezvous string) multiaddr.Multiaddr {
-	return multiaddr.StringCast(fmt.Sprintf("/%s/%s/%s", ID, pid.String(), rendezvous))
+	return multiaddr.StringCast(fmt.Sprintf("/%s/%s/%s", ProtocolID, pid.String(), rendezvous))
 }
 
 // PeerIDFromWebmeshAddr returns the peer ID argument from a webmesh multiaddr.
 func PeerIDFromWebmeshAddr(addr multiaddr.Multiaddr) (peer.ID, error) {
-	pid, err := addr.ValueForProtocol(Code)
+	pid, err := addr.ValueForProtocol(P_WEBMESH)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrNoPeerID, err)
 	}
@@ -190,7 +192,7 @@ func PeerIDFromWebmeshAddr(addr multiaddr.Multiaddr) (peer.ID, error) {
 
 // RendezvousFromWebmeshAddr returns the rendezvous argument from a webmesh multiaddr.
 func RendezvousFromWebmeshAddr(addr multiaddr.Multiaddr) (string, error) {
-	rendezvous, err := addr.ValueForProtocol(Code)
+	rendezvous, err := addr.ValueForProtocol(P_WEBMESH)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrNoRedezvous, err)
 	}

@@ -34,9 +34,9 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	wmconfig "github.com/webmeshproj/webmesh/pkg/embed/libp2p/config"
-	wmproto "github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/util"
+	wmconfig "github.com/webmeshproj/webmesh/pkg/libp2p/config"
+	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	"github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"

@@ -27,8 +27,8 @@ import (
 
 	wmconfig "github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	p2pproto "github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
-	p2ptransport "github.com/webmeshproj/webmesh/pkg/embed/libp2p/transport"
+	p2pproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	p2ptransport "github.com/webmeshproj/webmesh/pkg/libp2p/transport"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 

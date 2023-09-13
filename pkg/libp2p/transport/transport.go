@@ -42,8 +42,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
-	p2putil "github.com/webmeshproj/webmesh/pkg/embed/libp2p/util"
+	"github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -422,7 +422,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 
 // Protocol returns the set of protocols handled by this transport.
 func (t *WebmeshTransport) Protocols() []int {
-	return []int{protocol.Code}
+	return []int{protocol.P_WEBMESH}
 }
 
 // Proxy returns true if this is a proxy transport.

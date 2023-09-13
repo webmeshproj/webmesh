@@ -17,13 +17,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
-	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
+	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
+	tcp "github.com/libp2p/go-libp2p/p2p/transport/tcp"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/config"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/wgsecurity"
+	"github.com/webmeshproj/webmesh/pkg/libp2p/config"
+	"github.com/webmeshproj/webmesh/pkg/libp2p/wgtransport"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
 	wmp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
@@ -46,16 +48,18 @@ var conf = config.Options{
 	},
 }
 
+var logLevel string
 var payloadSize = 4096
+var testType string = "webmesh"
 
 func main() {
 	// Bind flags to the configurations
-	var logLevel string
 	flag.IntVar(&payloadSize, "payload", payloadSize, "payload size")
 	flag.IntVar(&conf.Config.ListenPort, "wgport", conf.Config.ListenPort, "wireguard port")
 	flag.StringVar(&conf.Config.InterfaceName, "ifname", conf.Config.InterfaceName, "wireguard interface name")
 	flag.IntVar(&conf.Config.MTU, "mtu", conf.Config.MTU, "wireguard interface MTU")
 	flag.StringVar(&logLevel, "loglevel", "error", "log level")
+	flag.StringVar(&testType, "type", testType, "test type")
 	flag.Parse()
 	conf.Logger = logutil.NewLogger(logLevel)
 	err := run()
@@ -73,16 +77,45 @@ func run() error {
 		announcer = true
 		rendezvous = crypto.MustGeneratePSK().String()
 	}
-	host, err := libp2p.New(libp2p.ChainOptions(
-		libp2p.Transport(tcp.NewTCPTransport),
-		libp2p.ProtocolVersion(protocol.SecurityID),
-		libp2p.Security(protocol.SecurityID, wgsecurity.NewTransport(conf)),
-		libp2p.Muxer(protocol.SecurityID, wgsecurity.Multiplexer),
-		libp2p.DefaultSecurity,
-		libp2p.DefaultMuxers,
-		libp2p.DefaultListenAddrs,
-		// libp2p.FallbackDefaults,
-	))
+
+	var opts libp2p.Option
+	switch testType {
+	case "webmesh":
+		log.Println("Running webmesh test")
+		// opts = libp2p.ChainOptions(
+		// 	libp2p.RandomIdentity,
+		// 	libp2p.Transport(tcp.NewTCPTransport),
+		// 	libp2p.ProtocolVersion(protocol.SecurityID),
+		// 	libp2p.Security(protocol.SecurityID, wgsecurity.NewTransport(conf)),
+		// 	libp2p.Muxer(protocol.SecurityID, wgsecurity.Multiplexer),
+		// 	libp2p.DefaultSecurity,
+		// 	libp2p.DefaultMuxers,
+		// 	libp2p.DefaultListenAddrs,
+		// )
+		opts = libp2p.ChainOptions(
+			libp2p.RandomIdentity,
+			wgtransport.NewOption(logutil.NewLogger(logLevel)),
+			libp2p.DefaultListenAddrs,
+		)
+	case "quic":
+		log.Println("Running QUIC test")
+		opts = libp2p.ChainOptions(
+			libp2p.RandomIdentity,
+			libp2p.Transport(quic.NewTransport),
+			libp2p.Security(tls.ID, tls.New),
+			libp2p.DefaultListenAddrs,
+		)
+	case "tcp":
+		log.Println("Running TCP/Noise test")
+		opts = libp2p.ChainOptions(
+			libp2p.RandomIdentity,
+			libp2p.Transport(tcp.NewTCPTransport),
+			libp2p.Security(noise.ID, noise.New),
+			libp2p.DefaultListenAddrs,
+		)
+	}
+
+	host, err := libp2p.New(opts)
 	if err != nil {
 		return err
 	}
@@ -119,7 +152,7 @@ func run() error {
 
 	routingDiscovery := drouting.NewRoutingDiscovery(dht)
 	if announcer {
-		log.Println("Announcing for peers at our PSK", rendezvous)
+		log.Println("Announcing for peers to connect at:", rendezvous)
 		dutil.Advertise(ctx, routingDiscovery, rendezvous, discovery.TTL(time.Minute))
 		select {
 		case <-ctx.Done():
@@ -127,7 +160,7 @@ func run() error {
 		}
 		return nil
 	}
-	log.Println("Searching for peers at our PSK", rendezvous)
+	log.Println("Searching for peers at:", rendezvous)
 FindPeers:
 	for {
 		peerChan, err := routingDiscovery.FindPeers(ctx, rendezvous)
@@ -145,6 +178,7 @@ FindPeers:
 					continue FindPeers
 				}
 				if peer.ID == host.ID() {
+					log.Println("Found ourself:", peer.ID)
 					continue
 				}
 				log.Println("Found peer:", peer.ID)

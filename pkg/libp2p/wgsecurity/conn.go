@@ -33,8 +33,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wgcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	wmproto "github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/util"
+	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	"github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )

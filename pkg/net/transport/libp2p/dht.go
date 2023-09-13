@@ -82,7 +82,7 @@ func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, serv
 				log.Debug("Failed to connect to DHT bootstrap peer", "error", err.Error())
 				return
 			}
-			log.Debug("Connection established with bootstrap node", "node", peerinfo.String())
+			log.Info("Connection established with bootstrap node", "node", peerinfo.String())
 		}()
 	}
 	wg.Wait()

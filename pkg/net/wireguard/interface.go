@@ -24,6 +24,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,7 +43,7 @@ import (
 const DefaultListenPort = 51820
 
 // DefaultInterfaceName is the default name to use for the WireGuard interface.
-var DefaultInterfaceName = "webmesh0"
+var DefaultInterfaceName = "webmesh+"
 
 func init() {
 	switch runtime.GOOS {
@@ -64,7 +65,7 @@ type Interface interface {
 	// InNetwork returns true if the given address is in the network of this interface.
 	InNetwork(addr netip.Addr) bool
 	// Configure configures the wireguard interface to use the given key and listen port.
-	Configure(ctx context.Context, key crypto.PrivateKey, listenPort int) error
+	Configure(ctx context.Context, key crypto.PrivateKey) error
 	// ListenPort returns the current listen port of the wireguard interface.
 	ListenPort() (int, error)
 	// PutPeer updates a peer in the wireguard configuration.
@@ -136,21 +137,23 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		opts.Name = DefaultInterfaceName
 	}
 	if opts.ForceName {
-		log.Info("forcing wireguard interface name", "name", opts.Name)
-		iface, err := net.InterfaceByName(opts.Name)
-		if err != nil {
-			if !system.IsInterfaceNotExists(err) {
-				return nil, fmt.Errorf("failed to get interface: %w", err)
-			}
-		} else if iface != nil {
-			err = link.RemoveInterface(ctx, opts.Name)
+		if !strings.HasSuffix(opts.Name, "+") {
+			log.Info("Forcing wireguard interface name", "name", opts.Name)
+			iface, err := net.InterfaceByName(opts.Name)
 			if err != nil {
-				return nil, fmt.Errorf("failed to delete interface: %w", err)
+				if !system.IsInterfaceNotExists(err) {
+					return nil, fmt.Errorf("failed to get interface: %w", err)
+				}
+			} else if iface != nil {
+				err = link.RemoveInterface(ctx, opts.Name)
+				if err != nil {
+					return nil, fmt.Errorf("failed to delete interface: %w", err)
+				}
 			}
 		}
 	}
 	if os.Getuid() == 0 {
-		log.Debug("enabling ip forwarding")
+		log.Debug("Enabling ip forwarding")
 		err := routes.EnableIPForwarding()
 		if err != nil {
 			log.Warn("failed to enable ip forwarding", "error", err)
@@ -163,7 +166,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	if err != nil {
 		log.Warn("failed to get default gateway", "error", err.Error())
 	}
-	log.Info("creating wireguard interface", "name", opts.Name)
+	log.Info("Creating wireguard interface", "name", opts.Name)
 	iface, err := system.New(ctx, &system.Options{
 		Name:        opts.Name,
 		AddressV4:   opts.AddressV4,
@@ -178,7 +181,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	}
 	handleErr := func(err error) error {
 		if err := iface.Destroy(ctx); err != nil {
-			log.Warn("failed to destroy interface", "error", err)
+			log.Warn("Failed to destroy interface", "error", err)
 		}
 		return err
 	}
@@ -251,11 +254,15 @@ func (w *wginterface) Close(ctx context.Context) error {
 }
 
 // Configure configures the wireguard interface to use the given key and listen port.
-func (w *wginterface) Configure(ctx context.Context, key crypto.PrivateKey, listenPort int) error {
+func (w *wginterface) Configure(ctx context.Context, key crypto.PrivateKey) error {
+	var listenPort *int
+	if w.opts.ListenPort != 0 {
+		listenPort = &w.opts.ListenPort
+	}
 	wgKey := key.WireGuardKey()
 	err := w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
 		PrivateKey:   &wgKey,
-		ListenPort:   &listenPort,
+		ListenPort:   listenPort,
 		ReplacePeers: false,
 	})
 	if err != nil {

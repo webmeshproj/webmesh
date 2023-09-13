@@ -28,7 +28,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/embed/libp2p/protocol"
+	"github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 )
 
 // ErrNotStarted is returned when the transport is not started.

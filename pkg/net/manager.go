@@ -236,7 +236,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		noIPv4:       m.opts.DisableIPv4,
 		noIPv6:       m.opts.DisableIPv6,
 	}
-	err = m.wg.Configure(ctx, opts.Key, m.opts.ListenPort)
+	err = m.wg.Configure(ctx, opts.Key)
 	if err != nil {
 		return handleErr(fmt.Errorf("configure wireguard: %w", err))
 	}

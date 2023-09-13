@@ -5,3 +5,4 @@ bin/
 coverage.out
 */testdata/*
 junit-report.xml
+/test
