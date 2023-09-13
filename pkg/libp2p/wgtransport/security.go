@@ -76,7 +76,7 @@ func (st *SecureTransport) ID() protocol.ID { return st.protocolID }
 // SecureInbound secures an inbound connection. If p is empty, connections from any peer are accepted.
 func (st *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
 	log := context.LoggerFrom(ctx)
-	log.Info("Securing inbound connection")
+	log.Debug("Securing inbound connection")
 	ctx = context.WithLogger(ctx, log)
 	wc, ok := insecure.(*WebmeshConn)
 	if !ok {
@@ -95,7 +95,7 @@ func (st *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn,
 func (st *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
 	// Extract the peers public key from the peer ID.
 	log := context.LoggerFrom(ctx)
-	log.Info("Securing outbound connection")
+	log.Debug("Securing outbound connection")
 	wc, ok := insecure.(*WebmeshConn)
 	if !ok {
 		log.Warn("Failed to secure inbound connection: invalid connection type")
@@ -112,8 +112,8 @@ func (st *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn
 // NewSecureConn upgrades an insecure connection with peer identity.
 func (st *SecureTransport) NewSecureConn(ctx context.Context, insecure *WebmeshConn, rpeer peer.ID) (*SecureConn, error) {
 	log := context.LoggerFrom(ctx)
-	sc := &SecureConn{}
-	sc.Conn = insecure
+	var sc SecureConn
+	sc.WebmeshConn = insecure
 	sc.protocol = wmproto.SecurityID
 
 	// First do a peer ID exchange
@@ -121,20 +121,18 @@ func (st *SecureTransport) NewSecureConn(ctx context.Context, insecure *WebmeshC
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange peer IDs: %w", err)
 	}
-
 	// Then do an endpoint exchange
 	endpoint, err := sc.exchangeEndpoints(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange endpoints: %w", err)
 	}
-
-	// Exchange signaling ports
+	// Finallly exchange signaling ports
 	err = sc.exchangeSignalingPorts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange signaling ports: %w", err)
 	}
 
-	// Determine expected remote addresses
+	// Determine expected remote addresses and configure wireguard.
 	var rula netip.Prefix
 	if len(st.psk) > 0 {
 		// We seed the ULA with the PSK
@@ -145,7 +143,6 @@ func (st *SecureTransport) NewSecureConn(ctx context.Context, insecure *WebmeshC
 		rula, sc.raddr = netutil.GenerateULAWithKey(sc.rkey)
 	}
 	log.Debug("Determined remote ULA and address for peer", "ula", rula.String(), "addr", sc.raddr.String())
-
 	peer := wireguard.Peer{
 		ID:          sc.rpeer.String(),
 		PublicKey:   sc.rkey,
@@ -158,5 +155,5 @@ func (st *SecureTransport) NewSecureConn(ctx context.Context, insecure *WebmeshC
 	if err != nil {
 		return nil, fmt.Errorf("failed to add peer to wireguard interface: %w", err)
 	}
-	return sc, nil
+	return &sc, nil
 }

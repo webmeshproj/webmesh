@@ -65,7 +65,7 @@ func (c *SecureConn) RemotePublicKey() crypto.PubKey { return c.rkey }
 // ConnState returns information about the connection state.
 func (c *SecureConn) ConnState() network.ConnectionState {
 	return network.ConnectionState{
-		StreamMultiplexer:         wmproto.SecurityID,
+		StreamMultiplexer:         MuxerID,
 		Security:                  wmproto.SecurityID,
 		Transport:                 "tcp",
 		UsedEarlyMuxerNegotiation: true,

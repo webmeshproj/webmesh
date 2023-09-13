@@ -35,7 +35,9 @@ const (
 	// SecurityID is the protocol ID of the security protocol.
 	SecurityID = "/webmesh/1.0.0"
 	// ID is the ID for the webmesh libp2p transport protocol.
-	ProtocolID = "webmesh"
+	ProtocolID = "webmesh-v1"
+	// ProtocolPath is the path for the webmesh libp2p transport protocol.
+	ProtocolPath = "/" + ProtocolID
 	// ProtocolCode is the code for the webmesh libp2p transport protocol.
 	ProtocolCode = 613
 	// P_WEBMESH is the code for the webmesh libp2p protocol.
@@ -64,12 +66,12 @@ var Protocol = multiaddr.Protocol{
 
 // Decapsulate strips the webmesh component from the given multiaddr.
 func Decapsulate(addr multiaddr.Multiaddr) multiaddr.Multiaddr {
-	return addr.Decapsulate(multiaddr.StringCast("/webmesh"))
+	return multiaddr.StringCast(strings.TrimSuffix(addr.String(), ProtocolPath))
 }
 
 // Encapsulate appends the webmesh protocol to the given address.
 func Encapsulate(addr multiaddr.Multiaddr) multiaddr.Multiaddr {
-	return multiaddr.Join(addr, multiaddr.StringCast("/webmesh"))
+	return multiaddr.Join(addr, multiaddr.StringCast(ProtocolPath))
 }
 
 // IsWebmeshCapableAddr returns true if the given multiaddr is a webmesh-capable multiaddr.

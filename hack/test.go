@@ -82,16 +82,6 @@ func run() error {
 	switch testType {
 	case "webmesh":
 		log.Println("Running webmesh test")
-		// opts = libp2p.ChainOptions(
-		// 	libp2p.RandomIdentity,
-		// 	libp2p.Transport(tcp.NewTCPTransport),
-		// 	libp2p.ProtocolVersion(protocol.SecurityID),
-		// 	libp2p.Security(protocol.SecurityID, wgsecurity.NewTransport(conf)),
-		// 	libp2p.Muxer(protocol.SecurityID, wgsecurity.Multiplexer),
-		// 	libp2p.DefaultSecurity,
-		// 	libp2p.DefaultMuxers,
-		// 	libp2p.DefaultListenAddrs,
-		// )
 		opts = libp2p.ChainOptions(
 			libp2p.RandomIdentity,
 			wgtransport.NewOption(logutil.NewLogger(logLevel)),

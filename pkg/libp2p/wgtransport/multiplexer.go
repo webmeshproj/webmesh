@@ -37,6 +37,9 @@ var _ network.Multiplexer = (*WireGuardMultiplexer)(nil)
 var _ network.MuxedConn = (*Conn)(nil)
 var _ network.MuxedStream = (*Stream)(nil)
 
+// MuxerID is the ID of the wireguard multiplexer.
+const MuxerID = "/webmesh/wireguard/1.0.0"
+
 // Multiplexer is a ready to use multiplexer.
 var Multiplexer = &WireGuardMultiplexer{}
 

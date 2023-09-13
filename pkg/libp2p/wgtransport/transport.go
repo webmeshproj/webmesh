@@ -34,7 +34,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/core/transport"
-	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 
@@ -66,36 +65,33 @@ type Constructor func(tu transport.Upgrader, host host.Host, key crypto.PrivKey,
 
 // WebmeshTransport is the webmesh wireguard transport.
 type WebmeshTransport struct {
-	host  host.Host
-	psk   pnet.PSK
-	key   wmcrypto.PrivateKey
-	p2ptu transport.Upgrader
-	rcmgr network.ResourceManager
-	gater connmgr.ConnectionGater
-	iface wireguard.Interface
-	eps   endpoints.PrefixList
-	log   *slog.Logger
-}
-
-// WebmeshConn wraps the basic net.Conn with a reference back to the underlying transport.
-type WebmeshConn struct {
-	mnet.Conn
-	lkey  wmcrypto.PrivateKey
-	lpeer peer.ID
-	iface wireguard.Interface
-	eps   []string
-	log   *slog.Logger
+	peerID peer.ID
+	host   host.Host
+	psk    pnet.PSK
+	key    wmcrypto.PrivateKey
+	p2ptu  transport.Upgrader
+	rcmgr  network.ResourceManager
+	gater  connmgr.ConnectionGater
+	iface  wireguard.Interface
+	eps    endpoints.PrefixList
+	log    *slog.Logger
 }
 
 // NewOption returns a chained option for all the components of a webmesh transport.
 func NewOption(log *slog.Logger) libp2p.Option {
 	return libp2p.ChainOptions(
-		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(NewWithLogger(log)),
-		libp2p.ProtocolVersion(wmproto.SecurityID),
 		libp2p.Security(wmproto.SecurityID, NewSecurity),
-		libp2p.Muxer(wmproto.SecurityID, Multiplexer),
-		libp2p.AddrsFactory(AddrsFactory),
+		libp2p.Muxer(MuxerID, Multiplexer),
+		libp2p.AddrsFactory(func(addrs []ma.Multiaddr) []ma.Multiaddr {
+			var out []ma.Multiaddr
+			for _, addr := range addrs {
+				out = append(out, wmproto.Decapsulate(addr))
+			}
+			return out
+		}),
+		libp2p.DefaultSecurity,
+		libp2p.DefaultMuxers,
 	)
 }
 
@@ -114,19 +110,6 @@ func New(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK
 	return NewWithLogger(logutil.NewLogger(""))(tu, host, key, psk, gater, rcmgr)
 }
 
-// AddrsFactory automatically broadcasts webmesh availability on all local addresses.
-func AddrsFactory(addrs []ma.Multiaddr) []ma.Multiaddr {
-	var out []ma.Multiaddr
-	for _, addr := range addrs {
-		if wmproto.IsWebmeshCapableAddr(addr) {
-			out = append(out, wmproto.Encapsulate(addr))
-		} else {
-			out = append(out, addr)
-		}
-	}
-	return out
-}
-
 // newWebmeshTransport is the constructor for the webmesh transport.
 func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error) {
 	var rt WebmeshTransport
@@ -140,6 +123,10 @@ func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host
 	rt.key, err = p2putil.ToWebmeshPrivateKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert private key to webmesh identity: %w", err)
+	}
+	rt.peerID, err = peer.IDFromPrivateKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract peer ID from private key: %w", err)
 	}
 	ctx := context.WithLogger(context.Background(), rt.log)
 
@@ -211,19 +198,19 @@ func (t *WebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p peer
 	var dialer mnet.Dialer
 	log := t.log.With("peer", p.String(), "raddr", rmaddr.String())
 	ctx = context.WithLogger(ctx, log)
-	connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, false, rmaddr)
-	if err != nil {
-		log.Error("Failed to open connection", "error", err.Error())
-		return nil, fmt.Errorf("failed to open connection: %w", err)
-	}
 	direction := network.DirOutbound
 	if ok, isClient, _ := network.GetSimultaneousConnect(ctx); ok && !isClient {
 		direction = network.DirInbound
 	}
-	log.Debug("Dialing remote webmesh address")
+	connScope, err := t.rcmgr.OpenConnection(direction, false, rmaddr)
+	if err != nil {
+		log.Error("Failed to open connection", "error", err.Error())
+		return nil, fmt.Errorf("failed to open connection: %w", err)
+	}
+	defer connScope.Done()
+	log.Debug("Dialing remote address")
 	conn, err := dialer.DialContext(ctx, wmproto.Decapsulate(rmaddr))
 	if err != nil {
-		defer connScope.Done()
 		log.Debug("Failed to dial remote multiaddr", "error", err.Error())
 		return nil, fmt.Errorf("failed to dial: %w", err)
 	}
@@ -237,14 +224,14 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen: %w", err)
 	}
-	return t.p2ptu.UpgradeListener(t, &WebmeshListener{Listener: lis, rt: t}), nil
+	return t.p2ptu.UpgradeListener(t, t.WrapListener(lis)), nil
 }
 
 // Protocol returns the set of protocols handled by this transport.
 func (t *WebmeshTransport) Protocols() []int {
 	return []int{
 		wmproto.P_WEBMESH,
-		// ma.P_TCP,
+		ma.P_TCP,
 		// ma.P_UDP,
 	}
 }
@@ -279,7 +266,7 @@ func (t *WebmeshTransport) WrapConn(c mnet.Conn) *WebmeshConn {
 	return &WebmeshConn{
 		Conn:  c,
 		lkey:  t.key,
-		lpeer: t.host.ID(),
+		lpeer: t.peerID,
 		iface: t.iface,
 		eps:   t.WireGuardEndpoints(),
 		log: t.log.With(
@@ -288,4 +275,12 @@ func (t *WebmeshTransport) WrapConn(c mnet.Conn) *WebmeshConn {
 			"remote-multiaddr", c.RemoteMultiaddr().String(),
 		),
 	}
+}
+
+func (t *WebmeshTransport) WrapListener(l mnet.Listener) *WebmeshListener {
+	ln := &WebmeshListener{
+		Listener: l,
+		rt:       t,
+	}
+	return ln
 }

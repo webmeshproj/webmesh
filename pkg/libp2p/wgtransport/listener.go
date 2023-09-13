@@ -18,12 +18,36 @@ package wgtransport
 
 import (
 	"errors"
-	"fmt"
+	"log/slog"
 	"net"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/transport"
+	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
+
+	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
+	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 )
+
+// WebmeshConn wraps the basic net.Conn with a reference back to the underlying transport.
+type WebmeshConn struct {
+	mnet.Conn
+	lkey  wmcrypto.PrivateKey
+	lpeer peer.ID
+	iface wireguard.Interface
+	eps   []string
+	log   *slog.Logger
+}
+
+func (w *WebmeshConn) LocalMultiaddr() ma.Multiaddr {
+	return wmproto.Encapsulate(w.Conn.LocalMultiaddr())
+}
+
+func (w *WebmeshConn) RemoteMultiaddr() ma.Multiaddr {
+	return wmproto.Encapsulate(w.Conn.RemoteMultiaddr())
+}
 
 // WebmeshListener wraps a basic listener to be upgraded and injects the transport
 // into incoming connections.
@@ -39,7 +63,13 @@ func (ln *WebmeshListener) Accept() (mnet.Conn, error) {
 		if errors.Is(err, net.ErrClosed) {
 			return nil, transport.ErrListenerClosed
 		}
-		return nil, fmt.Errorf("failed to accept connection: %w", err)
+		ln.rt.log.Error("Failed to accept connection", "error", err.Error())
+		return nil, err
 	}
-	return ln.rt.WrapConn(c), nil
+	wc := ln.rt.WrapConn(c)
+	return wc, nil
+}
+
+func (ln *WebmeshListener) Multiaddr() ma.Multiaddr {
+	return wmproto.Encapsulate(ln.Listener.Multiaddr())
 }
