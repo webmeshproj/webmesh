@@ -53,7 +53,7 @@ func (w *WebmeshConn) RemoteMultiaddr() ma.Multiaddr {
 // into incoming connections.
 type WebmeshListener struct {
 	mnet.Listener
-	rt *WebmeshTransport
+	rt *Transport
 }
 
 // Accept waits for and returns the next connection to the listener.

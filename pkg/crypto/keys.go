@@ -27,8 +27,8 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	cryptopb "github.com/libp2p/go-libp2p/core/crypto/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	oasised25519 "github.com/oasisprotocol/ed25519"
-	"github.com/oasisprotocol/ed25519/extra/x25519"
+	oed25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
+	"github.com/oasisprotocol/curve25519-voi/primitives/x25519"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/protobuf/proto"
 
@@ -245,7 +245,7 @@ func (w *WebmeshPrivateKey) PublicKey() PublicKey {
 
 // WireGuardKey computes the private key's wireguard key.
 func (w *WebmeshPrivateKey) WireGuardKey() wgtypes.Key {
-	key := oasised25519.PrivateKey(w.raw[:])
+	key := oed25519.PrivateKey(w.raw[:])
 	wgkey := x25519.EdPrivateKeyToX25519(key)
 	return wgtypes.Key(wgkey)
 }
@@ -325,7 +325,7 @@ func (w *WebmeshPublicKey) Verify(data []byte, sig []byte) (success bool, err er
 
 // WireGuardKey computes the private key's wireguard key.
 func (w *WebmeshPublicKey) WireGuardKey() wgtypes.Key {
-	key := oasised25519.PublicKey(w.raw[:])
+	key := oed25519.PublicKey(w.raw[:])
 	wgkey, ok := x25519.EdPublicKeyToX25519(key)
 	if !ok {
 		panic("WireGuardKey called on invalid ed25519 public key")

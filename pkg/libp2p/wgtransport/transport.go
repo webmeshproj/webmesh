@@ -48,10 +48,10 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
-// Transport is the webmesh wireguard transport. This transport does not run a
+// WebmeshTransport is the webmesh wireguard transport. This transport does not run a
 // full mesh node, but rather utilizes libp2p streams to perform an authenticated
 // keypair negotiation to compute IPv6 addresses for peers.
-type Transport interface {
+type WebmeshTransport interface {
 	// Closer for the underlying transport that shuts down the webmesh node.
 	io.Closer
 	// Transport is the underlying libp2p Transport.
@@ -61,10 +61,10 @@ type Transport interface {
 }
 
 // Constructor is the constructor for the webmesh transport.
-type Constructor func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error)
+type Constructor func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WebmeshTransport, error)
 
-// WebmeshTransport is the webmesh wireguard transport.
-type WebmeshTransport struct {
+// Transport is the webmesh wireguard transport.
+type Transport struct {
 	peerID peer.ID
 	host   host.Host
 	psk    pnet.PSK
@@ -100,19 +100,19 @@ func NewWithLogger(log *slog.Logger) Constructor {
 	if log == nil {
 		log = logutil.NewLogger("")
 	}
-	return func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error) {
+	return func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WebmeshTransport, error) {
 		return newWebmeshTransport(log, tu, host, key, psk, gater, rcmgr)
 	}
 }
 
 // New is the standard constructor for a webmesh transport.
-func New(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error) {
+func New(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WebmeshTransport, error) {
 	return NewWithLogger(logutil.NewLogger(""))(tu, host, key, psk, gater, rcmgr)
 }
 
 // newWebmeshTransport is the constructor for the webmesh transport.
-func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (Transport, error) {
-	var rt WebmeshTransport
+func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WebmeshTransport, error) {
+	var rt Transport
 	var err error
 	rt.log = log
 	rt.host = host
@@ -189,12 +189,12 @@ func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host
 // Returning true does not guarantee that dialing this multiaddr will
 // succeed. This function should *only* be used to preemptively filter
 // out addresses that we can't dial.
-func (t *WebmeshTransport) CanDial(addr ma.Multiaddr) bool {
+func (t *Transport) CanDial(addr ma.Multiaddr) bool {
 	return wmproto.IsWebmeshCapableAddr(addr)
 }
 
 // Dial dials the given multiaddr.
-func (t *WebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
+func (t *Transport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
 	var dialer mnet.Dialer
 	log := t.log.With("peer", p.String(), "raddr", rmaddr.String())
 	ctx = context.WithLogger(ctx, log)
@@ -218,7 +218,7 @@ func (t *WebmeshTransport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p peer
 }
 
 // Listen listens on the passed multiaddr.
-func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
+func (t *Transport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
 	t.log.Debug("Setting up webmesh listener", "laddr", laddr.String())
 	lis, err := mnet.Listen(wmproto.Decapsulate(laddr))
 	if err != nil {
@@ -228,7 +228,7 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 }
 
 // Protocol returns the set of protocols handled by this transport.
-func (t *WebmeshTransport) Protocols() []int {
+func (t *Transport) Protocols() []int {
 	return []int{
 		wmproto.P_WEBMESH,
 		ma.P_TCP,
@@ -237,12 +237,12 @@ func (t *WebmeshTransport) Protocols() []int {
 }
 
 // Proxy returns true if this is a proxy transport.
-func (t *WebmeshTransport) Proxy() bool {
+func (t *Transport) Proxy() bool {
 	return false
 }
 
 // Close shuts down the wireguard interface.
-func (t *WebmeshTransport) Close() error {
+func (t *Transport) Close() error {
 	ctx := context.WithLogger(context.Background(), t.log)
 	if t.iface != nil {
 		t.log.Debug("Shutting down wireguard interface")
@@ -252,7 +252,7 @@ func (t *WebmeshTransport) Close() error {
 }
 
 // WireGuardEndpoints returns the exposed endpoints for our wireguard interface.
-func (t *WebmeshTransport) WireGuardEndpoints() []string {
+func (t *Transport) WireGuardEndpoints() []string {
 	var out []string
 	wgport, _ := t.iface.ListenPort()
 	addrports := t.eps.AddrPorts(uint16(wgport))
@@ -262,7 +262,7 @@ func (t *WebmeshTransport) WireGuardEndpoints() []string {
 	return out
 }
 
-func (t *WebmeshTransport) WrapConn(c mnet.Conn) *WebmeshConn {
+func (t *Transport) WrapConn(c mnet.Conn) *WebmeshConn {
 	return &WebmeshConn{
 		Conn:  c,
 		lkey:  t.key,
@@ -277,7 +277,7 @@ func (t *WebmeshTransport) WrapConn(c mnet.Conn) *WebmeshConn {
 	}
 }
 
-func (t *WebmeshTransport) WrapListener(l mnet.Listener) *WebmeshListener {
+func (t *Transport) WrapListener(l mnet.Listener) *WebmeshListener {
 	ln := &WebmeshListener{
 		Listener: l,
 		rt:       t,
