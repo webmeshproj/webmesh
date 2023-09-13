@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/netip"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/net/system/link"
@@ -74,7 +75,7 @@ func DetectPublicAddresses(ctx context.Context) ([]netip.Addr, error) {
 	for _, addr := range addrs {
 		if addr.Is4() {
 			ipv4 = addr
-		} else if addr.Is6() {
+		} else if addr.Is6() || addr.Is4In6() {
 			ipv6 = addr
 		}
 	}
@@ -123,6 +124,10 @@ func detectFromInterfaces(opts *DetectOpts) (PrefixList, error) {
 			continue
 		}
 		if iface.Flags&net.FlagPointToPoint != 0 {
+			continue
+		}
+		// Skip virtual interfaces
+		if strings.HasPrefix(iface.Name, "veth") || strings.HasPrefix(iface.Name, "docker") || strings.HasPrefix(iface.Name, "virbr") {
 			continue
 		}
 		if slices.Contains(opts.SkipInterfaces, iface.Name) {

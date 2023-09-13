@@ -17,7 +17,12 @@ limitations under the License.
 package endpoints
 
 import (
+	"fmt"
 	"net/netip"
+
+	ma "github.com/multiformats/go-multiaddr"
+
+	"github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 )
 
 // DetectOpts contains options for endpoint detection.
@@ -63,6 +68,20 @@ func (a PrefixList) AddrPorts(port uint16) []netip.AddrPort {
 	var out []netip.AddrPort
 	for _, addr := range a {
 		out = append(out, netip.AddrPortFrom(addr.Addr(), port))
+	}
+	return out
+}
+
+func (a PrefixList) WebmeshMultiaddrs(proto string, port uint16) []ma.Multiaddr {
+	var out []ma.Multiaddr
+	for _, addr := range a {
+		var maddr ma.Multiaddr
+		if addr.Addr().Is6() {
+			maddr = ma.StringCast(fmt.Sprintf("/ip6/%s/%s/%d/%s", addr.Addr().String(), proto, port, protocol.ProtocolID))
+		} else {
+			maddr = ma.StringCast(fmt.Sprintf("/ip4/%s/%s/%d/%s", addr.Addr().String(), proto, port, protocol.ProtocolID))
+		}
+		out = append(out, maddr)
 	}
 	return out
 }
