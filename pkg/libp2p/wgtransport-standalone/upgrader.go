@@ -80,8 +80,8 @@ func (u *Upgrader) upgradeConn(ctx context.Context, maconn mnet.Conn, dir networ
 			sc:     sc.(*SecureConn),
 			rt:     u.rt,
 			scope:  scope,
-			lmaddr: wmproto.Encapsulate(maconn.LocalMultiaddr()),
-			rmaddr: wmproto.Encapsulate(maconn.RemoteMultiaddr()),
+			lmaddr: wmproto.Encapsulate(maconn.LocalMultiaddr(), sc.LocalPeer()),
+			rmaddr: wmproto.Encapsulate(maconn.RemoteMultiaddr(), sc.RemotePeer()),
 		}, nil
 	case network.DirOutbound:
 		sc, err := u.rt.sec.SecureOutbound(ctx, maconn, p)
@@ -92,8 +92,8 @@ func (u *Upgrader) upgradeConn(ctx context.Context, maconn mnet.Conn, dir networ
 			sc:     sc.(*SecureConn),
 			rt:     u.rt,
 			scope:  scope,
-			lmaddr: wmproto.Encapsulate(maconn.LocalMultiaddr()),
-			rmaddr: wmproto.Encapsulate(maconn.RemoteMultiaddr()),
+			lmaddr: wmproto.Encapsulate(maconn.LocalMultiaddr(), sc.LocalPeer()),
+			rmaddr: wmproto.Encapsulate(maconn.RemoteMultiaddr(), sc.RemotePeer()),
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid upgrade direction: %v", dir)

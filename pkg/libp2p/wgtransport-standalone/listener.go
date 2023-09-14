@@ -74,7 +74,7 @@ func (ln *WebmeshListener) Addr() net.Addr {
 
 // Multiaddr encapsulates the listener with the webmesh protocol.
 func (ln *WebmeshListener) Multiaddr() ma.Multiaddr {
-	return wmproto.Encapsulate(ln.ln.Multiaddr())
+	return wmproto.Encapsulate(ln.ln.Multiaddr(), ln.tu.rt.peerID)
 }
 
 // Close closes the listener.

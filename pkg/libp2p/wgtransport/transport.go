@@ -77,8 +77,8 @@ type Transport struct {
 	log    *slog.Logger
 }
 
-// NewOption returns a chained option for all the components of a webmesh transport.
-func NewOption(log *slog.Logger) libp2p.Option {
+// NewOptions returns a chained option for all the components of a webmesh transport.
+func NewOptions(log *slog.Logger) libp2p.Option {
 	return libp2p.ChainOptions(
 		libp2p.Transport(NewWithLogger(log)),
 		libp2p.Security(wmproto.SecurityID, NewSecurity),
@@ -90,6 +90,7 @@ func NewOption(log *slog.Logger) libp2p.Option {
 			}
 			return out
 		}),
+		libp2p.DefaultListenAddrs,
 		libp2p.DefaultSecurity,
 		libp2p.DefaultMuxers,
 	)
@@ -208,10 +209,8 @@ func (t *Transport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p peer.ID) (t
 		return nil, fmt.Errorf("failed to open connection: %w", err)
 	}
 	defer connScope.Done()
-	log.Debug("Dialing remote address")
 	conn, err := dialer.DialContext(ctx, wmproto.Decapsulate(rmaddr))
 	if err != nil {
-		log.Debug("Failed to dial remote multiaddr", "error", err.Error())
 		return nil, fmt.Errorf("failed to dial: %w", err)
 	}
 	return t.p2ptu.Upgrade(ctx, t, t.WrapConn(conn), direction, p, connScope)
@@ -232,7 +231,6 @@ func (t *Transport) Protocols() []int {
 	return []int{
 		wmproto.P_WEBMESH,
 		ma.P_TCP,
-		// ma.P_UDP,
 	}
 }
 
@@ -281,6 +279,9 @@ func (t *Transport) WrapListener(l mnet.Listener) *WebmeshListener {
 	ln := &WebmeshListener{
 		Listener: l,
 		rt:       t,
+		conns:    make(chan *WebmeshConn, 10),
+		donec:    make(chan struct{}),
 	}
+	go ln.handleIncoming()
 	return ln
 }

@@ -71,6 +71,7 @@ type Transport struct {
 	psk    pnet.PSK
 	key    wmcrypto.PrivateKey
 	tu     transport.Upgrader
+	p2ptu  transport.Upgrader
 	sec    *SecureTransport
 	rcmgr  network.ResourceManager
 	gater  connmgr.ConnectionGater
@@ -79,11 +80,25 @@ type Transport struct {
 	log    *slog.Logger
 }
 
-// NewOption returns a chained option for all the components of a webmesh transport.
-func NewOption(log *slog.Logger) libp2p.Option {
+// NewOptions returns a chained option for all the components of a webmesh transport.
+func NewOptions(log *slog.Logger) libp2p.Option {
+	eps, _ := endpoints.Detect(context.Background(), endpoints.DetectOpts{
+		DetectPrivate:        true,
+		DetectIPv6:           true,
+		AllowRemoteDetection: false,
+	})
 	return libp2p.ChainOptions(
-		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(NewWithLogger(log)),
+		// libp2p.Transport(libp2pquic.NewTransport),
+		libp2p.ListenAddrs(
+			append(
+				[]ma.Multiaddr{
+					ma.StringCast("/ip6/::/tcp/0/webmesh-v1/CG="),
+					ma.StringCast("/ip4/127.0.0.1/tcp/0/webmesh-v1/CG="),
+				},
+				eps.WebmeshMultiaddrs("tcp", 0, "CG==")...,
+			)...,
+		),
 		libp2p.DefaultSecurity,
 		libp2p.DefaultMuxers,
 	)
@@ -110,10 +125,22 @@ func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host
 	var err error
 	rt.log = log
 	rt.host = host
+	if nw, ok := host.Network().(transport.TransportNetwork); ok {
+		log.Info("Adding TCP transport to network")
+		tcp, err := tcp.NewTCPTransport(tu, rcmgr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TCP transport: %w", err)
+		}
+		err = nw.AddTransport(tcp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add TCP transport to network: %w", err)
+		}
+	}
 	rt.psk = psk
 	rt.rcmgr = rcmgr
 	rt.gater = gater
 	rt.tu = newUpgrader(&rt)
+	rt.p2ptu = tu
 	rt.key, err = p2putil.ToWebmeshPrivateKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert private key to webmesh identity: %w", err)
@@ -218,6 +245,7 @@ func (t *Transport) Dial(ctx context.Context, rmaddr ma.Multiaddr, p peer.ID) (t
 		log.Debug("Failed to dial remote multiaddr", "error", err.Error())
 		return nil, fmt.Errorf("failed to dial: %w", err)
 	}
+	log.Debug("Upgrading connection with webmesh upgrader")
 	return t.tu.Upgrade(ctx, t, conn, direction, p, connScope)
 }
 

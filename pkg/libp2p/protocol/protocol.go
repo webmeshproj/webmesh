@@ -59,19 +59,21 @@ var Protocol = multiaddr.Protocol{
 	Name:       ProtocolID,
 	Code:       P_WEBMESH,
 	VCode:      multiaddr.CodeToVarint(P_WEBMESH),
-	Size:       0,
+	Size:       -1,
 	Path:       false,
 	Transcoder: multiaddr.NewTranscoderFromFunctions(protocolStrToBytes, protocolBytesToStr, validateBytes),
 }
 
 // Decapsulate strips the webmesh component from the given multiaddr.
 func Decapsulate(addr multiaddr.Multiaddr) multiaddr.Multiaddr {
-	return multiaddr.StringCast(strings.TrimSuffix(addr.String(), ProtocolPath))
+	spl := strings.Split(addr.String(), ProtocolID)
+	spl[0] = strings.TrimSuffix(spl[0], "/")
+	return multiaddr.StringCast(spl[0])
 }
 
 // Encapsulate appends the webmesh protocol to the given address.
-func Encapsulate(addr multiaddr.Multiaddr) multiaddr.Multiaddr {
-	return multiaddr.Join(addr, multiaddr.StringCast(ProtocolPath))
+func Encapsulate(addr multiaddr.Multiaddr, pid peer.ID) multiaddr.Multiaddr {
+	return multiaddr.Join(addr, multiaddr.StringCast(ProtocolPath+"/"+pid.String()))
 }
 
 // IsWebmeshCapableAddr returns true if the given multiaddr is a webmesh-capable multiaddr.

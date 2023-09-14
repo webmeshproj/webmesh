@@ -17,8 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
-	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
-	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	tcp "github.com/libp2p/go-libp2p/p2p/transport/tcp"
 
@@ -84,24 +82,23 @@ func run() error {
 		log.Println("Running webmesh test")
 		opts = libp2p.ChainOptions(
 			libp2p.RandomIdentity,
-			wgtransport.NewOption(logutil.NewLogger(logLevel)),
-			libp2p.DefaultListenAddrs,
+			wgtransport.NewOptions(logutil.NewLogger(logLevel)),
 		)
 	case "quic":
 		log.Println("Running QUIC test")
 		opts = libp2p.ChainOptions(
 			libp2p.RandomIdentity,
 			libp2p.Transport(quic.NewTransport),
-			libp2p.Security(tls.ID, tls.New),
 			libp2p.DefaultListenAddrs,
+			libp2p.DefaultSecurity,
 		)
 	case "tcp":
 		log.Println("Running TCP/Noise test")
 		opts = libp2p.ChainOptions(
 			libp2p.RandomIdentity,
 			libp2p.Transport(tcp.NewTCPTransport),
-			libp2p.Security(noise.ID, noise.New),
 			libp2p.DefaultListenAddrs,
+			libp2p.DefaultSecurity,
 		)
 	}
 
@@ -122,6 +119,7 @@ func run() error {
 	defer cancel()
 	host.SetStreamHandler("/speedtest", func(stream network.Stream) {
 		log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
+		log.Printf("Connection state: %+v\n", stream.Conn().ConnState())
 		go func() {
 			defer cancel()
 			runSpeedTest(ctx, stream, payloadSize)
@@ -181,6 +179,7 @@ FindPeers:
 					continue
 				}
 				log.Println("Opened connection to", conn.Conn().RemoteMultiaddr())
+				log.Printf("Connection state: %+v\n", conn.Conn().ConnState())
 				go runSpeedTest(ctx, conn, payloadSize)
 				select {
 				case <-ctx.Done():

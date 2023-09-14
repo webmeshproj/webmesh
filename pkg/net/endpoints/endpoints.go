@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/netip"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
@@ -72,14 +73,21 @@ func (a PrefixList) AddrPorts(port uint16) []netip.AddrPort {
 	return out
 }
 
-func (a PrefixList) WebmeshMultiaddrs(proto string, port uint16) []ma.Multiaddr {
+func (a PrefixList) WebmeshMultiaddrs(proto string, port uint16, peerID peer.ID) []ma.Multiaddr {
+	if len(a) == 0 {
+		return nil
+	}
 	var out []ma.Multiaddr
 	for _, addr := range a {
 		var maddr ma.Multiaddr
 		if addr.Addr().Is6() {
-			maddr = ma.StringCast(fmt.Sprintf("/ip6/%s/%s/%d/%s", addr.Addr().String(), proto, port, protocol.ProtocolID))
+			maddr = ma.StringCast(fmt.Sprintf("/ip6/%s/%s/%d/%s/%s",
+				addr.Addr().String(), proto, port, protocol.ProtocolID, peerID,
+			))
 		} else {
-			maddr = ma.StringCast(fmt.Sprintf("/ip4/%s/%s/%d/%s", addr.Addr().String(), proto, port, protocol.ProtocolID))
+			maddr = ma.StringCast(fmt.Sprintf("/ip4/%s/%s/%d/%s/%s",
+				addr.Addr().String(), proto, port, protocol.ProtocolID, peerID,
+			))
 		}
 		out = append(out, maddr)
 	}
