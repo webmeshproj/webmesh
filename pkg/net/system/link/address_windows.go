@@ -18,6 +18,7 @@ package link
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -46,4 +47,9 @@ func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) er
 		return err
 	}
 	return nil
+}
+
+// RemoveInterfaceAddress removes the address of the interface with the given name.
+func RemoveInterfaceAddress(_ context.Context, name string, addr netip.Prefix) error {
+	return errors.New("not implemented")
 }

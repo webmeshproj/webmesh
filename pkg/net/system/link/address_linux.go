@@ -42,3 +42,20 @@ func SetInterfaceAddress(_ context.Context, name string, addr netip.Prefix) erro
 	}
 	return netlink.AddrAdd(link, nladdr)
 }
+
+// RemoveInterfaceAddress removes the address of the interface with the given name.
+func RemoveInterfaceAddress(_ context.Context, name string, addr netip.Prefix) error {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		var notExistsErr *netlink.LinkNotFoundError
+		if errors.As(err, &notExistsErr) {
+			return ErrLinkNotExists
+		}
+		return err
+	}
+	nladdr, err := netlink.ParseAddr(addr.String())
+	if err != nil {
+		return fmt.Errorf("netlink parse addr: %w", err)
+	}
+	return netlink.AddrDel(link, nladdr)
+}

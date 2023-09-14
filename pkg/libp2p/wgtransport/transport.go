@@ -24,6 +24,8 @@ import (
 	"math/rand"
 	"net/netip"
 	"runtime"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -43,6 +45,7 @@ import (
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
+	"github.com/webmeshproj/webmesh/pkg/net/system/link"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
@@ -65,16 +68,18 @@ type Constructor func(tu transport.Upgrader, host host.Host, key crypto.PrivKey,
 
 // Transport is the webmesh wireguard transport.
 type Transport struct {
-	peerID peer.ID
-	host   host.Host
-	psk    pnet.PSK
-	key    wmcrypto.PrivateKey
-	p2ptu  transport.Upgrader
-	rcmgr  network.ResourceManager
-	gater  connmgr.ConnectionGater
-	iface  wireguard.Interface
-	eps    endpoints.PrefixList
-	log    *slog.Logger
+	peerID  peer.ID
+	host    host.Host
+	psk     pnet.PSK
+	key     wmcrypto.PrivateKey
+	p2ptu   transport.Upgrader
+	rcmgr   network.ResourceManager
+	gater   connmgr.ConnectionGater
+	iface   wireguard.Interface
+	eps     endpoints.PrefixList
+	curaddr netip.Addr
+	log     *slog.Logger
+	addrmu  sync.Mutex
 }
 
 // NewOptions returns a chained option for all the components of a webmesh transport.
@@ -151,7 +156,8 @@ func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host
 		// We'll generate our own unique local addresses.
 		ula, addr = netutil.GenerateULAWithKey(rt.key.PublicKey())
 	}
-	rt.log.Debug("Calculated our local IPv6 address space", "ula", ula.String(), "addr", addr.String())
+	rt.curaddr = addr
+	rt.log.Debug("Calculated our local IPv6 address space", "ula", ula.String())
 	// We go ahead and create an interface for ourself. If we can't do this we'll fail to
 	// do pretty much everything.
 	wgopts := wireguard.Options{
@@ -175,6 +181,10 @@ func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host
 	iface, err := wireguard.New(ctx, &wgopts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create wireguard interface: %w", err)
+	}
+	err = iface.AddRoute(ctx, ula)
+	if err != nil && !system.IsRouteExists(err) {
+		return nil, fmt.Errorf("failed to add route: %w", err)
 	}
 	err = iface.Configure(ctx, rt.key)
 	if err != nil {
@@ -231,6 +241,7 @@ func (t *Transport) Protocols() []int {
 	return []int{
 		wmproto.P_WEBMESH,
 		ma.P_TCP,
+		ma.P_UDP,
 	}
 }
 
@@ -262,12 +273,13 @@ func (t *Transport) WireGuardEndpoints() []string {
 
 func (t *Transport) WrapConn(c mnet.Conn) *WebmeshConn {
 	return &WebmeshConn{
-		Conn:  c,
-		lkey:  t.key,
-		lpeer: t.peerID,
-		raddr: wmproto.Encapsulate(c.RemoteMultiaddr(), "CG="),
-		iface: t.iface,
-		eps:   t.WireGuardEndpoints(),
+		Conn:   c,
+		rt:     t,
+		lkey:   t.key,
+		lpeer:  t.peerID,
+		rmaddr: wmproto.Encapsulate(c.RemoteMultiaddr(), "CG="),
+		iface:  t.iface,
+		eps:    t.WireGuardEndpoints(),
 		log: t.log.With(
 			"local-peer", t.host.ID().String(),
 			"local-multiaddr", c.LocalMultiaddr().String(),
@@ -285,4 +297,24 @@ func (t *Transport) WrapListener(l mnet.Listener) *WebmeshListener {
 	}
 	go ln.handleIncoming()
 	return ln
+}
+
+// NextLocalAddr assigns and returns the next local address for the connection.
+func (t *Transport) NextLocalAddr() (netip.Addr, error) {
+	t.addrmu.Lock()
+	defer t.addrmu.Unlock()
+	t.curaddr = t.curaddr.Next()
+	prefix := netip.PrefixFrom(t.curaddr, 128)
+	t.log.Debug("Assigning new address to connection", "address", prefix)
+	err := link.SetInterfaceAddress(context.Background(), t.iface.Name(), prefix)
+	if err != nil && !strings.Contains(err.Error(), "file exists") {
+		return netip.Addr{}, fmt.Errorf("failed to set interface address: %w", err)
+	}
+	return t.curaddr, nil
+}
+
+func (t *Transport) FreeLocalAddr(addr netip.Addr) error {
+	t.addrmu.Lock()
+	defer t.addrmu.Unlock()
+	return link.RemoveInterfaceAddress(context.Background(), t.iface.Name(), netip.PrefixFrom(addr, 128))
 }

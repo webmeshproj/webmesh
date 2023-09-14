@@ -19,10 +19,15 @@ package wgtransport
 import (
 	"net"
 	"time"
+
+	"github.com/libp2p/go-libp2p/core/network"
 )
 
-// Stream is a multiplexed stream.
-type Stream struct {
+// Ensure we implement the interface
+var _ network.MuxedStream = (*TCPStream)(nil)
+
+// TCPStream is a multiplexed stream.
+type TCPStream struct {
 	*net.TCPConn
 }
 
@@ -36,7 +41,7 @@ type Stream struct {
 //
 // CloseRead does not free the stream, users must still call Close or
 // Reset.
-func (s *Stream) CloseRead() error {
+func (s *TCPStream) CloseRead() error {
 	// A bit of a hack but we just make all future reads fail.
 	// The caller could technically remove this deadline but that's
 	// not our problem.
@@ -48,7 +53,7 @@ func (s *Stream) CloseRead() error {
 //
 // CloseWrite does not free the stream, users must still call Close or
 // Reset.
-func (s *Stream) CloseWrite() error {
+func (s *TCPStream) CloseWrite() error {
 	// A bit of a hack but we just make all future writes fail.
 	// The caller could technically remove this deadline but that's
 	// not our problem.
@@ -57,6 +62,6 @@ func (s *Stream) CloseWrite() error {
 
 // Reset closes both ends of the stream. Use this to tell the remote
 // side to hang up and go away.
-func (s *Stream) Reset() error {
+func (s *TCPStream) Reset() error {
 	return s.Close()
 }

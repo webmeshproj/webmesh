@@ -35,12 +35,13 @@ import (
 // WebmeshConn wraps the basic net.Conn with a reference back to the underlying transport.
 type WebmeshConn struct {
 	mnet.Conn
-	lkey  wmcrypto.PrivateKey
-	lpeer peer.ID
-	iface wireguard.Interface
-	raddr ma.Multiaddr
-	eps   []string
-	log   *slog.Logger
+	rt     *Transport
+	lkey   wmcrypto.PrivateKey
+	lpeer  peer.ID
+	iface  wireguard.Interface
+	rmaddr ma.Multiaddr
+	eps    []string
+	log    *slog.Logger
 }
 
 func (w *WebmeshConn) LocalMultiaddr() ma.Multiaddr {
@@ -48,7 +49,7 @@ func (w *WebmeshConn) LocalMultiaddr() ma.Multiaddr {
 }
 
 func (w *WebmeshConn) RemoteMultiaddr() ma.Multiaddr {
-	return w.raddr
+	return w.rmaddr
 }
 
 // Context returns a context that contains the logger tied

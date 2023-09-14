@@ -67,7 +67,7 @@ func (c *SecureConn) ConnState() network.ConnectionState {
 	return network.ConnectionState{
 		StreamMultiplexer:         MuxerID,
 		Security:                  wmproto.SecurityID,
-		Transport:                 "tcp",
+		Transport:                 "udp",
 		UsedEarlyMuxerNegotiation: true,
 	}
 }
@@ -80,25 +80,6 @@ func (c *SecureConn) NewStreamListener() (*net.TCPListener, error) {
 		Port: 0,
 	}
 	return net.ListenTCP("tcp6", addr)
-}
-
-// DialStreamListener dials the stream listener on the other side of this connection.
-func (c *SecureConn) DialStream(ctx context.Context, addr netip.AddrPort) (*net.TCPConn, error) {
-	raddr := &net.TCPAddr{
-		IP:   addr.Addr().AsSlice(),
-		Port: int(addr.Port()),
-	}
-	var dialer net.Dialer
-	dialer.LocalAddr = &net.TCPAddr{
-		IP:   c.iface.AddressV6().Addr().AsSlice(),
-		Port: 0,
-	}
-	context.LoggerFrom(ctx).Debug("Dialing signaling stream", "address", raddr.String())
-	rc, err := dialer.DialContext(ctx, "tcp6", raddr.String())
-	if err != nil {
-		return nil, err
-	}
-	return rc.(*net.TCPConn), nil
 }
 
 // DialSignaler dials the signaler on the other side of this connection.
@@ -149,8 +130,8 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 		return remoteEndpoint, fmt.Errorf("failed to start signaling server: %w", err)
 	}
 	c.lsignals = l
-	errs := make(chan error, 1)
 	log.Debug("Signaling server started, handling negotiation", "address", l.Addr().String())
+	errs := make(chan error, 1)
 	go func() {
 		defer close(errs)
 		log.Debug("Waiting for negotiation payload")
@@ -196,14 +177,14 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 		log.Debug("Negotiation signature is valid")
 		c.rsignalp = msg.SignalPort
 		c.rpeer = msg.PeerID
-		c.WebmeshConn.raddr = wmproto.Encapsulate(c.WebmeshConn.Conn.RemoteMultiaddr(), c.rpeer)
+		c.WebmeshConn.rmaddr = wmproto.Encapsulate(c.WebmeshConn.Conn.RemoteMultiaddr(), c.rpeer)
 		if len(psk) > 0 {
 			// We seed the ULA with the PSK
 			c.rula = netutil.GenerateULAWithSeed(psk)
-			c.raddr = netutil.AssignToPrefix(c.rula, key).Addr()
+			c.raddr = netutil.AssignToPrefix(c.rula, c.rkey).Addr()
 		} else {
 			// The peer will have their own ULA that we'll trust.
-			c.rula, c.raddr = netutil.GenerateULAWithKey(key)
+			c.rula, c.raddr = netutil.GenerateULAWithKey(c.rkey)
 		}
 		if len(msg.Endpoints) == 0 {
 			// We're done here
