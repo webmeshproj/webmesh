@@ -38,6 +38,7 @@ type WebmeshConn struct {
 	lkey  wmcrypto.PrivateKey
 	lpeer peer.ID
 	iface wireguard.Interface
+	raddr ma.Multiaddr
 	eps   []string
 	log   *slog.Logger
 }
@@ -47,7 +48,7 @@ func (w *WebmeshConn) LocalMultiaddr() ma.Multiaddr {
 }
 
 func (w *WebmeshConn) RemoteMultiaddr() ma.Multiaddr {
-	return wmproto.Encapsulate(w.Conn.RemoteMultiaddr(), "CG=")
+	return w.raddr
 }
 
 // Context returns a context that contains the logger tied

@@ -265,6 +265,7 @@ func (t *Transport) WrapConn(c mnet.Conn) *WebmeshConn {
 		Conn:  c,
 		lkey:  t.key,
 		lpeer: t.peerID,
+		raddr: wmproto.Encapsulate(c.RemoteMultiaddr(), "CG="),
 		iface: t.iface,
 		eps:   t.WireGuardEndpoints(),
 		log: t.log.With(

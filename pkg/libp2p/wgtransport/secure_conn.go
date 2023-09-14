@@ -198,6 +198,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 		log.Debug("Negotiation signature is valid")
 		c.rsignalp = msg.SignalPort
 		c.rpeer = msg.PeerID
+		c.WebmeshConn.raddr = wmproto.Encapsulate(c.WebmeshConn.Conn.RemoteMultiaddr(), c.rpeer)
 		if len(psk) > 0 {
 			// We seed the ULA with the PSK
 			c.rula = netutil.GenerateULAWithSeed(psk)

@@ -33,7 +33,6 @@ import (
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	"github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // Ensure we implement the interface
@@ -122,23 +121,13 @@ func (st *SecureTransport) NewSecureConn(ctx context.Context, insecure *WebmeshC
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange endpoints: %w", err)
 	}
-	// Determine expected remote addresses and configure wireguard.
-	var rula netip.Prefix
-	if len(st.psk) > 0 {
-		// We seed the ULA with the PSK
-		rula = netutil.GenerateULAWithSeed(st.psk)
-		sc.raddr = netutil.AssignToPrefix(rula, sc.rkey).Addr()
-	} else {
-		// The peer will have their own ULA that we'll trust.
-		rula, sc.raddr = netutil.GenerateULAWithKey(sc.rkey)
-	}
-	log.Debug("Determined remote ULA and address for peer", "ula", rula.String(), "addr", sc.raddr.String())
+	log.Debug("Determined remote ULA and address for peer", "ula", sc.rula.String(), "addr", sc.raddr.String())
 	peer := wireguard.Peer{
 		ID:          sc.rpeer.String(),
 		PublicKey:   sc.rkey,
 		Endpoint:    endpoint,
 		PrivateIPv6: netip.PrefixFrom(sc.raddr, wmproto.PrefixSize),
-		AllowedIPs:  []netip.Prefix{rula},
+		AllowedIPs:  []netip.Prefix{sc.rula},
 	}
 	log.Debug("Adding peer to wireguard interface", "config", peer)
 	err = insecure.iface.PutPeer(context.WithLogger(ctx, log), &peer)
