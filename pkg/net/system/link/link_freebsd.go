@@ -86,6 +86,7 @@ func InterfaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Pr
 			if addr != forAddr.String() {
 				continue
 			}
+			addr = strings.Split(addr, "%")[0]
 			ip, err := netip.ParseAddr(addr)
 			if err != nil {
 				return netip.Prefix{}, fmt.Errorf("parse %s: %w", addr, err)
