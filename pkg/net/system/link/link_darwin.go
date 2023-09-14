@@ -18,9 +18,7 @@ package link
 
 import (
 	"context"
-	"fmt"
 	"net/netip"
-	"strconv"
 	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/util"
@@ -64,50 +62,11 @@ func RemoveInterface(ctx context.Context, ifaceName string) error {
 
 // InterfaceNetwork returns the network for the given interface and address.
 func InterfaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Prefix, error) {
-	out, err := util.ExecOutput(context.Background(), "ifconfig", ifaceName)
-	if err != nil {
-		if strings.Contains(string(out), "not exist") {
-			return netip.Prefix{}, ErrLinkNotExists
-		}
-		return netip.Prefix{}, fmt.Errorf("ifconfig %s: %w: %s", ifaceName, err, out)
-	}
-	strPrefix := "inet"
+	// We just return back the final address in the zone with a /32 or /128 mask.
+	// This is because we don't know the subnet mask of the interface.
+	// We could try to parse the output of ifconfig, but that's not portable.
 	if ipv6 {
-		strPrefix = "inet6"
+		return netip.PrefixFrom(forAddr, 128), nil
 	}
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, strPrefix) {
-			fields := strings.Fields(line)
-			if len(fields) < 4 {
-				continue
-			}
-			addr, prefix := fields[1], fields[3]
-			if addr != forAddr.String() {
-				continue
-			}
-			// The addr may have a zone appended if this IPv6
-			// address is link-local.
-			addr = strings.Split(addr, "%")[0]
-			ip, err := netip.ParseAddr(addr)
-			if err != nil {
-				return netip.Prefix{}, fmt.Errorf("parse %s: %w", addr, err)
-			}
-			if ipv6 {
-				// We have a raw prefixlen in the field
-				bits, err := strconv.Atoi(prefix)
-				if err != nil {
-					return netip.Prefix{}, fmt.Errorf("parse %s: %w", prefix, err)
-				}
-				return netip.PrefixFrom(ip, bits), nil
-			}
-			// We have a hex prefix in the field
-			bits, err := strconv.ParseUint(prefix, 16, 32)
-			if err != nil {
-				return netip.Prefix{}, fmt.Errorf("parse %s: %w", prefix, err)
-			}
-			return netip.PrefixFrom(ip, int(bits)), nil
-		}
-	}
-	return netip.Prefix{}, fmt.Errorf("no %s address found for %s", forAddr, ifaceName)
+	return netip.PrefixFrom(forAddr, 32), nil
 }
