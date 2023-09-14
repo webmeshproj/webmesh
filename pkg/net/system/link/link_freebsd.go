@@ -70,4 +70,3 @@ func InterfaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Pr
 	}
 	return netip.PrefixFrom(forAddr, 32), nil
 }
-s
