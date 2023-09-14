@@ -111,7 +111,7 @@ WaitForStream:
 		case <-ctx.Done():
 			return nil, fmt.Errorf("failed to read stream address: %w", ctx.Err())
 		default:
-			err = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			err = conn.SetReadDeadline(time.Now().Add(time.Second))
 			if err != nil {
 				return nil, fmt.Errorf("failed to set read deadline: %w", err)
 			}

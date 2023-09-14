@@ -153,8 +153,6 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 	log.Debug("Signaling server started, handling negotiation", "address", l.Addr().String())
 	go func() {
 		defer close(errs)
-		// There should be a valid JSON payload followed by a 64
-		// byte signature.
 		log.Debug("Waiting for negotiation payload")
 		var msg Negotiation
 		err := json.NewDecoder(c).Decode(&msg)
