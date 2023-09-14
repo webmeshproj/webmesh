@@ -75,7 +75,7 @@ func (st *SecureTransport) ID() protocol.ID { return st.protocolID }
 // SecureInbound secures an inbound connection. If p is empty, connections from any peer are accepted.
 func (st *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
 	// We throw away the initial insecure connection no matter what and move it to wireguard
-	// defer insecure.Close()
+	defer insecure.Close()
 	wc, ok := insecure.(*WebmeshConn)
 	if !ok {
 		return nil, fmt.Errorf("failed to secure outbound connection: invalid connection type")
@@ -93,7 +93,7 @@ func (st *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn,
 // SecureOutbound secures an outbound connection.
 func (st *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
 	// We throw away the initial insecure connection no matter what and move it to wireguard
-	// defer insecure.Close()
+	defer insecure.Close()
 	wc, ok := insecure.(*WebmeshConn)
 	if !ok {
 		return nil, fmt.Errorf("failed to secure outbound connection: invalid connection type")

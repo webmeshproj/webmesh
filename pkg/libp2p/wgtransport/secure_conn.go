@@ -72,16 +72,6 @@ func (c *SecureConn) ConnState() network.ConnectionState {
 	}
 }
 
-// NewStreamListener creates a new stream listener on this connection
-// by allocating a random UDP port on the local wireguard interface.
-func (c *SecureConn) NewStreamListener() (*net.TCPListener, error) {
-	addr := &net.TCPAddr{
-		IP:   c.iface.AddressV6().Addr().AsSlice(),
-		Port: 0,
-	}
-	return net.ListenTCP("tcp6", addr)
-}
-
 // DialSignaler dials the signaler on the other side of this connection.
 func (c *SecureConn) DialSignaler(ctx context.Context) (*net.TCPConn, error) {
 	var dialer net.Dialer
