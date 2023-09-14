@@ -49,7 +49,7 @@ func init() {
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS TUN interfaces have to be named "utun" followed by a number.
-		DefaultInterfaceName = "utun+"
+		DefaultInterfaceName = "utun0"
 	}
 }
 

@@ -165,7 +165,7 @@ func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host
 		// Will only work on Linux/Windows, needs to be utun+ on macOS.
 		Name: func() string {
 			if runtime.GOOS == "darwin" {
-				return "utun+"
+				return "utun9"
 			}
 			// Pick a random number to append to the interface name
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
