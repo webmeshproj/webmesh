@@ -240,19 +240,8 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 		case <-ctx.Done():
 			return
 		default:
-			err := stream.SetReadDeadline(time.Now().Add(time.Second))
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					log.Println("ERROR: ", err)
-				}
-				return
-			}
 			n, err := stream.Read(buf)
 			if err != nil {
-				// Check if it's a network timeout error
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					continue
-				}
 				if !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
 					log.Println("ERROR: ", err)
 				}
