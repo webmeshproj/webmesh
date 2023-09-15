@@ -22,44 +22,23 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/libp2p/config"
 	"github.com/webmeshproj/webmesh/pkg/libp2p/wgtransport"
-	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
-	"github.com/webmeshproj/webmesh/pkg/net/system"
 	wmp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
-var conf = config.Options{
-	Config: config.WireGuardOptions{
-		ListenPort:         wireguard.DefaultListenPort,
-		InterfaceName:      wireguard.DefaultInterfaceName,
-		ForceInterfaceName: true,
-		MTU:                system.DefaultMTU,
-	},
-	EndpointDetection: &endpoints.DetectOpts{
-		DetectIPv6:           true,
-		DetectPrivate:        true,
-		AllowRemoteDetection: false,
-	},
-}
-
-var logLevel string
-var payloadSize = 4096
-var testType string = "webmesh"
+var (
+	logLevel    string
+	payloadSize        = 4096
+	testType    string = "webmesh"
+)
 
 func main() {
-	// Bind flags to the configurations
 	flag.IntVar(&payloadSize, "payload", payloadSize, "payload size")
-	flag.IntVar(&conf.Config.ListenPort, "wgport", conf.Config.ListenPort, "wireguard port")
-	flag.StringVar(&conf.Config.InterfaceName, "ifname", conf.Config.InterfaceName, "wireguard interface name")
-	flag.IntVar(&conf.Config.MTU, "mtu", conf.Config.MTU, "wireguard interface MTU")
 	flag.StringVar(&logLevel, "loglevel", "error", "log level")
 	flag.StringVar(&testType, "type", testType, "test type")
 	flag.Parse()
-	conf.Logger = logutil.NewLogger(logLevel)
 	err := run()
 	if err != nil {
 		panic(err)
@@ -114,7 +93,7 @@ func run() error {
 	}
 
 	// Setup the speed test handler
-	ctx := context.WithLogger(context.Background(), conf.Logger)
+	ctx := context.WithLogger(context.Background(), logutil.NewLogger(logLevel))
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	host.SetStreamHandler("/speedtest", func(stream network.Stream) {
