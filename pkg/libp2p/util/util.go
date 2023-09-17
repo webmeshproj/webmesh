@@ -20,15 +20,12 @@ package util
 import (
 	"fmt"
 	"net"
-	"net/netip"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
-	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 )
 
 // ErrNotStarted is returned when the transport is not started.
@@ -36,33 +33,6 @@ var ErrNotStarted = fmt.Errorf("transport is not started")
 
 // ErrInvalidSecureTransport is returned when the transport is not used with a webmesh keypair and security transport.
 var ErrInvalidSecureTransport = fmt.Errorf("transport must be used with a webmesh keypair and security transport")
-
-// AddrToSignalMultiaddr converts a netip.Addr to a multiaddr intended for signaling.
-func AddrToSignalMultiaddrs(addr netip.Addr) []ma.Multiaddr {
-	switch {
-	case addr.Is6():
-		return []ma.Multiaddr{
-			ma.StringCast(fmt.Sprintf("/ip6/%s/udp/%d", addr.String(), protocol.SignalingPort)),
-			ma.StringCast(fmt.Sprintf("/ip6/%s/tcp/%d", addr.String(), protocol.SignalingPort)),
-		}
-	case addr.Is4In6():
-		// For now we pack the IPv6 address back into an IPv4 address. There is a good
-		// chance this was not provided by the user and rather parsed as such by the runtime.
-		addrBytes := addr.As4()
-		ipv4 := net.IP(addrBytes[:])
-		return []ma.Multiaddr{
-			ma.StringCast(fmt.Sprintf("/ip4/%s/udp/%d", ipv4.String(), protocol.SignalingPort)),
-			ma.StringCast(fmt.Sprintf("/ip4/%s/tcp/%d", ipv4.String(), protocol.SignalingPort)),
-		}
-	case addr.Is4():
-		return []ma.Multiaddr{
-			ma.StringCast(fmt.Sprintf("/ip4/%s/udp/%d", addr.String(), protocol.SignalingPort)),
-			ma.StringCast(fmt.Sprintf("/ip4/%s/tcp/%d", addr.String(), protocol.SignalingPort)),
-		}
-	default:
-		return nil
-	}
-}
 
 // ExtractWebmeshPublicKey extracts the webmesh public key from a peer ID.
 func ExtractWebmeshPublicKey(ctx context.Context, p peer.ID) (wmcrypto.PublicKey, error) {
