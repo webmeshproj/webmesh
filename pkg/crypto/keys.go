@@ -91,6 +91,13 @@ type PublicKey interface {
 	p2pcrypto.PubKey
 }
 
+// SortedKeys is a slice of public keys that can be sorted.
+type SortedKeys []PublicKey
+
+func (s SortedKeys) Len() int           { return len(s) }
+func (s SortedKeys) Less(i, j int) bool { return string(s[i].Bytes()) < string(s[j].Bytes()) }
+func (s SortedKeys) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
 // GenerateKey generates a new private key.
 func GenerateKey() (PrivateKey, error) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)

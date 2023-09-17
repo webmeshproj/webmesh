@@ -27,7 +27,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/pnet"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/sec"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -44,13 +43,13 @@ var _ sec.SecureConn = (*SecureConn)(nil)
 // peer information.
 type SecureConn struct {
 	*WebmeshConn
-	lsignals net.Listener
-	rsignalp int
-	rpeer    peer.ID
-	rkey     wgcrypto.PublicKey
-	rula     netip.Prefix
-	raddr    netip.Addr
-	protocol protocol.ID
+	signals     net.Listener
+	rsignalp    int
+	rpeer       peer.ID
+	rkey        wgcrypto.PublicKey
+	rula        netip.Prefix
+	raddr       netip.Addr
+	mcastPrefix netip.Prefix
 }
 
 // LocalPeer returns our peer ID
@@ -65,7 +64,7 @@ func (c *SecureConn) RemotePublicKey() crypto.PubKey { return c.rkey }
 // ConnState returns information about the connection state.
 func (c *SecureConn) ConnState() network.ConnectionState {
 	return network.ConnectionState{
-		StreamMultiplexer:         MuxerID,
+		StreamMultiplexer:         wmproto.MuxerID,
 		Security:                  wmproto.SecurityID,
 		Transport:                 "udp",
 		UsedEarlyMuxerNegotiation: true,
@@ -85,6 +84,16 @@ func (c *SecureConn) DialSignaler(ctx context.Context) (*net.TCPConn, error) {
 	}
 	context.LoggerFrom(ctx).Debug("Dialing signaling stream", "address", raddr.String())
 	rc, err := dialer.DialContext(ctx, "tcp6", raddr.String())
+	if err != nil {
+		return nil, err
+	}
+	return rc.(*net.TCPConn), nil
+}
+
+// AcceptSignal accepts a signaler on the other side of this connection.
+func (c *SecureConn) AcceptSignal() (*net.TCPConn, error) {
+	c.log.Debug("Accepting signaling stream")
+	rc, err := c.signals.Accept()
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +128,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 	if err != nil {
 		return remoteEndpoint, fmt.Errorf("failed to start signaling server: %w", err)
 	}
-	c.lsignals = l
+	c.signals = l
 	log.Debug("Signaling server started, handling negotiation", "address", l.Addr().String())
 	errs := make(chan error, 1)
 	go func() {

@@ -25,6 +25,7 @@ import (
 	mrand "math/rand"
 	"net"
 	"net/netip"
+	"sort"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -80,6 +81,23 @@ func AssignToPrefix(prefix netip.Prefix, publicKey crypto.PublicKey) netip.Prefi
 	// Set the client ID to the first 8 bytes of the hash
 	copy(ip[6:], data[:8])
 	addr, _ := netip.AddrFromSlice(ip)
+	return netip.PrefixFrom(addr, 112)
+}
+
+// AssignMulticastGroup assigns a multicast group to two or more public keys.
+func AssignMulticastGroup(keys ...crypto.PublicKey) netip.Prefix {
+	group := netip.MustParsePrefix("ff0e::/16").Addr().AsSlice()
+	// Take a hash of the public keys in order of their bytes
+	sorted := crypto.SortedKeys(keys)
+	sort.Sort(sorted)
+	sha := sha256.New()
+	for _, key := range sorted {
+		sha.Write(key.Bytes())
+	}
+	data := sha.Sum(nil)
+	// Set the first 8 bytes of the hash to the multicast group ID
+	copy(group[2:], data[:8])
+	addr, _ := netip.AddrFromSlice(group)
 	return netip.PrefixFrom(addr, 112)
 }
 

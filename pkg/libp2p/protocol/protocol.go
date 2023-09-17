@@ -36,6 +36,8 @@ const (
 	SecurityID = "/webmesh/1.0.0"
 	// ID is the ID for the webmesh libp2p transport protocol.
 	ProtocolID = "webmesh-v1"
+	// MuxerID is the ID for the webmesh libp2p multiplexer.
+	MuxerID = "/webmesh/wireguard/1.0.0"
 	// ProtocolPath is the path for the webmesh libp2p transport protocol.
 	ProtocolPath = "/" + ProtocolID
 	// ProtocolCode is the code for the webmesh libp2p transport protocol.

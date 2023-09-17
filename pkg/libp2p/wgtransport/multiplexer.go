@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/netip"
 	"sync/atomic"
 
 	"github.com/libp2p/go-libp2p/core/network"
@@ -31,9 +32,6 @@ import (
 // Ensure we implement the interface
 var _ network.Multiplexer = (*WireGuardMultiplexer)(nil)
 var _ network.MuxedConn = (*Conn)(nil)
-
-// MuxerID is the ID of the wireguard multiplexer.
-const MuxerID = "/webmesh/wireguard/1.0.0"
 
 // Multiplexer is a ready to use multiplexer.
 var Multiplexer = &WireGuardMultiplexer{}
@@ -50,29 +48,30 @@ func (m *WireGuardMultiplexer) NewConn(c net.Conn, isServer bool, scope network.
 	log := secureConn.log
 	log.Debug("Starting new multiplexed wireguard connection")
 	mc := &Conn{
-		sc:      secureConn,
-		streams: make(chan network.MuxedStream, 16),
-		donec:   make(chan struct{}),
-		log:     log,
+		sc:        secureConn,
+		streams:   make(chan network.MuxedStream, 16),
+		donec:     make(chan struct{}),
+		groupaddr: secureConn.mcastPrefix.Addr(),
+		log:       log,
 	}
-	// go mc.acceptIPStreams()
 	go mc.acceptTCPStreams()
 	return mc, nil
 }
 
 // Conn is a connection that can be multiplexed
 type Conn struct {
-	closed  atomic.Bool
-	sc      *SecureConn
-	streams chan network.MuxedStream
-	donec   chan struct{}
-	log     *slog.Logger
+	closed    atomic.Bool
+	sc        *SecureConn
+	streams   chan network.MuxedStream
+	donec     chan struct{}
+	groupaddr netip.Addr
+	log       *slog.Logger
 }
 
 // Close closes the connection.
 func (c *Conn) Close() error {
 	defer c.closed.Store(true)
-	return c.sc.lsignals.Close()
+	return c.sc.signals.Close()
 }
 
 // IsClosed returns whether a connection is fully closed, so it can
@@ -96,7 +95,6 @@ func (c *Conn) AcceptStream() (network.MuxedStream, error) {
 	}
 }
 
-// OpenStream creates a new stream.
 func (c *Conn) openTCPStream(ctx context.Context) (network.MuxedStream, error) {
 	conn, err := c.sc.DialSignaler(ctx)
 	if err != nil {
@@ -111,7 +109,7 @@ func (c *Conn) acceptTCPStreams() {
 	defer close(c.donec)
 	defer c.closed.Store(true)
 	for {
-		conn, err := c.sc.lsignals.Accept()
+		conn, err := c.sc.AcceptSignal()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return
@@ -119,6 +117,6 @@ func (c *Conn) acceptTCPStreams() {
 			c.log.Error("Failed to accept new stream", "error", err.Error())
 			continue
 		}
-		c.streams <- &TCPStream{TCPConn: conn.(*net.TCPConn)}
+		c.streams <- &TCPStream{TCPConn: conn}
 	}
 }
