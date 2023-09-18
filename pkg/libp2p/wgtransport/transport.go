@@ -82,7 +82,7 @@ func NewOptions(log *slog.Logger) libp2p.Option {
 	return libp2p.ChainOptions(
 		libp2p.Transport(NewWithLogger(log)),
 		libp2p.Security(wmproto.SecurityID, NewSecurity),
-		libp2p.Muxer(wmproto.MuxerID, WireGuardMultiplexer),
+		libp2p.Muxer(wmproto.MuxerID, &Multiplexer{}),
 		libp2p.AddrsFactory(func(addrs []ma.Multiaddr) []ma.Multiaddr {
 			var out []ma.Multiaddr
 			for _, addr := range addrs {

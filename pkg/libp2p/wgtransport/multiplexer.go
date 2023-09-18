@@ -34,9 +34,6 @@ var _ network.Multiplexer = (*Multiplexer)(nil)
 var _ network.MuxedConn = (*MultiplexedConn)(nil)
 var _ network.MuxedStream = (*TCPStream)(nil)
 
-// WireGuardMultiplexer is a ready to use multiplexer.
-var WireGuardMultiplexer = &Multiplexer{}
-
 // Multiplexer is a multiplexer for libp2p connections.
 type Multiplexer struct{}
 
@@ -157,5 +154,5 @@ func (s *TCPStream) CloseWrite() error {
 // Reset closes both ends of the stream. Use this to tell the remote
 // side to hang up and go away.
 func (s *TCPStream) Reset() error {
-	return s.Close()
+	return s.TCPConn.Close()
 }
