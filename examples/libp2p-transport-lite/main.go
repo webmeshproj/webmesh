@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,7 +31,7 @@ import (
 
 var (
 	logLevel    string
-	payloadSize        = 4096
+	payloadSize int    = 4096
 	testType    string = "webmesh"
 )
 
@@ -97,12 +98,21 @@ func run() error {
 	ctx := context.WithLogger(context.Background(), logutil.NewLogger(logLevel))
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	host.SetStreamHandler("/speedtest", func(stream network.Stream) {
+
+	host.SetStreamHandler("/stream-one", func(stream network.Stream) {
 		log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
 		log.Printf("Connection state: %+v\n", stream.Conn().ConnState())
 		go func() {
 			defer cancel()
-			runSpeedTest(ctx, stream, payloadSize)
+			runSpeedTest(ctx, "stream-one", stream, payloadSize)
+		}()
+	})
+	host.SetStreamHandler("/stream-two", func(stream network.Stream) {
+		log.Println("Received connection from", stream.Conn().RemoteMultiaddr())
+		log.Printf("Connection state: %+v\n", stream.Conn().ConnState())
+		go func() {
+			defer cancel()
+			runSpeedTest(ctx, "stream-two", stream, payloadSize)
 		}()
 	})
 
@@ -153,14 +163,22 @@ FindPeers:
 				for _, addr := range peer.Addrs {
 					log.Println("\t-", addr)
 				}
-				conn, err := host.NewStream(ctx, peer.ID, "/speedtest")
+				conn, err := host.NewStream(ctx, peer.ID, "/stream-one")
 				if err != nil {
 					log.Println("Failed to dial peer:", err)
 					continue
 				}
-				log.Println("Opened connection to", conn.Conn().RemoteMultiaddr())
+				log.Println("Opened stream one to", conn.Conn().RemoteMultiaddr())
 				log.Printf("Connection state: %+v\n", conn.Conn().ConnState())
-				go runSpeedTest(ctx, conn, payloadSize)
+				go runSpeedTest(ctx, "stream-one", conn, payloadSize)
+				conn, err = host.NewStream(ctx, peer.ID, "/stream-two")
+				if err != nil {
+					log.Println("Failed to dial peer:", err)
+					continue
+				}
+				log.Println("Opened stream two to", conn.Conn().RemoteMultiaddr())
+				log.Printf("Connection state: %+v\n", conn.Conn().ConnState())
+				go runSpeedTest(ctx, "stream-two", conn, payloadSize)
 				select {
 				case <-ctx.Done():
 				case <-sig:
@@ -171,7 +189,7 @@ FindPeers:
 	}
 }
 
-func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
+func runSpeedTest(ctx context.Context, name string, stream network.Stream, payloadSize int) {
 	var bytesWritten atomic.Int64
 	var bytesRead atomic.Int64
 	start := time.Now()
@@ -190,14 +208,14 @@ func runSpeedTest(ctx context.Context, stream network.Stream, payloadSize int) {
 				elapsed := time.Since(start)
 				sent := util.PrettyByteSize(float64(written) / elapsed.Seconds())
 				received := util.PrettyByteSize(float64(read) / elapsed.Seconds())
-				fmt.Printf("Sent %d bytes in %s (%s/s)\n", written, elapsed, sent)
-				fmt.Printf("Received %d bytes in %s (%s/s)\n", read, elapsed, received)
+				fmt.Printf("%s: Sent %d bytes in %s (%s/s)\n", name, written, elapsed, sent)
+				fmt.Printf("%s: Received %d bytes in %s (%s/s)\n", name, read, elapsed, received)
 			}
 		}
 	}()
 	go func() {
 		defer cancel()
-		buf := make([]byte, payloadSize)
+		buf := bytes.Repeat([]byte("a"), payloadSize)
 		for {
 			select {
 			case <-ctx.Done():

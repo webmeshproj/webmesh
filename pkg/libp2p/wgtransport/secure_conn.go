@@ -44,8 +44,8 @@ var _ sec.SecureConn = (*SecureConn)(nil)
 // peer information.
 type SecureConn struct {
 	*Conn
-	signals  net.Listener
-	rsignalp int
+	streams  net.Listener
+	rstreamp int
 	rpeer    peer.ID
 	rkey     wgcrypto.PublicKey
 	rula     netip.Prefix
@@ -53,7 +53,7 @@ type SecureConn struct {
 }
 
 // NewSecureConn upgrades an insecure connection with peer identity.
-func NewSecureConn(ctx context.Context, insecure *Conn, rpeer peer.ID, psk pnet.PSK) (*SecureConn, error) {
+func NewSecureConn(ctx context.Context, insecure *Conn, rpeer peer.ID, psk pnet.PSK, dir network.Direction) (*SecureConn, error) {
 	log := context.LoggerFrom(ctx)
 	sc := &SecureConn{}
 	sc.Conn = insecure
@@ -104,8 +104,8 @@ func (c *SecureConn) ConnState() network.ConnectionState {
 	}
 }
 
-// DialSignaler dials the signaler on the other side of this connection.
-func (c *SecureConn) DialSignaler(ctx context.Context) (*net.TCPConn, error) {
+// DialStream dials the stream listener on the other side of this connection.
+func (c *SecureConn) DialStream(ctx context.Context) (*net.TCPConn, error) {
 	var dialer net.Dialer
 	dialer.LocalAddr = &net.TCPAddr{
 		IP:   c.iface.AddressV6().Addr().AsSlice(),
@@ -113,9 +113,9 @@ func (c *SecureConn) DialSignaler(ctx context.Context) (*net.TCPConn, error) {
 	}
 	raddr := &net.TCPAddr{
 		IP:   c.raddr.AsSlice(),
-		Port: c.rsignalp,
+		Port: c.rstreamp,
 	}
-	context.LoggerFrom(ctx).Debug("Dialing signaling stream", "address", raddr.String())
+	c.log.Debug("Dialing stream server", "address", raddr.String())
 	rc, err := dialer.DialContext(ctx, "tcp6", raddr.String())
 	if err != nil {
 		return nil, err
@@ -123,13 +123,13 @@ func (c *SecureConn) DialSignaler(ctx context.Context) (*net.TCPConn, error) {
 	return rc.(*net.TCPConn), nil
 }
 
-// AcceptSignal accepts a signaler on the other side of this connection.
-func (c *SecureConn) AcceptSignal() (*net.TCPConn, error) {
-	c.log.Debug("Accepting signaling stream")
-	rc, err := c.signals.Accept()
+// AcceptStream accepts a new stream from the remote peer.
+func (c *SecureConn) AcceptStream() (*net.TCPConn, error) {
+	rc, err := c.streams.Accept()
 	if err != nil {
 		return nil, err
 	}
+	c.log.Debug("Accepted new stream")
 	return rc.(*net.TCPConn), nil
 }
 
@@ -161,7 +161,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 	if err != nil {
 		return remoteEndpoint, fmt.Errorf("failed to start signaling server: %w", err)
 	}
-	c.signals = l
+	c.streams = l
 	log.Debug("Signaling server started, handling negotiation", "address", l.Addr().String())
 	errs := make(chan error, 1)
 	go func() {
@@ -207,7 +207,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 			return
 		}
 		log.Debug("Negotiation signature is valid")
-		c.rsignalp = msg.SignalPort
+		c.rstreamp = msg.SignalPort
 		c.rpeer = msg.PeerID
 		c.Conn.rmaddr = wmproto.Encapsulate(c.Conn.Conn.RemoteMultiaddr(), c.rpeer)
 		if len(psk) > 0 {

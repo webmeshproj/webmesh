@@ -67,7 +67,7 @@ type MultiplexedConn struct {
 // Close closes the connection.
 func (c *MultiplexedConn) Close() error {
 	defer c.closed.Store(true)
-	return c.sc.signals.Close()
+	return c.sc.streams.Close()
 }
 
 // IsClosed returns whether a connection is fully closed, so it can
@@ -92,7 +92,7 @@ func (c *MultiplexedConn) AcceptStream() (network.MuxedStream, error) {
 }
 
 func (c *MultiplexedConn) openTCPStream(ctx context.Context) (network.MuxedStream, error) {
-	conn, err := c.sc.DialSignaler(ctx)
+	conn, err := c.sc.DialStream(ctx)
 	if err != nil {
 		c.log.Error("Failed to dial signaling server", "error", err.Error())
 		return nil, fmt.Errorf("failed to connect for new stream: %w", err)
@@ -105,7 +105,7 @@ func (c *MultiplexedConn) acceptTCPStreams() {
 	defer close(c.donec)
 	defer c.closed.Store(true)
 	for {
-		conn, err := c.sc.AcceptSignal()
+		conn, err := c.sc.AcceptStream()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return

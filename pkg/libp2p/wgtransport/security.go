@@ -22,6 +22,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -79,7 +80,7 @@ func (st *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn,
 	}
 	log := context.LoggerFrom(wc.Context())
 	log.Debug("Securing inbound connection")
-	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk)
+	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk, network.DirInbound)
 	if err != nil {
 		log.Error("Failed to secure connection", "error", err.Error())
 		return nil, fmt.Errorf("failed to secure connection: %w", err)
@@ -97,7 +98,7 @@ func (st *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn
 	}
 	log := context.LoggerFrom(wc.Context())
 	log.Debug("Securing outbound connection")
-	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk)
+	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk, network.DirOutbound)
 	if err != nil {
 		log.Error("Failed to secure connection", "error", err.Error())
 		return nil, fmt.Errorf("failed to secure connection: %w", err)
