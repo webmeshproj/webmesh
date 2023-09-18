@@ -18,57 +18,26 @@ package wgtransport
 
 import (
 	"errors"
-	"log/slog"
 	"net"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/transport"
 	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 
-	"github.com/webmeshproj/webmesh/pkg/context"
-	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 )
 
-// WebmeshConn wraps the basic net.Conn with a reference back to the underlying transport.
-type WebmeshConn struct {
-	mnet.Conn
-	rt     *Transport
-	lkey   wmcrypto.PrivateKey
-	lpeer  peer.ID
-	iface  wireguard.Interface
-	rmaddr ma.Multiaddr
-	eps    []string
-	log    *slog.Logger
-}
-
-func (w *WebmeshConn) LocalMultiaddr() ma.Multiaddr {
-	return wmproto.Encapsulate(w.Conn.LocalMultiaddr(), w.lpeer)
-}
-
-func (w *WebmeshConn) RemoteMultiaddr() ma.Multiaddr {
-	return w.rmaddr
-}
-
-// Context returns a context that contains the logger tied
-// to this connection
-func (w *WebmeshConn) Context() context.Context {
-	return context.WithLogger(context.Background(), w.log)
-}
-
-// WebmeshListener wraps a basic listener to be upgraded and injects the transport
+// Listener wraps a basic listener to be upgraded and injects the transport
 // into incoming connections.
-type WebmeshListener struct {
+type Listener struct {
 	mnet.Listener
 	rt    *Transport
-	conns chan *WebmeshConn
+	conns chan *Conn
 	donec chan struct{}
 }
 
 // Accept waits for and returns the next connection to the listener.
-func (ln *WebmeshListener) Accept() (mnet.Conn, error) {
+func (ln *Listener) Accept() (mnet.Conn, error) {
 	select {
 	case c := <-ln.conns:
 		return c, nil
@@ -77,11 +46,11 @@ func (ln *WebmeshListener) Accept() (mnet.Conn, error) {
 	}
 }
 
-func (ln *WebmeshListener) Multiaddr() ma.Multiaddr {
+func (ln *Listener) Multiaddr() ma.Multiaddr {
 	return wmproto.Encapsulate(ln.Listener.Multiaddr(), ln.rt.peerID)
 }
 
-func (ln *WebmeshListener) handleIncoming() {
+func (ln *Listener) handleIncoming() {
 	defer close(ln.donec)
 	for {
 		c, err := ln.Listener.Accept()

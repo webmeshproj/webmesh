@@ -24,8 +24,6 @@ import (
 	"math/rand"
 	"net/netip"
 	"runtime"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -45,16 +43,15 @@ import (
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
-	"github.com/webmeshproj/webmesh/pkg/net/system/link"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
-// WebmeshTransport is the webmesh wireguard transport. This transport does not run a
+// WireGuardTransport is the webmesh wireguard transport. This transport does not run a
 // full mesh node, but rather utilizes libp2p streams to perform an authenticated
 // keypair negotiation to compute IPv6 addresses for peers.
-type WebmeshTransport interface {
+type WireGuardTransport interface {
 	// Closer for the underlying transport that shuts down the webmesh node.
 	io.Closer
 	// Transport is the underlying libp2p Transport.
@@ -64,22 +61,20 @@ type WebmeshTransport interface {
 }
 
 // Constructor is the constructor for the webmesh transport.
-type Constructor func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WebmeshTransport, error)
+type Constructor func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WireGuardTransport, error)
 
 // Transport is the webmesh wireguard transport.
 type Transport struct {
-	peerID  peer.ID
-	host    host.Host
-	psk     pnet.PSK
-	key     wmcrypto.PrivateKey
-	p2ptu   transport.Upgrader
-	rcmgr   network.ResourceManager
-	gater   connmgr.ConnectionGater
-	iface   wireguard.Interface
-	eps     endpoints.PrefixList
-	curaddr netip.Addr
-	log     *slog.Logger
-	addrmu  sync.Mutex
+	peerID peer.ID
+	host   host.Host
+	psk    pnet.PSK
+	key    wmcrypto.PrivateKey
+	p2ptu  transport.Upgrader
+	rcmgr  network.ResourceManager
+	gater  connmgr.ConnectionGater
+	iface  wireguard.Interface
+	eps    endpoints.PrefixList
+	log    *slog.Logger
 }
 
 // NewOptions returns a chained option for all the components of a webmesh transport.
@@ -87,7 +82,7 @@ func NewOptions(log *slog.Logger) libp2p.Option {
 	return libp2p.ChainOptions(
 		libp2p.Transport(NewWithLogger(log)),
 		libp2p.Security(wmproto.SecurityID, NewSecurity),
-		libp2p.Muxer(wmproto.MuxerID, Multiplexer),
+		libp2p.Muxer(wmproto.MuxerID, WireGuardMultiplexer),
 		libp2p.AddrsFactory(func(addrs []ma.Multiaddr) []ma.Multiaddr {
 			var out []ma.Multiaddr
 			for _, addr := range addrs {
@@ -106,18 +101,18 @@ func NewWithLogger(log *slog.Logger) Constructor {
 	if log == nil {
 		log = logutil.NewLogger("")
 	}
-	return func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WebmeshTransport, error) {
+	return func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WireGuardTransport, error) {
 		return newWebmeshTransport(log, tu, host, key, psk, gater, rcmgr)
 	}
 }
 
 // New is the standard constructor for a webmesh transport.
-func New(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WebmeshTransport, error) {
+func New(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WireGuardTransport, error) {
 	return NewWithLogger(logutil.NewLogger(""))(tu, host, key, psk, gater, rcmgr)
 }
 
 // newWebmeshTransport is the constructor for the webmesh transport.
-func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WebmeshTransport, error) {
+func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WireGuardTransport, error) {
 	var rt Transport
 	var err error
 	rt.log = log
@@ -156,7 +151,6 @@ func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host
 		// We'll generate our own unique local addresses.
 		ula, addr = netutil.GenerateULAWithKey(rt.key.PublicKey())
 	}
-	rt.curaddr = addr
 	rt.log.Debug("Calculated our local IPv6 address space", "ula", ula.String())
 	// We go ahead and create an interface for ourself. If we can't do this we'll fail to
 	// do pretty much everything.
@@ -271,8 +265,8 @@ func (t *Transport) WireGuardEndpoints() []string {
 	return out
 }
 
-func (t *Transport) WrapConn(c mnet.Conn) *WebmeshConn {
-	return &WebmeshConn{
+func (t *Transport) WrapConn(c mnet.Conn) *Conn {
+	return &Conn{
 		Conn:   c,
 		rt:     t,
 		lkey:   t.key,
@@ -288,33 +282,13 @@ func (t *Transport) WrapConn(c mnet.Conn) *WebmeshConn {
 	}
 }
 
-func (t *Transport) WrapListener(l mnet.Listener) *WebmeshListener {
-	ln := &WebmeshListener{
+func (t *Transport) WrapListener(l mnet.Listener) *Listener {
+	ln := &Listener{
 		Listener: l,
 		rt:       t,
-		conns:    make(chan *WebmeshConn, 10),
+		conns:    make(chan *Conn, 10),
 		donec:    make(chan struct{}),
 	}
 	go ln.handleIncoming()
 	return ln
-}
-
-// NextLocalAddr assigns and returns the next local address for the connection.
-func (t *Transport) NextLocalAddr() (netip.Addr, error) {
-	t.addrmu.Lock()
-	defer t.addrmu.Unlock()
-	t.curaddr = t.curaddr.Next()
-	prefix := netip.PrefixFrom(t.curaddr, 128)
-	t.log.Debug("Assigning new address to connection", "address", prefix)
-	err := link.SetInterfaceAddress(context.Background(), t.iface.Name(), prefix)
-	if err != nil && !strings.Contains(err.Error(), "file exists") {
-		return netip.Addr{}, fmt.Errorf("failed to set interface address: %w", err)
-	}
-	return t.curaddr, nil
-}
-
-func (t *Transport) FreeLocalAddr(addr netip.Addr) error {
-	t.addrmu.Lock()
-	defer t.addrmu.Unlock()
-	return link.RemoveInterfaceAddress(context.Background(), t.iface.Name(), netip.PrefixFrom(addr, 128))
 }

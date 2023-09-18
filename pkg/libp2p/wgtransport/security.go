@@ -19,7 +19,6 @@ package wgtransport
 import (
 	"fmt"
 	"net"
-	"net/netip"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -30,10 +29,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	"github.com/webmeshproj/webmesh/pkg/libp2p/util"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // Ensure we implement the interface
@@ -77,13 +73,13 @@ func (st *SecureTransport) ID() protocol.ID { return st.protocolID }
 func (st *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
 	// We throw away the initial insecure connection no matter what and move it to wireguard
 	defer insecure.Close()
-	wc, ok := insecure.(*WebmeshConn)
+	wc, ok := insecure.(*Conn)
 	if !ok {
 		return nil, fmt.Errorf("failed to secure outbound connection: invalid connection type")
 	}
 	log := context.LoggerFrom(wc.Context())
 	log.Debug("Securing inbound connection")
-	c, err := st.NewSecureConn(context.WithLogger(ctx, log), wc, p)
+	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk)
 	if err != nil {
 		log.Error("Failed to secure connection", "error", err.Error())
 		return nil, fmt.Errorf("failed to secure connection: %w", err)
@@ -95,52 +91,16 @@ func (st *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn,
 func (st *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
 	// We throw away the initial insecure connection no matter what and move it to wireguard
 	defer insecure.Close()
-	wc, ok := insecure.(*WebmeshConn)
+	wc, ok := insecure.(*Conn)
 	if !ok {
 		return nil, fmt.Errorf("failed to secure outbound connection: invalid connection type")
 	}
 	log := context.LoggerFrom(wc.Context())
 	log.Debug("Securing outbound connection")
-	c, err := st.NewSecureConn(context.WithLogger(ctx, log), wc, p)
+	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk)
 	if err != nil {
 		log.Error("Failed to secure connection", "error", err.Error())
 		return nil, fmt.Errorf("failed to secure connection: %w", err)
 	}
 	return c, nil
-}
-
-// NewSecureConn upgrades an insecure connection with peer identity.
-func (st *SecureTransport) NewSecureConn(ctx context.Context, insecure *WebmeshConn, rpeer peer.ID) (*SecureConn, error) {
-	log := context.LoggerFrom(ctx)
-	sc := &SecureConn{}
-	sc.WebmeshConn = insecure
-	sc.log = log
-	// Do the negotiation exchange
-	log.Debug("Performing security negotiation")
-	endpoint, err := sc.negotiate(ctx, st.psk)
-	if err != nil {
-		return nil, fmt.Errorf("failed to exchange endpoints: %w", err)
-	}
-	sc.mcastPrefix = netutil.AssignMulticastGroup(sc.rkey, sc.lkey.PublicKey())
-	log.Debug("Determined remote network addresses for for peer",
-		"ula", sc.rula.String(),
-		"addr", sc.raddr.String(),
-		"mcast", sc.mcastPrefix.String(),
-	)
-	peer := wireguard.Peer{
-		ID:          sc.rpeer.String(),
-		PublicKey:   sc.rkey,
-		Endpoint:    endpoint,
-		PrivateIPv6: netip.PrefixFrom(sc.raddr, wmproto.PrefixSize),
-		AllowedIPs: []netip.Prefix{
-			sc.rula,
-			sc.mcastPrefix,
-		},
-	}
-	log.Debug("Adding peer to wireguard interface", "config", peer)
-	err = insecure.iface.PutPeer(context.WithLogger(ctx, log), &peer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add peer to wireguard interface: %w", err)
-	}
-	return sc, nil
 }

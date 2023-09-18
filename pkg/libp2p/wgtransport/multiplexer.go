@@ -21,72 +21,71 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"net/netip"
 	"sync/atomic"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/network"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
-// Ensure we implement the interface
-var _ network.Multiplexer = (*WireGuardMultiplexer)(nil)
-var _ network.MuxedConn = (*Conn)(nil)
+// Ensure we implement the interfaces.
+var _ network.Multiplexer = (*Multiplexer)(nil)
+var _ network.MuxedConn = (*MultiplexedConn)(nil)
+var _ network.MuxedStream = (*TCPStream)(nil)
 
-// Multiplexer is a ready to use multiplexer.
-var Multiplexer = &WireGuardMultiplexer{}
+// WireGuardMultiplexer is a ready to use multiplexer.
+var WireGuardMultiplexer = &Multiplexer{}
 
-// WireGuardMultiplexer is a multiplexer for libp2p connections.
-type WireGuardMultiplexer struct{}
+// Multiplexer is a multiplexer for libp2p connections.
+type Multiplexer struct{}
 
 // NewConn constructs a new connection
-func (m *WireGuardMultiplexer) NewConn(c net.Conn, isServer bool, scope network.PeerScope) (network.MuxedConn, error) {
+func (m *Multiplexer) NewConn(c net.Conn, isServer bool, scope network.PeerScope) (network.MuxedConn, error) {
 	secureConn, ok := c.(*SecureConn)
 	if !ok {
 		return nil, fmt.Errorf("connection is not a wireguad secure connection")
 	}
 	log := secureConn.log
 	log.Debug("Starting new multiplexed wireguard connection")
-	mc := &Conn{
-		sc:        secureConn,
-		streams:   make(chan network.MuxedStream, 16),
-		donec:     make(chan struct{}),
-		groupaddr: secureConn.mcastPrefix.Addr(),
-		log:       log,
+	mc := &MultiplexedConn{
+		sc:      secureConn,
+		streams: make(chan network.MuxedStream, 16),
+		donec:   make(chan struct{}),
+		log:     log,
 	}
 	go mc.acceptTCPStreams()
 	return mc, nil
 }
 
-// Conn is a connection that can be multiplexed
-type Conn struct {
-	closed    atomic.Bool
-	sc        *SecureConn
-	streams   chan network.MuxedStream
-	donec     chan struct{}
-	groupaddr netip.Addr
-	log       *slog.Logger
+// MultiplexedConn is a connection that can be multiplexed
+type MultiplexedConn struct {
+	closed  atomic.Bool
+	sc      *SecureConn
+	streams chan network.MuxedStream
+	donec   chan struct{}
+	log     *slog.Logger
 }
 
 // Close closes the connection.
-func (c *Conn) Close() error {
+func (c *MultiplexedConn) Close() error {
 	defer c.closed.Store(true)
 	return c.sc.signals.Close()
 }
 
 // IsClosed returns whether a connection is fully closed, so it can
 // be garbage collected.
-func (c *Conn) IsClosed() bool {
+func (c *MultiplexedConn) IsClosed() bool {
 	return c.closed.Load()
 }
 
 // OpenStream opens a new stream.
-func (c *Conn) OpenStream(ctx context.Context) (network.MuxedStream, error) {
+func (c *MultiplexedConn) OpenStream(ctx context.Context) (network.MuxedStream, error) {
 	return c.openTCPStream(ctx)
 }
 
 // AcceptStream accepts a stream opened by the other side.
-func (c *Conn) AcceptStream() (network.MuxedStream, error) {
+func (c *MultiplexedConn) AcceptStream() (network.MuxedStream, error) {
 	select {
 	case <-c.donec:
 		return nil, fmt.Errorf("connection closed")
@@ -95,7 +94,7 @@ func (c *Conn) AcceptStream() (network.MuxedStream, error) {
 	}
 }
 
-func (c *Conn) openTCPStream(ctx context.Context) (network.MuxedStream, error) {
+func (c *MultiplexedConn) openTCPStream(ctx context.Context) (network.MuxedStream, error) {
 	conn, err := c.sc.DialSignaler(ctx)
 	if err != nil {
 		c.log.Error("Failed to dial signaling server", "error", err.Error())
@@ -105,7 +104,7 @@ func (c *Conn) openTCPStream(ctx context.Context) (network.MuxedStream, error) {
 	return muxedStream, nil
 }
 
-func (c *Conn) acceptTCPStreams() {
+func (c *MultiplexedConn) acceptTCPStreams() {
 	defer close(c.donec)
 	defer c.closed.Store(true)
 	for {
@@ -119,4 +118,44 @@ func (c *Conn) acceptTCPStreams() {
 		}
 		c.streams <- &TCPStream{TCPConn: conn}
 	}
+}
+
+// TCPStream is a multiplexed stream.
+type TCPStream struct {
+	*net.TCPConn
+}
+
+// CloseRead closes the stream for reading but leaves it open for
+// writing.
+//
+// When CloseRead is called, all in-progress Read calls are interrupted with a non-EOF error and
+// no further calls to Read will succeed.
+//
+// The handling of new incoming data on the stream after calling this function is implementation defined.
+//
+// CloseRead does not free the stream, users must still call Close or
+// Reset.
+func (s *TCPStream) CloseRead() error {
+	// A bit of a hack but we just make all future reads fail.
+	// The caller could technically remove this deadline but that's
+	// not our problem.
+	return s.TCPConn.SetReadDeadline(time.Now())
+}
+
+// CloseWrite closes the stream for writing but leaves it open for
+// reading.
+//
+// CloseWrite does not free the stream, users must still call Close or
+// Reset.
+func (s *TCPStream) CloseWrite() error {
+	// A bit of a hack but we just make all future writes fail.
+	// The caller could technically remove this deadline but that's
+	// not our problem.
+	return s.TCPConn.SetWriteDeadline(time.Now())
+}
+
+// Reset closes both ends of the stream. Use this to tell the remote
+// side to hang up and go away.
+func (s *TCPStream) Reset() error {
+	return s.Close()
 }

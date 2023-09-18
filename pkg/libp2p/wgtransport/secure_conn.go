@@ -33,6 +33,7 @@ import (
 	wgcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
+	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
@@ -42,18 +43,50 @@ var _ sec.SecureConn = (*SecureConn)(nil)
 // SecureConn is a simple wrapper around a sec.SecureConn that just holds the
 // peer information.
 type SecureConn struct {
-	*WebmeshConn
-	signals     net.Listener
-	rsignalp    int
-	rpeer       peer.ID
-	rkey        wgcrypto.PublicKey
-	rula        netip.Prefix
-	raddr       netip.Addr
-	mcastPrefix netip.Prefix
+	*Conn
+	signals  net.Listener
+	rsignalp int
+	rpeer    peer.ID
+	rkey     wgcrypto.PublicKey
+	rula     netip.Prefix
+	raddr    netip.Addr
+}
+
+// NewSecureConn upgrades an insecure connection with peer identity.
+func NewSecureConn(ctx context.Context, insecure *Conn, rpeer peer.ID, psk pnet.PSK) (*SecureConn, error) {
+	log := context.LoggerFrom(ctx)
+	sc := &SecureConn{}
+	sc.Conn = insecure
+	sc.log = log
+	// Do the negotiation exchange
+	log.Debug("Performing security negotiation")
+	endpoint, err := sc.negotiate(ctx, psk)
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange endpoints: %w", err)
+	}
+	log.Debug("Determined remote network addresses for for peer",
+		"ula", sc.rula.String(),
+		"addr", sc.raddr.String(),
+	)
+	peer := wireguard.Peer{
+		ID:          sc.rpeer.String(),
+		PublicKey:   sc.rkey,
+		Endpoint:    endpoint,
+		PrivateIPv6: netip.PrefixFrom(sc.raddr, wmproto.PrefixSize),
+		AllowedIPs: []netip.Prefix{
+			sc.rula,
+		},
+	}
+	log.Debug("Adding peer to wireguard interface", "config", peer)
+	err = insecure.iface.PutPeer(context.WithLogger(ctx, log), &peer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add peer to wireguard interface: %w", err)
+	}
+	return sc, nil
 }
 
 // LocalPeer returns our peer ID
-func (c *SecureConn) LocalPeer() peer.ID { return c.WebmeshConn.lpeer }
+func (c *SecureConn) LocalPeer() peer.ID { return c.Conn.lpeer }
 
 // RemotePeer returns the peer ID of the remote peer.
 func (c *SecureConn) RemotePeer() peer.ID { return c.rpeer }
@@ -66,7 +99,7 @@ func (c *SecureConn) ConnState() network.ConnectionState {
 	return network.ConnectionState{
 		StreamMultiplexer:         wmproto.MuxerID,
 		Security:                  wmproto.SecurityID,
-		Transport:                 "udp",
+		Transport:                 "tcp",
 		UsedEarlyMuxerNegotiation: true,
 	}
 }
@@ -100,7 +133,7 @@ func (c *SecureConn) AcceptSignal() (*net.TCPConn, error) {
 	return rc.(*net.TCPConn), nil
 }
 
-type Negotiation struct {
+type negotiation struct {
 	// PeerID is the peer ID of the remote peer.
 	PeerID peer.ID
 	// Endpoints is a comma-separated list of strings of the form
@@ -134,7 +167,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 	go func() {
 		defer close(errs)
 		log.Debug("Waiting for negotiation payload")
-		var msg Negotiation
+		var msg negotiation
 		err := json.NewDecoder(c).Decode(&msg)
 		if err != nil {
 			errs <- fmt.Errorf("failed to decode negotiation payload: %w", err)
@@ -176,7 +209,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 		log.Debug("Negotiation signature is valid")
 		c.rsignalp = msg.SignalPort
 		c.rpeer = msg.PeerID
-		c.WebmeshConn.rmaddr = wmproto.Encapsulate(c.WebmeshConn.Conn.RemoteMultiaddr(), c.rpeer)
+		c.Conn.rmaddr = wmproto.Encapsulate(c.Conn.Conn.RemoteMultiaddr(), c.rpeer)
 		if len(psk) > 0 {
 			// We seed the ULA with the PSK
 			c.rula = netutil.GenerateULAWithSeed(psk)
@@ -195,9 +228,9 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK) (netip.AddrPor
 		remoteEndpoint, err = netip.ParseAddrPort(epString)
 		errs <- err
 	}()
-	payload := Negotiation{
-		PeerID:     c.WebmeshConn.lpeer,
-		Endpoints:  c.WebmeshConn.eps,
+	payload := negotiation{
+		PeerID:     c.Conn.lpeer,
+		Endpoints:  c.Conn.eps,
 		SignalPort: l.Addr().(*net.TCPAddr).Port,
 	}
 	data, err := json.Marshal(payload)
