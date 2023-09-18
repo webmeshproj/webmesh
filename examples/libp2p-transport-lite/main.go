@@ -68,6 +68,7 @@ func run() error {
 		opts = libp2p.ChainOptions(
 			libp2p.RandomIdentity,
 			libp2p.Transport(quic.NewTransport),
+			libp2p.Transport(tcp.NewTCPTransport),
 			libp2p.DefaultListenAddrs,
 			libp2p.DefaultSecurity,
 		)
