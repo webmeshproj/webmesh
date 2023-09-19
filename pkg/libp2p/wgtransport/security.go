@@ -56,7 +56,6 @@ func NewSecurity(id protocol.ID, host host.Host, psk pnet.PSK, privkey crypto.Pr
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert private key to webmesh key: %w", err)
 	}
-	// Set the negotiation handler for the security protocol.
 	sec := &SecureTransport{
 		peerID:     peerID,
 		host:       host,
@@ -72,33 +71,30 @@ func (st *SecureTransport) ID() protocol.ID { return st.protocolID }
 
 // SecureInbound secures an inbound connection. If p is empty, connections from any peer are accepted.
 func (st *SecureTransport) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
-	// We throw away the initial insecure connection no matter what and move it to wireguard
-	defer insecure.Close()
-	wc, ok := insecure.(*Conn)
-	if !ok {
-		return nil, fmt.Errorf("failed to secure outbound connection: invalid connection type")
-	}
-	log := context.LoggerFrom(wc.Context())
-	log.Debug("Securing inbound connection")
-	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk, network.DirInbound)
-	if err != nil {
-		log.Error("Failed to secure connection", "error", err.Error())
-		return nil, fmt.Errorf("failed to secure connection: %w", err)
-	}
-	return c, nil
+	return st.secureConn(ctx, insecure, p, network.DirInbound)
 }
 
 // SecureOutbound secures an outbound connection.
 func (st *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
-	// We throw away the initial insecure connection no matter what and move it to wireguard
-	defer insecure.Close()
+	return st.secureConn(ctx, insecure, p, network.DirOutbound)
+}
+
+func (st *SecureTransport) secureConn(ctx context.Context, insecure net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, error) {
 	wc, ok := insecure.(*Conn)
 	if !ok {
-		return nil, fmt.Errorf("failed to secure outbound connection: invalid connection type")
+		defer insecure.Close()
+		return nil, fmt.Errorf("failed to secure connection: invalid connection type")
 	}
+	// We throw away the initial insecure connection no matter what and move it to wireguard
 	log := context.LoggerFrom(wc.Context())
-	log.Debug("Securing outbound connection")
-	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk, network.DirOutbound)
+	ic := wc.Conn
+	defer ic.Close()
+	if dir == network.DirInbound {
+		log.Debug("Securing inbound connection")
+	} else {
+		log.Debug("Securing outbound connection")
+	}
+	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk, dir)
 	if err != nil {
 		log.Error("Failed to secure connection", "error", err.Error())
 		return nil, fmt.Errorf("failed to secure connection: %w", err)
