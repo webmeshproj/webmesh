@@ -23,7 +23,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/libp2p/wgtransport"
+	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	"github.com/webmeshproj/webmesh/pkg/libp2p/security"
 	wmp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/util"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
@@ -62,7 +63,10 @@ func run() error {
 		log.Println("Running webmesh test")
 		opts = libp2p.ChainOptions(
 			libp2p.RandomIdentity,
-			wgtransport.NewOptions(logutil.NewLogger(logLevel)),
+			libp2p.Transport(tcp.NewTCPTransport),
+			libp2p.Security(wmproto.SecurityID, security.New),
+			libp2p.DefaultListenAddrs,
+			libp2p.DefaultSecurity,
 		)
 	case "quic":
 		log.Println("Running QUIC test")
