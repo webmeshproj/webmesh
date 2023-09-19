@@ -100,6 +100,13 @@ func NewTUN(ctx context.Context, name string, mtu uint32) (realName string, clos
 		err = fmt.Errorf("uapi listen: %w", err)
 		return
 	}
+	err = ActivateInterface(ctx, realName)
+	if err != nil {
+		device.Close()
+		uapi.Close()
+		err = fmt.Errorf("activate interface: %w", err)
+		return
+	}
 	// Handle UAPI connections
 	go func() {
 		for {

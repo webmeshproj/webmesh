@@ -165,6 +165,7 @@ func newWebmeshTransport(log *slog.Logger, tu transport.Upgrader, host host.Host
 			return fmt.Sprintf("webmesh%d", r.Intn(1000))
 		}(),
 		ForceName:   true,
+		ForceTUN:    true,
 		MTU:         system.DefaultMTU,
 		NetworkV6:   ula,
 		AddressV6:   netip.PrefixFrom(addr, wmproto.PrefixSize),
