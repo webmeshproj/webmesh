@@ -42,16 +42,14 @@ const (
 	GroupReference = "group:"
 )
 
-// IsSystemNetworkACL returns true if the NetworkACL is a system NetworkACL.
-func IsSystemNetworkACL(name string) bool {
-	return name == BootstrapNodesNetworkACLName
-}
-
 // ErrACLNotFound is returned when a NetworkACL is not found.
 var ErrACLNotFound = errors.New("network acl not found")
 
 // ErrRouteNotFound is returned when a Route is not found.
 var ErrRouteNotFound = errors.New("route not found")
+
+// ErrInvalidACL is returned when a NetworkACL is invalid.
+var ErrInvalidACL = errors.New("invalid network acl")
 
 // GraphResolver is an interface that can return a mesh graph and resolve
 // nodes by their ID.
@@ -67,7 +65,7 @@ type Networking interface {
 	// PutNetworkACL creates or updates a NetworkACL.
 	PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error
 	// GetNetworkACL returns a NetworkACL by name.
-	GetNetworkACL(ctx context.Context, name string) (*ACL, error)
+	GetNetworkACL(ctx context.Context, name string) (ACL, error)
 	// DeleteNetworkACL deletes a NetworkACL by name.
 	DeleteNetworkACL(ctx context.Context, name string) error
 	// ListNetworkACLs returns a list of NetworkACLs.
@@ -103,15 +101,9 @@ type networking struct {
 
 // PutNetworkACL creates or updates a NetworkACL.
 func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error {
-	if IsSystemNetworkACL(acl.GetName()) {
-		// Allow if the system NetworkACL doesn't exist yet
-		_, err := n.GetNetworkACL(ctx, acl.GetName())
-		if err != nil && err != ErrACLNotFound {
-			return err
-		}
-		if err == nil {
-			return fmt.Errorf("cannot update system network acl %s", acl.GetName())
-		}
+	err := ValidateACL(acl)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidACL, err)
 	}
 	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, acl.GetName())
 	data, err := protojson.Marshal(acl)
@@ -126,21 +118,21 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 }
 
 // GetNetworkACL returns a NetworkACL by name.
-func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, error) {
+func (n *networking) GetNetworkACL(ctx context.Context, name string) (ACL, error) {
 	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, name)
 	data, err := n.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
-			return nil, ErrACLNotFound
+			return ACL{}, ErrACLNotFound
 		}
-		return nil, fmt.Errorf("get network acl: %w", err)
+		return ACL{}, fmt.Errorf("get network acl: %w", err)
 	}
 	acl := &v1.NetworkACL{}
 	err = protojson.Unmarshal([]byte(data), acl)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal network acl: %w", err)
+		return ACL{}, fmt.Errorf("unmarshal network acl: %w", err)
 	}
-	return &ACL{
+	return ACL{
 		NetworkACL: acl,
 		storage:    n.MeshStorage,
 	}, nil
@@ -148,12 +140,9 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (*ACL, erro
 
 // DeleteNetworkACL deletes a NetworkACL by name.
 func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
-	if IsSystemNetworkACL(name) {
-		return fmt.Errorf("cannot delete system network acl %s", name)
-	}
 	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, name)
 	err := n.Delete(ctx, key)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrKeyNotFound) {
 		return fmt.Errorf("delete network acl: %w", err)
 	}
 	return nil
@@ -251,7 +240,7 @@ func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr string) ([]*v1.Ro
 func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 	key := fmt.Sprintf("%s/%s", RoutesPrefix, name)
 	err := n.Delete(ctx, key)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrKeyNotFound) {
 		return fmt.Errorf("delete network route: %w", err)
 	}
 	return nil

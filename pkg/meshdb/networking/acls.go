@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package networking contains interfaces to the database models for Network ACLs and Routes.
 package networking
 
 import (
 	"errors"
+	"fmt"
 	"net/netip"
 	"slices"
 	"sort"
@@ -29,8 +29,41 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
+
+// ValidateACL validates a NetworkACL.
+func ValidateACL(acl *v1.NetworkACL) error {
+	if acl.GetName() == "" {
+		return errors.New("acl name is required")
+	}
+	if !dbutil.IsValidID(acl.GetName()) {
+		return errors.New("acl name must be a valid ID")
+	}
+	if _, ok := v1.ACLAction_name[int32(acl.GetAction())]; !ok {
+		return errors.New("invalid acl action")
+	}
+	for _, node := range append(acl.GetSourceNodes(), acl.GetDestinationNodes()...) {
+		if node == "*" {
+			continue
+		}
+		node = strings.TrimPrefix(node, GroupReference)
+		if !dbutil.IsValidID(node) {
+			return fmt.Errorf("invalid source node: %s", node)
+		}
+	}
+	for _, cidr := range append(acl.GetSourceCidrs(), acl.GetDestinationCidrs()...) {
+		if cidr == "*" {
+			continue
+		}
+		_, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			return fmt.Errorf("invalid source cidr: %s", cidr)
+		}
+	}
+	return nil
+}
 
 // SortDirection is the direction to sort ACLs.
 type SortDirection int
@@ -91,40 +124,6 @@ func (a ACLs) Expand(ctx context.Context) error {
 	return nil
 }
 
-// Action wraps a NetworkAction.
-type Action struct {
-	*v1.NetworkAction
-}
-
-// Proto returns the protobuf representation of the action.
-func (a *Action) Proto() *v1.NetworkAction {
-	return a.NetworkAction
-}
-
-// SourcePrefix returns the source prefix for the action if it is valid.
-func (a *Action) SourcePrefix() netip.Prefix {
-	if a.GetSrcCidr() == "" {
-		return netip.Prefix{}
-	}
-	if a.GetSrcCidr() == "*" {
-		return netip.MustParsePrefix("0.0.0.0/0")
-	}
-	out, _ := netip.ParsePrefix(a.GetSrcCidr())
-	return out
-}
-
-// DestinationPrefix returns the destination prefix for the action if it is valid.
-func (a *Action) DestinationPrefix() netip.Prefix {
-	if a.GetDstCidr() == "" {
-		return netip.Prefix{}
-	}
-	if a.GetDstCidr() == "*" {
-		return netip.MustParsePrefix("0.0.0.0/0")
-	}
-	out, _ := netip.ParsePrefix(a.GetDstCidr())
-	return out
-}
-
 // ACL is a Network ACL.
 type ACL struct {
 	*v1.NetworkACL
@@ -134,6 +133,33 @@ type ACL struct {
 // Proto returns the protobuf representation of the ACL.
 func (a *ACL) Proto() *v1.NetworkACL {
 	return a.NetworkACL
+}
+
+// Equals returns whether the ACLs are equal.
+func (a *ACL) Equals(other *ACL) bool {
+	if a.GetName() != other.GetName() {
+		return false
+	}
+	if a.GetPriority() != other.GetPriority() {
+		return false
+	}
+	if a.GetAction() != other.GetAction() {
+		return false
+	}
+	slComps := [][][]string{
+		{a.GetSourceNodes(), other.GetSourceNodes()},
+		{a.GetDestinationNodes(), other.GetDestinationNodes()},
+		{a.GetSourceCidrs(), other.GetSourceCidrs()},
+		{a.GetDestinationCidrs(), other.GetDestinationCidrs()},
+	}
+	for _, toCompare := range slComps {
+		sort.Strings(toCompare[0])
+		sort.Strings(toCompare[1])
+		if !slices.Equal(toCompare[0], toCompare[1]) {
+			return false
+		}
+	}
+	return true
 }
 
 // SourcePrefixes returns the source prefixes for the ACL.

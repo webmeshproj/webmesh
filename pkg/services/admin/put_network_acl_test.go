@@ -22,8 +22,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 )
 
 func TestPutNetworkACL(t *testing.T) {
@@ -37,15 +35,6 @@ func TestPutNetworkACL(t *testing.T) {
 			code: codes.InvalidArgument,
 			req: &v1.NetworkACL{
 				Name:        "",
-				Action:      v1.ACLAction_ACTION_ACCEPT,
-				SourceNodes: []string{"foo"},
-			},
-		},
-		{
-			name: "system network acl",
-			code: codes.InvalidArgument,
-			req: &v1.NetworkACL{
-				Name:        networking.BootstrapNodesNetworkACLName,
 				Action:      v1.ACLAction_ACTION_ACCEPT,
 				SourceNodes: []string{"foo"},
 			},

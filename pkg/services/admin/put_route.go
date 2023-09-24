@@ -27,7 +27,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
@@ -45,6 +45,9 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 	if route.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "route name is required")
 	}
+	if !dbutil.IsValidID(route.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "route name must be a valid ID")
+	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRouteAction.For(route.GetName())); !ok {
 		if err != nil {
 			context.LoggerFrom(ctx).Error("failed to evaluate put route action", "error", err)
@@ -53,7 +56,7 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 	}
 	if route.GetNode() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node name is required")
-	} else if !peers.IsValidID(route.GetNode()) {
+	} else if !dbutil.IsValidNodeID(route.GetNode()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid node ID")
 	}
 	if len(route.GetDestinationCidrs()) == 0 {

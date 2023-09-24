@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
@@ -52,7 +52,7 @@ func (s *Server) PutEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty
 			}
 			return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put the given edge")
 		}
-		if !peers.IsValidID(id) {
+		if !dbutil.IsValidNodeID(id) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid node ID: %s", id)
 		}
 	}

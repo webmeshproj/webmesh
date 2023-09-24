@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 	"time"
 
@@ -39,56 +38,6 @@ import (
 
 // ErrNodeNotFound is returned when a node is not found.
 var ErrNodeNotFound = errors.New("node not found")
-
-// InvalidNodeIDChars are the characters that are not allowed in node IDs.
-var InvalidNodeIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', ','}
-
-// ReservedNodeIDs are reserved node IDs.
-var ReservedNodeIDs = []string{"self", "local", "localhost", "leader", "voters", "observers"}
-
-// IsValidID returns true if the given node ID is valid.
-func IsValidID(id string) bool {
-	if len(id) == 0 {
-		return false
-	}
-	if slices.Contains(ReservedNodeIDs, id) {
-		return false
-	}
-	for _, c := range InvalidNodeIDChars {
-		if strings.ContainsRune(id, c) {
-			return false
-		}
-	}
-	return true
-}
-
-// EdgeAttrsForProto returns the edge attributes for the given protocol.
-func EdgeAttrsForProto(proto v1.ConnectProtocol) map[string]string {
-	attrs := map[string]string{}
-	switch proto {
-	case v1.ConnectProtocol_CONNECT_ICE:
-		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_ICE.String()] = "true"
-	case v1.ConnectProtocol_CONNECT_LIBP2P:
-		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_LIBP2P.String()] = "true"
-	default:
-		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_NATIVE.String()] = "true"
-	}
-	return attrs
-}
-
-// ProtoFromEdgeAttrs returns the protocol for the given edge attributes.
-func ProtoFromEdgeAttrs(attrs map[string]string) v1.ConnectProtocol {
-	if attrs == nil {
-		return v1.ConnectProtocol_CONNECT_NATIVE
-	}
-	if _, ok := attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_ICE.String()]; ok {
-		return v1.ConnectProtocol_CONNECT_ICE
-	}
-	if _, ok := attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_LIBP2P.String()]; ok {
-		return v1.ConnectProtocol_CONNECT_LIBP2P
-	}
-	return v1.ConnectProtocol_CONNECT_NATIVE
-}
 
 // Peers is the peers interface.
 type Peers interface {

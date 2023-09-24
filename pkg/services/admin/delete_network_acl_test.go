@@ -21,8 +21,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 )
 
 func TestDeleteNetworkACL(t *testing.T) {
@@ -35,11 +33,6 @@ func TestDeleteNetworkACL(t *testing.T) {
 			name: "no acl name",
 			code: codes.InvalidArgument,
 			req:  &v1.NetworkACL{},
-		},
-		{
-			name: "system acl",
-			code: codes.InvalidArgument,
-			req:  &v1.NetworkACL{Name: networking.BootstrapNodesNetworkACLName},
 		},
 		{
 			name: "any other acl",

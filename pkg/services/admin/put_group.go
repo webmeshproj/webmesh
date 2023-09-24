@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
@@ -41,6 +41,9 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 	}
 	if group.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name is required")
+	}
+	if !dbutil.IsValidID(group.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "group name must be a valid ID")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putGroupAction.For(group.GetName())); !ok {
 		if err != nil {
@@ -61,7 +64,7 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 			return nil, status.Error(codes.InvalidArgument, "subject type must be one of: USER, NODE, ALL")
 		}
 		// Make sure the subject name is a valid node ID
-		if !peers.IsValidID(subject.GetName()) {
+		if !dbutil.IsValidNodeID(subject.GetName()) {
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}

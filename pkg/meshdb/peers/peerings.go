@@ -29,6 +29,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -88,7 +89,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 		// Each direct adjacent is a peer
 		peer := &v1.WireGuardPeer{
 			Node:          node.MeshNode,
-			Proto:         ProtoFromEdgeAttrs(edge.Properties.Attributes),
+			Proto:         dbutil.ConnectProtoFromEdgeAttrs(edge.Properties.Attributes),
 			AllowedIps:    []string{},
 			AllowedRoutes: []string{},
 		}

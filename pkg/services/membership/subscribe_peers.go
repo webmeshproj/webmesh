@@ -29,6 +29,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	meshpeers "github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	meshgraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -41,7 +42,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	// Validate inputs
 	if req.GetId() == "" {
 		return status.Error(codes.InvalidArgument, "node id required")
-	} else if !meshpeers.IsValidID(req.GetId()) {
+	} else if !dbutil.IsValidNodeID(req.GetId()) {
 		return status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if s.rbac.IsSecure() {

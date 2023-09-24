@@ -32,6 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
@@ -59,7 +60,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	// Validate inputs
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node id required")
-	} else if !peers.IsValidID(req.GetId()) {
+	} else if !dbutil.IsValidNodeID(req.GetId()) {
 		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if len(req.GetRoutes()) > 0 {

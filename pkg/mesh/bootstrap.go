@@ -35,6 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -378,7 +379,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				Source:     s.ID(),
 				Target:     peer,
 				Weight:     0,
-				Attributes: peers.EdgeAttrsForProto(proto),
+				Attributes: dbutil.EdgeAttrsForConnectProto(proto),
 			})
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)

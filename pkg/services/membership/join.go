@@ -32,6 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
@@ -76,7 +77,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Validate inputs
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node id required")
-	} else if !peers.IsValidID(req.GetId()) {
+	} else if !dbutil.IsValidNodeID(req.GetId()) {
 		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if len(req.GetRoutes()) > 0 {
@@ -306,7 +307,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				Source:     peer,
 				Target:     req.GetId(),
 				Weight:     1,
-				Attributes: peers.EdgeAttrsForProto(proto),
+				Attributes: dbutil.EdgeAttrsForConnectProto(proto),
 			})
 			if err != nil {
 				return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))

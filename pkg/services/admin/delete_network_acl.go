@@ -24,7 +24,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 )
 
@@ -47,9 +46,6 @@ func (s *Server) DeleteNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emp
 			context.LoggerFrom(ctx).Error("failed to evaluate delete network acl action", "error", err)
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete network acls")
-	}
-	if networking.IsSystemNetworkACL(acl.GetName()) {
-		return nil, status.Error(codes.InvalidArgument, "cannot delete system network acls")
 	}
 	err := s.networking.DeleteNetworkACL(ctx, acl.GetName())
 	if err != nil {
