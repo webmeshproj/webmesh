@@ -42,20 +42,13 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 	}
 	graph := peers.Graph()
 	nw := networking.New(st)
-	adjacencyMap, err := nw.FilterGraph(ctx, graph, peerID)
+	adjacencyMap, err := nw.FilterGraph(ctx, peers, graph, thisPeer)
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)
 	}
 	routes, err := nw.GetRoutesByNode(ctx, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("get routes by node: %w", err)
-	}
-	acls, err := nw.ListNetworkACLs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list network ACLs: %w", err)
-	}
-	if err := acls.Expand(ctx); err != nil {
-		return nil, fmt.Errorf("expand network ACLs: %w", err)
 	}
 	ourRoutes := make([]netip.Prefix, 0)
 	for _, route := range routes {
@@ -75,23 +68,6 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 			return nil, fmt.Errorf("get vertex: %w", err)
 		}
 		if node.PublicKey == "" {
-			continue
-		}
-		// Check if acls allow access to this node
-		actionv4 := &v1.NetworkAction{
-			SrcNode: thisPeer.Id,
-			SrcCidr: thisPeer.PrivateIpv4,
-			DstNode: node.Id,
-			DstCidr: node.PrivateIpv4,
-		}
-		actionv6 := &v1.NetworkAction{
-			SrcNode: thisPeer.Id,
-			SrcCidr: thisPeer.PrivateIpv6,
-			DstNode: node.Id,
-			DstCidr: node.PrivateIpv6,
-		}
-		if !acls.Accept(ctx, actionv4) || !acls.Accept(ctx, actionv6) {
-			context.LoggerFrom(ctx).Debug("Network ACLs deny access to node", "dest-node", node.Id, "src-node", thisPeer.Id)
 			continue
 		}
 		_, err = crypto.DecodePublicKey(node.PublicKey)
@@ -120,7 +96,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 			AllowedIps:    []string{},
 			AllowedRoutes: []string{},
 		}
-		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, acls, &thisPeer, ourRoutes, &node)
+		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, &thisPeer, ourRoutes, &node)
 		if err != nil {
 			return nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}
@@ -144,7 +120,6 @@ func recursePeers(
 	nw networking.Networking,
 	graph peergraph.Graph,
 	adjacencyMap networking.AdjacencyMap,
-	acls networking.ACLs,
 	thisPeer *peergraph.MeshNode,
 	thisRoutes []netip.Prefix,
 	node *peergraph.MeshNode,
@@ -173,7 +148,7 @@ func recursePeers(
 			}
 		}
 	}
-	edgeIPs, edgeRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, acls, thisPeer, thisRoutes, node, nil)
+	edgeIPs, edgeRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, node, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("recurse edge allowed IPs: %w", err)
 	}
@@ -195,7 +170,6 @@ func recurseEdges(
 	nw networking.Networking,
 	graph peergraph.Graph,
 	adjacencyMap networking.AdjacencyMap,
-	acls networking.ACLs,
 	thisPeer *peergraph.MeshNode,
 	thisRoutes []netip.Prefix,
 	node *peergraph.MeshNode,
@@ -225,23 +199,6 @@ func recurseEdges(
 		if targetNode.PublicKey == "" {
 			continue
 		}
-		// Check if acls allow access to this node
-		actionv4 := &v1.NetworkAction{
-			SrcNode: thisPeer.Id,
-			SrcCidr: thisPeer.PrivateIpv4,
-			DstNode: targetNode.Id,
-			DstCidr: targetNode.PrivateIpv4,
-		}
-		actionv6 := &v1.NetworkAction{
-			SrcNode: thisPeer.Id,
-			SrcCidr: thisPeer.PrivateIpv6,
-			DstNode: targetNode.Id,
-			DstCidr: targetNode.PrivateIpv6,
-		}
-		if !acls.Accept(ctx, actionv4) || !acls.Accept(ctx, actionv6) {
-			context.LoggerFrom(ctx).Debug("Network ACLs deny access to node", "dest-node", targetNode.Id, "src-node", thisPeer.Id)
-			continue
-		}
 		if targetNode.PrivateAddrV4().IsValid() {
 			allowedIPs = append(allowedIPs, targetNode.PrivateAddrV4())
 		}
@@ -266,7 +223,7 @@ func recurseEdges(
 				}
 			}
 		}
-		ips, ipRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, acls, thisPeer, thisRoutes, &targetNode, visited)
+		ips, ipRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, &targetNode, visited)
 		if err != nil {
 			return nil, nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}

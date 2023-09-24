@@ -25,6 +25,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 )
 
@@ -34,6 +35,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 	tt := []struct {
 		name      string
 		peers     []*v1.MeshNode
+		groups    map[string][]string
 		acls      []*v1.NetworkACL
 		edges     map[string][]string // peerID -> []peerID
 		wantPeers map[string][]string // peerID -> []peerID
@@ -51,6 +53,35 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 				"c": {"a", "b"},
 			},
 			acls: []*v1.NetworkACL{},
+			wantPeers: map[string][]string{
+				"a": {},
+				"b": {},
+				"c": {},
+			},
+		},
+		{
+			name: "deny-all ACL",
+			peers: []*v1.MeshNode{
+				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			},
+			edges: map[string][]string{
+				"a": {"b", "c"},
+				"b": {"a", "c"},
+				"c": {"a", "b"},
+			},
+			acls: []*v1.NetworkACL{
+				{
+					Name:             "deny-all",
+					Priority:         0,
+					Action:           v1.ACLAction_ACTION_DENY,
+					SourceNodes:      []string{"*"},
+					DestinationNodes: []string{"*"},
+					SourceCidrs:      []string{"*"},
+					DestinationCidrs: []string{"*"},
+				},
+			},
 			wantPeers: map[string][]string{
 				"a": {},
 				"b": {},
@@ -87,7 +118,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			},
 		},
 		{
-			name: "deny-all ACL",
+			name: "allow-a-b ACL",
 			peers: []*v1.MeshNode{
 				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
 				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
@@ -100,18 +131,16 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			},
 			acls: []*v1.NetworkACL{
 				{
-					Name:             "deny-all",
+					Name:             "allow-a-b",
 					Priority:         0,
-					Action:           v1.ACLAction_ACTION_DENY,
-					SourceNodes:      []string{"*"},
-					DestinationNodes: []string{"*"},
-					SourceCidrs:      []string{"*"},
-					DestinationCidrs: []string{"*"},
+					Action:           v1.ACLAction_ACTION_ACCEPT,
+					SourceNodes:      []string{"a", "b"},
+					DestinationNodes: []string{"a", "b"},
 				},
 			},
 			wantPeers: map[string][]string{
-				"a": {},
-				"b": {},
+				"a": {"b"},
+				"b": {"a"},
 				"c": {},
 			},
 		},
@@ -121,6 +150,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 		testCase := tc
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+			// Prepare the test database
 			ctx := context.Background()
 			db, err := badgerdb.New(badgerdb.Options{InMemory: true})
 			if err != nil {
@@ -128,11 +158,30 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			}
 			defer db.Close()
 			peerdb := New(db)
-			nw := networking.New(db)
+			rbacdb := rbac.New(db)
+			nwdb := networking.New(db)
 			for _, peer := range testCase.peers {
 				peer.PublicKey = mustGenerateKey(t)
 				if err := peerdb.Put(ctx, peer); err != nil {
 					t.Fatalf("create peer: %v", err)
+				}
+			}
+			for groupName, peers := range testCase.groups {
+				err := rbacdb.PutGroup(ctx, &v1.Group{
+					Name: groupName,
+					Subjects: func() []*v1.Subject {
+						var out []*v1.Subject
+						for _, peerID := range peers {
+							out = append(out, &v1.Subject{
+								Type: v1.SubjectType_SUBJECT_ALL,
+								Name: peerID,
+							})
+						}
+						return out
+					}(),
+				})
+				if err != nil {
+					t.Fatalf("create group %q: %v", groupName, err)
 				}
 			}
 			for peerID, edges := range testCase.edges {
@@ -147,10 +196,11 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 				}
 			}
 			for _, acl := range testCase.acls {
-				if err := nw.PutNetworkACL(ctx, acl); err != nil {
+				if err := nwdb.PutNetworkACL(ctx, acl); err != nil {
 					t.Fatalf("create network ACL: %v", err)
 				}
 			}
+			// Run the test cases
 			for peerID := range testCase.wantPeers {
 				peers, err := WireGuardPeersFor(ctx, db, peerID)
 				if err != nil {

@@ -19,6 +19,7 @@ package networking
 
 import (
 	"errors"
+	"net/netip"
 	"slices"
 	"sort"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
@@ -89,6 +91,40 @@ func (a ACLs) Expand(ctx context.Context) error {
 	return nil
 }
 
+// Action wraps a NetworkAction.
+type Action struct {
+	*v1.NetworkAction
+}
+
+// Proto returns the protobuf representation of the action.
+func (a *Action) Proto() *v1.NetworkAction {
+	return a.NetworkAction
+}
+
+// SourcePrefix returns the source prefix for the action if it is valid.
+func (a *Action) SourcePrefix() netip.Prefix {
+	if a.GetSrcCidr() == "" {
+		return netip.Prefix{}
+	}
+	if a.GetSrcCidr() == "*" {
+		return netip.MustParsePrefix("0.0.0.0/0")
+	}
+	out, _ := netip.ParsePrefix(a.GetSrcCidr())
+	return out
+}
+
+// DestinationPrefix returns the destination prefix for the action if it is valid.
+func (a *Action) DestinationPrefix() netip.Prefix {
+	if a.GetDstCidr() == "" {
+		return netip.Prefix{}
+	}
+	if a.GetDstCidr() == "*" {
+		return netip.MustParsePrefix("0.0.0.0/0")
+	}
+	out, _ := netip.ParsePrefix(a.GetDstCidr())
+	return out
+}
+
 // ACL is a Network ACL.
 type ACL struct {
 	*v1.NetworkACL
@@ -98,6 +134,36 @@ type ACL struct {
 // Proto returns the protobuf representation of the ACL.
 func (a *ACL) Proto() *v1.NetworkACL {
 	return a.NetworkACL
+}
+
+// SourcePrefixes returns the source prefixes for the ACL.
+// Invalid prefixes will be ignored.
+func (a *ACL) SourcePrefixes() []netip.Prefix {
+	return toPrefixes(a.GetSourceCidrs())
+}
+
+// DestinationPrefixes returns the destination prefixes for the ACL.
+// Invalid prefixes will be ignored.
+func (a *ACL) DestinationPrefixes() []netip.Prefix {
+	return toPrefixes(a.GetDestinationCidrs())
+}
+
+func toPrefixes(ss []string) []netip.Prefix {
+	var out []netip.Prefix
+	for _, cidr := range ss {
+		var prefix netip.Prefix
+		var err error
+		if cidr == "*" {
+			prefix = netip.MustParsePrefix("0.0.0.0/0")
+		} else {
+			prefix, err = netip.ParsePrefix(cidr)
+			if err != nil {
+				continue
+			}
+		}
+		out = append(out, prefix)
+	}
+	return out
 }
 
 // Expand expands any group references in the ACL.
@@ -155,13 +221,31 @@ func (a *ACL) Expand(ctx context.Context) error {
 	return nil
 }
 
+// AllowNodesToCommunicate checks if the given nodes are allowed to communicate.
+func (a ACLs) AllowNodesToCommunicate(ctx context.Context, nodeA, nodeB peergraph.MeshNode) bool {
+	v4action := Action{
+		NetworkAction: &v1.NetworkAction{
+			SrcNode: nodeA.Id,
+			SrcCidr: nodeA.PrivateIpv4,
+			DstNode: nodeB.Id,
+			DstCidr: nodeB.PrivateIpv4,
+		},
+	}
+	v6action := Action{
+		NetworkAction: &v1.NetworkAction{
+			SrcNode: nodeA.Id,
+			SrcCidr: nodeA.PrivateIpv6,
+			DstNode: nodeB.Id,
+			DstCidr: nodeB.PrivateIpv6,
+		},
+	}
+	return a.Accept(ctx, v4action) || a.Accept(ctx, v6action)
+}
+
 // Accept evaluates an action against the ACLs in the list. It assumes the ACLs
 // are sorted by priority. The first ACL that matches the action will be used.
 // If no ACL matches, the action is denied.
-func (a ACLs) Accept(ctx context.Context, action *v1.NetworkAction) bool {
-	if a == nil {
-		return false
-	}
+func (a ACLs) Accept(ctx context.Context, action Action) bool {
 	for _, acl := range a {
 		if acl.Matches(ctx, action) {
 			context.LoggerFrom(ctx).Debug("Network ACL matches action", "action", action, "acl", acl)
@@ -173,33 +257,25 @@ func (a ACLs) Accept(ctx context.Context, action *v1.NetworkAction) bool {
 }
 
 // Matches checks if an action matches this ACL.
-func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
-	if action.GetSrcNode() != "" {
-		if len(acl.GetSourceNodes()) >= 0 {
-			if !containsOrWildcardMatch(acl.GetSourceNodes(), action.GetSrcNode()) {
-				return false
-			}
+func (acl *ACL) Matches(ctx context.Context, action Action) bool {
+	if action.GetSrcNode() != "" && len(acl.GetSourceNodes()) >= 0 {
+		if !containsOrWildcardMatch(acl.GetSourceNodes(), action.GetSrcNode()) {
+			return false
 		}
 	}
-	if action.GetDstNode() != "" {
-		if len(acl.GetDestinationNodes()) >= 0 {
-			if !containsOrWildcardMatch(acl.GetDestinationNodes(), action.GetDstNode()) {
-				return false
-			}
+	if action.GetDstNode() != "" && len(acl.GetDestinationNodes()) >= 0 {
+		if !containsOrWildcardMatch(acl.GetDestinationNodes(), action.GetDstNode()) {
+			return false
 		}
 	}
-	if action.GetSrcCidr() != "" {
-		if len(acl.GetSourceCidrs()) >= 0 {
-			if !containsOrWildcardMatch(acl.GetSourceCidrs(), action.GetSrcCidr()) {
-				return false
-			}
+	if action.SourcePrefix().IsValid() && len(acl.GetSourceCidrs()) > 0 {
+		if !containsAddress(acl.SourcePrefixes(), action.SourcePrefix().Addr()) {
+			return false
 		}
 	}
-	if action.GetDstCidr() != "" {
-		if len(acl.GetDestinationCidrs()) >= 0 {
-			if !containsOrWildcardMatch(acl.GetDestinationCidrs(), action.GetDstCidr()) {
-				return false
-			}
+	if action.DestinationPrefix().IsValid() && len(acl.GetDestinationCidrs()) > 0 {
+		if !containsAddress(acl.DestinationPrefixes(), action.DestinationPrefix().Addr()) {
+			return false
 		}
 	}
 	return true
@@ -207,24 +283,16 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 
 func containsOrWildcardMatch(ss []string, s string) bool {
 	for _, v := range ss {
-		if v == "*" {
+		if v == "*" || v == s {
 			return true
-		} else if strings.Contains(v, "*") {
-			if strings.HasPrefix(v, "*") {
-				if strings.HasSuffix(s, strings.TrimPrefix(v, "*")) {
-					return true
-				}
-			} else if strings.HasSuffix(v, "*") {
-				if strings.HasPrefix(s, strings.TrimSuffix(v, "*")) {
-					return true
-				}
-			} else {
-				parts := strings.Split(v, "*")
-				if strings.HasPrefix(s, parts[0]) && strings.HasSuffix(s, parts[1]) {
-					return true
-				}
-			}
-		} else if v == s {
+		}
+	}
+	return false
+}
+
+func containsAddress(cidrs []netip.Prefix, addr netip.Addr) bool {
+	for _, cidr := range cidrs {
+		if cidr.Addr().IsUnspecified() || cidr.Contains(addr) {
 			return true
 		}
 	}
