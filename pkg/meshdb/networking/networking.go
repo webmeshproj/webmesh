@@ -23,7 +23,6 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -54,8 +53,12 @@ var ErrACLNotFound = errors.New("network acl not found")
 // ErrRouteNotFound is returned when a Route is not found.
 var ErrRouteNotFound = errors.New("route not found")
 
-// NodeGetter is an interface that can resolve a node ID to a MeshNode.
-type NodeGetter interface {
+// GraphResolver is an interface that can return a mesh graph and resolve
+// nodes by their ID.
+type GraphResolver interface {
+	// Graph returns the mesh graph.
+	Graph() peergraph.Graph
+	// Get returns a node by ID.
 	Get(ctx context.Context, id string) (peergraph.MeshNode, error)
 }
 
@@ -83,14 +86,11 @@ type Networking interface {
 	// ListRoutes returns a list of Routes.
 	ListRoutes(ctx context.Context) ([]*v1.Route, error)
 
-	// FilterGraph filters the adjacency map in the given graph for the given node name according
+	// FilterGraph filters the adjacency map in the given graph for the given node ID according
 	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
 	// error is returned on faiure building the initial map or any database error.
-	FilterGraph(ctx context.Context, getter NodeGetter, peerGraph peergraph.Graph, node peergraph.MeshNode) (AdjacencyMap, error)
+	FilterGraph(ctx context.Context, resolver GraphResolver, nodeID string) (peergraph.AdjacencyMap, error)
 }
-
-// AdjacencyMap is a map of node names to a map of node names to edges.
-type AdjacencyMap map[string]map[string]graph.Edge[string]
 
 // New returns a new Networking interface.
 func New(st storage.MeshStorage) Networking {
@@ -281,25 +281,36 @@ func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
 // needs improvement to be more efficient and to allow edges so long as one of the routes encountered is
 // allowed. Currently if a single route provided by a destination node is not allowed, the entire node
 // is filtered out.
-func (n *networking) FilterGraph(ctx context.Context, getter NodeGetter, peerGraph peergraph.Graph, thisNode peergraph.MeshNode) (AdjacencyMap, error) {
+func (n *networking) FilterGraph(ctx context.Context, resolver GraphResolver, thisNodeID string) (peergraph.AdjacencyMap, error) {
 	log := context.LoggerFrom(ctx)
+
+	// Resolve the current node ID
+	thisNode, err := resolver.Get(ctx, thisNodeID)
+	if err != nil {
+		return nil, fmt.Errorf("get node: %w", err)
+	}
 
 	// Gather all the ACLs and the current adjacency map
 	acls, err := n.ListNetworkACLs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network acls: %w", err)
 	}
+	if len(acls) == 0 {
+		return nil, nil
+	}
 	err = acls.Expand(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("expand network acls: %w", err)
 	}
-	fullMap, err := peerGraph.AdjacencyMap()
+	fullMap, err := peergraph.BuildAdjacencyMap(resolver.Graph())
 	if err != nil {
 		return nil, fmt.Errorf("build adjacency map: %w", err)
 	}
-
 	log.Debug("Full adjacency map", "from", thisNode.Id, "map", fullMap)
-	filtered := make(AdjacencyMap)
+
+	// Start with a copy of the full map and filter out nodes that are not allowed to communicate
+	// with the current node.
+	filtered := make(peergraph.AdjacencyMap)
 	filtered[thisNode.Id] = fullMap[thisNode.Id]
 
 Nodes:
@@ -307,7 +318,7 @@ Nodes:
 		if nodeID == thisNode.Id {
 			continue
 		}
-		node, err := getter.Get(ctx, nodeID)
+		node, err := resolver.Get(ctx, nodeID)
 		if err != nil {
 			return nil, fmt.Errorf("get node: %w", err)
 		}
@@ -355,7 +366,7 @@ Nodes:
 				}
 			}
 		}
-		filtered[node.GetId()] = make(map[string]graph.Edge[string])
+		filtered[node.GetId()] = make(map[string]peergraph.Edge)
 	}
 	for node := range filtered {
 		edges, ok := fullMap[node]
@@ -369,7 +380,7 @@ Nodes:
 				filtered[node][peerID] = e
 				continue
 			}
-			peer, err := getter.Get(ctx, peerID)
+			peer, err := resolver.Get(ctx, peerID)
 			if err != nil {
 				return nil, fmt.Errorf("get peer: %w", err)
 			}

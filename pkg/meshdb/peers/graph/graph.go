@@ -34,6 +34,12 @@ import (
 // Graph is the graph.Graph implementation for the mesh network.
 type Graph graph.Graph[string, MeshNode]
 
+// Edge is the graph.Edge implementation for the mesh network.
+type Edge graph.Edge[string]
+
+// AdjacencyMap is a map of node names to a map of node names to edges.
+type AdjacencyMap map[string]map[string]Edge
+
 // GraphStore implements graph.Store[string, Node] where
 // string is the node ID and Node is the node itself.
 type GraphStore struct {
@@ -65,6 +71,22 @@ func graphHasher(n MeshNode) string { return n.GetId() }
 
 // ErrEdgeNotFound is returned when an edge is not found.
 var ErrEdgeNotFound = graph.ErrEdgeNotFound
+
+// BuildAdjacencyMap returns the adjacency map for the graph.
+func BuildAdjacencyMap(g Graph) (AdjacencyMap, error) {
+	m, err := g.AdjacencyMap()
+	if err != nil {
+		return nil, fmt.Errorf("get adjacency map: %w", err)
+	}
+	out := make(AdjacencyMap, len(m))
+	for source, targets := range m {
+		out[source] = make(map[string]Edge, len(targets))
+		for target, edge := range targets {
+			out[source][target] = Edge(edge)
+		}
+	}
+	return out, nil
+}
 
 // AddVertex should add the given vertex with the given hash value and vertex properties to the
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no

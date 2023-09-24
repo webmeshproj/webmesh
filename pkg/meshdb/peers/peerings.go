@@ -36,13 +36,9 @@ import (
 // Peers are filtered by network ACLs.
 func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID string) ([]*v1.WireGuardPeer, error) {
 	peers := New(st)
-	thisPeer, err := peers.Get(ctx, peerID)
-	if err != nil {
-		return nil, fmt.Errorf("get peer: %w", err)
-	}
 	graph := peers.Graph()
 	nw := networking.New(st)
-	adjacencyMap, err := nw.FilterGraph(ctx, peers, graph, thisPeer)
+	adjacencyMap, err := nw.FilterGraph(ctx, peers, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)
 	}
@@ -96,7 +92,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 			AllowedIps:    []string{},
 			AllowedRoutes: []string{},
 		}
-		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, &thisPeer, ourRoutes, &node)
+		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, peerID, ourRoutes, &node)
 		if err != nil {
 			return nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}
@@ -119,8 +115,8 @@ func recursePeers(
 	ctx context.Context,
 	nw networking.Networking,
 	graph peergraph.Graph,
-	adjacencyMap networking.AdjacencyMap,
-	thisPeer *peergraph.MeshNode,
+	adjacencyMap peergraph.AdjacencyMap,
+	thisPeer string,
 	thisRoutes []netip.Prefix,
 	node *peergraph.MeshNode,
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
@@ -169,8 +165,8 @@ func recurseEdges(
 	ctx context.Context,
 	nw networking.Networking,
 	graph peergraph.Graph,
-	adjacencyMap networking.AdjacencyMap,
-	thisPeer *peergraph.MeshNode,
+	adjacencyMap peergraph.AdjacencyMap,
+	thisPeer string,
 	thisRoutes []netip.Prefix,
 	node *peergraph.MeshNode,
 	visited map[string]struct{},
@@ -178,11 +174,11 @@ func recurseEdges(
 	if visited == nil {
 		visited = make(map[string]struct{})
 	}
-	directAdjacents := adjacencyMap[thisPeer.Id]
+	directAdjacents := adjacencyMap[thisPeer]
 	visited[node.GetId()] = struct{}{}
 	targets := adjacencyMap[node.GetId()]
 	for target := range targets {
-		if target == thisPeer.Id {
+		if target == thisPeer {
 			continue
 		}
 		if _, ok := directAdjacents[target]; ok {
