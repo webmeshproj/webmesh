@@ -74,17 +74,11 @@ ifndef ($(TEST_PARALLEL))
 endif
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
-ci: fmt vet test-junit ## Run all CI tests.
+ci-test: fmt vet test ## Run all CI tests.
 
 test: ## Run unit tests.
 	$(GO) install github.com/kyoh86/richgo@latest
 	$(GOBIN)/richgo test $(TEST_ARGS) ./...
-	$(GO) tool cover -func=$(COVERAGE_FILE)
-
-test-junit: ## Run unit tests and output junit xml
-	$(GO) install github.com/jstemmer/go-junit-report/v2@latest
-	$(GO) test $(TEST_ARGS) ./... 2>&1 \
-		| $(GOBIN)/go-junit-report -set-exit-code > junit-report.xml
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 lint: ## Run linters.

@@ -52,7 +52,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: "read"
-      checks: "write"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -67,13 +66,7 @@ jobs:
         shell: bash
         env:
           TEST_PARALLEL: 8
-        run: make ci
-
-      - name: Publish Test Report
-        uses: mikepenz/action-junit-report@v4
-        if: success() || failure()
-        with:
-          report_paths: "junit-report.xml"
+        run: make ci-test
 
   build-binaries:
     name: Build Binary Artifacts
