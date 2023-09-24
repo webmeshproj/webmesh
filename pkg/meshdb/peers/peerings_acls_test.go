@@ -1,0 +1,171 @@
+/*
+Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package peers
+
+import (
+	"context"
+	"sort"
+	"testing"
+
+	v1 "github.com/webmeshproj/api/v1"
+	"golang.org/x/exp/slices"
+
+	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
+)
+
+func TestWireGuardPeersWithACLs(t *testing.T) {
+	t.Parallel()
+
+	tt := []struct {
+		name      string
+		peers     []*v1.MeshNode
+		acls      []*v1.NetworkACL
+		edges     map[string][]string // peerID -> []peerID
+		wantPeers map[string][]string // peerID -> []peerID
+	}{
+		{
+			name: "no ACLs",
+			peers: []*v1.MeshNode{
+				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			},
+			edges: map[string][]string{
+				"a": {"b", "c"},
+				"b": {"a", "c"},
+				"c": {"a", "b"},
+			},
+			acls: []*v1.NetworkACL{},
+			wantPeers: map[string][]string{
+				"a": {},
+				"b": {},
+				"c": {},
+			},
+		},
+		{
+			name: "accept-all ACL",
+			peers: []*v1.MeshNode{
+				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			},
+			edges: map[string][]string{
+				"a": {"b", "c"},
+				"b": {"a", "c"},
+				"c": {"a", "b"},
+			},
+			acls: []*v1.NetworkACL{
+				{
+					Name:             "allow-all",
+					Priority:         0,
+					Action:           v1.ACLAction_ACTION_ACCEPT,
+					SourceNodes:      []string{"*"},
+					DestinationNodes: []string{"*"},
+					SourceCidrs:      []string{"*"},
+					DestinationCidrs: []string{"*"},
+				},
+			},
+			wantPeers: map[string][]string{
+				"a": {"b", "c"},
+				"b": {"a", "c"},
+				"c": {"a", "b"},
+			},
+		},
+		{
+			name: "deny-all ACL",
+			peers: []*v1.MeshNode{
+				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			},
+			edges: map[string][]string{
+				"a": {"b", "c"},
+				"b": {"a", "c"},
+				"c": {"a", "b"},
+			},
+			acls: []*v1.NetworkACL{
+				{
+					Name:             "deny-all",
+					Priority:         0,
+					Action:           v1.ACLAction_ACTION_DENY,
+					SourceNodes:      []string{"*"},
+					DestinationNodes: []string{"*"},
+					SourceCidrs:      []string{"*"},
+					DestinationCidrs: []string{"*"},
+				},
+			},
+			wantPeers: map[string][]string{
+				"a": {},
+				"b": {},
+				"c": {},
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		testCase := tc
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			db, err := badgerdb.New(badgerdb.Options{InMemory: true})
+			if err != nil {
+				t.Fatalf("create test db: %v", err)
+			}
+			defer db.Close()
+			peerdb := New(db)
+			nw := networking.New(db)
+			for _, peer := range testCase.peers {
+				peer.PublicKey = mustGenerateKey(t)
+				if err := peerdb.Put(ctx, peer); err != nil {
+					t.Fatalf("create peer: %v", err)
+				}
+			}
+			for peerID, edges := range testCase.edges {
+				for _, edge := range edges {
+					err = peerdb.PutEdge(ctx, &v1.MeshEdge{
+						Source: peerID,
+						Target: edge,
+					})
+					if err != nil {
+						t.Fatalf("put edge from %q to %q: %v", peerID, edge, err)
+					}
+				}
+			}
+			for _, acl := range testCase.acls {
+				if err := nw.PutNetworkACL(ctx, acl); err != nil {
+					t.Fatalf("create network ACL: %v", err)
+				}
+			}
+			for peerID := range testCase.wantPeers {
+				peers, err := WireGuardPeersFor(ctx, db, peerID)
+				if err != nil {
+					t.Fatalf("get WireGuard peers for %q: %v", peerID, err)
+				}
+				gotPeers := make([]string, 0, len(peers))
+				for _, peer := range peers {
+					gotPeers = append(gotPeers, peer.Node.Id)
+				}
+				sort.Strings(gotPeers)
+				sort.Strings(testCase.wantPeers[peerID])
+				if !slices.Equal(gotPeers, testCase.wantPeers[peerID]) {
+					t.Errorf("WireGuardPeersFor(%q) = %v, want %v", peerID, gotPeers, testCase.wantPeers[peerID])
+				}
+			}
+		})
+	}
+}

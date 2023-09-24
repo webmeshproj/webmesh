@@ -30,7 +30,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 )
 
-func TestWireGuardPeers(t *testing.T) {
+func TestWireGuardTopologies(t *testing.T) {
 	t.Parallel()
 
 	tt := []struct {
@@ -429,7 +429,9 @@ func TestWireGuardPeers(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
+		testCase := tc
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			db, err := badgerdb.New(badgerdb.Options{InMemory: true})
 			if err != nil {
@@ -450,10 +452,10 @@ func TestWireGuardPeers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("put network acl: %v", err)
 			}
-			for peerID, addrs := range tc.peers {
+			for peerID, addrs := range testCase.peers {
 				err = peerdb.Put(ctx, &v1.MeshNode{
 					Id:          peerID,
-					PublicKey:   mustGenerateEncodedKey(t),
+					PublicKey:   mustGenerateKey(t),
 					PrivateIpv4: netip.MustParsePrefix(addrs[0]).String(),
 					PrivateIpv6: netip.MustParsePrefix(addrs[1]).String(),
 				})
@@ -461,7 +463,7 @@ func TestWireGuardPeers(t *testing.T) {
 					t.Fatalf("put peer %q: %v", peerID, err)
 				}
 			}
-			for peerID, edges := range tc.edges {
+			for peerID, edges := range testCase.edges {
 				for _, edge := range edges {
 					err = peerdb.PutEdge(ctx, &v1.MeshEdge{
 						Source: peerID,
@@ -472,7 +474,7 @@ func TestWireGuardPeers(t *testing.T) {
 					}
 				}
 			}
-			for peer, want := range tc.wantIPs {
+			for peer, want := range testCase.wantIPs {
 				peers, err := WireGuardPeersFor(ctx, db, peer)
 				if err != nil {
 					t.Fatalf("get peers for %q: %v", peer, err)
@@ -494,7 +496,7 @@ func TestWireGuardPeers(t *testing.T) {
 	}
 }
 
-func mustGenerateEncodedKey(t *testing.T) string {
+func mustGenerateKey(t *testing.T) string {
 	t.Helper()
 	key, err := crypto.GenerateKey()
 	if err != nil {

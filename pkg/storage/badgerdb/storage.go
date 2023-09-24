@@ -60,7 +60,7 @@ type badgerDB struct {
 	mu                sync.RWMutex
 }
 
-// New creates a new NutsDB storage.
+// New creates a new BadgerDB storage.
 func New(opts Options) (storage.DualStorage, error) {
 	badgeropts := badger.DefaultOptions(opts.DiskPath).
 		WithNumGoroutines(16) // TODO: make this configurable
