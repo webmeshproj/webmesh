@@ -35,7 +35,12 @@ import (
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
 // Peers are filtered by network ACLs.
 func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID string) ([]*v1.WireGuardPeer, error) {
-	graph := New(st).Graph()
+	peers := New(st)
+	thisPeer, err := peers.Get(ctx, peerID)
+	if err != nil {
+		return nil, fmt.Errorf("get peer: %w", err)
+	}
+	graph := peers.Graph()
 	nw := networking.New(st)
 	adjacencyMap, err := nw.FilterGraph(ctx, graph, peerID)
 	if err != nil {
@@ -72,6 +77,23 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 		if node.PublicKey == "" {
 			continue
 		}
+		// Check if acls allow access to this node
+		actionv4 := &v1.NetworkAction{
+			SrcNode: thisPeer.Id,
+			SrcCidr: thisPeer.PrivateIpv4,
+			DstNode: node.Id,
+			DstCidr: node.PrivateIpv4,
+		}
+		actionv6 := &v1.NetworkAction{
+			SrcNode: thisPeer.Id,
+			SrcCidr: thisPeer.PrivateIpv6,
+			DstNode: node.Id,
+			DstCidr: node.PrivateIpv6,
+		}
+		if !acls.Accept(ctx, actionv4) || !acls.Accept(ctx, actionv6) {
+			context.LoggerFrom(ctx).Debug("Network ACLs deny access to node", "dest-node", node.Id, "src-node", thisPeer.Id)
+			continue
+		}
 		_, err = crypto.DecodePublicKey(node.PublicKey)
 		if err != nil {
 			context.LoggerFrom(ctx).Error("Node has invalid public key, ignoring", "node", node.Id, "public_key", node.PublicKey)
@@ -90,35 +112,15 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 		if primaryEndpoint == "" && len(node.WireguardEndpoints) > 0 {
 			primaryEndpoint = node.WireguardEndpoints[0]
 		}
+		node.MeshNode.PrimaryEndpoint = primaryEndpoint
 		// Each direct adjacent is a peer
 		peer := &v1.WireGuardPeer{
-			Node: &v1.MeshNode{
-				Id:                 node.Id,
-				PublicKey:          node.PublicKey,
-				PrimaryEndpoint:    primaryEndpoint,
-				WireguardEndpoints: node.WireguardEndpoints,
-				ZoneAwarenessId:    node.ZoneAwarenessId,
-				Multiaddrs:         node.Multiaddrs,
-				PrivateIpv4: func() string {
-					if node.PrivateAddrV4().IsValid() {
-						return node.PrivateAddrV4().String()
-					}
-					return ""
-				}(),
-				PrivateIpv6: func() string {
-					if node.PrivateAddrV6().IsValid() {
-						return node.PrivateAddrV6().String()
-					}
-					return ""
-				}(),
-				Features: node.Features,
-				JoinedAt: node.JoinedAt,
-			},
+			Node:          node.MeshNode,
 			Proto:         ProtoFromEdgeAttrs(edge.Properties.Attributes),
 			AllowedIps:    []string{},
 			AllowedRoutes: []string{},
 		}
-		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, peerID, ourRoutes, &node)
+		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, acls, &thisPeer, ourRoutes, &node)
 		if err != nil {
 			return nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}
@@ -142,7 +144,8 @@ func recursePeers(
 	nw networking.Networking,
 	graph peergraph.Graph,
 	adjacencyMap networking.AdjacencyMap,
-	thisPeer string,
+	acls networking.ACLs,
+	thisPeer *peergraph.MeshNode,
 	thisRoutes []netip.Prefix,
 	node *peergraph.MeshNode,
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
@@ -170,7 +173,7 @@ func recursePeers(
 			}
 		}
 	}
-	edgeIPs, edgeRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, node, nil)
+	edgeIPs, edgeRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, acls, thisPeer, thisRoutes, node, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("recurse edge allowed IPs: %w", err)
 	}
@@ -192,7 +195,8 @@ func recurseEdges(
 	nw networking.Networking,
 	graph peergraph.Graph,
 	adjacencyMap networking.AdjacencyMap,
-	thisPeer string,
+	acls networking.ACLs,
+	thisPeer *peergraph.MeshNode,
 	thisRoutes []netip.Prefix,
 	node *peergraph.MeshNode,
 	visited map[string]struct{},
@@ -200,11 +204,11 @@ func recurseEdges(
 	if visited == nil {
 		visited = make(map[string]struct{})
 	}
-	directAdjacents := adjacencyMap[thisPeer]
+	directAdjacents := adjacencyMap[thisPeer.Id]
 	visited[node.GetId()] = struct{}{}
 	targets := adjacencyMap[node.GetId()]
 	for target := range targets {
-		if target == thisPeer {
+		if target == thisPeer.Id {
 			continue
 		}
 		if _, ok := directAdjacents[target]; ok {
@@ -219,6 +223,23 @@ func recurseEdges(
 			return nil, nil, fmt.Errorf("get vertex: %w", err)
 		}
 		if targetNode.PublicKey == "" {
+			continue
+		}
+		// Check if acls allow access to this node
+		actionv4 := &v1.NetworkAction{
+			SrcNode: thisPeer.Id,
+			SrcCidr: thisPeer.PrivateIpv4,
+			DstNode: targetNode.Id,
+			DstCidr: targetNode.PrivateIpv4,
+		}
+		actionv6 := &v1.NetworkAction{
+			SrcNode: thisPeer.Id,
+			SrcCidr: thisPeer.PrivateIpv6,
+			DstNode: targetNode.Id,
+			DstCidr: targetNode.PrivateIpv6,
+		}
+		if !acls.Accept(ctx, actionv4) || !acls.Accept(ctx, actionv6) {
+			context.LoggerFrom(ctx).Debug("Network ACLs deny access to node", "dest-node", targetNode.Id, "src-node", thisPeer.Id)
 			continue
 		}
 		if targetNode.PrivateAddrV4().IsValid() {
@@ -245,7 +266,7 @@ func recurseEdges(
 				}
 			}
 		}
-		ips, ipRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, thisPeer, thisRoutes, &targetNode, visited)
+		ips, ipRoutes, err := recurseEdges(ctx, nw, graph, adjacencyMap, acls, thisPeer, thisRoutes, &targetNode, visited)
 		if err != nil {
 			return nil, nil, fmt.Errorf("recurse allowed IPs: %w", err)
 		}

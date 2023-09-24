@@ -110,8 +110,7 @@ func (g *GraphStore) Vertex(nodeID string) (node MeshNode, props graph.VertexPro
 		}
 		return
 	}
-	node = MeshNode{&v1.MeshNode{}}
-	err = protojson.Unmarshal([]byte(data), node.MeshNode)
+	err = node.Unmarshal([]byte(data))
 	if err != nil {
 		err = fmt.Errorf("unmarshal node: %w", err)
 	}

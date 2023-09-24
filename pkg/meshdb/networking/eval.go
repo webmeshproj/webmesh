@@ -89,7 +89,7 @@ func (a ACLs) Expand(ctx context.Context) error {
 	return nil
 }
 
-// ACL is a Network ACL. It contains a reference to the database for evaluating group membership.
+// ACL is a Network ACL.
 type ACL struct {
 	*v1.NetworkACL
 	storage storage.MeshStorage
@@ -110,6 +110,7 @@ func (a *ACL) Expand(ctx context.Context) error {
 			continue
 		}
 		groupName := strings.TrimPrefix(node, GroupReference)
+		context.LoggerFrom(ctx).Debug("Expanding group reference", "group", groupName)
 		group, err := rbac.New(a.storage).GetGroup(ctx, groupName)
 		if err != nil {
 			if !errors.Is(err, rbac.ErrGroupNotFound) {
@@ -134,6 +135,7 @@ func (a *ACL) Expand(ctx context.Context) error {
 			continue
 		}
 		groupName := strings.TrimPrefix(node, GroupReference)
+		context.LoggerFrom(ctx).Debug("Expanding group reference", "group", groupName)
 		group, err := rbac.New(a.storage).GetGroup(ctx, groupName)
 		if err != nil {
 			if !errors.Is(err, rbac.ErrGroupNotFound) {
@@ -162,14 +164,15 @@ func (a ACLs) Accept(ctx context.Context, action *v1.NetworkAction) bool {
 	}
 	for _, acl := range a {
 		if acl.Matches(ctx, action) {
+			context.LoggerFrom(ctx).Debug("Network ACL matches action", "action", action, "acl", acl)
 			return acl.Action == v1.ACLAction_ACTION_ACCEPT
 		}
 	}
+	context.LoggerFrom(ctx).Debug("No network ACL matches action, denying", "action", action)
 	return false
 }
 
-// Matches checks if an action matches this ACL. If a database query fails it will log the
-// error and return false.
+// Matches checks if an action matches this ACL.
 func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 	if action.GetSrcNode() != "" {
 		if len(acl.GetSourceNodes()) >= 0 {
