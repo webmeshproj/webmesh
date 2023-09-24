@@ -144,6 +144,33 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 				"c": {},
 			},
 		},
+		{
+			name: "allow-a-b-c ACL",
+			peers: []*v1.MeshNode{
+				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			},
+			edges: map[string][]string{
+				"a": {"b", "c"},
+				"b": {"a", "c"},
+				"c": {"a", "b"},
+			},
+			acls: []*v1.NetworkACL{
+				{
+					Name:             "allow-a-b-c",
+					Priority:         0,
+					Action:           v1.ACLAction_ACTION_ACCEPT,
+					SourceNodes:      []string{"a", "b", "c"},
+					DestinationNodes: []string{"a", "b", "c"},
+				},
+			},
+			wantPeers: map[string][]string{
+				"a": {"b", "c"},
+				"b": {"a", "c"},
+				"c": {"a", "b"},
+			},
+		},
 	}
 
 	for _, tc := range tt {
