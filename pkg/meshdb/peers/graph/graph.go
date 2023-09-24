@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package peers
+package graph
 
 import (
 	"context"
@@ -30,6 +30,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
+
+// Graph is the graph.Graph implementation for the mesh network.
+type Graph graph.Graph[string, MeshNode]
 
 // GraphStore implements graph.Store[string, Node] where
 // string is the node ID and Node is the node itself.
@@ -56,6 +59,12 @@ func NewGraph(st storage.MeshStorage) Graph {
 func NewGraphStore(st storage.MeshStorage) graph.Store[string, MeshNode] {
 	return graph.Store[string, MeshNode](&GraphStore{MeshStorage: st})
 }
+
+// graphHasher is the hash key function for the graph.
+func graphHasher(n MeshNode) string { return n.GetId() }
+
+// ErrEdgeNotFound is returned when an edge is not found.
+var ErrEdgeNotFound = graph.ErrEdgeNotFound
 
 // AddVertex should add the given vertex with the given hash value and vertex properties to the
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no

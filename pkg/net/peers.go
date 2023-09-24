@@ -32,6 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/relay"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
@@ -39,7 +40,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/util/meshutil"
 	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
@@ -364,7 +364,7 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 		defer func() {
 			// This is a hacky way to attempt to reconnect to the peer if
 			// the ICE connection is closed and they are still in the store.
-			wgpeers, err := meshutil.WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
+			wgpeers, err := peers.WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
 			if err != nil {
 				log.Error("Error getting wireguard peers after p2p connection closed", slog.String("error", err.Error()))
 				return
@@ -429,7 +429,7 @@ func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPe
 		defer func() {
 			// This is a hacky way to attempt to reconnect to the peer if
 			// the ICE connection is closed and they are still in the store.
-			wgpeers, err := meshutil.WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
+			wgpeers, err := peers.WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
 			if err != nil {
 				log.Error("Error getting wireguard peers after ICE connection closed", slog.String("error", err.Error()))
 				return
@@ -472,7 +472,7 @@ func (m *peerManager) getSignalingTransport(ctx context.Context, peer *v1.WireGu
 	} else {
 		// We'll use our local storage
 		log.Debug("We'll use our local storage for ICE negotiation lookup")
-		resolver = peers.New(m.net.storage).Resolver().FeatureResolver(func(mn peers.MeshNode) bool {
+		resolver = peers.New(m.net.storage).Resolver().FeatureResolver(func(mn graph.MeshNode) bool {
 			return mn.GetId() != peer.GetNode().GetId()
 		})
 	}

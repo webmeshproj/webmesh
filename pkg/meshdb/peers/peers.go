@@ -30,24 +30,15 @@ import (
 	"github.com/dominikbraun/graph/draw"
 	"github.com/google/go-cmp/cmp"
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // ErrNodeNotFound is returned when a node is not found.
 var ErrNodeNotFound = errors.New("node not found")
-
-// ErrEdgeNotFound is returned when an edge is not found.
-var ErrEdgeNotFound = graph.ErrEdgeNotFound
-
-// Graph is the graph.Graph implementation for the mesh network.
-type Graph graph.Graph[string, MeshNode]
-
-// graphHasher is the hash key function for the graph.
-func graphHasher(n MeshNode) string { return n.GetId() }
 
 // InvalidNodeIDChars are the characters that are not allowed in node IDs.
 var InvalidNodeIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', ','}
@@ -105,25 +96,25 @@ type Peers interface {
 	// of this instance.
 	Resolver() Resolver
 	// Graph returns the graph of nodes.
-	Graph() Graph
+	Graph() peergraph.Graph
 	// Put creates or updates a node.
 	Put(ctx context.Context, n *v1.MeshNode) error
 	// Get gets a node by ID.
-	Get(ctx context.Context, id string) (MeshNode, error)
+	Get(ctx context.Context, id string) (peergraph.MeshNode, error)
 	// GetByPubKey gets a node by their public key.
-	GetByPubKey(ctx context.Context, key crypto.PublicKey) (MeshNode, error)
+	GetByPubKey(ctx context.Context, key crypto.PublicKey) (peergraph.MeshNode, error)
 	// Delete deletes a node.
 	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
-	List(ctx context.Context) ([]MeshNode, error)
+	List(ctx context.Context) ([]peergraph.MeshNode, error)
 	// ListIDs lists all node IDs.
 	ListIDs(ctx context.Context) ([]string, error)
 	// ListPublicNodes lists all public nodes.
-	ListPublicNodes(ctx context.Context) ([]MeshNode, error)
+	ListPublicNodes(ctx context.Context) ([]peergraph.MeshNode, error)
 	// ListByZoneID lists all nodes in a zone.
-	ListByZoneID(ctx context.Context, zoneID string) ([]MeshNode, error)
+	ListByZoneID(ctx context.Context, zoneID string) ([]peergraph.MeshNode, error)
 	// ListByFeature lists all nodes with a given feature.
-	ListByFeature(ctx context.Context, feature v1.Feature) ([]MeshNode, error)
+	ListByFeature(ctx context.Context, feature v1.Feature) ([]peergraph.MeshNode, error)
 	// AddEdge adds an edge between two nodes.
 	PutEdge(ctx context.Context, edge *v1.MeshEdge) error
 	// RemoveEdge removes an edge between two nodes.
@@ -134,24 +125,24 @@ type Peers interface {
 
 // New returns a new Peers interface.
 func New(db storage.MeshStorage) Peers {
-	return &peers{
+	return &peerDB{
 		db:    db,
-		graph: NewGraph(db),
+		graph: peergraph.NewGraph(db),
 	}
 }
 
-type peers struct {
+type peerDB struct {
 	db    storage.MeshStorage
-	graph Graph
+	graph peergraph.Graph
 }
 
-func (p *peers) Resolver() Resolver {
+func (p *peerDB) Resolver() Resolver {
 	return &peerResolver{p.db}
 }
 
-func (p *peers) Graph() Graph { return p.graph }
+func (p *peerDB) Graph() peergraph.Graph { return p.graph }
 
-func (p *peers) Put(ctx context.Context, node *v1.MeshNode) error {
+func (p *peerDB) Put(ctx context.Context, node *v1.MeshNode) error {
 	// Dedup the wireguard endpoints.
 	seen := make(map[string]struct{})
 	var wgendpoints []string
@@ -164,45 +155,45 @@ func (p *peers) Put(ctx context.Context, node *v1.MeshNode) error {
 	}
 	node.WireguardEndpoints = wgendpoints
 	node.JoinedAt = timestamppb.New(time.Now().UTC())
-	err := p.graph.AddVertex(MeshNode{node})
+	err := p.graph.AddVertex(peergraph.MeshNode{MeshNode: node})
 	if err != nil {
 		return fmt.Errorf("put node: %w", err)
 	}
 	return nil
 }
 
-func (p *peers) Get(ctx context.Context, id string) (MeshNode, error) {
+func (p *peerDB) Get(ctx context.Context, id string) (peergraph.MeshNode, error) {
 	node, err := p.graph.Vertex(id)
 	if err != nil {
 		if errors.Is(err, graph.ErrVertexNotFound) {
-			return MeshNode{}, ErrNodeNotFound
+			return peergraph.MeshNode{}, ErrNodeNotFound
 		}
-		return MeshNode{}, fmt.Errorf("get node: %w", err)
+		return peergraph.MeshNode{}, fmt.Errorf("get node: %w", err)
 	}
 	return node, nil
 }
 
 // GetByPubKey gets a node by their public key.
-func (p *peers) GetByPubKey(ctx context.Context, key crypto.PublicKey) (MeshNode, error) {
+func (p *peerDB) GetByPubKey(ctx context.Context, key crypto.PublicKey) (peergraph.MeshNode, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
-		return MeshNode{}, fmt.Errorf("list nodes: %w", err)
+		return peergraph.MeshNode{}, fmt.Errorf("list nodes: %w", err)
 	}
 	for _, node := range nodes {
 		if node.GetPublicKey() != "" {
 			key, err := crypto.DecodePublicKey(node.GetPublicKey())
 			if err != nil {
-				return MeshNode{}, fmt.Errorf("parse host public key: %w", err)
+				return peergraph.MeshNode{}, fmt.Errorf("parse host public key: %w", err)
 			}
 			if key.Equals(key) {
 				return node, nil
 			}
 		}
 	}
-	return MeshNode{}, ErrNodeNotFound
+	return peergraph.MeshNode{}, ErrNodeNotFound
 }
 
-func (p *peers) Delete(ctx context.Context, id string) error {
+func (p *peerDB) Delete(ctx context.Context, id string) error {
 	edges, err := p.graph.Edges()
 	if err != nil {
 		return fmt.Errorf("get edges: %w", err)
@@ -227,14 +218,14 @@ func (p *peers) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (p *peers) List(ctx context.Context) ([]MeshNode, error) {
-	out := make([]MeshNode, 0)
-	err := p.db.IterPrefix(ctx, NodesPrefix.String(), func(key, value string) error {
-		if key == NodesPrefix.String() {
+func (p *peerDB) List(ctx context.Context) ([]peergraph.MeshNode, error) {
+	out := make([]peergraph.MeshNode, 0)
+	err := p.db.IterPrefix(ctx, peergraph.NodesPrefix.String(), func(key, value string) error {
+		if key == peergraph.NodesPrefix.String() {
 			return nil
 		}
-		node := MeshNode{&v1.MeshNode{}}
-		err := protojson.Unmarshal([]byte(value), node.MeshNode)
+		var node peergraph.MeshNode
+		err := node.Unmarshal([]byte(value))
 		if err != nil {
 			return fmt.Errorf("unmarshal node: %w", err)
 		}
@@ -244,24 +235,24 @@ func (p *peers) List(ctx context.Context) ([]MeshNode, error) {
 	return out, err
 }
 
-func (p *peers) ListIDs(ctx context.Context) ([]string, error) {
-	keys, err := p.db.List(ctx, NodesPrefix.String())
+func (p *peerDB) ListIDs(ctx context.Context) ([]string, error) {
+	keys, err := p.db.List(ctx, peergraph.NodesPrefix.String())
 	if err != nil {
 		return nil, fmt.Errorf("list keys: %w", err)
 	}
 	ids := make([]string, 0)
 	for _, key := range keys {
-		ids = append(ids, strings.TrimPrefix(key, NodesPrefix.String()+"/"))
+		ids = append(ids, strings.TrimPrefix(key, peergraph.NodesPrefix.String()+"/"))
 	}
 	return ids, nil
 }
 
-func (p *peers) ListPublicNodes(ctx context.Context) ([]MeshNode, error) {
+func (p *peerDB) ListPublicNodes(ctx context.Context) ([]peergraph.MeshNode, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]MeshNode, 0)
+	out := make([]peergraph.MeshNode, 0)
 	for _, node := range nodes {
 		n := node
 		if n.PrimaryEndpoint != "" {
@@ -271,12 +262,12 @@ func (p *peers) ListPublicNodes(ctx context.Context) ([]MeshNode, error) {
 	return out, nil
 }
 
-func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]MeshNode, error) {
+func (p *peerDB) ListByZoneID(ctx context.Context, zoneID string) ([]peergraph.MeshNode, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]MeshNode, 0)
+	out := make([]peergraph.MeshNode, 0)
 	for _, node := range nodes {
 		n := node
 		if n.GetZoneAwarenessId() == zoneID {
@@ -286,12 +277,12 @@ func (p *peers) ListByZoneID(ctx context.Context, zoneID string) ([]MeshNode, er
 	return out, nil
 }
 
-func (p *peers) ListByFeature(ctx context.Context, feature v1.Feature) ([]MeshNode, error) {
+func (p *peerDB) ListByFeature(ctx context.Context, feature v1.Feature) ([]peergraph.MeshNode, error) {
 	nodes, err := p.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]MeshNode, 0)
+	out := make([]peergraph.MeshNode, 0)
 	for _, node := range nodes {
 		n := node
 		if n.HasFeature(feature) {
@@ -301,7 +292,7 @@ func (p *peers) ListByFeature(ctx context.Context, feature v1.Feature) ([]MeshNo
 	return out, nil
 }
 
-func (p *peers) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
+func (p *peerDB) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
 	if edge.Source == edge.Target {
 		return nil
 	}
@@ -333,7 +324,7 @@ func (p *peers) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
 	return nil
 }
 
-func (p *peers) RemoveEdge(ctx context.Context, from, to string) error {
+func (p *peerDB) RemoveEdge(ctx context.Context, from, to string) error {
 	err := p.graph.RemoveEdge(from, to)
 	if err != nil {
 		if err == graph.ErrEdgeNotFound {
@@ -344,8 +335,8 @@ func (p *peers) RemoveEdge(ctx context.Context, from, to string) error {
 	return nil
 }
 
-func (p *peers) DrawGraph(ctx context.Context, w io.Writer) error {
-	graph := graph.Graph[string, MeshNode](p.graph)
+func (p *peerDB) DrawGraph(ctx context.Context, w io.Writer) error {
+	graph := graph.Graph[string, peergraph.MeshNode](p.graph)
 	err := draw.DOT(graph, w)
 	if err != nil {
 		return fmt.Errorf("draw graph: %w", err)

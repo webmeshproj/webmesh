@@ -24,7 +24,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/util/meshutil"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 )
 
 func (s *meshStore) onDBUpdate(key, value string) {
@@ -49,8 +49,8 @@ func (s *meshStore) onDBUpdate(key, value string) {
 }
 
 func isNodeChangeKey(key string) bool {
-	return strings.HasPrefix(key, peers.NodesPrefix.String()) ||
-		strings.HasPrefix(key, peers.EdgesPrefix.String())
+	return strings.HasPrefix(key, graph.NodesPrefix.String()) ||
+		strings.HasPrefix(key, graph.EdgesPrefix.String())
 }
 
 func isRouteChangeKey(key string) bool {
@@ -87,7 +87,7 @@ func (s *meshStore) queuePeersUpdate() {
 	s.peerUpdateGroup.TryGo(func() error {
 		defer cancel()
 		s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
-		wgpeers, err := meshutil.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+		wgpeers, err := peers.WireGuardPeersFor(ctx, s.Storage(), s.ID())
 		if err != nil {
 			s.log.Error("error getting wireguard peers", slog.String("error", err.Error()))
 			return nil

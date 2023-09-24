@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package meshutil
+package peers
 
 import (
 	"context"
@@ -27,7 +27,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 )
 
@@ -437,7 +436,7 @@ func TestWireGuardPeers(t *testing.T) {
 				t.Fatalf("create test db: %v", err)
 			}
 			defer db.Close()
-			peerdb := peers.New(db)
+			peerdb := New(db)
 			nw := networking.New(db)
 			// Create an allow-all traffic policy.
 			err = nw.PutNetworkACL(ctx, &v1.NetworkACL{

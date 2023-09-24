@@ -46,6 +46,7 @@ import (
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/util/logutil"
@@ -576,9 +577,9 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 
 	// Subscribe to peer updates
 	t.log.Debug("Subscribing to peer updates")
-	_, err = node.Storage().Subscribe(context.Background(), peers.NodesPrefix.String(), func(key string, value string) {
+	_, err = node.Storage().Subscribe(context.Background(), graph.NodesPrefix.String(), func(key string, value string) {
 		log := context.LoggerFrom(ctx)
-		peer := peers.MeshNode{MeshNode: &v1.MeshNode{}}
+		peer := graph.MeshNode{MeshNode: &v1.MeshNode{}}
 		err = protojson.Unmarshal([]byte(value), peer.MeshNode)
 		if err != nil {
 			log.Error("Failed to unmarshal peer", "error", err.Error())
@@ -702,7 +703,7 @@ func (t *WebmeshTransport) multiaddrsForLocalListenAddr(listenAddr net.Addr) ([]
 	return addrs, nil
 }
 
-func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode) error {
+func (t *WebmeshTransport) registerNode(ctx context.Context, node graph.MeshNode) error {
 	ps := t.host.Peerstore()
 	pubkey, err := wmcrypto.DecodePublicKey(node.GetPublicKey())
 	if err != nil {
@@ -727,7 +728,7 @@ func (t *WebmeshTransport) registerNode(ctx context.Context, node peers.MeshNode
 	return nil
 }
 
-func peerToIPMultiaddrs(peer peers.MeshNode, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+func peerToIPMultiaddrs(peer graph.MeshNode, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	var peerv4addr, peerv6addr netip.Prefix
 	var err error
 	if peer.PrivateIpv4 != "" {

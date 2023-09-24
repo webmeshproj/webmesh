@@ -27,9 +27,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	meshpeers "github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	meshgraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util/meshutil"
 )
 
 func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Membership_SubscribePeersServer) error {
@@ -41,7 +41,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	// Validate inputs
 	if req.GetId() == "" {
 		return status.Error(codes.InvalidArgument, "node id required")
-	} else if !peers.IsValidID(req.GetId()) {
+	} else if !meshpeers.IsValidID(req.GetId()) {
 		return status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if s.rbac.IsSecure() {
@@ -77,7 +77,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 			log.Error("failed to get mdns servers", "error", err.Error())
 			return
 		}
-		peers, err := meshutil.WireGuardPeersFor(ctx, st, peerID)
+		peers, err := meshpeers.WireGuardPeersFor(ctx, st, peerID)
 		if err != nil {
 			log.Error("failed to get wireguard peers", "error", err.Error())
 			return
@@ -85,7 +85,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		slices.Sort(iceNegServers)
 		slices.Sort(dnsServers)
 		if len(lastConfig) > 0 {
-			if slices.Equal(lastIceServers, iceNegServers) && slices.Equal(lastDnsServers, dnsServers) && meshutil.WireGuardPeersEqual(lastConfig, peers) {
+			if slices.Equal(lastIceServers, iceNegServers) && slices.Equal(lastDnsServers, dnsServers) && meshpeers.WireGuardPeersEqual(lastConfig, peers) {
 				log.Debug("Skipping wireguard peers notification, no changes")
 				return
 			}
@@ -106,12 +106,12 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		}
 	}
 
-	nodeCancel, err := st.Subscribe(ctx, peers.NodesPrefix.String(), notify)
+	nodeCancel, err := st.Subscribe(ctx, meshgraph.NodesPrefix.String(), notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to node changes: %v", err)
 	}
 	defer nodeCancel()
-	edgeCancel, err := st.Subscribe(ctx, peers.EdgesPrefix.String(), notify)
+	edgeCancel, err := st.Subscribe(ctx, meshgraph.EdgesPrefix.String(), notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to edge changes: %v", err)
 	}
@@ -131,7 +131,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 
 func listDNSServers(ctx context.Context, st storage.MeshStorage, peerID string) ([]string, error) {
 	var servers []string
-	dnsServers, err := peers.New(st).ListByFeature(ctx, v1.Feature_MESH_DNS)
+	dnsServers, err := meshpeers.New(st).ListByFeature(ctx, v1.Feature_MESH_DNS)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func listDNSServers(ctx context.Context, st storage.MeshStorage, peerID string) 
 
 func listICEServers(ctx context.Context, st storage.MeshStorage, peerID string) ([]string, error) {
 	var servers []string
-	iceServers, err := peers.New(st).ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
+	iceServers, err := meshpeers.New(st).ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
 	if err != nil {
 		return nil, err
 	}

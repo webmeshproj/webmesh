@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package meshutil contains helpers for computing networking information from the mesh.
-package meshutil
+package peers
 
 import (
 	"fmt"
@@ -28,14 +28,14 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
 // Peers are filtered by network ACLs.
 func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID string) ([]*v1.WireGuardPeer, error) {
-	graph := peers.New(st).Graph()
+	graph := New(st).Graph()
 	nw := networking.New(st)
 	adjacencyMap, err := nw.FilterGraph(ctx, graph, peerID)
 	if err != nil {
@@ -114,7 +114,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 				Features: node.Features,
 				JoinedAt: node.JoinedAt,
 			},
-			Proto:         peers.ProtoFromEdgeAttrs(edge.Properties.Attributes),
+			Proto:         ProtoFromEdgeAttrs(edge.Properties.Attributes),
 			AllowedIps:    []string{},
 			AllowedRoutes: []string{},
 		}
@@ -140,11 +140,11 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 func recursePeers(
 	ctx context.Context,
 	nw networking.Networking,
-	graph peers.Graph,
+	graph peergraph.Graph,
 	adjacencyMap networking.AdjacencyMap,
 	thisPeer string,
 	thisRoutes []netip.Prefix,
-	node *peers.MeshNode,
+	node *peergraph.MeshNode,
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
 	if node.PrivateAddrV4().IsValid() {
 		allowedIPs = append(allowedIPs, node.PrivateAddrV4())
@@ -190,11 +190,11 @@ func recursePeers(
 func recurseEdges(
 	ctx context.Context,
 	nw networking.Networking,
-	graph peers.Graph,
+	graph peergraph.Graph,
 	adjacencyMap networking.AdjacencyMap,
 	thisPeer string,
 	thisRoutes []netip.Prefix,
-	node *peers.MeshNode,
+	node *peergraph.MeshNode,
 	visited map[string]struct{},
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
 	if visited == nil {

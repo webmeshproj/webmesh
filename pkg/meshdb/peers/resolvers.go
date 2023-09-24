@@ -24,12 +24,13 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // FilterFunc is a function that can be used to filter responses returned by a resolver.
-type FilterFunc func(MeshNode) bool
+type FilterFunc func(peergraph.MeshNode) bool
 
 // Resolver provides facilities for creating various transport.Resolver instances.
 type Resolver interface {
@@ -51,7 +52,7 @@ type peerResolver struct {
 // NodeIDResolver returns a resolver that resolves node addresses by node ID.
 func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 	return transport.NodeIDResolverFunc(func(ctx context.Context, lookup string) ([]netip.AddrPort, error) {
-		key := fmt.Sprintf("%s/%s", NodesPrefix, lookup)
+		key := fmt.Sprintf("%s/%s", peergraph.NodesPrefix, lookup)
 		val, err := r.st.GetValue(ctx, key)
 		if err != nil {
 			return nil, err
@@ -61,7 +62,7 @@ func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal node: %w", err)
 		}
-		node := MeshNode{MeshNode: mnode}
+		node := peergraph.MeshNode{MeshNode: mnode}
 		var addrs []netip.AddrPort
 		if addr := node.PrivateAddrV4(); addr.IsValid() {
 			addrs = append(addrs, netip.AddrPortFrom(addr.Addr(), 0))
@@ -77,8 +78,8 @@ func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 func (r *peerResolver) FeatureResolver(filterFn ...FilterFunc) transport.FeatureResolver {
 	return transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
 		var addrs []netip.AddrPort
-		err := r.st.IterPrefix(ctx, NodesPrefix.String(), func(key string, val string) error {
-			if key == NodesPrefix.String() {
+		err := r.st.IterPrefix(ctx, peergraph.NodesPrefix.String(), func(key string, val string) error {
+			if key == peergraph.NodesPrefix.String() {
 				return nil
 			}
 			mnode := &v1.MeshNode{}
@@ -86,7 +87,7 @@ func (r *peerResolver) FeatureResolver(filterFn ...FilterFunc) transport.Feature
 			if err != nil {
 				return fmt.Errorf("unmarshal node: %w", err)
 			}
-			node := MeshNode{MeshNode: mnode}
+			node := peergraph.MeshNode{MeshNode: mnode}
 			for _, fn := range filterFn {
 				if !fn(node) {
 					return nil

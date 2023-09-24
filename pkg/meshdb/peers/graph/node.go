@@ -14,16 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package peers contains an interface for managing nodes in the mesh.
-package peers
+package graph
 
 import (
 	"net/netip"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type MeshNode struct{ *v1.MeshNode }
+
+func (n *MeshNode) Unmarshal(data []byte) error {
+	var node v1.MeshNode
+	if err := protojson.Unmarshal(data, &node); err != nil {
+		return err
+	}
+	n.MeshNode = &node
+	return nil
+}
 
 // HasFeature returns true if the node has the given feature.
 func (n *MeshNode) HasFeature(feature v1.Feature) bool {

@@ -27,7 +27,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -80,7 +80,7 @@ type Networking interface {
 	// FilterGraph filters the adjacency map in the given graph for the given node name according
 	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
 	// error is returned on faiure building the initial map or any database error.
-	FilterGraph(ctx context.Context, peerGraph peers.Graph, nodeName string) (AdjacencyMap, error)
+	FilterGraph(ctx context.Context, peerGraph peergraph.Graph, nodeName string) (AdjacencyMap, error)
 }
 
 // AdjacencyMap is a map of node names to a map of node names to edges.
@@ -275,7 +275,7 @@ func (n *networking) ListRoutes(ctx context.Context) ([]*v1.Route, error) {
 // needs improvement to be more efficient and to allow edges so long as one of the routes encountered is
 // allowed. Currently if a single route provided by a destination node is not allowed, the entire node
 // is filtered out.
-func (n *networking) FilterGraph(ctx context.Context, peerGraph peers.Graph, nodeName string) (AdjacencyMap, error) {
+func (n *networking) FilterGraph(ctx context.Context, peerGraph peergraph.Graph, nodeName string) (AdjacencyMap, error) {
 	log := context.LoggerFrom(ctx)
 
 	acls, err := n.ListNetworkACLs(ctx)

@@ -25,7 +25,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/util/meshutil"
 )
 
 func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
@@ -63,7 +62,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 			if string(data.Peer.ID) == s.nodeID {
 				return
 			}
-			wgpeers, err := meshutil.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+			wgpeers, err := peers.WireGuardPeersFor(ctx, s.Storage(), s.ID())
 			if err != nil {
 				log.Warn("failed to get wireguard peers", slog.String("error", err.Error()))
 			} else {
