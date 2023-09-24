@@ -38,6 +38,8 @@ const (
 	NetworkACLsPrefix = storage.RegistryPrefix + "network-acls"
 	// RoutesPrefix is where Routes are stored in the database.
 	RoutesPrefix = storage.RegistryPrefix + "routes"
+	// GroupReference is the prefix of a node name that indicates it is a group reference.
+	GroupReference = "group:"
 )
 
 // IsSystemNetworkACL returns true if the NetworkACL is a system NetworkACL.

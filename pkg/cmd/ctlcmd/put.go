@@ -18,7 +18,6 @@ package ctlcmd
 
 import (
 	"errors"
-	"strconv"
 
 	"github.com/spf13/cobra"
 	v1 "github.com/webmeshproj/api/v1"
@@ -37,15 +36,13 @@ var (
 	putGroupNodes []string
 	putGroupUsers []string
 
-	putNetworkACLPriority  int32
-	putNetworkACLSrcNodes  []string
-	putNetworkACLDstNodes  []string
-	putNetworkACLSrcCIDRs  []string
-	putNetworkACLDstCIDRs  []string
-	putNetworkACLProtocols []string
-	putNetworkACLPorts     []string
-	putNetworkACLAccept    bool
-	putNetworkACLDeny      bool
+	putNetworkACLPriority int32
+	putNetworkACLSrcNodes []string
+	putNetworkACLDstNodes []string
+	putNetworkACLSrcCIDRs []string
+	putNetworkACLDstCIDRs []string
+	putNetworkACLAccept   bool
+	putNetworkACLDeny     bool
 
 	putRouteNode    string
 	putRouteCIDRs   []string
@@ -90,8 +87,6 @@ func init() {
 	putACLFlags.StringArrayVar(&putNetworkACLDstNodes, "dst-node", nil, "destination nodes to add to the ACL")
 	putACLFlags.StringArrayVar(&putNetworkACLSrcCIDRs, "src-cidr", nil, "source CIDRs to add to the ACL")
 	putACLFlags.StringArrayVar(&putNetworkACLDstCIDRs, "dst-cidr", nil, "destination CIDRs to add to the ACL")
-	putACLFlags.StringArrayVar(&putNetworkACLProtocols, "protocol", nil, "protocols to add to the ACL")
-	putACLFlags.StringArrayVar(&putNetworkACLPorts, "port", nil, "ports to add to the ACL")
 	putACLFlags.BoolVar(&putNetworkACLAccept, "accept", true, "whether to accept traffic matching the ACL")
 	putACLFlags.BoolVar(&putNetworkACLDeny, "deny", false, "whether to deny traffic matching the ACL")
 	cobra.CheckErr(putNetworkACLCmd.RegisterFlagCompletionFunc("src-node", completeNodes(1)))
@@ -322,16 +317,6 @@ var putNetworkACLCmd = &cobra.Command{
 		if len(putNetworkACLSrcNodes) == 0 && len(putNetworkACLDstNodes) == 0 && len(putNetworkACLSrcCIDRs) == 0 && len(putNetworkACLDstCIDRs) == 0 {
 			return errors.New("no sources or targets specified")
 		}
-		var ports []uint32
-		if len(putNetworkACLPorts) > 0 {
-			for _, portStr := range putNetworkACLPorts {
-				port, err := strconv.ParseUint(portStr, 10, 32)
-				if err != nil {
-					return err
-				}
-				ports = append(ports, uint32(port))
-			}
-		}
 		action := func() v1.ACLAction {
 			if putNetworkACLDeny {
 				return v1.ACLAction_ACTION_DENY
@@ -349,8 +334,6 @@ var putNetworkACLCmd = &cobra.Command{
 			DestinationNodes: putNetworkACLDstNodes,
 			SourceCidrs:      putNetworkACLSrcCIDRs,
 			DestinationCidrs: putNetworkACLDstCIDRs,
-			Protocols:        putNetworkACLProtocols,
-			Ports:            ports,
 		}
 		client, closer, err := cliConfig.NewAdminClient()
 		if err != nil {

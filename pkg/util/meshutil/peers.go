@@ -45,6 +45,13 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 	if err != nil {
 		return nil, fmt.Errorf("get routes by node: %w", err)
 	}
+	acls, err := nw.ListNetworkACLs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list network ACLs: %w", err)
+	}
+	if err := acls.Expand(ctx); err != nil {
+		return nil, fmt.Errorf("expand network ACLs: %w", err)
+	}
 	ourRoutes := make([]netip.Prefix, 0)
 	for _, route := range routes {
 		for _, cidr := range route.GetDestinationCidrs() {

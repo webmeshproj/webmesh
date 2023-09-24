@@ -18,6 +18,8 @@ limitations under the License.
 package networking
 
 import (
+	"errors"
+	"slices"
 	"sort"
 	"strings"
 
@@ -28,33 +30,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// ACLs is a list of Network ACLs. It contains methods for evaluating actions against
-// contained permissions. It also allows for sorting by priority.
-type ACLs []*ACL
-
-// Proto returns the protobuf representation of the ACLs.
-func (a ACLs) Proto() []*v1.NetworkACL {
-	if a == nil {
-		return nil
-	}
-	proto := make([]*v1.NetworkACL, len(a))
-	for i, acl := range a {
-		proto[i] = acl.Proto()
-	}
-	return proto
-}
-
-// ACL is a Network ACL. It contains a reference to the database for evaluating group membership.
-type ACL struct {
-	*v1.NetworkACL
-	storage storage.MeshStorage
-}
-
-// Proto returns the protobuf representation of the ACL.
-func (a *ACL) Proto() *v1.NetworkACL {
-	return a.NetworkACL
-}
-
 // SortDirection is the direction to sort ACLs.
 type SortDirection int
 
@@ -64,6 +39,10 @@ const (
 	// SortAscending sorts ACLs in ascending order.
 	SortAscending
 )
+
+// ACLs is a list of Network ACLs. It contains methods for evaluating actions against
+// contained permissions. It also allows for sorting by priority.
+type ACLs []*ACL
 
 // Len returns the length of the ACLs list.
 func (a ACLs) Len() int { return len(a) }
@@ -88,6 +67,92 @@ func (a ACLs) Sort(direction SortDirection) {
 	}
 }
 
+// Proto returns the protobuf representation of the ACLs.
+func (a ACLs) Proto() []*v1.NetworkACL {
+	if a == nil {
+		return nil
+	}
+	proto := make([]*v1.NetworkACL, len(a))
+	for i, acl := range a {
+		proto[i] = acl.Proto()
+	}
+	return proto
+}
+
+// Expand expands any group references in the ACLs.
+func (a ACLs) Expand(ctx context.Context) error {
+	for _, acl := range a {
+		if err := acl.Expand(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ACL is a Network ACL. It contains a reference to the database for evaluating group membership.
+type ACL struct {
+	*v1.NetworkACL
+	storage storage.MeshStorage
+}
+
+// Proto returns the protobuf representation of the ACL.
+func (a *ACL) Proto() *v1.NetworkACL {
+	return a.NetworkACL
+}
+
+// Expand expands any group references in the ACL.
+func (a *ACL) Expand(ctx context.Context) error {
+	// Expand group references in the source nodes
+	var srcNodes []string
+	for _, node := range a.GetSourceNodes() {
+		if !strings.HasPrefix(node, GroupReference) {
+			srcNodes = append(srcNodes, node)
+			continue
+		}
+		groupName := strings.TrimPrefix(node, GroupReference)
+		group, err := rbac.New(a.storage).GetGroup(ctx, groupName)
+		if err != nil {
+			if !errors.Is(err, rbac.ErrGroupNotFound) {
+				context.LoggerFrom(ctx).Error("Failed to lookup group", "group", groupName, "error", err.Error())
+				return err
+			}
+			// If the group doesn't exist, we'll just ignore it.
+			continue
+		}
+		for _, subject := range group.GetSubjects() {
+			if !slices.Contains(srcNodes, subject.GetName()) {
+				srcNodes = append(srcNodes, subject.GetName())
+			}
+		}
+	}
+	a.SourceNodes = srcNodes
+	// The same for destination nodes
+	var dstNodes []string
+	for _, node := range a.GetDestinationNodes() {
+		if !strings.HasPrefix(node, GroupReference) {
+			dstNodes = append(dstNodes, node)
+			continue
+		}
+		groupName := strings.TrimPrefix(node, GroupReference)
+		group, err := rbac.New(a.storage).GetGroup(ctx, groupName)
+		if err != nil {
+			if !errors.Is(err, rbac.ErrGroupNotFound) {
+				context.LoggerFrom(ctx).Error("Failed to lookup group", "group", groupName, "error", err.Error())
+				return err
+			}
+			// If the group doesn't exist, we'll just ignore it.
+			continue
+		}
+		for _, subject := range group.GetSubjects() {
+			if !slices.Contains(dstNodes, subject.GetName()) {
+				dstNodes = append(dstNodes, subject.GetName())
+			}
+		}
+	}
+	a.DestinationNodes = dstNodes
+	return nil
+}
+
 // Accept evaluates an action against the ACLs in the list. It assumes the ACLs
 // are sorted by priority. The first ACL that matches the action will be used.
 // If no ACL matches, the action is denied.
@@ -108,40 +173,6 @@ func (a ACLs) Accept(ctx context.Context, action *v1.NetworkAction) bool {
 func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 	if action.GetSrcNode() != "" {
 		if len(acl.GetSourceNodes()) >= 0 {
-			// Are we expanding any groups?
-			groups := make(map[string][]string)
-			for _, node := range acl.GetSourceNodes() {
-				if strings.HasPrefix(node, "group:") {
-					if _, ok := groups[node]; ok {
-						continue
-					}
-					groupName := strings.TrimPrefix(node, "group:")
-					group, err := rbac.New(acl.storage).GetGroup(ctx, groupName)
-					if err != nil {
-						if err != rbac.ErrGroupNotFound {
-							context.LoggerFrom(ctx).Error("failed to get group", "group", groupName, "error", err)
-							return false
-						}
-						// If the group doesn't exist, we'll just ignore it.
-						continue
-					}
-					for _, subject := range group.GetSubjects() {
-						if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_NODE {
-							groups[groupName] = append(groups[groupName], subject.GetName())
-						}
-					}
-				}
-			}
-			// Replace group references with their members.
-			for groupName, members := range groups {
-			SrcNodes:
-				for _, node := range acl.GetSourceNodes() {
-					if node == "group:"+groupName {
-						acl.SourceNodes = replace(acl.SourceNodes, node, members)
-						break SrcNodes
-					}
-				}
-			}
 			if !containsOrWildcardMatch(acl.GetSourceNodes(), action.GetSrcNode()) {
 				return false
 			}
@@ -149,40 +180,6 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 	}
 	if action.GetDstNode() != "" {
 		if len(acl.GetDestinationNodes()) >= 0 {
-			// Are we expanding any groups?
-			groups := make(map[string][]string)
-			for _, node := range acl.GetDestinationNodes() {
-				if strings.HasPrefix(node, "group:") {
-					if _, ok := groups[node]; ok {
-						continue
-					}
-					groupName := strings.TrimPrefix(node, "group:")
-					group, err := rbac.New(acl.storage).GetGroup(ctx, groupName)
-					if err != nil {
-						if err != rbac.ErrGroupNotFound {
-							context.LoggerFrom(ctx).Error("failed to get group", "group", groupName, "error", err)
-							return false
-						}
-						// If the group doesn't exist, we'll just ignore it.
-						continue
-					}
-					for _, subject := range group.GetSubjects() {
-						if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_NODE {
-							groups[groupName] = append(groups[groupName], subject.GetName())
-						}
-					}
-				}
-			}
-			// Replace group references with their members.
-			for groupName, members := range groups {
-			DstNodes:
-				for _, node := range acl.GetDestinationNodes() {
-					if node == "group:"+groupName {
-						acl.DestinationNodes = replace(acl.DestinationNodes, node, members)
-						break DstNodes
-					}
-				}
-			}
 			if !containsOrWildcardMatch(acl.GetDestinationNodes(), action.GetDstNode()) {
 				return false
 			}
@@ -198,20 +195,6 @@ func (acl *ACL) Matches(ctx context.Context, action *v1.NetworkAction) bool {
 	if action.GetDstCidr() != "" {
 		if len(acl.GetDestinationCidrs()) >= 0 {
 			if !containsOrWildcardMatch(acl.GetDestinationCidrs(), action.GetDstCidr()) {
-				return false
-			}
-		}
-	}
-	if action.GetProtocol() != "" {
-		if len(acl.GetProtocols()) >= 0 {
-			if !containsOrWildcardMatch(acl.GetProtocols(), action.GetProtocol()) {
-				return false
-			}
-		}
-	}
-	if action.GetPort() != 0 {
-		if len(acl.GetPorts()) >= 0 {
-			if !containsPort(acl.GetPorts(), action.GetPort()) {
 				return false
 			}
 		}
@@ -243,25 +226,4 @@ func containsOrWildcardMatch(ss []string, s string) bool {
 		}
 	}
 	return false
-}
-
-func containsPort(pp []uint32, p uint32) bool {
-	for _, v := range pp {
-		if v == p {
-			return true
-		}
-	}
-	return false
-}
-
-func replace(in []string, obj string, with []string) []string {
-	out := make([]string, 0, len(in))
-	for _, v := range in {
-		if v == obj {
-			out = append(out, with...)
-		} else {
-			out = append(out, v)
-		}
-	}
-	return out
 }
