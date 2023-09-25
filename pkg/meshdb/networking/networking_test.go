@@ -19,6 +19,7 @@ package networking
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -238,10 +239,104 @@ func TestNetworkACLs(t *testing.T) {
 
 	t.Run("DeleteACLs", func(t *testing.T) {
 		t.Parallel()
+		nw := setupTest(t)
+
+		// Put a valid ACL, we should be able to delete it
+		// and further calls to delete should not error.
+		acl := &ACL{
+			NetworkACL: &v1.NetworkACL{
+				Name:             "wildcard-acl",
+				Priority:         0,
+				Action:           v1.ACLAction_ACTION_ACCEPT,
+				SourceNodes:      []string{"*"},
+				DestinationNodes: []string{"*"},
+				SourceCidrs:      []string{"*"},
+				DestinationCidrs: []string{"*"},
+			},
+		}
+		err := nw.PutNetworkACL(context.Background(), acl.NetworkACL)
+		if err != nil {
+			t.Fatalf("put network acl: %v", err)
+		}
+		err = nw.DeleteNetworkACL(context.Background(), acl.GetName())
+		if err != nil {
+			t.Fatalf("delete network acl: %v", err)
+		}
+		// The ACL should be gone
+		_, err = nw.GetNetworkACL(context.Background(), acl.GetName())
+		if err == nil {
+			t.Fatalf("expected error, got nil")
+		} else if !errors.Is(err, ErrACLNotFound) {
+			t.Fatalf("expected %v, got %v", ErrACLNotFound, err)
+		}
+		// Further calls to delete should not error
+		err = nw.DeleteNetworkACL(context.Background(), acl.GetName())
+		if err != nil {
+			t.Fatalf("delete network acl: %v", err)
+		}
 	})
 
 	t.Run("ListACLs", func(t *testing.T) {
 		t.Parallel()
+
+		// Put a few ACLs
+		nw := setupTest(t)
+		acls := []*ACL{
+			{
+				NetworkACL: &v1.NetworkACL{
+					Name:             "acl1",
+					Priority:         0,
+					Action:           v1.ACLAction_ACTION_ACCEPT,
+					SourceNodes:      []string{"*"},
+					DestinationNodes: []string{"*"},
+					SourceCidrs:      []string{"*"},
+					DestinationCidrs: []string{"*"},
+				},
+			},
+			{
+				NetworkACL: &v1.NetworkACL{
+					Name:             "acl2",
+					Priority:         1,
+					Action:           v1.ACLAction_ACTION_ACCEPT,
+					SourceNodes:      []string{"*"},
+					DestinationNodes: []string{"*"},
+					SourceCidrs:      []string{"*"},
+					DestinationCidrs: []string{"*"},
+				},
+			},
+			{
+				NetworkACL: &v1.NetworkACL{
+					Name:             "acl3",
+					Priority:         2,
+					Action:           v1.ACLAction_ACTION_ACCEPT,
+					SourceNodes:      []string{"*"},
+					DestinationNodes: []string{"*"},
+					SourceCidrs:      []string{"*"},
+					DestinationCidrs: []string{"*"},
+				},
+			},
+		}
+		for _, acl := range acls {
+			err := nw.PutNetworkACL(context.Background(), acl.NetworkACL)
+			if err != nil {
+				t.Fatalf("put network acl: %v", err)
+			}
+		}
+
+		// List the ACLs
+		got, err := nw.ListNetworkACLs(context.Background())
+		if err != nil {
+			t.Fatalf("list network acls: %v", err)
+		}
+		got.Sort(SortAscending)
+		if len(got) != len(acls) {
+			t.Fatalf("expected %d acls, got %d", len(acls), len(got))
+		}
+		for i, acl := range acls {
+			if !acl.Equals(got[i]) {
+				t.Fatalf("expected %v, got %v", acl, got[i])
+			}
+		}
 	})
 }
 
@@ -250,22 +345,358 @@ func TestNetworkRoutes(t *testing.T) {
 
 	t.Run("GetPutRoutes", func(t *testing.T) {
 		t.Parallel()
+		nw := setupTest(t)
+
+		t.Run("ValidRoutes", func(t *testing.T) {
+			t.Parallel()
+			tc := []struct {
+				name  string
+				route Route
+			}{
+				{
+					name: "full-ipv4-tunnel",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "full-ipv4-tunnel",
+							Node:             "nodea",
+							DestinationCidrs: []string{"0.0.0.0/0"},
+						},
+					},
+				},
+				{
+					name: "full-ipv6-tunnel",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "full-ipv6-tunnel",
+							Node:             "nodea",
+							DestinationCidrs: []string{"::/0"},
+						},
+					},
+				},
+				{
+					name: "full-tunnel",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "full-tunnel",
+							Node:             "nodea",
+							DestinationCidrs: []string{"::/0", "0.0.0.0/0"},
+						},
+					},
+				},
+				{
+					name: "internal-ipv4-route",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "internal-ipv4-route",
+							Node:             "nodea",
+							DestinationCidrs: []string{"10.0.0.0/8"},
+						},
+					},
+				},
+				{
+					name: "internal-ipv6-route",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "internal-ipv6-route",
+							Node:             "nodea",
+							DestinationCidrs: []string{"2001:db8::/32"},
+						},
+					},
+				},
+			}
+
+			for _, tt := range tc {
+				testCase := tt
+				t.Run(tt.name, func(t *testing.T) {
+					t.Parallel()
+					err := nw.PutRoute(context.Background(), testCase.route.Route)
+					if err != nil {
+						t.Fatalf("put route: %v", err)
+					}
+					got, err := nw.GetRoute(context.Background(), testCase.route.GetName())
+					if err != nil {
+						t.Fatalf("get route: %v", err)
+					}
+					if !testCase.route.Equals(&got) {
+						t.Fatalf("expected %v, got %v", testCase.route, got)
+					}
+				})
+			}
+		})
+
+		t.Run("InvalidRoutes", func(t *testing.T) {
+			t.Parallel()
+			nw := setupTest(t)
+			tc := []struct {
+				name  string
+				route Route
+			}{
+				{
+					name: "empty-name",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "",
+							Node:             "nodea",
+							DestinationCidrs: []string{"::/0"},
+						},
+					},
+				},
+				{
+					name: "empty-node",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "route",
+							Node:             "",
+							DestinationCidrs: []string{"::/0"},
+						},
+					},
+				},
+				{
+					name: "empty-cidrs",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "route",
+							Node:             "node-a",
+							DestinationCidrs: []string{},
+						},
+					},
+				},
+				{
+					name: "invalid-route-id",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "route/invalid",
+							Node:             "node-a",
+							DestinationCidrs: []string{"::/0"},
+						},
+					},
+				},
+				{
+					name: "invalid-node-id",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "route",
+							Node:             "nodea/nodeb",
+							DestinationCidrs: []string{"::/0"},
+						},
+					},
+				},
+				{
+					name: "invalid-next-hop-node-id",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "route",
+							Node:             "node-1",
+							DestinationCidrs: []string{"::/0"},
+							NextHopNode:      "nodea/nodeb",
+						},
+					},
+				},
+				{
+					name: "invalid-network-cidrs",
+					route: Route{
+						Route: &v1.Route{
+							Name:             "route",
+							Node:             "node-1",
+							DestinationCidrs: []string{"invalid/cidr"},
+						},
+					},
+				},
+			}
+
+			for _, tt := range tc {
+				testCase := tt
+				t.Run(tt.name, func(t *testing.T) {
+					t.Parallel()
+					err := nw.PutRoute(context.Background(), testCase.route.Route)
+					if err == nil {
+						t.Fatalf("expected error, got nil")
+					}
+					if !errors.Is(err, ErrInvalidRoute) {
+						t.Errorf("expected %v, got %v", ErrInvalidRoute, err)
+					}
+				})
+			}
+		})
 	})
 
 	t.Run("GetRoutesByNode", func(t *testing.T) {
 		t.Parallel()
+
+		routes := []Route{
+			{
+				Route: &v1.Route{
+					Name:             "node-a-route",
+					Node:             "node-a",
+					DestinationCidrs: []string{"::/0"},
+				},
+			},
+			{
+				Route: &v1.Route{
+					Name:             "node-b-route",
+					Node:             "node-b",
+					DestinationCidrs: []string{"::/0"},
+				},
+			},
+		}
+
+		nw := setupTest(t)
+		for _, route := range routes {
+			err := nw.PutRoute(context.Background(), route.Route)
+			if err != nil {
+				t.Fatalf("put route: %v", err)
+			}
+		}
+		nodeARoutes, err := nw.GetRoutesByNode(context.Background(), "node-a")
+		if err != nil {
+			t.Fatalf("get routes by node: %v", err)
+		}
+		if len(nodeARoutes) != 1 {
+			t.Fatalf("expected 1 route, got %d", len(nodeARoutes))
+		}
+		if !routes[0].Equals(&nodeARoutes[0]) {
+			t.Fatalf("expected %v, got %v", routes[0], nodeARoutes[0])
+		}
+		nodeBRoutes, err := nw.GetRoutesByNode(context.Background(), "node-b")
+		if err != nil {
+			t.Fatalf("get routes by node: %v", err)
+		}
+		if len(nodeBRoutes) != 1 {
+			t.Fatalf("expected 1 route, got %d", len(nodeBRoutes))
+		}
+		if !routes[1].Equals(&nodeBRoutes[0]) {
+			t.Fatalf("expected %v, got %v", routes[1], nodeBRoutes[0])
+		}
 	})
 
 	t.Run("GetRoutesByCIDR", func(t *testing.T) {
 		t.Parallel()
+
+		routes := []Route{
+			{
+				Route: &v1.Route{
+					Name:             "node-a-route",
+					Node:             "node-a",
+					DestinationCidrs: []string{"10.0.0.0/8"},
+				},
+			},
+			{
+				Route: &v1.Route{
+					Name:             "node-b-route",
+					Node:             "node-b",
+					DestinationCidrs: []string{"192.168.0.0/16"},
+				},
+			},
+		}
+
+		nw := setupTest(t)
+		for _, route := range routes {
+			err := nw.PutRoute(context.Background(), route.Route)
+			if err != nil {
+				t.Fatalf("put route: %v", err)
+			}
+		}
+
+		nodeARoutes, err := nw.GetRoutesByCIDR(context.Background(), netip.MustParsePrefix("10.0.0.0/8"))
+		if err != nil {
+			t.Fatalf("get routes by cidr: %v", err)
+		}
+		if len(nodeARoutes) != 1 {
+			t.Fatalf("expected 1 route, got %d", len(nodeARoutes))
+		}
+		if !routes[0].Equals(&nodeARoutes[0]) {
+			t.Fatalf("expected %v, got %v", routes[0], nodeARoutes[0])
+		}
+
+		nodeBRoutes, err := nw.GetRoutesByCIDR(context.Background(), netip.MustParsePrefix("192.168.0.0/16"))
+		if err != nil {
+			t.Fatalf("get routes by cidr: %v", err)
+		}
+		if len(nodeBRoutes) != 1 {
+			t.Fatalf("expected 1 route, got %d", len(nodeBRoutes))
+		}
+		if !routes[1].Equals(&nodeBRoutes[0]) {
+			t.Fatalf("expected %v, got %v", routes[1], nodeBRoutes[0])
+		}
 	})
 
 	t.Run("DeleteRoutes", func(t *testing.T) {
 		t.Parallel()
+		// Put a route, make sure we can delete it, make sure further delete calls don't fail
+		nw := setupTest(t)
+		route := &Route{
+			Route: &v1.Route{
+				Name:             "route",
+				Node:             "node-a",
+				DestinationCidrs: []string{"::/0"},
+			},
+		}
+		err := nw.PutRoute(context.Background(), route.Route)
+		if err != nil {
+			t.Fatalf("put route: %v", err)
+		}
+		// Make sure its there
+		_, err = nw.GetRoute(context.Background(), route.GetName())
+		if err != nil {
+			t.Fatalf("get route: %v", err)
+		}
+		// Delete it
+		err = nw.DeleteRoute(context.Background(), route.GetName())
+		if err != nil {
+			t.Fatalf("delete route: %v", err)
+		}
+		// Make sure its gone
+		_, err = nw.GetRoute(context.Background(), route.GetName())
+		if err == nil {
+			t.Fatalf("expected error, got nil")
+		} else if !errors.Is(err, ErrRouteNotFound) {
+			t.Fatalf("expected %v, got %v", ErrRouteNotFound, err)
+		}
+		// Further delete calls should not error
+		err = nw.DeleteRoute(context.Background(), route.GetName())
+		if err != nil {
+			t.Fatalf("delete route: %v", err)
+		}
 	})
 
 	t.Run("ListRoutes", func(t *testing.T) {
 		t.Parallel()
+		routes := []Route{
+			{
+				Route: &v1.Route{
+					Name:             "node-a-route",
+					Node:             "node-a",
+					DestinationCidrs: []string{"10.0.0.0/8"},
+				},
+			},
+			{
+				Route: &v1.Route{
+					Name:             "node-b-route",
+					Node:             "node-b",
+					DestinationCidrs: []string{"192.168.0.0/16"},
+				},
+			},
+		}
+		nw := setupTest(t)
+		for _, route := range routes {
+			err := nw.PutRoute(context.Background(), route.Route)
+			if err != nil {
+				t.Fatalf("put route: %v", err)
+			}
+		}
+		got, err := nw.ListRoutes(context.Background())
+		if err != nil {
+			t.Fatalf("list routes: %v", err)
+		}
+		got.Sort()
+		if len(got) != len(routes) {
+			t.Fatalf("expected %d routes, got %d", len(routes), len(got))
+		}
+		for i, route := range routes {
+			if !route.Equals(&got[i]) {
+				t.Fatalf("expected %v, got %v", route, got[i])
+			}
+		}
 	})
 }
 

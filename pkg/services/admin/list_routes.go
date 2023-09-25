@@ -31,5 +31,5 @@ func (s *Server) ListRoutes(ctx context.Context, _ *emptypb.Empty) (*v1.Routes, 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Routes{Items: routes}, nil
+	return &v1.Routes{Items: routes.Proto()}, nil
 }

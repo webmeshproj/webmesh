@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
@@ -135,6 +136,22 @@ func (a *ACL) Proto() *v1.NetworkACL {
 	return a.NetworkACL
 }
 
+// Marshal marshals the ACL to protobuf json.
+func (a ACL) MarshalJSON() ([]byte, error) {
+	return protojson.Marshal(a.NetworkACL)
+}
+
+// Unmarshal unmarshals the ACL from a protobuf.
+func (a *ACL) UnmarshalJSON(data []byte) error {
+	var acl v1.NetworkACL
+	err := protojson.Unmarshal(data, &acl)
+	if err != nil {
+		return fmt.Errorf("unmarshal acl: %w", err)
+	}
+	a.NetworkACL = &acl
+	return nil
+}
+
 // Equals returns whether the ACLs are equal.
 func (a *ACL) Equals(other *ACL) bool {
 	if a.GetName() != other.GetName() {
@@ -172,24 +189,6 @@ func (a *ACL) SourcePrefixes() []netip.Prefix {
 // Invalid prefixes will be ignored.
 func (a *ACL) DestinationPrefixes() []netip.Prefix {
 	return toPrefixes(a.GetDestinationCidrs())
-}
-
-func toPrefixes(ss []string) []netip.Prefix {
-	var out []netip.Prefix
-	for _, cidr := range ss {
-		var prefix netip.Prefix
-		var err error
-		if cidr == "*" {
-			prefix = netip.MustParsePrefix("0.0.0.0/0")
-		} else {
-			prefix, err = netip.ParsePrefix(cidr)
-			if err != nil {
-				continue
-			}
-		}
-		out = append(out, prefix)
-	}
-	return out
 }
 
 // Expand expands any group references in the ACL.
