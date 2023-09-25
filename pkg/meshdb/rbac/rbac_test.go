@@ -23,7 +23,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
+
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
 
 const admin = "admin"

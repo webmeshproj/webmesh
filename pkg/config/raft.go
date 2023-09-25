@@ -32,8 +32,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
-	"github.com/webmeshproj/webmesh/pkg/storage/memory"
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/memory"
 )
 
 // RaftOptions are options for the raft backend.

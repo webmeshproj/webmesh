@@ -24,7 +24,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
 
 func TestNetworkACLs(t *testing.T) {

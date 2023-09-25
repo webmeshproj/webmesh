@@ -22,7 +22,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
 
 func TestSnapshotter(t *testing.T) {

@@ -24,7 +24,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
 
 var (

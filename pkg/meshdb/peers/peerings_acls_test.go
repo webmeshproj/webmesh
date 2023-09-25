@@ -26,7 +26,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
 
 func TestWireGuardPeersWithACLs(t *testing.T) {

@@ -27,7 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/raft"
-	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
 
 // NewTestNode creates a new test mesh and waits for it to be ready.
