@@ -109,6 +109,14 @@ func (r *RaftStorageProvider) Consensus() storage.Consensus {
 
 // Status returns the status of the storage provider.
 func (r *RaftStorageProvider) Status() *v1.StorageStatus {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.started.Load() {
+		return &v1.StorageStatus{
+			IsWritable: false,
+			Message:    storage.ErrClosed.Error(),
+		}
+	}
 	var status v1.StorageStatus
 	config := r.raft.GetConfiguration().Configuration()
 	status.IsWritable = r.IsVoter()

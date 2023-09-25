@@ -21,6 +21,7 @@ package external
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -33,6 +34,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/logging"
@@ -175,6 +177,11 @@ type ExternalConsensus struct {
 
 // IsLeader returns true if the node is the leader of the storage group.
 func (ext *ExternalConsensus) IsLeader() bool {
+	ext.mu.Lock()
+	defer ext.mu.Unlock()
+	if ext.cli == nil {
+		return false
+	}
 	// Use a short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
@@ -195,6 +202,9 @@ func (ext *ExternalConsensus) AddVoter(ctx context.Context, peer *v1.StoragePeer
 	}
 	_, err := ext.cli.AddVoter(ctx, peer)
 	if err != nil {
+		if status.Code(err) == codes.FailedPrecondition {
+			return storage.ErrNotLeader
+		}
 		return fmt.Errorf("add voter: %w", err)
 	}
 	return nil
@@ -209,6 +219,9 @@ func (ext *ExternalConsensus) AddObserver(ctx context.Context, peer *v1.StorageP
 	}
 	_, err := ext.cli.AddObserver(ctx, peer)
 	if err != nil {
+		if status.Code(err) == codes.FailedPrecondition {
+			return storage.ErrNotLeader
+		}
 		return fmt.Errorf("add observer: %w", err)
 	}
 	return nil
@@ -223,6 +236,9 @@ func (ext *ExternalConsensus) DemoteVoter(ctx context.Context, peer *v1.StorageP
 	}
 	_, err := ext.cli.DemoteVoter(ctx, peer)
 	if err != nil {
+		if status.Code(err) == codes.FailedPrecondition {
+			return storage.ErrNotLeader
+		}
 		return fmt.Errorf("demote voter: %w", err)
 	}
 	return nil
@@ -238,6 +254,9 @@ func (ext *ExternalConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePe
 	}
 	_, err := ext.cli.RemovePeer(ctx, peer)
 	if err != nil {
+		if status.Code(err) == codes.FailedPrecondition {
+			return storage.ErrNotLeader
+		}
 		return fmt.Errorf("remove peer: %w", err)
 	}
 	return nil
@@ -255,7 +274,14 @@ func (ext *ExternalStorage) GetValue(ctx context.Context, key string) (string, e
 	if ext.cli == nil {
 		return "", storage.ErrClosed
 	}
-	return "", storage.ErrNotImplemented
+	resp, err := ext.cli.GetValue(ctx, &v1.GetValueRequest{Key: key})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return "", storage.ErrKeyNotFound
+		}
+		return "", fmt.Errorf("get value: %w", err)
+	}
+	return resp.GetValue().GetValue(), nil
 }
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
@@ -265,7 +291,20 @@ func (ext *ExternalStorage) PutValue(ctx context.Context, key, value string, ttl
 	if ext.cli == nil {
 		return storage.ErrClosed
 	}
-	return storage.ErrNotImplemented
+	_, err := ext.cli.PutValue(ctx, &v1.PutValueRequest{
+		Value: &v1.StorageValue{
+			Key:   key,
+			Value: value,
+		},
+		Ttl: durationpb.New(ttl),
+	})
+	if err != nil {
+		if status.Code(err) == codes.FailedPrecondition {
+			return storage.ErrNotVoter
+		}
+		return fmt.Errorf("put value: %w", err)
+	}
+	return nil
 }
 
 // Delete removes a key.
@@ -275,7 +314,14 @@ func (ext *ExternalStorage) Delete(ctx context.Context, key string) error {
 	if ext.cli == nil {
 		return storage.ErrClosed
 	}
-	return storage.ErrNotImplemented
+	_, err := ext.cli.DeleteValue(ctx, &v1.DeleteValueRequest{Key: key})
+	if err != nil {
+		if status.Code(err) == codes.FailedPrecondition {
+			return storage.ErrNotVoter
+		}
+		return fmt.Errorf("delete value: %w", err)
+	}
+	return nil
 }
 
 // List returns all keys with a given prefix.
@@ -285,7 +331,14 @@ func (ext *ExternalStorage) List(ctx context.Context, prefix string) ([]string, 
 	if ext.cli == nil {
 		return nil, storage.ErrClosed
 	}
-	return nil, storage.ErrNotImplemented
+	resp, err := ext.cli.ListKeys(ctx, &v1.ListKeysRequest{Prefix: prefix})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, storage.ErrKeyNotFound
+		}
+		return nil, fmt.Errorf("list keys: %w", err)
+	}
+	return resp.GetKeys(), nil
 }
 
 // IterPrefix iterates over all keys with a given prefix. It is important
@@ -297,7 +350,19 @@ func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix string, fn st
 	if ext.cli == nil {
 		return storage.ErrClosed
 	}
-	return storage.ErrNotImplemented
+	resp, err := ext.cli.ListValues(ctx, &v1.ListValuesRequest{Prefix: prefix})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return storage.ErrKeyNotFound
+		}
+		return fmt.Errorf("list values: %w", err)
+	}
+	for _, value := range resp.GetValues() {
+		if err := fn(value.GetKey(), value.GetValue()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Snapshot returns a snapshot of the storage.
@@ -328,5 +393,35 @@ func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix string, fn sto
 	if ext.cli == nil {
 		return func() {}, storage.ErrClosed
 	}
-	return func() {}, storage.ErrNotImplemented
+	ctx, cancel := context.WithCancel(ctx)
+	stream, err := ext.cli.SubscribePrefix(ctx, &v1.SubscribePrefixRequest{Prefix: prefix})
+	if err != nil {
+		defer cancel()
+		return func() {}, fmt.Errorf("subscribe prefix: %w", err)
+	}
+	go func() {
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				if status.Code(err) == codes.Canceled {
+					return
+				} else if status.Code(err) == codes.Unavailable {
+					ext.log.Error("Storage provider is unavailable", "error", err.Error())
+					return
+				} else if errors.Is(err, io.EOF) {
+					ext.log.Error("Storage provider closed connection", "error", err.Error())
+					return
+				}
+				ext.log.Error("Failed to receive subscription message", "error", err.Error())
+				continue
+			}
+			switch msg.GetEventType() {
+			case v1.PrefixEvent_EventTypeRemoved:
+				fn(msg.GetValue().GetKey(), "")
+			case v1.PrefixEvent_EventTypeUpdated:
+				fn(msg.GetValue().GetKey(), msg.GetValue().GetValue())
+			}
+		}
+	}()
+	return cancel, nil
 }
