@@ -39,7 +39,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 	peers := New(st)
 	graph := peers.Graph()
 	nw := networking.New(st)
-	adjacencyMap, err := nw.FilterGraph(ctx, peers, peerID)
+	adjacencyMap, err := nw.FilterGraph(ctx, peers.Graph(), peerID)
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)
 	}
@@ -57,7 +57,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 			ourRoutes = append(ourRoutes, prefix)
 		}
 	}
-	directAdjacents := adjacencyMap[peerID]
+	directAdjacents := adjacencyMap[peergraph.NodeID(peerID)]
 	out := make([]*v1.WireGuardPeer, 0, len(directAdjacents))
 	for adjacent, edge := range directAdjacents {
 		node, err := graph.Vertex(adjacent)
@@ -170,16 +170,16 @@ func recurseEdges(
 	thisPeer string,
 	thisRoutes []netip.Prefix,
 	node *peergraph.MeshNode,
-	visited map[string]struct{},
+	visited map[peergraph.NodeID]struct{},
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
 	if visited == nil {
-		visited = make(map[string]struct{})
+		visited = make(map[peergraph.NodeID]struct{})
 	}
-	directAdjacents := adjacencyMap[thisPeer]
-	visited[node.GetId()] = struct{}{}
-	targets := adjacencyMap[node.GetId()]
+	directAdjacents := adjacencyMap[peergraph.NodeID(thisPeer)]
+	visited[peergraph.NodeID(node.GetId())] = struct{}{}
+	targets := adjacencyMap[peergraph.NodeID(node.GetId())]
 	for target := range targets {
-		if target == thisPeer {
+		if target.String() == thisPeer {
 			continue
 		}
 		if _, ok := directAdjacents[target]; ok {

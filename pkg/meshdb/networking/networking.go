@@ -52,15 +52,6 @@ var ErrInvalidACL = errors.New("invalid network acl")
 // ErrInvalidRoute is returned when a Route is invalid.
 var ErrInvalidRoute = errors.New("invalid route")
 
-// GraphResolver is an interface that can return a mesh graph and resolve
-// nodes by their ID.
-type GraphResolver interface {
-	// Graph returns the mesh graph.
-	Graph() peergraph.Graph
-	// Get returns a node by ID.
-	Get(ctx context.Context, id string) (peergraph.MeshNode, error)
-}
-
 // Networking is the interface to the database models for network resources.
 type Networking interface {
 	// PutNetworkACL creates or updates a NetworkACL.
@@ -88,7 +79,7 @@ type Networking interface {
 	// FilterGraph filters the adjacency map in the given graph for the given node ID according
 	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
 	// error is returned on faiure building the initial map or any database error.
-	FilterGraph(ctx context.Context, resolver GraphResolver, nodeID string) (peergraph.AdjacencyMap, error)
+	FilterGraph(ctx context.Context, graph peergraph.Graph, nodeID string) (peergraph.AdjacencyMap, error)
 }
 
 // New returns a new Networking interface.
@@ -274,11 +265,11 @@ func (n *networking) ListRoutes(ctx context.Context) (Routes, error) {
 // needs improvement to be more efficient and to allow edges so long as one of the routes encountered is
 // allowed. Currently if a single route provided by a destination node is not allowed, the entire node
 // is filtered out.
-func (n *networking) FilterGraph(ctx context.Context, resolver GraphResolver, thisNodeID string) (peergraph.AdjacencyMap, error) {
+func (n *networking) FilterGraph(ctx context.Context, graph peergraph.Graph, thisNodeID string) (peergraph.AdjacencyMap, error) {
 	log := context.LoggerFrom(ctx)
 
 	// Resolve the current node ID
-	thisNode, err := resolver.Get(ctx, thisNodeID)
+	thisNode, err := graph.Vertex(peergraph.NodeID(thisNodeID))
 	if err != nil {
 		return nil, fmt.Errorf("get node: %w", err)
 	}
@@ -296,7 +287,7 @@ func (n *networking) FilterGraph(ctx context.Context, resolver GraphResolver, th
 		return nil, fmt.Errorf("expand network acls: %w", err)
 	}
 	acls.Sort(SortDescending)
-	fullMap, err := peergraph.BuildAdjacencyMap(resolver.Graph())
+	fullMap, err := peergraph.BuildAdjacencyMap(graph)
 	if err != nil {
 		return nil, fmt.Errorf("build adjacency map: %w", err)
 	}
@@ -305,20 +296,20 @@ func (n *networking) FilterGraph(ctx context.Context, resolver GraphResolver, th
 	// Start with a copy of the full map and filter out nodes that are not allowed to communicate
 	// with the current node.
 	filtered := make(peergraph.AdjacencyMap)
-	filtered[thisNode.Id] = fullMap[thisNode.Id]
+	filtered[peergraph.NodeID(thisNode.GetId())] = fullMap[peergraph.NodeID(thisNode.GetId())]
 
 Nodes:
 	for nodeID := range fullMap {
-		if nodeID == thisNode.Id {
+		if nodeID.String() == thisNode.GetId() {
 			continue
 		}
-		node, err := resolver.Get(ctx, nodeID)
+		node, err := graph.Vertex(nodeID)
 		if err != nil {
 			return nil, fmt.Errorf("get node: %w", err)
 		}
 		if !acls.AllowNodesToCommunicate(ctx, thisNode, node) {
 			log.Debug("Nodes not allowed to communicate", "nodeA", thisNode, "nodeB", node)
-			delete(filtered[thisNode.Id], node.GetId())
+			delete(filtered[peergraph.NodeID(thisNode.GetId())], peergraph.NodeID(node.GetId()))
 			continue Nodes
 		}
 		// If the destination node exposes additional routes, check if the nodes can communicate
@@ -328,39 +319,35 @@ Nodes:
 			return nil, fmt.Errorf("get routes by node: %w", err)
 		}
 		for _, route := range routes {
-			for _, cidr := range route.GetDestinationCidrs() {
-				prefix, err := netip.ParsePrefix(cidr)
-				if err != nil {
-					return nil, fmt.Errorf("parse prefix: %w", err)
-				}
+			for _, cidr := range route.DestinationPrefixes() {
 				var action Action
-				if prefix.Addr().Is4() {
+				if cidr.Addr().Is4() {
 					action = Action{
 						NetworkAction: &v1.NetworkAction{
-							SrcNode: thisNode.Id,
-							SrcCidr: thisNode.PrivateIpv4,
-							DstNode: node.Id,
-							DstCidr: cidr,
+							SrcNode: thisNode.GetId(),
+							SrcCidr: thisNode.GetPrivateIpv4(),
+							DstNode: node.GetId(),
+							DstCidr: cidr.String(),
 						},
 					}
 				} else {
 					action = Action{
 						NetworkAction: &v1.NetworkAction{
-							SrcNode: thisNode.Id,
-							SrcCidr: thisNode.PrivateIpv6,
-							DstNode: node.Id,
-							DstCidr: cidr,
+							SrcNode: thisNode.GetId(),
+							SrcCidr: thisNode.GetPrivateIpv6(),
+							DstNode: node.GetId(),
+							DstCidr: cidr.String(),
 						},
 					}
 				}
 				if !acls.Accept(ctx, action) {
 					log.Debug("filtering node", "node", node, "reason", "route not allowed", "action", action)
-					delete(filtered[thisNode.Id], node.GetId())
+					delete(filtered[peergraph.NodeID(thisNode.GetId())], peergraph.NodeID(node.GetId()))
 					continue Nodes
 				}
 			}
 		}
-		filtered[node.GetId()] = make(map[string]peergraph.Edge)
+		filtered[peergraph.NodeID(node.GetId())] = make(map[peergraph.NodeID]peergraph.Edge)
 	}
 	for node := range filtered {
 		edges, ok := fullMap[node]
@@ -370,11 +357,11 @@ Nodes:
 	Peers:
 		for peerID, edge := range edges {
 			e := edge
-			if peerID == thisNode.Id {
+			if peerID.String() == thisNode.GetId() {
 				filtered[node][peerID] = e
 				continue
 			}
-			peer, err := resolver.Get(ctx, peerID)
+			peer, err := graph.Vertex(peerID)
 			if err != nil {
 				return nil, fmt.Errorf("get peer: %w", err)
 			}
@@ -384,30 +371,26 @@ Nodes:
 			}
 			// If the peer exposes additional routes, check if the nodes can communicate
 			// via any of those routes.
-			routes, err := n.GetRoutesByNode(ctx, peerID)
+			routes, err := n.GetRoutesByNode(ctx, peerID.String())
 			if err != nil {
 				return nil, fmt.Errorf("get routes by node: %w", err)
 			}
 			for _, route := range routes {
-				for _, cidr := range route.GetDestinationCidrs() {
-					prefix, err := netip.ParsePrefix(cidr)
-					if err != nil {
-						return nil, fmt.Errorf("parse prefix: %w", err)
-					}
+				for _, cidr := range route.DestinationPrefixes() {
 					var action v1.NetworkAction
-					if prefix.Addr().Is4() {
+					if cidr.Addr().Is4() {
 						action = v1.NetworkAction{
-							SrcNode: thisNode.Id,
-							SrcCidr: thisNode.PrivateIpv4,
-							DstNode: peerID,
-							DstCidr: cidr,
+							SrcNode: thisNode.GetId(),
+							SrcCidr: thisNode.GetPrivateIpv4(),
+							DstNode: peerID.String(),
+							DstCidr: cidr.String(),
 						}
 					} else {
 						action = v1.NetworkAction{
-							SrcNode: thisNode.Id,
-							SrcCidr: thisNode.PrivateIpv6,
-							DstNode: peerID,
-							DstCidr: cidr,
+							SrcNode: thisNode.GetId(),
+							SrcCidr: thisNode.GetPrivateIpv6(),
+							DstNode: peerID.String(),
+							DstCidr: cidr.String(),
 						}
 					}
 					if !acls.Accept(ctx, Action{&action}) {

@@ -112,7 +112,7 @@ func (p *peerDB) Put(ctx context.Context, node *v1.MeshNode) error {
 }
 
 func (p *peerDB) Get(ctx context.Context, id string) (peergraph.MeshNode, error) {
-	node, err := p.graph.Vertex(id)
+	node, err := p.graph.Vertex(peergraph.NodeID(id))
 	if err != nil {
 		if errors.Is(err, graph.ErrVertexNotFound) {
 			return peergraph.MeshNode{}, ErrNodeNotFound
@@ -148,14 +148,14 @@ func (p *peerDB) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("get edges: %w", err)
 	}
 	for _, edge := range edges {
-		if edge.Source == id || edge.Target == id {
+		if edge.Source.String() == id || edge.Target.String() == id {
 			err = p.graph.RemoveEdge(edge.Source, edge.Target)
 			if err != nil {
 				return fmt.Errorf("remove edge: %w", err)
 			}
 		}
 	}
-	err = p.graph.RemoveVertex(id)
+	err = p.graph.RemoveVertex(peergraph.NodeID(id))
 	if err != nil {
 		if errors.Is(err, graph.ErrVertexNotFound) {
 			// We don't return this error in the graph store
@@ -174,7 +174,7 @@ func (p *peerDB) List(ctx context.Context) ([]peergraph.MeshNode, error) {
 			return nil
 		}
 		var node peergraph.MeshNode
-		err := node.Unmarshal([]byte(value))
+		err := node.UnmarshalJSON([]byte(value))
 		if err != nil {
 			return fmt.Errorf("unmarshal node: %w", err)
 		}
@@ -252,21 +252,21 @@ func (p *peerDB) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
 		}
 	}
 	// Save the raft log some trouble by checking if the edge already exists.
-	graphEdge, err := p.graph.Edge(edge.Source, edge.Target)
+	graphEdge, err := p.graph.Edge(peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target))
 	if err == nil {
 		// Check if the weight or attributes changed
 		if !cmp.Equal(graphEdge.Properties.Attributes, edge.Attributes) {
-			return p.graph.UpdateEdge(edge.Source, edge.Target, opts...)
+			return p.graph.UpdateEdge(peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target), opts...)
 		}
 		if graphEdge.Properties.Weight != int(edge.Weight) {
-			return p.graph.UpdateEdge(edge.Source, edge.Target, opts...)
+			return p.graph.UpdateEdge(peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target), opts...)
 		}
 		return nil
 	}
 	if !errors.Is(err, graph.ErrEdgeNotFound) {
 		return fmt.Errorf("get edge: %w", err)
 	}
-	err = p.graph.AddEdge(edge.Source, edge.Target, opts...)
+	err = p.graph.AddEdge(peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target), opts...)
 	if err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {
 		return fmt.Errorf("add edge: %w", err)
 	}
@@ -274,7 +274,7 @@ func (p *peerDB) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
 }
 
 func (p *peerDB) RemoveEdge(ctx context.Context, from, to string) error {
-	err := p.graph.RemoveEdge(from, to)
+	err := p.graph.RemoveEdge(peergraph.NodeID(from), peergraph.NodeID(to))
 	if err != nil {
 		if err == graph.ErrEdgeNotFound {
 			return nil
@@ -285,7 +285,7 @@ func (p *peerDB) RemoveEdge(ctx context.Context, from, to string) error {
 }
 
 func (p *peerDB) DrawGraph(ctx context.Context, w io.Writer) error {
-	graph := graph.Graph[string, peergraph.MeshNode](p.graph)
+	graph := graph.Graph[peergraph.NodeID, peergraph.MeshNode](p.graph)
 	err := draw.DOT(graph, w)
 	if err != nil {
 		return fmt.Errorf("draw graph: %w", err)

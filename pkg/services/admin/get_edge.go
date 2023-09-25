@@ -35,7 +35,7 @@ func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, 
 	if edge.GetTarget() == "" {
 		return nil, status.Error(codes.InvalidArgument, "edge target is required")
 	}
-	graphEdge, err := s.peers.Graph().Edge(edge.GetSource(), edge.GetTarget())
+	graphEdge, err := s.peers.Graph().Edge(graph.NodeID(edge.GetSource()), graph.NodeID(edge.GetTarget()))
 	if err != nil {
 		if errors.Is(err, graph.ErrEdgeNotFound) {
 			return nil, status.Errorf(codes.NotFound, "edge %q to %q not found", edge.GetSource(), edge.GetTarget())

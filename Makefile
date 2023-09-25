@@ -68,10 +68,7 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 ##@ Testing
 
 COVERAGE_FILE := coverage.out
-TEST_PARALLEL ?= $(shell nproc)
-ifndef ($(TEST_PARALLEL))
-	TEST_PARALLEL = 8
-endif
+TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
 ci-test: fmt vet test ## Run all CI tests.

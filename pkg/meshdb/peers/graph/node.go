@@ -23,9 +23,16 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+// MeshNode wraps a mesh node.
 type MeshNode struct{ *v1.MeshNode }
 
-func (n *MeshNode) Unmarshal(data []byte) error {
+// MarshalJSON marshals the node to JSON.
+func (n MeshNode) MarshalJSON() ([]byte, error) {
+	return protojson.Marshal(n.MeshNode)
+}
+
+// UnmarshalJSON unmarshals the node from JSON.
+func (n *MeshNode) UnmarshalJSON(data []byte) error {
 	var node v1.MeshNode
 	if err := protojson.Unmarshal(data, &node); err != nil {
 		return err

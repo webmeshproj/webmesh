@@ -34,8 +34,8 @@ func (s *Server) ListEdges(ctx context.Context, _ *emptypb.Empty) (*v1.MeshEdges
 	out := make([]*v1.MeshEdge, len(edges))
 	for i, edge := range edges {
 		out[i] = &v1.MeshEdge{
-			Source:     edge.Source,
-			Target:     edge.Target,
+			Source:     edge.Source.String(),
+			Target:     edge.Target.String(),
 			Weight:     int32(edge.Properties.Weight),
 			Attributes: edge.Properties.Attributes,
 		}

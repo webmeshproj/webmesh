@@ -89,8 +89,8 @@ func (s *Server) GetMeshGraph(ctx context.Context, _ *emptypb.Empty) (*v1.MeshGr
 	}
 	for i, edge := range edges {
 		out.Edges[i] = &v1.MeshEdge{
-			Source: edge.Source,
-			Target: edge.Target,
+			Source: edge.Source.String(),
+			Target: edge.Target.String(),
 			Weight: int32(edge.Properties.Weight),
 		}
 	}
