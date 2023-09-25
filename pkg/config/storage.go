@@ -31,8 +31,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	extstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/external"
-	"github.com/webmeshproj/webmesh/pkg/storage/providers/passthrough"
-	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
+	passthroughstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/passthrough"
+	raftstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 
 // StorageProvider is a type of storage provider.
@@ -129,7 +129,7 @@ func (o *StorageOptions) NewProvider(ctx context.Context, dialer transport.NodeD
 // NewRaftStorageProvider returns a new raftstorage provider for the current configuration.
 func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, dialer transport.NodeDialer, nodeID string, isMember bool) storage.Provider {
 	if !isMember {
-		return passthrough.NewStorageProvider(o.NewPassthroughOptions(ctx, dialer, nodeID))
+		return passthroughstorage.NewStorageProvider(o.NewPassthroughOptions(ctx, dialer, nodeID))
 	}
 	return raftstorage.NewStorageProvider(o.NewRaftOptions(ctx, nodeID))
 }
@@ -156,8 +156,8 @@ func (o *StorageOptions) NewRaftOptions(ctx context.Context, nodeID string) raft
 }
 
 // NewPassthroughOptions returns a new passthrough options for the current configuration.
-func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, dialer transport.NodeDialer, nodeID string) passthrough.Options {
-	return passthrough.Options{
+func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, dialer transport.NodeDialer, nodeID string) passthroughstorage.Options {
+	return passthroughstorage.Options{
 		Dialer:   dialer,
 		LogLevel: o.LogLevel,
 	}
