@@ -114,11 +114,15 @@ func (o *StorageOptions) Validate() error {
 	return nil
 }
 
-// NewProvider creates a new storage provider from the given options.
+// NewProvider creates a new storage provider from the given options. If not a storage providing member, a node dialer
+// is required for the passthrough storage provider.
 func (o *StorageOptions) NewProvider(ctx context.Context, dialer transport.NodeDialer, nodeID string, isMember bool) (storage.Provider, error) {
+	if !isMember {
+		return passthroughstorage.NewStorageProvider(o.NewPassthroughOptions(ctx, dialer, nodeID)), nil
+	}
 	switch o.Provider {
 	case StorageProviderRaft, "":
-		return o.NewRaftStorageProvider(ctx, dialer, nodeID, isMember), nil
+		return o.NewRaftStorageProvider(ctx, nodeID), nil
 	case StorageProviderExternal:
 		return o.NewExternalStorageProvider(ctx, nodeID)
 	default:
@@ -127,11 +131,17 @@ func (o *StorageOptions) NewProvider(ctx context.Context, dialer transport.NodeD
 }
 
 // NewRaftStorageProvider returns a new raftstorage provider for the current configuration.
-func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, dialer transport.NodeDialer, nodeID string, isMember bool) storage.Provider {
-	if !isMember {
-		return passthroughstorage.NewStorageProvider(o.NewPassthroughOptions(ctx, dialer, nodeID))
-	}
+func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, nodeID string) storage.Provider {
 	return raftstorage.NewStorageProvider(o.NewRaftOptions(ctx, nodeID))
+}
+
+// NewExternalStorageProvider returns a new external storage provider for the current configuration.
+func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID string) (storage.Provider, error) {
+	opts, err := o.NewExternalStorageOptions(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	return extstorage.NewStorageProvider(opts), nil
 }
 
 // NewRaftOptions returns a new raft options for the current configuration.
@@ -161,15 +171,6 @@ func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, dialer trans
 		Dialer:   dialer,
 		LogLevel: o.LogLevel,
 	}
-}
-
-// NewExternalStorageProvider returns a new external storage provider for the current configuration.
-func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID string) (storage.Provider, error) {
-	opts, err := o.NewExternalStorageOptions(ctx, nodeID)
-	if err != nil {
-		return nil, err
-	}
-	return extstorage.NewStorageProvider(opts), nil
 }
 
 // NewExternalStorageOptions creates a new external storage options.
