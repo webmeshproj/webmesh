@@ -28,7 +28,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"

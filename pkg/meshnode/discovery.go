@@ -27,8 +27,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 )
 

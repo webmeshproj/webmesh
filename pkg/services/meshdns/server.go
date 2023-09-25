@@ -31,7 +31,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	dnsutil "github.com/webmeshproj/webmesh/pkg/net/system/dns"
+	dnsutil "github.com/webmeshproj/webmesh/pkg/meshnet/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )

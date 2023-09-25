@@ -29,7 +29,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/raft/fsm"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )

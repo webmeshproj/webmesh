@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/webmeshproj/webmesh/pkg/net/system"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
 
 // WireGuardOptions are options for configuring the WireGuard interface.

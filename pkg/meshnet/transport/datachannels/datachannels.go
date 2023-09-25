@@ -33,7 +33,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
 // ManagedServerChannel is a channel that is managed for a particular purpose.

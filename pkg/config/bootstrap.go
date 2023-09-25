@@ -26,11 +26,11 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
-	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
 

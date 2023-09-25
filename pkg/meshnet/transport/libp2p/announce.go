@@ -33,7 +33,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
 // Announcer is an interface for nodes that can announce themselves to the

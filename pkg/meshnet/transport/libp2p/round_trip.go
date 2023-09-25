@@ -31,7 +31,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
 // RoundTripOptions are options for performing a round trip against

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/webmeshproj/webmesh/pkg/net/system/link"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/link"
 )
 
 // Detect detects endpoints for this machine.

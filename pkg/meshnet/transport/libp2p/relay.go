@@ -28,7 +28,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/net/relay"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/relay"
 )
 
 // UDPRelayOptions are the options for negotiating a UDP relay.

@@ -27,7 +27,7 @@ import (
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	"github.com/webmeshproj/webmesh/pkg/libp2p/security"
 	"github.com/webmeshproj/webmesh/pkg/logging"
-	wmp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
+	wmp2p "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 )
 
 var (

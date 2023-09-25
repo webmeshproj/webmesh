@@ -26,8 +26,8 @@ import (
 	"strings"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/system/link"
-	"github.com/webmeshproj/webmesh/pkg/net/system/routes"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/link"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/routes"
 )
 
 // DefaultMTU is the default MTU for wireguard interfaces.

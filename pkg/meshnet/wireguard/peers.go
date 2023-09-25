@@ -29,7 +29,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/net/system"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
 )
 
 // Peer contains configurations for a wireguard peer. When removing,

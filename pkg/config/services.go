@@ -35,8 +35,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
-	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/membership"

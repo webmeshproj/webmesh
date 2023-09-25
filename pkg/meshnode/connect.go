@@ -30,9 +30,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
-	"github.com/webmeshproj/webmesh/pkg/net"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 )
@@ -48,7 +48,7 @@ type ConnectOptions struct {
 	// JoinRoundTripper is the round tripper to use for joining the mesh.
 	JoinRoundTripper transport.JoinRoundTripper
 	// NetworkOptions are options for the network manager
-	NetworkOptions net.Options
+	NetworkOptions meshnet.Options
 	// Discovery are options for broadcasting to others to join the mesh
 	// via this node. It can be turned on later if needed.
 	Discovery *libp2p.AnnounceOptions
@@ -182,7 +182,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	// Create the network manager
 	opts.NetworkOptions.NodeID = s.ID()
 	opts.NetworkOptions.RaftPort = int(s.raft.ListenPort())
-	s.nw = net.New(s.Storage(), opts.NetworkOptions)
+	s.nw = meshnet.New(s.Storage(), opts.NetworkOptions)
 	// At this point we are open for business.
 	s.open.Store(true)
 	if opts.Bootstrap != nil {
@@ -299,7 +299,7 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get self peer: %w", err)
 	}
-	opts := net.StartOptions{
+	opts := meshnet.StartOptions{
 		Key: s.key,
 		AddressV4: func() netip.Prefix {
 			if s.opts.DisableIPv4 {

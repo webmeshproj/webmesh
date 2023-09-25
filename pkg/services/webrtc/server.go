@@ -20,8 +20,8 @@ package webrtc
 import (
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )

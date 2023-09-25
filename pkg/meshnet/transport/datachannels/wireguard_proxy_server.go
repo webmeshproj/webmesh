@@ -26,7 +26,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/relay"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/relay"
 )
 
 // WireguardProxyServer is a WebRTC datachannel proxy for WireGuard. It is used

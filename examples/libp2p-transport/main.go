@@ -25,7 +25,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
-	wmp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
+	wmp2p "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 )
 
 func main() {

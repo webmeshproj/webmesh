@@ -26,7 +26,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
 )
 
 // GlobalOptions are options that will be re-applied to all relevant configurations after parsing.

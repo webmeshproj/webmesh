@@ -22,7 +22,7 @@ import (
 
 	"github.com/hashicorp/raft"
 
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
 var (

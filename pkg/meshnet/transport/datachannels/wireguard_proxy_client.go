@@ -27,8 +27,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/relay"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/relay"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
 // WireGuardProxyClient is a WireGuard proxy client. It is used for outgoing

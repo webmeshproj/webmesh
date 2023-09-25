@@ -34,9 +34,9 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/net/system"
-	"github.com/webmeshproj/webmesh/pkg/net/system/link"
-	"github.com/webmeshproj/webmesh/pkg/net/system/routes"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/link"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/routes"
 )
 
 // DefaultListenPort is the default listen port for the WireGuard interface.

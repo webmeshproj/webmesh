@@ -26,7 +26,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
 
 // Conn wraps the basic net.Conn with a reference back to the underlying transport.

@@ -28,7 +28,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/net/system/buffers"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/buffers"
 )
 
 const (

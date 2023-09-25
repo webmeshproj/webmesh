@@ -31,7 +31,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
 // ClientOptions are options for configuring a client peer connection.

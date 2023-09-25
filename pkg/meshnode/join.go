@@ -26,7 +26,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	meshnet "github.com/webmeshproj/webmesh/pkg/net"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/services"
 )
 

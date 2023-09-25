@@ -42,10 +42,10 @@ import (
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/logging"
-	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
-	"github.com/webmeshproj/webmesh/pkg/net/system"
-	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
 
 // WireGuardTransport is the webmesh wireguard transport. This transport does not run a

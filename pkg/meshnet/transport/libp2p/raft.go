@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
 // RaftTransportOptions are options for the TCP transport.

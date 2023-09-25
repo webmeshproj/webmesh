@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package net
+// Package meshnet provides the core networking functionality for WebMesh.
+package meshnet
 
 import (
 	"errors"
@@ -33,14 +34,14 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
-	"github.com/webmeshproj/webmesh/pkg/net/relay"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/datachannels"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
-	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/relay"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/datachannels"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
 
 // PeerManager is the interface for tracking and managing WireGuard peers.

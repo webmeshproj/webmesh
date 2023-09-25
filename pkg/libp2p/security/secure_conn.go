@@ -35,8 +35,8 @@ import (
 	wgcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
-	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
 
 // Ensure we implement the interface

@@ -36,7 +36,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
-	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 )

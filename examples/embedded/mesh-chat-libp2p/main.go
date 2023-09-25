@@ -30,7 +30,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
-	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
 )
 
 func main() {

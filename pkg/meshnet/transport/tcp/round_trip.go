@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
 // RoundTripOptions are options for a gRPC round tripper.

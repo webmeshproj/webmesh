@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package net
+package meshnet
 
 import (
 	"fmt"
@@ -30,12 +30,12 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/net/system"
-	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
-	"github.com/webmeshproj/webmesh/pkg/net/system/firewall"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
-	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/dns"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 

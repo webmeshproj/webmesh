@@ -36,8 +36,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
-	meshnet "github.com/webmeshproj/webmesh/pkg/net"
-	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )

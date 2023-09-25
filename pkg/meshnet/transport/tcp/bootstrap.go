@@ -25,8 +25,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 )
 
 // BootstrapTransportOptions are options for the TCP transport.
