@@ -26,7 +26,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // DefaultDataDir is the default data directory.
@@ -48,12 +47,13 @@ const (
 type Options struct {
 	// NodeID is the node ID.
 	NodeID string
-	// Transport is the Raft transport.
+	// Transport is the Raft transport to use for communicating with
+	// other Raft nodes.
 	Transport transport.RaftTransport
-	// RaftStorage is the Raft storage.
-	RaftStorage storage.RaftStorage
 	// DataDir is the directory to store data in.
 	DataDir string
+	// ClearDataDir is if the data directory should be cleared on startup.
+	ClearDataDir bool
 	// InMemory is if the store should be in memory. This should only be used for testing and ephemeral nodes.
 	InMemory bool
 	// ConnectionPoolCount is the number of connections to pool. If 0, no connection pooling is used.

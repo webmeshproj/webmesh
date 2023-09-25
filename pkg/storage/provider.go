@@ -29,28 +29,32 @@ type Provider interface {
 	// that the provider may have allocated.
 	io.Closer
 
-	// Start should start the provider and any resources that it may need.
-	Start(context.Context) error
-	// Bootstrap should bootstrap the provider for first-time usage.
-	Bootstrap(context.Context) error
-	// Status returns the status of the storage provider.
-	Status() *v1.StorageStatus
 	// Storage returns the underlying MeshStorage instance.
 	// The provider does not need to guarantee consistency
 	// on read operations.
 	Storage() MeshStorage
 	// Consensus returns the underlying Consensus instance.
 	Consensus() Consensus
+
+	// Start should start the provider and any resources that it may need.
+	Start(context.Context) error
+	// Bootstrap should bootstrap the provider for first-time usage.
+	Bootstrap(context.Context) error
+	// Status returns the status of the storage provider.
+	Status() *v1.StorageStatus
 }
 
 // Consensus is the interface for configuring storage consensus.
 type Consensus interface {
+	// IsLeader returns true if the node is the leader of the storage group.
+	IsLeader() bool
 	// AddVoter adds a voter to the consensus group.
 	AddVoter(context.Context, *v1.StoragePeer) error
 	// AddObserver adds an observer to the consensus group.
 	AddObserver(context.Context, *v1.StoragePeer) error
 	// DemoteVoter demotes a voter to an observer.
 	DemoteVoter(context.Context, *v1.StoragePeer) error
-	// RemovePeer removes a peer from the consensus group.
-	RemovePeer(context.Context, *v1.StoragePeer) error
+	// RemovePeer removes a peer from the consensus group. If wait
+	// is true, the function will wait for the peer to be removed.
+	RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error
 }
