@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package raft
+package raftstorage
 
 import (
 	"runtime"
@@ -25,6 +25,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/logging"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // DefaultDataDir is the default data directory.
@@ -46,6 +48,10 @@ const (
 type Options struct {
 	// NodeID is the node ID.
 	NodeID string
+	// Transport is the Raft transport.
+	Transport transport.RaftTransport
+	// RaftStorage is the Raft storage.
+	RaftStorage storage.RaftStorage
 	// DataDir is the directory to store data in.
 	DataDir string
 	// InMemory is if the store should be in memory. This should only be used for testing and ephemeral nodes.
@@ -125,7 +131,6 @@ func (o *Options) RaftConfig(ctx context.Context, nodeID string) *raft.Config {
 		config.SnapshotThreshold = o.SnapshotThreshold
 	}
 	config.LogLevel = hclog.LevelFromString(o.LogLevel).String()
-
 	config.Logger = logging.NewHCLogAdapter("", o.LogLevel, context.LoggerFrom(ctx).With("component", "raft"))
 	return config
 }

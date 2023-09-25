@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package storage contains the interface for storing and retrieving data
-// about the state of the mesh and providing storage backends for raft.
+// Package storage contains the interfaces for storing and retrieving data
+// about the state of the mesh and maintaining consensus.
 package storage
 
 import (

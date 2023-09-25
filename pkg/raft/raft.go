@@ -30,6 +30,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/raft/fsm"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -59,10 +60,6 @@ const (
 	Voter    = raft.Voter
 	Nonvoter = raft.Nonvoter
 )
-
-// BootstrapCallback is a callback for when the cluster is bootstrapped.
-// The isLeader flag is set to true if the node is the leader, and false otherwise.
-type BootstrapCallback func(isLeader bool) error
 
 // ObservationCallback is a callback that can be registered for when an observation
 // is received.
@@ -195,10 +192,7 @@ func (r *raftNode) Start(ctx context.Context, opts StartOptions) error {
 		snapshotStore, err = raft.NewFileSnapshotStoreWithLogger(
 			r.opts.DataDir,
 			int(r.opts.SnapshotRetention),
-			&hclogAdapter{
-				Logger: r.log.With("component", "snapshotstore"),
-				level:  r.opts.LogLevel,
-			},
+			logging.NewHCLogAdapter("", r.opts.LogLevel, r.log.With("component", "snapshotstore")),
 		)
 		if err != nil {
 			r.mu.Unlock()
