@@ -56,7 +56,7 @@ func (s *Server) GetRaftConfiguration(ctx context.Context, _ *v1.RaftConfigurati
 				case raft.Voter:
 					return v1.ClusterStatus_CLUSTER_VOTER
 				case raft.Nonvoter:
-					return v1.ClusterStatus_CLUSTER_NON_VOTER
+					return v1.ClusterStatus_CLUSTER_OBSERVER
 				default:
 					return v1.ClusterStatus_CLUSTER_STATUS_UNKNOWN
 				}

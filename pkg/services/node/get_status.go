@@ -55,7 +55,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 			} else if s.Raft.IsVoter() {
 				return v1.ClusterStatus_CLUSTER_VOTER
 			} else if s.Raft.IsObserver() {
-				return v1.ClusterStatus_CLUSTER_NON_VOTER
+				return v1.ClusterStatus_CLUSTER_OBSERVER
 			}
 			return v1.ClusterStatus_CLUSTER_NODE
 		}(),

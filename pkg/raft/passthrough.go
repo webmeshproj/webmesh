@@ -102,7 +102,7 @@ func (p *passthroughRaft) Configuration() (raft.Configuration, error) {
 					return raft.Voter
 				case v1.ClusterStatus_CLUSTER_VOTER:
 					return raft.Voter
-				case v1.ClusterStatus_CLUSTER_NON_VOTER:
+				case v1.ClusterStatus_CLUSTER_OBSERVER:
 					return raft.Nonvoter
 				default:
 					return raft.Nonvoter
