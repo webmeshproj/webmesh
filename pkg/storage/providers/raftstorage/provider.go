@@ -87,8 +87,8 @@ type RaftStorageProvider struct {
 	mu                          sync.Mutex
 }
 
-// NewRaftStorageProvider returns a new RaftStorageProvider.
-func NewRaftStorageProvider(opts Options) *RaftStorageProvider {
+// NewStorageProvider returns a new RaftStorageProvider.
+func NewStorageProvider(opts Options) *RaftStorageProvider {
 	return &RaftStorageProvider{
 		Options: opts,
 		nodeID:  raft.ServerID(opts.NodeID),

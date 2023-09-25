@@ -37,6 +37,10 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
+// Ensure we satisfy the provider interface.
+var _ storage.Provider = &PassthroughStorageProvider{}
+var _ storage.Consensus = &PassthroughConsensus{}
+
 // ErrNotStorageNode is returned when the node is not a storage node.
 var ErrNotStorageNode = fmt.Errorf("not a storage node")
 
@@ -61,8 +65,8 @@ type PassthroughStorageProvider struct {
 	mu         sync.Mutex
 }
 
-// NewPassthroughStorageProvider returns a new passthrough storage provider.
-func NewPassthroughStorageProvider(opts Options) *PassthroughStorageProvider {
+// NewStorageProvider returns a new passthrough storage provider.
+func NewStorageProvider(opts Options) *PassthroughStorageProvider {
 	return &PassthroughStorageProvider{
 		Options: opts,
 		log:     logging.NewLogger(opts.LogLevel).With("component", "passthrough-storage"),
