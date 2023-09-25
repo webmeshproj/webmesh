@@ -33,8 +33,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -45,7 +45,7 @@ type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
 
 	config     Config
-	mesh       mesh.Node
+	mesh       meshnode.Node
 	svcs       *services.Server
 	connecting atomic.Bool
 	mu         sync.Mutex
@@ -117,7 +117,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create mesh config: %v", err)
 	}
-	meshConn := mesh.New(meshConfig)
+	meshConn := meshnode.New(meshConfig)
 	// Create a new raft node
 	raftNode, err := conf.NewRaftNode(ctx, meshConn)
 	if err != nil {

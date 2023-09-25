@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
@@ -38,7 +38,7 @@ func (wf *winFirewall) AddWireguardForwarding(ctx context.Context, ifaceName str
 		return err
 	}
 	index := iface.Index
-	err = util.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
+	err = common.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
 		`name="WireGuard Forwarding"`, "dir=in", "action=allow",
 		fmt.Sprintf("interface=%d", index),
 	)
@@ -55,7 +55,7 @@ func (wf *winFirewall) AddMasquerade(ctx context.Context, ifaceName string) erro
 		return err
 	}
 	index := iface.Index
-	err = util.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
+	err = common.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
 		`name="WireGuard Masquerade"`, "dir=out", "action=allow",
 		fmt.Sprintf("interface=%d", index),
 	)

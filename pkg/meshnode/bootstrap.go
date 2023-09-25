@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mesh
+package meshnode
 
 import (
 	"context"
@@ -37,9 +37,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
+	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {

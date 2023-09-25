@@ -25,10 +25,10 @@ import (
 
 	"github.com/pion/webrtc/v3"
 
+	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/relay"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // WireGuardProxyClient is a WireGuard proxy client. It is used for outgoing
@@ -116,8 +116,8 @@ func NewWireGuardProxyClient(ctx context.Context, rt transport.WebRTCSignalTrans
 		}
 	})
 	dc, err := pc.conn.CreateDataChannel("wireguard-proxy", &webrtc.DataChannelInit{
-		ID:         util.Pointer(uint16(0)),
-		Negotiated: util.Pointer(true),
+		ID:         common.Pointer(uint16(0)),
+		Negotiated: common.Pointer(true),
 	})
 	if err != nil {
 		defer pc.Close()

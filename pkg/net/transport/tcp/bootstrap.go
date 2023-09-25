@@ -26,7 +26,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
+	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 )
 
 // BootstrapTransportOptions are options for the TCP transport.

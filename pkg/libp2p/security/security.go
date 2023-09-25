@@ -39,8 +39,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
+	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // Ensure we implement the interface

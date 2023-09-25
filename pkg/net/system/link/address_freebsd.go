@@ -23,13 +23,13 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 // SetInterfaceAddress sets the address of the interface with the given name.
 func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
 	if addr.Addr().Is4() {
-		out, err := util.ExecOutput(ctx, "ifconfig", name, "inet", addr.String(), addr.Addr().String())
+		out, err := common.ExecOutput(ctx, "ifconfig", name, "inet", addr.String(), addr.Addr().String())
 		if err != nil {
 			if strings.Contains(string(out), "not exist") {
 				return ErrLinkNotExists
@@ -37,7 +37,7 @@ func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) er
 			return err
 		}
 	}
-	out, err := util.ExecOutput(ctx, "ifconfig", name, "inet6", addr.String(), "prefixlen", fmt.Sprintf("%d", addr.Bits()), "alias")
+	out, err := common.ExecOutput(ctx, "ifconfig", name, "inet6", addr.String(), "prefixlen", fmt.Sprintf("%d", addr.Bits()), "alias")
 	if err != nil {
 		if strings.Contains(string(out), "not exist") {
 			return ErrLinkNotExists

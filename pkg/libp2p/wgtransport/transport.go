@@ -41,11 +41,11 @@ import (
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/net/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/net/system"
+	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 	"github.com/webmeshproj/webmesh/pkg/net/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // WireGuardTransport is the webmesh wireguard transport. This transport does not run a
@@ -98,7 +98,7 @@ func NewOptions(log *slog.Logger) libp2p.Option {
 // NewWithLogger returns a new constructor for a webmesh transport using the given logger.
 func NewWithLogger(log *slog.Logger) Constructor {
 	if log == nil {
-		log = logutil.NewLogger("")
+		log = logging.NewLogger("")
 	}
 	return func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WireGuardTransport, error) {
 		return newWebmeshTransport(log, tu, host, key, psk, gater, rcmgr)
@@ -107,7 +107,7 @@ func NewWithLogger(log *slog.Logger) Constructor {
 
 // New is the standard constructor for a webmesh transport.
 func New(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WireGuardTransport, error) {
-	return NewWithLogger(logutil.NewLogger(""))(tu, host, key, psk, gater, rcmgr)
+	return NewWithLogger(logging.NewLogger(""))(tu, host, key, psk, gater, rcmgr)
 }
 
 // newWebmeshTransport is the constructor for the webmesh transport.

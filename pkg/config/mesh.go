@@ -37,17 +37,17 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	meshnet "github.com/webmeshproj/webmesh/pkg/net"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
+	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // MeshOptions are the options for participating in a mesh.
@@ -147,7 +147,7 @@ func (o *MeshOptions) Validate() error {
 
 // NewMeshConfig return a new Mesh configuration based on the node configuration.
 // The key is optional and will be taken from the configuration if not provided.
-func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf mesh.Config, err error) {
+func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf meshnode.Config, err error) {
 	log := context.LoggerFrom(ctx)
 	nodeid, err := o.NodeID()
 	if err != nil {
@@ -159,7 +159,7 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 			return
 		}
 	}
-	conf = mesh.Config{
+	conf = meshnode.Config{
 		NodeID:                  nodeid,
 		Key:                     key,
 		HeartbeatPurgeThreshold: o.Raft.HeartbeatPurgeThreshold,
@@ -329,7 +329,7 @@ func (o *Config) LoadKey(ctx context.Context) (crypto.PrivateKey, error) {
 
 // NewConnectOptions returns new connection options for the configuration. The given raft node must
 // be started it can be used. Host can be nil and if one is needed it will be created.
-func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Node, raft raft.Raft, host host.Host) (opts mesh.ConnectOptions, err error) {
+func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, raft raft.Raft, host host.Host) (opts meshnode.ConnectOptions, err error) {
 	// Determine our node ID
 	nodeid, err := o.NodeID()
 	if err != nil {
@@ -384,7 +384,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Node, raft raf
 	}
 
 	// Configure any bootstrap options
-	var bootstrap *mesh.BootstrapOptions
+	var bootstrap *meshnode.BootstrapOptions
 	if o.Bootstrap.Enabled {
 		rt, err := o.NewBootstrapTransport(ctx, nodeid, conn, host)
 		if err != nil {
@@ -403,7 +403,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Node, raft raf
 			}
 			bootstrapServers = append(bootstrapServers, id)
 		}
-		bootstrap = &mesh.BootstrapOptions{
+		bootstrap = &meshnode.BootstrapOptions{
 			Transport:            rt,
 			IPv4Network:          o.Bootstrap.IPv4Network,
 			MeshDomain:           o.Bootstrap.MeshDomain,
@@ -431,7 +431,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Node, raft raf
 		localDNSAddr = netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), localDNSAddr.Port())
 	}
 
-	opts = mesh.ConnectOptions{
+	opts = meshnode.ConnectOptions{
 		Raft:                 raft,
 		JoinRoundTripper:     joinRT,
 		Features:             o.NewFeatureSet(),
@@ -494,7 +494,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn mesh.Node, raft raf
 	return
 }
 
-func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn mesh.Node, host host.Host) (transport.JoinRoundTripper, error) {
+func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn meshnode.Node, host host.Host) (transport.JoinRoundTripper, error) {
 	if o.Bootstrap.Enabled {
 		// Our join transport is the gRPC transport to other bootstrap nodes
 		var addrs []string

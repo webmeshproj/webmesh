@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 // Below functions are no-ops on Windows except for InterfaceNetwork.
@@ -47,7 +47,7 @@ func RemoveInterface(ctx context.Context, ifaceName string) error {
 
 // InterfaceNetwork returns the network for the given interface and address.
 func InterfaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Prefix, error) {
-	out, err := util.ExecOutput(context.Background(),
+	out, err := common.ExecOutput(context.Background(),
 		"wmic", "nic", "where", "ipenabled=true", "get", "ipaddress,ipsubnet", "/format:csv")
 	if err != nil {
 		return netip.Prefix{}, err

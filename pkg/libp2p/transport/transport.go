@@ -44,12 +44,12 @@ import (
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/logging"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
+	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 // TransportBuilder is the signature of a function that builds a webmesh transport.
@@ -90,7 +90,7 @@ func New(opts Options) (TransportBuilder, *WebmeshTransport) {
 		panic("config is required")
 	}
 	if opts.Logger == nil {
-		opts.Logger = logutil.NewLogger("")
+		opts.Logger = logging.NewLogger("")
 	}
 	rt := &WebmeshTransport{
 		opts: opts,
@@ -115,7 +115,7 @@ type WebmeshTransport struct {
 	started atomic.Bool
 	opts    Options
 	conf    *config.Config
-	node    mesh.Node
+	node    meshnode.Node
 	svcs    *services.Server
 	host    host.Host
 	key     wmcrypto.PrivateKey
@@ -290,7 +290,7 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 		// We use the background context to not let the listen timeout
 		// interfere with the start timeout
 		logLevel := t.opts.Config.Global.LogLevel
-		node, err := t.startNode(context.WithLogger(context.Background(), logutil.NewLogger(logLevel)), laddr)
+		node, err := t.startNode(context.WithLogger(context.Background(), logging.NewLogger(logLevel)), laddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to start node: %w", err)
 		}
@@ -461,7 +461,7 @@ func (t *WebmeshTransport) Close() error {
 	return nil
 }
 
-func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (mesh.Node, error) {
+func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (meshnode.Node, error) {
 	if t.opts.StartTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t.opts.StartTimeout)
@@ -501,7 +501,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 		return nil, fmt.Errorf("failed to create mesh config: %w", err)
 	}
 	meshConfig.Key = t.key
-	node := mesh.NewWithLogger(logutil.NewLogger(conf.Global.LogLevel).With("component", "webmesh-node"), meshConfig)
+	node := meshnode.NewWithLogger(logging.NewLogger(conf.Global.LogLevel).With("component", "webmesh-node"), meshConfig)
 	startOpts, err := conf.NewRaftStartOptions(node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create raft start options: %w", err)

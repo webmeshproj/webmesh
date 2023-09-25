@@ -33,7 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/embed"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -119,7 +119,7 @@ func Execute() error {
 
 	// Time to get going
 
-	log := logutil.SetupLogging(conf.Global.LogLevel)
+	log := logging.SetupLogging(conf.Global.LogLevel)
 	ctx := context.WithLogger(context.Background(), log)
 
 	log.Info("Starting webmesh node",

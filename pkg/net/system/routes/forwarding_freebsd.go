@@ -19,10 +19,10 @@ package routes
 import (
 	"context"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 // EnableIPForwarding enables IP forwarding.
 func EnableIPForwarding() error {
-	return util.Exec(context.Background(), "sysctl", "-w", "net.inet.ip.forwarding=1")
+	return common.Exec(context.Background(), "sysctl", "-w", "net.inet.ip.forwarding=1")
 }

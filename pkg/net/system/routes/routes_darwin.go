@@ -23,12 +23,12 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 // GetDefaultGateway returns the default gateway of the current system.
 func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
-	out, err := util.ExecOutput(ctx, "route", "-n", "get", "default")
+	out, err := common.ExecOutput(ctx, "route", "-n", "get", "default")
 	if err != nil {
 		return netip.Addr{}, fmt.Errorf("failed to get default gateway: %w", err)
 	}
@@ -53,7 +53,7 @@ func SetDefaultIPv6Gateway(ctx context.Context, gateway netip.Addr) error {
 
 // Add adds a route to the interface with the given name.
 func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	out, err := util.ExecOutput(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
+	out, err := common.ExecOutput(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
 	if err != nil {
 		if strings.Contains(string(out), "already in table") || strings.Contains(string(out), "exists") {
 			return ErrRouteExists
@@ -65,7 +65,7 @@ func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 
 // Remove removes a route from the interface with the given name.
 func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	return util.Exec(ctx, "route", "-n", "delete", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
+	return common.Exec(ctx, "route", "-n", "delete", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
 }
 
 func getFamily(addr netip.Addr) string {

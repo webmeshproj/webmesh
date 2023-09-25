@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+// Package common contains common utility functions.
+package common
 
 import (
 	"fmt"
@@ -24,16 +25,6 @@ import (
 // Pointer returns a pointer to the given value.
 func Pointer[T any](t T) *T {
 	return &t
-}
-
-// Contains returns true if the given slice contains the given item.
-func Contains[T comparable](sl []T, item T) bool {
-	for _, v := range sl {
-		if v == item {
-			return true
-		}
-	}
-	return false
 }
 
 // UpsertSlice with insert the given item into a slice if it does not exist,

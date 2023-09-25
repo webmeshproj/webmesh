@@ -26,13 +26,13 @@ import (
 	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
 
+	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // NewKernel creates a new kernel WireGuard interface on the host system with the given name.
 func NewKernel(ctx context.Context, name string, mtu uint32) error {
-	err := util.Exec(ctx, "ifconfig", name, "create", "name", name, "mtu", strconv.Itoa(int(mtu)))
+	err := common.Exec(ctx, "ifconfig", name, "create", "name", name, "mtu", strconv.Itoa(int(mtu)))
 	if err != nil {
 		return fmt.Errorf("ifconfig create: %w", err)
 	}

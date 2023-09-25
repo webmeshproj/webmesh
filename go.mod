@@ -35,7 +35,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/multiformats/go-multiaddr v0.11.0
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a
-	github.com/pelletier/go-toml/v2 v2.0.9
 	github.com/pion/datachannel v1.5.5
 	github.com/pion/logging v0.2.2
 	github.com/pion/stun v0.6.1

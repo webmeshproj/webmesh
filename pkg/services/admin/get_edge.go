@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 )
 
 func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, error) {

@@ -33,9 +33,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
+	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 var canVoteAction = &rbac.Action{

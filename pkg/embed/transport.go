@@ -29,7 +29,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	p2pproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	p2ptransport "github.com/webmeshproj/webmesh/pkg/libp2p/transport"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
 
 // TransportOptions are options for configuring a libp2p transport.
@@ -54,7 +54,7 @@ func WithWebmeshTransport(topts TransportOptions) config.Option {
 		StartTimeout:  time.Second * 30,
 		StopTimeout:   time.Second * 30,
 		ListenTimeout: time.Second * 30,
-		Logger:        logutil.NewLogger(topts.LogLevel),
+		Logger:        logging.NewLogger(topts.LogLevel),
 	})
 	opts := []config.Option{
 		libp2p.ProtocolVersion(p2pproto.SecurityID),

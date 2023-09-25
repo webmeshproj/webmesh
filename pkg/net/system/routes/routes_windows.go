@@ -24,7 +24,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 // GetDefaultGateway returns the default gateway of the current system.
@@ -48,7 +48,7 @@ func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	if addr.Addr().Is6() {
 		family = "ipv6"
 	}
-	out, err := util.ExecOutput(ctx, "netsh", "interface", family, "add", "route", addr.String(), ifaceName, "metric=0", "store=active")
+	out, err := common.ExecOutput(ctx, "netsh", "interface", family, "add", "route", addr.String(), ifaceName, "metric=0", "store=active")
 	if err != nil {
 		if strings.Contains(string(out), "already in table") || strings.Contains(string(out), "exists") {
 			return ErrRouteExists
@@ -64,7 +64,7 @@ func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	if addr.Addr().Is6() {
 		family = "ipv6"
 	}
-	err := util.Exec(ctx, "netsh", "interface", family, "delete", "route", addr.String(), ifaceName, "metric=0", "store=active")
+	err := common.Exec(ctx, "netsh", "interface", family, "delete", "route", addr.String(), ifaceName, "metric=0", "store=active")
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 }
 
 func defaultGatewayIPConfig(ctx context.Context) (netip.Addr, error) {
-	out, err := util.ExecOutput(ctx, "ipconfig")
+	out, err := common.ExecOutput(ctx, "ipconfig")
 	if err != nil {
 		return netip.Addr{}, err
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mesh
+package meshnode
 
 import (
 	"context"
@@ -30,9 +30,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/badgerdb"
 )
 
-// NewTestMesh creates a new test mesh and waits for it to be ready.
+// NewTestNode creates a new test mesh and waits for it to be ready.
 // The context is used to enforce startup timeouts.
-func NewTestMesh(ctx context.Context) (Node, error) {
+func NewTestNode(ctx context.Context) (Node, error) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 	st := New(Config{
 		NodeID: uuid.NewString(),

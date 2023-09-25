@@ -31,13 +31,13 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/logging"
+	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 // Node is an embedded webmesh node.
@@ -54,7 +54,7 @@ type Node interface {
 	// At the moment, any error is fatal and will cause the node to stop.
 	Errors() <-chan error
 	// Mesh returns the underlying mesh instance.
-	Mesh() mesh.Node
+	Mesh() meshnode.Node
 	// Raft is the underlying Raft instance.
 	Raft() raft.Raft
 	// Storage is the underlying storage instance.
@@ -85,7 +85,7 @@ func NewNode(ctx context.Context, opts Options) (Node, error) {
 	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
 		return nil, fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
-	log := logutil.SetupLogging(config.Global.LogLevel)
+	log := logging.SetupLogging(config.Global.LogLevel)
 	if config.Global.LogLevel == "" || config.Global.LogLevel == "silent" {
 		log = slog.New(slog.NewTextHandler(io.Discard, nil))
 		ctx = context.WithLogger(ctx, log)
@@ -95,7 +95,7 @@ func NewNode(ctx context.Context, opts Options) (Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mesh config: %w", err)
 	}
-	meshConn := mesh.NewWithLogger(log, meshConfig)
+	meshConn := meshnode.NewWithLogger(log, meshConfig)
 	// Create a new raft node
 	raftNode, err := config.NewRaftNode(ctx, meshConn)
 	if err != nil {
@@ -116,7 +116,7 @@ type node struct {
 	opts     Options
 	conf     *config.Config
 	log      *slog.Logger
-	mesh     mesh.Node
+	mesh     meshnode.Node
 	raft     raft.Raft
 	storage  storage.MeshStorage
 	services *services.Server
@@ -125,7 +125,7 @@ type node struct {
 	mu       sync.Mutex
 }
 
-func (n *node) Mesh() mesh.Node {
+func (n *node) Mesh() meshnode.Node {
 	return n.mesh
 }
 

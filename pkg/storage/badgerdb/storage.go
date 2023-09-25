@@ -37,8 +37,8 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 // Options are the options for creating a new NutsDB storage.
@@ -71,9 +71,9 @@ func New(opts Options) (storage.DualStorage, error) {
 			badgeropts = badgeropts.WithSyncWrites(true)
 		}
 	}
-	badgeropts = badgeropts.WithLogger(NewLogAdapter(logutil.NewLogger("")))
+	badgeropts = badgeropts.WithLogger(NewLogAdapter(logging.NewLogger("")))
 	if opts.Debug {
-		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(NewLogAdapter(logutil.NewLogger("debug")))
+		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(NewLogAdapter(logging.NewLogger("debug")))
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {

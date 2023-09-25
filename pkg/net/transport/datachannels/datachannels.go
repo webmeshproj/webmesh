@@ -31,9 +31,9 @@ import (
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
-	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // ManagedServerChannel is a channel that is managed for a particular purpose.
@@ -118,10 +118,10 @@ func NewServerChannel(ctx context.Context, rt transport.WebRTCSignalTransport) (
 	})
 	// Create the negotiation data channel
 	dc, err := c.CreateDataChannel(v1.DataChannel_CHANNELS.String(), &webrtc.DataChannelInit{
-		Protocol:   util.Pointer("tcp"),
-		Ordered:    util.Pointer(true),
-		Negotiated: util.Pointer(true),
-		ID:         util.Pointer(uint16(0)),
+		Protocol:   common.Pointer("tcp"),
+		Ordered:    common.Pointer(true),
+		Negotiated: common.Pointer(true),
+		ID:         common.Pointer(uint16(0)),
 	})
 	if err != nil {
 		defer c.Close()
@@ -165,11 +165,11 @@ func NewServerChannel(ctx context.Context, rt transport.WebRTCSignalTransport) (
 							if proto == "" {
 								return nil
 							}
-							return util.Pointer(proto)
+							return common.Pointer(proto)
 						}(),
-						Ordered:    util.Pointer(true),
-						Negotiated: util.Pointer(true),
-						ID:         util.Pointer(uint16(connNumber)),
+						Ordered:    common.Pointer(true),
+						Negotiated: common.Pointer(true),
+						ID:         common.Pointer(uint16(connNumber)),
 					},
 				)
 				if err != nil {
@@ -344,10 +344,10 @@ func NewClientChannel(ctx context.Context, rt transport.WebRTCSignalTransport) (
 	})
 	// Create the negotiation data channel
 	dc, err := c.CreateDataChannel(v1.DataChannel_CHANNELS.String(), &webrtc.DataChannelInit{
-		Protocol:   util.Pointer("tcp"),
-		Ordered:    util.Pointer(true),
-		Negotiated: util.Pointer(true),
-		ID:         util.Pointer(uint16(0)),
+		Protocol:   common.Pointer("tcp"),
+		Ordered:    common.Pointer(true),
+		Negotiated: common.Pointer(true),
+		ID:         common.Pointer(uint16(0)),
 	})
 	if err != nil {
 		defer c.Close()
@@ -455,11 +455,11 @@ func (c *clientChannel) Open(ctx context.Context, proto string) (io.ReadWriteClo
 				if proto == "" {
 					return nil
 				}
-				return util.Pointer(proto)
+				return common.Pointer(proto)
 			}(),
-			Ordered:    util.Pointer(true),
-			Negotiated: util.Pointer(true),
-			ID:         util.Pointer(uint16(connNumber)),
+			Ordered:    common.Pointer(true),
+			Negotiated: common.Pointer(true),
+			ID:         common.Pointer(uint16(connNumber)),
 		},
 	)
 	c.mu.Unlock()

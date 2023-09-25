@@ -23,7 +23,7 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 // SetInterfaceAddress sets the address of the interface with the given name.
@@ -38,7 +38,7 @@ func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) er
 		family = "ipv6"
 		mask = fmt.Sprintf("%d", addr.Bits())
 	}
-	err = util.Exec(ctx, "netsh", "interface", family, "set", "address",
+	err = common.Exec(ctx, "netsh", "interface", family, "set", "address",
 		fmt.Sprintf("%q", name), "static",
 		addr.Addr().String(), mask,
 		"store=active",

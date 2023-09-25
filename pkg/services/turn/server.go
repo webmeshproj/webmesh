@@ -25,8 +25,8 @@ import (
 	"github.com/pion/turn/v2"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
+	"github.com/webmeshproj/webmesh/pkg/logging"
+	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 )
 
 // DefaultPortRange is the default port range for the TURN server.
@@ -98,7 +98,7 @@ func (s *Server) ListenAndServe() error {
 	// Create the turn server
 	srv, err := turn.NewServer(turn.ServerConfig{
 		Realm:         s.Realm,
-		LoggerFactory: logutil.NewSTUNLoggerFactory(log.With("server", "turn")),
+		LoggerFactory: logging.NewSTUNLoggerFactory(log.With("server", "turn")),
 		// Set AuthHandler callback
 		// This is called every time a user tries to authenticate with the TURN server
 		// Return the key for that user, or false when no user is found

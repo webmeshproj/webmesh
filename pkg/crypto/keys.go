@@ -32,7 +32,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 // WebmeshKeyType is the protobuf key type for Webmesh keys.
@@ -276,7 +276,7 @@ func (w *WebmeshPrivateKey) Encode() (string, error) {
 func (w *WebmeshPrivateKey) Marshal() ([]byte, error) {
 	raw, _ := w.Raw()
 	pb := cryptopb.PrivateKey{
-		Type: util.Pointer(WebmeshKeyType),
+		Type: common.Pointer(WebmeshKeyType),
 		Data: raw,
 	}
 	marshaled, err := proto.Marshal(&pb)
@@ -360,7 +360,7 @@ func (w *WebmeshPublicKey) Encode() (string, error) {
 func (w *WebmeshPublicKey) Marshal() ([]byte, error) {
 	raw, _ := w.Raw()
 	pb := cryptopb.PublicKey{
-		Type: util.Pointer(WebmeshKeyType),
+		Type: common.Pointer(WebmeshKeyType),
 		Data: raw,
 	}
 	marshaled, err := proto.Marshal(&pb)

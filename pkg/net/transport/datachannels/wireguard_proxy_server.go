@@ -24,9 +24,9 @@ import (
 
 	"github.com/pion/webrtc/v3"
 
+	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/net/relay"
-	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // WireguardProxyServer is a WebRTC datachannel proxy for WireGuard. It is used
@@ -107,8 +107,8 @@ func NewWireGuardProxyServer(ctx context.Context, stunServers []string, targetPo
 		}
 	})
 	dc, err := pc.conn.CreateDataChannel("wireguard-proxy", &webrtc.DataChannelInit{
-		ID:         util.Pointer(uint16(0)),
-		Negotiated: util.Pointer(true),
+		ID:         common.Pointer(uint16(0)),
+		Negotiated: common.Pointer(true),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create data channel: %w", err)

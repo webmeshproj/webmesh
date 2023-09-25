@@ -14,30 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package netutil
+package util
 
-import (
-	"fmt"
-	"strconv"
-	"strings"
-)
+import "crypto/x509"
 
-// ParsePortRange parses a port range string.
-func ParsePortRange(s string) (start int, end int, err error) {
-	spl := strings.Split(s, "-")
-	if len(spl) > 2 {
-		return 0, 0, fmt.Errorf("invalid port range: %s", s)
+// VerifyChainOnly is a function that can be used in a TLS configuration
+// to only verify that the certificate chain is valid.
+func VerifyChainOnly(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+	roots := x509.NewCertPool()
+	if systemPool, err := x509.SystemCertPool(); err == nil {
+		roots = systemPool
 	}
-	start, err = strconv.Atoi(spl[0])
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid port range: %s", s)
-	}
-	end = start
-	if len(spl) == 2 {
-		end, err = strconv.Atoi(spl[1])
+	var cert *x509.Certificate
+	for _, rawCert := range rawCerts {
+		var err error
+		cert, err = x509.ParseCertificate(rawCert)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid port range: %s", s)
+			return err
 		}
+		roots.AddCert(cert)
 	}
-	return start, end, nil
+	_, err := cert.Verify(x509.VerifyOptions{
+		Roots: roots,
+	})
+	return err
 }

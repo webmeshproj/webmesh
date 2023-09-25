@@ -27,8 +27,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	meshgraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	meshpeers "github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	meshgraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )

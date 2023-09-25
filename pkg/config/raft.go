@@ -27,7 +27,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/net/transport"
 	"github.com/webmeshproj/webmesh/pkg/net/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/raft"
@@ -164,7 +164,7 @@ func (o *Config) IsRaftMember() bool {
 }
 
 // NewRaftNode creates a new raft node for the given mesh instance.
-func (o *Config) NewRaftNode(ctx context.Context, conn mesh.Node) (raft.Raft, error) {
+func (o *Config) NewRaftNode(ctx context.Context, conn meshnode.Node) (raft.Raft, error) {
 	nodeid, err := o.NodeID()
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func (o *Config) NewRaftNode(ctx context.Context, conn mesh.Node) (raft.Raft, er
 }
 
 // NewRaftStartOptions creates a new start options for the current configuration.
-func (o *Config) NewRaftStartOptions(conn mesh.Node) (opts raft.StartOptions, err error) {
+func (o *Config) NewRaftStartOptions(conn meshnode.Node) (opts raft.StartOptions, err error) {
 	if !o.Raft.RequestVote && !o.Raft.RequestObserver && !o.Bootstrap.Enabled {
 		// We don't actually start raft
 		return
@@ -213,7 +213,7 @@ func (o *Config) NewRaftStartOptions(conn mesh.Node) (opts raft.StartOptions, er
 }
 
 // NewRaftTransport creates a new raft transport for the current configuration.
-func (o *Config) NewRaftTransport(conn mesh.Node) (transport.RaftTransport, error) {
+func (o *Config) NewRaftTransport(conn meshnode.Node) (transport.RaftTransport, error) {
 	return tcp.NewRaftTransport(conn, tcp.RaftTransportOptions{
 		Addr:    o.Raft.ListenAddress,
 		MaxPool: o.Raft.ConnectionPoolCount,

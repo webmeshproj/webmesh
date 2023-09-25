@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package options contains configuration parsing for the nodecmd.
+// Package config contains configuration options and parsing for the webmesh node.
 package config
 
 import (

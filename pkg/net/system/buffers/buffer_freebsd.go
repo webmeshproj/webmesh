@@ -20,19 +20,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 func setMaxReadBuffer(val int) error {
 	// On darwin and BSD we need to add 15% to the value to account for
 	// overhead.
 	val = int(float64(val) * 1.15)
-	return util.Exec(context.Background(), "sysctl", "-w", fmt.Sprintf("kern.ipc.maxsockbuf=%d", val))
+	return common.Exec(context.Background(), "sysctl", "-w", fmt.Sprintf("kern.ipc.maxsockbuf=%d", val))
 }
 
 func setMaxWriteBuffer(val int) error {
 	// On darwin and BSD we need to add 15% to the value to account for
 	// overhead.
 	val = int(float64(val) * 1.15)
-	return util.Exec(context.Background(), "sysctl", "-w", fmt.Sprintf("kern.ipc.maxsockbuf=%d", val))
+	return common.Exec(context.Background(), "sysctl", "-w", fmt.Sprintf("kern.ipc.maxsockbuf=%d", val))
 }

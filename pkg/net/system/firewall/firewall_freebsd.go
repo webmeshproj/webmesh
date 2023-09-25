@@ -22,7 +22,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 const anchorFile = "/etc/pf.anchors/com.webmesh"
@@ -38,7 +38,7 @@ func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 		return nil, fmt.Errorf("touch anchor file: %w", err)
 	}
 	// Enable the packet filter
-	out, err := util.ExecOutput(context.Background(), "pfctl", "-e")
+	out, err := common.ExecOutput(context.Background(), "pfctl", "-e")
 	if err != nil {
 		if strings.Contains(string(out), "pf already enabled") {
 			return &pfctlFirewall{
@@ -71,7 +71,7 @@ func (pf *pfctlFirewall) AddWireguardForwarding(ctx context.Context, ifaceName s
 		return fmt.Errorf("write anchor file: %w", err)
 	}
 	// Reload pfctl
-	err = util.Exec(ctx, "pfctl", "-f", anchorFile)
+	err = common.Exec(ctx, "pfctl", "-f", anchorFile)
 	return err
 }
 
@@ -87,7 +87,7 @@ func (pf *pfctlFirewall) AddMasquerade(ctx context.Context, ifaceName string) er
 		return fmt.Errorf("write anchor file: %w", err)
 	}
 	// Reload pfctl
-	err = util.Exec(ctx, "pfctl", "-f", anchorFile)
+	err = common.Exec(ctx, "pfctl", "-f", anchorFile)
 	return err
 }
 
@@ -99,7 +99,7 @@ func (pf *pfctlFirewall) Clear(ctx context.Context) error {
 		return fmt.Errorf("clear anchor file: %w", err)
 	}
 	// Reload pfctl
-	err = util.Exec(ctx, "pfctl", "-f", anchorFile)
+	err = common.Exec(ctx, "pfctl", "-f", anchorFile)
 	return err
 }
 
@@ -116,8 +116,8 @@ func (pf *pfctlFirewall) Close(ctx context.Context) error {
 	}
 	// If we started with pf disabled, re-disable it
 	if !pf.enabledAtStart {
-		return util.Exec(ctx, "pfctl", "-d")
+		return common.Exec(ctx, "pfctl", "-d")
 	}
 	// Reload the main pf.conf
-	return util.Exec(ctx, "pfctl", "-f", "/etc/pf.conf")
+	return common.Exec(ctx, "pfctl", "-f", "/etc/pf.conf")
 }

@@ -36,7 +36,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
+	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/net/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -49,7 +49,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	log := context.LoggerFrom(ctx)
 
 	// Build all the mesh objects.
-	meshes := make(map[string]mesh.Node)
+	meshes := make(map[string]meshnode.Node)
 	for meshID, meshConfig := range config.Meshes {
 		id := meshID
 		// For now we only allow IPv6 on bridged meshes.
@@ -63,7 +63,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 		if err != nil {
 			return fmt.Errorf("failed to create mesh config: %w", err)
 		}
-		meshConn := mesh.NewWithLogger(log.With("mesh-id", id), meshConfig)
+		meshConn := meshnode.NewWithLogger(log.With("mesh-id", id), meshConfig)
 		meshes[id] = meshConn
 	}
 

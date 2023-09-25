@@ -21,12 +21,12 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/webmeshproj/webmesh/pkg/util"
+	"github.com/webmeshproj/webmesh/pkg/common"
 )
 
 // ActivateInterface activates the interface with the given name.
 func ActivateInterface(ctx context.Context, name string) error {
-	out, err := util.ExecOutput(ctx, "ifconfig", name, "up")
+	out, err := common.ExecOutput(ctx, "ifconfig", name, "up")
 	if err != nil {
 		if strings.Contains(string(out), "not exist") {
 			return ErrLinkNotExists
@@ -38,7 +38,7 @@ func ActivateInterface(ctx context.Context, name string) error {
 
 // DeactivateInterface deactivates the interface with the given name.
 func DeactivateInterface(ctx context.Context, name string) error {
-	out, err := util.ExecOutput(ctx, "ifconfig", name, "down")
+	out, err := common.ExecOutput(ctx, "ifconfig", name, "down")
 	if err != nil {
 		if strings.Contains(string(out), "not exist") {
 			return ErrLinkNotExists
@@ -50,7 +50,7 @@ func DeactivateInterface(ctx context.Context, name string) error {
 
 // RemoveInterface removes the given interface.
 func RemoveInterface(ctx context.Context, ifaceName string) error {
-	out, err := util.ExecOutput(ctx, "ifconfig", ifaceName, "destroy")
+	out, err := common.ExecOutput(ctx, "ifconfig", ifaceName, "destroy")
 	if err != nil {
 		if strings.Contains(string(out), "not exist") {
 			return ErrLinkNotExists

@@ -36,7 +36,7 @@ build-wasm: fmt vet ## Build node wasm binary for the current architecture.
 	$(GORELEASER) build $(BUILD_ARGS) --id node-wasm --parallelism=$(PARALLEL)
 
 dist: fmt vet ## Build distribution binaries and packages for all platforms.
-	$(GORELEASER) release --skip-sign $(BUILD_ARGS) --parallelism=$(PARALLEL)
+	$(GORELEASER) release --skip=sign $(BUILD_ARGS) --parallelism=$(PARALLEL)
 
 DOCKER ?= docker
 

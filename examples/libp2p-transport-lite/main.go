@@ -21,13 +21,13 @@ import (
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	tcp "github.com/libp2p/go-libp2p/p2p/transport/tcp"
 
+	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	"github.com/webmeshproj/webmesh/pkg/libp2p/security"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 	wmp2p "github.com/webmeshproj/webmesh/pkg/net/transport/libp2p"
-	"github.com/webmeshproj/webmesh/pkg/util"
-	"github.com/webmeshproj/webmesh/pkg/util/logutil"
 )
 
 var (
@@ -99,7 +99,7 @@ func run() error {
 	}
 
 	// Setup the speed test handler
-	ctx := context.WithLogger(context.Background(), logutil.NewLogger(logLevel))
+	ctx := context.WithLogger(context.Background(), logging.NewLogger(logLevel))
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -210,8 +210,8 @@ func runSpeedTest(ctx context.Context, name string, stream network.Stream, paylo
 				written := bytesWritten.Load()
 				read := bytesRead.Load()
 				elapsed := time.Since(start)
-				sent := util.PrettyByteSize(float64(written) / elapsed.Seconds())
-				received := util.PrettyByteSize(float64(read) / elapsed.Seconds())
+				sent := common.PrettyByteSize(float64(written) / elapsed.Seconds())
+				received := common.PrettyByteSize(float64(read) / elapsed.Seconds())
 				fmt.Printf("%s: Sent %d bytes in %s (%s/s)\n", name, written, elapsed, sent)
 				fmt.Printf("%s: Received %d bytes in %s (%s/s)\n", name, read, elapsed, received)
 			}

@@ -25,7 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
+	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 )
 
 func TestFilteredGraph(t *testing.T) {

@@ -34,8 +34,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/mesh"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/meshnode"
+	netutil "github.com/webmeshproj/webmesh/pkg/net/util"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/membership"
@@ -47,7 +48,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/storage"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
-	"github.com/webmeshproj/webmesh/pkg/util/netutil"
 )
 
 // ServiceOptions contains the configuration for the mesh services.
@@ -429,7 +429,7 @@ func (m *MetricsOptions) Validate() error {
 }
 
 // RegisterAPIs registers the configured APIs to the given server.
-func (o *Config) RegisterAPIs(ctx context.Context, conn mesh.Node, srv *services.Server) error {
+func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *services.Server) error {
 	log := context.LoggerFrom(ctx)
 	var rbacDisabled bool
 	var err error
@@ -577,7 +577,7 @@ func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 }
 
 // NewServiceOptions returns new options for the webmesh services.
-func (o *Config) NewServiceOptions(ctx context.Context, conn mesh.Node) (conf services.Options, err error) {
+func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (conf services.Options, err error) {
 	if !o.Services.API.Disabled {
 		conf.ListenAddress = o.Services.API.ListenAddress
 		// Build out the server options

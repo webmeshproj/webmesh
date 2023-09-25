@@ -25,7 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
+	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 

@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package mesh contains the mesh store and related interfaces.
-package mesh
+// Package meshnode contains the mesh node and related interfaces.
+package meshnode
 
 import (
 	"fmt"

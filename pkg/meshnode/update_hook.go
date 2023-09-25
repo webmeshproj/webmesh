@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mesh
+package meshnode
 
 import (
 	"context"
@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers/graph"
 )
 
 func (s *meshStore) onDBUpdate(key, value string) {

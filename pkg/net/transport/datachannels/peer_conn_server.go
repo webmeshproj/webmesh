@@ -28,8 +28,8 @@ import (
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/util"
 )
 
 // PeerConnectionServer represents a connection to a peer where we
@@ -141,10 +141,10 @@ func NewPeerConnectionServer(ctx context.Context, opts *OfferOptions) (*PeerConn
 	pc.OnICECandidate(pc.onICECandidate)
 	dc, err := pc.CreateDataChannel(
 		v1.DataChannel_CHANNELS.String(), &webrtc.DataChannelInit{
-			Protocol:   util.Pointer("tcp"),
-			Ordered:    util.Pointer(true),
-			Negotiated: util.Pointer(true),
-			ID:         util.Pointer(uint16(0)),
+			Protocol:   common.Pointer("tcp"),
+			Ordered:    common.Pointer(true),
+			Negotiated: common.Pointer(true),
+			ID:         common.Pointer(uint16(0)),
 		})
 	if err != nil {
 		return nil, err
@@ -267,9 +267,9 @@ func (pc *PeerConnectionServer) onDataChannelOpen() {
 		d, err := pc.CreateDataChannel(
 			v1.DataChannel_CONNECTIONS.String(), &webrtc.DataChannelInit{
 				Protocol:   &pc.proto,
-				Ordered:    util.Pointer(true),
-				Negotiated: util.Pointer(true),
-				ID:         util.Pointer(uint16(channelID)),
+				Ordered:    common.Pointer(true),
+				Negotiated: common.Pointer(true),
+				ID:         common.Pointer(uint16(channelID)),
 			})
 		if err != nil {
 			log.Error("failed to create data channel",
