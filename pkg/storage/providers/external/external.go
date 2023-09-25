@@ -107,6 +107,9 @@ func (ext *ExternalStorageProvider) Start(ctx context.Context) error {
 	}
 	ext.conn = c
 	ext.cli = v1.NewStorageProviderPluginClient(c)
+	if ext.Options.Config == nil {
+		ext.Options.Config = &v1.PluginConfiguration{}
+	}
 	_, err = v1.NewPluginClient(c).Configure(ctx, ext.Options.Config)
 	if err != nil {
 		return fmt.Errorf("configure plugin: %w", err)

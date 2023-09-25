@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package config contains configuration options and parsing for the webmesh node.
+// Package config contains configuration options and parsing for the webmesh node CLI and daemon server.
 package config
 
 import (
@@ -50,6 +50,8 @@ type Config struct {
 	Mesh MeshOptions `koanf:"mesh,omitempty"`
 	// Raft are the raft options.
 	Raft RaftOptions `koanf:"raft,omitempty"`
+	// Storage are the storage options.
+	Storage StorageOptions `koanf:"storage,omitempty"`
 	// Services are the service options.
 	Services ServiceOptions `koanf:"services,omitempty"`
 	// TLS are the TLS options.
@@ -73,6 +75,7 @@ func NewDefaultConfig(nodeID string) Config {
 		Auth:      AuthOptions{},
 		Mesh:      NewMeshOptions(nodeID),
 		Raft:      NewRaftOptions(),
+		Storage:   NewStorageOptions(),
 		Services:  NewServiceOptions(),
 		TLS:       TLSOptions{},
 		WireGuard: NewWireGuardOptions(),
@@ -92,6 +95,7 @@ func NewInsecureConfig(nodeID string) *Config {
 		Auth:      AuthOptions{},
 		Mesh:      NewMeshOptions(nodeID),
 		Raft:      NewRaftOptions(),
+		Storage:   NewStorageOptions(),
 		Services:  NewServiceOptions(),
 		TLS:       TLSOptions{},
 		WireGuard: NewWireGuardOptions(),
@@ -116,6 +120,7 @@ func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
 	o.Auth.BindFlags(prefix, fs)
 	o.Mesh.BindFlags(prefix, fs)
 	o.Raft.BindFlags(prefix, fs)
+	o.Storage.BindFlags(prefix, fs)
 	o.Services.BindFlags(prefix, fs)
 	o.TLS.BindFlags(prefix, fs)
 	o.WireGuard.BindFlags(prefix, fs)
@@ -137,6 +142,7 @@ func (o *Config) ShallowCopy() *Config {
 		Auth:      o.Auth,
 		Mesh:      o.Mesh,
 		Raft:      o.Raft,
+		Storage:   o.Storage,
 		Services:  o.Services,
 		TLS:       o.TLS,
 		WireGuard: o.WireGuard,

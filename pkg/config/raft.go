@@ -34,6 +34,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/memory"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 
 // RaftOptions are options for the raft backend.
@@ -83,8 +84,8 @@ type RaftOptions struct {
 // NewRaftOptions returns a new RaftOptions with the default values.
 func NewRaftOptions() RaftOptions {
 	return RaftOptions{
-		ListenAddress:           raft.DefaultListenAddress,
-		DataDir:                 raft.DefaultDataDir,
+		ListenAddress:           raftstorage.DefaultListenAddress,
+		DataDir:                 raftstorage.DefaultDataDir,
 		InMemory:                false,
 		ConnectionPoolCount:     0,
 		ConnectionTimeout:       3 * time.Second,
@@ -108,8 +109,8 @@ func NewRaftOptions() RaftOptions {
 
 // BindFlags binds the flags.
 func (o *RaftOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringVar(&o.ListenAddress, prefix+"raft.listen-address", raft.DefaultListenAddress, "Raft listen address.")
-	fs.StringVar(&o.DataDir, prefix+"raft.data-dir", raft.DefaultDataDir, "Raft data directory.")
+	fs.StringVar(&o.ListenAddress, prefix+"raft.listen-address", raftstorage.DefaultListenAddress, "Raft listen address.")
+	fs.StringVar(&o.DataDir, prefix+"raft.data-dir", raftstorage.DefaultDataDir, "Raft data directory.")
 	fs.BoolVar(&o.InMemory, prefix+"raft.in-memory", false, "Run raft with in-memory storage.")
 	fs.IntVar(&o.ConnectionPoolCount, prefix+"raft.connection-pool-count", 0, "Raft connection pool count.")
 	fs.DurationVar(&o.ConnectionTimeout, prefix+"raft.connection-timeout", time.Second*3, "Raft connection timeout.")
