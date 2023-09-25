@@ -27,7 +27,6 @@ import (
 
 	"github.com/dominikbraun/graph"
 	"github.com/dominikbraun/graph/draw"
-	"github.com/google/go-cmp/cmp"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -245,32 +244,8 @@ func (p *peerDB) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
 	if edge.Source == edge.Target {
 		return nil
 	}
-	opts := []func(*graph.EdgeProperties){graph.EdgeWeight(int(edge.Weight))}
-	if len(edge.Attributes) > 0 {
-		for k, v := range edge.Attributes {
-			opts = append(opts, graph.EdgeAttribute(k, v))
-		}
-	}
-	// Save the raft log some trouble by checking if the edge already exists.
-	graphEdge, err := p.graph.Edge(peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target))
-	if err == nil {
-		// Check if the weight or attributes changed
-		if !cmp.Equal(graphEdge.Properties.Attributes, edge.Attributes) {
-			return p.graph.UpdateEdge(peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target), opts...)
-		}
-		if graphEdge.Properties.Weight != int(edge.Weight) {
-			return p.graph.UpdateEdge(peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target), opts...)
-		}
-		return nil
-	}
-	if !errors.Is(err, graph.ErrEdgeNotFound) {
-		return fmt.Errorf("get edge: %w", err)
-	}
-	err = p.graph.AddEdge(peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target), opts...)
-	if err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {
-		return fmt.Errorf("add edge: %w", err)
-	}
-	return nil
+	e := peergraph.MeshEdge{MeshEdge: edge}
+	return e.PutInto(p.graph)
 }
 
 func (p *peerDB) RemoveEdge(ctx context.Context, from, to string) error {

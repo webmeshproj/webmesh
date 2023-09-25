@@ -26,6 +26,11 @@ import (
 // MeshNode wraps a mesh node.
 type MeshNode struct{ *v1.MeshNode }
 
+// NodeID returns the node's ID.
+func (n MeshNode) NodeID() NodeID {
+	return NodeID(n.GetId())
+}
+
 // MarshalJSON marshals the node to JSON.
 func (n MeshNode) MarshalJSON() ([]byte, error) {
 	return protojson.Marshal(n.MeshNode)

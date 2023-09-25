@@ -296,7 +296,7 @@ func (n *networking) FilterGraph(ctx context.Context, graph peergraph.Graph, thi
 	// Start with a copy of the full map and filter out nodes that are not allowed to communicate
 	// with the current node.
 	filtered := make(peergraph.AdjacencyMap)
-	filtered[peergraph.NodeID(thisNode.GetId())] = fullMap[peergraph.NodeID(thisNode.GetId())]
+	filtered[thisNode.NodeID()] = fullMap[thisNode.NodeID()]
 
 Nodes:
 	for nodeID := range fullMap {
@@ -309,7 +309,7 @@ Nodes:
 		}
 		if !acls.AllowNodesToCommunicate(ctx, thisNode, node) {
 			log.Debug("Nodes not allowed to communicate", "nodeA", thisNode, "nodeB", node)
-			delete(filtered[peergraph.NodeID(thisNode.GetId())], peergraph.NodeID(node.GetId()))
+			delete(filtered[thisNode.NodeID()], node.NodeID())
 			continue Nodes
 		}
 		// If the destination node exposes additional routes, check if the nodes can communicate
@@ -342,12 +342,12 @@ Nodes:
 				}
 				if !acls.Accept(ctx, action) {
 					log.Debug("filtering node", "node", node, "reason", "route not allowed", "action", action)
-					delete(filtered[peergraph.NodeID(thisNode.GetId())], peergraph.NodeID(node.GetId()))
+					delete(filtered[thisNode.NodeID()], node.NodeID())
 					continue Nodes
 				}
 			}
 		}
-		filtered[peergraph.NodeID(node.GetId())] = make(map[peergraph.NodeID]peergraph.Edge)
+		filtered[node.NodeID()] = make(peergraph.EdgeMap)
 	}
 	for node := range filtered {
 		edges, ok := fullMap[node]
