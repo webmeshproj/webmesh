@@ -21,8 +21,7 @@ import (
 	"errors"
 
 	"github.com/hashicorp/raft"
-
-	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var (
@@ -33,7 +32,7 @@ var (
 	// ErrNoLeader is returned when there is no leader.
 	ErrNoLeader = errors.New("no leader")
 	// ErrAlreadyBootstrapped is returned when the Raft node is already bootstrapped.
-	ErrAlreadyBootstrapped = transport.ErrAlreadyBootstrapped
+	ErrAlreadyBootstrapped = storage.ErrAlreadyBootstrapped
 	// ErrNotLeader is returned when the Raft node is not the leader.
 	ErrNotLeader = raft.ErrNotLeader
 	// ErrNotVoter is returned when the Raft node is not a voter.

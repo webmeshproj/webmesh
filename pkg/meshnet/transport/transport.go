@@ -113,17 +113,13 @@ type JoinServer = UnaryServer[v1.JoinRequest, v1.JoinResponse]
 // JoinServerFunc is a function that implements JoinServer.
 type JoinServerFunc = UnaryServerFunc[v1.JoinRequest, v1.JoinResponse]
 
-// ErrAlreadyBootstrapped is returned when a node believes the cluster to be
-// already bootstrapped.
-var ErrAlreadyBootstrapped = raft.ErrCantBootstrap
-
 // BootstrapTransport is the interface for dialing other peers to bootstrap
 // a new mesh.
 type BootstrapTransport interface {
 	// LeaderElect should perform an initial leader election. It returns
 	// true is this node was elected leader, or otherwise a JoinRoundTripper
 	// for contacting the elected leader. If one or more nodes believe
-	// the cluster to be already bootstrapped, then ErrAlreadyBootstrapped
+	// the cluster to be already bootstrapped, then storage.ErrAlreadyBootstrapped
 	// should be returned with an optional JoinRoundTripper to nodes who are
 	// already bootstrapped.
 	LeaderElect(ctx context.Context) (isLeader bool, rt JoinRoundTripper, err error)

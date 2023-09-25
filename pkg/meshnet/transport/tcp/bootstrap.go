@@ -27,6 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // BootstrapTransportOptions are options for the TCP transport.
@@ -144,7 +145,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 			}
 			opts.Credentials = t.Credentials
 			opts.AddressTimeout = t.Timeout
-			return false, NewJoinRoundTripper(opts), transport.ErrAlreadyBootstrapped
+			return false, NewJoinRoundTripper(opts), storage.ErrAlreadyBootstrapped
 		}
 		return false, nil, err
 	}

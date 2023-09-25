@@ -52,7 +52,7 @@ type RaftStorage struct {
 // Put sets the value of a key.
 func (rs *RaftStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
 	if !rs.raft.IsVoter() {
-		return ErrNotVoter
+		return storage.ErrNotVoter
 	}
 	logEntry := v1.RaftLogEntry{
 		Type:  v1.RaftCommandType_PUT,
@@ -71,7 +71,7 @@ func (rs *RaftStorage) PutValue(ctx context.Context, key, value string, ttl time
 // Delete removes a key.
 func (rs *RaftStorage) Delete(ctx context.Context, key string) error {
 	if !rs.raft.IsVoter() {
-		return ErrNotVoter
+		return storage.ErrNotVoter
 	}
 	logEntry := v1.RaftLogEntry{
 		Type: v1.RaftCommandType_DELETE,
@@ -119,7 +119,7 @@ func (rs *RaftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) 
 	res, err := rs.raft.Apply(ctx, logEntry)
 	if err != nil {
 		if errors.Is(err, raft.ErrNotLeader) {
-			return ErrNotLeader
+			return storage.ErrNotLeader
 		}
 		return fmt.Errorf("apply log entry: %w", err)
 	}

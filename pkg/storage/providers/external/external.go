@@ -20,7 +20,6 @@ package external
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
@@ -60,24 +59,24 @@ func (ext *ExternalStorageProvider) Consensus() storage.Consensus {
 
 // Start should start the provider and any resources that it may need.
 func (ext *ExternalStorageProvider) Start(context.Context) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // Bootstrap should bootstrap the provider for first-time usage.
 func (ext *ExternalStorageProvider) Bootstrap(context.Context) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // Status returns the status of the storage provider.
 func (ext *ExternalStorageProvider) Status() *v1.StorageStatus {
 	return &v1.StorageStatus{
-		Message: "not implemented",
+		Message: storage.ErrNotImplemented.Error(),
 	}
 }
 
 // Close should close the underlying storage as well as any other resources that the provider may have allocated.
 func (ext *ExternalStorageProvider) Close() error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // ExternalConsensus is a consensus implementation that uses a storage plugin.
@@ -92,23 +91,23 @@ func (ext *ExternalConsensus) IsLeader() bool {
 
 // AddVoter adds a voter to the consensus group.
 func (ext *ExternalConsensus) AddVoter(context.Context, *v1.StoragePeer) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // AddObserver adds an observer to the consensus group.
 func (ext *ExternalConsensus) AddObserver(context.Context, *v1.StoragePeer) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // DemoteVoter demotes a voter to an observer.
 func (ext *ExternalConsensus) DemoteVoter(context.Context, *v1.StoragePeer) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // RemovePeer removes a peer from the consensus group. If wait
 // is true, the function will wait for the peer to be removed.
 func (ext *ExternalConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // ExternalStorage is a storage implementation that uses a storage plugin.
@@ -118,43 +117,43 @@ type ExternalStorage struct {
 
 // GetValue returns the value of a key.
 func (ext *ExternalStorage) GetValue(ctx context.Context, key string) (string, error) {
-	return "", fmt.Errorf("not implemented")
+	return "", storage.ErrNotImplemented
 }
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
 func (ext *ExternalStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // Delete removes a key.
 func (ext *ExternalStorage) Delete(ctx context.Context, key string) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // List returns all keys with a given prefix.
 func (ext *ExternalStorage) List(ctx context.Context, prefix string) ([]string, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, storage.ErrNotImplemented
 }
 
 // IterPrefix iterates over all keys with a given prefix. It is important
 // that the iterator not attempt any write operations as this will cause
 // a deadlock. The iteration will stop if the iterator returns an error.
 func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // Snapshot returns a snapshot of the storage.
 func (ext *ExternalStorage) Snapshot(ctx context.Context) (io.Reader, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, storage.ErrNotImplemented
 }
 
 // Restore restores a snapshot of the storage.
 func (ext *ExternalStorage) Restore(ctx context.Context, r io.Reader) error {
-	return fmt.Errorf("not implemented")
+	return storage.ErrNotImplemented
 }
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
-	return func() {}, fmt.Errorf("not implemented")
+	return func() {}, storage.ErrNotImplemented
 }

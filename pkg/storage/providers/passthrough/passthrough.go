@@ -22,7 +22,6 @@ package passthrough
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -40,12 +39,6 @@ import (
 // Ensure we satisfy the provider interface.
 var _ storage.Provider = &PassthroughStorageProvider{}
 var _ storage.Consensus = &PassthroughConsensus{}
-
-// ErrNotStorageNode is returned when the node is not a storage node.
-var ErrNotStorageNode = fmt.Errorf("not a storage node")
-
-// ErrClosed is returned when the storage provider is closed.
-var ErrClosed = errors.New("storage provider is closed")
 
 // Options are the passthrough options.
 type Options struct {
@@ -103,14 +96,14 @@ func (p *PassthroughStorageProvider) Close() error {
 }
 
 func (p *PassthroughStorageProvider) Bootstrap(ctx context.Context) error {
-	return ErrNotStorageNode
+	return storage.ErrNotStorageNode
 }
 
 func (p *PassthroughStorageProvider) Status() *v1.StorageStatus {
 	status := v1.StorageStatus{
 		IsWritable:    false,
 		ClusterStatus: v1.ClusterStatus_CLUSTER_NODE,
-		Message:       ErrNotStorageNode.Error(),
+		Message:       storage.ErrNotStorageNode.Error(),
 	}
 	config, err := p.getConfiguration()
 	if err != nil {
@@ -151,23 +144,23 @@ func (p *PassthroughConsensus) IsLeader() bool { return false }
 
 // AddVoter adds a voter to the consensus group.
 func (p *PassthroughConsensus) AddVoter(context.Context, *v1.StoragePeer) error {
-	return ErrNotStorageNode
+	return storage.ErrNotStorageNode
 }
 
 // AddObserver adds an observer to the consensus group.
 func (p *PassthroughConsensus) AddObserver(context.Context, *v1.StoragePeer) error {
-	return ErrNotStorageNode
+	return storage.ErrNotStorageNode
 }
 
 // DemoteVoter demotes a voter to an observer.
 func (p *PassthroughConsensus) DemoteVoter(context.Context, *v1.StoragePeer) error {
-	return ErrNotStorageNode
+	return storage.ErrNotStorageNode
 }
 
 // RemovePeer removes a peer from the consensus group. If wait
 // is true, the function will wait for the peer to be removed.
 func (p *PassthroughConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
-	return ErrNotStorageNode
+	return storage.ErrNotStorageNode
 }
 
 type PassthroughStorage struct {
@@ -222,7 +215,7 @@ func (p *PassthroughStorage) PutValue(ctx context.Context, key, value string, tt
 
 // Delete removes a key.
 func (p *PassthroughStorage) Delete(ctx context.Context, key string) error {
-	return ErrNotStorageNode
+	return storage.ErrNotStorageNode
 }
 
 // List returns all keys with a given prefix.
@@ -291,12 +284,12 @@ func (p *PassthroughStorage) IterPrefix(ctx context.Context, prefix string, fn s
 
 // Snapshot returns a snapshot of the storage.
 func (p *PassthroughStorage) Snapshot(ctx context.Context) (io.Reader, error) {
-	return nil, ErrNotStorageNode
+	return nil, storage.ErrNotStorageNode
 }
 
 // Restore restores a snapshot of the storage.
 func (p *PassthroughStorage) Restore(ctx context.Context, r io.Reader) error {
-	return ErrNotStorageNode
+	return storage.ErrNotStorageNode
 }
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
@@ -398,7 +391,7 @@ func (p *PassthroughStorage) Close() error {
 func (p *PassthroughStorage) newStorageClient(ctx context.Context) (v1.StorageClient, func(), error) {
 	select {
 	case <-p.provider.closec:
-		return nil, nil, ErrClosed
+		return nil, nil, storage.ErrClosed
 	default:
 	}
 	c, err := p.provider.Options.Dialer.DialNode(ctx, "")

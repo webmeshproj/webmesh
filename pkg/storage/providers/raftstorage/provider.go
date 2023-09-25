@@ -19,6 +19,7 @@ package raftstorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -159,7 +160,7 @@ func (r *RaftStorageProvider) Start(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.started.Load() {
-		return ErrStarted
+		return storage.ErrStarted
 	}
 	log := r.log
 	log.Debug("Starting raft storage provider")
@@ -283,7 +284,7 @@ func (r *RaftStorageProvider) Bootstrap(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return ErrClosed
+		return storage.ErrClosed
 	}
 	port := r.Options.Transport.AddrPort().Port()
 	cfg := raft.Configuration{
@@ -299,7 +300,7 @@ func (r *RaftStorageProvider) Bootstrap(ctx context.Context) error {
 	err := f.Error()
 	if err != nil {
 		if err == raft.ErrCantBootstrap {
-			return ErrAlreadyBootstrapped
+			return storage.ErrAlreadyBootstrapped
 		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
@@ -352,7 +353,7 @@ func (r *RaftStorageProvider) Close() error {
 	// If we were the leader, step down.
 	if r.raft.State() == raft.Leader {
 		r.log.Debug("Raft node is current leader, stepping down")
-		if err := r.raft.LeadershipTransfer().Error(); err != nil && err != ErrNotLeader {
+		if err := r.raft.LeadershipTransfer().Error(); err != nil && !errors.Is(err, raft.ErrNotLeader) {
 			r.log.Warn("Failed to transfer leadership", slog.String("error", err.Error()))
 		}
 	}
@@ -395,7 +396,7 @@ func (r *RaftStorageProvider) IsObserver() bool {
 // Configuration returns the current raft configuration.
 func (r *RaftStorageProvider) Configuration() (raft.Configuration, error) {
 	if r.raft == nil {
-		return raft.Configuration{}, ErrClosed
+		return raft.Configuration{}, storage.ErrClosed
 	}
 	return r.raft.GetConfiguration().Configuration(), nil
 }
@@ -405,10 +406,10 @@ func (r *RaftStorageProvider) Apply(ctx context.Context, log *v1.RaftLogEntry) (
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return nil, ErrClosed
+		return nil, storage.ErrClosed
 	}
 	if !r.Consensus().IsLeader() {
-		return nil, ErrNotLeader
+		return nil, storage.ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
@@ -446,10 +447,10 @@ func (r *RaftConsensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) erro
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return ErrClosed
+		return storage.ErrClosed
 	}
 	if !r.IsLeader() {
-		return ErrNotLeader
+		return storage.ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
@@ -457,8 +458,8 @@ func (r *RaftConsensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) erro
 	}
 	f := r.raft.AddVoter(raft.ServerID(peer.GetId()), raft.ServerAddress(peer.GetAddress()), 0, timeout)
 	err := f.Error()
-	if err != nil && err == raft.ErrNotLeader {
-		return ErrNotLeader
+	if err != nil && errors.Is(err, raft.ErrNotLeader) {
+		return storage.ErrNotLeader
 	}
 	return err
 }
@@ -468,10 +469,10 @@ func (r *RaftConsensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) e
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return ErrClosed
+		return storage.ErrClosed
 	}
 	if !r.IsLeader() {
-		return ErrNotLeader
+		return storage.ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
@@ -479,8 +480,8 @@ func (r *RaftConsensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) e
 	}
 	f := r.raft.AddNonvoter(raft.ServerID(peer.GetId()), raft.ServerAddress(peer.GetAddress()), 0, timeout)
 	err := f.Error()
-	if err != nil && err == raft.ErrNotLeader {
-		return ErrNotLeader
+	if err != nil && errors.Is(err, raft.ErrNotLeader) {
+		return storage.ErrNotLeader
 	}
 	return err
 }
@@ -490,10 +491,10 @@ func (r *RaftConsensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) e
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return ErrClosed
+		return storage.ErrClosed
 	}
 	if !r.IsLeader() {
-		return ErrNotLeader
+		return storage.ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
@@ -501,8 +502,8 @@ func (r *RaftConsensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) e
 	}
 	f := r.raft.DemoteVoter(raft.ServerID(peer.GetId()), 0, timeout)
 	err := f.Error()
-	if err != nil && err == raft.ErrNotLeader {
-		return ErrNotLeader
+	if err != nil && errors.Is(err, raft.ErrNotLeader) {
+		return storage.ErrNotLeader
 	}
 	return err
 }
@@ -512,10 +513,10 @@ func (r *RaftConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wa
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return ErrClosed
+		return storage.ErrClosed
 	}
 	if !r.IsLeader() {
-		return ErrNotLeader
+		return storage.ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
@@ -526,8 +527,8 @@ func (r *RaftConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wa
 		return nil
 	}
 	err := f.Error()
-	if err != nil && err == raft.ErrNotLeader {
-		return ErrNotLeader
+	if err != nil && errors.Is(err, raft.ErrNotLeader) {
+		return storage.ErrNotLeader
 	}
 	return err
 }
