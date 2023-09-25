@@ -41,7 +41,7 @@ import (
 // Plugin is the debug plugin.
 type Plugin struct {
 	v1.UnimplementedPluginServer
-	v1.UnimplementedStoragePluginServer
+	v1.UnimplementedStorageQuerierPluginServer
 
 	data    storage.MeshStorage
 	datamux sync.Mutex
@@ -108,7 +108,7 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Version:     version.Version,
 		Description: "Debug server plugin",
 		Capabilities: []v1.PluginInfo_PluginCapability{
-			v1.PluginInfo_STORAGE,
+			v1.PluginInfo_STORAGE_QUERIER,
 		},
 	}, nil
 }
@@ -133,7 +133,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 }
 
 // InjectQuerier injects the querier.
-func (p *Plugin) InjectQuerier(srv v1.StoragePlugin_InjectQuerierServer) error {
+func (p *Plugin) InjectQuerier(srv v1.StorageQuerierPlugin_InjectQuerierServer) error {
 	p.datamux.Lock()
 	p.data = plugindb.Open(srv)
 	p.datamux.Unlock()

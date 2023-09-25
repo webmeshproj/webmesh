@@ -33,15 +33,6 @@ import (
 type DualStorage interface {
 	MeshStorage
 	RaftStorage
-	DropStorage
-}
-
-// DropStorage is a storage interface that can be dropped entirely.
-// This is primarily used for testing.
-type DropStorage interface {
-	// DropAll drops all data from the storage. This is primarily used
-	// for testing.
-	DropAll(ctx context.Context) error
 }
 
 // RaftStorage is the interface for storing and retrieving data about the state of the mesh.
@@ -49,14 +40,11 @@ type DropStorage interface {
 type RaftStorage interface {
 	raft.LogStore
 	raft.StableStore
-	DropStorage
 	io.Closer
 }
 
 // MeshStorage is the interface for storing and retrieving data about the state of the mesh.
 type MeshStorage interface {
-	DropStorage
-
 	// GetValue returns the value of a key.
 	GetValue(ctx context.Context, key string) (string, error)
 	// PutValue sets the value of a key. TTL is optional and can be set to 0.
@@ -78,6 +66,14 @@ type MeshStorage interface {
 	Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (context.CancelFunc, error)
 	// Close closes the storage.
 	Close() error
+}
+
+// DropStorage is a storage interface that can be dropped entirely.
+// This is primarily used for testing.
+type DropStorage interface {
+	// DropAll drops all data from the storage. This is primarily used
+	// for testing.
+	DropAll(ctx context.Context) error
 }
 
 // SubscribeFunc is the function signature for subscribing to changes to a key.

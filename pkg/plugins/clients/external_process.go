@@ -80,12 +80,8 @@ func (p *externalProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, op
 	return &emptypb.Empty{}, nil
 }
 
-func (p *externalProcessPlugin) Raft() v1.RaftPluginClient {
-	return v1.NewRaftPluginClient(p.conn)
-}
-
-func (p *externalProcessPlugin) Storage() v1.StoragePluginClient {
-	return v1.NewStoragePluginClient(p.conn)
+func (p *externalProcessPlugin) Storage() v1.StorageQuerierPluginClient {
+	return v1.NewStorageQuerierPluginClient(p.conn)
 }
 
 func (p *externalProcessPlugin) Auth() v1.AuthPluginClient {

@@ -30,7 +30,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
-	"github.com/webmeshproj/webmesh/pkg/raft/fsm"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -60,16 +59,6 @@ type passthroughRaft struct {
 	closec     chan struct{}
 	log        *slog.Logger
 	mu         sync.Mutex
-}
-
-// OnApply registers a callback for when a log is applied to the state machine.
-func (r *passthroughRaft) OnApply(cb fsm.ApplyCallback) {
-	// No-op
-}
-
-// OnSnapshotRestore registers a callback for when a snapshot is restored.
-func (r *passthroughRaft) OnSnapshotRestore(cb SnapshotRestoreCallback) {
-	// No-op
 }
 
 // OnObservation registers a callback for when an observation is received.

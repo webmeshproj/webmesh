@@ -29,7 +29,7 @@ func main() {
 type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedWatchPluginServer
-	v1.UnimplementedStoragePluginServer
+	v1.UnimplementedStorageQuerierPluginServer
 	// data is the meshdb database.
 	data   storage.MeshStorage
 	closec chan struct{}
@@ -44,7 +44,7 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Description: "Watch plugin that prints events to stdout",
 		Capabilities: []v1.PluginInfo_PluginCapability{
 			v1.PluginInfo_WATCH,
-			v1.PluginInfo_STORAGE,
+			v1.PluginInfo_STORAGE_QUERIER,
 		},
 	}, nil
 }
@@ -74,7 +74,7 @@ func (p *Plugin) Emit(ctx context.Context, ev *v1.Event) (*emptypb.Empty, error)
 // InjectQuerier can optionally be implemented by plugins that want to use the meshdb.
 // It is called after Configure and before any other methods are called. The stream
 // can be used with the plugindb package to open a database connection.
-func (p *Plugin) InjectQuerier(srv v1.StoragePlugin_InjectQuerierServer) error {
+func (p *Plugin) InjectQuerier(srv v1.StorageQuerierPlugin_InjectQuerierServer) error {
 	p.data = plugindb.Open(srv)
 	select {
 	case <-p.closec:

@@ -50,9 +50,9 @@ func Serve(ctx context.Context, plugin v1.PluginServer) error {
 	}
 	s := grpc.NewServer()
 	v1.RegisterPluginServer(s, plugin)
-	if storage, ok := plugin.(v1.StoragePluginServer); ok {
+	if storage, ok := plugin.(v1.StorageQuerierPluginServer); ok {
 		log.Info("registering storage plugin")
-		v1.RegisterStoragePluginServer(s, storage)
+		v1.RegisterStorageQuerierPluginServer(s, storage)
 	}
 	if auth, ok := plugin.(v1.AuthPluginServer); ok {
 		log.Info("registering auth plugin")

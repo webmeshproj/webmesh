@@ -19,7 +19,6 @@ package meshnode
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/netip"
 	"time"
@@ -147,24 +146,6 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	}
 	// Create the raft node
 	s.raft.OnObservation(s.newObserver())
-	s.raft.OnSnapshotRestore(func(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) {
-		// Dispatch the snapshot to any storage plugins.
-		if err = s.plugins.ApplySnapshot(ctx, meta, data); err != nil {
-			// This is non-fatal for now.
-			s.log.Error("failed to apply snapshot to plugins", slog.String("error", err.Error()))
-		}
-	})
-	s.raft.OnApply(func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry) {
-		// Dispatch the log entry to any storage plugins.
-		if _, err := s.plugins.ApplyRaftLog(ctx, &v1.StoreLogRequest{
-			Term:  term,
-			Index: index,
-			Log:   log,
-		}); err != nil {
-			// This is non-fatal for now.
-			s.log.Error("failed to apply log to plugins", slog.String("error", err.Error()))
-		}
-	})
 	// Start serving storage queries for plugins.
 	handleErr := func(cause error) error {
 		s.kvSubCancel()

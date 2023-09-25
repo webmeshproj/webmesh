@@ -42,7 +42,7 @@ import (
 type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedIPAMPluginServer
-	v1.UnimplementedStoragePluginServer
+	v1.UnimplementedStorageQuerierPluginServer
 
 	config  Config
 	data    storage.MeshStorage
@@ -109,7 +109,7 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 		Description: "Simple IPAM plugin",
 		Capabilities: []v1.PluginInfo_PluginCapability{
 			v1.PluginInfo_IPAMV4,
-			v1.PluginInfo_STORAGE,
+			v1.PluginInfo_STORAGE_QUERIER,
 		},
 	}, nil
 }
@@ -129,7 +129,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	return &emptypb.Empty{}, nil
 }
 
-func (p *Plugin) InjectQuerier(srv v1.StoragePlugin_InjectQuerierServer) error {
+func (p *Plugin) InjectQuerier(srv v1.StorageQuerierPlugin_InjectQuerierServer) error {
 	p.datamux.Lock()
 	p.data = plugindb.Open(srv)
 	p.datamux.Unlock()

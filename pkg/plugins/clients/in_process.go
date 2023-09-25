@@ -31,7 +31,7 @@ func NewInProcessClient(plugin v1.PluginServer) *inProcessPlugin {
 
 type inProcessPlugin struct {
 	server      v1.PluginServer
-	queryStream v1.StoragePlugin_InjectQuerierClient
+	queryStream v1.StorageQuerierPlugin_InjectQuerierClient
 }
 
 func (p *inProcessPlugin) GetInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*v1.PluginInfo, error) {
@@ -52,16 +52,8 @@ func (p *inProcessPlugin) Close(ctx context.Context, in *emptypb.Empty, opts ...
 	return p.server.Close(ctx, &emptypb.Empty{})
 }
 
-func (p *inProcessPlugin) Raft() v1.RaftPluginClient {
-	cli, ok := p.server.(v1.RaftPluginServer)
-	if !ok {
-		return nil
-	}
-	return &inProcessRaftPlugin{cli}
-}
-
-func (p *inProcessPlugin) Storage() v1.StoragePluginClient {
-	_, ok := p.server.(v1.StoragePluginServer)
+func (p *inProcessPlugin) Storage() v1.StorageQuerierPluginClient {
+	_, ok := p.server.(v1.StorageQuerierPluginServer)
 	if !ok {
 		return nil
 	}
@@ -96,21 +88,9 @@ type inProcessStoragePlugin struct {
 	*inProcessPlugin
 }
 
-func (p *inProcessStoragePlugin) InjectQuerier(ctx context.Context, opts ...grpc.CallOption) (v1.StoragePlugin_InjectQuerierClient, error) {
+func (p *inProcessStoragePlugin) InjectQuerier(ctx context.Context, opts ...grpc.CallOption) (v1.StorageQuerierPlugin_InjectQuerierClient, error) {
 	p.queryStream = inProcessQueryPipe(ctx, p.server)
 	return p.queryStream, nil
-}
-
-type inProcessRaftPlugin struct {
-	server v1.RaftPluginServer
-}
-
-func (p *inProcessRaftPlugin) Store(ctx context.Context, in *v1.StoreLogRequest, opts ...grpc.CallOption) (*v1.RaftApplyResponse, error) {
-	return p.server.Store(ctx, in)
-}
-
-func (p *inProcessRaftPlugin) RestoreSnapshot(ctx context.Context, in *v1.DataSnapshot, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	return p.server.RestoreSnapshot(ctx, in)
 }
 
 type inProcessAuthPlugin struct {

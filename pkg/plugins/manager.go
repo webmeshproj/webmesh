@@ -8,7 +8,6 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -77,11 +76,6 @@ type Manager interface {
 	// AllocateIP calls the configured IPAM plugin to allocate an IP address for the given request.
 	// If the requested version does not have a registered plugin, ErrUnsupported is returned.
 	AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (netip.Prefix, error)
-	// ApplyRaftLog applies a raft log entry to all storage plugins. Responses are still returned
-	// even if an error occurs.
-	ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) ([]*v1.RaftApplyResponse, error)
-	// ApplySnapshot applies a snapshot to all storage plugins.
-	ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) error
 	// Emit emits an event to all watch plugins.
 	Emit(ctx context.Context, ev *v1.Event) error
 	// Close closes all plugins.
@@ -156,7 +150,7 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 			Client: clients.NewInProcessClient(&ipam.Plugin{}),
 			capabilities: []v1.PluginInfo_PluginCapability{
 				v1.PluginInfo_IPAMV4,
-				v1.PluginInfo_STORAGE,
+				v1.PluginInfo_STORAGE_QUERIER,
 			},
 			name: "simple-ipam",
 		}
@@ -262,67 +256,6 @@ func (m *manager) AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (ne
 	return addr, err
 }
 
-// ApplyRaftLog applies a raft log entry to all storage plugins.
-func (m *manager) ApplyRaftLog(ctx context.Context, entry *v1.StoreLogRequest) ([]*v1.RaftApplyResponse, error) {
-	raftstores := m.getRaftStores()
-	if len(raftstores) == 0 {
-		return nil, nil
-	}
-	out := make([]*v1.RaftApplyResponse, len(raftstores))
-	errs := make([]error, 0)
-	for i, store := range raftstores {
-		resp, err := store.Client.Raft().Store(ctx, entry)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		out[i] = resp
-	}
-	var err error
-	if len(errs) > 0 {
-		err = fmt.Errorf("apply raft log: %v", errs)
-	}
-	return out, err
-}
-
-// ApplySnapshot applies a snapshot to all storage plugins.
-func (m *manager) ApplySnapshot(ctx context.Context, meta *raft.SnapshotMeta, data io.ReadCloser) error {
-	raftstores := m.getRaftStores()
-	if len(raftstores) == 0 {
-		return nil
-	}
-	defer data.Close()
-	snapshot, err := io.ReadAll(data)
-	if err != nil {
-		return fmt.Errorf("read snapshot: %w", err)
-	}
-	errs := make([]error, 0)
-	for _, store := range raftstores {
-		_, err := store.Client.Raft().RestoreSnapshot(ctx, &v1.DataSnapshot{
-			Term:  meta.Term,
-			Index: meta.Index,
-			Data:  snapshot,
-		})
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if len(errs) > 0 {
-		return fmt.Errorf("apply snapshot: %v", errs)
-	}
-	return nil
-}
-
-func (m *manager) getRaftStores() []*Plugin {
-	var raftstores []*Plugin
-	for _, plugin := range m.plugins {
-		if plugin.hasCapability(v1.PluginInfo_RAFT) {
-			raftstores = append(raftstores, plugin)
-		}
-	}
-	return raftstores
-}
-
 // Emit emits an event to all watch plugins.
 func (m *manager) Emit(ctx context.Context, ev *v1.Event) error {
 	errs := make([]error, 0)
@@ -362,7 +295,7 @@ func (m *manager) Close() error {
 // handleQueries handles SQL queries from plugins.
 func (m *manager) handleQueries(db storage.MeshStorage) {
 	for plugin, client := range m.plugins {
-		if !client.hasCapability(v1.PluginInfo_STORAGE) {
+		if !client.hasCapability(v1.PluginInfo_STORAGE_QUERIER) {
 			return
 		}
 		ctx := context.Background()
@@ -381,7 +314,7 @@ func (m *manager) handleQueries(db storage.MeshStorage) {
 }
 
 // handleQueryClient handles a query client.
-func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queries v1.StoragePlugin_InjectQuerierClient) {
+func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queries v1.StorageQuerierPlugin_InjectQuerierClient) {
 	defer func() {
 		if err := queries.CloseSend(); err != nil {
 			m.log.Error("close query stream", "plugin", plugin, "error", err)

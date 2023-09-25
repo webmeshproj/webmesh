@@ -28,7 +28,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
-func inProcessQueryPipe(ctx context.Context, server v1.PluginServer) v1.StoragePlugin_InjectQuerierClient {
+func inProcessQueryPipe(ctx context.Context, server v1.PluginServer) v1.StorageQuerierPlugin_InjectQuerierClient {
 	// TODO: Make this configurable
 	schan := make(chan *v1.PluginQuery, 100)
 	rchan := make(chan *v1.PluginQueryResult, 100)
@@ -37,7 +37,7 @@ func inProcessQueryPipe(ctx context.Context, server v1.PluginServer) v1.StorageP
 	cli := &inProcessStreamClient[v1.PluginQuery, v1.PluginQueryResult]{ctx, cancel, schan, rchan}
 	go func() {
 		defer cancel()
-		err := server.(v1.StoragePluginServer).InjectQuerier(srv)
+		err := server.(v1.StorageQuerierPluginServer).InjectQuerier(srv)
 		if err != nil {
 			if err != io.EOF && err != context.Canceled && status.Code(err) != codes.Unimplemented {
 				context.LoggerFrom(ctx).Error("error in plugin query", "error", err)

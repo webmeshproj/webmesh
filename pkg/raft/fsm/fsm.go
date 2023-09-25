@@ -36,15 +36,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
+// Ensure that RaftFSM implements the raft.FSM interface.
 var _ raft.FSM = &RaftFSM{}
-
-// ApplyCallback is a callback that can be registered for everytime a log is applied
-// to the state machine.
-type ApplyCallback func(ctx context.Context, term, index uint64, log *v1.RaftLogEntry)
-
-// SnapshotRestoreCallback is a callback that can be registered for when a snapshot
-// is restored.
-type SnapshotRestoreCallback func(ctx context.Context)
 
 // RaftFSM is the Raft FSM.
 type RaftFSM struct {
@@ -61,10 +54,6 @@ type RaftFSM struct {
 type Options struct {
 	// ApplyTimeout is the timeout for applying a log entry.
 	ApplyTimeout time.Duration
-	// OnApplyLog are the callbacks for when a log entry is applied.
-	OnApplyLog ApplyCallback
-	// OnSnapshotRestore are the callbacks for when a snapshot is restored.
-	OnSnapshotRestore SnapshotRestoreCallback
 }
 
 // New returns a new RaftFSM. The storage interface must be a direct
@@ -105,9 +94,6 @@ func (r *RaftFSM) Restore(rdr io.ReadCloser) error {
 	if err != nil {
 		return fmt.Errorf("restore snapshot: %w", err)
 	}
-	if r.opts.OnSnapshotRestore != nil {
-		r.opts.OnSnapshotRestore(context.Background())
-	}
 	return nil
 }
 
@@ -116,12 +102,8 @@ func (r *RaftFSM) ApplyBatch(logs []*raft.Log) []any {
 	r.mu.Lock()
 	r.log.Debug("Applying batch", slog.Int("count", len(logs)))
 	res := make([]any, len(logs))
-	var cmd *v1.RaftLogEntry
 	for i, l := range logs {
-		cmd, res[i] = r.applyLog(l)
-		if r.opts.OnApplyLog != nil {
-			r.opts.OnApplyLog(context.Background(), l.Term, l.Index, cmd)
-		}
+		_, res[i] = r.applyLog(l)
 	}
 	r.mu.Unlock()
 	return res
@@ -130,13 +112,8 @@ func (r *RaftFSM) ApplyBatch(logs []*raft.Log) []any {
 // Apply applies a Raft log entry to the store.
 func (r *RaftFSM) Apply(l *raft.Log) any {
 	r.mu.Lock()
-	cmd, res := r.applyLog(l)
+	_, res := r.applyLog(l)
 	r.mu.Unlock()
-	if cmd != nil {
-		if r.opts.OnApplyLog != nil {
-			r.opts.OnApplyLog(context.Background(), l.Term, l.Index, cmd)
-		}
-	}
 	return res
 }
 
