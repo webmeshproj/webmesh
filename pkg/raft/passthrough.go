@@ -217,10 +217,6 @@ type passthroughStorage struct {
 	raft *passthroughRaft
 }
 
-func (p *passthroughStorage) DropAll(context.Context) error {
-	return errors.New("drop all not implemented")
-}
-
 // GetValue returns the value of a key.
 func (p *passthroughStorage) GetValue(ctx context.Context, key string) (string, error) {
 	cli, close, err := p.newStorageClient(ctx)
