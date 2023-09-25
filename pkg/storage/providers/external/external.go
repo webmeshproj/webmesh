@@ -61,11 +61,10 @@ type Options struct {
 // ExternalStorageProvider is a storage provider that uses a storage plugin.
 type ExternalStorageProvider struct {
 	Options
-	plugin v1.PluginClient
-	cli    v1.StorageProviderPluginClient
-	conn   *grpc.ClientConn
-	log    *slog.Logger
-	mu     sync.Mutex
+	cli  v1.StorageProviderPluginClient
+	conn *grpc.ClientConn
+	log  *slog.Logger
+	mu   sync.Mutex
 }
 
 // NewStorageProvider returns a new ExternalStorageProvider.
@@ -105,9 +104,8 @@ func (ext *ExternalStorageProvider) Start(ctx context.Context) error {
 		return fmt.Errorf("dial storage provider: %w", err)
 	}
 	ext.conn = c
-	ext.plugin = v1.NewPluginClient(c)
 	ext.cli = v1.NewStorageProviderPluginClient(c)
-	_, err = ext.plugin.Configure(ctx, ext.Options.Config)
+	_, err = v1.NewPluginClient(c).Configure(ctx, ext.Options.Config)
 	if err != nil {
 		return fmt.Errorf("configure plugin: %w", err)
 	}
@@ -163,7 +161,7 @@ func (ext *ExternalStorageProvider) Close() error {
 		}
 		ext.conn = nil
 	}()
-	_, err := ext.plugin.Close(context.Background(), &emptypb.Empty{})
+	_, err := v1.NewPluginClient(ext.conn).Close(context.Background(), &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf("close plugin: %w", err)
 	}
