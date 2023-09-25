@@ -65,5 +65,3 @@ WireGuard is a registered trademark of Jason A. Donenfeld.
 ## Support
 
 Become a [Github Sponsor](https://github.com/sponsors/webmeshproj).
-
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/webmeshproj)
