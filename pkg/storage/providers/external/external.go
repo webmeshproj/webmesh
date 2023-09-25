@@ -77,9 +77,9 @@ func NewStorageProvider(opts Options) *ExternalStorageProvider {
 	}
 }
 
-// Storage returns the underlying MeshStorage instance. The provider does not need to
+// MeshStorage returns the underlying MeshStorage instance. The provider does not need to
 // guarantee consistency on read operations.
-func (ext *ExternalStorageProvider) Storage() storage.MeshStorage {
+func (ext *ExternalStorageProvider) MeshStorage() storage.MeshStorage {
 	return &ExternalStorage{ext}
 }
 
@@ -180,20 +180,42 @@ type ExternalConsensus struct {
 
 // IsLeader returns true if the node is the leader of the storage group.
 func (ext *ExternalConsensus) IsLeader() bool {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
-	if ext.cli == nil {
-		return false
-	}
 	// Use a short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
-	leader, err := ext.cli.GetLeader(ctx, &v1.GetLeaderRequest{})
+	leader, err := ext.GetLeader(ctx)
 	if err != nil {
 		ext.log.Error("Failed to get leader", "error", err.Error())
 		return false
 	}
 	return leader.GetId() == ext.NodeID
+}
+
+// IsMember returns true if the node is a member of the storage group.
+func (ext *ExternalConsensus) IsMember() bool {
+	// Use a short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+	resp, err := ext.cli.IsMember(ctx, &v1.IsMemberRequest{Peer: ext.NodeID})
+	if err != nil {
+		ext.log.Error("Failed to get membership", "error", err.Error())
+		return false
+	}
+	return resp.GetIsMember()
+}
+
+// GetLeader returns the leader of the storage group.
+func (ext *ExternalConsensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
+	ext.mu.Lock()
+	defer ext.mu.Unlock()
+	if ext.cli == nil {
+		return nil, storage.ErrClosed
+	}
+	leader, err := ext.cli.GetLeader(ctx, &v1.GetLeaderRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("get leader: %w", err)
+	}
+	return leader, nil
 }
 
 // AddVoter adds a voter to the consensus group.

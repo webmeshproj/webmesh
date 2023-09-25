@@ -67,7 +67,7 @@ func NewStorageProvider(opts Options) *PassthroughStorageProvider {
 	}
 }
 
-func (p *PassthroughStorageProvider) Storage() storage.MeshStorage {
+func (p *PassthroughStorageProvider) MeshStorage() storage.MeshStorage {
 	return &PassthroughStorage{provider: p}
 }
 
@@ -141,6 +141,14 @@ type PassthroughConsensus struct{}
 
 // IsLeader returns true if the node is the leader of the storage group.
 func (p *PassthroughConsensus) IsLeader() bool { return false }
+
+// IsMember returns true if the node is a member of the storage group.
+func (p *PassthroughConsensus) IsMember() bool { return false }
+
+// GetLeader returns the leader of the storage group.
+func (p *PassthroughConsensus) GetLeader(context.Context) (*v1.StoragePeer, error) {
+	return nil, storage.ErrNotStorageNode
+}
 
 // AddVoter adds a voter to the consensus group.
 func (p *PassthroughConsensus) AddVoter(context.Context, *v1.StoragePeer) error {

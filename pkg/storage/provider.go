@@ -50,10 +50,9 @@ type Provider interface {
 	// that the provider may have allocated.
 	io.Closer
 
-	// Storage returns the underlying MeshStorage instance.
-	// The provider does not need to guarantee consistency
-	// on read operations.
-	Storage() MeshStorage
+	// MeshStorage returns the underlying MeshStorage instance. The provider does not
+	// need to guarantee consistency on read operations.
+	MeshStorage() MeshStorage
 	// Consensus returns the underlying Consensus instance.
 	Consensus() Consensus
 
@@ -69,6 +68,10 @@ type Provider interface {
 type Consensus interface {
 	// IsLeader returns true if the node is the leader of the storage group.
 	IsLeader() bool
+	// IsMember returns true if the node is a member of the storage group.
+	IsMember() bool
+	// GetLeader returns the leader of the storage group.
+	GetLeader(context.Context) (*v1.StoragePeer, error)
 	// AddVoter adds a voter to the consensus group.
 	AddVoter(context.Context, *v1.StoragePeer) error
 	// AddObserver adds an observer to the consensus group.

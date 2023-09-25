@@ -97,8 +97,8 @@ func NewStorageProvider(opts Options) *RaftStorageProvider {
 	}
 }
 
-// Storage returns the underlying MeshStorage instance.
-func (r *RaftStorageProvider) Storage() storage.MeshStorage {
+// MeshStorage returns the underlying MeshStorage instance.
+func (r *RaftStorageProvider) MeshStorage() storage.MeshStorage {
 	return r.storage
 }
 
@@ -448,6 +448,47 @@ type RaftConsensus struct {
 // IsLeader returns true if the Raft node is the leader.
 func (r *RaftConsensus) IsLeader() bool {
 	return r.raft.State() == raft.Leader
+}
+
+// GetLeader returns the leader of the cluster.
+func (r *RaftConsensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.started.Load() {
+		return nil, storage.ErrClosed
+	}
+	if r.IsLeader() {
+		// Fast path for leader.
+		return &v1.StoragePeer{
+			Id:            string(r.nodeID),
+			Address:       string(r.Options.Transport.LocalAddr()),
+			ClusterStatus: v1.ClusterStatus_CLUSTER_LEADER,
+		}, nil
+	}
+	// Slow path for non-leaders.
+	leaderAddr, leaderID := r.raft.LeaderWithID()
+	if leaderAddr == "" && leaderID == "" {
+		return nil, storage.ErrNoLeader
+	}
+	return &v1.StoragePeer{
+		Id:            string(leaderID),
+		Address:       string(leaderAddr),
+		ClusterStatus: v1.ClusterStatus_CLUSTER_LEADER,
+	}, nil
+}
+
+// IsMember returns true if the Raft node is a member of the cluster.
+func (r *RaftConsensus) IsMember() bool {
+	config, err := r.Configuration()
+	if err != nil {
+		return false
+	}
+	for _, server := range config.Servers {
+		if server.ID == r.nodeID {
+			return true
+		}
+	}
+	return false
 }
 
 // AddVoter adds a voter to the consensus group.
