@@ -22,33 +22,8 @@ env:
   COSIGN_EXPERIMENTAL: 1
 
 jobs:
-  module-cache:
-    name: Build Module Caches
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: "read"
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          check-latest: true
-          cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
-
-      - name: Download Go Modules
-        run: go mod download -x
-
   lint:
     name: Static Analysis
-    needs: [module-cache]
     runs-on: ubuntu-latest
     permissions:
       contents: "read"
