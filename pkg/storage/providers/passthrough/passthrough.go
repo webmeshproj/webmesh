@@ -158,6 +158,11 @@ func (p *Consensus) IsLeader() bool { return false }
 // IsMember returns true if the node is a member of the storage group.
 func (p *Consensus) IsMember() bool { return false }
 
+// GetPeers returns the peers of the storage group.
+func (p *Consensus) GetPeers(context.Context) ([]*v1.StoragePeer, error) {
+	return p.Status().GetPeers(), nil
+}
+
 // GetLeader returns the leader of the storage group.
 func (p *Consensus) GetLeader(context.Context) (*v1.StoragePeer, error) {
 	status := p.Status()

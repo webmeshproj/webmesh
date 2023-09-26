@@ -46,6 +46,41 @@ func (r *Consensus) IsMember() bool {
 	return true
 }
 
+// GetPeers returns the peers of the cluster.
+func (r *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if !r.started.Load() {
+		return nil, storage.ErrClosed
+	}
+	cfg := r.GetRaftConfiguration()
+	leader, err := r.GetLeader(ctx)
+	if err != nil {
+		return nil, err
+	}
+	peers := make([]*v1.StoragePeer, 0, len(cfg.Servers))
+	for _, srv := range cfg.Servers {
+		peers = append(peers, &v1.StoragePeer{
+			Id:      string(srv.ID),
+			Address: string(srv.Address),
+			ClusterStatus: func() v1.ClusterStatus {
+				if leader.GetId() == string(srv.ID) {
+					return v1.ClusterStatus_CLUSTER_LEADER
+				}
+				switch srv.Suffrage {
+				case raft.Voter:
+					return v1.ClusterStatus_CLUSTER_VOTER
+				case raft.Nonvoter:
+					return v1.ClusterStatus_CLUSTER_OBSERVER
+				default:
+					return v1.ClusterStatus_CLUSTER_NODE
+				}
+			}(),
+		})
+	}
+	return peers, nil
+}
+
 // GetLeader returns the leader of the cluster.
 func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 	r.mu.RLock()

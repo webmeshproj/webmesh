@@ -51,13 +51,8 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !ok {
 		return nil, status.Errorf(codes.FailedPrecondition, "no peer")
 	}
-	cfg, err := provider.GetRaftConfiguration()
-	if err != nil {
-		// Should never happen
-		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
-	}
 	var found bool
-	for _, server := range cfg.Servers {
+	for _, server := range provider.GetRaftConfiguration().Servers {
 		host, _, err := net.SplitHostPort(peer.Addr.String())
 		if err != nil {
 			return nil, status.Errorf(codes.FailedPrecondition, "invalid peer address")

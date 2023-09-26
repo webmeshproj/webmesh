@@ -51,7 +51,8 @@ type Consensus interface {
 	IsLeader() bool
 	// IsMember returns true if the node is a member of the storage group.
 	IsMember() bool
-	// TODO: GetPeers method
+	// GetPeers returns the peers of the storage group.
+	GetPeers(context.Context) ([]*v1.StoragePeer, error)
 	// GetLeader returns the leader of the storage group.
 	GetLeader(context.Context) (*v1.StoragePeer, error)
 	// AddVoter adds a voter to the consensus group.

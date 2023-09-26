@@ -318,11 +318,8 @@ func (r *Provider) Close() error {
 }
 
 // GetRaftConfiguration returns the current raft configuration.
-func (r *Provider) GetRaftConfiguration() (raft.Configuration, error) {
-	if r.raft == nil {
-		return raft.Configuration{}, storage.ErrClosed
-	}
-	return r.raft.GetConfiguration().Configuration(), nil
+func (r *Provider) GetRaftConfiguration() raft.Configuration {
+	return r.raft.GetConfiguration().Configuration()
 }
 
 // ApplyRaftLog applies a raft log entry.
@@ -358,10 +355,7 @@ func (r *Provider) ApplyRaftLog(ctx context.Context, log *v1.RaftLogEntry) (*v1.
 
 // IsVoter returns true if the Raft node is a voter.
 func (r *Provider) isVoter() bool {
-	config, err := r.GetRaftConfiguration()
-	if err != nil {
-		return false
-	}
+	config := r.GetRaftConfiguration()
 	for _, server := range config.Servers {
 		if server.ID == r.nodeID {
 			return server.Suffrage == raft.Voter
@@ -372,10 +366,7 @@ func (r *Provider) isVoter() bool {
 
 // IsObserver returns true if the Raft node is an observer.
 func (r *Provider) isObserver() bool {
-	config, err := r.GetRaftConfiguration()
-	if err != nil {
-		return false
-	}
+	config := r.GetRaftConfiguration()
 	for _, server := range config.Servers {
 		if server.ID == r.nodeID {
 			return server.Suffrage == raft.Nonvoter

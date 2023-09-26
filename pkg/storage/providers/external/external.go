@@ -219,6 +219,20 @@ func (ext *Consensus) IsMember() bool {
 	return true
 }
 
+// GetPeers returns the peers of the storage group.
+func (ext *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
+	ext.mu.RLock()
+	defer ext.mu.RUnlock()
+	if ext.cli == nil {
+		return nil, storage.ErrClosed
+	}
+	resp, err := ext.cli.GetPeers(ctx, &v1.GetPeersRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("get peers: %w", err)
+	}
+	return resp.GetPeers(), nil
+}
+
 // GetLeader returns the leader of the storage group.
 func (ext *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 	ext.mu.RLock()
