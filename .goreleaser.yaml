@@ -3,6 +3,7 @@ project_name: webmesh
 before:
   hooks:
     - go mod tidy
+    - go mod download -x
     - go generate ./...
 
 builds:
