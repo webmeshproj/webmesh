@@ -10,15 +10,15 @@ GO    ?= go
 ARCH  ?= $(shell $(GO) env GOARCH)
 OS    ?= $(shell $(GO) env GOOS)
 
-PATHSEP := /
-ifeq ($(OS),Windows_NT)
-	PATHSEP := \\
-endif
-
-GOBIN ?= $(shell $(GO) env GOPATH)$(PATHSEP)bin
-
+GOPATH ?= $(shell $(GO) env GOPATH)
 ifeq ($(OS),Windows_NT)
 	OS := windows
+# Double escape the backslashes for Windows paths.
+	GOBIN  := $(subst \,\\,$(GOPATH))\\bin\\
+	RICHGO := $(subst \,\\,$(GOBIN))richgo.exe
+else
+	GOBIN := $(GOPATH)/bin
+	RICHGO := $(GOBIN)/richgo
 endif
 
 default: build
@@ -95,14 +95,14 @@ ci-test: mod-download fmt vet lint test
 endif
 endif
 
-RICHGO := $(GOBIN)$(PATHSEP)richgo
+
 RICHGO_INSTALLED := $(shell test -f $(RICHGO) && echo true || echo false)
 
 test: ## Run unit tests.
 ifeq ($(RICHGO_INSTALLED),false)
 	$(GO) install github.com/kyoh86/richgo@latest
 endif
-	$(GOBIN)$(PATHSEP)richgo test $(TEST_ARGS) ./...
+	$(RICHGO) test $(TEST_ARGS) ./...
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 LINT_TIMEOUT := 10m
