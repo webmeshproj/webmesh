@@ -13,13 +13,13 @@ env:
   GO_VERSION: ^1.21
   GOLANGCI_LINT_VERSION: v1.54.2
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
-  DISTROLESS_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   CACHE_DEP_PATH: go.sum
   LINT_TIMEOUT: 10m
   BUILD_PARALLELISM: 4
   TEST_PARALLELISM: 16
   # Lower test parallelism to avoid OOM on Windows
   WIN_TEST_PARALLELISM: 2
+  COSIGN_EXPERIMENTAL: 1
 
 jobs:
   module-cache:
@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -43,7 +43,6 @@ jobs:
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
 
       - name: Download Go Modules
-        shell: bash
         run: go mod download -x
 
   lint:
@@ -54,7 +53,7 @@ jobs:
       contents: "read"
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -67,7 +66,6 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout ${{ env.LINT_TIMEOUT }}
-          # skip-pkg-cache: true
 
   tests:
     name: Unit Tests
@@ -81,7 +79,7 @@ jobs:
       contents: "read"
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -90,7 +88,6 @@ jobs:
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
 
       - name: Run Unit Tests
-        shell: bash
         env:
           TEST_PARALLEL: ${{ matrix.os == 'windows-latest' && env.WIN_TEST_PARALLELISM || env.TEST_PARALLELISM }}
           RICHGO_FORCE_COLOR: 1
@@ -106,7 +103,7 @@ jobs:
       packages: "write"
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -120,14 +117,14 @@ jobs:
         uses: sigstore/cosign-installer@main
 
       - name: Run Snapshot Release
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         with:
           version: latest
           args: release --snapshot --clean --fail-fast --parallelism=${{ env.BUILD_PARALLELISM }}
 
       - name: Run Release
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -146,7 +143,7 @@ jobs:
       packages: "write"
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -160,10 +157,10 @@ jobs:
         uses: sigstore/cosign-installer@main
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Setup Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Compute Image Tags
         shell: bash
@@ -179,21 +176,21 @@ jobs:
           echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
 
       - name: Run Snapshot Build
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         with:
           version: latest
           args: build --snapshot --clean --id node-docker-linux --parallelism=${{ env.BUILD_PARALLELISM }}
 
       - name: Run Build
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         with:
           version: latest
           args: build --clean --id node-docker-linux --parallelism=${{ env.BUILD_PARALLELISM }}
 
       - name: Login to GHCR
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           registry: ${{ env.REGISTRY }}
@@ -201,7 +198,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Build Alpine Container Images
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         id: alpine-build
         with:
           context: .
@@ -211,21 +208,18 @@ jobs:
           build-args: PREFIX=node-docker-linux
 
       - name: Build Distroless Container Images
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         id: distroless-build
         with:
           context: .
           file: Dockerfile.distroless
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.image-tags.outputs.distroless-images }}
-          platforms: ${{ env.DISTROLESS_PLATFORMS }}
+          platforms: ${{ env.DOCKER_PLATFORMS }}
           build-args: PREFIX=node-docker-linux
 
       - name: Sign Container Images
-        shell: bash
         if: ${{ github.event_name != 'pull_request' }}
-        env:
-          COSIGN_EXPERIMENTAL: "1"
         run: |
           cosign sign --yes --recursive ${{ env.ALPINE_IMAGE_NAME }}@${{ steps.alpine-build.outputs.digest }}
           cosign sign --yes --recursive ${{ env.DISTROLESS_IMAGE_NAME }}@${{ steps.distroless-build.outputs.digest }}
