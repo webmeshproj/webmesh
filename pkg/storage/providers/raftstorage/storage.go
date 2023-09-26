@@ -37,10 +37,6 @@ var _ = raft.MonotonicLogStore(&MonotonicLogStore{})
 // Ensure we satisfy the MeshStorage interface.
 var _ storage.MeshStorage = &RaftStorage{}
 
-// BarrierThreshold is the threshold for sending a barrier after
-// a write operation. TODO: make this configurable.
-const BarrierThreshold = 10
-
 // MonotonicLogStore is a LogStore that is monotonic.
 type MonotonicLogStore struct {
 	raft.LogStore
@@ -54,7 +50,7 @@ func (m *MonotonicLogStore) IsMonotonic() bool {
 // RaftStorage wraps the storage.Storage interface to force write operations through the Raft log.
 type RaftStorage struct {
 	storage    storage.MeshStorage
-	writecount atomic.Uint64
+	writecount atomic.Int32
 	raft       *Provider
 }
 
@@ -162,7 +158,7 @@ func (rs *RaftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLog
 
 func (rs *RaftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
 	rs.writecount.Add(1)
-	if rs.writecount.Load() >= BarrierThreshold {
+	if rs.writecount.Load() >= rs.raft.Options.BarrierThreshold {
 		defer func() {
 			rs.writecount.Store(0)
 			if err := rs.raft.raft.Barrier(rs.raft.Options.ApplyTimeout).Error(); err != nil {

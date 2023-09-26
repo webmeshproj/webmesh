@@ -41,6 +41,9 @@ const (
 	DefaultListenPort = 9000
 	// DefaultListenAddress is the default raft listen address
 	DefaultListenAddress = "[::]:9000"
+	// DefaultBarrierThreshold is the threshold for sending a barrier after
+	// a write operation.
+	DefaultBarrierThreshold = 10
 )
 
 // Options are the raft options.
@@ -80,6 +83,8 @@ type Options struct {
 	SnapshotRetention uint64
 	// ObserverChanBuffer is the buffer size for the observer channel.
 	ObserverChanBuffer int
+	// BarrierThreshold is the threshold for sending a barrier after a write operation.
+	BarrierThreshold int32
 	// LogLevel is the log level for the raft backend.
 	LogLevel string
 }
@@ -100,6 +105,7 @@ func NewOptions(nodeID string) Options {
 		MaxAppendEntries:   15,
 		SnapshotRetention:  3,
 		ObserverChanBuffer: 100,
+		BarrierThreshold:   DefaultBarrierThreshold,
 		LogLevel:           "info",
 	}
 }
@@ -129,6 +135,9 @@ func (o *Options) RaftConfig(ctx context.Context, nodeID string) *raft.Config {
 	}
 	if o.SnapshotThreshold != 0 {
 		config.SnapshotThreshold = o.SnapshotThreshold
+	}
+	if o.BarrierThreshold <= 0 {
+		o.BarrierThreshold = DefaultBarrierThreshold
 	}
 	config.LogLevel = hclog.LevelFromString(o.LogLevel).String()
 	config.Logger = logging.NewHCLogAdapter("", o.LogLevel, context.LoggerFrom(ctx).With("component", "raft"))

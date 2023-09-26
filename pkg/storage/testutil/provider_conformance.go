@@ -15,3 +15,17 @@ limitations under the License.
 */
 
 package testutil
+
+import (
+	"testing"
+
+	"github.com/webmeshproj/webmesh/pkg/storage"
+)
+
+// NewProviderFunc is a function that returns a new storage provider.
+// It should have unique identifying properties for each call.
+type NewProviderFunc func(t *testing.T) storage.Provider
+
+// TestStorageProviderConformance tests that the storage provider conforms to the
+// storage provider interface.
+func TestStorageProviderConformance(t *testing.T, newProvider NewProviderFunc) {}
