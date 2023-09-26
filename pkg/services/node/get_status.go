@@ -18,7 +18,6 @@ package node
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -28,40 +27,34 @@ import (
 )
 
 func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.Status, error) {
-	if req.GetId() != "" && req.GetId() != string(s.Raft.ID()) {
+	if req.GetId() != "" && req.GetId() != s.NodeID {
 		return s.getRemoteNodeStatus(ctx, req.GetId())
-	}
-	var leader string
-	var err error
-	leader, err = s.Raft.LeaderID()
-	if err != nil {
-		s.log.Error("failed to lookup current leader", slog.String("error", err.Error()))
 	}
 	ifaceMetrics, err := s.WireGuard.Metrics()
 	if err != nil {
 		return nil, err
 	}
+	storageStatus := s.Storage.Status()
+	var leaderID string
+	var ourStatus v1.ClusterStatus
+	for _, node := range storageStatus.GetPeers() {
+		if node.GetId() == s.NodeID {
+			ourStatus = node.GetClusterStatus()
+		}
+		if node.GetClusterStatus() == v1.ClusterStatus_CLUSTER_LEADER {
+			leaderID = node.GetId()
+		}
+	}
 	return &v1.Status{
-		Id:        string(s.Raft.ID()),
-		Version:   version.Version,
-		Commit:    version.Commit,
-		BuildDate: version.BuildDate,
-		Uptime:    time.Since(s.startedAt).String(),
-		StartedAt: timestamppb.New(s.startedAt),
-		Features:  s.Features,
-		ClusterStatus: func() v1.ClusterStatus {
-			if s.Raft.IsLeader() {
-				return v1.ClusterStatus_CLUSTER_LEADER
-			} else if s.Raft.IsVoter() {
-				return v1.ClusterStatus_CLUSTER_VOTER
-			} else if s.Raft.IsObserver() {
-				return v1.ClusterStatus_CLUSTER_OBSERVER
-			}
-			return v1.ClusterStatus_CLUSTER_NODE
-		}(),
-		CurrentLeader:    leader,
-		LastLogIndex:     s.Raft.LastIndex(),
-		LastApplied:      s.Raft.LastAppliedIndex(),
+		Id:               s.NodeID,
+		Version:          version.Version,
+		Commit:           version.Commit,
+		BuildDate:        version.BuildDate,
+		Uptime:           time.Since(s.startedAt).String(),
+		StartedAt:        timestamppb.New(s.startedAt),
+		Features:         s.Features,
+		ClusterStatus:    ourStatus,
+		CurrentLeader:    leaderID,
 		InterfaceMetrics: ifaceMetrics,
 	}, nil
 }

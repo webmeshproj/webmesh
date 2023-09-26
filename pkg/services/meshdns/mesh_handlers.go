@@ -23,10 +23,10 @@ import (
 	"sync"
 
 	"github.com/miekg/dns"
+	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -40,9 +40,9 @@ type meshLookupMux struct {
 }
 
 type meshDomain struct {
+	nodeID   string
 	domain   string
-	storage  storage.MeshStorage
-	raft     raft.Raft
+	storage  storage.Provider
 	ipv6Only bool
 }
 
@@ -99,13 +99,13 @@ func (s *meshLookupMux) handleLeaderLookup(ctx context.Context, w dns.ResponseWr
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
-	leaderID, err := mesh.raft.LeaderID()
+	leader, err := mesh.storage.Consensus().GetLeader(ctx)
 	if err != nil {
 		s.log.Error("failed to get leader", slog.String("error", err.Error()))
 		s.writeMsg(w, r, m, dns.RcodeServerFailure)
 		return
 	}
-	nodeID := string(leaderID)
+	nodeID := string(leader.GetId())
 	m.Answer = append(m.Answer, &dns.CNAME{
 		Hdr:    dns.RR_Header{Name: newFQDN(mesh, "leader"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
 		Target: newFQDN(mesh, nodeID),
@@ -126,19 +126,14 @@ func (s *meshLookupMux) handleVotersLookup(ctx context.Context, w dns.ResponseWr
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
-	config, err := mesh.raft.Configuration()
-	if err != nil {
-		s.log.Error("failed to get configuration", slog.String("error", err.Error()))
-		s.writeMsg(w, r, m, dns.RcodeServerFailure)
-		return
-	}
-	for _, server := range config.Servers {
-		if server.Suffrage == raft.Voter {
+	status := mesh.storage.Status()
+	for _, server := range status.GetPeers() {
+		if status.ClusterStatus == v1.ClusterStatus_CLUSTER_VOTER {
 			m.Answer = append(m.Answer, &dns.CNAME{
 				Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
-				Target: newFQDN(mesh, string(server.ID)),
+				Target: newFQDN(mesh, server.GetId()),
 			})
-			err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID), s.ipv6Only)
+			err := s.appendPeerToMessage(ctx, mesh, r, m, server.GetId(), s.ipv6Only)
 			if err != nil {
 				s.writeMsg(w, r, m, errToRcode(err))
 				return
@@ -156,19 +151,14 @@ func (s *meshLookupMux) handleObserversLookup(ctx context.Context, w dns.Respons
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
-	config, err := mesh.raft.Configuration()
-	if err != nil {
-		s.log.Error("failed to get configuration", slog.String("error", err.Error()))
-		s.writeMsg(w, r, m, dns.RcodeServerFailure)
-		return
-	}
-	for _, server := range config.Servers {
-		if server.Suffrage == raft.Nonvoter {
+	status := mesh.storage.Status()
+	for _, server := range status.GetPeers() {
+		if server.ClusterStatus == v1.ClusterStatus_CLUSTER_OBSERVER {
 			m.Answer = append(m.Answer, &dns.CNAME{
 				Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
-				Target: newFQDN(mesh, string(server.ID)),
+				Target: newFQDN(mesh, server.GetId()),
 			})
-			err := s.appendPeerToMessage(ctx, mesh, r, m, string(server.ID), s.ipv6Only)
+			err := s.appendPeerToMessage(ctx, mesh, r, m, server.GetId(), s.ipv6Only)
 			if err != nil {
 				s.writeMsg(w, r, m, errToRcode(err))
 				return

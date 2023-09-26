@@ -214,7 +214,7 @@ func setupTest(t *testing.T) (*state, func()) {
 				Port:    int32(rpcPort),
 			},
 			{
-				Feature: v1.Feature_STORAGE,
+				Feature: v1.Feature_STORAGE_PROVIDER,
 				Port:    2,
 			},
 		},
@@ -233,7 +233,7 @@ func setupTest(t *testing.T) (*state, func()) {
 				Port:    int32(rpcPort),
 			},
 			{
-				Feature: v1.Feature_STORAGE,
+				Feature: v1.Feature_STORAGE_PROVIDER,
 				Port:    2,
 			},
 		},

@@ -54,8 +54,8 @@ type Options struct {
 	DefaultPolicy Policy
 	// WireguardPort is the port to allow for wireguard traffic.
 	WireguardPort uint16
-	// RaftPort is the port to allow for raft traffic.
-	RaftPort uint16
+	// StoragePort is the port to allow for storage traffic.
+	StoragePort uint16
 	// GRPCPort is the port to allow for grpc traffic.
 	GRPCPort uint16
 }

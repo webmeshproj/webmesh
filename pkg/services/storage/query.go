@@ -26,13 +26,13 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
-func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) error {
+func (s *Server) Query(req *v1.QueryRequest, stream v1.StorageQueryService_QueryServer) error {
 	if !context.IsInNetwork(stream.Context(), s.wg) {
 		addr, _ := context.PeerAddrFrom(stream.Context())
 		s.log.Warn("Received Query request from out of network", slog.String("peer", addr.String()))
 		return status.Errorf(codes.PermissionDenied, "request is not in-network")
 	}
-	if !s.raft.IsVoter() && !s.raft.IsObserver() {
+	if !s.storage.Consensus().IsMember() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "node not available to query")
 	}
@@ -40,7 +40,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) erro
 	case v1.QueryRequest_GET:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		val, err := s.raft.Storage().GetValue(stream.Context(), req.GetQuery())
+		val, err := s.storage.MeshStorage().GetValue(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -53,7 +53,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) erro
 	case v1.QueryRequest_LIST:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		vals, err := s.raft.Storage().List(stream.Context(), req.GetQuery())
+		vals, err := s.storage.MeshStorage().List(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -64,7 +64,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.Storage_QueryServer) erro
 			return err
 		}
 	case v1.QueryRequest_ITER:
-		err := s.raft.Storage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
+		err := s.storage.MeshStorage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
 			var result v1.QueryResponse
 			result.Key = key
 			result.Value = []string{value}

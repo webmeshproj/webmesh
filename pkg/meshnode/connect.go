@@ -33,13 +33,14 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 
 // ConnectOptions are options for opening the connection to the mesh.
 type ConnectOptions struct {
-	// Raft is the Raft instance. It should not be closed.
-	Raft raft.Raft
+	// StorageProvider is the underlying storage provider to use.
+	StorageProvider storage.Provider
 	// Features are the features to broadcast to others in the mesh.
 	Features []*v1.FeaturePort
 	// Plugins is a map of plugins to use.
@@ -116,15 +117,10 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	if s.open.Load() {
 		return ErrOpen
 	}
-	s.raft = opts.Raft
-
-	// If we still don't have a node id, use raft's node id.
-	// It would be very weird for this to happen at this point.
-	if s.ID() == "" {
-		s.nodeID = s.raft.ID()
-		s.log = s.log.With("node-id", s.nodeID)
-	}
+	s.storage = opts.StorageProvider
 	log := s.log
+
+	log.Debug("Connecting to mesh network", slog.Any("options", opts))
 
 	// If our key is still nil, generate an ephemeral key.
 	if s.key == nil {
@@ -138,14 +134,16 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 
 	// Create the plugin manager
 	var pluginopts plugins.Options
-	pluginopts.Storage = s.Storage()
+	pluginopts.Storage = s.Storage().MeshStorage()
 	pluginopts.Plugins = opts.Plugins
 	s.plugins, err = plugins.NewManager(ctx, pluginopts)
 	if err != nil {
 		return fmt.Errorf("failed to load plugins: %w", err)
 	}
-	// Create the raft node
-	s.raft.OnObservation(s.newObserver())
+	// If we are using the built-in storage, register the observer
+	if raft, ok := s.storage.(*raftstorage.Provider); ok {
+		raft.OnObservation(s.newObserver())
+	}
 	// Start serving storage queries for plugins.
 	handleErr := func(cause error) error {
 		s.kvSubCancel()
@@ -154,16 +152,12 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		if perr != nil {
 			log.Error("failed to close plugin manager", slog.String("error", perr.Error()))
 		}
-		cerr := s.raft.Stop(ctx)
-		if cerr != nil {
-			log.Error("failed to stop raft node", slog.String("error", cerr.Error()))
-		}
 		return cause
 	}
 	// Create the network manager
 	opts.NetworkOptions.NodeID = s.ID()
-	opts.NetworkOptions.RaftPort = int(s.raft.ListenPort())
-	s.nw = meshnet.New(s.Storage(), opts.NetworkOptions)
+	opts.NetworkOptions.StoragePort = int(s.storage.ListenPort())
+	s.nw = meshnet.New(s.Storage().MeshStorage(), opts.NetworkOptions)
 	// At this point we are open for business.
 	s.open.Store(true)
 	if opts.Bootstrap != nil {
@@ -185,14 +179,17 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 			return fmt.Errorf("recover wireguard: %w", err)
 		}
 	}
+	if s.testStore {
+		return nil
+	}
 	// Register an update hook to watch for network changes.
-	if s.raft.IsMember() {
+	if s.storage.Consensus().IsMember() {
 		s.log.Debug("Subscribing to peer updates from local storage")
-		s.kvSubCancel, err = s.raft.Storage().Subscribe(context.Background(), "", s.onDBUpdate)
+		s.kvSubCancel, err = s.storage.MeshStorage().Subscribe(context.Background(), "", s.onDBUpdate)
 		if err != nil {
 			return handleErr(fmt.Errorf("subscribe: %w", err))
 		}
-	} else if !s.testStore {
+	} else {
 		// Otherwise we are going to subscibe to peer updates from the network leader
 		s.log.Debug("Subscribing to peer updates from the network")
 		var subctx context.Context
@@ -264,18 +261,18 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	var meshnetworkv4, meshnetworkv6 netip.Prefix
 	var err error
 	if !s.opts.DisableIPv6 {
-		meshnetworkv6, err = state.New(s.Storage()).GetIPv6Prefix(ctx)
+		meshnetworkv6, err = state.New(s.Storage().MeshStorage()).GetIPv6Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ula prefix: %w", err)
 		}
 	}
 	if !s.opts.DisableIPv4 {
-		meshnetworkv4, err = state.New(s.Storage()).GetIPv4Prefix(ctx)
+		meshnetworkv4, err = state.New(s.Storage().MeshStorage()).GetIPv4Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ipv4 prefix: %w", err)
 		}
 	}
-	p := peers.New(s.Storage())
+	p := peers.New(s.Storage().MeshStorage())
 	self, err := p.Get(ctx, s.ID())
 	if err != nil {
 		return fmt.Errorf("get self peer: %w", err)
@@ -301,7 +298,7 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
-	wgpeers, err := peers.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+	wgpeers, err := peers.WireGuardPeersFor(ctx, s.Storage().MeshStorage(), s.ID())
 	if err != nil {
 		return fmt.Errorf("get wireguard peers: %w", err)
 	}

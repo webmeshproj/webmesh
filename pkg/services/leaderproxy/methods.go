@@ -39,31 +39,31 @@ func RouteRequiresInNetworkSource(route string) bool {
 		route == v1.Membership_Leave_FullMethodName ||
 		route == v1.Membership_Apply_FullMethodName ||
 		route == v1.Membership_SubscribePeers_FullMethodName ||
-		route == v1.Membership_GetRaftConfiguration_FullMethodName ||
+		route == v1.Membership_GetStorageConfiguration_FullMethodName ||
 		route == v1.Node_NegotiateDataChannel_FullMethodName ||
-		route == v1.Storage_Query_FullMethodName ||
-		route == v1.Storage_Publish_FullMethodName ||
-		route == v1.Storage_Subscribe_FullMethodName
+		route == v1.StorageQueryService_Query_FullMethodName ||
+		route == v1.StorageQueryService_Publish_FullMethodName ||
+		route == v1.StorageQueryService_Subscribe_FullMethodName
 }
 
 // MethodPolicyMap is a map of method names to their MethodPolicy.
 var MethodPolicyMap = map[string]MethodPolicy{
 	// Membership API
-	v1.Membership_Join_FullMethodName:                 RequireLeader,
-	v1.Membership_Update_FullMethodName:               RequireLeader,
-	v1.Membership_Leave_FullMethodName:                RequireLeader,
-	v1.Membership_Apply_FullMethodName:                RequireLeader,
-	v1.Membership_SubscribePeers_FullMethodName:       AllowNonLeader,
-	v1.Membership_GetRaftConfiguration_FullMethodName: AllowNonLeader,
+	v1.Membership_Join_FullMethodName:                    RequireLeader,
+	v1.Membership_Update_FullMethodName:                  RequireLeader,
+	v1.Membership_Leave_FullMethodName:                   RequireLeader,
+	v1.Membership_Apply_FullMethodName:                   RequireLeader,
+	v1.Membership_SubscribePeers_FullMethodName:          AllowNonLeader,
+	v1.Membership_GetStorageConfiguration_FullMethodName: AllowNonLeader,
 
 	// Node API
 	v1.Node_GetStatus_FullMethodName:            RequireLocal,
 	v1.Node_NegotiateDataChannel_FullMethodName: RequireLocal,
 
 	// Storage API
-	v1.Storage_Query_FullMethodName:     AllowNonLeader,
-	v1.Storage_Publish_FullMethodName:   AllowNonLeader,
-	v1.Storage_Subscribe_FullMethodName: RequireLocal,
+	v1.StorageQueryService_Query_FullMethodName:     AllowNonLeader,
+	v1.StorageQueryService_Publish_FullMethodName:   AllowNonLeader,
+	v1.StorageQueryService_Subscribe_FullMethodName: RequireLocal,
 
 	// Mesh API
 	v1.Mesh_GetNode_FullMethodName:      AllowNonLeader,

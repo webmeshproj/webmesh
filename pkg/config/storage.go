@@ -28,7 +28,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	extstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/external"
 	passthroughstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/passthrough"
@@ -41,6 +41,8 @@ type StorageProvider string
 const (
 	// StorageProviderRaft is the builtin raft storage provider.
 	StorageProviderRaft StorageProvider = "raft"
+	// StorageProviderPassThrough is the passthrough storage provider.
+	StorageProviderPassThrough StorageProvider = "passthrough"
 	// StorageProviderExternal is an external storage provider.
 	StorageProviderExternal StorageProvider = "external"
 )
@@ -48,7 +50,7 @@ const (
 // IsValid checks if the storage provider is valid.
 func (s StorageProvider) IsValid() bool {
 	switch s {
-	case StorageProviderRaft, StorageProviderExternal:
+	case StorageProviderRaft, StorageProviderPassThrough, StorageProviderExternal:
 		return true
 	case "": // Defaults to raft
 		return true
@@ -89,21 +91,21 @@ func (o *StorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.InMemory, prefix+"in-memory", o.InMemory, "Use in-memory storage")
 	fs.StringVar(&o.Path, prefix+"path", o.Path, "Path to the storage directory")
 	fs.StringVar((*string)(&o.Provider), prefix+"provider", string(o.Provider), "Storage provider")
+	fs.StringVar(&o.LogLevel, prefix+"log-level", o.LogLevel, "Log level for the storage provider")
 	o.Raft.BindFlags(prefix+"raft.", fs)
 	o.External.BindFlags(prefix+"external.", fs)
 }
 
 // Validate validates the storage options.
-func (o *StorageOptions) Validate() error {
+func (o *StorageOptions) Validate(isMember bool) error {
 	if !o.Provider.IsValid() {
 		return fmt.Errorf("invalid storage provider: %s", o.Provider)
 	}
-	if !o.InMemory && o.Path == "" {
-		return fmt.Errorf("storage path is required")
-	}
 	if o.Provider == StorageProviderRaft {
-		if err := o.Raft.Validate(); err != nil {
-			return err
+		if isMember {
+			if err := o.Raft.Validate(o.Path, o.InMemory); err != nil {
+				return err
+			}
 		}
 	}
 	if o.Provider == StorageProviderExternal {
@@ -114,25 +116,40 @@ func (o *StorageOptions) Validate() error {
 	return nil
 }
 
-// NewProvider creates a new storage provider from the given options. If not a storage providing member, a node dialer
-// is required for the passthrough storage provider.
-func (o *StorageOptions) NewProvider(ctx context.Context, dialer transport.NodeDialer, nodeID string, isMember bool) (storage.Provider, error) {
-	if !isMember {
-		return passthroughstorage.NewStorageProvider(o.NewPassthroughOptions(ctx, dialer, nodeID)), nil
+// ListenPort returns the port to listen on for the storage provider.
+func (o *StorageOptions) ListenPort() int {
+	if o.Provider == StorageProviderRaft || o.Provider == "" {
+		return o.Raft.ListenPort()
 	}
-	switch o.Provider {
+	// TODO: Get the port from the external storage provider.
+	return 0
+}
+
+// NewStorageProvider creates a new storage provider from the given options. If not a storage providing member, a node dialer
+// is required for the passthrough storage provider.
+func (o *Config) NewStorageProvider(ctx context.Context, node meshnode.Node) (storage.Provider, error) {
+	if !o.IsStorageMember() {
+		return passthroughstorage.NewProvider(o.Storage.NewPassthroughOptions(ctx, node)), nil
+	}
+	switch o.Storage.Provider {
 	case StorageProviderRaft, "":
-		return o.NewRaftStorageProvider(ctx, nodeID), nil
+		return o.Storage.NewRaftStorageProvider(ctx, node)
 	case StorageProviderExternal:
-		return o.NewExternalStorageProvider(ctx, nodeID)
+		return o.Storage.NewExternalStorageProvider(ctx, node.ID())
+	case StorageProviderPassThrough:
+		return passthroughstorage.NewProvider(o.Storage.NewPassthroughOptions(ctx, node)), nil
 	default:
-		return nil, fmt.Errorf("invalid storage provider: %s", o.Provider)
+		return nil, fmt.Errorf("invalid storage provider: %s", o.Storage.Provider)
 	}
 }
 
 // NewRaftStorageProvider returns a new raftstorage provider for the current configuration.
-func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, nodeID string) storage.Provider {
-	return raftstorage.NewStorageProvider(o.NewRaftOptions(ctx, nodeID))
+func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, node meshnode.Node) (storage.Provider, error) {
+	opts, err := o.NewRaftOptions(ctx, node)
+	if err != nil {
+		return nil, err
+	}
+	return raftstorage.NewProvider(opts), nil
 }
 
 // NewExternalStorageProvider returns a new external storage provider for the current configuration.
@@ -141,14 +158,19 @@ func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID 
 	if err != nil {
 		return nil, err
 	}
-	return extstorage.NewStorageProvider(opts), nil
+	return extstorage.NewProvider(opts), nil
 }
 
 // NewRaftOptions returns a new raft options for the current configuration.
-func (o *StorageOptions) NewRaftOptions(ctx context.Context, nodeID string) raftstorage.Options {
-	opts := raftstorage.NewOptions(nodeID)
-	opts.DataDir = o.Raft.DataDir
-	opts.InMemory = o.Raft.InMemory
+func (o *StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node) (raftstorage.Options, error) {
+	opts := raftstorage.NewOptions(node.ID())
+	raftTransport, err := o.Raft.NewTransport(node)
+	if err != nil {
+		return opts, fmt.Errorf("create raft transport: %w", err)
+	}
+	opts.Transport = raftTransport
+	opts.DataDir = o.Path
+	opts.InMemory = o.InMemory
 	opts.ConnectionPoolCount = o.Raft.ConnectionPoolCount
 	opts.ConnectionTimeout = o.Raft.ConnectionTimeout
 	opts.HeartbeatTimeout = o.Raft.HeartbeatTimeout
@@ -162,13 +184,13 @@ func (o *StorageOptions) NewRaftOptions(ctx context.Context, nodeID string) raft
 	opts.SnapshotRetention = o.Raft.SnapshotRetention
 	opts.ObserverChanBuffer = o.Raft.ObserverChanBuffer
 	opts.LogLevel = o.LogLevel
-	return opts
+	return opts, nil
 }
 
 // NewPassthroughOptions returns a new passthrough options for the current configuration.
-func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, dialer transport.NodeDialer, nodeID string) passthroughstorage.Options {
+func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, node meshnode.Node) passthroughstorage.Options {
 	return passthroughstorage.Options{
-		Dialer:   dialer,
+		Dialer:   node,
 		LogLevel: o.LogLevel,
 	}
 }

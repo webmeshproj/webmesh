@@ -30,16 +30,17 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Server is the webmesh Membership service.
 type Server struct {
 	v1.UnimplementedMembershipServer
 
-	raft       raft.Raft
+	nodeID     string
+	storage    storage.Provider
 	plugins    plugins.Manager
 	rbac       rbac.Evaluator
 	wg         wireguard.Interface
@@ -52,7 +53,8 @@ type Server struct {
 
 // Options are the options for the Membership service.
 type Options struct {
-	Raft      raft.Raft
+	NodeID    string
+	Storage   storage.Provider
 	Plugins   plugins.Manager
 	RBAC      rbac.Evaluator
 	WireGuard wireguard.Interface
@@ -61,7 +63,8 @@ type Options struct {
 // NewServer returns a new Server.
 func NewServer(ctx context.Context, opts Options) *Server {
 	return &Server{
-		raft:    opts.Raft,
+		nodeID:  opts.NodeID,
+		storage: opts.Storage,
 		plugins: opts.Plugins,
 		rbac:    opts.RBAC,
 		wg:      opts.WireGuard,
@@ -71,7 +74,7 @@ func NewServer(ctx context.Context, opts Options) *Server {
 
 func (s *Server) loadMeshState(ctx context.Context) error {
 	var err error
-	state := state.New(s.raft.Storage())
+	state := state.New(s.storage.MeshStorage())
 	if !s.ipv6Prefix.IsValid() {
 		s.log.Debug("Looking up mesh IPv6 prefix")
 		s.ipv6Prefix, err = state.GetIPv6Prefix(ctx)
@@ -97,7 +100,7 @@ func (s *Server) loadMeshState(ctx context.Context) error {
 }
 
 func (s *Server) ensurePeerRoutes(ctx context.Context, nodeID string, routes []string) (created bool, err error) {
-	nw := networking.New(s.raft.Storage())
+	nw := networking.New(s.storage.MeshStorage())
 	current, err := nw.GetRoutesByNode(ctx, nodeID)
 	if err != nil {
 		return false, fmt.Errorf("get routes for node %q: %w", nodeID, err)

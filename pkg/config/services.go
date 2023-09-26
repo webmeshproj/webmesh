@@ -435,7 +435,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 	var err error
 	maxTries := 5
 	for i := 0; i < maxTries; i++ {
-		rbacDisabled, err = rbacdb.New(conn.Storage()).IsDisabled(context.Background())
+		rbacDisabled, err = rbacdb.New(conn.Storage().MeshStorage()).IsDisabled(context.Background())
 		if err != nil {
 			log.Error("Failed to check rbac status", "error", err.Error())
 			if i == maxTries-1 {
@@ -452,33 +452,36 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 		log.Warn("Running services without authorization")
 		rbacEvaluator = rbac.NewNoopEvaluator()
 	} else {
-		rbacEvaluator = rbac.NewStoreEvaluator(conn.Storage())
+		rbacEvaluator = rbac.NewStoreEvaluator(conn.Storage().MeshStorage())
 	}
 	// Always register the node API
 	log.Debug("Registering node service")
 	v1.RegisterNodeServer(srv, node.NewServer(ctx, node.Options{
-		Raft:       conn.Raft(),
+		NodeID:     conn.ID(),
+		Storage:    conn.Storage(),
 		WireGuard:  conn.Network().WireGuard(),
 		NodeDialer: conn,
 		Plugins:    conn.Plugins(),
 		Features:   o.NewFeatureSet(),
 	}))
-	// Register membership and storage if we are a raft member
-	if o.IsRaftMember() {
+	// Register membership and storage if we are a storage provider
+	if o.IsStorageMember() {
 		log.Debug("Registering membership service")
 		v1.RegisterMembershipServer(srv, membership.NewServer(ctx, membership.Options{
-			Raft:      conn.Raft(),
+			NodeID:    conn.ID(),
+			Storage:   conn.Storage(),
 			Plugins:   conn.Plugins(),
 			RBAC:      rbacEvaluator,
 			WireGuard: conn.Network().WireGuard(),
 		}))
 		log.Debug("Registering storage service")
-		v1.RegisterStorageServer(srv, storage.NewServer(ctx, conn.Raft(), rbacEvaluator, conn.Network().WireGuard()))
+		storageSrv := storage.NewServer(ctx, conn.Storage(), rbacEvaluator, conn.Network().WireGuard())
+		v1.RegisterStorageQueryServiceServer(srv, storageSrv)
 	}
 	// Register any other enabled APIs
 	if o.Services.API.MeshEnabled {
 		log.Debug("Registering mesh api")
-		v1.RegisterMeshServer(srv, meshapi.NewServer(conn.Storage(), conn.Raft()))
+		v1.RegisterMeshServer(srv, meshapi.NewServer(conn.Storage().MeshStorage()))
 	}
 	if o.Services.WebRTC.Enabled {
 		log.Debug("Registering WebRTC api")
@@ -491,7 +494,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 		}
 		v1.RegisterWebRTCServer(srv, webrtc.NewServer(webrtc.Options{
 			ID:          conn.ID(),
-			Storage:     conn.Storage(),
+			Storage:     conn.Storage().MeshStorage(),
 			Wireguard:   conn.Network().WireGuard(),
 			NodeDialer:  conn,
 			RBAC:        rbacEvaluator,
@@ -515,9 +518,9 @@ func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 		})
 	}
 	// If we are a raft member, we automatically serve storage and membership
-	if o.IsRaftMember() {
+	if o.IsStorageMember() {
 		features = append(features, &v1.FeaturePort{
-			Feature: v1.Feature_STORAGE,
+			Feature: v1.Feature_STORAGE_QUERIER,
 			Port:    int32(o.Mesh.GRPCAdvertisePort),
 		})
 		features = append(features, &v1.FeaturePort{
@@ -525,8 +528,8 @@ func (o *Config) NewFeatureSet() []*v1.FeaturePort {
 			Port:    int32(o.Mesh.GRPCAdvertisePort),
 		})
 		features = append(features, &v1.FeaturePort{
-			Feature: v1.Feature_RAFT,
-			Port:    int32(o.RaftListenPort()),
+			Feature: v1.Feature_STORAGE_PROVIDER,
+			Port:    int32(o.Storage.ListenPort()),
 		})
 	}
 	if !o.Services.API.Disabled {
@@ -617,7 +620,7 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (con
 		}
 
 		if !o.Services.API.DisableLeaderProxy {
-			leaderProxy := leaderproxy.New(conn.Raft(), conn, conn.Network().WireGuard())
+			leaderProxy := leaderproxy.New(conn.ID(), conn.Storage().Consensus(), conn, conn.Network().WireGuard())
 			unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
 			streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
 		}
@@ -641,9 +644,9 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (con
 		})
 		// Automatically register the local domain
 		err := dnsServer.RegisterDomain(meshdns.DomainOptions{
+			NodeID:              conn.ID(),
 			MeshDomain:          conn.Domain(),
 			MeshStorage:         conn.Storage(),
-			Raft:                conn.Raft(),
 			IPv6Only:            o.Services.MeshDNS.IPv6Only,
 			SubscribeForwarders: o.Services.MeshDNS.SubscribeForwarders,
 		})
@@ -706,6 +709,13 @@ func (o *Config) NewServerTLSOptions() (grpc.ServerOption, error) {
 // InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.
 func InterceptorLogger() logging.Logger {
 	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
-		context.LoggerFrom(ctx).Log(ctx, slog.Level(lvl), msg, fields...)
+		log := context.LoggerFrom(ctx)
+		if msg == "started call" {
+			msg = "Started gRPC call"
+		}
+		if msg == "finished call" {
+			msg = "Finished gRPC call"
+		}
+		log.Log(ctx, slog.Level(lvl), msg, fields...)
 	})
 }

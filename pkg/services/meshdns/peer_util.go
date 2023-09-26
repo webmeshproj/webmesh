@@ -28,7 +28,7 @@ import (
 )
 
 func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *dns.Msg, peerID string, ipv6Only bool) error {
-	peer, err := peers.New(dom.storage).Get(ctx, peerID)
+	peer, err := peers.New(dom.storage.MeshStorage()).Get(ctx, peerID)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *
 func newPeerTXTRecord(name string, peer *graph.MeshNode) *dns.TXT {
 	txtData := []string{
 		fmt.Sprintf("id=%s", peer.GetId()),
-		fmt.Sprintf("raft_port=%d", peer.RaftPort()),
+		fmt.Sprintf("storage_port=%d", peer.StoragePort()),
 		fmt.Sprintf("grpc_port=%d", peer.RPCPort()),
 		fmt.Sprintf("wireguard_endpoints=%s", func() string {
 			if len(peer.WireguardEndpoints) > 0 {

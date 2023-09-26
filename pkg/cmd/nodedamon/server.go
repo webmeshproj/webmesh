@@ -118,29 +118,24 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		return nil, status.Errorf(codes.Internal, "failed to create mesh config: %v", err)
 	}
 	meshConn := meshnode.New(meshConfig)
-	// Create a new raft node
-	raftNode, err := conf.NewRaftNode(ctx, meshConn)
+	storageProvider, err := conf.NewStorageProvider(ctx, meshConn)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create raft node: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to create storage provider: %v", err)
 	}
-	startOpts, err := conf.NewRaftStartOptions(meshConn)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create raft start options: %v", err)
-	}
-	connectOpts, err := conf.NewConnectOptions(ctx, meshConn, raftNode, nil)
+	connectOpts, err := conf.NewConnectOptions(ctx, meshConn, storageProvider, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create connect options: %v", err)
 	}
-	// Start the raft node
-	err = raftNode.Start(ctx, startOpts)
+	// Start the storage provider
+	err = storageProvider.Start(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to start raft node: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to start storage provider: %v", err)
 	}
 	// Connect to the mesh
 	err = meshConn.Connect(ctx, connectOpts)
 	if err != nil {
 		defer func() {
-			err := raftNode.Stop(context.Background())
+			err := storageProvider.Close()
 			if err != nil {
 				log.Error("failed to shutdown raft node", slog.String("error", err.Error()))
 			}
@@ -235,7 +230,7 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 	case v1.QueryRequest_GET:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		val, err := app.mesh.Storage().GetValue(stream.Context(), req.GetQuery())
+		val, err := app.mesh.Storage().MeshStorage().GetValue(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -248,7 +243,7 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 	case v1.QueryRequest_LIST:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		vals, err := app.mesh.Storage().List(stream.Context(), req.GetQuery())
+		vals, err := app.mesh.Storage().MeshStorage().List(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -259,7 +254,7 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 			return err
 		}
 	case v1.QueryRequest_ITER:
-		err := app.mesh.Storage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
+		err := app.mesh.Storage().MeshStorage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
 			var result v1.QueryResponse
 			result.Key = key
 			result.Value = []string{value}
@@ -296,7 +291,7 @@ func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.Stat
 			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
 		}, nil
 	}
-	p, err := peers.New(app.mesh.Storage()).Get(ctx, app.mesh.ID())
+	p, err := peers.New(app.mesh.Storage().MeshStorage()).Get(ctx, app.mesh.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +310,7 @@ func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.
 	if storage.IsReservedPrefix(req.GetKey()) {
 		return nil, status.Errorf(codes.InvalidArgument, "key %q is reserved", req.GetKey())
 	}
-	err := app.mesh.Storage().PutValue(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())
+	err := app.mesh.Storage().MeshStorage().PutValue(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "error publishing: %v", err)
 	}
@@ -328,7 +323,7 @@ func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_Subsc
 		app.mu.Unlock()
 		return ErrNotConnected
 	}
-	cancel, err := app.mesh.Storage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
+	cancel, err := app.mesh.Storage().MeshStorage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
 		err := srv.Send(&v1.SubscriptionEvent{
 			Key:   key,
 			Value: value,

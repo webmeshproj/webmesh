@@ -39,7 +39,7 @@ func newTestServer(t *testing.T) *Server {
 	t.Cleanup(func() {
 		store.Close(ctx)
 	})
-	return New(store.Storage(), store.Raft(), rbac.NewNoopEvaluator())
+	return New(store.Storage(), rbac.NewNoopEvaluator())
 }
 
 func newEncodedPubKey(t *testing.T) string {

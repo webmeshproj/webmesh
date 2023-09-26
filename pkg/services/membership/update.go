@@ -21,10 +21,8 @@ import (
 	"log/slog"
 	"net/netip"
 	"sort"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -42,7 +40,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		s.log.Warn("Received Update request from out of network", slog.String("peer", addr.String()))
 		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")
 	}
-	if !s.raft.IsLeader() {
+	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.mu.Lock()
@@ -111,29 +109,11 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		}
 	}
 
-	// Issue a barrier to the raft cluster to ensure all nodes are
-	// fully caught up before we make changes
-	// TODO: Make timeout configurable
-	_, err = s.raft.Barrier(ctx, time.Second*15)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
-	}
-
-	// Send another barrier after we're done to ensure all nodes are
-	// fully caught up before we return
-	defer func() {
-		_, _ = s.raft.Barrier(ctx, time.Second*15)
-	}()
-
 	// Lookup the peer's current state
-	var currentSuffrage raft.ServerSuffrage = -1
-	var currentAddress raft.ServerAddress = ""
-	cfg, err := s.raft.Configuration()
-	if err != nil {
-		// Should never happen
-		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
-	}
-	p := peers.New(s.raft.Storage())
+	var currentSuffrage v1.ClusterStatus
+	var currentAddress string
+	storageStatus := s.storage.Status()
+	p := peers.New(s.storage.MeshStorage())
 	peer, err := p.Get(ctx, req.GetId())
 	if err != nil {
 		if errors.Is(err, peers.ErrNodeNotFound) {
@@ -143,10 +123,10 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		return nil, status.Errorf(codes.FailedPrecondition, "node %s not found", req.GetId())
 	}
 	// Determine the peer's current status
-	for _, server := range cfg.Servers {
-		if server.ID == raft.ServerID(peer.GetId()) {
-			currentSuffrage = server.Suffrage
-			currentAddress = server.Address
+	for _, server := range storageStatus.GetPeers() {
+		if server.GetId() == peer.GetId() {
+			currentSuffrage = server.GetClusterStatus()
+			currentAddress = server.GetAddress()
 			break
 		}
 	}
@@ -213,13 +193,16 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	}
 
 	// Change to voter if requested and not already
-	if req.GetAsVoter() && currentSuffrage != raft.Voter {
+	if req.GetAsVoter() && currentSuffrage != v1.ClusterStatus_CLUSTER_VOTER {
 		if currentAddress == "" {
 			return nil, status.Errorf(codes.Internal, "failed to lookup peer address")
 		}
 		// Promote to voter
 		log.Info("promoting to voter", slog.String("raft_address", string(currentAddress)))
-		if err := s.raft.AddVoter(ctx, peer.GetId(), string(currentAddress)); err != nil {
+		if err := s.storage.Consensus().AddVoter(ctx, &v1.StoragePeer{
+			Id:      req.GetId(),
+			Address: currentAddress,
+		}); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to promote to voter: %v", err)
 		}
 	}

@@ -32,7 +32,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	dnsutil "github.com/webmeshproj/webmesh/pkg/meshnet/system/dns"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -123,12 +122,12 @@ type cacheValue struct {
 }
 
 type DomainOptions struct {
+	// NodeID is the node ID to use for this domain.
+	NodeID string
 	// MeshDomain is the domain to serve.
 	MeshDomain string
 	// MeshStorage is the storage for the mesh that this domain belongs to.
-	MeshStorage storage.MeshStorage
-	// Raft is the raft instance for the mesh that this domain belongs to.
-	Raft raft.Raft
+	MeshStorage storage.Provider
 	// IPv6Only indicates that this domain should only respond to IPv6 requests.
 	IPv6Only bool
 	// SubscribeForwarders indicates that new forwarders added to the mesh should be
@@ -141,9 +140,9 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	dom := meshDomain{
+		nodeID:   opts.NodeID,
 		domain:   opts.MeshDomain,
 		storage:  opts.MeshStorage,
-		raft:     opts.Raft,
 		ipv6Only: opts.IPv6Only,
 	}
 	// Check if we have an overlapping domain. This is not a good way to run this,
@@ -162,8 +161,8 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 		s.meshmuxes = append(s.meshmuxes, mux)
 	}
 	if opts.SubscribeForwarders {
-		cancel, err := dom.storage.Subscribe(context.Background(), graph.NodesPrefix.String(), func(_, _ string) {
-			peers, err := peers.New(dom.storage).ListByFeature(context.Background(), v1.Feature_FORWARD_MESH_DNS)
+		cancel, err := dom.storage.MeshStorage().Subscribe(context.Background(), graph.NodesPrefix.String(), func(_, _ string) {
+			peers, err := peers.New(dom.storage.MeshStorage()).ListByFeature(context.Background(), v1.Feature_FORWARD_MESH_DNS)
 			if err != nil {
 				s.log.Warn("failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
 				return

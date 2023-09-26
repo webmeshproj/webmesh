@@ -20,7 +20,6 @@ import (
 	"log/slog"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
@@ -29,6 +28,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 
 func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
@@ -38,7 +38,11 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 		s.log.Warn("Received Apply request from out of network", slog.String("peer", addr.String()))
 		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")
 	}
-	if !s.raft.IsLeader() {
+	provider, ok := s.storage.(*raftstorage.Provider)
+	if !ok {
+		return nil, status.Errorf(codes.FailedPrecondition, "storage provider is not raft")
+	}
+	if !provider.Consensus().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.mu.Lock()
@@ -47,7 +51,7 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !ok {
 		return nil, status.Errorf(codes.FailedPrecondition, "no peer")
 	}
-	cfg, err := s.raft.Configuration()
+	cfg, err := provider.Configuration()
 	if err != nil {
 		// Should never happen
 		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
@@ -69,17 +73,5 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !found {
 		return nil, status.Errorf(codes.FailedPrecondition, "peer not found in configuration")
 	}
-	// Issue a barrier to the raft cluster to ensure all nodes are
-	// fully caught up before we make changes
-	// TODO: Make timeout configurable
-	_, err = s.raft.Barrier(ctx, time.Second*15)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
-	}
-	// Send another barrier after we're done to ensure all nodes are
-	// fully caught up before we return
-	defer func() {
-		_, _ = s.raft.Barrier(ctx, time.Second*15)
-	}()
-	return s.raft.Apply(ctx, log)
+	return provider.Apply(ctx, log)
 }

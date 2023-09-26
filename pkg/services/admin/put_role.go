@@ -37,7 +37,7 @@ var putRoleAction = rbac.Actions{
 }
 
 func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, error) {
-	if !s.raft.IsLeader() {
+	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if role.GetName() == "" {

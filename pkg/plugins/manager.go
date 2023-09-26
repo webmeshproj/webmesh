@@ -299,7 +299,7 @@ func (m *manager) handleQueries(db storage.MeshStorage) {
 			return
 		}
 		ctx := context.Background()
-		m.log.Info("Starting plugin query stream", "plugin", plugin)
+		m.log.Debug("Starting plugin query stream", "plugin", plugin)
 		q, err := client.Client.Storage().InjectQuerier(ctx)
 		if err != nil {
 			if status.Code(err) == codes.Unimplemented {

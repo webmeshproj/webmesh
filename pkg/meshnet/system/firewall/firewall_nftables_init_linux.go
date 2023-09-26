@@ -315,7 +315,7 @@ func (fw *firewall) initInputChain() error {
 		},
 	}
 
-	if fw.opts.RaftPort > 0 {
+	if fw.opts.StoragePort > 0 {
 		rules = append(rules, []struct {
 			comment string
 			cmd     string
@@ -327,7 +327,7 @@ func (fw *firewall) initInputChain() error {
 					L4: &nftableslib.L4Rule{
 						L4Proto: unix.IPPROTO_TCP,
 						Dst: &nftableslib.Port{
-							List: nftableslib.SetPortList([]int{int(fw.opts.RaftPort)}),
+							List: nftableslib.SetPortList([]int{int(fw.opts.StoragePort)}),
 						},
 					},
 					Action: accept,

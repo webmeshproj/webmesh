@@ -150,6 +150,9 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 	}
 
 	// Apply global options
+	if global.LogLevel != "" {
+		o.Storage.LogLevel = global.LogLevel
+	}
 
 	// If the primary endpoint was detected, set it to the appropriate places
 	if primaryEndpoint.IsValid() {

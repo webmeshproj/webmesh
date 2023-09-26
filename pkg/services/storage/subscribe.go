@@ -35,13 +35,13 @@ var canSubscribeAction = rbac.Actions{
 	},
 }
 
-func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Storage_SubscribeServer) error {
+func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.StorageQueryService_SubscribeServer) error {
 	if !context.IsInNetwork(srv.Context(), s.wg) {
 		addr, _ := context.PeerAddrFrom(srv.Context())
 		s.log.Warn("Received Subscribe request from out of network", slog.String("peer", addr.String()))
 		return status.Errorf(codes.PermissionDenied, "request is not in-network")
 	}
-	if !s.raft.IsVoter() && !s.raft.IsObserver() {
+	if !s.storage.Consensus().IsMember() {
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "current node not available to subscribe")
 	}
@@ -56,7 +56,7 @@ func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.Storage_SubscribeSer
 			return status.Error(codes.PermissionDenied, "not allowed")
 		}
 	}
-	cancel, err := s.raft.Storage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
+	cancel, err := s.storage.MeshStorage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
 		err := srv.Send(&v1.SubscriptionEvent{
 			Key:   key,
 			Value: value,

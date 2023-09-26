@@ -59,8 +59,8 @@ type Options struct {
 	RecordMetrics bool
 	// RecordMetricsInterval is the interval to use for recording metrics.
 	RecordMetricsInterval time.Duration
-	// RaftPort is the port being used for raft.
-	RaftPort int
+	// StoragePort is the port being used for the storage provider.
+	StoragePort int
 	// GRPCPort is the port being used for gRPC.
 	GRPCPort int
 	// ZoneAwarenessID is the zone awareness ID.
@@ -179,6 +179,8 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 	defer m.mu.Unlock()
 	m.key = opts.Key
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
+	log.Info("Starting mesh network manager")
+	log.Debug("Network manager stasrt options", slog.Any("start-opts", opts))
 	handleErr := func(err error) error {
 		if m.wg != nil {
 			if closeErr := m.wg.Close(ctx); closeErr != nil {
@@ -197,10 +199,10 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		// TODO: Make this configurable
 		DefaultPolicy: firewall.PolicyAccept,
 		WireguardPort: uint16(m.opts.ListenPort),
-		RaftPort:      uint16(m.opts.RaftPort),
+		StoragePort:   uint16(m.opts.StoragePort),
 		GRPCPort:      uint16(m.opts.GRPCPort),
 	}
-	log.Info("Configuring firewall", slog.Any("opts", fwopts))
+	log.Debug("Configuring firewall", slog.Any("opts", fwopts))
 	var err error
 	m.fw, err = firewall.New(ctx, fwopts)
 	if err != nil {
@@ -223,7 +225,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		DisableIPv4:         m.opts.DisableIPv4,
 		DisableIPv6:         m.opts.DisableIPv6,
 	}
-	log.Info("Configuring wireguard", slog.Any("opts", wgopts))
+	log.Debug("Configuring wireguard", slog.Any("opts", wgopts))
 	m.wg, err = wireguard.New(ctx, wgopts)
 	if err != nil {
 		return handleErr(fmt.Errorf("new wireguard: %w", err))

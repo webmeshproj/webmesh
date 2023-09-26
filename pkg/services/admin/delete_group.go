@@ -36,7 +36,7 @@ var deleteGroupAction = rbac.Actions{
 }
 
 func (s *Server) DeleteGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty, error) {
-	if !s.raft.IsLeader() {
+	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if group.GetName() == "" {

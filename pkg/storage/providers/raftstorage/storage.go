@@ -46,7 +46,7 @@ func (m *MonotonicLogStore) IsMonotonic() bool {
 // RaftStorage wraps the storage.Storage interface to force write operations through the Raft log.
 type RaftStorage struct {
 	storage.MeshStorage
-	raft *RaftStorageProvider
+	raft *Provider
 }
 
 // Put sets the value of a key.

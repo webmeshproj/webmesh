@@ -56,10 +56,10 @@ func (s *meshStore) Close(ctx context.Context) error {
 			s.log.Error("error closing plugins", slog.String("error", err.Error()))
 		}
 	}
-	if s.raft != nil {
-		err := s.raft.Stop(ctx)
+	if s.storage != nil {
+		err := s.storage.Close()
 		if err != nil {
-			s.log.Error("error stopping raft", slog.String("error", err.Error()))
+			s.log.Error("error stopping storage provider", slog.String("error", err.Error()))
 		}
 	}
 	s.log.Debug("all services shut down, leaving cluster")

@@ -12,6 +12,9 @@ networks:
         - subnet: 2001:db8:3200::/64
           gateway: 2001:db8:3200::1
 
+volumes:
+  data:
+
 services:
   bootstrap-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -29,7 +32,9 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --storage.in-memory
+      - --storage.path=/data
+    volumes:
+      - data:/data
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0

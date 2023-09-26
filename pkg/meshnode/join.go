@@ -71,7 +71,7 @@ func (s *meshStore) join(ctx context.Context, opts ConnectOptions) error {
 
 func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions, resp *v1.JoinResponse) error {
 	log := context.LoggerFrom(ctx)
-	log.Info("Received join response", slog.Any("resp", resp))
+	log.Debug("Received join response", slog.Any("resp", resp))
 	s.meshDomain = resp.GetMeshDomain()
 	if !strings.HasSuffix(s.meshDomain, ".") {
 		s.meshDomain += "."
@@ -173,11 +173,11 @@ func (s *meshStore) newJoinRequest(opts ConnectOptions, encodedKey string) *v1.J
 			}
 			return eps
 		}(),
-		ZoneAwarenessId: s.opts.ZoneAwarenessID,
-		AssignIpv4:      !s.opts.DisableIPv4,
-		PreferRaftIpv6:  !s.opts.DisableIPv6 && opts.PreferIPv6,
-		AsVoter:         opts.RequestVote,
-		AsObserver:      opts.RequestObserver,
+		ZoneAwarenessId:   s.opts.ZoneAwarenessID,
+		AssignIpv4:        !s.opts.DisableIPv4,
+		PreferStorageIpv6: !s.opts.DisableIPv6 && opts.PreferIPv6,
+		AsVoter:           opts.RequestVote,
+		AsObserver:        opts.RequestObserver,
 		Routes: func() []string {
 			var routes []string
 			for _, route := range opts.Routes {

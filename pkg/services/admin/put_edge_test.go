@@ -32,7 +32,7 @@ func TestPutEdge(t *testing.T) {
 	server := newTestServer(t)
 
 	// Pre register the nodes
-	p := peers.New(server.store)
+	p := peers.New(server.storage.MeshStorage())
 	for _, peer := range []string{"foo", "baz"} {
 		err := p.Put(context.Background(), &v1.MeshNode{
 			Id:        peer,

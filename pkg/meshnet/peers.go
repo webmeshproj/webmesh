@@ -196,11 +196,11 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		allowedRoutes = append(allowedRoutes, prefix)
 	}
 	var rpcPort int
-	var isRaftMember bool
+	var isStorageProvider bool
 	for _, feat := range peer.GetNode().GetFeatures() {
-		if feat.Feature == v1.Feature_STORAGE {
+		if feat.Feature == v1.Feature_STORAGE_PROVIDER {
 			// They are a raft member
-			isRaftMember = true
+			isStorageProvider = true
 		}
 		if feat.Feature == v1.Feature_NODES {
 			// This is their RPC port
@@ -208,15 +208,15 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		}
 	}
 	wgpeer := wireguard.Peer{
-		ID:            peer.GetNode().GetId(),
-		GRPCPort:      rpcPort,
-		RaftMember:    isRaftMember,
-		PublicKey:     key,
-		Endpoint:      endpoint,
-		PrivateIPv4:   priv4,
-		PrivateIPv6:   priv6,
-		AllowedIPs:    allowedIPs,
-		AllowedRoutes: allowedRoutes,
+		ID:              peer.GetNode().GetId(),
+		GRPCPort:        rpcPort,
+		StorageProvider: isStorageProvider,
+		PublicKey:       key,
+		Endpoint:        endpoint,
+		PrivateIPv4:     priv4,
+		PrivateIPv6:     priv6,
+		AllowedIPs:      allowedIPs,
+		AllowedRoutes:   allowedRoutes,
 	}
 	for _, addr := range peer.GetNode().GetMultiaddrs() {
 		ma, err := multiaddr.NewMultiaddr(addr)

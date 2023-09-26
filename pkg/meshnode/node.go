@@ -37,7 +37,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -96,11 +95,8 @@ type Node interface {
 	Credentials() []grpc.DialOption
 	// LeaderID returns the current Raft leader ID.
 	LeaderID() (string, error)
-	// Storage returns a storage interface for use by the application.
-	Storage() storage.MeshStorage
-	// Raft returns the Raft interface. This will be nil if connect has not
-	// been called.
-	Raft() raft.Raft
+	// Storage returns the underlying storage provider.
+	Storage() storage.Provider
 	// Network returns the Network manager.
 	Network() meshnet.Manager
 	// Plugins returns the Plugin manager.
@@ -176,7 +172,7 @@ type meshStore struct {
 	meshDomain       string
 	opts             Config
 	key              crypto.PrivateKey
-	raft             raft.Raft
+	storage          storage.Provider
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
 	discovery        *meshStoreAnnouncer
@@ -207,13 +203,8 @@ func (s *meshStore) Domain() string {
 }
 
 // Storage returns a storage interface for use by the application.
-func (s *meshStore) Storage() storage.MeshStorage {
-	return s.raft.Storage()
-}
-
-// Raft returns the Raft interface.
-func (s *meshStore) Raft() raft.Raft {
-	return s.raft
+func (s *meshStore) Storage() storage.Provider {
+	return s.storage
 }
 
 // Network returns the Network manager.
@@ -247,7 +238,7 @@ func (s *meshStore) Ready() <-chan struct{} {
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_, err = peers.New(s.Storage()).Get(ctx, leader)
+			_, err = peers.New(s.Storage().MeshStorage()).Get(ctx, leader)
 			cancel()
 			if err != nil {
 				s.log.Debug("waiting for leader", slog.String("leader", leader), slog.String("error", err.Error()))
@@ -262,15 +253,19 @@ func (s *meshStore) Ready() <-chan struct{} {
 
 // Leader returns the current Raft leader.
 func (s *meshStore) LeaderID() (string, error) {
-	if s.raft == nil || !s.open.Load() {
+	if s.storage == nil || !s.open.Load() {
 		return "", ErrNotOpen
 	}
-	return s.raft.LeaderID()
+	leader, err := s.storage.Consensus().GetLeader(context.WithLogger(context.Background(), s.log))
+	if err != nil {
+		return "", fmt.Errorf("get leader: %w", err)
+	}
+	return leader.GetId(), nil
 }
 
 // Dial is a generic dial method.
 func (s *meshStore) Dial(ctx context.Context, network, address string) (net.Conn, error) {
-	if s.raft == nil || !s.open.Load() {
+	if s.storage == nil || !s.open.Load() {
 		return nil, ErrNotOpen
 	}
 	return s.nw.Dial(ctx, network, address)
@@ -278,7 +273,7 @@ func (s *meshStore) Dial(ctx context.Context, network, address string) (net.Conn
 
 // DialLeader opens a new gRPC connection to the current Raft leader.
 func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
-	if s.raft == nil || !s.open.Load() {
+	if s.storage == nil || !s.open.Load() {
 		return nil, ErrNotOpen
 	}
 	leader, err := s.LeaderID()
@@ -290,10 +285,10 @@ func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 
 // Dial opens a new gRPC connection to the given node.
 func (s *meshStore) DialNode(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
-	if s.raft == nil || !s.open.Load() {
+	if s.storage == nil || !s.open.Load() {
 		return nil, ErrNotOpen
 	}
-	if !s.raft.IsVoter() && !s.raft.IsObserver() {
+	if !s.storage.Consensus().IsMember() {
 		// We are not a raft node and don't have a local copy of the DB.
 		// A call to storage would cause a recursive call to this method.
 		return s.dialWithWireguardPeers(ctx, nodeID)
@@ -306,7 +301,7 @@ func (s *meshStore) Credentials() []grpc.DialOption {
 }
 
 func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
-	node, err := peers.New(s.Storage()).Get(ctx, nodeID)
+	node, err := peers.New(s.Storage().MeshStorage()).Get(ctx, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("get node private rpc address: %w", err)
 	}
@@ -338,8 +333,8 @@ func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (
 	}
 	var toDial *wireguard.Peer
 	for id, peer := range peers {
-		if !peer.RaftMember {
-			// This method is only used for raft requests, so skip non-raft peers.
+		if !peer.StorageProvider {
+			// This method is only used for storage requests, so skip non-storage-providing peers.
 			// This may change in the future.
 			continue
 		}

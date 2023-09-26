@@ -37,8 +37,9 @@ import (
 )
 
 // Ensure we satisfy the provider interface.
-var _ storage.Provider = &PassthroughStorageProvider{}
-var _ storage.Consensus = &PassthroughConsensus{}
+var _ storage.Provider = &Provider{}
+var _ storage.Consensus = &Consensus{}
+var _ storage.MeshStorage = &Storage{}
 
 // Options are the passthrough options.
 type Options struct {
@@ -48,9 +49,9 @@ type Options struct {
 	LogLevel string
 }
 
-// PassthroughStorageProvider is a storage provider that passes through all
-// storage operations to another node in the cluster.
-type PassthroughStorageProvider struct {
+// Provider is a storage provider that passes through all storage operations to another node
+// in the cluster.
+type Provider struct {
 	Options
 	log        *slog.Logger
 	subCancels []func()
@@ -58,29 +59,33 @@ type PassthroughStorageProvider struct {
 	mu         sync.Mutex
 }
 
-// NewStorageProvider returns a new passthrough storage provider.
-func NewStorageProvider(opts Options) *PassthroughStorageProvider {
-	return &PassthroughStorageProvider{
+// NewProvider returns a new passthrough storage provider.
+func NewProvider(opts Options) *Provider {
+	return &Provider{
 		Options: opts,
 		log:     logging.NewLogger(opts.LogLevel).With("component", "passthrough-storage"),
 		closec:  make(chan struct{}),
 	}
 }
 
-func (p *PassthroughStorageProvider) MeshStorage() storage.MeshStorage {
-	return &PassthroughStorage{provider: p}
+func (p *Provider) MeshStorage() storage.MeshStorage {
+	return &Storage{p}
 }
 
-func (p *PassthroughStorageProvider) Consensus() storage.Consensus {
-	return &PassthroughConsensus{}
+func (p *Provider) Consensus() storage.Consensus {
+	return &Consensus{p}
 }
 
-func (p *PassthroughStorageProvider) Start(ctx context.Context) error {
+func (p *Provider) Start(ctx context.Context) error {
 	// No-op
 	return nil
 }
 
-func (p *PassthroughStorageProvider) Close() error {
+func (p *Provider) ListenPort() uint16 {
+	return 0
+}
+
+func (p *Provider) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	select {
@@ -95,11 +100,11 @@ func (p *PassthroughStorageProvider) Close() error {
 	return nil
 }
 
-func (p *PassthroughStorageProvider) Bootstrap(ctx context.Context) error {
+func (p *Provider) Bootstrap(ctx context.Context) error {
 	return storage.ErrNotStorageNode
 }
 
-func (p *PassthroughStorageProvider) Status() *v1.StorageStatus {
+func (p *Provider) Status() *v1.StorageStatus {
 	status := v1.StorageStatus{
 		IsWritable:    false,
 		ClusterStatus: v1.ClusterStatus_CLUSTER_NODE,
@@ -107,9 +112,10 @@ func (p *PassthroughStorageProvider) Status() *v1.StorageStatus {
 	}
 	config, err := p.getConfiguration()
 	if err != nil {
-		p.log.Error("failed to get configuration", "err", err)
+		p.log.Error("Failed to get storage peer configuration", "error", err.Error())
 		return &status
 	}
+	p.log.Debug("Got storage peer configuration", "config", config)
 	for _, peer := range config.Servers {
 		status.Peers = append(status.Peers, &v1.StoragePeer{
 			Id:            peer.GetId(),
@@ -120,7 +126,7 @@ func (p *PassthroughStorageProvider) Status() *v1.StorageStatus {
 	return &status
 }
 
-func (p *PassthroughStorageProvider) getConfiguration() (*v1.RaftConfigurationResponse, error) {
+func (p *Provider) getConfiguration() (*v1.StorageConfigurationResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, err := p.Options.Dialer.DialNode(ctx, "")
@@ -128,7 +134,7 @@ func (p *PassthroughStorageProvider) getConfiguration() (*v1.RaftConfigurationRe
 		return nil, err
 	}
 	cli := v1.NewMembershipClient(c)
-	config, err := cli.GetRaftConfiguration(ctx, &v1.RaftConfigurationRequest{})
+	config, err := cli.GetStorageConfiguration(ctx, &v1.StorageConfigurationRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -136,47 +142,61 @@ func (p *PassthroughStorageProvider) getConfiguration() (*v1.RaftConfigurationRe
 }
 
 // PassthroughConsensus is a consensus provider that returns an error for all
-// operations.
-type PassthroughConsensus struct{}
+// write operations.
+type Consensus struct {
+	*Provider
+}
 
 // IsLeader returns true if the node is the leader of the storage group.
-func (p *PassthroughConsensus) IsLeader() bool { return false }
+func (p *Consensus) IsLeader() bool { return false }
 
 // IsMember returns true if the node is a member of the storage group.
-func (p *PassthroughConsensus) IsMember() bool { return false }
+func (p *Consensus) IsMember() bool { return false }
 
 // GetLeader returns the leader of the storage group.
-func (p *PassthroughConsensus) GetLeader(context.Context) (*v1.StoragePeer, error) {
-	return nil, storage.ErrNotStorageNode
+func (p *Consensus) GetLeader(context.Context) (*v1.StoragePeer, error) {
+	status := p.Status()
+	var leader *v1.StoragePeer
+	for _, peer := range status.GetPeers() {
+		if peer.GetClusterStatus() == v1.ClusterStatus_CLUSTER_LEADER {
+			leader = peer
+			break
+		}
+	}
+	if leader == nil {
+		p.log.Warn("No leader found in storage group", "status", status)
+		return nil, storage.ErrNoLeader
+	}
+	return leader, nil
 }
 
 // AddVoter adds a voter to the consensus group.
-func (p *PassthroughConsensus) AddVoter(context.Context, *v1.StoragePeer) error {
+func (p *Consensus) AddVoter(context.Context, *v1.StoragePeer) error {
 	return storage.ErrNotStorageNode
 }
 
 // AddObserver adds an observer to the consensus group.
-func (p *PassthroughConsensus) AddObserver(context.Context, *v1.StoragePeer) error {
+func (p *Consensus) AddObserver(context.Context, *v1.StoragePeer) error {
 	return storage.ErrNotStorageNode
 }
 
 // DemoteVoter demotes a voter to an observer.
-func (p *PassthroughConsensus) DemoteVoter(context.Context, *v1.StoragePeer) error {
+func (p *Consensus) DemoteVoter(context.Context, *v1.StoragePeer) error {
 	return storage.ErrNotStorageNode
 }
 
 // RemovePeer removes a peer from the consensus group. If wait
 // is true, the function will wait for the peer to be removed.
-func (p *PassthroughConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
+func (p *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
 	return storage.ErrNotStorageNode
 }
 
-type PassthroughStorage struct {
-	provider *PassthroughStorageProvider
+type Storage struct {
+	*Provider
 }
 
 // GetValue returns the value of a key.
-func (p *PassthroughStorage) GetValue(ctx context.Context, key string) (string, error) {
+func (p *Storage) GetValue(ctx context.Context, key string) (string, error) {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return "", err
@@ -205,7 +225,7 @@ func (p *PassthroughStorage) GetValue(ctx context.Context, key string) (string, 
 }
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
-func (p *PassthroughStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
+func (p *Storage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
 	// We pass this through to the publish API. Should only be called by non-raft nodes wanting to publish
 	// non-internal values. The server will enforce permissions and other restrictions.
 	cli, close, err := p.newStorageClient(ctx)
@@ -222,12 +242,12 @@ func (p *PassthroughStorage) PutValue(ctx context.Context, key, value string, tt
 }
 
 // Delete removes a key.
-func (p *PassthroughStorage) Delete(ctx context.Context, key string) error {
+func (p *Storage) Delete(ctx context.Context, key string) error {
 	return storage.ErrNotStorageNode
 }
 
 // List returns all keys with a given prefix.
-func (p *PassthroughStorage) List(ctx context.Context, prefix string) ([]string, error) {
+func (p *Storage) List(ctx context.Context, prefix string) ([]string, error) {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return nil, err
@@ -255,7 +275,7 @@ func (p *PassthroughStorage) List(ctx context.Context, prefix string) ([]string,
 // IterPrefix iterates over all keys with a given prefix. It is important
 // that the iterator not attempt any write operations as this will cause
 // a deadlock.
-func (p *PassthroughStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
+func (p *Storage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err
@@ -291,27 +311,27 @@ func (p *PassthroughStorage) IterPrefix(ctx context.Context, prefix string, fn s
 }
 
 // Snapshot returns a snapshot of the storage.
-func (p *PassthroughStorage) Snapshot(ctx context.Context) (io.Reader, error) {
+func (p *Storage) Snapshot(ctx context.Context) (io.Reader, error) {
 	return nil, storage.ErrNotStorageNode
 }
 
 // Restore restores a snapshot of the storage.
-func (p *PassthroughStorage) Restore(ctx context.Context, r io.Reader) error {
+func (p *Storage) Restore(ctx context.Context, r io.Reader) error {
 	return storage.ErrNotStorageNode
 }
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (p *PassthroughStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (p *Storage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(ctx)
-	p.provider.mu.Lock()
-	p.provider.subCancels = append(p.provider.subCancels, cancel)
-	p.provider.mu.Unlock()
+	p.mu.Lock()
+	p.subCancels = append(p.subCancels, cancel)
+	p.mu.Unlock()
 	go func() {
 		var started bool
 		for {
 			select {
-			case <-p.provider.closec:
+			case <-p.closec:
 				return
 			case <-ctx.Done():
 				return
@@ -329,9 +349,9 @@ func (p *PassthroughStorage) Subscribe(ctx context.Context, prefix string, fn st
 					if ctx.Err() != nil {
 						return
 					}
-					p.provider.log.Error("error in storage subscription, retrying in 3 seconds", "error", err.Error())
+					p.log.Error("error in storage subscription, retrying in 3 seconds", "error", err.Error())
 					select {
-					case <-p.provider.closec:
+					case <-p.closec:
 						return
 					case <-ctx.Done():
 						return
@@ -346,9 +366,9 @@ func (p *PassthroughStorage) Subscribe(ctx context.Context, prefix string, fn st
 				if ctx.Err() != nil {
 					return
 				}
-				p.provider.log.Error("error in storage subscription, retrying in 3 seconds", "error", err.Error())
+				p.log.Error("error in storage subscription, retrying in 3 seconds", "error", err.Error())
 				select {
-				case <-p.provider.closec:
+				case <-p.closec:
 					return
 				case <-ctx.Done():
 					return
@@ -362,7 +382,7 @@ func (p *PassthroughStorage) Subscribe(ctx context.Context, prefix string, fn st
 	return cancel, nil
 }
 
-func (p *PassthroughStorage) doSubscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) error {
+func (p *Storage) doSubscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) error {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err
@@ -377,7 +397,7 @@ func (p *PassthroughStorage) doSubscribe(ctx context.Context, prefix string, fn 
 	defer p.checkErr(stream.CloseSend)
 	for {
 		select {
-		case <-p.provider.closec:
+		case <-p.closec:
 			return nil
 		case <-ctx.Done():
 			return nil
@@ -392,25 +412,25 @@ func (p *PassthroughStorage) doSubscribe(ctx context.Context, prefix string, fn 
 }
 
 // Close closes the storage. This is a no-op and is handled by the passthroughRaft.
-func (p *PassthroughStorage) Close() error {
+func (p *Storage) Close() error {
 	return nil
 }
 
-func (p *PassthroughStorage) newStorageClient(ctx context.Context) (v1.StorageClient, func(), error) {
+func (p *Storage) newStorageClient(ctx context.Context) (v1.StorageQueryServiceClient, func(), error) {
 	select {
-	case <-p.provider.closec:
+	case <-p.closec:
 		return nil, nil, storage.ErrClosed
 	default:
 	}
-	c, err := p.provider.Options.Dialer.DialNode(ctx, "")
+	c, err := p.Options.Dialer.DialNode(ctx, "")
 	if err != nil {
 		return nil, nil, err
 	}
-	return v1.NewStorageClient(c), func() { _ = c.Close() }, nil
+	return v1.NewStorageQueryServiceClient(c), func() { _ = c.Close() }, nil
 }
 
-func (p *PassthroughStorage) checkErr(fn func() error) {
+func (p *Storage) checkErr(fn func() error) {
 	if err := fn(); err != nil {
-		p.provider.log.Error("error in storage operation", "error", err)
+		p.log.Error("error in storage operation", "error", err)
 	}
 }

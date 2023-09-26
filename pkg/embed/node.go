@@ -34,7 +34,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -55,10 +54,8 @@ type Node interface {
 	Errors() <-chan error
 	// Mesh returns the underlying mesh instance.
 	Mesh() meshnode.Node
-	// Raft is the underlying Raft instance.
-	Raft() raft.Raft
 	// Storage is the underlying storage instance.
-	Storage() storage.MeshStorage
+	Storage() storage.Provider
 	// Services returns the underlying services instance if it is running.
 	Services() *services.Server
 	// MeshDNS returns the underlying MeshDNS instance if it is running.
@@ -96,18 +93,17 @@ func NewNode(ctx context.Context, opts Options) (Node, error) {
 		return nil, fmt.Errorf("failed to create mesh config: %w", err)
 	}
 	meshConn := meshnode.NewWithLogger(log, meshConfig)
-	// Create a new raft node
-	raftNode, err := config.NewRaftNode(ctx, meshConn)
+	// Create a storage provider
+	storageProvider, err := config.NewStorageProvider(ctx, meshConn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create raft node: %w", err)
+		return nil, fmt.Errorf("failed to create storage provider: %w", err)
 	}
 	return &node{
 		opts:    opts,
 		conf:    config,
 		log:     log,
 		mesh:    meshConn,
-		raft:    raftNode,
-		storage: raftNode.Storage(),
+		storage: storageProvider,
 		errs:    make(chan error, 1),
 	}, nil
 }
@@ -117,8 +113,7 @@ type node struct {
 	conf     *config.Config
 	log      *slog.Logger
 	mesh     meshnode.Node
-	raft     raft.Raft
-	storage  storage.MeshStorage
+	storage  storage.Provider
 	services *services.Server
 	meshdns  *meshdns.Server
 	errs     chan error
@@ -129,11 +124,7 @@ func (n *node) Mesh() meshnode.Node {
 	return n.mesh
 }
 
-func (n *node) Raft() raft.Raft {
-	return n.raft
-}
-
-func (n *node) Storage() storage.MeshStorage {
+func (n *node) Storage() storage.Provider {
 	return n.storage
 }
 
@@ -162,16 +153,12 @@ func (n *node) Start(ctx context.Context) error {
 	defer n.mu.Unlock()
 	log := n.log
 	ctx = context.WithLogger(ctx, log)
-	startOpts, err := n.conf.NewRaftStartOptions(n.Mesh())
-	if err != nil {
-		return fmt.Errorf("failed to create raft start options: %w", err)
-	}
-	connectOpts, err := n.conf.NewConnectOptions(ctx, n.Mesh(), n.Raft(), n.opts.Host)
+	connectOpts, err := n.conf.NewConnectOptions(ctx, n.Mesh(), n.Storage(), n.opts.Host)
 	if err != nil {
 		return fmt.Errorf("failed to create connect options: %w", err)
 	}
 	// Start the raft node
-	err = n.Raft().Start(ctx, startOpts)
+	err = n.Storage().Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start raft node: %w", err)
 	}
@@ -179,7 +166,7 @@ func (n *node) Start(ctx context.Context) error {
 	err = n.Mesh().Connect(ctx, connectOpts)
 	if err != nil {
 		defer func() {
-			err := n.Raft().Stop(context.Background())
+			err := n.Storage().Close()
 			if err != nil {
 				log.Error("failed to shutdown raft node", slog.String("error", err.Error()))
 			}

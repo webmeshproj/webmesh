@@ -64,7 +64,7 @@ func (s *meshStore) queueRouteUpdate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	s.routeUpdateGroup.TryGo(func() error {
 		defer cancel()
-		nw := networking.New(s.Storage())
+		nw := networking.New(s.Storage().MeshStorage())
 		routes, err := nw.GetRoutesByNode(ctx, s.ID())
 		if err != nil {
 			s.log.Error("error getting routes by node", slog.String("error", err.Error()))
@@ -87,7 +87,7 @@ func (s *meshStore) queuePeersUpdate() {
 	s.peerUpdateGroup.TryGo(func() error {
 		defer cancel()
 		s.log.Debug("applied batch with node edge changes, refreshing wireguard peers")
-		wgpeers, err := peers.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+		wgpeers, err := peers.WireGuardPeersFor(ctx, s.Storage().MeshStorage(), s.ID())
 		if err != nil {
 			s.log.Error("error getting wireguard peers", slog.String("error", err.Error()))
 			return nil

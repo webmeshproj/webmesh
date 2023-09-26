@@ -30,14 +30,15 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
-	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Interceptor is the leaderproxy interceptor.
 type Interceptor struct {
-	raft    raft.Raft
-	dialer  Dialer
-	network context.Network
+	nodeID    string
+	consensus storage.Consensus
+	dialer    Dialer
+	network   context.Network
 }
 
 // Dialer is the interface required for the leader proxy interceptor.
@@ -47,11 +48,12 @@ type Dialer interface {
 }
 
 // New returns a new leader proxy interceptor.
-func New(raft raft.Raft, dialer Dialer, network context.Network) *Interceptor {
+func New(nodeID string, consensus storage.Consensus, dialer Dialer, network context.Network) *Interceptor {
 	return &Interceptor{
-		raft:    raft,
-		dialer:  dialer,
-		network: network,
+		nodeID:    nodeID,
+		consensus: consensus,
+		dialer:    dialer,
+		network:   network,
 	}
 }
 
@@ -61,7 +63,7 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 		// Fast path - if we are the leader, it doesn't make sense to proxy the request.
 		// However, this could be a place to centralize checking the source address of the request.
 		log := context.LoggerFrom(ctx)
-		if i.raft.IsLeader() {
+		if i.consensus.IsLeader() {
 			log.Debug("Currently the leader, handling request locally", slog.String("method", info.FullMethod))
 			return handler(ctx, req)
 		}
@@ -95,7 +97,7 @@ func (i *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
 func (i *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		log := context.LoggerFrom(ss.Context())
-		if i.raft.IsLeader() {
+		if i.consensus.IsLeader() {
 			log.Debug("Currently the leader, handling stream locally", slog.String("method", info.FullMethod))
 			return handler(srv, ss)
 		}
@@ -131,7 +133,7 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return nil, err
 	}
 	defer conn.Close()
-	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, string(i.raft.ID()))
+	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, i.nodeID)
 	if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
@@ -145,18 +147,18 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewMembershipClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
 	case v1.Membership_Apply_FullMethodName:
 		return v1.NewMembershipClient(conn).Apply(ctx, req.(*v1.RaftLogEntry))
-	case v1.Membership_GetRaftConfiguration_FullMethodName:
-		return v1.NewMembershipClient(conn).GetRaftConfiguration(ctx, req.(*v1.RaftConfigurationRequest))
+	case v1.Membership_GetStorageConfiguration_FullMethodName:
+		return v1.NewMembershipClient(conn).GetStorageConfiguration(ctx, req.(*v1.StorageConfigurationRequest))
 
 	// Node API
 	case v1.Node_GetStatus_FullMethodName:
 		return v1.NewNodeClient(conn).GetStatus(ctx, req.(*v1.GetStatusRequest))
 
 	//Storage API
-	case v1.Storage_Query_FullMethodName:
-		return v1.NewStorageClient(conn).Query(ctx, req.(*v1.QueryRequest))
-	case v1.Storage_Publish_FullMethodName:
-		return v1.NewStorageClient(conn).Publish(ctx, req.(*v1.PublishRequest))
+	case v1.StorageQueryService_Query_FullMethodName:
+		return v1.NewStorageQueryServiceClient(conn).Query(ctx, req.(*v1.QueryRequest))
+	case v1.StorageQueryService_Publish_FullMethodName:
+		return v1.NewStorageQueryServiceClient(conn).Publish(ctx, req.(*v1.PublishRequest))
 
 	// Mesh API
 	case v1.Mesh_GetNode_FullMethodName:
@@ -232,7 +234,7 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 		return err
 	}
 	defer conn.Close()
-	ctx := metadata.AppendToOutgoingContext(ss.Context(), ProxiedFromMeta, string(i.raft.ID()))
+	ctx := metadata.AppendToOutgoingContext(ss.Context(), ProxiedFromMeta, i.nodeID)
 	if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
@@ -270,8 +272,8 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 		return proxyStream[v1.StartDataChannelRequest, v1.DataChannelOffer](ctx, ss, stream)
 
 	// Storage API
-	case v1.Storage_Subscribe_FullMethodName:
-		client := v1.NewStorageClient(conn)
+	case v1.StorageQueryService_Subscribe_FullMethodName:
+		client := v1.NewStorageQueryServiceClient(conn)
 		var req *v1.SubscribeRequest
 		if err := ss.RecvMsg(&req); err != nil {
 			return err

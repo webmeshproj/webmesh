@@ -79,25 +79,21 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	for meshID, meshConn := range meshes {
 		// Create a new raft node and build connection options
 		meshConfig := config.Meshes[meshID]
-		raftNode, err := meshConfig.NewRaftNode(ctx, meshConn)
+		storageProvider, err := meshConfig.NewStorageProvider(ctx, meshConn)
 		if err != nil {
-			return handleErr(fmt.Errorf("failed to create raft node: %w", err))
+			return handleErr(fmt.Errorf("failed to create storage provider: %w", err))
 		}
-		startOpts, err := meshConfig.NewRaftStartOptions(meshConn)
-		if err != nil {
-			return handleErr(fmt.Errorf("failed to create raft start options: %w", err))
-		}
-		connectOpts, err := meshConfig.NewConnectOptions(ctx, meshConn, raftNode, nil)
+		connectOpts, err := meshConfig.NewConnectOptions(ctx, meshConn, storageProvider, nil)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create connect options: %w", err))
 		}
-		// Start the raft node
-		err = raftNode.Start(ctx, startOpts)
+		// Start the storage provider
+		err = storageProvider.Start(ctx)
 		if err != nil {
-			return handleErr(fmt.Errorf("failed to start raft node: %w", err))
+			return handleErr(fmt.Errorf("failed to start storage provider: %w", err))
 		}
 		cleanFuncs = append(cleanFuncs, func() {
-			err := raftNode.Stop(context.Background())
+			err := storageProvider.Close()
 			if err != nil {
 				log.Error("failed to shutdown raft node", slog.String("error", err.Error()))
 			}
@@ -180,9 +176,9 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 		// Register each mesh to the server
 		for meshID, meshConn := range meshes {
 			err := dnsSrv.RegisterDomain(meshdns.DomainOptions{
+				NodeID:              meshConn.ID(),
 				MeshDomain:          meshConn.Domain(),
 				MeshStorage:         meshConn.Storage(),
-				Raft:                meshConn.Raft(),
 				IPv6Only:            true,
 				SubscribeForwarders: false,
 			})

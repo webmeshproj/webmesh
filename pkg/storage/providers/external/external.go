@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -42,8 +43,8 @@ import (
 )
 
 // Ensure we satisfy the provider interface.
-var _ storage.Provider = &ExternalStorageProvider{}
-var _ storage.Consensus = &ExternalConsensus{}
+var _ storage.Provider = &Provider{}
+var _ storage.Consensus = &Consensus{}
 var _ storage.MeshStorage = &ExternalStorage{}
 
 // Options are the options for the external storage provider.
@@ -60,18 +61,18 @@ type Options struct {
 	LogLevel string
 }
 
-// ExternalStorageProvider is a storage provider that uses a storage plugin.
-type ExternalStorageProvider struct {
+// Provider is a storage provider that uses a storage plugin.
+type Provider struct {
 	Options
 	cli  v1.StorageProviderPluginClient
 	conn *grpc.ClientConn
 	log  *slog.Logger
-	mu   sync.Mutex
+	mu   sync.RWMutex
 }
 
-// NewStorageProvider returns a new ExternalStorageProvider.
-func NewStorageProvider(opts Options) *ExternalStorageProvider {
-	return &ExternalStorageProvider{
+// NewProvider returns a new ExternalStorageProvider.
+func NewProvider(opts Options) *Provider {
+	return &Provider{
 		Options: opts,
 		log:     logging.NewLogger(opts.LogLevel).With("component", "storage-provider", "provider", "external"),
 	}
@@ -79,17 +80,17 @@ func NewStorageProvider(opts Options) *ExternalStorageProvider {
 
 // MeshStorage returns the underlying MeshStorage instance. The provider does not need to
 // guarantee consistency on read operations.
-func (ext *ExternalStorageProvider) MeshStorage() storage.MeshStorage {
+func (ext *Provider) MeshStorage() storage.MeshStorage {
 	return &ExternalStorage{ext}
 }
 
 // Consensus returns the underlying Consensus instance.
-func (ext *ExternalStorageProvider) Consensus() storage.Consensus {
-	return &ExternalConsensus{ext}
+func (ext *Provider) Consensus() storage.Consensus {
+	return &Consensus{ext}
 }
 
 // Start should start the provider and any resources that it may need.
-func (ext *ExternalStorageProvider) Start(ctx context.Context) error {
+func (ext *Provider) Start(ctx context.Context) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.conn != nil {
@@ -118,7 +119,7 @@ func (ext *ExternalStorageProvider) Start(ctx context.Context) error {
 }
 
 // Bootstrap should bootstrap the provider for first-time usage.
-func (ext *ExternalStorageProvider) Bootstrap(ctx context.Context) error {
+func (ext *Provider) Bootstrap(ctx context.Context) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
@@ -134,10 +135,26 @@ func (ext *ExternalStorageProvider) Bootstrap(ctx context.Context) error {
 	return nil
 }
 
+// ListenPort attempts to return the TCP port that the storage provider is listening on.
+func (ext *Provider) ListenPort() uint16 {
+	status := ext.Status()
+	for _, peer := range status.GetPeers() {
+		if peer.GetId() == ext.NodeID {
+			addrport, err := netip.ParseAddrPort(peer.GetAddress())
+			if err != nil {
+				ext.log.Error("Failed to parse peer address", "error", err.Error())
+				return 0
+			}
+			return addrport.Port()
+		}
+	}
+	return 0
+}
+
 // Status returns the status of the storage provider.
-func (ext *ExternalStorageProvider) Status() *v1.StorageStatus {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+func (ext *Provider) Status() *v1.StorageStatus {
+	ext.mu.RLock()
+	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return &v1.StorageStatus{
 			Message: storage.ErrClosed.Error(),
@@ -153,7 +170,7 @@ func (ext *ExternalStorageProvider) Status() *v1.StorageStatus {
 }
 
 // Close should close the underlying storage as well as any other resources that the provider may have allocated.
-func (ext *ExternalStorageProvider) Close() error {
+func (ext *Provider) Close() error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.conn == nil {
@@ -173,13 +190,13 @@ func (ext *ExternalStorageProvider) Close() error {
 	return nil
 }
 
-// ExternalConsensus is a consensus implementation that uses a storage plugin.
-type ExternalConsensus struct {
-	*ExternalStorageProvider
+// Consensus is a consensus implementation that uses a storage plugin.
+type Consensus struct {
+	*Provider
 }
 
 // IsLeader returns true if the node is the leader of the storage group.
-func (ext *ExternalConsensus) IsLeader() bool {
+func (ext *Consensus) IsLeader() bool {
 	// Use a short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
@@ -192,7 +209,7 @@ func (ext *ExternalConsensus) IsLeader() bool {
 }
 
 // IsMember returns true if the node is a member of the storage group.
-func (ext *ExternalConsensus) IsMember() bool {
+func (ext *Consensus) IsMember() bool {
 	// Use a short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
@@ -205,9 +222,9 @@ func (ext *ExternalConsensus) IsMember() bool {
 }
 
 // GetLeader returns the leader of the storage group.
-func (ext *ExternalConsensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+func (ext *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
+	ext.mu.RLock()
+	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return nil, storage.ErrClosed
 	}
@@ -219,7 +236,7 @@ func (ext *ExternalConsensus) GetLeader(ctx context.Context) (*v1.StoragePeer, e
 }
 
 // AddVoter adds a voter to the consensus group.
-func (ext *ExternalConsensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
+func (ext *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
@@ -236,7 +253,7 @@ func (ext *ExternalConsensus) AddVoter(ctx context.Context, peer *v1.StoragePeer
 }
 
 // AddObserver adds an observer to the consensus group.
-func (ext *ExternalConsensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error {
+func (ext *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
@@ -253,7 +270,7 @@ func (ext *ExternalConsensus) AddObserver(ctx context.Context, peer *v1.StorageP
 }
 
 // DemoteVoter demotes a voter to an observer.
-func (ext *ExternalConsensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error {
+func (ext *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
@@ -271,7 +288,7 @@ func (ext *ExternalConsensus) DemoteVoter(ctx context.Context, peer *v1.StorageP
 
 // RemovePeer removes a peer from the consensus group. If wait
 // is true, the function will wait for the peer to be removed.
-func (ext *ExternalConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
+func (ext *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
@@ -289,13 +306,13 @@ func (ext *ExternalConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePe
 
 // ExternalStorage is a storage implementation that uses a storage plugin.
 type ExternalStorage struct {
-	*ExternalStorageProvider
+	*Provider
 }
 
 // GetValue returns the value of a key.
 func (ext *ExternalStorage) GetValue(ctx context.Context, key string) (string, error) {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+	ext.mu.RLock()
+	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return "", storage.ErrClosed
 	}
@@ -351,8 +368,8 @@ func (ext *ExternalStorage) Delete(ctx context.Context, key string) error {
 
 // List returns all keys with a given prefix.
 func (ext *ExternalStorage) List(ctx context.Context, prefix string) ([]string, error) {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+	ext.mu.RLock()
+	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return nil, storage.ErrClosed
 	}
@@ -370,8 +387,8 @@ func (ext *ExternalStorage) List(ctx context.Context, prefix string) ([]string, 
 // that the iterator not attempt any write operations as this will cause
 // a deadlock. The iteration will stop if the iterator returns an error.
 func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+	ext.mu.RLock()
+	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return storage.ErrClosed
 	}
@@ -413,8 +430,8 @@ func (ext *ExternalStorage) Restore(ctx context.Context, r io.Reader) error {
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
+	ext.mu.RLock()
+	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return func() {}, storage.ErrClosed
 	}

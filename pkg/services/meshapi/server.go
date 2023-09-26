@@ -27,7 +27,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -35,18 +34,12 @@ import (
 type Server struct {
 	v1.UnimplementedMeshServer
 
-	store storage.MeshStorage
-	raft  raft.Raft
 	peers peers.Peers
 }
 
 // NewServer returns a new Server.
-func NewServer(store storage.MeshStorage, raft raft.Raft) *Server {
-	return &Server{
-		store: store,
-		raft:  raft,
-		peers: peers.New(store),
-	}
+func NewServer(storage storage.MeshStorage) *Server {
+	return &Server{peers: peers.New(storage)}
 }
 
 func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshNode, error) {

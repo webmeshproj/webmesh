@@ -62,6 +62,8 @@ type Provider interface {
 	Bootstrap(context.Context) error
 	// Status returns the status of the storage provider.
 	Status() *v1.StorageStatus
+	// ListenPort should return the TCP port that the storage provider is listening on.
+	ListenPort() uint16
 }
 
 // Consensus is the interface for configuring storage consensus.

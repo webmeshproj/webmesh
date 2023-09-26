@@ -33,7 +33,7 @@ func TestGetEdge(t *testing.T) {
 	server := newTestServer(t)
 
 	// Place a dummy peer
-	err := peers.New(server.store).Put(ctx, &v1.MeshNode{
+	err := peers.New(server.storage.MeshStorage()).Put(ctx, &v1.MeshNode{
 		Id:        "foo",
 		PublicKey: newEncodedPubKey(t),
 	})
@@ -41,7 +41,7 @@ func TestGetEdge(t *testing.T) {
 		t.Errorf("Put() error = %v", err)
 		return
 	}
-	err = peers.New(server.store).Put(ctx, &v1.MeshNode{
+	err = peers.New(server.storage.MeshStorage()).Put(ctx, &v1.MeshNode{
 		Id:        "bar",
 		PublicKey: newEncodedPubKey(t),
 	})

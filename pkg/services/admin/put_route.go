@@ -36,7 +36,7 @@ var putRouteAction = rbac.Actions{
 }
 
 func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty, error) {
-	if !s.raft.IsLeader() {
+	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	err := networking.ValidateRoute(route)

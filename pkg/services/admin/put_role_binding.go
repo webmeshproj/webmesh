@@ -37,7 +37,7 @@ var putRoleBindingAction = rbac.Actions{
 }
 
 func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*emptypb.Empty, error) {
-	if !s.raft.IsLeader() {
+	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if rb.GetName() == "" {

@@ -19,7 +19,6 @@ package node
 
 import (
 	"log/slog"
-	"net/netip"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -28,7 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	"github.com/webmeshproj/webmesh/pkg/raft"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // Server is the webmesh node service.
@@ -41,13 +40,12 @@ type Server struct {
 
 // Options are options for the Node service.
 type Options struct {
-	Raft       raft.Raft
+	NodeID     string
+	Storage    storage.Provider
 	WireGuard  wireguard.Interface
 	NodeDialer transport.NodeDialer
 	Plugins    plugins.Manager
 	Features   []*v1.FeaturePort
-	NetworkV4  netip.Prefix
-	NetworkV6  netip.Prefix
 }
 
 // NewServer returns a new Server. Features are used for returning what features are enabled.

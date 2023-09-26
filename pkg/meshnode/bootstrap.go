@@ -38,14 +38,13 @@ import (
 	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	// Check if the mesh network is defined
 	s.log.Debug("Checking if cluster is already bootstrapped")
-	_, err := s.Storage().GetValue(ctx, state.IPv6PrefixKey)
+	_, err := s.Storage().MeshStorage().GetValue(ctx, state.IPv6PrefixKey)
 	var firstBootstrap bool
 	if err != nil {
 		if !storage.IsKeyNotFoundError(err) {
@@ -63,7 +62,7 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	s.log.Debug("Cluster not yet bootstrapped, attempting to bootstrap")
 	isLeader, joinRT, err := opts.Bootstrap.Transport.LeaderElect(ctx)
 	if err != nil {
-		if errors.Is(err, raft.ErrAlreadyBootstrapped) && joinRT != nil {
+		if errors.Is(err, storage.ErrAlreadyBootstrapped) && joinRT != nil {
 			s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 			opts.JoinRoundTripper = joinRT
 			return s.join(ctx, opts)
@@ -85,7 +84,7 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOptions) error {
 	// We'll bootstrap the raft cluster as just ourselves.
 	s.log.Info("Bootstrapping raft cluster")
-	err := s.raft.Bootstrap(ctx)
+	err := s.storage.Bootstrap(ctx)
 	if err != nil {
 		return fmt.Errorf("bootstrap raft: %w", err)
 	}
@@ -114,11 +113,12 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	s.log.Info("Newly bootstrapped cluster, setting IPv4/IPv6 networks",
 		slog.String("ipv4-network", opts.Bootstrap.IPv4Network),
 		slog.String("ipv6-network", meshnetworkv6.String()))
-	err = s.Storage().PutValue(ctx, state.IPv6PrefixKey, meshnetworkv6.String(), 0)
+	meshStorage := s.Storage().MeshStorage()
+	err = meshStorage.PutValue(ctx, state.IPv6PrefixKey, meshnetworkv6.String(), 0)
 	if err != nil {
 		return fmt.Errorf("set IPv6 prefix to db: %w", err)
 	}
-	err = s.Storage().PutValue(ctx, state.IPv4PrefixKey, meshnetworkv4.String(), 0)
+	err = meshStorage.PutValue(ctx, state.IPv4PrefixKey, meshnetworkv4.String(), 0)
 	if err != nil {
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
 	}
@@ -126,13 +126,13 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if !strings.HasSuffix(s.meshDomain, ".") {
 		s.meshDomain += "."
 	}
-	err = s.Storage().PutValue(ctx, state.MeshDomainKey, s.meshDomain, 0)
+	err = meshStorage.PutValue(ctx, state.MeshDomainKey, s.meshDomain, 0)
 	if err != nil {
 		return fmt.Errorf("set mesh domain to db: %w", err)
 	}
 
 	// Initialize the RBAC system.
-	rb := rbac.New(s.Storage())
+	rb := rbac.New(meshStorage)
 
 	// Create an admin role and add the admin user/node to it.
 	err = rb.PutRole(ctx, &v1.Role{
@@ -230,7 +230,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	}
 
 	// Initialize the Networking system.
-	nw := networking.New(s.Storage())
+	nw := networking.New(meshStorage)
 
 	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
@@ -285,8 +285,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// address. This is done by creating a new node in the database and then
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
-	p := peers.New(s.Storage())
-	encoded, err := s.key.PublicKey().Encode()
+	p := peers.New(meshStorage)
+	encodedPubKey, err := s.key.PublicKey().Encode()
 	if err != nil {
 		return fmt.Errorf("encode public key: %w", err)
 	}
@@ -302,7 +302,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			return out
 		}(),
 		ZoneAwarenessId: s.opts.ZoneAwarenessID,
-		PublicKey:       encoded,
+		PublicKey:       encodedPubKey,
 		PrivateIpv6:     privatev6.String(),
 		Features:        opts.Features,
 		JoinedAt:        timestamppb.New(time.Now().UTC()),
@@ -390,12 +390,13 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		// We dont manage network connections on test stores
 		return nil
 	}
-	// Determine what our raft address will be
-	var raftAddr string
+	// Determine what our storage address will be
+	var storageAddr string
+	lport := s.storage.ListenPort()
 	if !s.opts.DisableIPv4 && !opts.PreferIPv6 {
-		raftAddr = net.JoinHostPort(privatev4.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
+		storageAddr = net.JoinHostPort(privatev4.Addr().String(), strconv.Itoa(int(lport)))
 	} else {
-		raftAddr = net.JoinHostPort(privatev6.Addr().String(), strconv.Itoa(int(s.raft.ListenPort())))
+		storageAddr = net.JoinHostPort(privatev6.Addr().String(), strconv.Itoa(int(lport)))
 	}
 	// Start network resources
 	s.log.Info("Starting network manager")
@@ -432,7 +433,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	}
 	// We need to readd ourselves server to the cluster as a voter with the acquired raft address.
 	s.log.Info("Readmitting ourselves to the cluster with the acquired wireguard address")
-	err = s.raft.AddVoter(ctx, s.ID(), raftAddr)
+	err = s.storage.Consensus().AddVoter(ctx, &v1.StoragePeer{
+		Id:        s.nodeID,
+		PublicKey: encodedPubKey,
+		Address:   storageAddr,
+	})
 	if err != nil {
 		return fmt.Errorf("add voter: %w", err)
 	}

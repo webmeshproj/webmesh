@@ -55,9 +55,9 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	peerID := req.GetId()
 	log := s.log.With("remote-peer", peerID)
 	ctx := stream.Context()
-	st := s.raft.Storage()
+	st := s.storage.MeshStorage()
 
-	log.Info("Received subscribe peers request")
+	log.Debug("Received subscribe peers request for peer", slog.String("peer", peerID))
 
 	var lastIceServers []string
 	var lastDnsServers []string

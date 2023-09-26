@@ -138,7 +138,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	}
 	if opts.ForceName {
 		if !strings.HasSuffix(opts.Name, "+") {
-			log.Info("Forcing wireguard interface name", "name", opts.Name)
+			log.Warn("Forcing wireguard interface name", "name", opts.Name)
 			iface, err := net.InterfaceByName(opts.Name)
 			if err != nil {
 				if !system.IsInterfaceNotExists(err) {
@@ -156,7 +156,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		log.Debug("Enabling ip forwarding")
 		err := routes.EnableIPForwarding()
 		if err != nil {
-			log.Warn("failed to enable ip forwarding", "error", err)
+			log.Debug("Failed to enable ip forwarding", "error", err.Error())
 		}
 	}
 	// Get the default gateway in case we change it later.
@@ -167,7 +167,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		log.Warn("failed to get default gateway", "error", err.Error())
 	}
 	log.Info("Creating wireguard interface", "name", opts.Name)
-	iface, err := system.New(ctx, &system.Options{
+	ifaceopts := &system.Options{
 		Name:        opts.Name,
 		AddressV4:   opts.AddressV4,
 		AddressV6:   opts.AddressV6,
@@ -175,7 +175,9 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		MTU:         uint32(opts.MTU),
 		DisableIPv4: opts.DisableIPv4,
 		DisableIPv6: opts.DisableIPv6,
-	})
+	}
+	log.Debug("Creating system interface", "options", ifaceopts)
+	iface, err := system.New(ctx, ifaceopts)
 	if err != nil {
 		return nil, fmt.Errorf("new interface: %w", err)
 	}

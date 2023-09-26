@@ -36,7 +36,7 @@ var putEdgeAction = rbac.Actions{
 }
 
 func (s *Server) PutEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty, error) {
-	if !s.raft.IsLeader() {
+	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
 	if edge.GetSource() == "" {

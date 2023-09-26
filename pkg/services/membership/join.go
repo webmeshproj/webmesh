@@ -59,7 +59,7 @@ var canPutEdgeAction = &rbac.Action{
 }
 
 func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinResponse, error) {
-	if !s.raft.IsLeader() {
+	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.mu.Lock()
@@ -96,16 +96,16 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
 	}
-	var raftPort int32
+	var storagePort int32
 	if req.GetAsVoter() || req.GetAsObserver() {
 		for _, feat := range req.GetFeatures() {
-			if feat.Feature == v1.Feature_RAFT {
-				raftPort = feat.Port
+			if feat.Feature == v1.Feature_STORAGE_PROVIDER {
+				storagePort = feat.Port
 				break
 			}
 		}
-		if raftPort <= 0 {
-			return nil, status.Error(codes.InvalidArgument, "raft port required")
+		if storagePort <= 0 {
+			return nil, status.Error(codes.InvalidArgument, "storage provider port required")
 		}
 	}
 
@@ -147,20 +147,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
-	// Issue a barrier to the raft cluster to ensure all nodes are
-	// fully caught up before we make changes
-	// TODO: Make timeout configurable
-	_, err = s.raft.Barrier(ctx, time.Second*15)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to send barrier: %v", err)
-	}
-
-	// Send another barrier after we're done to ensure all nodes are
-	// fully caught up before we return
-	defer func() {
-		_, _ = s.raft.Barrier(ctx, time.Second*15)
-	}()
-
 	// Start building a list of clean up functions to run if we fail
 	cleanFuncs := make([]func(), 0)
 	handleErr := func(cause error) error {
@@ -177,7 +163,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err))
 		} else if created {
 			cleanFuncs = append(cleanFuncs, func() {
-				err := networking.New(s.raft.Storage()).DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
+				err := networking.New(s.storage.MeshStorage()).DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
 				if err != nil {
 					log.Warn("Failed to delete route", slog.String("error", err.Error()))
 				}
@@ -202,7 +188,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Debug("Assigned IPv4 address to peer", slog.String("ipv4", leasev4.String()))
 	}
 	// Write the peer to the database
-	p := peers.New(s.raft.Storage())
+	p := peers.New(s.storage.MeshStorage())
 	err = p.Put(ctx, &v1.MeshNode{
 		Id:                 req.GetId(),
 		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
@@ -226,7 +212,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	})
 	// At this point we want to
 	// Add an edge from the joining server to the caller
-	joiningServer := string(s.raft.ID())
+	joiningServer := s.nodeID
 	if proxiedFrom, ok := leaderproxy.ProxiedFrom(ctx); ok {
 		joiningServer = proxiedFrom
 	}
@@ -316,7 +302,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// Collect the list of peers we will send to the new node
-	peers, err := peers.WireGuardPeersFor(ctx, s.raft.Storage(), req.GetId())
+	peers, err := peers.WireGuardPeersFor(ctx, s.storage.MeshStorage(), req.GetId())
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
 	}
@@ -331,23 +317,31 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			// To give the caller a better chance at being ready before the
 			// first heartbeat.
 			<-ctx.Done()
-			var raftAddress string
-			if req.GetAssignIpv4() && !req.GetPreferRaftIpv6() {
+			var storageAddress string
+			if req.GetAssignIpv4() && !req.GetPreferStorageIpv6() {
 				// Prefer IPv4 for raft
-				raftAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(raftPort)))
+				storageAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(storagePort)))
 			} else {
 				// Use IPv6 for raft
-				raftAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(raftPort)))
+				storageAddress = net.JoinHostPort(leasev6.Addr().String(), strconv.Itoa(int(storagePort)))
 			}
 			if req.GetAsVoter() {
-				log.Info("Adding voter to cluster", slog.String("raft_address", raftAddress))
-				if err := s.raft.AddVoter(ctx, req.GetId(), raftAddress); err != nil {
+				log.Info("Adding voter to cluster", slog.String("raft_address", storageAddress))
+				if err := s.storage.Consensus().AddVoter(ctx, &v1.StoragePeer{
+					Id:        req.GetId(),
+					PublicKey: req.GetPublicKey(),
+					Address:   storageAddress,
+				}); err != nil {
 					log.Error("Failed to add voter", slog.String("error", err.Error()))
 					return
 				}
 			} else if req.GetAsObserver() {
-				log.Info("Adding observer to cluster", slog.String("raft_address", raftAddress))
-				if err := s.raft.AddNonVoter(ctx, req.GetId(), raftAddress); err != nil {
+				log.Info("Adding observer to cluster", slog.String("raft_address", storageAddress))
+				if err := s.storage.Consensus().AddObserver(ctx, &v1.StoragePeer{
+					Id:        req.GetId(),
+					PublicKey: req.GetPublicKey(),
+					Address:   storageAddress,
+				}); err != nil {
 					log.Error("Failed to add observer", slog.String("error", err.Error()))
 					return
 				}

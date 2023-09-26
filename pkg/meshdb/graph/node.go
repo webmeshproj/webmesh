@@ -82,9 +82,9 @@ func (n *MeshNode) TURNPort() uint16 {
 	return n.PortFor(v1.Feature_TURN_SERVER)
 }
 
-// RaftPort returns the node's Raft port.
-func (n *MeshNode) RaftPort() uint16 {
-	return n.PortFor(v1.Feature_RAFT)
+// StoragePort returns the node's Storage port.
+func (n *MeshNode) StoragePort() uint16 {
+	return n.PortFor(v1.Feature_STORAGE_PROVIDER)
 }
 
 // PrivateAddrV4 returns the node's private IPv4 address.
@@ -158,10 +158,10 @@ func (n *MeshNode) PrivateRPCAddrV6() netip.AddrPort {
 	return netip.AddrPortFrom(addr.Addr(), rpcport)
 }
 
-// PrivateRaftAddrV4 returns the private IPv4 address for the node's raft listener.
+// PrivateStorageAddrV4 returns the private IPv4 address for the node's raft listener.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateRaftAddrV4() netip.AddrPort {
-	rpcport := n.RaftPort()
+func (n *MeshNode) PrivateStorageAddrV4() netip.AddrPort {
+	rpcport := n.StoragePort()
 	if rpcport == 0 {
 		return netip.AddrPort{}
 	}
@@ -172,10 +172,10 @@ func (n *MeshNode) PrivateRaftAddrV4() netip.AddrPort {
 	return netip.AddrPortFrom(addr.Addr(), rpcport)
 }
 
-// PrivateRaftAddrV6 returns the private IPv6 address for the node's raft listener.
+// PrivateStorageAddrV6 returns the private IPv6 address for the node's raft listener.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateRaftAddrV6() netip.AddrPort {
-	rpcport := n.RaftPort()
+func (n *MeshNode) PrivateStorageAddrV6() netip.AddrPort {
+	rpcport := n.StoragePort()
 	if rpcport == 0 {
 		return netip.AddrPort{}
 	}

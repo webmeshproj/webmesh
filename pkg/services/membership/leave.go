@@ -18,7 +18,6 @@ package membership
 
 import (
 	"log/slog"
-	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
@@ -38,7 +37,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
-	if !s.raft.IsLeader() {
+	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
 	}
 	s.mu.Lock()
@@ -62,7 +61,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 
 	// Lookup the peer first to make sure they exist
-	leaving, err := peers.New(s.raft.Storage()).Get(ctx, req.GetId())
+	leaving, err := peers.New(s.storage.MeshStorage()).Get(ctx, req.GetId())
 	if err != nil {
 		if err == peers.ErrNodeNotFound {
 			// We're done here if they don't exist
@@ -71,19 +70,16 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 		return nil, status.Errorf(codes.Internal, "failed to get peer: %v", err)
 	}
 
-	if leaving.PortFor(v1.Feature_RAFT) != 0 {
-		defer func() {
-			_, _ = s.raft.Barrier(ctx, time.Second*15)
-		}()
-		s.log.Info("Removing mesh node from raft", "id", req.GetId())
-		err := s.raft.RemoveServer(ctx, req.GetId(), false)
+	if leaving.PortFor(v1.Feature_STORAGE_PROVIDER) != 0 {
+		s.log.Info("Removing mesh node from storage consensus", "id", req.GetId())
+		err := s.storage.Consensus().RemovePeer(ctx, &v1.StoragePeer{Id: req.GetId()}, false)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to remove raft member: %v", err)
 		}
 	}
 
 	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
-	err = peers.New(s.raft.Storage()).Delete(ctx, req.GetId())
+	err = peers.New(s.storage.MeshStorage()).Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}

@@ -88,8 +88,8 @@ func runServer(loglevel string) error {
 	conf.Global.LogLevel = loglevel
 	conf.Services.API.ListenAddress = "[::]:8443"
 	conf.Services.API.Insecure = true
-	conf.Raft.ListenAddress = "[::]:9000"
-	conf.Raft.InMemory = true
+	conf.Storage.Raft.ListenAddress = "[::]:9000"
+	conf.Storage.InMemory = true
 	conf.WireGuard.ListenPort = 61820
 	conf.WireGuard.InterfaceName = "meshserver0"
 	conf.Bootstrap.Enabled = true

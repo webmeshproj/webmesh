@@ -39,8 +39,9 @@ import (
 )
 
 // Ensure we satisfy the provider interface.
-var _ storage.Provider = &RaftStorageProvider{}
-var _ storage.Consensus = &RaftConsensus{}
+var _ storage.Provider = &Provider{}
+var _ storage.Consensus = &Consensus{}
+var _ storage.MeshStorage = &RaftStorage{}
 
 type (
 	// SnapshotMeta is an alias for raft.SnapshotMeta.
@@ -73,7 +74,7 @@ const (
 
 // RaftStorage is a storage provider that uses Raft for consensus.
 // BadgerDB is used for the underlying storage.
-type RaftStorageProvider struct {
+type Provider struct {
 	Options
 	nodeID                      raft.ServerID
 	started                     atomic.Bool
@@ -85,43 +86,59 @@ type RaftStorageProvider struct {
 	observerClose, observerDone chan struct{}
 	observerCbs                 []ObservationCallback
 	log                         *slog.Logger
-	mu                          sync.Mutex
+	mu                          sync.RWMutex
 }
 
-// NewStorageProvider returns a new RaftStorageProvider.
-func NewStorageProvider(opts Options) *RaftStorageProvider {
-	return &RaftStorageProvider{
+// NewProvider returns a new RaftStorageProvider.
+func NewProvider(opts Options) *Provider {
+	return &Provider{
 		Options: opts,
 		nodeID:  raft.ServerID(opts.NodeID),
 		log:     logging.NewLogger(opts.LogLevel).With("component", "raftstorage"),
 	}
 }
 
+// OnObservation registers a callback for when an observation is received.
+func (r *Provider) OnObservation(cb ObservationCallback) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.observerCbs = append(r.observerCbs, cb)
+}
+
 // MeshStorage returns the underlying MeshStorage instance.
-func (r *RaftStorageProvider) MeshStorage() storage.MeshStorage {
+func (r *Provider) MeshStorage() storage.MeshStorage {
 	return r.storage
 }
 
 // Consensus returns the underlying Consensus instance.
-func (r *RaftStorageProvider) Consensus() storage.Consensus {
-	return &RaftConsensus{RaftStorageProvider: r}
+func (r *Provider) Consensus() storage.Consensus {
+	return &Consensus{Provider: r}
+}
+
+// ListenPort returns the TCP port that the storage provider is listening on.
+func (r *Provider) ListenPort() uint16 {
+	return r.Options.Transport.AddrPort().Port()
 }
 
 // Status returns the status of the storage provider.
-func (r *RaftStorageProvider) Status() *v1.StorageStatus {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.started.Load() {
+func (r *Provider) Status() *v1.StorageStatus {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if !r.started.Load() {
 		return &v1.StorageStatus{
 			IsWritable: false,
-			Message:    storage.ErrClosed.Error(),
+			Message:    "raftstorage is closed",
 		}
 	}
 	var status v1.StorageStatus
 	config := r.raft.GetConfiguration().Configuration()
 	status.IsWritable = r.IsVoter()
+	leader, err := r.Consensus().GetLeader(context.Background())
+	if err != nil {
+		r.log.Error("Failed to get leader", "error", err.Error())
+	}
 	status.ClusterStatus = func() v1.ClusterStatus {
-		if r.Consensus().IsLeader() {
+		if leader != nil && leader.GetId() == string(r.nodeID) {
 			return v1.ClusterStatus_CLUSTER_LEADER
 		}
 		if r.IsVoter() {
@@ -139,7 +156,7 @@ func (r *RaftStorageProvider) Status() *v1.StorageStatus {
 		if r.IsObserver() {
 			return "current cluster observer"
 		}
-		if r.Consensus().IsLeader() {
+		if status.ClusterStatus == v1.ClusterStatus_CLUSTER_LEADER {
 			return "current cluster leader"
 		}
 		return "not a leader, voter, or observer"
@@ -149,6 +166,9 @@ func (r *RaftStorageProvider) Status() *v1.StorageStatus {
 			Id:      string(server.ID),
 			Address: string(server.Address),
 			ClusterStatus: func() v1.ClusterStatus {
+				if leader != nil && server.ID == raft.ServerID(leader.GetId()) {
+					return v1.ClusterStatus_CLUSTER_LEADER
+				}
 				switch server.Suffrage {
 				case raft.Voter:
 					return v1.ClusterStatus_CLUSTER_VOTER
@@ -164,7 +184,7 @@ func (r *RaftStorageProvider) Status() *v1.StorageStatus {
 }
 
 // Start starts the raft storage provider.
-func (r *RaftStorageProvider) Start(ctx context.Context) error {
+func (r *Provider) Start(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.started.Load() {
@@ -209,7 +229,7 @@ func (r *RaftStorageProvider) Start(ctx context.Context) error {
 }
 
 // createStorage creates the underlying storage.
-func (r *RaftStorageProvider) createStorage() (storage.DualStorage, error) {
+func (r *Provider) createStorage() (storage.DualStorage, error) {
 	if r.Options.InMemory {
 		db, err := badgerdb.New(badgerdb.Options{InMemory: true})
 		if err != nil {
@@ -238,7 +258,7 @@ func (r *RaftStorageProvider) createStorage() (storage.DualStorage, error) {
 }
 
 // createSnapshotStorage creates the snapshot storage.
-func (r *RaftStorageProvider) createSnapshotStorage() (raft.SnapshotStore, error) {
+func (r *Provider) createSnapshotStorage() (raft.SnapshotStore, error) {
 	if r.Options.InMemory {
 		return raft.NewInmemSnapshotStore(), nil
 	}
@@ -253,7 +273,7 @@ func (r *RaftStorageProvider) createSnapshotStorage() (raft.SnapshotStore, error
 	return snapshotStore, nil
 }
 
-func (r *RaftStorageProvider) observe() (closeCh, doneCh chan struct{}) {
+func (r *Provider) observe() (closeCh, doneCh chan struct{}) {
 	closeCh = make(chan struct{})
 	doneCh = make(chan struct{})
 	go func() {
@@ -288,7 +308,7 @@ func (r *RaftStorageProvider) observe() (closeCh, doneCh chan struct{}) {
 }
 
 // Bootstrap bootstraps the raft storage provider.
-func (r *RaftStorageProvider) Bootstrap(ctx context.Context) error {
+func (r *Provider) Bootstrap(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -333,7 +353,7 @@ func (r *RaftStorageProvider) Bootstrap(ctx context.Context) error {
 }
 
 // Close closes the mesh storage and shuts down the raft instance.
-func (r *RaftStorageProvider) Close() error {
+func (r *Provider) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -374,7 +394,7 @@ func (r *RaftStorageProvider) Close() error {
 }
 
 // IsVoter returns true if the Raft node is a voter.
-func (r *RaftStorageProvider) IsVoter() bool {
+func (r *Provider) IsVoter() bool {
 	config, err := r.Configuration()
 	if err != nil {
 		return false
@@ -388,7 +408,7 @@ func (r *RaftStorageProvider) IsVoter() bool {
 }
 
 // IsObserver returns true if the Raft node is an observer.
-func (r *RaftStorageProvider) IsObserver() bool {
+func (r *Provider) IsObserver() bool {
 	config, err := r.Configuration()
 	if err != nil {
 		return false
@@ -402,7 +422,7 @@ func (r *RaftStorageProvider) IsObserver() bool {
 }
 
 // Configuration returns the current raft configuration.
-func (r *RaftStorageProvider) Configuration() (raft.Configuration, error) {
+func (r *Provider) Configuration() (raft.Configuration, error) {
 	if r.raft == nil {
 		return raft.Configuration{}, storage.ErrClosed
 	}
@@ -410,7 +430,7 @@ func (r *RaftStorageProvider) Configuration() (raft.Configuration, error) {
 }
 
 // Apply applies a raft log entry.
-func (r *RaftStorageProvider) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
+func (r *Provider) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -441,19 +461,19 @@ func (r *RaftStorageProvider) Apply(ctx context.Context, log *v1.RaftLogEntry) (
 }
 
 // RaftConsensus is the Raft consensus implementation.
-type RaftConsensus struct {
-	*RaftStorageProvider
+type Consensus struct {
+	*Provider
 }
 
 // IsLeader returns true if the Raft node is the leader.
-func (r *RaftConsensus) IsLeader() bool {
+func (r *Consensus) IsLeader() bool {
 	return r.raft.State() == raft.Leader
 }
 
 // GetLeader returns the leader of the cluster.
-func (r *RaftConsensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if !r.started.Load() {
 		return nil, storage.ErrClosed
 	}
@@ -478,21 +498,15 @@ func (r *RaftConsensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) 
 }
 
 // IsMember returns true if the Raft node is a member of the cluster.
-func (r *RaftConsensus) IsMember() bool {
-	config, err := r.Configuration()
-	if err != nil {
-		return false
-	}
-	for _, server := range config.Servers {
-		if server.ID == r.nodeID {
-			return true
-		}
-	}
-	return false
+func (r *Consensus) IsMember() bool {
+	// We fast path this to avoid the lock and avoid race conditions
+	// if voter propagation is slow.
+	// Non raft-members use the passthrough storage.
+	return true
 }
 
 // AddVoter adds a voter to the consensus group.
-func (r *RaftConsensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
+func (r *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -514,7 +528,7 @@ func (r *RaftConsensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) erro
 }
 
 // AddObserver adds an observer to the consensus group.
-func (r *RaftConsensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error {
+func (r *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -536,7 +550,7 @@ func (r *RaftConsensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) e
 }
 
 // DemoteVoter demotes a voter to an observer.
-func (r *RaftConsensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error {
+func (r *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -558,7 +572,7 @@ func (r *RaftConsensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) e
 }
 
 // RemovePeer removes a peer from the consensus group.
-func (r *RaftConsensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
+func (r *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {

@@ -48,8 +48,6 @@ type Config struct {
 	Auth AuthOptions `koanf:"auth,omitempty"`
 	// Mesh are the mesh options.
 	Mesh MeshOptions `koanf:"mesh,omitempty"`
-	// Raft are the raft options.
-	Raft RaftOptions `koanf:"raft,omitempty"`
 	// Storage are the storage options.
 	Storage StorageOptions `koanf:"storage,omitempty"`
 	// Services are the service options.
@@ -74,7 +72,6 @@ func NewDefaultConfig(nodeID string) Config {
 		Bootstrap: NewBootstrapOptions(),
 		Auth:      AuthOptions{},
 		Mesh:      NewMeshOptions(nodeID),
-		Raft:      NewRaftOptions(),
 		Storage:   NewStorageOptions(),
 		Services:  NewServiceOptions(),
 		TLS:       TLSOptions{},
@@ -94,7 +91,6 @@ func NewInsecureConfig(nodeID string) *Config {
 		Bootstrap: NewBootstrapOptions(),
 		Auth:      AuthOptions{},
 		Mesh:      NewMeshOptions(nodeID),
-		Raft:      NewRaftOptions(),
 		Storage:   NewStorageOptions(),
 		Services:  NewServiceOptions(),
 		TLS:       TLSOptions{},
@@ -103,11 +99,11 @@ func NewInsecureConfig(nodeID string) *Config {
 		Plugins:   PluginOptions{},
 		Bridge:    BridgeOptions{},
 	}
-	conf.Raft.InMemory = true
+	conf.Storage.InMemory = true
 	// Lower the raft timeouts
-	conf.Raft.HeartbeatTimeout = time.Millisecond * 500
-	conf.Raft.ElectionTimeout = time.Millisecond * 500
-	conf.Raft.LeaderLeaseTimeout = time.Millisecond * 500
+	conf.Storage.Raft.HeartbeatTimeout = time.Millisecond * 500
+	conf.Storage.Raft.ElectionTimeout = time.Millisecond * 500
+	conf.Storage.Raft.LeaderLeaseTimeout = time.Millisecond * 500
 	conf.Global.Insecure = true
 	conf.Services.API.Insecure = true
 	c, _ := conf.Global.ApplyGlobals(conf)
@@ -119,7 +115,6 @@ func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
 	o.Bootstrap.BindFlags(prefix, fs)
 	o.Auth.BindFlags(prefix, fs)
 	o.Mesh.BindFlags(prefix, fs)
-	o.Raft.BindFlags(prefix, fs)
 	o.Storage.BindFlags(prefix, fs)
 	o.Services.BindFlags(prefix, fs)
 	o.TLS.BindFlags(prefix, fs)
@@ -141,7 +136,6 @@ func (o *Config) ShallowCopy() *Config {
 		Bootstrap: o.Bootstrap,
 		Auth:      o.Auth,
 		Mesh:      o.Mesh,
-		Raft:      o.Raft,
 		Storage:   o.Storage,
 		Services:  o.Services,
 		TLS:       o.TLS,
@@ -179,11 +173,9 @@ func (o *Config) Validate() error {
 	if err != nil {
 		return fmt.Errorf("invalid mesh options: %w", err)
 	}
-	if o.IsRaftMember() {
-		err := o.Raft.Validate()
-		if err != nil {
-			return fmt.Errorf("invalid raft options: %w", err)
-		}
+	err = o.Storage.Validate(o.IsStorageMember())
+	if err != nil {
+		return fmt.Errorf("invalid raft options: %w", err)
 	}
 	err = o.Services.Validate()
 	if err != nil {

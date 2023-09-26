@@ -25,6 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 
 func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
@@ -32,6 +33,8 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 	return func(ctx context.Context, ev raft.Observation) {
 		log := s.log.With("event", "observation")
 		log.Debug("received observation event", slog.String("type", reflect.TypeOf(ev.Data).String()))
+		provider := s.Storage().(*raftstorage.Provider)
+		consensus := provider.Consensus()
 		switch data := ev.Data.(type) {
 		case raft.FailedHeartbeatObservation:
 			if s.opts.HeartbeatPurgeThreshold <= 0 {
@@ -39,14 +42,14 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 			}
 			failedHeartBeats[data.PeerID]++
 			log.Debug("failed heartbeat", slog.String("peer", string(data.PeerID)), slog.Int("count", failedHeartBeats[data.PeerID]))
-			if failedHeartBeats[data.PeerID] >= s.opts.HeartbeatPurgeThreshold && s.raft.IsLeader() {
+			if failedHeartBeats[data.PeerID] >= s.opts.HeartbeatPurgeThreshold && consensus.IsLeader() {
 				// Remove the peer from the cluster
 				log.Info("failed heartbeat threshold reached, removing peer", slog.String("peer", string(data.PeerID)))
-				if err := s.raft.RemoveServer(ctx, string(data.PeerID), true); err != nil {
+				if err := consensus.RemovePeer(ctx, &v1.StoragePeer{Id: string(data.PeerID)}, true); err != nil {
 					log.Warn("failed to remove peer", slog.String("error", err.Error()))
 					return
 				}
-				if err := peers.New(s.Storage()).Delete(ctx, string(data.PeerID)); err != nil {
+				if err := peers.New(provider.MeshStorage()).Delete(ctx, string(data.PeerID)); err != nil {
 					log.Warn("failed to remove peer from database", slog.String("error", err.Error()))
 				}
 				delete(failedHeartBeats, data.PeerID)
@@ -62,7 +65,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 			if string(data.Peer.ID) == s.nodeID {
 				return
 			}
-			wgpeers, err := peers.WireGuardPeersFor(ctx, s.Storage(), s.ID())
+			wgpeers, err := peers.WireGuardPeersFor(ctx, provider.MeshStorage(), s.ID())
 			if err != nil {
 				log.Warn("failed to get wireguard peers", slog.String("error", err.Error()))
 			} else {
@@ -71,7 +74,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 				}
 			}
 			if s.plugins.HasWatchers() {
-				p := peers.New(s.Storage())
+				p := peers.New(provider.MeshStorage())
 				node, err := p.Get(ctx, string(data.Peer.ID))
 				if err != nil {
 					log.Warn("failed to lookup peer, can't emit event", slog.String("error", err.Error()))
@@ -94,7 +97,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 			}
 		case raft.LeaderObservation:
 			if s.plugins.HasWatchers() {
-				p := peers.New(s.Storage())
+				p := peers.New(provider.MeshStorage())
 				node, err := p.Get(ctx, string(data.LeaderID))
 				if err != nil {
 					log.Warn("failed to get leader, may be fresh cluster, can't emit event", slog.String("error", err.Error()))

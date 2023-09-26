@@ -26,8 +26,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
-	"github.com/webmeshproj/webmesh/pkg/raft"
-	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 
 // NewTestNode creates a new test mesh and waits for it to be ready.
@@ -39,10 +38,6 @@ func NewTestNode(ctx context.Context) (Node, error) {
 	})
 	stor := st.(*meshStore)
 	stor.testStore = true
-	storage, err := badgerdb.New(badgerdb.Options{InMemory: true})
-	if err != nil {
-		return nil, err
-	}
 	raftTransport, err := tcp.NewRaftTransport(st, tcp.RaftTransportOptions{
 		Addr:    ":0",
 		MaxPool: 1,
@@ -51,18 +46,15 @@ func NewTestNode(ctx context.Context) (Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts := raft.NewOptions(st.ID())
+	opts := raftstorage.NewOptions(st.ID())
 	opts.InMemory = true
-	rft := raft.New(ctx, opts)
-	if err := rft.Start(ctx, raft.StartOptions{
-		Transport:   raftTransport,
-		MeshStorage: storage,
-		RaftStorage: storage,
-	}); err != nil {
+	opts.Transport = raftTransport
+	rft := raftstorage.NewProvider(opts)
+	if err := rft.Start(ctx); err != nil {
 		return nil, err
 	}
 	if err := stor.Connect(ctx, ConnectOptions{
-		Raft:                 rft,
+		StorageProvider:      rft,
 		GRPCAdvertisePort:    8443,
 		MeshDNSAdvertisePort: 53,
 		Bootstrap: &BootstrapOptions{

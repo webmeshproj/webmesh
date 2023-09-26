@@ -23,7 +23,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
@@ -32,8 +31,7 @@ import (
 type Server struct {
 	v1.UnimplementedAdminServer
 
-	store      storage.MeshStorage
-	raft       raft.Raft
+	storage    storage.Provider
 	peers      peers.Peers
 	rbac       rbacdb.RBAC
 	rbacEval   rbac.Evaluator
@@ -41,13 +39,12 @@ type Server struct {
 }
 
 // New creates a new admin server.
-func New(store storage.MeshStorage, raft raft.Raft, rbac rbac.Evaluator) *Server {
+func New(storage storage.Provider, rbac rbac.Evaluator) *Server {
 	return &Server{
-		store:      store,
-		raft:       raft,
-		peers:      peers.New(store),
-		rbac:       rbacdb.New(store),
+		storage:    storage,
+		peers:      peers.New(storage.MeshStorage()),
+		rbac:       rbacdb.New(storage.MeshStorage()),
 		rbacEval:   rbac,
-		networking: networking.New(store),
+		networking: networking.New(storage.MeshStorage()),
 	}
 }

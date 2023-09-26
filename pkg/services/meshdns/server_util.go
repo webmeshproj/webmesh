@@ -99,6 +99,6 @@ func newNSRecord(mesh meshDomain) dns.RR {
 			Class:  dns.ClassINET,
 			Ttl:    1,
 		},
-		Ns: dns.CanonicalName(fmt.Sprintf("%s.%s", mesh.raft.ID(), mesh.domain)),
+		Ns: dns.CanonicalName(fmt.Sprintf("%s.%s", mesh.nodeID, mesh.domain)),
 	}
 }

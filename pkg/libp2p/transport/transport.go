@@ -18,6 +18,7 @@ limitations under the License.
 package transport
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -48,8 +49,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // TransportBuilder is the signature of a function that builds a webmesh transport.
@@ -373,7 +374,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 			return nil, fmt.Errorf("cannot resolve self")
 		}
 		t.log.Debug("Resolving DNS6 address", "fqdn", fqdn, "nodeID", nodeID)
-		peer, err := peers.New(t.node.Storage()).Get(ctx, nodeID)
+		peer, err := peers.New(t.node.Storage().MeshStorage()).Get(ctx, nodeID)
 		if err != nil {
 			t.log.Error("Failed to get peer", "error", err.Error(), "nodeID", nodeID)
 			return nil, fmt.Errorf("failed to get peer: %w", err)
@@ -391,7 +392,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 			return nil, fmt.Errorf("cannot resolve self")
 		}
 		t.log.Debug("Resolving DNS4 address", "fqdn", fqdn, "nodeID", nodeID)
-		peer, err := peers.New(t.node.Storage()).Get(ctx, nodeID)
+		peer, err := peers.New(t.node.Storage().MeshStorage()).Get(ctx, nodeID)
 		if err != nil {
 			t.log.Error("Failed to get peer", "error", err.Error(), "nodeID", nodeID)
 			return nil, fmt.Errorf("failed to get peer: %w", err)
@@ -413,7 +414,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		t.log.Error("Failed to cast public key to wireguard public key", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to cast public key to wireguard public key")
 	}
-	peer, err := peers.New(t.node.Storage()).GetByPubKey(ctx, wgkey)
+	peer, err := peers.New(t.node.Storage().MeshStorage()).GetByPubKey(ctx, wgkey)
 	if err != nil {
 		t.log.Error("Failed to lookup peer by their public key", "error", err.Error(), "id", id)
 		return nil, fmt.Errorf("failed to get peer: %w", err)
@@ -450,7 +451,7 @@ func (t *WebmeshTransport) Close() error {
 	}
 	err := t.node.Close(ctx)
 	if err != nil {
-		if raft.IsNoLeaderErr(err) {
+		if errors.Is(err, storage.ErrNoLeader) {
 			// This error could possibly mean we were a single node cluster.
 			// Silently ignore it.
 			t.log.Debug("failed to close node", "error", err.Error())
@@ -502,15 +503,11 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	}
 	meshConfig.Key = t.key
 	node := meshnode.NewWithLogger(logging.NewLogger(conf.Global.LogLevel).With("component", "webmesh-node"), meshConfig)
-	startOpts, err := conf.NewRaftStartOptions(node)
+	storageProvider, err := conf.NewStorageProvider(ctx, node)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create raft start options: %w", err)
+		return nil, fmt.Errorf("failed to create storage provider: %w", err)
 	}
-	raft, err := conf.NewRaftNode(ctx, node)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create raft node: %w", err)
-	}
-	connectOpts, err := conf.NewConnectOptions(ctx, node, raft, nil)
+	connectOpts, err := conf.NewConnectOptions(ctx, node, storageProvider, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connect options: %w", err)
 	}
@@ -527,12 +524,12 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	}
 
 	t.log.Info("Starting webmesh node")
-	err = raft.Start(ctx, startOpts)
+	err = storageProvider.Start(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start raft node: %w", err)
 	}
 	cleanFuncs = append(cleanFuncs, func() error {
-		return raft.Stop(ctx)
+		return storageProvider.Close()
 	})
 	err = node.Connect(ctx, connectOpts)
 	if err != nil {
@@ -577,7 +574,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 
 	// Subscribe to peer updates
 	t.log.Debug("Subscribing to peer updates")
-	_, err = node.Storage().Subscribe(context.Background(), graph.NodesPrefix.String(), func(key string, value string) {
+	_, err = node.Storage().MeshStorage().Subscribe(context.Background(), graph.NodesPrefix.String(), func(key string, value string) {
 		log := context.LoggerFrom(ctx)
 		peer := graph.MeshNode{MeshNode: &v1.MeshNode{}}
 		err = protojson.Unmarshal([]byte(value), peer.MeshNode)
@@ -628,7 +625,7 @@ func (t *WebmeshTransport) registerMultiaddrsForListener(ctx context.Context, li
 		}
 		return straddrs
 	}()
-	if !t.node.Raft().IsVoter() {
+	if !t.node.Storage().Consensus().IsMember() {
 		c, err := t.node.DialLeader(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to dial leader: %w", err)
@@ -644,12 +641,12 @@ func (t *WebmeshTransport) registerMultiaddrsForListener(ctx context.Context, li
 		return nil
 	}
 	// We can write it directly to storage
-	self, err := peers.New(t.node.Storage()).Get(ctx, t.node.ID())
+	self, err := peers.New(t.node.Storage().MeshStorage()).Get(ctx, t.node.ID())
 	if err != nil {
 		return fmt.Errorf("failed to get self: %w", err)
 	}
 	self.Multiaddrs = addrstrs
-	err = peers.New(t.node.Storage()).Put(ctx, self.MeshNode)
+	err = peers.New(t.node.Storage().MeshStorage()).Put(ctx, self.MeshNode)
 	if err != nil {
 		return fmt.Errorf("failed to update self: %w", err)
 	}

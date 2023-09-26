@@ -24,26 +24,29 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
+
+// Ensure we implement the interface.
+var _ v1.StorageQueryServiceServer = (*Server)(nil)
 
 // Server is the webmesh storage server.
 type Server struct {
-	v1.UnimplementedStorageServer
+	v1.UnimplementedStorageQueryServiceServer
 
-	raft raft.Raft
-	rbac rbac.Evaluator
-	wg   wireguard.Interface
-	log  *slog.Logger
+	storage storage.Provider
+	rbac    rbac.Evaluator
+	wg      wireguard.Interface
+	log     *slog.Logger
 }
 
 // NewServer returns a new storage Server.
-func NewServer(ctx context.Context, raft raft.Raft, rbac rbac.Evaluator, wg wireguard.Interface) *Server {
+func NewServer(ctx context.Context, storage storage.Provider, rbac rbac.Evaluator, wg wireguard.Interface) *Server {
 	return &Server{
-		raft: raft,
-		rbac: rbac,
-		wg:   wg,
-		log:  context.LoggerFrom(ctx).With("component", "storage-server"),
+		storage: storage,
+		rbac:    rbac,
+		wg:      wg,
+		log:     context.LoggerFrom(ctx).With("component", "storage-server"),
 	}
 }

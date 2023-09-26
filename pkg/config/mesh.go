@@ -45,9 +45,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
-	"github.com/webmeshproj/webmesh/pkg/raft"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // MeshOptions are the options for participating in a mesh.
@@ -78,6 +78,12 @@ type MeshOptions struct {
 	MeshDNSAdvertisePort int `koanf:"meshdns-advertise-port,omitempty"`
 	// UseMeshDNS indicates whether to set mesh DNS servers to the system configuration.
 	UseMeshDNS bool `koanf:"use-meshdns,omitempty"`
+	// RequestVote is true if the node should can provide storage and consensus.
+	RequestVote bool `koanf:"request-vote,omitempty"`
+	// RequestObserver is true if the node should be a storage observer.
+	RequestObserver bool `koanf:"request-observer,omitempty"`
+	// StoragePreferIPv6 is the prefer IPv6 flag for storage provider connections.
+	StoragePreferIPv6 bool `koanf:"prefer-ipv6,omitempty"`
 	// DisableIPv4 disables IPv4 usage.
 	DisableIPv4 bool `koanf:"disable-ipv4,omitempty"`
 	// DisableIPv6 disables IPv6 usage.
@@ -118,6 +124,9 @@ func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.IntVar(&o.GRPCAdvertisePort, prefix+"mesh.grpc-advertise-port", services.DefaultGRPCPort, "Port to advertise for gRPC.")
 	fs.IntVar(&o.MeshDNSAdvertisePort, prefix+"mesh.meshdns-advertise-port", meshdns.DefaultAdvertisePort, "Port to advertise for DNS.")
 	fs.BoolVar(&o.UseMeshDNS, prefix+"mesh.use-meshdns", false, "Set mesh DNS servers to the system configuration.")
+	fs.BoolVar(&o.RequestVote, prefix+"mesh.request-vote", false, "Request a vote in elections for the storage backend.")
+	fs.BoolVar(&o.RequestObserver, prefix+"mesh.request-observer", false, "Request to be an observer in the storage backend.")
+	fs.BoolVar(&o.StoragePreferIPv6, prefix+"mesh.storage-prefer-ipv6", false, "Prefer IPv6 connections for the storage backend transport.")
 	fs.BoolVar(&o.DisableIPv4, prefix+"mesh.disable-ipv4", false, "Disable IPv4 usage.")
 	fs.BoolVar(&o.DisableIPv6, prefix+"mesh.disable-ipv6", false, "Disable IPv6 usage.")
 	fs.BoolVar(&o.DisableFeatureAdvertisement, prefix+"mesh.disable-feature-advertisement", false, "Disable feature advertisement.")
@@ -145,6 +154,11 @@ func (o *MeshOptions) Validate() error {
 	return nil
 }
 
+// IsStorageMember returns true if the node is a storage provider.
+func (o *Config) IsStorageMember() bool {
+	return o.Bootstrap.Enabled || o.Mesh.RequestVote || o.Mesh.RequestObserver
+}
+
 // NewMeshConfig return a new Mesh configuration based on the node configuration.
 // The key is optional and will be taken from the configuration if not provided.
 func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf meshnode.Config, err error) {
@@ -162,7 +176,7 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 	conf = meshnode.Config{
 		NodeID:                  nodeid,
 		Key:                     key,
-		HeartbeatPurgeThreshold: o.Raft.HeartbeatPurgeThreshold,
+		HeartbeatPurgeThreshold: o.Storage.Raft.HeartbeatPurgeThreshold,
 		ZoneAwarenessID:         o.Mesh.ZoneAwarenessID,
 		UseMeshDNS:              o.Mesh.UseMeshDNS,
 		DisableIPv4:             o.Mesh.DisableIPv4,
@@ -328,8 +342,8 @@ func (o *Config) LoadKey(ctx context.Context) (crypto.PrivateKey, error) {
 }
 
 // NewConnectOptions returns new connection options for the configuration. The given raft node must
-// be started it can be used. Host can be nil and if one is needed it will be created.
-func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, raft raft.Raft, host host.Host) (opts meshnode.ConnectOptions, err error) {
+// be started before it can be used. Host can be nil and if one is needed it will be created.
+func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, provider storage.Provider, host host.Host) (opts meshnode.ConnectOptions, err error) {
 	// Determine our node ID
 	nodeid, err := o.NodeID()
 	if err != nil {
@@ -432,7 +446,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, raft
 	}
 
 	opts = meshnode.ConnectOptions{
-		Raft:                 raft,
+		StorageProvider:      provider,
 		JoinRoundTripper:     joinRT,
 		Features:             o.NewFeatureSet(),
 		Bootstrap:            bootstrap,
@@ -441,8 +455,8 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, raft
 		MeshDNSAdvertisePort: o.Mesh.MeshDNSAdvertisePort,
 		PrimaryEndpoint:      primaryEndpoint,
 		WireGuardEndpoints:   wireguardEndpoints,
-		RequestVote:          o.Raft.RequestVote,
-		RequestObserver:      o.Raft.RequestObserver,
+		RequestVote:          o.Mesh.RequestVote,
+		RequestObserver:      o.Mesh.RequestObserver,
 		Routes:               routes,
 		DirectPeers: func() map[string]v1.ConnectProtocol {
 			peers := make(map[string]v1.ConnectProtocol)
@@ -456,7 +470,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, raft
 			}
 			return peers
 		}(),
-		PreferIPv6: o.Raft.PreferIPv6,
+		PreferIPv6: o.Mesh.StoragePreferIPv6,
 		Plugins:    plugins,
 		Discovery: func() *libp2p.AnnounceOptions {
 			if !o.Discovery.Announce {
@@ -479,7 +493,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, raft
 			MTU:                   o.WireGuard.MTU,
 			RecordMetrics:         o.WireGuard.RecordMetrics,
 			RecordMetricsInterval: o.WireGuard.RecordMetricsInterval,
-			RaftPort:              o.RaftListenPort(),
+			StoragePort:           o.Storage.ListenPort(),
 			GRPCPort:              o.Mesh.GRPCAdvertisePort,
 			ZoneAwarenessID:       o.Mesh.ZoneAwarenessID,
 			DialOptions:           conn.Credentials(),
