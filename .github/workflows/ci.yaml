@@ -66,6 +66,7 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout ${{ env.LINT_TIMEOUT }}
+          skip-pkg-cache: true
 
   tests:
     name: Unit Tests
