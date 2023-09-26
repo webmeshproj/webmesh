@@ -71,16 +71,18 @@ COVERAGE_FILE := coverage.out
 TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
-# We limit fmt vet to only Linux in workflows to speed up CI run.
 CI ?= false
 ifeq ($(CI),true)
+# We are running in CI, so skip fmt and vet on Windows and macOS.
 ifeq ($(OS),linux)
 ci-test: mod-download fmt vet test ## Run all CI tests.
 else
 ci-test: mod-download test
 endif
 else
+# We are running locally, so we can run all tests.
 ifeq ($(OS),windows)
+# Don't fmt on Windows, it screws up the line endings.
 ci-test: mod-download vet lint test
 else
 ci-test: mod-download fmt vet lint test
