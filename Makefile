@@ -79,12 +79,9 @@ else
 ci-test: mod-download vet lint test
 endif
 
+RICHGO_VERSION := v0.3.12
 test: ## Run unit tests.
-ifeq ($(OS),linux)
-	$(GO) run github.com/kyoh86/richgo@latest test $(TEST_ARGS) ./...
-else
-	$(GO) test $(TEST_ARGS) ./...
-endif
+	$(GO) run github.com/kyoh86/richgo@$(RICHGO_VERSION) test $(TEST_ARGS) ./...
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 LINT_TIMEOUT := 10m
