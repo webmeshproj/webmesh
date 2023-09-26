@@ -99,7 +99,6 @@ jobs:
           restore-keys: ${{ runner.os }}-binaries-go-${{ env.GO_VERSION }}-
           path: |
             ~/go/pkg
-            ~/go/bin
             ~/.cache/go-build
 
       - name: Setup Cosign
@@ -150,7 +149,6 @@ jobs:
           restore-keys: ${{ runner.os }}-containers-go-${{ env.GO_VERSION }}-
           path: |
             ~/go/pkg
-            ~/go/bin
             ~/.cache/go-build
 
       - name: Setup Cosign
