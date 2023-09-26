@@ -71,7 +71,7 @@ COVERAGE_FILE := coverage.out
 TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
-ci-test: fmt vet test ## Run all CI tests.
+ci-test: mod-download vet test ## Run all CI tests.
 
 test: ## Run unit tests.
 	$(GO) install github.com/kyoh86/richgo@latest
@@ -80,6 +80,9 @@ test: ## Run unit tests.
 
 lint: ## Run linters.
 	$(GO) run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --timeout=5m
+
+mod-download:
+	$(GO) mod download -x
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
