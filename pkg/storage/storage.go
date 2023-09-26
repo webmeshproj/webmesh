@@ -35,19 +35,6 @@ type DualStorage interface {
 	RaftStorage
 }
 
-// RaftStorage is the interface for storing and retrieving data about the state of the mesh.
-// This interface is used by mesh members that are part of the Raft cluster.
-type RaftStorage interface {
-	io.Closer
-	raft.LogStore
-	raft.StableStore
-
-	// Snapshot returns a snapshot of the storage.
-	Snapshot(ctx context.Context) (io.Reader, error)
-	// Restore restores a snapshot of the storage.
-	Restore(ctx context.Context, r io.Reader) error
-}
-
 // MeshStorage is the interface for storing and retrieving data about the state of the mesh.
 type MeshStorage interface {
 	io.Closer
@@ -67,6 +54,19 @@ type MeshStorage interface {
 	// Subscribe will call the given function whenever a key with the given prefix is changed.
 	// The returned function can be called to unsubscribe.
 	Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (context.CancelFunc, error)
+}
+
+// RaftStorage is the interface for storing and retrieving data about the state of the mesh.
+// This interface is used by mesh members that are part of the Raft cluster.
+type RaftStorage interface {
+	io.Closer
+	raft.LogStore
+	raft.StableStore
+
+	// Snapshot returns a snapshot of the storage.
+	Snapshot(ctx context.Context) (io.Reader, error)
+	// Restore restores a snapshot of the storage.
+	Restore(ctx context.Context, r io.Reader) error
 }
 
 // DropStorage is a storage interface that can be dropped entirely.

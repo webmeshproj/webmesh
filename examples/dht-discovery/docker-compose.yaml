@@ -41,7 +41,7 @@ services:
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.100.10.0/24
       - --bootstrap.disable-rbac
-      - --raft.in-memory
+      - --storage.in-memory
       # Enable the WebRTC API to help nodes with ICE connectivity.
       - --services.webrtc.enabled
       - --services.webrtc.stun-servers=stun:10.40.0.1:3478

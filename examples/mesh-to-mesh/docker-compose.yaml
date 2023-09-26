@@ -42,7 +42,7 @@ services:
       - --global.insecure
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --raft.in-memory
+      - --storage.in-memory
       # Bootstrap a new mesh with the domain site-1.internal.
       # We can leave the default and it won't affect DNS later, unless there are overlaps,
       # but that is intended only for testing.
@@ -74,7 +74,7 @@ services:
       - --global.insecure
       - --global.detect-endpoints
       - --global.detect-private-endpoints
-      - --raft.in-memory
+      - --storage.in-memory
       # Same as above, but with the domain site-2.internal.
       - --bootstrap.enabled
       - --bootstrap.mesh-domain=site-2.internal
@@ -110,20 +110,20 @@ services:
       - --global.detect-private-endpoints
       # Site 1 Options
       - --bridge.site-1.mesh.join-address=site-1-node:8443
-      - --bridge.site-1.raft.in-memory
       - --bridge.site-1.wireguard.listen-port=51821
       - --bridge.site-1.wireguard.interface-name=wgsite1
       - --bridge.site-1.services.api.listen-address=:8443
-      - --bridge.site-1.raft.listen-address=:9443
-      - --bridge.site-2.raft.request-observer
+      - --bridge.site-1.storage.in-memory
+      - --bridge.site-1.storage.raft.listen-address=:9443
+      - --bridge.site-2.storage.raft.request-observer
       # Site 2 Options
       - --bridge.site-2.mesh.join-address=site-2-node:8443
-      - --bridge.site-2.raft.in-memory
       - --bridge.site-2.wireguard.listen-port=51822
       - --bridge.site-2.wireguard.interface-name=wgsite2
       - --bridge.site-2.services.api.listen-address=:8444
-      - --bridge.site-2.raft.listen-address=:9444
-      - --bridge.site-2.raft.request-observer
+      - --bridge.site-2.storage.in-memory
+      - --bridge.site-2.storage.raft.listen-address=:9444
+      - --bridge.site-2.storage.raft.request-observer
       # Bridged DNS Options. The DNS server will handle queries for both
       # site-1.internal and site-2.internal and act as a forwarder for each.
       - --bridge.meshdns.enabled

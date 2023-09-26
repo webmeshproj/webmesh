@@ -45,7 +45,7 @@ services:
       - --bootstrap.advertise-address=site-1-leader:9001
       - --bootstrap.servers=site-2-leader=site-2-leader:9001,site-3-leader=site-3-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --raft.in-memory
+      - --storage.in-memory
       - --mesh.zone-awareness-id=site-1
     ports:
       - 8443:8443
@@ -112,7 +112,7 @@ services:
       - --bootstrap.advertise-address=site-2-leader:9001
       - --bootstrap.servers=site-1-leader=site-1-leader:9001,site-3-leader=site-3-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --raft.in-memory
+      - --storage.in-memory
       - --mesh.zone-awareness-id=site-2
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -177,7 +177,7 @@ services:
       - --bootstrap.advertise-address=site-3-leader:9001
       - --bootstrap.servers=site-1-leader=site-1-leader:9001,site-2-leader=site-2-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --raft.in-memory
+      - --storage.in-memory
       - --mesh.zone-awareness-id=site-3
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 

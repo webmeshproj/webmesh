@@ -33,7 +33,7 @@ services:
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.100.10.0/24
-      - --raft.in-memory
+      - --storage.in-memory
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]
 

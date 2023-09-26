@@ -33,7 +33,7 @@ services:
       - --bootstrap.transport.rendezvous=${RENDEZVOUS:-supersecret-webmesh-spot}
       - --bootstrap.transport.rendezvous-nodes=node-2
       - --bootstrap.transport.psk=${PSK:-aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz}
-      - --raft.in-memory
+      - --storage.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
@@ -55,7 +55,7 @@ services:
       - --bootstrap.transport.rendezvous=${RENDEZVOUS:-supersecret-webmesh-spot}
       - --bootstrap.transport.rendezvous-nodes=node-1
       - --bootstrap.transport.psk=${PSK:-aqb6zy6txUO8seqQsPkzUqrbl2X8U6jz}
-      - --raft.in-memory
+      - --storage.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0

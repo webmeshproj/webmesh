@@ -26,7 +26,7 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --raft.in-memory
+      - --storage.in-memory
       - --plugins.test-plugin.remote.server=10.1.0.1:8081
       - --plugins.test-plugin.remote.insecure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
