@@ -74,8 +74,7 @@ TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomi
 ci-test: mod-download vet test ## Run all CI tests.
 
 test: ## Run unit tests.
-	$(GO) install github.com/kyoh86/richgo@latest
-	$(GOBIN)/richgo test $(TEST_ARGS) ./...
+	$(GO) run github.com/kyoh86/richgo@latest test $(TEST_ARGS) ./...
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 lint: ## Run linters.
