@@ -80,7 +80,6 @@ type Provider struct {
 	started                     atomic.Bool
 	raft                        *raft.Raft
 	storage                     *RaftStorage
-	fsm                         *fsm.RaftFSM
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
 	observerClose, observerDone chan struct{}
@@ -133,18 +132,16 @@ func (r *Provider) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create storage: %w", err)
 	}
-	r.storage = &RaftStorage{MeshStorage: storage, raft: r}
 	snapshots, err := r.createSnapshotStorage()
 	if err != nil {
 		return fmt.Errorf("create snapshot storage: %w", err)
 	}
 	log.Debug("Starting raft instance", slog.String("listen-addr", string(r.Options.Transport.LocalAddr())))
-	r.fsm = fsm.New(ctx, storage, fsm.Options{
-		ApplyTimeout: r.Options.ApplyTimeout,
-	})
 	r.raft, err = raft.NewRaft(
 		r.Options.RaftConfig(ctx, string(r.nodeID)),
-		r.fsm,
+		fsm.New(ctx, storage, fsm.Options{
+			ApplyTimeout: r.Options.ApplyTimeout,
+		}),
 		&MonotonicLogStore{storage},
 		storage,
 		snapshots,
@@ -153,6 +150,7 @@ func (r *Provider) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("new raft: %w", err)
 	}
+	r.storage = &RaftStorage{MeshStorage: storage, raft: r}
 	// Register observers.
 	r.observerChan = make(chan raft.Observation, r.Options.ObserverChanBuffer)
 	r.observer = raft.NewObserver(r.observerChan, false, func(o *raft.Observation) bool {
