@@ -80,7 +80,11 @@ ci-test: mod-download vet lint test
 endif
 
 test: ## Run unit tests.
+ifeq ($(OS),linux)
 	$(GO) run github.com/kyoh86/richgo@latest test $(TEST_ARGS) ./...
+else
+	$(GO) test $(TEST_ARGS) ./...
+endif
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 LINT_TIMEOUT := 10m
