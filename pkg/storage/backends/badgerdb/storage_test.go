@@ -31,7 +31,7 @@ func TestInMemoryBadgerStorage(t *testing.T) {
 		t.Fatalf("failed to create in-memory storage: %v", err)
 	}
 	defer st.Close()
-	testutil.RunRaftStorageConformance(t, st)
+	testutil.RunConsensusStorageConformance(t, st)
 	testutil.RunMeshStorageConformance(t, st)
 }
 
@@ -48,6 +48,6 @@ func TestDiskBadgerStorage(t *testing.T) {
 		t.Fatalf("failed to create disk storage: %v", err)
 	}
 	defer st.Close()
-	testutil.RunRaftStorageConformance(t, st)
+	testutil.RunConsensusStorageConformance(t, st)
 	testutil.RunMeshStorageConformance(t, st)
 }

@@ -18,30 +18,9 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	v1 "github.com/webmeshproj/api/v1"
-)
-
-// Common errors for storage providers to use.
-var (
-	// ErrNotStorageNode is returned when a storage operation is attempted on a non-storage node.
-	ErrNotStorageNode = fmt.Errorf("not a storage node")
-	// ErrStarted is returned when the storage provider is already started.
-	ErrStarted = fmt.Errorf("storage provider already started")
-	// ErrClosed is returned when the storage provider is closed.
-	ErrClosed = fmt.Errorf("storage provider is closed")
-	// ErrNotImplemented is returned when a method is not implemented.
-	ErrNotImplemented = fmt.Errorf("not implemented")
-	// ErrNoLeader is returned when there is no leader.
-	ErrNoLeader = fmt.Errorf("no leader")
-	// ErrNotLeader is returned when the node is not the leader.
-	ErrNotLeader = fmt.Errorf("not leader")
-	// ErrNotVoter is returned when the node is not a voter.
-	ErrNotVoter = fmt.Errorf("not voter")
-	// ErrAlreadyBootstrapped is returned when the storage provider is already bootstrapped.
-	ErrAlreadyBootstrapped = fmt.Errorf("already bootstrapped")
 )
 
 // Provider is a provider of MeshStorage.

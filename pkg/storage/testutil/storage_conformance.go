@@ -31,12 +31,12 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// RunRaftStorageConformance tests that the RaftStorage interface is implemented correctly.
-func RunRaftStorageConformance(t *testing.T, raftStorage storage.RaftStorage) {
+// RunConsensusStorageConformance tests that the ConsensusStorage interface is implemented correctly.
+func RunConsensusStorageConformance(t *testing.T, raftStorage storage.ConsensusStorage) {
 	t.Helper()
 
 	defer func() {
-		if dropper, ok := raftStorage.(storage.DropStorage); ok {
+		if dropper, ok := raftStorage.(DropStorage); ok {
 			_ = dropper.DropAll(context.Background())
 		}
 	}()
@@ -487,7 +487,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(storage.DropStorage); ok {
+	if dropper, ok := meshStorage.(DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
@@ -510,7 +510,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(storage.DropStorage); ok {
+	if dropper, ok := meshStorage.(DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
@@ -540,7 +540,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(storage.DropStorage); ok {
+	if dropper, ok := meshStorage.(DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
@@ -613,7 +613,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(storage.DropStorage); ok {
+	if dropper, ok := meshStorage.(DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
@@ -661,13 +661,13 @@ func RunDualStorageConformance(t *testing.T, dualStorage storage.DualStorage) {
 	t.Helper()
 	ctx := context.Background()
 
-	RunRaftStorageConformance(t, dualStorage)
-	if dropper, ok := dualStorage.(storage.DropStorage); ok {
+	RunConsensusStorageConformance(t, dualStorage)
+	if dropper, ok := dualStorage.(DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
 	RunMeshStorageConformance(t, dualStorage)
-	if dropper, ok := dualStorage.(storage.DropStorage); ok {
+	if dropper, ok := dualStorage.(DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 }

@@ -40,12 +40,12 @@ type Snapshotter interface {
 }
 
 type snapshotter struct {
-	st  storage.RaftStorage
+	st  storage.ConsensusStorage
 	log *slog.Logger
 }
 
 // New returns a new Snapshotter.
-func New(ctx context.Context, st storage.RaftStorage) Snapshotter {
+func New(ctx context.Context, st storage.ConsensusStorage) Snapshotter {
 	return &snapshotter{
 		st:  st,
 		log: context.LoggerFrom(ctx).With("component", "snapshots"),

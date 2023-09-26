@@ -16,3 +16,13 @@ limitations under the License.
 
 // Package testutil contains testing utilities for storage providers and backends.
 package testutil
+
+import "context"
+
+// DropStorage is a storage interface that can be dropped entirely.
+// This is primarily used for testing.
+type DropStorage interface {
+	// DropAll drops all data from the storage. This is primarily used
+	// for testing.
+	DropAll(ctx context.Context) error
+}

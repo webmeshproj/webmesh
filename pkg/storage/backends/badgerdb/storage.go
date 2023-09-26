@@ -360,7 +360,7 @@ func (db *badgerDB) Close() error {
 
 // Raft Log Storage Operations
 
-var RaftLogPrefix = storage.RaftPrefix.For("/log/")
+var RaftLogPrefix = storage.ConsensusPrefix.For("/log/")
 
 // FirstIndex returns the first index written. 0 for no entries.
 func (db *badgerDB) FirstIndex() (uint64, error) {
@@ -483,7 +483,7 @@ func (db *badgerDB) DeleteRange(min, max uint64) error {
 
 // Raft Stable Storage Operations
 
-var StableStorePrefix = storage.RaftPrefix.For("/stable/")
+var StableStorePrefix = storage.ConsensusPrefix.For("/stable/")
 
 func (db *badgerDB) Set(key []byte, val []byte) error {
 	db.mu.Lock()

@@ -20,20 +20,11 @@ package storage
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/raft"
 )
-
-// DualStorage represents a storage interface that can serve as both a mesh and Raft storage.
-type DualStorage interface {
-	MeshStorage
-	RaftStorage
-}
 
 // MeshStorage is the interface for storing and retrieving data about the state of the mesh.
 type MeshStorage interface {
@@ -56,9 +47,9 @@ type MeshStorage interface {
 	Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (context.CancelFunc, error)
 }
 
-// RaftStorage is the interface for storing and retrieving data about the state of the mesh.
-// This interface is used by mesh members that are part of the Raft cluster.
-type RaftStorage interface {
+// ConsensusStorage is the interface for storing and retrieving data about the state of consensus.
+// This is currently only used by the built-in raftstorage implementation.
+type ConsensusStorage interface {
 	io.Closer
 	raft.LogStore
 	raft.StableStore
@@ -69,71 +60,14 @@ type RaftStorage interface {
 	Restore(ctx context.Context, r io.Reader) error
 }
 
-// DropStorage is a storage interface that can be dropped entirely.
-// This is primarily used for testing.
-type DropStorage interface {
-	// DropAll drops all data from the storage. This is primarily used
-	// for testing.
-	DropAll(ctx context.Context) error
-}
-
 // SubscribeFunc is the function signature for subscribing to changes to a key.
 type SubscribeFunc func(key, value string)
 
 // PrefixIterator is the function signature for iterating over all keys with a given prefix.
 type PrefixIterator func(key, value string) error
 
-// ErrKeyNotFound is the error returned when a key is not found.
-var ErrKeyNotFound = errors.New("key not found")
-
-// NewKeyNotFoundError returns a new ErrKeyNotFound error.
-func NewKeyNotFoundError(key string) error {
-	return fmt.Errorf("%w: %s", ErrKeyNotFound, key)
-}
-
-// IsKeyNotFoundError returns true if the given error is a ErrKeyNotFound error.
-func IsKeyNotFoundError(err error) bool {
-	return errors.Is(err, ErrKeyNotFound)
-}
-
-// Prefix is a prefix in the storage.
-type Prefix string
-
-const (
-	// RegistryPrefix is the prefix for all data stored in the mesh registry.
-	RegistryPrefix Prefix = "/registry/"
-
-	// RaftPrefix is the prefix for all data stored in the raft storage.
-	RaftPrefix Prefix = "/raft/"
-)
-
-// String returns the string representation of the prefix.
-func (p Prefix) String() string {
-	return string(p)
-}
-
-// Contains returns true if the given key is contained in the prefix.
-func (p Prefix) Contains(key string) bool {
-	return strings.HasPrefix(key, p.String())
-}
-
-// For is a helper method for creating a key for the prefix.
-func (p Prefix) For(key string) Prefix {
-	return Prefix(p.String() + strings.TrimSuffix(key, "/"))
-}
-
-// ReservedPrefixes is a list of all reserved prefixes.
-var ReservedPrefixes = []Prefix{
-	RegistryPrefix,
-	RaftPrefix,
-}
-
-// IsReservedPrefix returns true if the given key is reserved.
-func IsReservedPrefix(key string) bool {
-	for _, prefix := range ReservedPrefixes {
-		if prefix.Contains(key) {
-			return true
-		}
-	}
-	return false
+// DualStorage represents a storage interface that can serve as both a mesh and consensus storage.
+type DualStorage interface {
+	MeshStorage
+	ConsensusStorage
 }
