@@ -41,6 +41,11 @@ type RaftStorage interface {
 	io.Closer
 	raft.LogStore
 	raft.StableStore
+
+	// Snapshot returns a snapshot of the storage.
+	Snapshot(ctx context.Context) (io.Reader, error)
+	// Restore restores a snapshot of the storage.
+	Restore(ctx context.Context, r io.Reader) error
 }
 
 // MeshStorage is the interface for storing and retrieving data about the state of the mesh.
@@ -59,10 +64,6 @@ type MeshStorage interface {
 	// that the iterator not attempt any write operations as this will cause
 	// a deadlock. The iteration will stop if the iterator returns an error.
 	IterPrefix(ctx context.Context, prefix string, fn PrefixIterator) error
-	// Snapshot returns a snapshot of the storage.
-	Snapshot(ctx context.Context) (io.Reader, error)
-	// Restore restores a snapshot of the storage.
-	Restore(ctx context.Context, r io.Reader) error
 	// Subscribe will call the given function whenever a key with the given prefix is changed.
 	// The returned function can be called to unsubscribe.
 	Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (context.CancelFunc, error)

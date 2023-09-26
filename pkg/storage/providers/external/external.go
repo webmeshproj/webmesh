@@ -407,26 +407,6 @@ func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix string, fn st
 	return nil
 }
 
-// Snapshot returns a snapshot of the storage.
-func (ext *ExternalStorage) Snapshot(ctx context.Context) (io.Reader, error) {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
-	if ext.cli == nil {
-		return nil, storage.ErrClosed
-	}
-	return nil, storage.ErrNotImplemented
-}
-
-// Restore restores a snapshot of the storage.
-func (ext *ExternalStorage) Restore(ctx context.Context, r io.Reader) error {
-	ext.mu.Lock()
-	defer ext.mu.Unlock()
-	if ext.cli == nil {
-		return storage.ErrClosed
-	}
-	return storage.ErrNotImplemented
-}
-
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {

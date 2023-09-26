@@ -58,7 +58,7 @@ type Options struct {
 
 // New returns a new RaftFSM. The storage interface must be a direct
 // connection to the underlying database.
-func New(ctx context.Context, st storage.MeshStorage, opts Options) *RaftFSM {
+func New(ctx context.Context, st storage.DualStorage, opts Options) *RaftFSM {
 	return &RaftFSM{
 		store:       st,
 		opts:        opts,

@@ -351,6 +351,109 @@ func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
 		})
 	})
 
+	// We will use the same snapshot for the Snapshot and Restore tests
+	var snapshot io.Reader
+	snapshotKV := map[string]string{
+		"/registry/Snapshot/key1": "value1",
+		"/registry/Snapshot/key2": "value2",
+	}
+
+	if meshStorage, ok := raftStorage.(MeshStorage); ok {
+		ctx := context.Background()
+		t.Run("Snapshot", func(t *testing.T) {
+			// Place a few keys and make sure a snapshot conforms to our expectations.
+			for key, value := range snapshotKV {
+				if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
+					t.Fatalf("failed to put key: %v", err)
+				}
+			}
+			var err error
+			snapshot, err = raftStorage.Snapshot(ctx)
+			if err != nil {
+				t.Fatalf("failed to get snapshot: %v", err)
+			}
+			// Unmarshal the snapshot
+			var snap v1.RaftSnapshot
+			var buf bytes.Buffer
+			tee := io.TeeReader(snapshot, &buf)
+			data, err := io.ReadAll(tee)
+			// Reset the snapshot reader for the Restore test
+			snapshot = &buf
+			if err != nil {
+				t.Fatalf("failed to read snapshot: %v", err)
+			}
+			if err := proto.Unmarshal(data, &snap); err != nil {
+				t.Fatalf("failed to unmarshal snapshot: %v", err)
+			}
+			// Make sure the snapshot has the correct keys
+			if len(snap.Kv) != len(snapshotKV) {
+				t.Errorf("expected %d keys, got %d", len(snapshotKV), len(snap.Kv))
+			}
+			for _, keyval := range snap.Kv {
+				if _, ok := snapshotKV[keyval.Key]; !ok {
+					t.Errorf("unexpected key %q", keyval.Key)
+				}
+			}
+			// Make sure the snapshot items have the correct data
+			for _, keyval := range snap.Kv {
+				if keyval.Value != snapshotKV[keyval.Key] {
+					t.Errorf("expected %q, got %q", snapshotKV[keyval.Key], keyval.Value)
+				}
+				if keyval.Ttl.AsDuration() != 0 {
+					t.Errorf("expected %q, got %q", snapshotKV[keyval.Key], keyval.Value)
+				}
+			}
+		})
+
+		t.Run("Restore", func(t *testing.T) {
+			// Place some keys that we don't want to see return
+			// after the snapshot is restored.
+			restoreKV := map[string]string{
+				"/registry/Restore/key1": "value1",
+				"/registry/Restore/key2": "value2",
+			}
+			for key, value := range restoreKV {
+				if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
+					t.Fatalf("failed to put key: %v", err)
+				}
+			}
+			// Drop all keys from the Snapshot test and then restore the snapshot.
+			// We should be able to get the keys back.
+			for key := range snapshotKV {
+				if err := meshStorage.Delete(ctx, key); err != nil {
+					t.Fatalf("failed to delete key: %v", err)
+				}
+			}
+			// Make sure they are indeed gone
+			for key := range snapshotKV {
+				_, err := meshStorage.GetValue(ctx, key)
+				if !IsKeyNotFoundError(err) {
+					t.Errorf("expected ErrKeyNotFound, got %v", err)
+				}
+			}
+			// Restore the snapshot
+			if err := raftStorage.Restore(ctx, snapshot); err != nil {
+				t.Fatalf("failed to restore snapshot: %v", err)
+			}
+			// Make sure we can get the keys back
+			for key, value := range snapshotKV {
+				got, err := meshStorage.GetValue(ctx, key)
+				if err != nil {
+					t.Fatalf("failed to get key: %v", err)
+				}
+				if got != value {
+					t.Errorf("expected %q, got %q", value, got)
+				}
+			}
+			// Make sure the keys we don't want to see are still gone
+			for key := range restoreKV {
+				_, err := meshStorage.GetValue(ctx, key)
+				if !IsKeyNotFoundError(err) {
+					t.Errorf("expected ErrKeyNotFound, got %v", err)
+				}
+			}
+		})
+	}
 }
 
 // RunMeshStorageConformance tests that the MeshStorage interface is implemented correctly.
@@ -546,111 +649,6 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		for key := range kv {
 			if err := meshStorage.Delete(ctx, key); err != nil {
 				t.Fatalf("failed to delete key: %v", err)
-			}
-		}
-	})
-
-	if dropper, ok := meshStorage.(DropStorage); ok {
-		_ = dropper.DropAll(ctx)
-	}
-
-	// We will use the same snapshot for the Snapshot and Restore tests
-	var snapshot io.Reader
-	snapshotKV := map[string]string{
-		"/registry/Snapshot/key1": "value1",
-		"/registry/Snapshot/key2": "value2",
-	}
-
-	t.Run("Snapshot", func(t *testing.T) {
-		// Place a few keys and make sure a snapshot conforms to our expectations.
-		for key, value := range snapshotKV {
-			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
-				t.Fatalf("failed to put key: %v", err)
-			}
-		}
-		var err error
-		snapshot, err = meshStorage.Snapshot(ctx)
-		if err != nil {
-			t.Fatalf("failed to get snapshot: %v", err)
-		}
-		// Unmarshal the snapshot
-		var snap v1.RaftSnapshot
-		var buf bytes.Buffer
-		tee := io.TeeReader(snapshot, &buf)
-		data, err := io.ReadAll(tee)
-		// Reset the snapshot reader for the Restore test
-		snapshot = &buf
-		if err != nil {
-			t.Fatalf("failed to read snapshot: %v", err)
-		}
-		if err := proto.Unmarshal(data, &snap); err != nil {
-			t.Fatalf("failed to unmarshal snapshot: %v", err)
-		}
-		// Make sure the snapshot has the correct keys
-		if len(snap.Kv) != len(snapshotKV) {
-			t.Errorf("expected %d keys, got %d", len(snapshotKV), len(snap.Kv))
-		}
-		for _, keyval := range snap.Kv {
-			if _, ok := snapshotKV[keyval.Key]; !ok {
-				t.Errorf("unexpected key %q", keyval.Key)
-			}
-		}
-		// Make sure the snapshot items have the correct data
-		for _, keyval := range snap.Kv {
-			if keyval.Value != snapshotKV[keyval.Key] {
-				t.Errorf("expected %q, got %q", snapshotKV[keyval.Key], keyval.Value)
-			}
-			if keyval.Ttl.AsDuration() != 0 {
-				t.Errorf("expected %q, got %q", snapshotKV[keyval.Key], keyval.Value)
-			}
-		}
-	})
-
-	t.Run("Restore", func(t *testing.T) {
-		// Place some keys that we don't want to see return
-		// after the snapshot is restored.
-		restoreKV := map[string]string{
-			"/registry/Restore/key1": "value1",
-			"/registry/Restore/key2": "value2",
-		}
-		for key, value := range restoreKV {
-			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
-				t.Fatalf("failed to put key: %v", err)
-			}
-		}
-		// Drop all keys from the Snapshot test and then restore the snapshot.
-		// We should be able to get the keys back.
-		for key := range snapshotKV {
-			if err := meshStorage.Delete(ctx, key); err != nil {
-				t.Fatalf("failed to delete key: %v", err)
-			}
-		}
-		// Make sure they are indeed gone
-		for key := range snapshotKV {
-			_, err := meshStorage.GetValue(ctx, key)
-			if !IsKeyNotFoundError(err) {
-				t.Errorf("expected ErrKeyNotFound, got %v", err)
-			}
-		}
-		// Restore the snapshot
-		if err := meshStorage.Restore(ctx, snapshot); err != nil {
-			t.Fatalf("failed to restore snapshot: %v", err)
-		}
-		// Make sure we can get the keys back
-		for key, value := range snapshotKV {
-			got, err := meshStorage.GetValue(ctx, key)
-			if err != nil {
-				t.Fatalf("failed to get key: %v", err)
-			}
-			if got != value {
-				t.Errorf("expected %q, got %q", value, got)
-			}
-		}
-		// Make sure the keys we don't want to see are still gone
-		for key := range restoreKV {
-			_, err := meshStorage.GetValue(ctx, key)
-			if !IsKeyNotFoundError(err) {
-				t.Errorf("expected ErrKeyNotFound, got %v", err)
 			}
 		}
 	})
