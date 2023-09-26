@@ -10,12 +10,12 @@ env:
   REGISTRY: ghcr.io
   ALPINE_IMAGE_NAME: ghcr.io/webmeshproj/node
   DISTROLESS_IMAGE_NAME: ghcr.io/webmeshproj/node-distroless
-  GO_VERSION: ^1.21
+  GO_VERSION: "1.21"
   GOLANGCI_LINT_VERSION: v1.54.2
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   CACHE_DEP_PATH: go.sum
   LINT_TIMEOUT: 10m
-  BUILD_PARALLELISM: 6
+  BUILD_PARALLELISM: 4
   TEST_PARALLELISM: 16
   # Lower test parallelism to avoid OOM on Windows
   WIN_TEST_PARALLELISM: 2
@@ -40,6 +40,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
 
       - name: Download Go Modules
@@ -59,6 +60,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
 
       - name: Run Linting
@@ -86,6 +88,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
 
       - name: Run Unit Tests
@@ -112,6 +115,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
 
       - name: Setup Cosign
@@ -152,6 +156,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
 
       - name: Setup Cosign
