@@ -312,8 +312,8 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// the Subscribe RPC.
 	if req.GetAsVoter() || req.GetAsObserver() {
 		// Add peer to the raft cluster
-		addRaftMember := func() {
-			// Wait for the call to be complete before adding the raft member
+		addStorageMember := func() {
+			// Wait for the call to be complete before adding the storage member
 			// To give the caller a better chance at being ready before the
 			// first heartbeat.
 			<-ctx.Done()
@@ -347,7 +347,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 			}
 		}
-		go addRaftMember()
+		go addStorageMember()
 	}
 
 	// Start building the response

@@ -185,7 +185,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 
 	// Apply any node changes
 	if hasChanges {
-		log.Debug("updating peer", slog.Any("peer", toUpdate))
+		log.Debug("Updating peer", slog.Any("peer", toUpdate))
 		err = p.Put(ctx, toUpdate.MeshNode)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
@@ -198,7 +198,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 			return nil, status.Errorf(codes.Internal, "failed to lookup peer address")
 		}
 		// Promote to voter
-		log.Info("promoting to voter", slog.String("raft_address", string(currentAddress)))
+		log.Debug("Promoting peer to voter", slog.String("storage-address", string(currentAddress)))
 		if err := s.storage.Consensus().AddVoter(ctx, &v1.StoragePeer{
 			Id:      req.GetId(),
 			Address: currentAddress,

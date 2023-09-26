@@ -513,6 +513,12 @@ func (r *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
 	if !r.IsLeader() {
 		return storage.ErrNotLeader
 	}
+	defer func() {
+		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
+		if err != nil {
+			r.log.Warn("Error issuing barrier", "error", err.Error())
+		}
+	}()
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
@@ -535,6 +541,12 @@ func (r *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error
 	if !r.IsLeader() {
 		return storage.ErrNotLeader
 	}
+	defer func() {
+		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
+		if err != nil {
+			r.log.Warn("Error issuing barrier", "error", err.Error())
+		}
+	}()
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
@@ -557,6 +569,12 @@ func (r *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error
 	if !r.IsLeader() {
 		return storage.ErrNotLeader
 	}
+	defer func() {
+		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
+		if err != nil {
+			r.log.Warn("Error issuing barrier", "error", err.Error())
+		}
+	}()
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
@@ -579,6 +597,12 @@ func (r *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait b
 	if !r.IsLeader() {
 		return storage.ErrNotLeader
 	}
+	defer func() {
+		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
+		if err != nil {
+			r.log.Warn("Error issuing barrier", "error", err.Error())
+		}
+	}()
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)

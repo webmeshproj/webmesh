@@ -15,7 +15,7 @@ env:
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   CACHE_DEP_PATH: go.sum
   LINT_TIMEOUT: 10m
-  BUILD_PARALLELISM: 16
+  BUILD_PARALLELISM: 6
   TEST_PARALLELISM: 16
   # Lower test parallelism to avoid OOM on Windows
   WIN_TEST_PARALLELISM: 2

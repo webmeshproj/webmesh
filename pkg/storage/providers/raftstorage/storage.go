@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -31,7 +32,12 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
+// Ensure that RaftStorage implements a MonothonicLogStore.
 var _ = raft.MonotonicLogStore(&MonotonicLogStore{})
+
+// BarrierThreshold is the threshold for sending a barrier after
+// a write operation. TODO: make this configurable.
+const BarrierThreshold = 10
 
 // MonotonicLogStore is a LogStore that is monotonic.
 type MonotonicLogStore struct {
@@ -46,7 +52,8 @@ func (m *MonotonicLogStore) IsMonotonic() bool {
 // RaftStorage wraps the storage.Storage interface to force write operations through the Raft log.
 type RaftStorage struct {
 	storage.MeshStorage
-	raft *Provider
+	writecount atomic.Uint64
+	raft       *Provider
 }
 
 // Put sets the value of a key.
@@ -116,6 +123,13 @@ func (rs *RaftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLog
 }
 
 func (rs *RaftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
+	rs.writecount.Add(1)
+	if rs.writecount.Load() >= BarrierThreshold {
+		defer rs.writecount.Store(0)
+		if err := rs.raft.raft.Barrier(rs.raft.Options.ApplyTimeout).Error(); err != nil {
+			rs.raft.log.Warn("Error issuing barrier", "error", err.Error())
+		}
+	}
 	res, err := rs.raft.Apply(ctx, logEntry)
 	if err != nil {
 		if errors.Is(err, raft.ErrNotLeader) {
