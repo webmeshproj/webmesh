@@ -209,16 +209,9 @@ func (ext *Consensus) IsLeader() bool {
 }
 
 // IsMember returns true if the node is a member of the storage group.
+// External storage providers should always be members.
 func (ext *Consensus) IsMember() bool {
-	// Use a short timeout
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-	defer cancel()
-	resp, err := ext.cli.IsMember(ctx, &v1.IsMemberRequest{Peer: ext.NodeID})
-	if err != nil {
-		ext.log.Error("Failed to get membership", "error", err.Error())
-		return false
-	}
-	return resp.GetIsMember()
+	return true
 }
 
 // GetLeader returns the leader of the storage group.

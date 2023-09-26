@@ -470,6 +470,12 @@ func (r *Consensus) IsLeader() bool {
 	return r.raft.State() == raft.Leader
 }
 
+// IsMember returns true if the Raft node is a member of the cluster.
+func (r *Consensus) IsMember() bool {
+	// Non raft-members use the passthrough storage.
+	return true
+}
+
 // GetLeader returns the leader of the cluster.
 func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 	r.mu.RLock()
@@ -495,14 +501,6 @@ func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 		Address:       string(leaderAddr),
 		ClusterStatus: v1.ClusterStatus_CLUSTER_LEADER,
 	}, nil
-}
-
-// IsMember returns true if the Raft node is a member of the cluster.
-func (r *Consensus) IsMember() bool {
-	// We fast path this to avoid the lock and avoid race conditions
-	// if voter propagation is slow.
-	// Non raft-members use the passthrough storage.
-	return true
 }
 
 // AddVoter adds a voter to the consensus group.
