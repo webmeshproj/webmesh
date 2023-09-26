@@ -14,15 +14,21 @@ env:
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   DISTROLESS_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   BUILD_PARALLELISM: 4
-  TEST_PARALLELISM: 8
-  WIN_TEST_PARALLELISM: 4
+  TEST_PARALLELISM: 16
+  # Lower test parallelism to avoid OOM on Windows
+  WIN_TEST_PARALLELISM: 2
 
 jobs:
-  lint:
-    name: Static Analysis
-    runs-on: ubuntu-latest
+  module-cache:
+    name: Build Module Caches
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: "read"
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -36,6 +42,22 @@ jobs:
       - name: Download Go Modules
         shell: bash
         run: go mod download -x
+
+  lint:
+    name: Static Analysis
+    needs: [module-cache]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: go.sum
 
       - name: Run Linting
         uses: golangci/golangci-lint-action@v3
@@ -67,7 +89,6 @@ jobs:
       - name: Run Unit Tests
         shell: bash
         env:
-          # Lower test parallelism to avoid OOM on Windows
           TEST_PARALLEL: ${{ matrix.os == 'windows-latest' && env.WIN_TEST_PARALLELISM || env.TEST_PARALLELISM }}
           RICHGO_FORCE_COLOR: 1
         run: make ci-test
