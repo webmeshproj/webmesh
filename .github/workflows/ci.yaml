@@ -66,6 +66,15 @@ jobs:
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
           cache: ${{ matrix.os != 'windows-latest' }}
 
+      - name: Setup Windows Mod Cache
+        uses: actions/cache@v3
+        if: ${{ matrix.os == 'windows-latest' }}
+        with:
+          key: ${{ runner.os }}-windows-tests-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
+          restore-keys: ${{ runner.os }}-windows-tests-go-${{ env.GO_VERSION }}-
+          path: |
+            ~/go/pkg
+
       - name: Run Unit Tests
         env:
           TEST_PARALLEL: ${{ matrix.os == 'windows-latest' && env.WIN_TEST_PARALLELISM || env.TEST_PARALLELISM }}
