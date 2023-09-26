@@ -165,7 +165,11 @@ FENCE
 	// Auth disclaimer about needing more flags
 	sb.WriteString("_TODO: Generic flags need to be provided for external plugin auth providers_\n\n")
 	appendFlagSection("Bootstrap Configurations", "bootstrap", &sb)
-	appendFlagSection("Raft Configurations", "raft", &sb)
+	appendFlagSection("Storage Configurations", "storage", &sb, "storage.raft", "storage.external")
+	sb.WriteString("#")
+	appendFlagSection("Raft Storage Configurations", "storage.raft", &sb)
+	sb.WriteString("#")
+	appendFlagSection("External Storage Configurations", "storage.external", &sb)
 	appendFlagSection("TLS Configurations", "tls", &sb)
 	appendFlagSection("WireGuard Configurations", "wireguard", &sb)
 	appendFlagSection("Discovery Configurations", "discovery", &sb)
@@ -174,13 +178,18 @@ FENCE
 	return os.WriteFile(outfile, []byte(sb.String()), 0644)
 }
 
-func appendFlagSection(title string, flagPrefix string, sb *strings.Builder) {
+func appendFlagSection(title string, flagPrefix string, sb *strings.Builder, skipPrefix ...string) {
 	if title != "" {
 		sb.WriteString(fmt.Sprintf("## %s\n\n", title))
 	}
 	sb.WriteString("| CLI Flag | Env Var | Config File | Default | Description |\n")
 	sb.WriteString("| -------- | ------- | ----------- | ------- | ----------- |\n")
 	flagset.VisitAll(func(f *pflag.Flag) {
+		for _, p := range skipPrefix {
+			if strings.HasPrefix(f.Name, p) {
+				return
+			}
+		}
 		if !strings.HasPrefix(f.Name, flagPrefix) {
 			return
 		}

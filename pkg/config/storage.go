@@ -65,7 +65,7 @@ type StorageOptions struct {
 	// Path is the path to the storage directory.
 	Path string `koanf:"path,omitempty"`
 	// Provider is the storage provider. If empty, the default is used.
-	Provider StorageProvider `koanf:"provider,omitempty"`
+	Provider string `koanf:"provider,omitempty"`
 	// Raft are the raft storage options.
 	Raft RaftOptions `koanf:"raft,omitempty"`
 	// External are the external storage options.
@@ -78,7 +78,7 @@ type StorageOptions struct {
 func NewStorageOptions() StorageOptions {
 	return StorageOptions{
 		Path:     raftstorage.DefaultDataDir,
-		Provider: StorageProviderRaft,
+		Provider: string(StorageProviderRaft),
 		Raft:     NewRaftOptions(),
 		External: NewExternalStorageOptions(),
 		LogLevel: "info",
@@ -90,7 +90,7 @@ func (o *StorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	prefix = prefix + "storage."
 	fs.BoolVar(&o.InMemory, prefix+"in-memory", o.InMemory, "Use in-memory storage")
 	fs.StringVar(&o.Path, prefix+"path", o.Path, "Path to the storage directory")
-	fs.StringVar((*string)(&o.Provider), prefix+"provider", string(o.Provider), "Storage provider")
+	fs.StringVar(&o.Provider, prefix+"provider", o.Provider, "Storage provider (defaults to raftstorage or passthrough depending on other options)")
 	fs.StringVar(&o.LogLevel, prefix+"log-level", o.LogLevel, "Log level for the storage provider")
 	o.Raft.BindFlags(prefix+"raft.", fs)
 	o.External.BindFlags(prefix+"external.", fs)
@@ -98,17 +98,18 @@ func (o *StorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 
 // Validate validates the storage options.
 func (o *StorageOptions) Validate(isMember bool) error {
-	if !o.Provider.IsValid() {
+	provider := StorageProvider(o.Provider)
+	if !provider.IsValid() {
 		return fmt.Errorf("invalid storage provider: %s", o.Provider)
 	}
-	if o.Provider == StorageProviderRaft {
+	if provider == StorageProviderRaft {
 		if isMember {
 			if err := o.Raft.Validate(o.Path, o.InMemory); err != nil {
 				return err
 			}
 		}
 	}
-	if o.Provider == StorageProviderExternal {
+	if provider == StorageProviderExternal {
 		if err := o.External.Validate(); err != nil {
 			return err
 		}
@@ -118,7 +119,7 @@ func (o *StorageOptions) Validate(isMember bool) error {
 
 // ListenPort returns the port to listen on for the storage provider.
 func (o *StorageOptions) ListenPort() int {
-	if o.Provider == StorageProviderRaft || o.Provider == "" {
+	if o.Provider == string(StorageProviderRaft) || o.Provider == "" {
 		return o.Raft.ListenPort()
 	}
 	// TODO: Get the port from the external storage provider.
@@ -131,7 +132,7 @@ func (o *Config) NewStorageProvider(ctx context.Context, node meshnode.Node) (st
 	if !o.IsStorageMember() {
 		return passthroughstorage.NewProvider(o.Storage.NewPassthroughOptions(ctx, node)), nil
 	}
-	switch o.Storage.Provider {
+	switch StorageProvider(o.Storage.Provider) {
 	case StorageProviderRaft, "":
 		return o.Storage.NewRaftStorageProvider(ctx, node)
 	case StorageProviderExternal:
@@ -254,9 +255,8 @@ func NewExternalStorageOptions() ExternalStorageOptions {
 
 // BindFlags binds the external storage options to the flag set.
 func (o *ExternalStorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	prefix = prefix + "external."
 	fs.StringVar(&o.Server, prefix+"server", o.Server, "Address of a server for the plugin")
-	fs.Var(&o.Config, prefix+"config", "Configuration to pass to the plugin")
+	fs.Var(&o.Config, prefix+"config", "Configuration to pass to the plugin as key value pairs")
 	fs.BoolVar(&o.Insecure, prefix+"insecure", o.Insecure, "Use an insecure connection to the plugin server")
 	fs.StringVar(&o.TLSCAFile, prefix+"tls-ca-file", o.TLSCAFile, "Path to a CA for verifying certificates")
 	fs.StringVar(&o.TLSCertFile, prefix+"tls-cert-file", o.TLSCertFile, "Path to a certificate for authenticating to the plugin server")

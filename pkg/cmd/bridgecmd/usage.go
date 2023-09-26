@@ -71,7 +71,11 @@ Global flags are supported, but do not override TLS and some WireGuard configura
 	// Auth disclaimer about needing more flags
 	sb.WriteString("_TODO: Generic flags need to be provided for external plugin auth providers_\n\n")
 	appendFlagSectionNoEnv(flagset, "Bootstrap Configurations", "bridge.<mesh-id>.bootstrap", &sb)
-	appendFlagSectionNoEnv(flagset, "Raft Configurations", "bridge.<mesh-id>.raft", &sb)
+	appendFlagSectionNoEnv(flagset, "Storage Configurations", "bridge.<mesh-id>.storage", &sb, "storage.raft", "storage.external")
+	sb.WriteString("#")
+	appendFlagSectionNoEnv(flagset, "Raft Storage Configurations", "bridge.<mesh-id>.storage.raft", &sb)
+	sb.WriteString("#")
+	appendFlagSectionNoEnv(flagset, "External Storage Configurations", "bridge.<mesh-id>.storage.external", &sb)
 	appendFlagSectionNoEnv(flagset, "TLS Configurations", "bridge.<mesh-id>.tls", &sb)
 	appendFlagSectionNoEnv(flagset, "WireGuard Configurations", "bridge.<mesh-id>.wireguard", &sb)
 	appendFlagSectionNoEnv(flagset, "Discovery Configurations", "bridge.<mesh-id>.discovery", &sb)
