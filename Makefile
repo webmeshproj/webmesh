@@ -32,8 +32,8 @@ PARALLEL   ?= $(shell nproc)
 build: fmt vet ## Build node and wmctl binaries for the current architecture.
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl --parallelism=$(PARALLEL)
 
-build-wasm: fmt vet ## Build node wasm binary for the current architecture.
-	$(GORELEASER) build $(BUILD_ARGS) --id node-wasm --parallelism=$(PARALLEL)
+# build-wasm: fmt vet ## Build node wasm binary for the current architecture.
+# 	$(GORELEASER) build $(BUILD_ARGS) --id node-wasm --parallelism=$(PARALLEL)
 
 dist: fmt vet ## Build distribution binaries and packages for all platforms.
 	$(GORELEASER) release --skip=sign $(BUILD_ARGS) --parallelism=$(PARALLEL)
@@ -71,14 +71,21 @@ COVERAGE_FILE := coverage.out
 TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
+# Lint is run in a previous stage during CI, so we don't need to run it again.
+CI ?= false
+ifeq ($(CI),true)
 ci-test: mod-download vet test ## Run all CI tests.
+else
+ci-test: mod-download vet lint test
+endif
 
 test: ## Run unit tests.
 	$(GO) run github.com/kyoh86/richgo@latest test $(TEST_ARGS) ./...
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
+LINT_TIMEOUT := 10m
 lint: ## Run linters.
-	$(GO) run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --timeout=5m
+	$(GO) run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --timeout=$(LINT_TIMEOUT)
 
 mod-download:
 	$(GO) mod download -x
