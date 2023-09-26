@@ -32,17 +32,18 @@ help: ## Display this help.
 ##@ Build
 
 GORELEASER ?= $(GO) run github.com/goreleaser/goreleaser@latest
-BUILD_ARGS ?= --snapshot --clean
+BUILD_ARGS ?= --snapshot --clean --parallelism=$(PARALLEL)
 PARALLEL   ?= $(shell nproc)
 
 build: ## Build node and wmctl binaries for the current architecture.
-	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl --parallelism=$(PARALLEL)
+	$(GORELEASER) build --single-target --id node --id wmctl $(BUILD_ARGS)
 
 # build-wasm: fmt vet ## Build node wasm binary for the current architecture.
 # 	$(GORELEASER) build $(BUILD_ARGS) --id node-wasm --parallelism=$(PARALLEL)
 
+.PHONY: dist
 dist: ## Build distribution binaries and packages for all platforms.
-	$(GORELEASER) release --skip=sign $(BUILD_ARGS) --parallelism=$(PARALLEL)
+	$(GORELEASER) release --skip=sign $(BUILD_ARGS)
 
 DOCKER ?= docker
 
