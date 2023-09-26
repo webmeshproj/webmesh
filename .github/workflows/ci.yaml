@@ -36,14 +36,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           check-latest: true
-          cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
+          cache: false
 
       - name: Run Linting
         uses: golangci/golangci-lint-action@v3
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout ${{ env.LINT_TIMEOUT }}
-          skip-pkg-cache: true
 
   tests:
     name: Unit Tests
@@ -65,6 +64,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           check-latest: true
           cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
+          cache: ${{ matrix.os != 'windows-latest' }}
 
       - name: Run Unit Tests
         env:
