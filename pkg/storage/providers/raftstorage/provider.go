@@ -40,8 +40,6 @@ import (
 
 // Ensure we satisfy the provider interface.
 var _ storage.Provider = &Provider{}
-var _ storage.Consensus = &Consensus{}
-var _ storage.MeshStorage = &RaftStorage{}
 
 type (
 	// SnapshotMeta is an alias for raft.SnapshotMeta.
@@ -79,7 +77,7 @@ type Provider struct {
 	nodeID                      raft.ServerID
 	started                     atomic.Bool
 	raft                        *raft.Raft
-	storage                     *RaftStorage
+	raftStorage                 *RaftStorage
 	consensus                   *Consensus
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
@@ -97,6 +95,7 @@ func NewProvider(opts Options) *Provider {
 		log:     logging.NewLogger(opts.LogLevel).With("component", "raftstorage"),
 	}
 	p.consensus = &Consensus{Provider: p}
+	p.raftStorage = &RaftStorage{raft: p}
 	return p
 }
 
@@ -109,7 +108,7 @@ func (r *Provider) OnObservation(cb ObservationCallback) {
 
 // MeshStorage returns the underlying MeshStorage instance.
 func (r *Provider) MeshStorage() storage.MeshStorage {
-	return r.storage
+	return r.raftStorage
 }
 
 // Consensus returns the underlying Consensus instance.
@@ -135,6 +134,8 @@ func (r *Provider) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create storage: %w", err)
 	}
+	// Set the raft storage instance.
+	r.raftStorage.storage = storage
 	snapshots, err := r.createSnapshotStorage()
 	if err != nil {
 		return fmt.Errorf("create snapshot storage: %w", err)
@@ -153,7 +154,6 @@ func (r *Provider) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("new raft: %w", err)
 	}
-	r.storage = &RaftStorage{MeshStorage: storage, raft: r}
 	// Register observers.
 	r.observerChan = make(chan raft.Observation, r.Options.ObserverChanBuffer)
 	r.observer = raft.NewObserver(r.observerChan, false, func(o *raft.Observation) bool {
@@ -178,7 +178,7 @@ func (r *Provider) Status() *v1.StorageStatus {
 	}
 	var status v1.StorageStatus
 	config := r.raft.GetConfiguration().Configuration()
-	status.IsWritable = r.IsVoter()
+	status.IsWritable = r.isVoter()
 	leader, err := r.Consensus().GetLeader(context.Background())
 	if err != nil {
 		r.log.Error("Failed to get leader", "error", err.Error())
@@ -187,19 +187,19 @@ func (r *Provider) Status() *v1.StorageStatus {
 		if leader != nil && leader.GetId() == string(r.nodeID) {
 			return v1.ClusterStatus_CLUSTER_LEADER
 		}
-		if r.IsVoter() {
+		if r.isVoter() {
 			return v1.ClusterStatus_CLUSTER_VOTER
 		}
-		if r.IsObserver() {
+		if r.isObserver() {
 			return v1.ClusterStatus_CLUSTER_OBSERVER
 		}
 		return v1.ClusterStatus_CLUSTER_NODE
 	}()
 	status.Message = func() string {
-		if r.IsVoter() {
+		if r.isVoter() {
 			return "current cluster voter"
 		}
-		if r.IsObserver() {
+		if r.isObserver() {
 			return "current cluster observer"
 		}
 		if status.ClusterStatus == v1.ClusterStatus_CLUSTER_LEADER {
@@ -227,6 +227,160 @@ func (r *Provider) Status() *v1.StorageStatus {
 		})
 	}
 	return &status
+}
+
+// Bootstrap bootstraps the raft storage provider.
+func (r *Provider) Bootstrap(ctx context.Context) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.started.Load() {
+		return storage.ErrClosed
+	}
+	port := r.Options.Transport.AddrPort().Port()
+	cfg := raft.Configuration{
+		Servers: []raft.Server{
+			{
+				Suffrage: raft.Voter,
+				ID:       r.nodeID,
+				Address:  raft.ServerAddress(net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))),
+			},
+		},
+	}
+	f := r.raft.BootstrapCluster(cfg)
+	err := f.Error()
+	if err != nil {
+		if err == raft.ErrCantBootstrap {
+			return storage.ErrAlreadyBootstrapped
+		}
+		return fmt.Errorf("bootstrap cluster: %w", err)
+	}
+	// Wait for the leader to be elected.
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("bootstrap cluster: %w", ctx.Err())
+		default:
+			addr, id := r.raft.LeaderWithID()
+			if addr == "" && id == "" {
+				time.Sleep(time.Millisecond * 500)
+				continue
+			}
+			if id != r.nodeID {
+				// Something very wrong happened.
+				return fmt.Errorf("bootstrap cluster: leader is not us")
+			}
+			return nil
+		}
+	}
+}
+
+// Close closes the mesh storage and shuts down the raft instance.
+func (r *Provider) Close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.started.Load() {
+		return nil
+	}
+	defer func() {
+		err := r.raftStorage.Close()
+		if err != nil {
+			r.log.Error("Error closing storage", "error", err.Error())
+		}
+	}()
+	r.log.Debug("Stopping raft storage provider")
+	defer r.log.Debug("Raft storage provider stopped")
+	defer r.started.Store(false)
+	defer r.raftStorage.Close()
+	defer r.Options.Transport.Close()
+	// If we were not running in memory, force a snapshot.
+	if !r.Options.InMemory {
+		r.log.Debug("Taking raft storage snapshot")
+		err := r.raft.Snapshot().Error()
+		if err != nil {
+			// Make this non-fatal for now
+			r.log.Error("Failed to take snapshot", slog.String("error", err.Error()))
+		}
+	}
+	// If we were the leader, step down.
+	if r.raft.State() == raft.Leader {
+		r.log.Debug("Raft node is current leader, stepping down")
+		if err := r.raft.LeadershipTransfer().Error(); err != nil && !errors.Is(err, raft.ErrNotLeader) {
+			r.log.Warn("Failed to transfer leadership", slog.String("error", err.Error()))
+		}
+	}
+	r.log.Debug("Shutting down raft node")
+	err := r.raft.Shutdown().Error()
+	if err != nil {
+		return fmt.Errorf("raft shutdown: %w", err)
+	}
+	return nil
+}
+
+// GetRaftConfiguration returns the current raft configuration.
+func (r *Provider) GetRaftConfiguration() (raft.Configuration, error) {
+	if r.raft == nil {
+		return raft.Configuration{}, storage.ErrClosed
+	}
+	return r.raft.GetConfiguration().Configuration(), nil
+}
+
+// ApplyRaftLog applies a raft log entry.
+func (r *Provider) ApplyRaftLog(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.started.Load() {
+		return nil, storage.ErrClosed
+	}
+	if !r.Consensus().IsLeader() {
+		return nil, storage.ErrNotLeader
+	}
+	var timeout time.Duration
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout = time.Until(deadline)
+	}
+	r.log.Debug("applying log entry", slog.String("type", log.Type.String()), slog.String("key", log.Key), slog.Duration("timeout", timeout))
+	data, err := fsm.MarshalLogEntry(log)
+	if err != nil {
+		return nil, fmt.Errorf("marshal log entry: %w", err)
+	}
+	f := r.raft.Apply(data, timeout)
+	err = f.Error()
+	if err != nil {
+		return nil, fmt.Errorf("apply: %w", err)
+	}
+	resp, ok := f.Response().(*v1.RaftApplyResponse)
+	if !ok {
+		return nil, fmt.Errorf("apply: invalid response type")
+	}
+	return resp, nil
+}
+
+// IsVoter returns true if the Raft node is a voter.
+func (r *Provider) isVoter() bool {
+	config, err := r.GetRaftConfiguration()
+	if err != nil {
+		return false
+	}
+	for _, server := range config.Servers {
+		if server.ID == r.nodeID {
+			return server.Suffrage == raft.Voter
+		}
+	}
+	return false
+}
+
+// IsObserver returns true if the Raft node is an observer.
+func (r *Provider) isObserver() bool {
+	config, err := r.GetRaftConfiguration()
+	if err != nil {
+		return false
+	}
+	for _, server := range config.Servers {
+		if server.ID == r.nodeID {
+			return server.Suffrage == raft.Nonvoter
+		}
+	}
+	return false
 }
 
 // createStorage creates the underlying storage.
@@ -306,315 +460,4 @@ func (r *Provider) observe() (closeCh, doneCh chan struct{}) {
 		}
 	}()
 	return closeCh, doneCh
-}
-
-// Bootstrap bootstraps the raft storage provider.
-func (r *Provider) Bootstrap(ctx context.Context) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.started.Load() {
-		return storage.ErrClosed
-	}
-	port := r.Options.Transport.AddrPort().Port()
-	cfg := raft.Configuration{
-		Servers: []raft.Server{
-			{
-				Suffrage: raft.Voter,
-				ID:       r.nodeID,
-				Address:  raft.ServerAddress(net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))),
-			},
-		},
-	}
-	f := r.raft.BootstrapCluster(cfg)
-	err := f.Error()
-	if err != nil {
-		if err == raft.ErrCantBootstrap {
-			return storage.ErrAlreadyBootstrapped
-		}
-		return fmt.Errorf("bootstrap cluster: %w", err)
-	}
-	// Wait for the leader to be elected.
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("bootstrap cluster: %w", ctx.Err())
-		default:
-			addr, id := r.raft.LeaderWithID()
-			if addr == "" && id == "" {
-				time.Sleep(time.Millisecond * 500)
-				continue
-			}
-			if id != r.nodeID {
-				// Something very wrong happened.
-				return fmt.Errorf("bootstrap cluster: leader is not us")
-			}
-			return nil
-		}
-	}
-}
-
-// Close closes the mesh storage and shuts down the raft instance.
-func (r *Provider) Close() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.started.Load() {
-		return nil
-	}
-	defer func() {
-		err := r.storage.Close()
-		if err != nil {
-			r.log.Error("Error closing storage", "error", err.Error())
-		}
-	}()
-	r.log.Debug("Stopping raft storage provider")
-	defer r.log.Debug("Raft storage provider stopped")
-	defer r.started.Store(false)
-	defer r.Options.Transport.Close()
-	// If we were not running in memory, force a snapshot.
-	if !r.Options.InMemory {
-		r.log.Debug("Taking raft storage snapshot")
-		err := r.raft.Snapshot().Error()
-		if err != nil {
-			// Make this non-fatal for now
-			r.log.Error("Failed to take snapshot", slog.String("error", err.Error()))
-		}
-	}
-	// If we were the leader, step down.
-	if r.raft.State() == raft.Leader {
-		r.log.Debug("Raft node is current leader, stepping down")
-		if err := r.raft.LeadershipTransfer().Error(); err != nil && !errors.Is(err, raft.ErrNotLeader) {
-			r.log.Warn("Failed to transfer leadership", slog.String("error", err.Error()))
-		}
-	}
-	r.log.Debug("Shutting down raft node")
-	err := r.raft.Shutdown().Error()
-	if err != nil {
-		return fmt.Errorf("raft shutdown: %w", err)
-	}
-	return nil
-}
-
-// IsVoter returns true if the Raft node is a voter.
-func (r *Provider) IsVoter() bool {
-	config, err := r.GetRaftConfiguration()
-	if err != nil {
-		return false
-	}
-	for _, server := range config.Servers {
-		if server.ID == r.nodeID {
-			return server.Suffrage == raft.Voter
-		}
-	}
-	return false
-}
-
-// IsObserver returns true if the Raft node is an observer.
-func (r *Provider) IsObserver() bool {
-	config, err := r.GetRaftConfiguration()
-	if err != nil {
-		return false
-	}
-	for _, server := range config.Servers {
-		if server.ID == r.nodeID {
-			return server.Suffrage == raft.Nonvoter
-		}
-	}
-	return false
-}
-
-// GetRaftConfiguration returns the current raft configuration.
-func (r *Provider) GetRaftConfiguration() (raft.Configuration, error) {
-	if r.raft == nil {
-		return raft.Configuration{}, storage.ErrClosed
-	}
-	return r.raft.GetConfiguration().Configuration(), nil
-}
-
-// ApplyRaftLog applies a raft log entry.
-func (r *Provider) ApplyRaftLog(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.started.Load() {
-		return nil, storage.ErrClosed
-	}
-	if !r.Consensus().IsLeader() {
-		return nil, storage.ErrNotLeader
-	}
-	var timeout time.Duration
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.Until(deadline)
-	}
-	r.log.Debug("applying log entry", slog.String("type", log.Type.String()), slog.String("key", log.Key), slog.Duration("timeout", timeout))
-	data, err := fsm.MarshalLogEntry(log)
-	if err != nil {
-		return nil, fmt.Errorf("marshal log entry: %w", err)
-	}
-	f := r.raft.Apply(data, timeout)
-	err = f.Error()
-	if err != nil {
-		return nil, fmt.Errorf("apply: %w", err)
-	}
-	resp, ok := f.Response().(*v1.RaftApplyResponse)
-	if !ok {
-		return nil, fmt.Errorf("apply: invalid response type")
-	}
-	return resp, nil
-}
-
-// RaftConsensus is the Raft consensus implementation.
-type Consensus struct {
-	*Provider
-}
-
-// IsLeader returns true if the Raft node is the leader.
-func (r *Consensus) IsLeader() bool {
-	return r.raft.State() == raft.Leader
-}
-
-// IsMember returns true if the Raft node is a member of the cluster.
-func (r *Consensus) IsMember() bool {
-	// Non raft-members use the passthrough storage.
-	return true
-}
-
-// GetLeader returns the leader of the cluster.
-func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if !r.started.Load() {
-		return nil, storage.ErrClosed
-	}
-	if r.IsLeader() {
-		// Fast path for leader.
-		return &v1.StoragePeer{
-			Id:            string(r.nodeID),
-			Address:       string(r.Options.Transport.LocalAddr()),
-			ClusterStatus: v1.ClusterStatus_CLUSTER_LEADER,
-		}, nil
-	}
-	// Slow path for non-leaders.
-	leaderAddr, leaderID := r.raft.LeaderWithID()
-	if leaderAddr == "" && leaderID == "" {
-		return nil, storage.ErrNoLeader
-	}
-	return &v1.StoragePeer{
-		Id:            string(leaderID),
-		Address:       string(leaderAddr),
-		ClusterStatus: v1.ClusterStatus_CLUSTER_LEADER,
-	}, nil
-}
-
-// AddVoter adds a voter to the consensus group.
-func (r *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.started.Load() {
-		return storage.ErrClosed
-	}
-	if !r.IsLeader() {
-		return storage.ErrNotLeader
-	}
-	defer func() {
-		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
-		if err != nil {
-			r.log.Warn("Error issuing barrier", "error", err.Error())
-		}
-	}()
-	var timeout time.Duration
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.Until(deadline)
-	}
-	f := r.raft.AddVoter(raft.ServerID(peer.GetId()), raft.ServerAddress(peer.GetAddress()), 0, timeout)
-	err := f.Error()
-	if err != nil && errors.Is(err, raft.ErrNotLeader) {
-		return storage.ErrNotLeader
-	}
-	return err
-}
-
-// AddObserver adds an observer to the consensus group.
-func (r *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.started.Load() {
-		return storage.ErrClosed
-	}
-	if !r.IsLeader() {
-		return storage.ErrNotLeader
-	}
-	defer func() {
-		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
-		if err != nil {
-			r.log.Warn("Error issuing barrier", "error", err.Error())
-		}
-	}()
-	var timeout time.Duration
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.Until(deadline)
-	}
-	f := r.raft.AddNonvoter(raft.ServerID(peer.GetId()), raft.ServerAddress(peer.GetAddress()), 0, timeout)
-	err := f.Error()
-	if err != nil && errors.Is(err, raft.ErrNotLeader) {
-		return storage.ErrNotLeader
-	}
-	return err
-}
-
-// DemoteVoter demotes a voter to an observer.
-func (r *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.started.Load() {
-		return storage.ErrClosed
-	}
-	if !r.IsLeader() {
-		return storage.ErrNotLeader
-	}
-	defer func() {
-		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
-		if err != nil {
-			r.log.Warn("Error issuing barrier", "error", err.Error())
-		}
-	}()
-	var timeout time.Duration
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.Until(deadline)
-	}
-	f := r.raft.DemoteVoter(raft.ServerID(peer.GetId()), 0, timeout)
-	err := f.Error()
-	if err != nil && errors.Is(err, raft.ErrNotLeader) {
-		return storage.ErrNotLeader
-	}
-	return err
-}
-
-// RemovePeer removes a peer from the consensus group.
-func (r *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.started.Load() {
-		return storage.ErrClosed
-	}
-	if !r.IsLeader() {
-		return storage.ErrNotLeader
-	}
-	defer func() {
-		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
-		if err != nil {
-			r.log.Warn("Error issuing barrier", "error", err.Error())
-		}
-	}()
-	var timeout time.Duration
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.Until(deadline)
-	}
-	f := r.raft.RemoveServer(raft.ServerID(peer.GetId()), 0, timeout)
-	if !wait {
-		return nil
-	}
-	err := f.Error()
-	if err != nil && errors.Is(err, raft.ErrNotLeader) {
-		return storage.ErrNotLeader
-	}
-	return err
 }

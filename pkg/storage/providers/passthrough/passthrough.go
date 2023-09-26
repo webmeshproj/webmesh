@@ -315,16 +315,6 @@ func (p *Storage) IterPrefix(ctx context.Context, prefix string, fn storage.Pref
 	}
 }
 
-// Snapshot returns a snapshot of the storage.
-func (p *Storage) Snapshot(ctx context.Context) (io.Reader, error) {
-	return nil, storage.ErrNotStorageNode
-}
-
-// Restore restores a snapshot of the storage.
-func (p *Storage) Restore(ctx context.Context, r io.Reader) error {
-	return storage.ErrNotStorageNode
-}
-
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (p *Storage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
@@ -416,7 +406,7 @@ func (p *Storage) doSubscribe(ctx context.Context, prefix string, fn storage.Sub
 	}
 }
 
-// Close closes the storage. This is a no-op and is handled by the passthroughRaft.
+// Close closes the storage.
 func (p *Storage) Close() error {
 	return nil
 }

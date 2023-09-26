@@ -19,7 +19,6 @@ package raftstorage
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -34,6 +33,9 @@ import (
 
 // Ensure that RaftStorage implements a MonothonicLogStore.
 var _ = raft.MonotonicLogStore(&MonotonicLogStore{})
+
+// Ensure we satisfy the MeshStorage interface.
+var _ storage.MeshStorage = &RaftStorage{}
 
 // BarrierThreshold is the threshold for sending a barrier after
 // a write operation. TODO: make this configurable.
@@ -51,14 +53,57 @@ func (m *MonotonicLogStore) IsMonotonic() bool {
 
 // RaftStorage wraps the storage.Storage interface to force write operations through the Raft log.
 type RaftStorage struct {
-	storage.MeshStorage
+	storage    storage.MeshStorage
 	writecount atomic.Uint64
 	raft       *Provider
 }
 
+// Close closes the storage.
+func (rs *RaftStorage) Close() error {
+	if !rs.raft.started.Load() {
+		return storage.ErrClosed
+	}
+	return rs.storage.Close()
+}
+
+// GetValue gets the value of a key.
+func (rs *RaftStorage) GetValue(ctx context.Context, key string) (string, error) {
+	if !rs.raft.started.Load() {
+		return "", storage.ErrClosed
+	}
+	return rs.storage.GetValue(ctx, key)
+}
+
+// List returns a list of keys.
+func (rs *RaftStorage) List(ctx context.Context, prefix string) ([]string, error) {
+	if !rs.raft.started.Load() {
+		return nil, storage.ErrClosed
+	}
+	return rs.storage.List(ctx, prefix)
+}
+
+// IterPrefix iterates over all keys with a given prefix.
+func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
+	if !rs.raft.started.Load() {
+		return storage.ErrClosed
+	}
+	return rs.storage.IterPrefix(ctx, prefix, fn)
+}
+
+// Subscribe subscribes to changes to a key.
+func (rs *RaftStorage) Subscribe(ctx context.Context, key string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+	if !rs.raft.started.Load() {
+		return func() {}, storage.ErrClosed
+	}
+	return rs.storage.Subscribe(ctx, key, fn)
+}
+
 // Put sets the value of a key.
 func (rs *RaftStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
-	if !rs.raft.IsVoter() {
+	if !rs.raft.started.Load() {
+		return storage.ErrClosed
+	}
+	if !rs.raft.isVoter() {
 		return storage.ErrNotVoter
 	}
 	logEntry := v1.RaftLogEntry{
@@ -77,7 +122,10 @@ func (rs *RaftStorage) PutValue(ctx context.Context, key, value string, ttl time
 
 // Delete removes a key.
 func (rs *RaftStorage) Delete(ctx context.Context, key string) error {
-	if !rs.raft.IsVoter() {
+	if !rs.raft.started.Load() {
+		return storage.ErrClosed
+	}
+	if !rs.raft.isVoter() {
 		return storage.ErrNotVoter
 	}
 	logEntry := v1.RaftLogEntry{
@@ -90,16 +138,6 @@ func (rs *RaftStorage) Delete(ctx context.Context, key string) error {
 	}
 	// We need to forward the request to the leader.
 	return rs.sendLogToLeader(ctx, &logEntry)
-}
-
-// Snapshot returns a snapshot of the storage.
-func (rs *RaftStorage) Snapshot(ctx context.Context) (io.Reader, error) {
-	return nil, errors.New("not implemented")
-}
-
-// Restore restores a snapshot of the storage.
-func (rs *RaftStorage) Restore(ctx context.Context, r io.Reader) error {
-	return errors.New("not implemented")
 }
 
 func (rs *RaftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLogEntry) error {
