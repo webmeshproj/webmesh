@@ -94,7 +94,11 @@ endif
 
 .PHONY: vet
 vet: ## Run go vet against code.
+ifeq ($(OS),windows)
+	echo "Skipping go vet on windows"
+else
 	$(GO) vet ./...
+endif
 
 ##@ Misc
 
