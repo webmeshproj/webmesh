@@ -63,7 +63,16 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           check-latest: true
-          cache-dependency-path: ${{ env.CACHE_DEP_PATH }}
+          cache: false
+
+      - name: Setup Test Cache
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-tests-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
+          restore-keys: ${{ runner.os }}-tests-go-${{ env.GO_VERSION }}-
+          path: |
+            ~/go/pkg
+            ~/.cache/go-build
 
       - name: Run Unit Tests
         env:
