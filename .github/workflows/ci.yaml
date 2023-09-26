@@ -15,7 +15,7 @@ env:
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   CACHE_DEP_PATH: go.sum
   LINT_TIMEOUT: 10m
-  WEBMESH_BADGER_MAX_GOROUTINES: 8
+  WEBMESH_BADGER_MAX_GOROUTINES: 4
   BUILD_PARALLELISM: 8
   TEST_PARALLELISM: 8
   # Lower test parallelism to avoid OOM on Windows
