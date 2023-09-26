@@ -29,13 +29,13 @@ GORELEASER ?= $(GO) run github.com/goreleaser/goreleaser@latest
 BUILD_ARGS ?= --snapshot --clean
 PARALLEL   ?= $(shell nproc)
 
-build: fmt vet ## Build node and wmctl binaries for the current architecture.
+build: ## Build node and wmctl binaries for the current architecture.
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id node --id wmctl --parallelism=$(PARALLEL)
 
 # build-wasm: fmt vet ## Build node wasm binary for the current architecture.
 # 	$(GORELEASER) build $(BUILD_ARGS) --id node-wasm --parallelism=$(PARALLEL)
 
-dist: fmt vet ## Build distribution binaries and packages for all platforms.
+dist: ## Build distribution binaries and packages for all platforms.
 	$(GORELEASER) release --skip=sign $(BUILD_ARGS) --parallelism=$(PARALLEL)
 
 DOCKER ?= docker
@@ -71,12 +71,20 @@ COVERAGE_FILE := coverage.out
 TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
-# Lint is run in a previous stage during CI, so we don't need to run it again.
+# We limit fmt vet to only Linux in workflows to speed up CI run.
 CI ?= false
 ifeq ($(CI),true)
-ci-test: mod-download vet test ## Run all CI tests.
+ifeq ($(OS),linux)
+ci-test: mod-download fmt vet test ## Run all CI tests.
 else
+ci-test: mod-download test
+endif
+else
+ifeq ($(OS),windows)
 ci-test: mod-download vet lint test
+else
+ci-test: mod-download fmt vet lint test
+endif
 endif
 
 RICHGO_VERSION := v0.3.12
@@ -93,19 +101,11 @@ mod-download:
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-ifeq ($(OS),windows)
-	echo "Skipping go fmt on windows"
-else
 	$(GO) fmt ./...
-endif
 
 .PHONY: vet
 vet: ## Run go vet against code.
-ifeq ($(OS),windows)
-	echo "Skipping go vet on windows"
-else
 	$(GO) vet ./...
-endif
 
 ##@ Misc
 
