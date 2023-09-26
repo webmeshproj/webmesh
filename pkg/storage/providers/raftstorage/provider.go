@@ -120,6 +120,51 @@ func (r *Provider) ListenPort() uint16 {
 	return r.Options.Transport.AddrPort().Port()
 }
 
+// Start starts the raft storage provider.
+func (r *Provider) Start(ctx context.Context) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.started.Load() {
+		return storage.ErrStarted
+	}
+	log := r.log
+	log.Debug("Starting raft storage provider")
+	storage, err := r.createStorage()
+	if err != nil {
+		return fmt.Errorf("create storage: %w", err)
+	}
+	r.storage = &RaftStorage{MeshStorage: storage, raft: r}
+	snapshots, err := r.createSnapshotStorage()
+	if err != nil {
+		return fmt.Errorf("create snapshot storage: %w", err)
+	}
+	log.Debug("Starting raft instance", slog.String("listen-addr", string(r.Options.Transport.LocalAddr())))
+	r.fsm = fsm.New(ctx, storage, fsm.Options{
+		ApplyTimeout: r.Options.ApplyTimeout,
+	})
+	r.raft, err = raft.NewRaft(
+		r.Options.RaftConfig(ctx, string(r.nodeID)),
+		r.fsm,
+		&MonotonicLogStore{storage},
+		storage,
+		snapshots,
+		r.Options.Transport,
+	)
+	if err != nil {
+		return fmt.Errorf("new raft: %w", err)
+	}
+	// Register observers.
+	r.observerChan = make(chan raft.Observation, r.Options.ObserverChanBuffer)
+	r.observer = raft.NewObserver(r.observerChan, false, func(o *raft.Observation) bool {
+		return true
+	})
+	r.raft.RegisterObserver(r.observer)
+	r.observerClose, r.observerDone = r.observe()
+	// We're done here.
+	r.started.Store(true)
+	return nil
+}
+
 // Status returns the status of the storage provider.
 func (r *Provider) Status() *v1.StorageStatus {
 	r.mu.RLock()
@@ -183,51 +228,6 @@ func (r *Provider) Status() *v1.StorageStatus {
 	return &status
 }
 
-// Start starts the raft storage provider.
-func (r *Provider) Start(ctx context.Context) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.started.Load() {
-		return storage.ErrStarted
-	}
-	log := r.log
-	log.Debug("Starting raft storage provider")
-	storage, err := r.createStorage()
-	if err != nil {
-		return fmt.Errorf("create storage: %w", err)
-	}
-	r.storage = &RaftStorage{MeshStorage: storage, raft: r}
-	snapshots, err := r.createSnapshotStorage()
-	if err != nil {
-		return fmt.Errorf("create snapshot storage: %w", err)
-	}
-	log.Debug("Starting raft instance", slog.String("listen-addr", string(r.Options.Transport.LocalAddr())))
-	r.fsm = fsm.New(ctx, storage, fsm.Options{
-		ApplyTimeout: r.Options.ApplyTimeout,
-	})
-	r.raft, err = raft.NewRaft(
-		r.Options.RaftConfig(ctx, string(r.nodeID)),
-		r.fsm,
-		&MonotonicLogStore{storage},
-		storage,
-		snapshots,
-		r.Options.Transport,
-	)
-	if err != nil {
-		return fmt.Errorf("new raft: %w", err)
-	}
-	// Register observers.
-	r.observerChan = make(chan raft.Observation, r.Options.ObserverChanBuffer)
-	r.observer = raft.NewObserver(r.observerChan, false, func(o *raft.Observation) bool {
-		return true
-	})
-	r.raft.RegisterObserver(r.observer)
-	r.observerClose, r.observerDone = r.observe()
-	// We're done here.
-	r.started.Store(true)
-	return nil
-}
-
 // createStorage creates the underlying storage.
 func (r *Provider) createStorage() (storage.DualStorage, error) {
 	if r.Options.InMemory {
@@ -238,15 +238,15 @@ func (r *Provider) createStorage() (storage.DualStorage, error) {
 		return db, nil
 	}
 	// Make sure the data directory exists
-	dataDir := filepath.Join(r.Options.DataDir, "data")
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		return nil, fmt.Errorf("create data directory: %w", err)
-	}
+	dataDir := filepath.Join(r.Options.DataDir, r.Options.NodeID, "data")
 	// If we are forcing bootstrap, delete the data directory
 	if r.Options.ClearDataDir {
-		if err := os.RemoveAll(dataDir); err != nil {
+		if err := os.RemoveAll(dataDir); err != nil && !os.IsNotExist(err) {
 			return nil, fmt.Errorf("remove data directory: %w", err)
 		}
+	}
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return nil, fmt.Errorf("ensure data directory: %w", err)
 	}
 	db, err := badgerdb.New(badgerdb.Options{
 		DiskPath: dataDir,

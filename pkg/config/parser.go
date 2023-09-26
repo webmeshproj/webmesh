@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	stdjson "encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -78,8 +79,29 @@ func (c *Config) LoadFrom(fs *pflag.FlagSet, confFiles []string) error {
 	if err != nil {
 		return fmt.Errorf("error loading flags: %w", err)
 	}
-
-	// Finally unmarsal the configuration
+	// TODO: Not sure why we have to do this here. Something to do
+	// with the custom flag value.
+	for _, mapKey := range []string{"storage.external.config"} {
+		// TODO: This is a hack to get around the fact that we can't
+		// set a map[string]any value from a flag.
+		val := k.String(mapKey)
+		if val == "" {
+			err := k.Set(mapKey, make(map[string]any))
+			if err != nil {
+				return fmt.Errorf("error setting %s: %w", mapKey, err)
+			}
+		}
+		var m map[string]any
+		err := stdjson.Unmarshal([]byte(val), &m)
+		if err != nil {
+			return fmt.Errorf("error unmarshaling %s: %w", mapKey, err)
+		}
+		err = k.Set(mapKey, m)
+		if err != nil {
+			return fmt.Errorf("error setting %s: %w", mapKey, err)
+		}
+	}
+	// Finally unmarsal the configuration'
 	err = k.Unmarshal("", c)
 	if err != nil {
 		return fmt.Errorf("error unmarshaling configuration: %w", err)

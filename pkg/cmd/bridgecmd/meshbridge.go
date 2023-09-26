@@ -79,7 +79,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	for meshID, meshConn := range meshes {
 		// Create a new raft node and build connection options
 		meshConfig := config.Meshes[meshID]
-		storageProvider, err := meshConfig.NewStorageProvider(ctx, meshConn)
+		storageProvider, err := meshConfig.NewStorageProvider(ctx, meshConn, meshConfig.Bootstrap.Force)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create storage provider: %w", err))
 		}

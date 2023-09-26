@@ -201,10 +201,13 @@ func appendFlagSection(title string, flagPrefix string, sb *strings.Builder, ski
 			strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(f.Name, "-", "_"), ".", "_")),
 			f.Name,
 			func() string {
-				if f.DefValue == "" {
+				if f.DefValue == "" && f.NoOptDefVal == "" {
 					return ""
 				}
-				return fmt.Sprintf("`%s`", f.DefValue)
+				if f.DefValue != "" {
+					return fmt.Sprintf("`%s`", f.DefValue)
+				}
+				return fmt.Sprintf("`%s`", f.NoOptDefVal)
 			}(),
 			usage,
 		))

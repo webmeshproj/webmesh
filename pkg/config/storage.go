@@ -88,10 +88,10 @@ func NewStorageOptions() StorageOptions {
 // BindFlags binds the storage options to the flag set.
 func (o *StorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	prefix = prefix + "storage."
-	fs.BoolVar(&o.InMemory, prefix+"in-memory", o.InMemory, "Use in-memory storage")
-	fs.StringVar(&o.Path, prefix+"path", o.Path, "Path to the storage directory")
-	fs.StringVar(&o.Provider, prefix+"provider", o.Provider, "Storage provider (defaults to raftstorage or passthrough depending on other options)")
-	fs.StringVar(&o.LogLevel, prefix+"log-level", o.LogLevel, "Log level for the storage provider")
+	fs.BoolVar(&o.InMemory, prefix+"in-memory", false, "Use in-memory storage")
+	fs.StringVar(&o.Path, prefix+"path", raftstorage.DefaultDataDir, "Path to the storage directory")
+	fs.StringVar(&o.Provider, prefix+"provider", string(StorageProviderRaft), "Storage provider (defaults to raftstorage or passthrough depending on other options)")
+	fs.StringVar(&o.LogLevel, prefix+"log-level", "info", "Log level for the storage provider")
 	o.Raft.BindFlags(prefix+"raft.", fs)
 	o.External.BindFlags(prefix+"external.", fs)
 }
@@ -128,13 +128,13 @@ func (o *StorageOptions) ListenPort() int {
 
 // NewStorageProvider creates a new storage provider from the given options. If not a storage providing member, a node dialer
 // is required for the passthrough storage provider.
-func (o *Config) NewStorageProvider(ctx context.Context, node meshnode.Node) (storage.Provider, error) {
+func (o *Config) NewStorageProvider(ctx context.Context, node meshnode.Node, force bool) (storage.Provider, error) {
 	if !o.IsStorageMember() {
 		return passthroughstorage.NewProvider(o.Storage.NewPassthroughOptions(ctx, node)), nil
 	}
 	switch StorageProvider(o.Storage.Provider) {
 	case StorageProviderRaft, "":
-		return o.Storage.NewRaftStorageProvider(ctx, node)
+		return o.Storage.NewRaftStorageProvider(ctx, node, force)
 	case StorageProviderExternal:
 		return o.Storage.NewExternalStorageProvider(ctx, node.ID())
 	case StorageProviderPassThrough:
@@ -145,8 +145,8 @@ func (o *Config) NewStorageProvider(ctx context.Context, node meshnode.Node) (st
 }
 
 // NewRaftStorageProvider returns a new raftstorage provider for the current configuration.
-func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, node meshnode.Node) (storage.Provider, error) {
-	opts, err := o.NewRaftOptions(ctx, node)
+func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, node meshnode.Node, force bool) (storage.Provider, error) {
+	opts, err := o.NewRaftOptions(ctx, node, force)
 	if err != nil {
 		return nil, err
 	}
@@ -163,13 +163,14 @@ func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID 
 }
 
 // NewRaftOptions returns a new raft options for the current configuration.
-func (o *StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node) (raftstorage.Options, error) {
+func (o *StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node, force bool) (raftstorage.Options, error) {
 	opts := raftstorage.NewOptions(node.ID())
 	raftTransport, err := o.Raft.NewTransport(node)
 	if err != nil {
 		return opts, fmt.Errorf("create raft transport: %w", err)
 	}
 	opts.Transport = raftTransport
+	opts.ClearDataDir = force
 	opts.DataDir = o.Path
 	opts.InMemory = o.InMemory
 	opts.ConnectionPoolCount = o.Raft.ConnectionPoolCount
@@ -250,7 +251,9 @@ type ExternalStorageOptions struct {
 
 // NewExternalStorageOptions creates a new external storage options.
 func NewExternalStorageOptions() ExternalStorageOptions {
-	return ExternalStorageOptions{}
+	return ExternalStorageOptions{
+		Config: make(PluginMapConfig),
+	}
 }
 
 // BindFlags binds the external storage options to the flag set.

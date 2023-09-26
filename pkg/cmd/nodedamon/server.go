@@ -118,7 +118,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		return nil, status.Errorf(codes.Internal, "failed to create mesh config: %v", err)
 	}
 	meshConn := meshnode.New(meshConfig)
-	storageProvider, err := conf.NewStorageProvider(ctx, meshConn)
+	storageProvider, err := conf.NewStorageProvider(ctx, meshConn, conf.Bootstrap.Force)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create storage provider: %v", err)
 	}

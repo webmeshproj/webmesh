@@ -503,7 +503,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	}
 	meshConfig.Key = t.key
 	node := meshnode.NewWithLogger(logging.NewLogger(conf.Global.LogLevel).With("component", "webmesh-node"), meshConfig)
-	storageProvider, err := conf.NewStorageProvider(ctx, node)
+	storageProvider, err := conf.NewStorageProvider(ctx, node, conf.Bootstrap.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage provider: %w", err)
 	}

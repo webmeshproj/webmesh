@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -89,6 +90,7 @@ type PluginConfig struct {
 
 // BindFlags binds the flags for the plugin configuration.
 func (o *PluginConfig) BindFlags(prefix string, fs *pflag.FlagSet) {
+	fs.Var(&o.Config, prefix+"config", "Configuration for the plugin as comma separated key values.")
 	o.Exec.BindFlags(prefix, fs)
 	o.Remote.BindFlags(prefix, fs)
 }
@@ -176,11 +178,18 @@ func (o *Config) NewPluginSet(ctx context.Context) (map[string]plugins.Plugin, e
 type PluginMapConfig map[string]any
 
 func (p PluginMapConfig) String() string {
-	return ""
+	if p == nil {
+		p = PluginMapConfig{}
+	}
+	out, _ := json.Marshal(p)
+	return string(out)
 }
 
 func (p PluginMapConfig) Set(s string) error {
 	// We split the string on commas first
+	if p == nil {
+		p = PluginMapConfig{}
+	}
 	fields := strings.Split(s, ",")
 	for _, field := range fields {
 		spl := strings.Split(field, "=")

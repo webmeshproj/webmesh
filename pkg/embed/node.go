@@ -94,7 +94,7 @@ func NewNode(ctx context.Context, opts Options) (Node, error) {
 	}
 	meshConn := meshnode.NewWithLogger(log, meshConfig)
 	// Create a storage provider
-	storageProvider, err := config.NewStorageProvider(ctx, meshConn)
+	storageProvider, err := config.NewStorageProvider(ctx, meshConn, config.Bootstrap.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage provider: %w", err)
 	}
