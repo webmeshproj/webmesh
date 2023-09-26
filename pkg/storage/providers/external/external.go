@@ -64,29 +64,34 @@ type Options struct {
 // Provider is a storage provider that uses a storage plugin.
 type Provider struct {
 	Options
-	cli  v1.StorageProviderPluginClient
-	conn *grpc.ClientConn
-	log  *slog.Logger
-	mu   sync.RWMutex
+	storage   storage.MeshStorage
+	consensus storage.Consensus
+	cli       v1.StorageProviderPluginClient
+	conn      *grpc.ClientConn
+	log       *slog.Logger
+	mu        sync.RWMutex
 }
 
 // NewProvider returns a new ExternalStorageProvider.
 func NewProvider(opts Options) *Provider {
-	return &Provider{
+	p := &Provider{
 		Options: opts,
 		log:     logging.NewLogger(opts.LogLevel).With("component", "storage-provider", "provider", "external"),
 	}
+	p.storage = &ExternalStorage{p}
+	p.consensus = &Consensus{p}
+	return p
 }
 
 // MeshStorage returns the underlying MeshStorage instance. The provider does not need to
 // guarantee consistency on read operations.
 func (ext *Provider) MeshStorage() storage.MeshStorage {
-	return &ExternalStorage{ext}
+	return ext.storage
 }
 
 // Consensus returns the underlying Consensus instance.
 func (ext *Provider) Consensus() storage.Consensus {
-	return &Consensus{ext}
+	return ext.consensus
 }
 
 // Start should start the provider and any resources that it may need.

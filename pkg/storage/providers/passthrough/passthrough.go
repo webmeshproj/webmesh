@@ -53,6 +53,8 @@ type Options struct {
 // in the cluster.
 type Provider struct {
 	Options
+	storage    storage.MeshStorage
+	consensus  storage.Consensus
 	log        *slog.Logger
 	subCancels []func()
 	closec     chan struct{}
@@ -61,19 +63,22 @@ type Provider struct {
 
 // NewProvider returns a new passthrough storage provider.
 func NewProvider(opts Options) *Provider {
-	return &Provider{
+	p := &Provider{
 		Options: opts,
 		log:     logging.NewLogger(opts.LogLevel).With("component", "passthrough-storage"),
 		closec:  make(chan struct{}),
 	}
+	p.storage = &Storage{Provider: p}
+	p.consensus = &Consensus{Provider: p}
+	return p
 }
 
 func (p *Provider) MeshStorage() storage.MeshStorage {
-	return &Storage{p}
+	return p.storage
 }
 
 func (p *Provider) Consensus() storage.Consensus {
-	return &Consensus{p}
+	return p.consensus
 }
 
 func (p *Provider) Start(ctx context.Context) error {

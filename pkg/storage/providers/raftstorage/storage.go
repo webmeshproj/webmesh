@@ -132,7 +132,7 @@ func (rs *RaftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) 
 			}
 		}()
 	}
-	res, err := rs.raft.Apply(ctx, logEntry)
+	res, err := rs.raft.ApplyRaftLog(ctx, logEntry)
 	if err != nil {
 		if errors.Is(err, raft.ErrNotLeader) {
 			return storage.ErrNotLeader

@@ -80,6 +80,7 @@ type Provider struct {
 	started                     atomic.Bool
 	raft                        *raft.Raft
 	storage                     *RaftStorage
+	consensus                   *Consensus
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
 	observerClose, observerDone chan struct{}
@@ -90,11 +91,13 @@ type Provider struct {
 
 // NewProvider returns a new RaftStorageProvider.
 func NewProvider(opts Options) *Provider {
-	return &Provider{
+	p := &Provider{
 		Options: opts,
 		nodeID:  raft.ServerID(opts.NodeID),
 		log:     logging.NewLogger(opts.LogLevel).With("component", "raftstorage"),
 	}
+	p.consensus = &Consensus{Provider: p}
+	return p
 }
 
 // OnObservation registers a callback for when an observation is received.
@@ -111,7 +114,7 @@ func (r *Provider) MeshStorage() storage.MeshStorage {
 
 // Consensus returns the underlying Consensus instance.
 func (r *Provider) Consensus() storage.Consensus {
-	return &Consensus{Provider: r}
+	return r.consensus
 }
 
 // ListenPort returns the TCP port that the storage provider is listening on.
@@ -393,7 +396,7 @@ func (r *Provider) Close() error {
 
 // IsVoter returns true if the Raft node is a voter.
 func (r *Provider) IsVoter() bool {
-	config, err := r.Configuration()
+	config, err := r.GetRaftConfiguration()
 	if err != nil {
 		return false
 	}
@@ -407,7 +410,7 @@ func (r *Provider) IsVoter() bool {
 
 // IsObserver returns true if the Raft node is an observer.
 func (r *Provider) IsObserver() bool {
-	config, err := r.Configuration()
+	config, err := r.GetRaftConfiguration()
 	if err != nil {
 		return false
 	}
@@ -419,16 +422,16 @@ func (r *Provider) IsObserver() bool {
 	return false
 }
 
-// Configuration returns the current raft configuration.
-func (r *Provider) Configuration() (raft.Configuration, error) {
+// GetRaftConfiguration returns the current raft configuration.
+func (r *Provider) GetRaftConfiguration() (raft.Configuration, error) {
 	if r.raft == nil {
 		return raft.Configuration{}, storage.ErrClosed
 	}
 	return r.raft.GetConfiguration().Configuration(), nil
 }
 
-// Apply applies a raft log entry.
-func (r *Provider) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
+// ApplyRaftLog applies a raft log entry.
+func (r *Provider) ApplyRaftLog(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {

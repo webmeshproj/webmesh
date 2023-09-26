@@ -40,7 +40,7 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	}
 	provider, ok := s.storage.(*raftstorage.Provider)
 	if !ok {
-		return nil, status.Errorf(codes.FailedPrecondition, "storage provider is not raft")
+		return nil, status.Errorf(codes.FailedPrecondition, "storage provider is not a raftstorage provider")
 	}
 	if !provider.Consensus().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
@@ -51,7 +51,7 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !ok {
 		return nil, status.Errorf(codes.FailedPrecondition, "no peer")
 	}
-	cfg, err := provider.Configuration()
+	cfg, err := provider.GetRaftConfiguration()
 	if err != nil {
 		// Should never happen
 		return nil, status.Errorf(codes.Internal, "failed to get configuration: %v", err)
@@ -73,5 +73,5 @@ func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApply
 	if !found {
 		return nil, status.Errorf(codes.FailedPrecondition, "peer not found in configuration")
 	}
-	return provider.Apply(ctx, log)
+	return provider.ApplyRaftLog(ctx, log)
 }
