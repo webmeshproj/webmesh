@@ -76,10 +76,13 @@ jobs:
             ~/.cache/go-build
 
       - name: Run Unit Tests
+        shell: bash
         env:
           TEST_PARALLEL: ${{ matrix.os == 'windows-latest' && env.WIN_TEST_PARALLELISM || env.TEST_PARALLELISM }}
           RICHGO_FORCE_COLOR: 1
-        run: make ci-test
+        run: |
+          set -eo pipefail
+          make ci-test | xargs -IL date +"[%Y-%m-%d %H:%M:%S]: L"
 
   build-binaries:
     name: Build Binary Artifacts
