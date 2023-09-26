@@ -9,7 +9,13 @@ DISTROLESS_IMAGE ?= $(REPO)/$(NAME)-distroless:latest
 GO    ?= go
 ARCH  ?= $(shell $(GO) env GOARCH)
 OS    ?= $(shell $(GO) env GOOS)
-GOBIN ?= $(shell $(GO) env GOPATH)/bin
+
+PATHSEP := /
+ifeq ($(OS),Windows_NT)
+	PATHSEP := \\
+endif
+
+GOBIN ?= $(shell $(GO) env GOPATH)$(PATHSEP)bin
 
 ifeq ($(OS),Windows_NT)
 	OS := windows
@@ -89,13 +95,14 @@ ci-test: mod-download fmt vet lint test
 endif
 endif
 
-RICHGO := $(GOBIN)/richgo
+RICHGO := $(GOBIN)$(PATHSEP)richgo
 RICHGO_INSTALLED := $(shell test -f $(RICHGO) && echo true || echo false)
+
 test: ## Run unit tests.
 ifeq ($(RICHGO_INSTALLED),false)
 	$(GO) install github.com/kyoh86/richgo@latest
 endif
-	$(GOBIN)/richgo test $(TEST_ARGS) ./...
+	$(GOBIN)$(PATHSEP)richgo test $(TEST_ARGS) ./...
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 LINT_TIMEOUT := 10m
