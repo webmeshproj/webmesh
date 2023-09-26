@@ -125,10 +125,12 @@ func (rs *RaftStorage) sendLogToLeader(ctx context.Context, logEntry *v1.RaftLog
 func (rs *RaftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) error {
 	rs.writecount.Add(1)
 	if rs.writecount.Load() >= BarrierThreshold {
-		defer rs.writecount.Store(0)
-		if err := rs.raft.raft.Barrier(rs.raft.Options.ApplyTimeout).Error(); err != nil {
-			rs.raft.log.Warn("Error issuing barrier", "error", err.Error())
-		}
+		defer func() {
+			rs.writecount.Store(0)
+			if err := rs.raft.raft.Barrier(rs.raft.Options.ApplyTimeout).Error(); err != nil {
+				rs.raft.log.Warn("Error issuing barrier", "error", err.Error())
+			}
+		}()
 	}
 	res, err := rs.raft.Apply(ctx, logEntry)
 	if err != nil {
