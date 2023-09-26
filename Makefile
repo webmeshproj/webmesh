@@ -89,9 +89,13 @@ ci-test: mod-download fmt vet lint test
 endif
 endif
 
-RICHGO_VERSION := v0.3.12
+RICHGO := $(GOBIN)/richgo
+RICHGO_INSTALLED := $(shell test -f $(RICHGO) && echo true || echo false)
 test: ## Run unit tests.
-	$(GO) run github.com/kyoh86/richgo@$(RICHGO_VERSION) test $(TEST_ARGS) ./...
+ifeq ($(RICHGO_INSTALLED),false)
+	$(GO) install github.com/kyoh86/richgo@latest
+endif
+	$(GOBIN)/richgo test $(TEST_ARGS) ./...
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 LINT_TIMEOUT := 10m
