@@ -37,6 +37,7 @@ You can run `make help` to see all the available targets.
 ## Roadmap
 
 - [ ] GUI Application. In the works over [here](https://github.com/webmeshproj/app).
+- [ ] More storage provider implementations. Currently only built-in raft storage is supported.
 - [ ] Potential SaaS offering for those who don't want to run their own controllers or have a simple off-site backup of the mesh state.
 
 Most other functionality that is provided by other similar projects already exists in the kernel or in other projects.
