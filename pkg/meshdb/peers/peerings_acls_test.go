@@ -179,7 +179,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			t.Parallel()
 			// Prepare the test database
 			ctx := context.Background()
-			db, err := badgerdb.New(badgerdb.Options{InMemory: true})
+			db, err := badgerdb.NewInMemory(badgerdb.Options{})
 			if err != nil {
 				t.Fatalf("create test db: %v", err)
 			}

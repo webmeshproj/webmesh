@@ -702,7 +702,7 @@ func TestNetworkRoutes(t *testing.T) {
 
 func setupTest(t *testing.T) Networking {
 	t.Helper()
-	db, err := badgerdb.New(badgerdb.Options{InMemory: true})
+	db, err := badgerdb.NewInMemory(badgerdb.Options{})
 	if err != nil {
 		t.Fatalf("create test db: %v", err)
 	}

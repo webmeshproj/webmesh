@@ -28,7 +28,7 @@ import (
 func TestSnapshotter(t *testing.T) {
 	t.Parallel()
 
-	db, err := badgerdb.New(badgerdb.Options{InMemory: true})
+	db, err := badgerdb.NewInMemory(badgerdb.Options{})
 	if err != nil {
 		t.Fatalf("create test db: %v", err)
 	}

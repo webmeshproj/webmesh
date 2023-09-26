@@ -22,7 +22,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/testutil"
 )
 
 func TestInMemoryBadgerStorage(t *testing.T) {
@@ -31,8 +31,8 @@ func TestInMemoryBadgerStorage(t *testing.T) {
 		t.Fatalf("failed to create in-memory storage: %v", err)
 	}
 	defer st.Close()
-	storage.RunRaftStorageConformance(t, st)
-	storage.RunMeshStorageConformance(t, st)
+	testutil.RunRaftStorageConformance(t, st)
+	testutil.RunMeshStorageConformance(t, st)
 }
 
 func TestDiskBadgerStorage(t *testing.T) {
@@ -48,6 +48,6 @@ func TestDiskBadgerStorage(t *testing.T) {
 		t.Fatalf("failed to create disk storage: %v", err)
 	}
 	defer st.Close()
-	storage.RunRaftStorageConformance(t, st)
-	storage.RunMeshStorageConformance(t, st)
+	testutil.RunRaftStorageConformance(t, st)
+	testutil.RunMeshStorageConformance(t, st)
 }

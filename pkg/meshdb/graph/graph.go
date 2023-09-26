@@ -64,7 +64,7 @@ func NewGraph(st storage.MeshStorage) Graph {
 
 // NewTestGraph is an alias for creating a new graph with in-memory storage.
 func NewTestGraph() (Graph, error) {
-	memdb, err := badgerdb.New(badgerdb.Options{InMemory: true})
+	memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("create in-memory database: %w", err)
 	}

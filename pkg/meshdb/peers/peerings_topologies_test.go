@@ -433,7 +433,7 @@ func TestWireGuardTopologies(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			db, err := badgerdb.New(badgerdb.Options{InMemory: true})
+			db, err := badgerdb.NewInMemory(badgerdb.Options{})
 			if err != nil {
 				t.Fatalf("create test db: %v", err)
 			}

@@ -25,6 +25,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -386,7 +387,11 @@ func (r *Provider) isObserver() bool {
 // createStorage creates the underlying storage.
 func (r *Provider) createStorage() (storage.DualStorage, error) {
 	if r.Options.InMemory {
-		db, err := badgerdb.New(badgerdb.Options{InMemory: true})
+		db, err := badgerdb.NewInMemory(badgerdb.Options{
+			Debug: func() bool {
+				return strings.ToLower(r.Options.LogLevel) == "debug"
+			}(),
+		})
 		if err != nil {
 			return nil, fmt.Errorf("create in-memory storage: %w", err)
 		}
@@ -404,7 +409,11 @@ func (r *Provider) createStorage() (storage.DualStorage, error) {
 		return nil, fmt.Errorf("ensure data directory: %w", err)
 	}
 	db, err := badgerdb.New(badgerdb.Options{
-		DiskPath: dataDir,
+		DiskPath:   dataDir,
+		SyncWrites: true,
+		Debug: func() bool {
+			return strings.ToLower(r.Options.LogLevel) == "debug"
+		}(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create raft storage: %w", err)

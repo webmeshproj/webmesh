@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package testutil
 
 import (
 	"bytes"
@@ -27,14 +27,16 @@ import (
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // RunRaftStorageConformance tests that the RaftStorage interface is implemented correctly.
-func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
+func RunRaftStorageConformance(t *testing.T, raftStorage storage.RaftStorage) {
 	t.Helper()
 
 	defer func() {
-		if dropper, ok := raftStorage.(DropStorage); ok {
+		if dropper, ok := raftStorage.(storage.DropStorage); ok {
 			_ = dropper.DropAll(context.Background())
 		}
 	}()
@@ -358,7 +360,7 @@ func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
 		"/registry/Snapshot/key2": "value2",
 	}
 
-	if meshStorage, ok := raftStorage.(MeshStorage); ok {
+	if meshStorage, ok := raftStorage.(storage.MeshStorage); ok {
 		ctx := context.Background()
 		t.Run("Snapshot", func(t *testing.T) {
 			// Place a few keys and make sure a snapshot conforms to our expectations.
@@ -427,7 +429,7 @@ func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
 			// Make sure they are indeed gone
 			for key := range snapshotKV {
 				_, err := meshStorage.GetValue(ctx, key)
-				if !IsKeyNotFoundError(err) {
+				if !storage.IsKeyNotFoundError(err) {
 					t.Errorf("expected ErrKeyNotFound, got %v", err)
 				}
 			}
@@ -448,7 +450,7 @@ func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
 			// Make sure the keys we don't want to see are still gone
 			for key := range restoreKV {
 				_, err := meshStorage.GetValue(ctx, key)
-				if !IsKeyNotFoundError(err) {
+				if !storage.IsKeyNotFoundError(err) {
 					t.Errorf("expected ErrKeyNotFound, got %v", err)
 				}
 			}
@@ -457,14 +459,14 @@ func RunRaftStorageConformance(t *testing.T, raftStorage RaftStorage) {
 }
 
 // RunMeshStorageConformance tests that the MeshStorage interface is implemented correctly.
-func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
+func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 	t.Helper()
 	ctx := context.Background()
 
 	t.Run("GetValue", func(t *testing.T) {
 		// Try to get a non-existent key and ensure it returns ErrKeyNotFound.
 		_, err := meshStorage.GetValue(ctx, "non-existent-key")
-		if !IsKeyNotFoundError(err) {
+		if !storage.IsKeyNotFoundError(err) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 		// Put a key and make sure it survives a round trip.
@@ -485,7 +487,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(DropStorage); ok {
+	if dropper, ok := meshStorage.(storage.DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
@@ -508,7 +510,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(DropStorage); ok {
+	if dropper, ok := meshStorage.(storage.DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
@@ -521,7 +523,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 		// Try to get a non-existent key and ensure it returns ErrKeyNotFound.
 		_, err := meshStorage.GetValue(ctx, key)
-		if !IsKeyNotFoundError(err) {
+		if !storage.IsKeyNotFoundError(err) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 		// Put a key and make sure it survives a round trip, and then delete it.
@@ -533,12 +535,12 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 			t.Fatalf("failed to delete key: %v", err)
 		}
 		_, err = meshStorage.GetValue(ctx, key)
-		if !IsKeyNotFoundError(err) {
+		if !storage.IsKeyNotFoundError(err) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 	})
 
-	if dropper, ok := meshStorage.(DropStorage); ok {
+	if dropper, ok := meshStorage.(storage.DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
@@ -611,7 +613,7 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(DropStorage); ok {
+	if dropper, ok := meshStorage.(storage.DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
@@ -655,17 +657,17 @@ func RunMeshStorageConformance(t *testing.T, meshStorage MeshStorage) {
 }
 
 // RunDualStorageConformance tests that the DualStorage interface is implemented correctly.
-func RunDualStorageConformance(t *testing.T, dualStorage DualStorage) {
+func RunDualStorageConformance(t *testing.T, dualStorage storage.DualStorage) {
 	t.Helper()
 	ctx := context.Background()
 
 	RunRaftStorageConformance(t, dualStorage)
-	if dropper, ok := dualStorage.(DropStorage); ok {
+	if dropper, ok := dualStorage.(storage.DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
 	RunMeshStorageConformance(t, dualStorage)
-	if dropper, ok := dualStorage.(DropStorage); ok {
+	if dropper, ok := dualStorage.(storage.DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 }

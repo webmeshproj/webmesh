@@ -178,7 +178,7 @@ func TestListPeerPrivateRPCAddresses(t *testing.T) {
 
 func setupTest(t *testing.T) (*state, func()) {
 	t.Helper()
-	db, err := badgerdb.New(badgerdb.Options{InMemory: true})
+	db, err := badgerdb.NewInMemory(badgerdb.Options{})
 	if err != nil {
 		t.Fatalf("create test db: %v", err)
 	}

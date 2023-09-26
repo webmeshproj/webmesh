@@ -14,16 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package memory
-
-import (
-	"testing"
-
-	"github.com/webmeshproj/webmesh/pkg/storage"
-)
-
-func TestInmemStorage(t *testing.T) {
-	st := New()
-	defer st.Close()
-	storage.RunMeshStorageConformance(t, st)
-}
+// Package testutil contains testing utilities for storage providers and backends.
+package testutil

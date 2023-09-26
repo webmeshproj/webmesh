@@ -92,7 +92,7 @@ var groupSeeds = []*v1.Group{
 func setupTest(t *testing.T) (*rbac, func()) {
 	t.Helper()
 	ctx := context.Background()
-	st, err := badgerdb.New(badgerdb.Options{InMemory: true})
+	st, err := badgerdb.NewInMemory(badgerdb.Options{})
 	if err != nil {
 		t.Fatalf("create test db: %v", err)
 	}

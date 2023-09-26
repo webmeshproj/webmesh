@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -40,6 +41,18 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
+
+// MaxGoRoutines is the maximum number of goroutines to use for BadgerDB.
+var MaxGoRoutines = 16
+
+func init() {
+	if val, ok := os.LookupEnv("WEBMESH_BADGER_MAX_GOROUTINES"); ok {
+		i, err := strconv.Atoi(val)
+		if err == nil {
+			MaxGoRoutines = i
+		}
+	}
+}
 
 // Options are the options for creating a new NutsDB storage.
 type Options struct {
@@ -62,14 +75,14 @@ type badgerDB struct {
 
 // New creates a new BadgerDB storage.
 func New(opts Options) (storage.DualStorage, error) {
-	badgeropts := badger.DefaultOptions(opts.DiskPath).
-		WithNumGoroutines(16) // TODO: make this configurable
 	if opts.InMemory {
-		badgeropts = badgeropts.WithInMemory(true)
-	} else {
-		if opts.SyncWrites {
-			badgeropts = badgeropts.WithSyncWrites(true)
-		}
+		return NewInMemory(opts)
+	}
+	badgeropts := badger.
+		DefaultOptions(opts.DiskPath).
+		WithNumGoroutines(MaxGoRoutines)
+	if opts.SyncWrites {
+		badgeropts = badgeropts.WithSyncWrites(true)
 	}
 	badgeropts = badgeropts.WithLogger(NewLogAdapter(logging.NewLogger("")))
 	if opts.Debug {
@@ -79,12 +92,9 @@ func New(opts Options) (storage.DualStorage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var first, last uint64
-	if !opts.InMemory {
-		first, last, err = getFirstAndLastIndex(db)
-		if err != nil {
-			return nil, err
-		}
+	first, last, err := getFirstAndLastIndex(db)
+	if err != nil {
+		return nil, err
 	}
 	bdb := &badgerDB{
 		opts: opts,
@@ -93,6 +103,25 @@ func New(opts Options) (storage.DualStorage, error) {
 	bdb.firstIdx.Store(first)
 	bdb.lastIdx.Store(last)
 	return bdb, nil
+}
+
+// NewInMemory creates a new in-memory BadgerDB storage.
+func NewInMemory(opts Options) (storage.DualStorage, error) {
+	badgeropts := badger.DefaultOptions("").
+		WithInMemory(true).
+		WithNumGoroutines(MaxGoRoutines)
+	badgeropts = badgeropts.WithLogger(NewLogAdapter(logging.NewLogger("")))
+	if opts.Debug {
+		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(NewLogAdapter(logging.NewLogger("debug")))
+	}
+	db, err := badger.Open(badgeropts)
+	if err != nil {
+		return nil, err
+	}
+	return &badgerDB{
+		opts: opts,
+		db:   db,
+	}, nil
 }
 
 // DropAll deletes all keys.
