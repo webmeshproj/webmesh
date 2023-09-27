@@ -31,8 +31,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// RunConsensusStorageConformance tests that the ConsensusStorage interface is implemented correctly.
-func RunConsensusStorageConformance(t *testing.T, raftStorage storage.ConsensusStorage) {
+// TestConsensusStorageConformance tests that the ConsensusStorage interface is implemented correctly.
+func TestConsensusStorageConformance(t *testing.T, raftStorage storage.ConsensusStorage) {
 	t.Helper()
 
 	defer func() {
@@ -458,8 +458,8 @@ func RunConsensusStorageConformance(t *testing.T, raftStorage storage.ConsensusS
 	}
 }
 
-// RunMeshStorageConformance tests that the MeshStorage interface is implemented correctly.
-func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
+// TestMeshStorageConformance tests that the MeshStorage interface is implemented correctly.
+func TestMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -487,10 +487,6 @@ func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(DropStorage); ok {
-		_ = dropper.DropAll(ctx)
-	}
-
 	t.Run("PutValue", func(t *testing.T) {
 		// Pretty simple, just put a key and make sure it survives a round trip.
 		key, value := "key", "value"
@@ -509,10 +505,6 @@ func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 			t.Fatalf("failed to delete key: %v", err)
 		}
 	})
-
-	if dropper, ok := meshStorage.(DropStorage); ok {
-		_ = dropper.DropAll(ctx)
-	}
 
 	t.Run("Delete", func(t *testing.T) {
 		// Delete should never error, but it should also work
@@ -538,11 +530,11 @@ func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 		if !storage.IsKeyNotFoundError(err) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
+		// Cleanup should not error
+		if err := meshStorage.Delete(ctx, key); err != nil {
+			t.Fatalf("failed to delete key: %v", err)
+		}
 	})
-
-	if dropper, ok := meshStorage.(DropStorage); ok {
-		_ = dropper.DropAll(ctx)
-	}
 
 	t.Run("List", func(t *testing.T) {
 		// Place a few keys and make sure we get the full list of them back
@@ -613,10 +605,6 @@ func RunMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 		}
 	})
 
-	if dropper, ok := meshStorage.(DropStorage); ok {
-		_ = dropper.DropAll(ctx)
-	}
-
 	t.Run("IterPrefix", func(t *testing.T) {
 		// We'll place a few keys and make sure our iterator is called
 		// for each of them.
@@ -661,12 +649,12 @@ func RunDualStorageConformance(t *testing.T, dualStorage storage.DualStorage) {
 	t.Helper()
 	ctx := context.Background()
 
-	RunConsensusStorageConformance(t, dualStorage)
+	TestConsensusStorageConformance(t, dualStorage)
 	if dropper, ok := dualStorage.(DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}
 
-	RunMeshStorageConformance(t, dualStorage)
+	TestMeshStorageConformance(t, dualStorage)
 	if dropper, ok := dualStorage.(DropStorage); ok {
 		_ = dropper.DropAll(ctx)
 	}

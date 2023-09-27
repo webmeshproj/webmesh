@@ -30,12 +30,15 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
 
 // TestBootstrapTransport tests the libp2p bootstrap transport.
 func TestBootstrapTransport(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
+	nooplog := logging.NewLogger("")
+	ctx = context.WithLogger(ctx, nooplog)
 
 	t.Run("SingleNode", func(t *testing.T) {
 		t.Parallel()

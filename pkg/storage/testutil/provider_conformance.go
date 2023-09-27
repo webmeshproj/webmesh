@@ -17,6 +17,7 @@ limitations under the License.
 package testutil
 
 import (
+	"context"
 	"testing"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -29,4 +30,16 @@ type NewProviderFunc func(t *testing.T) storage.Provider
 
 // TestStorageProviderConformance tests that the storage provider conforms to the
 // storage provider interface.
-func TestStorageProviderConformance(t *testing.T, newProvider NewProviderFunc) {}
+func TestStorageProviderConformance(t *testing.T, newProvider NewProviderFunc) {
+	ctx := context.Background()
+
+	t.Run("TestStorageConformance", func(t *testing.T) {
+		provider := newProvider(t)
+		defer provider.Close()
+		err := provider.Bootstrap(ctx)
+		if err != nil {
+			t.Fatalf("Failed to bootstrap provider: %v", err)
+		}
+		TestMeshStorageConformance(t, provider.MeshStorage())
+	})
+}

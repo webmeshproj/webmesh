@@ -17,7 +17,6 @@ limitations under the License.
 package tcp
 
 import (
-	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -25,6 +24,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
@@ -32,6 +33,8 @@ import (
 // It should not be run in parallel with other tests to avoid port conflicts.
 func TestBootstrapTransport(t *testing.T) {
 	ctx := context.Background()
+	nooplog := logging.NewLogger("")
+	ctx = context.WithLogger(ctx, nooplog)
 
 	// Test a single node transport.
 	t.Run("SingleNode", func(t *testing.T) {
