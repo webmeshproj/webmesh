@@ -70,8 +70,8 @@ jobs:
       - name: Setup Test Cache
         uses: actions/cache@v3
         with:
-          key: ${{ runner.os }}-unittests-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
-          restore-keys: ${{ runner.os }}-unittests-go-${{ env.GO_VERSION }}-
+          key: ${{ runner.os }}-ci-tests-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
+          restore-keys: ${{ runner.os }}-ci-tests-go-${{ env.GO_VERSION }}-
           path: |
             ~/go/pkg
             ~/go/bin
