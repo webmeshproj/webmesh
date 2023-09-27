@@ -11,15 +11,7 @@ ARCH  ?= $(shell $(GO) env GOARCH)
 OS    ?= $(shell $(GO) env GOOS)
 
 GOPATH ?= $(shell $(GO) env GOPATH)
-ifeq ($(OS),Windows_NT)
-	OS := windows
-# Double escape the backslashes for Windows paths.
-	GOBIN  := $(subst \,\\,$(GOPATH))\\bin\\
-	RICHGO := $(subst \,\\,$(GOBIN))richgo.exe
-else
-	GOBIN := $(GOPATH)/bin
-	RICHGO := $(GOBIN)/richgo
-endif
+GOBIN  ?= $(GOPATH)/bin
 
 default: build
 
@@ -93,18 +85,14 @@ endif
 endif
 
 ci-test: ## Run all CI tests.
-	set -eo pipefail ; make $(CI_TARGETS) | xargs -IL date +"[%Y-%m-%d %H:%M:%S]: L"
+	set -eo pipefail ; $(MAKE) $(CI_TARGETS) | xargs -IL date +"[%Y-%m-%d %H:%M:%S]: L"
 
-RICHGO_INSTALLED := $(shell test -f $(RICHGO) && echo true || echo false)
-COVERAGE_FILE    := coverage.out
-TEST_PARALLEL    ?= $(shell nproc 2>/dev/null || echo 8)
-TEST_ARGS        := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
+COVERAGE_FILE := coverage.out
+TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
+TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
 test: ## Run unit tests.
-ifeq ($(RICHGO_INSTALLED),false)
-	$(GO) install github.com/kyoh86/richgo@latest
-endif
-	$(RICHGO) test $(TEST_ARGS) ./...
+	$(GO) run github.com/kyoh86/richgo@v0.3.12 test $(TEST_ARGS) ./...
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 LINT_TIMEOUT := 10m
@@ -134,7 +122,7 @@ build-ctl:
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id $(CTL) -o dist/$(CTL)
 
 install-ctl: build-ctl
-	install -m 755 dist/$(CTL) $(shell go env GOPATH)/bin/$(CTL)
+	install -m 755 dist/$(CTL) $(GOBIN)/$(CTL)
 
 latest-api: ## Used for development and forces a pull of the API off the main branch.
 	GOPRIVATE=github.com/webmeshproj $(GO) get -u github.com/webmeshproj/api@main
