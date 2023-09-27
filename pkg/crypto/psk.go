@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package crypto contains cryptographic utilities.
 package crypto
 
 import (
@@ -23,6 +22,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"hash"
 )
 
 // DefaultPSKLength is the default length of a PSK.
@@ -90,18 +90,6 @@ func (p PSK) String() string {
 	return string(p)
 }
 
-func (p PSK) IsValid() bool {
-	return IsValidPSKBytes(p, len(p))
-}
-
-func (p PSK) SignatureSize() int {
-	return hmac.New(sha256.New, p).Size()
-}
-
-func (p PSK) DeterministicSignatureSize() int {
-	return sha256.New().Size()
-}
-
 // Sign creates a signature of the given data using this PSK.
 func (p PSK) Sign(data []byte) ([]byte, error) {
 	return Sign(data, p)
@@ -120,4 +108,60 @@ func (p PSK) Verify(data, signature []byte) error {
 // DeterministicVerify verifies the given signature against the given data using this PSK.
 func (p PSK) DeterministicVerify(data, signature []byte) error {
 	return verifyDeterministicWithHash(data, signature, p, sha256.New)
+}
+
+// Sign signs the given data using the given PSK.
+func Sign(data []byte, psk PSK) ([]byte, error) {
+	return signWithHash(data, psk, sha256.New)
+}
+
+// Verify verifies the given signature against the given data using the given PSK.
+func Verify(data, signature []byte, psk PSK) error {
+	return verifyWithHash(data, signature, psk, sha256.New)
+}
+
+// verifyWithHash verifies the given signature against the given data using the given PSK and hash function.
+func verifyWithHash(data, signature []byte, psk PSK, hash func() hash.Hash) error {
+	sig, err := signWithHash(data, psk, hash)
+	if err != nil {
+		return err
+	}
+	if !hmac.Equal(sig, signature) {
+		return ErrInvalidSignature
+	}
+	return nil
+}
+
+// signWithHash signs the given data using the given PSK and hash function.
+func signWithHash(data []byte, psk PSK, hash func() hash.Hash) ([]byte, error) {
+	mac := hmac.New(hash, psk)
+	if _, err := mac.Write(psk); err != nil {
+		return nil, err
+	}
+	if _, err := mac.Write(data); err != nil {
+		return nil, err
+	}
+	return mac.Sum(nil), nil
+}
+
+func signDeterministicWithHash(data []byte, psk PSK, hash func() hash.Hash) ([]byte, error) {
+	h := hash()
+	if _, err := h.Write(psk); err != nil {
+		return nil, err
+	}
+	if _, err := h.Write(data); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
+}
+
+func verifyDeterministicWithHash(data, signature []byte, psk PSK, hash func() hash.Hash) error {
+	sig, err := signDeterministicWithHash(data, psk, hash)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(sig, signature) {
+		return ErrInvalidSignature
+	}
+	return nil
 }
