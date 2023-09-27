@@ -34,6 +34,11 @@ type DropStorage interface {
 	DropAll(ctx context.Context) error
 }
 
+// NewProviderFunc is a function that returns a new started storage provider.
+// It should have unique identifying properties for each call and not be
+// bootstrapped. The providers listen port must be available on localhost.
+type NewProviderFunc func(ctx context.Context, t *testing.T) storage.Provider
+
 // MustBootstrap is a helper function that calls Bootstrap and fails the test if there
 // is an error.
 func MustBootstrap(ctx context.Context, t *testing.T, provider storage.Provider) {
@@ -44,6 +49,20 @@ func MustBootstrap(ctx context.Context, t *testing.T, provider storage.Provider)
 	}
 }
 
+// MustAddVoter is a helper function that adds a voter to the consensus group and fails
+// the test if there is an error.
+func MustAddVoter(ctx context.Context, t *testing.T, leader, voter storage.Provider) {
+	t.Helper()
+	voterInfo := voter.Status().GetPeers()
+	if len(voterInfo) != 1 {
+		t.Fatalf("Expected voter to have one peer in voter, got %d", len(voterInfo))
+	}
+	err := leader.Consensus().AddVoter(ctx, voterInfo[0])
+	if err != nil {
+		t.Fatalf("Failed to add voter: %v", err)
+	}
+}
+
 // Eventually is a function that should eventually meet the given condition.
 type Eventually[T comparable] func() T
 
@@ -51,8 +70,8 @@ type Eventually[T comparable] func() T
 type Condition[T comparable] func(T) bool
 
 // ShouldNotError eventually should not error.
-func (e Eventually[T]) ShouldNotError(t *testing.T, after time.Duration, tick time.Duration) bool {
-	return e.Should(t, after, tick, func(err T) bool {
+func (e Eventually[T]) ShouldNotError(after time.Duration, tick time.Duration) bool {
+	return e.Should(after, tick, func(err T) bool {
 		er, ok := any(err).(error)
 		if !ok {
 			// Nil errors are not errors. This is a special case.
@@ -63,8 +82,8 @@ func (e Eventually[T]) ShouldNotError(t *testing.T, after time.Duration, tick ti
 }
 
 // ShouldError eventually should error.
-func (e Eventually[T]) ShouldError(t *testing.T, after time.Duration, tick time.Duration) bool {
-	return e.Should(t, after, tick, func(err T) bool {
+func (e Eventually[T]) ShouldError(after time.Duration, tick time.Duration) bool {
+	return e.Should(after, tick, func(err T) bool {
 		er, ok := any(err).(error)
 		if !ok {
 			return false
@@ -74,8 +93,8 @@ func (e Eventually[T]) ShouldError(t *testing.T, after time.Duration, tick time.
 }
 
 // ShouldErrorWith eventually should error with the given error.
-func (e Eventually[T]) ShouldErrorWith(t *testing.T, after time.Duration, tick time.Duration, expected error) bool {
-	return e.Should(t, after, tick, func(err T) bool {
+func (e Eventually[T]) ShouldErrorWith(after time.Duration, tick time.Duration, expected error) bool {
+	return e.Should(after, tick, func(err T) bool {
 		er, ok := any(err).(error)
 		if !ok {
 			return false
@@ -85,21 +104,26 @@ func (e Eventually[T]) ShouldErrorWith(t *testing.T, after time.Duration, tick t
 }
 
 // ShouldEqual eventually should equal the given value.
-func (e Eventually[T]) ShouldEqual(t *testing.T, after time.Duration, tick time.Duration, expected T) bool {
-	return e.Should(t, after, tick, func(val T) bool {
+func (e Eventually[T]) ShouldEqual(after time.Duration, tick time.Duration, expected T) bool {
+	return e.Should(after, tick, func(val T) bool {
 		return val == expected
 	})
 }
 
 // ShouldNotEqual eventually should not equal the given value.
-func (e Eventually[T]) ShouldNotEqual(t *testing.T, after time.Duration, tick time.Duration, expected T) bool {
-	return e.Should(t, after, tick, func(val T) bool {
+func (e Eventually[T]) ShouldNotEqual(after time.Duration, tick time.Duration, expected T) bool {
+	return e.Should(after, tick, func(val T) bool {
 		return val != expected
 	})
 }
 
 // Should eventually meet the given condition.
-func (e Eventually[T]) Should(t *testing.T, after time.Duration, tick time.Duration, condition func(T) bool) bool {
+func (e Eventually[T]) Should(after time.Duration, tick time.Duration, condition func(T) bool) bool {
+	// Try the condition once immediately
+	res := e()
+	if condition(res) {
+		return true
+	}
 	done := time.After(after)
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()

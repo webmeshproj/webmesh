@@ -220,7 +220,11 @@ func (r *Provider) Status() *v1.StorageStatus {
 		}
 		return "not a leader, voter, or observer"
 	}()
+	foundSelf := false
 	for _, server := range config.Servers {
+		if server.ID == r.nodeID {
+			foundSelf = true
+		}
 		status.Peers = append(status.Peers, &v1.StoragePeer{
 			Id:      string(server.ID),
 			Address: string(server.Address),
@@ -237,6 +241,15 @@ func (r *Provider) Status() *v1.StorageStatus {
 					return v1.ClusterStatus_CLUSTER_NODE
 				}
 			}(),
+		})
+	}
+	if !foundSelf {
+		// If we didn't find ourself in the configuration, we are not a member of the cluster,
+		// not bootstrapped, or have not been added to the cluster yet. Add ourselves as a regular node.
+		status.Peers = append(status.Peers, &v1.StoragePeer{
+			Id:            string(r.nodeID),
+			Address:       string(r.Options.Transport.LocalAddr()),
+			ClusterStatus: v1.ClusterStatus_CLUSTER_NODE,
 		})
 	}
 	return &status

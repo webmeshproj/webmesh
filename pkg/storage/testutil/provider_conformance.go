@@ -19,14 +19,10 @@ package testutil
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
-
-// NewProviderFunc is a function that returns a new started storage provider.
-// It should have unique identifying properties for each call and not be
-// bootstrapped.
-type NewProviderFunc func(ctx context.Context, t *testing.T) storage.Provider
 
 // TestStorageProviderConformance tests that the storage provider conforms to the
 // storage provider interface.
@@ -36,5 +32,41 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 		defer provider.Close()
 		MustBootstrap(ctx, t, provider)
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
+	})
+
+	t.Run("TestThreeVoterConformance", func(t *testing.T) {
+		providers := map[string]storage.Provider{
+			"provider1": newProvider(ctx, t),
+			"provider2": newProvider(ctx, t),
+			"provider3": newProvider(ctx, t),
+		}
+		for _, provider := range providers {
+			defer provider.Close()
+		}
+		MustBootstrap(ctx, t, providers["provider1"])
+		// Provider 1 must be the leader
+		ok := Eventually[bool](func() bool {
+			return providers["provider1"].Consensus().IsLeader()
+		}).ShouldEqual(time.Second*10, time.Second, true)
+		if !ok {
+			t.Fatal("Provider 1 is not the leader")
+		}
+		// Add the others as voters.
+		for _, provider := range []storage.Provider{providers["provider2"], providers["provider3"]} {
+			// Add each provider as a voter to the consensus group.
+			MustAddVoter(ctx, t, providers["provider1"], provider)
+		}
+		// Each provider should eventually contain three peers.
+		for name, provider := range providers {
+			p := provider
+			ok := Eventually[int](func() int {
+				return len(p.Status().GetPeers())
+			}).ShouldEqual(time.Second*10, time.Second, 3)
+			if !ok {
+				t.Fatalf("Provider %s does not have three peers", name)
+			}
+
+		}
+		// We should be able to write keys to the leader and have them propagate to the followers.
 	})
 }

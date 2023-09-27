@@ -648,7 +648,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		ok := Eventually[int64](func() int64 {
 			return hitCount.Load()
-		}).ShouldEqual(t, SubscribeTimeout, time.Second, int64(len(kv)))
+		}).ShouldEqual(SubscribeTimeout, time.Second, int64(len(kv)))
 		if !ok {
 			t.Fatalf("failed to see all puts")
 		}
@@ -677,7 +677,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		ok = Eventually[int64](func() int64 {
 			return hitCount.Load()
-		}).ShouldEqual(t, SubscribeTimeout, time.Second, int64(len(kv)))
+		}).ShouldEqual(SubscribeTimeout, time.Second, int64(len(kv)))
 		if !ok {
 			t.Fatalf("failed to see all deletes")
 		}

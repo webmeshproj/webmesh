@@ -43,6 +43,8 @@ var _ storage.MeshStorage = &Storage{}
 
 // Options are the passthrough options.
 type Options struct {
+	// NodeID is the ID of the node.
+	NodeID string
 	// Dialer is the dialer to use for connecting to other nodes.
 	Dialer transport.NodeDialer
 	// LogLevel is the log level to use.
@@ -128,6 +130,11 @@ func (p *Provider) Status() *v1.StorageStatus {
 			ClusterStatus: peer.GetSuffrage(),
 		})
 	}
+	// Add ourself as a regular node
+	status.Peers = append(status.Peers, &v1.StoragePeer{
+		Id:            p.Options.NodeID,
+		ClusterStatus: v1.ClusterStatus_CLUSTER_NODE,
+	})
 	return &status
 }
 
