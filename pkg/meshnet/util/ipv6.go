@@ -104,7 +104,8 @@ func AssignMulticastGroup(keys ...crypto.PublicKey) netip.Prefix {
 // RandomAddress returns a random /128 address within a /112 prefix.
 // This is typically used for picking local dialing addresses, but can
 // also be used to assign relay addresses. The function does not check
-// that the prefix is a valid /112 prefix.
+// that the prefix is a valid /112 prefix. Addresses are not guaranteed
+// to be unique.
 func RandomAddress(prefix netip.Prefix) netip.Addr {
 	// We have the last two bytes to play with
 	ip := prefix.Addr().AsSlice()

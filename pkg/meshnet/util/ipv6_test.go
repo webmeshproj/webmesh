@@ -20,7 +20,6 @@ import (
 	"io"
 	"net/netip"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -146,9 +145,6 @@ func FuzzAssignToPrefix(f *testing.F) {
 }
 
 func FuzzRandomAddress(t *testing.F) {
-	if runtime.GOOS == "windows" {
-		t.Skip("skipping on windows")
-	}
 	ula := mustGenerateULA(t)
 	seed := mustGenerateSeedKey(t)
 	key, err := crypto.ParsePublicKey(seed)
@@ -156,12 +152,12 @@ func FuzzRandomAddress(t *testing.F) {
 		t.Fatalf("failed to parse public key: %s", err)
 	}
 	prefix := AssignToPrefix(ula, key)
-	// We're good to go, seed some data.
+	// This is a special case where we don't guarantee uniqueness,
+	// but we do guarantee that the generated address is contained
+	// within the prefix.
 	for i := 0; i <= defaultTestCount(t); i++ {
 		t.Add(string(mustGenerateSeedKey(t)))
 	}
-	var seen sync.Map
-	var count atomic.Uint64
 	t.Fuzz(func(t *testing.T, a string) {
 		// We ignore the fuzz data, but we need to consume it
 		c := io.NopCloser(strings.NewReader(a))
@@ -173,12 +169,6 @@ func FuzzRandomAddress(t *testing.F) {
 		if !prefix.Contains(addr) {
 			t.Fatalf("generated address %q not contained in prefix %q", addr.String(), prefix.String())
 		}
-		if _, ok := seen.Load(addr); ok {
-			t.Fatalf("generated duplicate address %q after %d runs", addr.String(), count.Load())
-		}
-		// Add the address to the seen map
-		seen.Store(addr, struct{}{})
-		count.Add(1)
 	})
 }
 
