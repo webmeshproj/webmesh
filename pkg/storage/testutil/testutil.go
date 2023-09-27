@@ -63,6 +63,20 @@ func MustAddVoter(ctx context.Context, t *testing.T, leader, voter storage.Provi
 	}
 }
 
+// MustAddObserver is a helper function that adds an observer to the consensus group and fails
+// the test if there is an error.
+func MustAddObserver(ctx context.Context, t *testing.T, leader, observer storage.Provider) {
+	t.Helper()
+	obsInfo := observer.Status().GetPeers()
+	if len(obsInfo) != 1 {
+		t.Fatalf("Expected observer to have one peer in voter, got %d", len(obsInfo))
+	}
+	err := leader.Consensus().AddObserver(ctx, obsInfo[0])
+	if err != nil {
+		t.Fatalf("Failed to add observer: %v", err)
+	}
+}
+
 // Eventually is a function that should eventually meet the given condition.
 type Eventually[T comparable] func() T
 
