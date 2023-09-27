@@ -21,6 +21,8 @@ import (
 	"context"
 	"io"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -612,6 +614,72 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		for key := range kv {
 			if err := meshStorage.Delete(ctx, key); err != nil {
 				t.Fatalf("failed to delete key: %v", err)
+			}
+		}
+	})
+
+	t.Run("Subscribe", func(t *testing.T) {
+		var hitCount atomic.Int64
+		var seen sync.Map
+		subCancel, err := meshStorage.Subscribe(ctx, "Subscribe/", func(key, value string) {
+			hitCount.Add(1)
+			seen.Store(key, value)
+		})
+		if err != nil {
+			t.Fatalf("failed to subscribe: %v", err)
+		}
+		defer subCancel()
+		// We should see a hit for each key we put
+		kv := map[string]string{
+			"Subscribe/key1": "value1",
+			"Subscribe/key2": "value2",
+		}
+		for key, value := range kv {
+			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
+				t.Fatalf("failed to put key: %v", err)
+			}
+		}
+		Eventually[int64](func() int64 {
+			return hitCount.Load()
+		}).ShouldEqual(t, time.Second*10, time.Second, int64(len(kv)))
+		// We should have seen the correct values.
+		seenVals := map[string]string{}
+		seen.Range(func(key, value interface{}) bool {
+			seenVals[key.(string)] = value.(string)
+			return true
+		})
+		if len(seenVals) != len(kv) {
+			t.Errorf("expected to see %d keys, got %d", len(kv), len(seenVals))
+		}
+		for key, value := range kv {
+			if seenVals[key] != value {
+				t.Errorf("expected %q, got %q", value, seenVals[key])
+			}
+		}
+
+		// We should see a hit for each key we delete
+		hitCount = atomic.Int64{}
+		seen = sync.Map{}
+		for key := range kv {
+			if err := meshStorage.Delete(ctx, key); err != nil {
+				t.Fatalf("failed to delete key: %v", err)
+			}
+		}
+		Eventually[int64](func() int64 {
+			return hitCount.Load()
+		}).ShouldEqual(t, time.Second*10, time.Second, int64(len(kv)))
+		// We should see empty values for each key we deleted.
+		seenVals = map[string]string{}
+		seen.Range(func(key, value interface{}) bool {
+			seenVals[key.(string)] = value.(string)
+			return true
+		})
+		if len(seenVals) != len(kv) {
+			t.Errorf("expected to see %d keys, got %d", len(kv), len(seenVals))
+		}
+		for key := range kv {
+			if seenVals[key] != "" {
+				t.Errorf("expected empty value, got %q", seenVals[key])
 			}
 		}
 	})

@@ -251,9 +251,7 @@ func (db *badgerDB) Subscribe(ctx context.Context, prefix string, fn storage.Sub
 		match := []pb.Match{{Prefix: []byte(prefix)}}
 		_ = db.db.Subscribe(ctx, func(kv *pb.KVList) error {
 			for _, kv := range kv.Kv {
-				if bytes.HasPrefix(kv.Key, []byte(prefix)) {
-					fn(string(kv.Key), string(kv.Value))
-				}
+				fn(string(kv.Key), string(kv.Value))
 			}
 			return nil
 		}, match)
