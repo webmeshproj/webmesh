@@ -149,6 +149,7 @@ func TestPeers(t *testing.T) {
 	})
 
 	t.Run("GetNodeByPubKey", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		p := setupPeersTest(t)
 		key := mustGeneratePublicKey(t)
