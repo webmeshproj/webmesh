@@ -307,6 +307,21 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
 	}
 
+	// Start building the response
+	resp := &v1.JoinResponse{
+		MeshDomain:  s.meshDomain,
+		NetworkIpv4: s.ipv4Prefix.String(),
+		NetworkIpv6: s.ipv6Prefix.String(),
+		AddressIpv6: leasev6.String(),
+		AddressIpv4: func() string {
+			if leasev4.IsValid() {
+				return leasev4.String()
+			}
+			return ""
+		}(),
+		Peers: peers,
+	}
+
 	// Add the node to Raft if requested
 	// The node will otherwise need to subscribe to cluster events manually with
 	// the Subscribe RPC.
@@ -350,19 +365,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		go addStorageMember()
 	}
 
-	// Start building the response
-	resp := &v1.JoinResponse{
-		MeshDomain:  s.meshDomain,
-		NetworkIpv4: s.ipv4Prefix.String(),
-		NetworkIpv6: s.ipv6Prefix.String(),
-		AddressIpv6: leasev6.String(),
-		AddressIpv4: func() string {
-			if leasev4.IsValid() {
-				return leasev4.String()
-			}
-			return ""
-		}(),
-	}
 	dnsServers, err := p.ListByFeature(ctx, v1.Feature_MESH_DNS)
 	if err != nil {
 		log.Warn("could not lookup DNS servers", slog.String("error", err.Error()))
@@ -388,7 +390,6 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			break
 		}
 	}
-	resp.Peers = peers
 
 	// If the caller needs ICE servers, find all the eligible peers and return them
 	if requiresICE {

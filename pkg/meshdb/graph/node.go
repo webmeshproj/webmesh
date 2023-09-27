@@ -23,6 +23,18 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+// NodeID is the type of a node ID.
+type NodeID string
+
+// String returns the string representation of the node ID.
+func (id NodeID) String() string { return string(id) }
+
+// Bytes returns the byte representation of the node ID.
+func (id NodeID) Bytes() []byte { return []byte(id) }
+
+// IsEmpty returns true if the node ID is empty.
+func (id NodeID) IsEmpty() bool { return id == "" }
+
 // MeshNode wraps a mesh node.
 type MeshNode struct{ *v1.MeshNode }
 
@@ -47,7 +59,7 @@ func (n *MeshNode) UnmarshalJSON(data []byte) error {
 }
 
 // HasFeature returns true if the node has the given feature.
-func (n *MeshNode) HasFeature(feature v1.Feature) bool {
+func (n MeshNode) HasFeature(feature v1.Feature) bool {
 	for _, f := range n.Features {
 		if f.Feature == feature {
 			return true
@@ -58,7 +70,7 @@ func (n *MeshNode) HasFeature(feature v1.Feature) bool {
 
 // PortFor returns the port for the given feature, or 0
 // if the feature is not available on this node.
-func (n *MeshNode) PortFor(feature v1.Feature) uint16 {
+func (n MeshNode) PortFor(feature v1.Feature) uint16 {
 	for _, f := range n.Features {
 		if f.Feature == feature {
 			return uint16(f.Port)
@@ -68,28 +80,28 @@ func (n *MeshNode) PortFor(feature v1.Feature) uint16 {
 }
 
 // RPCPort returns the node's RPC port.
-func (n *MeshNode) RPCPort() uint16 {
+func (n MeshNode) RPCPort() uint16 {
 	return n.PortFor(v1.Feature_NODES)
 }
 
 // DNSPort returns the node's DNS port.
-func (n *MeshNode) DNSPort() uint16 {
+func (n MeshNode) DNSPort() uint16 {
 	return n.PortFor(v1.Feature_MESH_DNS)
 }
 
 // TURNPort returns the node's TURN port.
-func (n *MeshNode) TURNPort() uint16 {
+func (n MeshNode) TURNPort() uint16 {
 	return n.PortFor(v1.Feature_TURN_SERVER)
 }
 
 // StoragePort returns the node's Storage port.
-func (n *MeshNode) StoragePort() uint16 {
+func (n MeshNode) StoragePort() uint16 {
 	return n.PortFor(v1.Feature_STORAGE_PROVIDER)
 }
 
 // PrivateAddrV4 returns the node's private IPv4 address.
 // Be sure to check if the returned Addr IsValid.
-func (n *MeshNode) PrivateAddrV4() netip.Prefix {
+func (n MeshNode) PrivateAddrV4() netip.Prefix {
 	if n.GetPrivateIpv4() == "" {
 		return netip.Prefix{}
 	}
@@ -102,7 +114,7 @@ func (n *MeshNode) PrivateAddrV4() netip.Prefix {
 
 // PrivateAddrV6 returns the node's private IPv6 address.
 // Be sure to check if the returned Addr IsValid.
-func (n *MeshNode) PrivateAddrV6() netip.Prefix {
+func (n MeshNode) PrivateAddrV6() netip.Prefix {
 	if n.GetPrivateIpv6() == "" {
 		return netip.Prefix{}
 	}
@@ -115,7 +127,7 @@ func (n *MeshNode) PrivateAddrV6() netip.Prefix {
 
 // PublicRPCAddr returns the public address for the node's RPC server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PublicRPCAddr() netip.AddrPort {
+func (n MeshNode) PublicRPCAddr() netip.AddrPort {
 	rpcport := n.RPCPort()
 	if rpcport == 0 {
 		return netip.AddrPort{}
@@ -132,7 +144,7 @@ func (n *MeshNode) PublicRPCAddr() netip.AddrPort {
 
 // PrivateRPCAddrV4 returns the private IPv4 address for the node's RPC server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateRPCAddrV4() netip.AddrPort {
+func (n MeshNode) PrivateRPCAddrV4() netip.AddrPort {
 	addr := n.PrivateAddrV4()
 	if !addr.IsValid() {
 		return netip.AddrPort{}
@@ -146,7 +158,7 @@ func (n *MeshNode) PrivateRPCAddrV4() netip.AddrPort {
 
 // PrivateRPCAddrV6 returns the private IPv6 address for the node's RPC server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateRPCAddrV6() netip.AddrPort {
+func (n MeshNode) PrivateRPCAddrV6() netip.AddrPort {
 	addr := n.PrivateAddrV6()
 	if !addr.IsValid() {
 		return netip.AddrPort{}
@@ -160,7 +172,7 @@ func (n *MeshNode) PrivateRPCAddrV6() netip.AddrPort {
 
 // PrivateStorageAddrV4 returns the private IPv4 address for the node's raft listener.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateStorageAddrV4() netip.AddrPort {
+func (n MeshNode) PrivateStorageAddrV4() netip.AddrPort {
 	rpcport := n.StoragePort()
 	if rpcport == 0 {
 		return netip.AddrPort{}
@@ -174,7 +186,7 @@ func (n *MeshNode) PrivateStorageAddrV4() netip.AddrPort {
 
 // PrivateStorageAddrV6 returns the private IPv6 address for the node's raft listener.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateStorageAddrV6() netip.AddrPort {
+func (n MeshNode) PrivateStorageAddrV6() netip.AddrPort {
 	rpcport := n.StoragePort()
 	if rpcport == 0 {
 		return netip.AddrPort{}
@@ -188,7 +200,7 @@ func (n *MeshNode) PrivateStorageAddrV6() netip.AddrPort {
 
 // PublicDNSAddr returns the public address for the node's DNS server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PublicDNSAddr() netip.AddrPort {
+func (n MeshNode) PublicDNSAddr() netip.AddrPort {
 	if n.PrimaryEndpoint == "" {
 		return netip.AddrPort{}
 	}
@@ -208,7 +220,7 @@ func (n *MeshNode) PublicDNSAddr() netip.AddrPort {
 
 // PrivateDNSAddrV4 returns the private IPv4 address for the node's DNS server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateDNSAddrV4() netip.AddrPort {
+func (n MeshNode) PrivateDNSAddrV4() netip.AddrPort {
 	addr := n.PrivateAddrV4()
 	if !addr.IsValid() {
 		return netip.AddrPort{}
@@ -222,7 +234,7 @@ func (n *MeshNode) PrivateDNSAddrV4() netip.AddrPort {
 
 // PrivateDNSAddrV6 returns the private IPv6 address for the node's DNS server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateDNSAddrV6() netip.AddrPort {
+func (n MeshNode) PrivateDNSAddrV6() netip.AddrPort {
 	addr := n.PrivateAddrV6()
 	if !addr.IsValid() {
 		return netip.AddrPort{}
@@ -236,7 +248,7 @@ func (n *MeshNode) PrivateDNSAddrV6() netip.AddrPort {
 
 // PrivateTURNAddrV4 returns the private IPv4 address for the node's TURN server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateTURNAddrV4() netip.AddrPort {
+func (n MeshNode) PrivateTURNAddrV4() netip.AddrPort {
 	addr := n.PrivateAddrV4()
 	if !addr.IsValid() {
 		return netip.AddrPort{}
@@ -250,7 +262,7 @@ func (n *MeshNode) PrivateTURNAddrV4() netip.AddrPort {
 
 // PrivateTURNAddrV6 returns the private IPv6 address for the node's TURN server.
 // Be sure to check if the returned AddrPort IsValid.
-func (n *MeshNode) PrivateTURNAddrV6() netip.AddrPort {
+func (n MeshNode) PrivateTURNAddrV6() netip.AddrPort {
 	addr := n.PrivateAddrV6()
 	if !addr.IsValid() {
 		return netip.AddrPort{}

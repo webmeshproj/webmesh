@@ -188,7 +188,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			rbacdb := rbac.New(db)
 			nwdb := networking.New(db)
 			for _, peer := range testCase.peers {
-				peer.PublicKey = mustGenerateKey(t)
+				peer.PublicKey = mustGeneratePublicKey(t)
 				if err := peerdb.Put(ctx, peer); err != nil {
 					t.Fatalf("create peer: %v", err)
 				}

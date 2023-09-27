@@ -73,6 +73,8 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 			continue
 		}
 		// Determine the preferred wireguard endpoint
+		// When returning a wireguard peer, we make sure the primary endpoint
+		// contains the port of the edge we're traversing.
 		var primaryEndpoint string
 		if node.PrimaryEndpoint != "" {
 			for _, endpoint := range node.GetWireguardEndpoints() {

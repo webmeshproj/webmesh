@@ -88,7 +88,7 @@ func (s *Server) GetMeshGraph(ctx context.Context, _ *emptypb.Empty) (*v1.MeshGr
 		}
 	}
 	var buf bytes.Buffer
-	err = s.peers.DrawGraph(ctx, &buf)
+	err = s.peers.DrawDOTGraph(ctx, &buf)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to draw graph: %v", err)
 	}

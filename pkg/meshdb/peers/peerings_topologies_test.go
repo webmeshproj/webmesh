@@ -25,7 +25,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
@@ -455,7 +454,7 @@ func TestWireGuardTopologies(t *testing.T) {
 			for peerID, addrs := range testCase.peers {
 				err = peerdb.Put(ctx, &v1.MeshNode{
 					Id:          peerID,
-					PublicKey:   mustGenerateKey(t),
+					PublicKey:   mustGeneratePublicKey(t),
 					PrivateIpv4: netip.MustParsePrefix(addrs[0]).String(),
 					PrivateIpv6: netip.MustParsePrefix(addrs[1]).String(),
 				})
@@ -494,17 +493,4 @@ func TestWireGuardTopologies(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustGenerateKey(t *testing.T) string {
-	t.Helper()
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	encoded, err := key.PublicKey().Encode()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return encoded
 }

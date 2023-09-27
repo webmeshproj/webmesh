@@ -67,8 +67,8 @@ type Peers interface {
 	PutEdge(ctx context.Context, edge *v1.MeshEdge) error
 	// RemoveEdge removes an edge between two nodes.
 	RemoveEdge(ctx context.Context, from, to string) error
-	// DrawGraph draws the graph of nodes to the given Writer.
-	DrawGraph(ctx context.Context, w io.Writer) error
+	// DrawDOTGraph draws the graph of nodes to the given Writer.
+	DrawDOTGraph(ctx context.Context, w io.Writer) error
 }
 
 // New returns a new Peers interface.
@@ -102,6 +102,7 @@ func (p *peerDB) Put(ctx context.Context, node *v1.MeshNode) error {
 		wgendpoints = append(wgendpoints, endpoint)
 	}
 	node.WireguardEndpoints = wgendpoints
+	// TODO: Track this separately or consider changing to UpdatedAt.
 	node.JoinedAt = timestamppb.New(time.Now().UTC())
 	err := p.graph.AddVertex(peergraph.MeshNode{MeshNode: node})
 	if err != nil {
@@ -262,7 +263,7 @@ func (p *peerDB) RemoveEdge(ctx context.Context, from, to string) error {
 	return nil
 }
 
-func (p *peerDB) DrawGraph(ctx context.Context, w io.Writer) error {
+func (p *peerDB) DrawDOTGraph(ctx context.Context, w io.Writer) error {
 	graph := graph.Graph[peergraph.NodeID, peergraph.MeshNode](p.graph)
 	err := draw.DOT(graph, w)
 	if err != nil {

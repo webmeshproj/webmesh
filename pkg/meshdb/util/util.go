@@ -35,6 +35,10 @@ func IsValidID(id string) bool {
 	if len(id) == 0 {
 		return false
 	}
+	// Make sure all characters are valid UTF-8.
+	if validated := strings.ToValidUTF8(id, "/"); validated != id {
+		return false
+	}
 	for _, c := range InvalidIDChars {
 		if strings.ContainsRune(id, c) {
 			return false

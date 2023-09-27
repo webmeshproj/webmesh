@@ -32,23 +32,13 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
 
-// NodeID is the type of a node ID.
-type NodeID string
-
-// String returns the string representation of the node ID.
-func (id NodeID) String() string { return string(id) }
-
-// Bytes returns the byte representation of the node ID.
-func (id NodeID) Bytes() []byte { return []byte(id) }
-
-// IsEmpty returns true if the node ID is empty.
-func (id NodeID) IsEmpty() bool { return id == "" }
-
 // Graph is the graph.Graph implementation for the mesh network.
 type Graph graph.Graph[NodeID, MeshNode]
 
-// GraphStore implements graph.Store[string, Node] where
-// string is the node ID and Node is the node itself.
+// Store is the graph.Store implementation for the mesh network.
+type Store graph.Store[NodeID, MeshNode]
+
+// GraphStore implements the Store.
 type GraphStore struct {
 	storage.MeshStorage
 	mu sync.RWMutex
@@ -63,23 +53,30 @@ var NodesPrefix = storage.RegistryPrefix.ForString("nodes")
 // in the format /registry/edges/<source>/<target>.
 var EdgesPrefix = storage.RegistryPrefix.ForString("edges")
 
+// ErrEmptyNodeID is returned when a node ID is empty.
+var ErrEmptyNodeID = errors.New("node ID must not be empty")
+
+// ErrInvalidNodeID is returned when a node ID is invalid.
+var ErrInvalidNodeID = errors.New("node ID is invalid")
+
 // NewGraph creates a new Graph instance.
 func NewGraph(st storage.MeshStorage) Graph {
-	return graph.NewWithStore(graphHasher, newGraphStore(st))
+	return NewGraphWithStore(st, &GraphStore{MeshStorage: st})
 }
 
 // NewTestGraph is an alias for creating a new graph with in-memory storage.
-func NewTestGraph() (Graph, error) {
+// It also returns the underlying storage instance.
+func NewTestGraph() (Graph, *GraphStore, error) {
 	memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
 	if err != nil {
-		return nil, fmt.Errorf("create in-memory database: %w", err)
+		return nil, nil, fmt.Errorf("create in-memory database: %w", err)
 	}
-	return NewGraph(memdb), nil
+	return NewGraph(memdb), &GraphStore{MeshStorage: memdb}, nil
 }
 
-// newGraphStore creates a new GraphStore instance.
-func newGraphStore(st storage.MeshStorage) graph.Store[NodeID, MeshNode] {
-	return graph.Store[NodeID, MeshNode](&GraphStore{MeshStorage: st})
+// NewGraphWithStore creates a new Graph instance with the given store.
+func NewGraphWithStore(st storage.MeshStorage, store Store) Graph {
+	return graph.NewWithStore(graphHasher, store)
 }
 
 // graphHasher is the hash key function for the graph.
@@ -109,10 +106,10 @@ func (g *GraphStore) AddVertex(nodeID NodeID, node MeshNode, props graph.VertexP
 	defer g.mu.Unlock()
 	ctx := context.Background()
 	if nodeID.IsEmpty() {
-		return fmt.Errorf("node ID must not be empty")
+		return ErrEmptyNodeID
 	}
 	if !dbutil.IsValidNodeID(nodeID.String()) {
-		return fmt.Errorf("invalid node ID: %s", nodeID)
+		return fmt.Errorf("%w: %s", ErrInvalidNodeID, nodeID)
 	}
 	if node.PublicKey != "" {
 		// Make sure it's a valid public key.
@@ -139,7 +136,11 @@ func (g *GraphStore) Vertex(nodeID NodeID) (node MeshNode, props graph.VertexPro
 	defer g.mu.RUnlock()
 	ctx := context.Background()
 	if nodeID.IsEmpty() {
-		err = fmt.Errorf("node ID must not be empty")
+		err = ErrEmptyNodeID
+		return
+	}
+	if !dbutil.IsValidNodeID(nodeID.String()) {
+		err = fmt.Errorf("%w: %s", ErrInvalidNodeID, nodeID)
 		return
 	}
 	key := NodesPrefix.For(nodeID.Bytes())
@@ -165,7 +166,10 @@ func (g *GraphStore) RemoveVertex(nodeID NodeID) error {
 	defer g.mu.Unlock()
 	ctx := context.Background()
 	if nodeID.IsEmpty() {
-		return fmt.Errorf("node ID must not be empty")
+		return ErrEmptyNodeID
+	}
+	if !dbutil.IsValidNodeID(nodeID.String()) {
+		return fmt.Errorf("%w: %s", ErrInvalidNodeID, nodeID)
 	}
 	key := NodesPrefix.For(nodeID.Bytes())
 	_, err := g.GetValue(ctx, key)
@@ -237,7 +241,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode NodeID, edge graph.Edge[Node
 	defer g.mu.Unlock()
 	ctx := context.Background()
 	if sourceNode.IsEmpty() || targetNode.IsEmpty() {
-		return fmt.Errorf("node ID must not be empty")
+		return ErrEmptyNodeID
 	}
 	// We diverge from the suggested implementation and only check that one of the nodes
 	// exists. This is so joiners can add edges to nodes that are not yet in the graph.
@@ -269,7 +273,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode NodeID, edge graph.Edge[Node
 			// Should never happen.
 			continue
 		}
-		if bytes.Equal(parts[0], sourceNode.Bytes()) && bytes.Equal(parts[1], sourceNode.Bytes()) {
+		if bytes.Equal(parts[0], sourceNode.Bytes()) && bytes.Equal(parts[1], targetNode.Bytes()) {
 			edgeExists = true
 			break
 		}
