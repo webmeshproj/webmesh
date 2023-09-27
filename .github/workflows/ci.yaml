@@ -15,10 +15,9 @@ env:
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   CACHE_DEP_PATH: go.sum
   LINT_TIMEOUT: 10m
-  WEBMESH_BADGER_GOROUTINES: 8
+  WEBMESH_BADGER_GOROUTINES: 12
   BUILD_PARALLELISM: 8
   TEST_PARALLELISM: 8
-  WIN_TEST_PARALLELISM: 6
   COSIGN_EXPERIMENTAL: 1
   RICHGO_FORCE_COLOR: 1
 
@@ -79,7 +78,7 @@ jobs:
       - name: Run Unit Tests
         shell: bash
         env:
-          TEST_PARALLEL: ${{ matrix.os == 'windows-latest' && env.WIN_TEST_PARALLELISM || env.TEST_PARALLELISM }}
+          TEST_PARALLEL: ${{ env.TEST_PARALLELISM }}
         run: make ci-test
 
   build-binaries:
