@@ -111,7 +111,6 @@ func TestPeers(t *testing.T) {
 		})
 
 		t.Run("DedupWireguardEndpoints", func(t *testing.T) {
-			t.Parallel()
 			node := &v1.MeshNode{
 				Id:                 "node-id",
 				PublicKey:          mustGeneratePublicKey(t),
