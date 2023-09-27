@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -619,13 +618,9 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 	})
 
-	// SubscribeTimeout is how long we wait for a subscription test case to complete.
-	var SubscribeTimeout = 30 * time.Second
-
 	t.Run("Subscribe", func(t *testing.T) {
-		if os.Getenv("CI") == "true" {
-			t.Skip("Skipping on CI due to flakiness")
-		}
+		SkipOnCI(t, "Skipping on CI due to flakiness")
+		var subscribeTimeout = 30 * time.Second
 		var hitCount atomic.Int64
 		var seen sync.Map
 		subCancel, err := meshStorage.Subscribe(ctx, "Subscribe/", func(key, value string) {
@@ -648,7 +643,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		ok := Eventually[int64](func() int64 {
 			return hitCount.Load()
-		}).ShouldEqual(SubscribeTimeout, time.Second, int64(len(kv)))
+		}).ShouldEqual(subscribeTimeout, time.Second, int64(len(kv)))
 		if !ok {
 			t.Fatalf("failed to see all puts")
 		}
@@ -677,7 +672,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		ok = Eventually[int64](func() int64 {
 			return hitCount.Load()
-		}).ShouldEqual(SubscribeTimeout, time.Second, int64(len(kv)))
+		}).ShouldEqual(subscribeTimeout, time.Second, int64(len(kv)))
 		if !ok {
 			t.Fatalf("failed to see all deletes")
 		}

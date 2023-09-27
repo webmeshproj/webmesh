@@ -20,6 +20,7 @@ package testutil
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -38,6 +39,15 @@ type DropStorage interface {
 // It should have unique identifying properties for each call and not be
 // bootstrapped. The providers listen port must be available on localhost.
 type NewProviderFunc func(ctx context.Context, t *testing.T) storage.Provider
+
+// SkipOnCI skips the test if the CI environment variable is set for the given
+// reason.
+func SkipOnCI(t *testing.T, reason string) {
+	t.Helper()
+	if os.Getenv("CI") == "true" {
+		t.Skip(reason)
+	}
+}
 
 // MustBootstrap is a helper function that calls Bootstrap and fails the test if there
 // is an error.

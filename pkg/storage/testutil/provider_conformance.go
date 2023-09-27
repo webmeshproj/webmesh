@@ -18,7 +18,7 @@ package testutil
 
 import (
 	"context"
-	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -146,15 +146,15 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 		}
 
 		t.Run("ThreeVoters", func(t *testing.T) {
+			if runtime.GOOS == "windows" {
+				SkipOnCI(t, "Skipping test on Windows CI to save time")
+			}
 			runTest(t, MustAddVoter)
 		})
 
 		// Same test as above but with one voter and two observers.
 		t.Run("OneVoterTwoObservers", func(t *testing.T) {
-			if os.Getenv("CI") == "true" {
-				// Only do the Voter test on CI to save time
-				t.Skip("Skipping test on CI")
-			}
+			SkipOnCI(t, "Skipping test on CI to save time")
 			runTest(t, MustAddObserver)
 		})
 	})
