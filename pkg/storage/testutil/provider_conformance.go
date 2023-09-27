@@ -31,10 +31,10 @@ type NewProviderFunc func(ctx context.Context, t *testing.T) storage.Provider
 // TestStorageProviderConformance tests that the storage provider conforms to the
 // storage provider interface.
 func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvider NewProviderFunc) {
-	t.Run("TestStorageConformance", func(t *testing.T) {
+	t.Run("TestSingleNodeStorageConformance", func(t *testing.T) {
 		provider := newProvider(ctx, t)
 		defer provider.Close()
 		MustBootstrap(ctx, t, provider)
-		// TestMeshStorageConformance(ctx, t, provider.MeshStorage())
+		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
 }

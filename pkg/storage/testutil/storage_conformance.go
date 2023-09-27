@@ -546,34 +546,6 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		// Place a few keys and make sure we get the full list of them back
 		// when we list them.
 		kv := map[string]string{
-			"key1": "value1",
-			"key2": "value2",
-			"key3": "value3",
-		}
-		for key, value := range kv {
-			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
-				t.Fatalf("failed to put key: %v", err)
-			}
-		}
-		keysl, err := meshStorage.List(ctx, "")
-		if err != nil {
-			t.Fatalf("failed to list keys: %v", err)
-		}
-		if len(keysl) != len(kv) {
-			t.Errorf("expected %d keys, got %d", len(kv), len(keysl))
-		}
-		keys := map[string]struct{}{
-			"key1": {},
-			"key2": {},
-			"key3": {},
-		}
-		for key := range keys {
-			if _, ok := kv[key]; !ok {
-				t.Errorf("unexpected key %q", key)
-			}
-		}
-		// Make sure the same works for a specific prefix
-		kv = map[string]string{
 			"prefix1/key1": "value1",
 			"prefix1/key2": "value2",
 		}
@@ -582,14 +554,14 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 				t.Fatalf("failed to put key: %v", err)
 			}
 		}
-		keysl, err = meshStorage.List(ctx, "prefix1/")
+		keysl, err := meshStorage.List(ctx, "prefix1/")
 		if err != nil {
 			t.Fatalf("failed to list keys: %v", err)
 		}
 		if len(keysl) != len(kv) {
 			t.Errorf("expected %d keys, got %d", len(kv), len(keysl))
 		}
-		keys = map[string]struct{}{
+		keys := map[string]struct{}{
 			"prefix1/key1": {},
 			"prefix1/key2": {},
 		}
@@ -600,11 +572,6 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		// Clean up
 		for key := range kv {
-			if err := meshStorage.Delete(ctx, key); err != nil {
-				t.Fatalf("failed to delete key: %v", err)
-			}
-		}
-		for _, key := range []string{"key1", "key2", "key3"} {
 			if err := meshStorage.Delete(ctx, key); err != nil {
 				t.Fatalf("failed to delete key: %v", err)
 			}

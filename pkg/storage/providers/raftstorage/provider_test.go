@@ -23,29 +23,53 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/testutil"
 )
 
 func TestInMemoryProviderConformance(t *testing.T) {
-	builder := func(ctx context.Context, t *testing.T) storage.Provider {
-		transport, err := tcp.NewRaftTransport(nil, tcp.RaftTransportOptions{
-			Addr:    "[::]:0",
-			MaxPool: 1,
-			Timeout: time.Second,
-		})
-		if err != nil {
-			t.Fatalf("failed to create raft transport: %v", err)
-		}
-		opts := NewOptions(uuid.NewString(), transport)
-		opts.InMemory = true
-		p := NewProvider(opts)
-		err = p.Start(ctx)
-		if err != nil {
-			t.Fatalf("failed to start provider: %v", err)
-		}
-		return p
+	builder := &builder{}
+	testutil.TestStorageProviderConformance(context.Background(), t, builder.newProvider)
+}
+
+type builder struct{}
+
+func (b *builder) newProvider(ctx context.Context, t *testing.T) storage.Provider {
+	transport, err := tcp.NewRaftTransport(nil, tcp.RaftTransportOptions{
+		Addr:    "[::]:0",
+		MaxPool: 10,
+		Timeout: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("failed to create raft transport: %v", err)
 	}
-	testutil.TestStorageProviderConformance(context.Background(), t, builder)
+	p := NewProvider(newTestOptions(transport))
+	err = p.Start(ctx)
+	if err != nil {
+		t.Fatalf("failed to start provider: %v", err)
+	}
+	return p
+}
+
+func newTestOptions(transport transport.RaftTransport) Options {
+	return Options{
+		NodeID:             uuid.NewString(),
+		Transport:          transport,
+		InMemory:           true,
+		ConnectionTimeout:  time.Millisecond * 500,
+		HeartbeatTimeout:   time.Millisecond * 500,
+		ElectionTimeout:    time.Millisecond * 500,
+		LeaderLeaseTimeout: time.Millisecond * 500,
+		ApplyTimeout:       time.Second * 10,
+		CommitTimeout:      time.Second * 10,
+		SnapshotInterval:   time.Minute,
+		SnapshotThreshold:  5,
+		MaxAppendEntries:   15,
+		SnapshotRetention:  3,
+		ObserverChanBuffer: 100,
+		BarrierThreshold:   1,
+		LogLevel:           "",
+	}
 }
