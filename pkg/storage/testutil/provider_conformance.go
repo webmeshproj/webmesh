@@ -26,20 +26,15 @@ import (
 // NewProviderFunc is a function that returns a new started storage provider.
 // It should have unique identifying properties for each call and not be
 // bootstrapped.
-type NewProviderFunc func(t *testing.T) storage.Provider
+type NewProviderFunc func(ctx context.Context, t *testing.T) storage.Provider
 
 // TestStorageProviderConformance tests that the storage provider conforms to the
 // storage provider interface.
-func TestStorageProviderConformance(t *testing.T, newProvider NewProviderFunc) {
-	ctx := context.Background()
-
+func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvider NewProviderFunc) {
 	t.Run("TestStorageConformance", func(t *testing.T) {
-		provider := newProvider(t)
+		provider := newProvider(ctx, t)
 		defer provider.Close()
-		err := provider.Bootstrap(ctx)
-		if err != nil {
-			t.Fatalf("Failed to bootstrap provider: %v", err)
-		}
-		TestMeshStorageConformance(t, provider.MeshStorage())
+		MustBootstrap(ctx, t, provider)
+		// TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
 }

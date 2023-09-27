@@ -31,13 +31,17 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// TestConsensusStorageConformance tests that the ConsensusStorage interface is implemented correctly.
-func TestConsensusStorageConformance(t *testing.T, raftStorage storage.ConsensusStorage) {
-	t.Helper()
+// TestDualStorageConformance tests that the DualStorage interface is implemented correctly.
+func TestDualStorageConformance(ctx context.Context, t *testing.T, dualStorage storage.DualStorage) {
+	TestConsensusStorageConformance(ctx, t, dualStorage)
+	TestMeshStorageConformance(ctx, t, dualStorage)
+}
 
+// TestConsensusStorageConformance tests that the ConsensusStorage interface is implemented correctly.
+func TestConsensusStorageConformance(ctx context.Context, t *testing.T, raftStorage storage.ConsensusStorage) {
 	defer func() {
 		if dropper, ok := raftStorage.(DropStorage); ok {
-			_ = dropper.DropAll(context.Background())
+			_ = dropper.DropAll(ctx)
 		}
 	}()
 
@@ -361,7 +365,6 @@ func TestConsensusStorageConformance(t *testing.T, raftStorage storage.Consensus
 	}
 
 	if meshStorage, ok := raftStorage.(storage.MeshStorage); ok {
-		ctx := context.Background()
 		t.Run("Snapshot", func(t *testing.T) {
 			// Place a few keys and make sure a snapshot conforms to our expectations.
 			for key, value := range snapshotKV {
@@ -459,13 +462,10 @@ func TestConsensusStorageConformance(t *testing.T, raftStorage storage.Consensus
 }
 
 // TestMeshStorageConformance tests that the MeshStorage interface is implemented correctly.
-func TestMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
-	t.Helper()
-	ctx := context.Background()
-
+func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage storage.MeshStorage) {
 	defer func() {
 		if dropper, ok := meshStorage.(DropStorage); ok {
-			_ = dropper.DropAll(context.Background())
+			_ = dropper.DropAll(ctx)
 		}
 	}()
 
@@ -648,20 +648,4 @@ func TestMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 			}
 		}
 	})
-}
-
-// RunDualStorageConformance tests that the DualStorage interface is implemented correctly.
-func RunDualStorageConformance(t *testing.T, dualStorage storage.DualStorage) {
-	t.Helper()
-	ctx := context.Background()
-
-	TestConsensusStorageConformance(t, dualStorage)
-	if dropper, ok := dualStorage.(DropStorage); ok {
-		_ = dropper.DropAll(ctx)
-	}
-
-	TestMeshStorageConformance(t, dualStorage)
-	if dropper, ok := dualStorage.(DropStorage); ok {
-		_ = dropper.DropAll(ctx)
-	}
 }

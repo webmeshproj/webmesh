@@ -42,6 +42,19 @@ import (
 // Ensure we satisfy the provider interface.
 var _ storage.Provider = &Provider{}
 
+// Ensure that RaftStorage implements a MonothonicLogStore.
+var _ = raft.MonotonicLogStore(&MonotonicLogStore{})
+
+// MonotonicLogStore is a LogStore that is monotonic.
+type MonotonicLogStore struct {
+	raft.LogStore
+}
+
+// IsMonotonic returns true if the log store is monotonic.
+func (m *MonotonicLogStore) IsMonotonic() bool {
+	return true
+}
+
 type (
 	// SnapshotMeta is an alias for raft.SnapshotMeta.
 	SnapshotMeta = raft.SnapshotMeta
@@ -129,8 +142,7 @@ func (r *Provider) Start(ctx context.Context) error {
 	if r.started.Load() {
 		return storage.ErrStarted
 	}
-	log := r.log
-	log.Debug("Starting raft storage provider")
+	r.log.Debug("Starting raft storage provider")
 	storage, err := r.createStorage()
 	if err != nil {
 		return fmt.Errorf("create storage: %w", err)
@@ -141,7 +153,7 @@ func (r *Provider) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create snapshot storage: %w", err)
 	}
-	log.Debug("Starting raft instance", slog.String("listen-addr", string(r.Options.Transport.LocalAddr())))
+	r.log.Debug("Starting raft instance", slog.String("listen-addr", string(r.Options.Transport.LocalAddr())))
 	r.raft, err = raft.NewRaft(
 		r.Options.RaftConfig(ctx, string(r.nodeID)),
 		fsm.New(ctx, storage, fsm.Options{

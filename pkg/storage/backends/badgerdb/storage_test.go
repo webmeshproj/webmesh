@@ -19,19 +19,30 @@ limitations under the License.
 package badgerdb
 
 import (
+	"context"
 	"os"
 	"testing"
 
 	"github.com/webmeshproj/webmesh/pkg/storage/testutil"
 )
 
+var BadgerTestDebug = false
+
+func init() {
+	if os.Getenv("BADGER_TEST_DEBUG") == "true" {
+		BadgerTestDebug = true
+	}
+}
+
 func TestInMemoryBadgerStorage(t *testing.T) {
-	st, err := New(Options{InMemory: true})
+	st, err := NewInMemory(Options{
+		Debug: BadgerTestDebug,
+	})
 	if err != nil {
 		t.Fatalf("failed to create in-memory storage: %v", err)
 	}
 	defer st.Close()
-	testutil.RunDualStorageConformance(t, st)
+	testutil.TestDualStorageConformance(context.Background(), t, st)
 }
 
 func TestDiskBadgerStorage(t *testing.T) {
@@ -42,10 +53,13 @@ func TestDiskBadgerStorage(t *testing.T) {
 	t.Cleanup(func() {
 		os.RemoveAll(tmp)
 	})
-	st, err := New(Options{DiskPath: tmp})
+	st, err := New(Options{
+		DiskPath: tmp,
+		Debug:    BadgerTestDebug,
+	})
 	if err != nil {
 		t.Fatalf("failed to create disk storage: %v", err)
 	}
 	defer st.Close()
-	testutil.RunDualStorageConformance(t, st)
+	testutil.TestDualStorageConformance(context.Background(), t, st)
 }

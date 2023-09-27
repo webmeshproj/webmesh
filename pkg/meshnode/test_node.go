@@ -46,9 +46,8 @@ func NewTestNode(ctx context.Context) (Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts := raftstorage.NewOptions(st.ID())
+	opts := raftstorage.NewOptions(st.ID(), raftTransport)
 	opts.InMemory = true
-	opts.Transport = raftTransport
 	rft := raftstorage.NewProvider(opts)
 	if err := rft.Start(ctx); err != nil {
 		return nil, err

@@ -31,21 +31,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// Ensure that RaftStorage implements a MonothonicLogStore.
-var _ = raft.MonotonicLogStore(&MonotonicLogStore{})
-
 // Ensure we satisfy the MeshStorage interface.
 var _ storage.MeshStorage = &RaftStorage{}
-
-// MonotonicLogStore is a LogStore that is monotonic.
-type MonotonicLogStore struct {
-	raft.LogStore
-}
-
-// IsMonotonic returns true if the log store is monotonic.
-func (m *MonotonicLogStore) IsMonotonic() bool {
-	return true
-}
 
 // RaftStorage wraps the storage.Storage interface to force write operations through the Raft log.
 type RaftStorage struct {

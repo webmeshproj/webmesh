@@ -90,9 +90,10 @@ type Options struct {
 }
 
 // NewOptions returns new raft options with sensible defaults.
-func NewOptions(nodeID string) Options {
+func NewOptions(nodeID string, transport transport.RaftTransport) Options {
 	return Options{
 		NodeID:             nodeID,
+		Transport:          transport,
 		DataDir:            DefaultDataDir,
 		ConnectionTimeout:  time.Second * 3,
 		HeartbeatTimeout:   time.Second * 3,
