@@ -28,7 +28,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	extstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/external"
@@ -147,11 +146,7 @@ func (o *Config) NewStorageProvider(ctx context.Context, node meshnode.Node, for
 
 // NewRaftStorageProvider returns a new raftstorage provider for the current configuration.
 func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, node meshnode.Node, force bool) (storage.Provider, error) {
-	transport, err := o.Raft.NewTransport(node)
-	if err != nil {
-		return nil, err
-	}
-	opts, err := o.NewRaftOptions(ctx, node, transport, force)
+	opts, err := o.NewRaftOptions(ctx, node, force)
 	if err != nil {
 		return nil, err
 	}
@@ -168,13 +163,12 @@ func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID 
 }
 
 // NewRaftOptions returns a new raft options for the current configuration.
-func (o *StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node, transport transport.RaftTransport, force bool) (raftstorage.Options, error) {
-	opts := raftstorage.NewOptions(node.ID(), transport)
+func (o *StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node, force bool) (raftstorage.Options, error) {
 	raftTransport, err := o.Raft.NewTransport(node)
 	if err != nil {
-		return opts, fmt.Errorf("create raft transport: %w", err)
+		return raftstorage.Options{}, fmt.Errorf("create raft transport: %w", err)
 	}
-	opts.Transport = raftTransport
+	opts := raftstorage.NewOptions(node.ID(), raftTransport)
 	opts.ClearDataDir = force
 	opts.DataDir = o.Path
 	opts.InMemory = o.InMemory
