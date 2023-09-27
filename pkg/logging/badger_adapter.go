@@ -1,5 +1,3 @@
-//go:build !wasm
-
 /*
 Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
 
@@ -16,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package badgerdb
+package logging
 
 import (
 	"fmt"
@@ -25,27 +23,33 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-type logAdapter struct {
+type badgerLogAdapter struct {
 	*slog.Logger
 }
 
-// NewLogAdapter returns a badger log adapter for the given logger.
-func NewLogAdapter(logger *slog.Logger) badger.Logger {
-	return &logAdapter{Logger: logger}
+// NewBadgerLogger returns a badger log adapter backed by slog with the given
+// log level.
+func NewBadgerLogger(logLevel string) badger.Logger {
+	return NewBadgerAdapter(NewLogger(logLevel))
 }
 
-func (l *logAdapter) Errorf(format string, args ...any) {
+// NewBadgerAdapter returns a badger log adapter for the given logger.
+func NewBadgerAdapter(logger *slog.Logger) badger.Logger {
+	return &badgerLogAdapter{Logger: logger}
+}
+
+func (l *badgerLogAdapter) Errorf(format string, args ...any) {
 	l.Error(fmt.Sprintf(format, args...))
 }
 
-func (l *logAdapter) Warningf(format string, args ...any) {
+func (l *badgerLogAdapter) Warningf(format string, args ...any) {
 	l.Error(fmt.Sprintf(format, args...))
 }
 
-func (l *logAdapter) Infof(format string, args ...any) {
+func (l *badgerLogAdapter) Infof(format string, args ...any) {
 	l.Info(fmt.Sprintf(format, args...))
 }
 
-func (l *logAdapter) Debugf(format string, args ...any) {
+func (l *badgerLogAdapter) Debugf(format string, args ...any) {
 	l.Debug(fmt.Sprintf(format, args...))
 }

@@ -16,6 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package badgerdb implements the storage backends using BadgerDB.
 package badgerdb
 
 import (
@@ -84,9 +85,9 @@ func New(opts Options) (storage.DualStorage, error) {
 	if opts.SyncWrites {
 		badgeropts = badgeropts.WithSyncWrites(true)
 	}
-	badgeropts = badgeropts.WithLogger(NewLogAdapter(logging.NewLogger("")))
+	badgeropts = badgeropts.WithLogger(logging.NewBadgerLogger(""))
 	if opts.Debug {
-		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(NewLogAdapter(logging.NewLogger("debug")))
+		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(logging.NewBadgerLogger("debug"))
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {
@@ -110,9 +111,9 @@ func NewInMemory(opts Options) (storage.DualStorage, error) {
 	badgeropts := badger.DefaultOptions("").
 		WithInMemory(true).
 		WithNumGoroutines(MaxGoRoutines)
-	badgeropts = badgeropts.WithLogger(NewLogAdapter(logging.NewLogger("")))
+	badgeropts = badgeropts.WithLogger(logging.NewBadgerLogger(""))
 	if opts.Debug {
-		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(NewLogAdapter(logging.NewLogger("debug")))
+		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(logging.NewBadgerLogger("debug"))
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {

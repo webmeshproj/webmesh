@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package logging contains logging utilities.
+// Package logging contains logging utilities and adapters for various logging
+// libraries.
 package logging
 
 import (

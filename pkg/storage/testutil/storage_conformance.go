@@ -463,6 +463,12 @@ func TestMeshStorageConformance(t *testing.T, meshStorage storage.MeshStorage) {
 	t.Helper()
 	ctx := context.Background()
 
+	defer func() {
+		if dropper, ok := meshStorage.(DropStorage); ok {
+			_ = dropper.DropAll(context.Background())
+		}
+	}()
+
 	t.Run("GetValue", func(t *testing.T) {
 		// Try to get a non-existent key and ensure it returns ErrKeyNotFound.
 		_, err := meshStorage.GetValue(ctx, "non-existent-key")
