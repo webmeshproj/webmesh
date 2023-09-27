@@ -249,9 +249,12 @@ func (db *badgerDB) Subscribe(ctx context.Context, prefix string, fn storage.Sub
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		match := []pb.Match{{Prefix: []byte(prefix)}}
+		var mu sync.Mutex
 		_ = db.db.Subscribe(ctx, func(kv *pb.KVList) error {
 			for _, kv := range kv.Kv {
+				mu.Lock()
 				fn(string(kv.Key), string(kv.Value))
+				mu.Unlock()
 			}
 			return nil
 		}, match)
