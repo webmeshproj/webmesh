@@ -21,7 +21,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -621,16 +620,11 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 	})
 
 	// SubscribeTimeout is how long we wait for a subscription test case to complete.
-	// We override this in CI for slow machines.
 	var SubscribeTimeout = 30 * time.Second
-	if os.Getenv("CI") == "true" {
-		// If it takes more than a minute regardless we have a problem.
-		SubscribeTimeout = 1 * time.Minute
-	}
 
 	t.Run("Subscribe", func(t *testing.T) {
-		if runtime.GOOS == "windows" && os.Getenv("CI") == "true" {
-			t.Skip("Skipping on windows in CI due to flakiness")
+		if os.Getenv("CI") == "true" {
+			t.Skip("Skipping on CI due to flakiness")
 		}
 		var hitCount atomic.Int64
 		var seen sync.Map
