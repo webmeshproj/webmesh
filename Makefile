@@ -10,6 +10,10 @@ GO    ?= go
 ARCH  ?= $(shell $(GO) env GOARCH)
 OS    ?= $(shell $(GO) env GOOS)
 
+ifeq ($(OS),Windows_NT)
+	OS := windows
+endif
+
 GOPATH ?= $(shell $(GO) env GOPATH)
 GOBIN  ?= $(GOPATH)/bin
 
@@ -92,7 +96,11 @@ TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
 TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
 test: ## Run unit tests.
+ifeq ($(OS),windows)
+	$(GO) test $(TEST_ARGS) ./...
+else
 	$(GO) run github.com/kyoh86/richgo@v0.3.12 test $(TEST_ARGS) ./...
+endif
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 LINT_TIMEOUT := 10m
