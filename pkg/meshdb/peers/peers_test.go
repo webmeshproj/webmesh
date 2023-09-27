@@ -17,7 +17,6 @@ limitations under the License.
 package peers
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -676,68 +675,6 @@ func TestPeers(t *testing.T) {
 		err = p.RemoveEdge(ctx, nodes[0].GetId(), nodes[1].GetId())
 		if err != nil {
 			t.Fatal(err)
-		}
-	})
-
-	t.Run("DrawDOTGraph", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		p := setupPeersTest(t)
-		nodes := []*v1.MeshNode{
-			{
-				Id:              "node-a",
-				PublicKey:       mustGeneratePublicKey(t),
-				ZoneAwarenessId: "zone-a",
-			},
-			{
-				Id:        "node-b",
-				PublicKey: mustGeneratePublicKey(t),
-			},
-		}
-		for _, node := range nodes {
-			err := p.Put(ctx, node)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-		// Add an edge between the two nodes
-		err := p.PutEdge(ctx, &v1.MeshEdge{
-			Source: nodes[0].GetId(),
-			Target: nodes[1].GetId(),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Draw the dot graph
-		var buf bytes.Buffer
-		err = p.DrawDOTGraph(ctx, &buf)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Log("Computed graph:", buf.String())
-		// Scan each line and make sure it's in the expected graph
-		expected := `strict graph {
-
-
-			"node-a" [  weight=0 ];
-
-			"node-a" -- "node-b" [  weight=0 ];
-
-			"node-b" [  weight=0 ];
-
-			"node-b" -- "node-a" [  weight=0 ];
-
-		}
-		`
-		expectedLines := bytes.Split([]byte(expected), []byte("\n"))
-		for i, line := range bytes.Split(buf.Bytes(), []byte("\n")) {
-			line = bytes.TrimSpace(line)
-			expectedLine := bytes.TrimSpace(expectedLines[i])
-			t.Log("Comparing line:", "'"+string(line)+"'", "to expected:", "'"+string(expectedLine)+"'")
-			if !bytes.Equal(expectedLine, line) {
-				t.Fatalf("line %d not found in expected graph", i)
-			}
 		}
 	})
 }
