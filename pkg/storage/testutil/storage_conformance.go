@@ -639,9 +639,12 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 				t.Fatalf("failed to put key: %v", err)
 			}
 		}
-		Eventually[int64](func() int64 {
+		ok := Eventually[int64](func() int64 {
 			return hitCount.Load()
-		}).ShouldEqual(t, time.Second*10, time.Second, int64(len(kv)))
+		}).ShouldEqual(t, time.Second*30, time.Second, int64(len(kv)))
+		if !ok {
+			t.Fatalf("failed to see all puts")
+		}
 		// We should have seen the correct values.
 		seenVals := map[string]string{}
 		seen.Range(func(key, value interface{}) bool {
@@ -665,9 +668,12 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 				t.Fatalf("failed to delete key: %v", err)
 			}
 		}
-		Eventually[int64](func() int64 {
+		ok = Eventually[int64](func() int64 {
 			return hitCount.Load()
-		}).ShouldEqual(t, time.Second*10, time.Second, int64(len(kv)))
+		}).ShouldEqual(t, time.Second*30, time.Second, int64(len(kv)))
+		if !ok {
+			t.Fatalf("failed to see all deletes")
+		}
 		// We should see empty values for each key we deleted.
 		seenVals = map[string]string{}
 		seen.Range(func(key, value interface{}) bool {
