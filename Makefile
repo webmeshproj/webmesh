@@ -74,30 +74,31 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 
 ##@ Testing
 
-COVERAGE_FILE := coverage.out
-TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
-TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
-
 CI ?= false
 ifeq ($(CI),true)
 # We are running in CI, so skip fmt and vet on Windows and macOS.
 ifeq ($(OS),linux)
-ci-test: mod-download fmt vet test ## Run all CI tests.
+CI_TARGETS := mod-download fmt vet test
 else
-ci-test: mod-download test
+CI_TARGETS := mod-download test
 endif
 else
 # We are running locally, so we can run all tests.
 ifeq ($(OS),windows)
 # Don't fmt on Windows, it screws up the line endings.
-ci-test: mod-download vet lint test
+CI_TARGETS := mod-download vet lint test
 else
-ci-test: mod-download fmt vet lint test
+CI_TARGETS :=  mod-download fmt vet lint test
 endif
 endif
 
+ci-test: ## Run all CI tests.
+	set -eo pipefail ; $(MAKE) $(CI_TARGETS) | xargs -IL date +"[%Y-%m-%d %H:%M:%S]: L"
 
 RICHGO_INSTALLED := $(shell test -f $(RICHGO) && echo true || echo false)
+COVERAGE_FILE    := coverage.out
+TEST_PARALLEL    ?= $(shell nproc 2>/dev/null || echo 8)
+TEST_ARGS        := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
 
 test: ## Run unit tests.
 ifeq ($(RICHGO_INSTALLED),false)

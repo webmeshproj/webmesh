@@ -43,14 +43,14 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-// MaxGoRoutines is the maximum number of goroutines to use for BadgerDB.
-var MaxGoRoutines = 16
+// BadgerGoRoutines is the maximum number of goroutines to use for BadgerDB.
+var BadgerGoRoutines = 16
 
 func init() {
-	if val, ok := os.LookupEnv("WEBMESH_BADGER_MAX_GOROUTINES"); ok {
+	if val, ok := os.LookupEnv("WEBMESH_BADGER_GOROUTINES"); ok {
 		i, err := strconv.Atoi(val)
 		if err == nil {
-			MaxGoRoutines = i
+			BadgerGoRoutines = i
 		}
 	}
 }
@@ -81,7 +81,7 @@ func New(opts Options) (storage.DualStorage, error) {
 	}
 	badgeropts := badger.
 		DefaultOptions(opts.DiskPath).
-		WithNumGoroutines(MaxGoRoutines)
+		WithNumGoroutines(BadgerGoRoutines)
 	if opts.SyncWrites {
 		badgeropts = badgeropts.WithSyncWrites(true)
 	}
@@ -110,7 +110,7 @@ func New(opts Options) (storage.DualStorage, error) {
 func NewInMemory(opts Options) (storage.DualStorage, error) {
 	badgeropts := badger.DefaultOptions("").
 		WithInMemory(true).
-		WithNumGoroutines(MaxGoRoutines)
+		WithNumGoroutines(BadgerGoRoutines)
 	badgeropts = badgeropts.WithLogger(logging.NewBadgerLogger(""))
 	if opts.Debug {
 		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(logging.NewBadgerLogger("debug"))
