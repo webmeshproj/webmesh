@@ -91,9 +91,9 @@ endif
 ci-test: ## Run all CI tests.
 	set -eo pipefail ; $(MAKE) $(CI_TARGETS) | xargs -IL date +"[%Y-%m-%d %H:%M:%S]: L"
 
-COVERAGE_FILE := coverage.out
-TEST_PARALLEL ?= $(shell nproc 2>/dev/null || echo 8)
-TEST_ARGS     := -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLEL)
+TEST_PARALLELISM ?= $(shell nproc 2>/dev/null || echo 8)
+COVERAGE_FILE ?= coverage.out
+TEST_ARGS ?= -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLELISM)
 
 test: ## Run unit tests.
 ifeq ($(OS),windows)
