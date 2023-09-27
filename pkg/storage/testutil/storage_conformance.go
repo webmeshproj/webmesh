@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,6 +33,17 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
+
+// SubscribeTimeout is how long we wait for a subscription test case to complete.
+// We override this in CI for slow machines.
+var SubscribeTimeout = 30 * time.Second
+
+func init() {
+	if os.Getenv("CI") == "true" {
+		// If it takes more than a minute regardless we have a problem.
+		SubscribeTimeout = 1 * time.Minute
+	}
+}
 
 // TestDualStorageConformance tests that the DualStorage interface is implemented correctly.
 func TestDualStorageConformance(ctx context.Context, t *testing.T, dualStorage storage.DualStorage) {
@@ -641,7 +653,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		ok := Eventually[int64](func() int64 {
 			return hitCount.Load()
-		}).ShouldEqual(t, time.Second*30, time.Second, int64(len(kv)))
+		}).ShouldEqual(t, SubscribeTimeout, time.Second, int64(len(kv)))
 		if !ok {
 			t.Fatalf("failed to see all puts")
 		}
@@ -670,7 +682,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		ok = Eventually[int64](func() int64 {
 			return hitCount.Load()
-		}).ShouldEqual(t, time.Second*30, time.Second, int64(len(kv)))
+		}).ShouldEqual(t, SubscribeTimeout, time.Second, int64(len(kv)))
 		if !ok {
 			t.Fatalf("failed to see all deletes")
 		}
