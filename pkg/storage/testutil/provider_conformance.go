@@ -55,7 +55,7 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			if !ok {
 				t.Fatal("Provider 1 is not the leader")
 			}
-			// Add the others to thr group.
+			// Add the others to the group.
 			for _, provider := range []storage.Provider{providers["provider2"], providers["provider3"]} {
 				addFunc(ctx, t, providers["provider1"], provider)
 			}
