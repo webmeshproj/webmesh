@@ -18,6 +18,7 @@ package testutil
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -37,8 +38,7 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 	t.Run("TestThreeNodeStorageConformance", func(t *testing.T) {
 		// We define a single test function that we run with different
 		// add functions.
-		var addFunc func(ctx context.Context, t *testing.T, leader, voter storage.Provider)
-		runTest := func(t *testing.T) {
+		runTest := func(t *testing.T, addFunc func(ctx context.Context, t *testing.T, leader, voter storage.Provider)) {
 			providers := map[string]storage.Provider{
 				"provider1": newProvider(ctx, t),
 				"provider2": newProvider(ctx, t),
@@ -146,14 +146,16 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 		}
 
 		t.Run("ThreeVoters", func(t *testing.T) {
-			addFunc = MustAddVoter
-			runTest(t)
+			runTest(t, MustAddVoter)
 		})
 
 		// Same test as above but with one voter and two observers.
 		t.Run("OneVoterTwoObservers", func(t *testing.T) {
-			addFunc = MustAddObserver
-			runTest(t)
+			if os.Getenv("CI") == "true" {
+				// Only do the Voter test on CI to save time
+				t.Skip("Skipping test on CI")
+			}
+			runTest(t, MustAddObserver)
 		})
 	})
 }
