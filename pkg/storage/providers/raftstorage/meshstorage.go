@@ -28,6 +28,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -54,6 +55,9 @@ func (rs *RaftStorage) GetValue(ctx context.Context, key []byte) ([]byte, error)
 	if !rs.raft.started.Load() {
 		return nil, storage.ErrClosed
 	}
+	if !util.IsValidKey(string(key)) {
+		return nil, storage.ErrInvalidKey
+	}
 	return rs.storage.GetValue(ctx, key)
 }
 
@@ -61,6 +65,9 @@ func (rs *RaftStorage) GetValue(ctx context.Context, key []byte) ([]byte, error)
 func (rs *RaftStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
 	if !rs.raft.started.Load() {
 		return nil, storage.ErrClosed
+	}
+	if !util.IsValidKey(string(prefix)) {
+		return nil, storage.ErrInvalidPrefix
 	}
 	return rs.storage.ListKeys(ctx, prefix)
 }
@@ -70,21 +77,30 @@ func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
 	}
+	if !util.IsValidKey(string(prefix)) {
+		return storage.ErrInvalidPrefix
+	}
 	return rs.storage.IterPrefix(ctx, prefix, fn)
 }
 
-// Subscribe subscribes to changes to a key.
-func (rs *RaftStorage) Subscribe(ctx context.Context, key []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+// Subscribe subscribes to changes to a prefix.
+func (rs *RaftStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	if !rs.raft.started.Load() {
 		return func() {}, storage.ErrClosed
 	}
-	return rs.storage.Subscribe(ctx, key, fn)
+	if !util.IsValidKey(string(prefix)) {
+		return func() {}, storage.ErrInvalidPrefix
+	}
+	return rs.storage.Subscribe(ctx, prefix, fn)
 }
 
 // Put sets the value of a key.
 func (rs *RaftStorage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
+	}
+	if !util.IsValidKey(string(key)) {
+		return storage.ErrInvalidKey
 	}
 	if !rs.raft.isVoter() {
 		return storage.ErrNotVoter
@@ -107,6 +123,9 @@ func (rs *RaftStorage) PutValue(ctx context.Context, key, value []byte, ttl time
 func (rs *RaftStorage) Delete(ctx context.Context, key []byte) error {
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
+	}
+	if !util.IsValidKey(string(key)) {
+		return storage.ErrInvalidKey
 	}
 	if !rs.raft.isVoter() {
 		return storage.ErrNotVoter

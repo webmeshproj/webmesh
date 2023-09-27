@@ -41,6 +41,10 @@ var (
 	ErrAlreadyBootstrapped = fmt.Errorf("already bootstrapped")
 	// ErrKeyNotFound is the error returned when a key is not found.
 	ErrKeyNotFound = errors.New("key not found")
+	// ErrInvalidKey is the error returned when a key is invalid.
+	ErrInvalidKey = errors.New("invalid key")
+	// ErrInvalidPrefix is the error returned when a prefix is invalid.
+	ErrInvalidPrefix = errors.New("invalid prefix")
 )
 
 // NewKeyNotFoundError returns a new ErrKeyNotFound error.

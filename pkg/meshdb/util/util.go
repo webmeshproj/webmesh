@@ -32,11 +32,8 @@ var ReservedNodeIDs = []string{"self", "local", "localhost", "leader", "voters",
 
 // IsValidID returns true if the given identifier is valid and safe to be saved to storage.
 func IsValidID(id string) bool {
-	if len(id) == 0 {
-		return false
-	}
-	// Make sure all characters are valid UTF-8.
-	if validated := strings.ToValidUTF8(id, "/"); validated != id {
+	// Make sure non-empty and all characters are valid UTF-8.
+	if !IsValidKey(id) {
 		return false
 	}
 	for _, c := range InvalidIDChars {
@@ -53,6 +50,18 @@ func IsValidNodeID(id string) bool {
 		return false
 	}
 	return !slices.Contains(ReservedNodeIDs, id)
+}
+
+// IsValidKey reports that a key is valid. All keys must be non-empty and valid UTF-8.
+func IsValidKey(key string) bool {
+	if len(key) == 0 {
+		return false
+	}
+	// Make sure all characters are valid UTF-8.
+	if validated := strings.ToValidUTF8(key, "/"); validated != key {
+		return false
+	}
+	return true
 }
 
 // EdgeAttrsForConnectProto returns the edge attributes for the given protocol.
