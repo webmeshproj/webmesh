@@ -54,6 +54,9 @@ type FlagBinder interface {
 	// AsMapStructure is called to convert the options to a map
 	// of string keys and values.
 	AsMapStructure() map[string]any
+	// SetMapStructure is called to set the options from a map
+	// of string keys and values.
+	SetMapStructure(map[string]any)
 }
 
 // NewPluginConfigs returns a map of the built-in plugin configurations.

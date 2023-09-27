@@ -36,9 +36,9 @@ func Apply(ctx context.Context, db storage.MeshStorage, logEntry *v1.RaftLogEntr
 	log := context.LoggerFrom(ctx)
 	switch logEntry.GetType() {
 	case v1.RaftCommandType_PUT:
-		log.Debug("applying put",
-			slog.String("key", logEntry.GetKey()),
-			slog.String("value", logEntry.GetValue()),
+		log.Debug("Applying put",
+			slog.String("key", string(logEntry.GetKey())),
+			slog.String("value", string(logEntry.GetValue())),
 		)
 		err := db.PutValue(ctx, logEntry.GetKey(), logEntry.GetValue(), logEntry.Ttl.AsDuration())
 		res := &v1.RaftApplyResponse{}
@@ -48,8 +48,8 @@ func Apply(ctx context.Context, db storage.MeshStorage, logEntry *v1.RaftLogEntr
 		res.Time = time.Since(start).String()
 		return res
 	case v1.RaftCommandType_DELETE:
-		log.Debug("applying delete",
-			slog.String("key", logEntry.GetKey()),
+		log.Debug("Applying delete",
+			slog.String("key", string(logEntry.GetKey())),
 		)
 		err := db.Delete(ctx, logEntry.GetKey())
 		res := &v1.RaftApplyResponse{}

@@ -322,24 +322,24 @@ type ExternalStorage struct {
 }
 
 // GetValue returns the value of a key.
-func (ext *ExternalStorage) GetValue(ctx context.Context, key string) (string, error) {
+func (ext *ExternalStorage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
-		return "", storage.ErrClosed
+		return nil, storage.ErrClosed
 	}
 	resp, err := ext.cli.GetValue(ctx, &v1.GetValueRequest{Key: key})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			return "", storage.ErrKeyNotFound
+			return nil, storage.ErrKeyNotFound
 		}
-		return "", fmt.Errorf("get value: %w", err)
+		return nil, fmt.Errorf("get value: %w", err)
 	}
 	return resp.GetValue().GetValue(), nil
 }
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
-func (ext *ExternalStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
+func (ext *ExternalStorage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
@@ -362,7 +362,7 @@ func (ext *ExternalStorage) PutValue(ctx context.Context, key, value string, ttl
 }
 
 // Delete removes a key.
-func (ext *ExternalStorage) Delete(ctx context.Context, key string) error {
+func (ext *ExternalStorage) Delete(ctx context.Context, key []byte) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
@@ -378,8 +378,8 @@ func (ext *ExternalStorage) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// List returns all keys with a given prefix.
-func (ext *ExternalStorage) List(ctx context.Context, prefix string) ([]string, error) {
+// ListKeys returns all keys with a given prefix.
+func (ext *ExternalStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
@@ -398,7 +398,7 @@ func (ext *ExternalStorage) List(ctx context.Context, prefix string) ([]string, 
 // IterPrefix iterates over all keys with a given prefix. It is important
 // that the iterator not attempt any write operations as this will cause
 // a deadlock. The iteration will stop if the iterator returns an error.
-func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
+func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
@@ -421,7 +421,7 @@ func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix string, fn st
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
@@ -451,7 +451,7 @@ func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix string, fn sto
 			}
 			switch msg.GetEventType() {
 			case v1.PrefixEvent_EventTypeRemoved:
-				fn(msg.GetValue().GetKey(), "")
+				fn(msg.GetValue().GetKey(), nil)
 			case v1.PrefixEvent_EventTypeUpdated:
 				fn(msg.GetValue().GetKey(), msg.GetValue().GetValue())
 			}

@@ -42,14 +42,14 @@ func TestPutRole(t *testing.T) {
 			name: "system admin role",
 			code: codes.InvalidArgument,
 			req: &v1.Role{
-				Name: rbac.MeshAdminRole,
+				Name: string(rbac.MeshAdminRole),
 			},
 		},
 		{
 			name: "system voters role",
 			code: codes.InvalidArgument,
 			req: &v1.Role{
-				Name: rbac.VotersRole,
+				Name: string(rbac.VotersRole),
 			},
 		},
 		{

@@ -17,6 +17,7 @@ limitations under the License.
 package peers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/netip"
@@ -52,7 +53,7 @@ type peerResolver struct {
 // NodeIDResolver returns a resolver that resolves node addresses by node ID.
 func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 	return transport.NodeIDResolverFunc(func(ctx context.Context, lookup string) ([]netip.AddrPort, error) {
-		key := fmt.Sprintf("%s/%s", peergraph.NodesPrefix, lookup)
+		key := peergraph.NodesPrefix.For([]byte(lookup))
 		val, err := r.st.GetValue(ctx, key)
 		if err != nil {
 			return nil, err
@@ -78,8 +79,8 @@ func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 func (r *peerResolver) FeatureResolver(filterFn ...FilterFunc) transport.FeatureResolver {
 	return transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
 		var addrs []netip.AddrPort
-		err := r.st.IterPrefix(ctx, peergraph.NodesPrefix.String(), func(key string, val string) error {
-			if key == peergraph.NodesPrefix.String() {
+		err := r.st.IterPrefix(ctx, peergraph.NodesPrefix, func(key, val []byte) error {
+			if bytes.Equal(key, peergraph.NodesPrefix) {
 				return nil
 			}
 			mnode := &v1.MeshNode{}

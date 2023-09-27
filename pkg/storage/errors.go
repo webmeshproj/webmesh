@@ -44,8 +44,8 @@ var (
 )
 
 // NewKeyNotFoundError returns a new ErrKeyNotFound error.
-func NewKeyNotFoundError(key string) error {
-	return fmt.Errorf("%w: %s", ErrKeyNotFound, key)
+func NewKeyNotFoundError(key []byte) error {
+	return fmt.Errorf("%w: %s", ErrKeyNotFound, string(key))
 }
 
 // IsKeyNotFoundError returns true if the given error is a ErrKeyNotFound error.

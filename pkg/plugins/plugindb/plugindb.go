@@ -42,12 +42,12 @@ type pluginDB struct {
 	mu sync.Mutex
 }
 
-func (p *pluginDB) GetValue(ctx context.Context, key string) (string, error) {
+func (p *pluginDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	id, err := uuid.NewRandom()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req := &v1.PluginQuery{
 		Id:      id.String(),
@@ -55,31 +55,31 @@ func (p *pluginDB) GetValue(ctx context.Context, key string) (string, error) {
 		Query:   key,
 	}
 	if err := p.srv.Send(req); err != nil {
-		return "", err
+		return nil, err
 	}
 	resp, err := p.srv.Recv()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(resp.GetValue()) == 0 {
 		// This should never happen, but just in case.
-		return "", storage.ErrKeyNotFound
+		return nil, storage.ErrKeyNotFound
 	}
 	return resp.GetValue()[0], nil
 }
 
 // Put sets the value of a key.
-func (p *pluginDB) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
+func (p *pluginDB) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
 	return errors.New("put not implemented")
 }
 
 // Delete removes a key.
-func (p *pluginDB) Delete(ctx context.Context, key string) error {
+func (p *pluginDB) Delete(ctx context.Context, key []byte) error {
 	return errors.New("delete not implemented")
 }
 
-// List returns all keys with a given prefix.
-func (p *pluginDB) List(ctx context.Context, prefix string) ([]string, error) {
+// ListKeys returns all keys with a given prefix.
+func (p *pluginDB) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	id, err := uuid.NewRandom()
@@ -102,7 +102,7 @@ func (p *pluginDB) List(ctx context.Context, prefix string) ([]string, error) {
 }
 
 // IterPrefix iterates over all keys with a given prefix.
-func (p *pluginDB) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
+func (p *pluginDB) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	id, err := uuid.NewRandom()
@@ -147,7 +147,7 @@ func (p *pluginDB) Restore(ctx context.Context, r io.Reader) error {
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (p *pluginDB) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (p *pluginDB) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	return nil, errors.New("subscribe not implemented")
 }
 

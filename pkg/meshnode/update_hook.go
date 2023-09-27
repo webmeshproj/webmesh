@@ -17,9 +17,9 @@ limitations under the License.
 package meshnode
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
@@ -27,8 +27,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 )
 
-func (s *meshStore) onDBUpdate(key, value string) {
-	s.log.Debug("Store update triggered", "key", key)
+func (s *meshStore) onDBUpdate(key, value []byte) {
+	s.log.Debug("Store update triggered", "key", string(key))
 	if s.testStore {
 		return
 	}
@@ -48,13 +48,12 @@ func (s *meshStore) onDBUpdate(key, value string) {
 	}
 }
 
-func isNodeChangeKey(key string) bool {
-	return strings.HasPrefix(key, graph.NodesPrefix.String()) ||
-		strings.HasPrefix(key, graph.EdgesPrefix.String())
+func isNodeChangeKey(key []byte) bool {
+	return bytes.HasPrefix(key, graph.NodesPrefix) || bytes.HasPrefix(key, graph.EdgesPrefix)
 }
 
-func isRouteChangeKey(key string) bool {
-	return strings.HasPrefix(key, networking.RoutesPrefix.String())
+func isRouteChangeKey(key []byte) bool {
+	return bytes.HasPrefix(key, networking.RoutesPrefix)
 }
 
 // TODO: Make all waits and timeouts below configurable

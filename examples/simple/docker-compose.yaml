@@ -30,7 +30,12 @@ services:
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --storage.in-memory
+      - --plugins.debug.listen-address=0.0.0.0:6060
+      - --plugins.debug.enable-db-querier=true
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    ports:
+      - "8443:8443"
+      - "6060:6060"
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
 

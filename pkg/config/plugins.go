@@ -42,7 +42,7 @@ func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	seen := map[string]struct{}{}
 	if len(os.Args[1:]) > 0 {
 		for _, arg := range os.Args[1:] {
-			flagPrefix := fmt.Sprintf("--%splugins.configs.", prefix)
+			flagPrefix := fmt.Sprintf("--%splugins.", prefix)
 			if strings.HasPrefix(arg, flagPrefix) {
 				arg = strings.TrimPrefix(arg, flagPrefix)
 				split := strings.Split(arg, ".")
@@ -61,14 +61,15 @@ func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	builtInConfigs := builtins.NewPluginConfigs()
 	for pluginName := range seen {
 		conf := PluginConfig{}
-		flagPrefix := "plugins.configs." + pluginName + "."
+		flagPrefix := "plugins." + pluginName + "."
 		if prefix != "" {
-			flagPrefix = prefix + "." + flagPrefix
+			flagPrefix = prefix + flagPrefix
 		}
 		if pluginConfig, ok := builtInConfigs[pluginName]; ok {
 			pconf := pluginConfig
-			conf.Config = pconf.AsMapStructure()
 			pconf.BindFlags(flagPrefix, fs)
+			conf.Config = pconf.AsMapStructure()
+			conf.builtinConfig = pconf
 		} else {
 			conf.Config = PluginMapConfig{}
 			fs.Var(&conf.Config, flagPrefix+"config", "Configuration for the plugin as comma separated key values.")
@@ -86,6 +87,8 @@ type PluginConfig struct {
 	Remote RemotePluginConfig `koanf:"remote,omitempty"`
 	// Config is the configuration that will be passed to the plugin's Configure method.
 	Config PluginMapConfig `koanf:"config,omitempty"`
+
+	builtinConfig builtins.FlagBinder
 }
 
 // BindFlags binds the flags for the plugin configuration.
@@ -146,6 +149,8 @@ func (o *Config) NewPluginSet(ctx context.Context) (map[string]plugins.Plugin, e
 		var err error
 		if builtin, ok := builtinClients[name]; ok {
 			cli = builtin
+			// Set any flag arguments back to the config
+			pluginConfig.Config = pluginConfig.builtinConfig.AsMapStructure()
 		} else if pluginConfig.Exec != (ExecutablePluginConfig{}) {
 			cli, err = clients.NewExternalProcessClient(ctx, pluginConfig.Exec.Path)
 			if err != nil {

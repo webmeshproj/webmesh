@@ -39,7 +39,7 @@ func TestDeleteRoleBinding(t *testing.T) {
 		{
 			name: "system rolebinding",
 			code: codes.InvalidArgument,
-			req:  &v1.RoleBinding{Name: rbac.MeshAdminRoleBinding},
+			req:  &v1.RoleBinding{Name: string(rbac.MeshAdminRoleBinding)},
 		},
 		{
 			name: "any other rolebinding",

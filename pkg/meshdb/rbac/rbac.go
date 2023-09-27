@@ -18,6 +18,7 @@ limitations under the License.
 package rbac
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -27,37 +28,37 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-const (
+var (
 	// MeshAdminRole is the name of the mesh admin role.
-	MeshAdminRole = "mesh-admin"
+	MeshAdminRole = []byte("mesh-admin")
 	// MeshAdminRoleBinding is the name of the mesh admin rolebinding.
-	MeshAdminRoleBinding = "mesh-admin"
+	MeshAdminRoleBinding = []byte("mesh-admin")
 	// VotersRole is the name of the voters role.
-	VotersRole = "voters"
+	VotersRole = []byte("voters")
 	// VotersGroup is the name of the voters group.
-	VotersGroup = "voters"
+	VotersGroup = []byte("voters")
 	// BootstrapVotersRoleBinding is the name of the bootstrap voters rolebinding.
-	BootstrapVotersRoleBinding = "bootstrap-voters"
+	BootstrapVotersRoleBinding = []byte("bootstrap-voters")
 
-	rolesPrefix        = storage.RegistryPrefix + "roles"
-	rolebindingsPrefix = storage.RegistryPrefix + "rolebindings"
-	groupsPrefix       = storage.RegistryPrefix + "groups"
-	rbacDisabledKey    = storage.RegistryPrefix + "rbac-disabled"
+	rolesPrefix        = storage.RegistryPrefix.ForString("roles")
+	rolebindingsPrefix = storage.RegistryPrefix.ForString("rolebindings")
+	groupsPrefix       = storage.RegistryPrefix.ForString("groups")
+	rbacDisabledKey    = storage.RegistryPrefix.ForString("rbac-disabled")
 )
 
 // IsSystemRole returns true if the role is a system role.
 func IsSystemRole(name string) bool {
-	return name == MeshAdminRole || name == VotersRole
+	return name == string(MeshAdminRole) || name == string(VotersRole)
 }
 
 // IsSystemRoleBinding returns true if the rolebinding is a system rolebinding.
 func IsSystemRoleBinding(name string) bool {
-	return name == MeshAdminRoleBinding || name == BootstrapVotersRoleBinding
+	return name == string(MeshAdminRoleBinding) || name == string(BootstrapVotersRoleBinding)
 }
 
 // IsSystemGroup returns true if the group is a system group.
 func IsSystemGroup(name string) bool {
-	return name == VotersGroup
+	return name == string(VotersGroup)
 }
 
 // ErrRoleNotFound is returned when a role is not found.
@@ -131,7 +132,7 @@ type rbac struct {
 
 // Disable disables RBAC.
 func (r *rbac) Disable(ctx context.Context) error {
-	err := r.PutValue(ctx, rbacDisabledKey.String(), "true", 0)
+	err := r.PutValue(ctx, rbacDisabledKey, []byte("true"), 0)
 	if err != nil {
 		return fmt.Errorf("put rbac disabled: %w", err)
 	}
@@ -140,7 +141,7 @@ func (r *rbac) Disable(ctx context.Context) error {
 
 // IsDisabled returns true if RBAC is disabled.
 func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
-	_, err := r.GetValue(ctx, rbacDisabledKey.String())
+	_, err := r.GetValue(ctx, rbacDisabledKey)
 	if err != nil {
 		if storage.IsKeyNotFoundError(err) {
 			return false, nil
@@ -152,7 +153,7 @@ func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
 
 // Enable enables RBAC.
 func (r *rbac) Enable(ctx context.Context) error {
-	err := r.Delete(ctx, rbacDisabledKey.String())
+	err := r.Delete(ctx, rbacDisabledKey)
 	if err != nil {
 		return fmt.Errorf("delete rbac disabled: %w", err)
 	}
@@ -181,8 +182,8 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 	if err != nil {
 		return fmt.Errorf("marshal role: %w", err)
 	}
-	key := fmt.Sprintf("%s/%s", rolesPrefix, role.GetName())
-	err = r.PutValue(ctx, key, string(data), 0)
+	key := rolesPrefix.ForString(role.GetName())
+	err = r.PutValue(ctx, key, data, 0)
 	if err != nil {
 		return fmt.Errorf("put role: %w", err)
 	}
@@ -191,7 +192,7 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 
 // GetRole returns a role by name.
 func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
-	key := fmt.Sprintf("%s/%s", rolesPrefix, name)
+	key := rolesPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if storage.IsKeyNotFoundError(err) {
@@ -200,7 +201,7 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 		return nil, fmt.Errorf("get role: %w", err)
 	}
 	role := &v1.Role{}
-	err = protojson.Unmarshal([]byte(data), role)
+	err = protojson.Unmarshal(data, role)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal role: %w", err)
 	}
@@ -212,7 +213,7 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 	if IsSystemRole(name) {
 		return fmt.Errorf("%w %q", ErrIsSystemRole, name)
 	}
-	key := fmt.Sprintf("%s/%s", rolesPrefix.String(), name)
+	key := rolesPrefix.ForString(name)
 	err := r.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("delete role: %w", err)
@@ -223,12 +224,12 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 // ListRoles returns a list of all roles.
 func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
 	out := make(RolesList, 0)
-	err := r.IterPrefix(ctx, rolesPrefix.String(), func(key, value string) error {
-		if key == rolesPrefix.String() {
+	err := r.IterPrefix(ctx, rolesPrefix, func(key, value []byte) error {
+		if bytes.Equal(key, rolesPrefix) {
 			return nil
 		}
 		role := &v1.Role{}
-		err := protojson.Unmarshal([]byte(value), role)
+		err := protojson.Unmarshal(value, role)
 		if err != nil {
 			return fmt.Errorf("unmarshal role: %w", err)
 		}
@@ -259,12 +260,12 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 	if len(rolebinding.GetSubjects()) == 0 {
 		return fmt.Errorf("rolebinding subjects cannot be empty")
 	}
-	key := fmt.Sprintf("%s/%s", rolebindingsPrefix, rolebinding.GetName())
+	key := rolebindingsPrefix.ForString(rolebinding.GetName())
 	data, err := protojson.Marshal(rolebinding)
 	if err != nil {
 		return fmt.Errorf("marshal rolebinding: %w", err)
 	}
-	err = r.PutValue(ctx, key, string(data), 0)
+	err = r.PutValue(ctx, key, data, 0)
 	if err != nil {
 		return fmt.Errorf("put rolebinding: %w", err)
 	}
@@ -273,7 +274,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 
 // GetRoleBinding returns a rolebinding by name.
 func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding, error) {
-	key := fmt.Sprintf("%s/%s", rolebindingsPrefix, name)
+	key := rolebindingsPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if storage.IsKeyNotFoundError(err) {
@@ -294,7 +295,7 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 	if IsSystemRoleBinding(name) {
 		return fmt.Errorf("%w %q", ErrIsSystemRoleBinding, name)
 	}
-	key := fmt.Sprintf("%s/%s", rolebindingsPrefix, name)
+	key := rolebindingsPrefix.ForString(name)
 	err := r.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("delete rolebinding: %w", err)
@@ -305,12 +306,12 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 // ListRoleBindings returns a list of all rolebindings.
 func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) {
 	out := make([]*v1.RoleBinding, 0)
-	err := r.IterPrefix(ctx, rolebindingsPrefix.String(), func(key, value string) error {
-		if key == rolebindingsPrefix.String() {
+	err := r.IterPrefix(ctx, rolebindingsPrefix, func(key, value []byte) error {
+		if bytes.Equal(key, rolebindingsPrefix) {
 			return nil
 		}
 		rolebinding := &v1.RoleBinding{}
-		err := protojson.Unmarshal([]byte(value), rolebinding)
+		err := protojson.Unmarshal(value, rolebinding)
 		if err != nil {
 			return fmt.Errorf("unmarshal rolebinding: %w", err)
 		}
@@ -328,12 +329,12 @@ func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
 	if len(group.GetSubjects()) == 0 {
 		return fmt.Errorf("group subjects cannot be empty")
 	}
-	key := fmt.Sprintf("%s/%s", groupsPrefix, group.GetName())
+	key := groupsPrefix.ForString(group.GetName())
 	data, err := protojson.Marshal(group)
 	if err != nil {
 		return fmt.Errorf("marshal group: %w", err)
 	}
-	err = r.PutValue(ctx, key, string(data), 0)
+	err = r.PutValue(ctx, key, data, 0)
 	if err != nil {
 		return fmt.Errorf("put group: %w", err)
 	}
@@ -342,7 +343,7 @@ func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
 
 // GetGroup returns a group by name.
 func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
-	key := fmt.Sprintf("%s/%s", groupsPrefix, name)
+	key := groupsPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if storage.IsKeyNotFoundError(err) {
@@ -363,7 +364,7 @@ func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 	if IsSystemGroup(name) {
 		return fmt.Errorf("%w %q", ErrIsSystemGroup, name)
 	}
-	key := fmt.Sprintf("%s/%s", groupsPrefix, name)
+	key := groupsPrefix.ForString(name)
 	err := r.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("delete group: %w", err)
@@ -374,12 +375,12 @@ func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 // ListGroups returns a list of all groups.
 func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
 	out := make([]*v1.Group, 0)
-	err := r.IterPrefix(ctx, groupsPrefix.String(), func(key, value string) error {
-		if key == groupsPrefix.String() {
+	err := r.IterPrefix(ctx, groupsPrefix, func(key, value []byte) error {
+		if bytes.Equal(key, groupsPrefix) {
 			return nil
 		}
 		group := &v1.Group{}
-		err := protojson.Unmarshal([]byte(value), group)
+		err := protojson.Unmarshal(value, group)
 		if err != nil {
 			return fmt.Errorf("unmarshal group: %w", err)
 		}

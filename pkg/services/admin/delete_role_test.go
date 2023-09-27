@@ -39,7 +39,7 @@ func TestDeleteRole(t *testing.T) {
 		{
 			name: "system role",
 			code: codes.InvalidArgument,
-			req:  &v1.Role{Name: rbac.MeshAdminRole},
+			req:  &v1.Role{Name: string(rbac.MeshAdminRole)},
 		},
 		{
 			name: "any other role",

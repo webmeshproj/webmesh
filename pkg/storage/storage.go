@@ -31,20 +31,20 @@ type MeshStorage interface {
 	io.Closer
 
 	// GetValue returns the value of a key.
-	GetValue(ctx context.Context, key string) (string, error)
+	GetValue(ctx context.Context, key []byte) ([]byte, error)
 	// PutValue sets the value of a key. TTL is optional and can be set to 0.
-	PutValue(ctx context.Context, key, value string, ttl time.Duration) error
+	PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error
 	// Delete removes a key.
-	Delete(ctx context.Context, key string) error
-	// List returns all keys with a given prefix.
-	List(ctx context.Context, prefix string) ([]string, error)
+	Delete(ctx context.Context, key []byte) error
+	// ListKeys returns all keys with a given prefix.
+	ListKeys(ctx context.Context, prefix []byte) ([][]byte, error)
 	// IterPrefix iterates over all keys with a given prefix. It is important
 	// that the iterator not attempt any write operations as this will cause
 	// a deadlock. The iteration will stop if the iterator returns an error.
-	IterPrefix(ctx context.Context, prefix string, fn PrefixIterator) error
+	IterPrefix(ctx context.Context, prefix []byte, fn PrefixIterator) error
 	// Subscribe will call the given function whenever a key with the given prefix is changed.
 	// The returned function can be called to unsubscribe.
-	Subscribe(ctx context.Context, prefix string, fn SubscribeFunc) (context.CancelFunc, error)
+	Subscribe(ctx context.Context, prefix []byte, fn SubscribeFunc) (context.CancelFunc, error)
 }
 
 // ConsensusStorage is the interface for storing and retrieving data about the state of consensus.
@@ -61,10 +61,10 @@ type ConsensusStorage interface {
 }
 
 // SubscribeFunc is the function signature for subscribing to changes to a key.
-type SubscribeFunc func(key, value string)
+type SubscribeFunc func(key, value []byte)
 
 // PrefixIterator is the function signature for iterating over all keys with a given prefix.
-type PrefixIterator func(key, value string) error
+type PrefixIterator func(key, value []byte) error
 
 // DualStorage represents a storage interface that can serve as both a mesh and consensus storage.
 type DualStorage interface {

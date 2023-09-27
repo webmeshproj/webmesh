@@ -43,7 +43,7 @@ func TestGetNetworkACL(t *testing.T) {
 		},
 		{
 			name: "existing system networkacl",
-			req:  &v1.NetworkACL{Name: networking.BootstrapNodesNetworkACLName},
+			req:  &v1.NetworkACL{Name: string(networking.BootstrapNodesNetworkACLName)},
 			code: codes.OK,
 		},
 	}

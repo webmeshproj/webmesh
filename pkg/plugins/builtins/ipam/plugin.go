@@ -97,6 +97,10 @@ func (c *Config) AsMapStructure() map[string]any {
 	}
 }
 
+func (c *Config) SetMapStructure(in map[string]any) {
+	_ = mapstructure.Decode(in, c)
+}
+
 // DefaultOptions returns the default options for the plugin.
 func (c *Config) DefaultOptions() *Config {
 	return &Config{}

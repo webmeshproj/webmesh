@@ -213,10 +213,10 @@ type Storage struct {
 }
 
 // GetValue returns the value of a key.
-func (p *Storage) GetValue(ctx context.Context, key string) (string, error) {
+func (p *Storage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer close()
 	resp, err := cli.Query(ctx, &v1.QueryRequest{
@@ -224,25 +224,25 @@ func (p *Storage) GetValue(ctx context.Context, key string) (string, error) {
 		Query:   key,
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer p.checkErr(resp.CloseSend)
 	result, err := resp.Recv()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if result.GetError() != "" {
 		// TODO: Should find a way to type assert this error
 		if strings.Contains(result.GetError(), storage.ErrKeyNotFound.Error()) {
-			return "", storage.NewKeyNotFoundError(key)
+			return nil, storage.NewKeyNotFoundError(key)
 		}
-		return "", errors.New(result.GetError())
+		return nil, errors.New(result.GetError())
 	}
 	return result.GetValue()[0], nil
 }
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
-func (p *Storage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
+func (p *Storage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
 	// We pass this through to the publish API. Should only be called by non-raft nodes wanting to publish
 	// non-internal values. The server will enforce permissions and other restrictions.
 	cli, close, err := p.newStorageClient(ctx)
@@ -259,12 +259,12 @@ func (p *Storage) PutValue(ctx context.Context, key, value string, ttl time.Dura
 }
 
 // Delete removes a key.
-func (p *Storage) Delete(ctx context.Context, key string) error {
+func (p *Storage) Delete(ctx context.Context, key []byte) error {
 	return storage.ErrNotStorageNode
 }
 
-// List returns all keys with a given prefix.
-func (p *Storage) List(ctx context.Context, prefix string) ([]string, error) {
+// ListKeys returns all keys with a given prefix.
+func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return nil, err
@@ -292,7 +292,7 @@ func (p *Storage) List(ctx context.Context, prefix string) ([]string, error) {
 // IterPrefix iterates over all keys with a given prefix. It is important
 // that the iterator not attempt any write operations as this will cause
 // a deadlock.
-func (p *Storage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
+func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err
@@ -329,7 +329,7 @@ func (p *Storage) IterPrefix(ctx context.Context, prefix string, fn storage.Pref
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (p *Storage) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (p *Storage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	p.mu.Lock()
 	p.subCancels = append(p.subCancels, cancel)
@@ -348,7 +348,7 @@ func (p *Storage) Subscribe(ctx context.Context, prefix string, fn storage.Subsc
 				// Start with a full iteration of the prefix, then switch to a subscription.
 				// This is a hack to work around the fact that this method is used to receive
 				// peer updates still very early in the startup process.
-				err := p.IterPrefix(ctx, prefix, func(key, value string) error {
+				err := p.IterPrefix(ctx, prefix, func(key, value []byte) error {
 					fn(key, value)
 					return nil
 				})
@@ -389,7 +389,7 @@ func (p *Storage) Subscribe(ctx context.Context, prefix string, fn storage.Subsc
 	return cancel, nil
 }
 
-func (p *Storage) doSubscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) error {
+func (p *Storage) doSubscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) error {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err

@@ -55,14 +55,14 @@ func TestPutRoleBinding(t *testing.T) {
 			name: "system admin rolebinding",
 			code: codes.InvalidArgument,
 			req: &v1.RoleBinding{
-				Name: rbac.MeshAdminRoleBinding,
+				Name: string(rbac.MeshAdminRoleBinding),
 			},
 		},
 		{
 			name: "system voters rolebinding",
 			code: codes.InvalidArgument,
 			req: &v1.RoleBinding{
-				Name: rbac.BootstrapVotersRoleBinding,
+				Name: string(rbac.BootstrapVotersRoleBinding),
 			},
 		},
 		{

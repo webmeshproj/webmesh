@@ -361,7 +361,11 @@ func (r *Provider) ApplyRaftLog(ctx context.Context, log *v1.RaftLogEntry) (*v1.
 	if deadline, ok := ctx.Deadline(); ok {
 		timeout = time.Until(deadline)
 	}
-	r.log.Debug("applying log entry", slog.String("type", log.Type.String()), slog.String("key", log.Key), slog.Duration("timeout", timeout))
+	r.log.Debug("Applying log entry",
+		slog.String("type", log.Type.String()),
+		slog.String("key", string(log.Key)),
+		slog.Duration("timeout", timeout),
+	)
 	data, err := fsm.MarshalLogEntry(log)
 	if err != nil {
 		return nil, fmt.Errorf("marshal log entry: %w", err)

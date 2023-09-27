@@ -361,16 +361,16 @@ func TestConsensusStorageConformance(ctx context.Context, t *testing.T, raftStor
 
 	// We will use the same snapshot for the Snapshot and Restore tests
 	var snapshot io.Reader
-	snapshotKV := map[string]string{
-		"/registry/Snapshot/key1": "value1",
-		"/registry/Snapshot/key2": "value2",
+	snapshotKV := map[string][]byte{
+		"/registry/Snapshot/key1": []byte("value1"),
+		"/registry/Snapshot/key2": []byte("value2"),
 	}
 
 	if meshStorage, ok := raftStorage.(storage.MeshStorage); ok {
 		t.Run("Snapshot", func(t *testing.T) {
 			// Place a few keys and make sure a snapshot conforms to our expectations.
 			for key, value := range snapshotKV {
-				if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
+				if err := meshStorage.PutValue(ctx, []byte(key), []byte(value), 0); err != nil {
 					t.Fatalf("failed to put key: %v", err)
 				}
 			}
@@ -397,17 +397,17 @@ func TestConsensusStorageConformance(ctx context.Context, t *testing.T, raftStor
 				t.Errorf("expected %d keys, got %d", len(snapshotKV), len(snap.Kv))
 			}
 			for _, keyval := range snap.Kv {
-				if _, ok := snapshotKV[keyval.Key]; !ok {
-					t.Errorf("unexpected key %q", keyval.Key)
+				if _, ok := snapshotKV[string(keyval.Key)]; !ok {
+					t.Errorf("unexpected key %q", string(keyval.Key))
 				}
 			}
 			// Make sure the snapshot items have the correct data
 			for _, keyval := range snap.Kv {
-				if keyval.Value != snapshotKV[keyval.Key] {
-					t.Errorf("expected %q, got %q", snapshotKV[keyval.Key], keyval.Value)
+				if !bytes.Equal(keyval.Value, snapshotKV[string(keyval.Key)]) {
+					t.Errorf("expected %q, got %q", snapshotKV[string(keyval.Key)], keyval.Value)
 				}
 				if keyval.Ttl.AsDuration() != 0 {
-					t.Errorf("expected %q, got %q", snapshotKV[keyval.Key], keyval.Value)
+					t.Errorf("expected %q, got %q", snapshotKV[string(keyval.Key)], keyval.Value)
 				}
 			}
 		})
@@ -415,25 +415,25 @@ func TestConsensusStorageConformance(ctx context.Context, t *testing.T, raftStor
 		t.Run("Restore", func(t *testing.T) {
 			// Place some keys that we don't want to see return
 			// after the snapshot is restored.
-			restoreKV := map[string]string{
-				"/registry/Restore/key1": "value1",
-				"/registry/Restore/key2": "value2",
+			restoreKV := map[string][]byte{
+				"/registry/Restore/key1": []byte("value1"),
+				"/registry/Restore/key2": []byte("value2"),
 			}
 			for key, value := range restoreKV {
-				if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
+				if err := meshStorage.PutValue(ctx, []byte(key), []byte(value), 0); err != nil {
 					t.Fatalf("failed to put key: %v", err)
 				}
 			}
 			// Drop all keys from the Snapshot test and then restore the snapshot.
 			// We should be able to get the keys back.
 			for key := range snapshotKV {
-				if err := meshStorage.Delete(ctx, key); err != nil {
+				if err := meshStorage.Delete(ctx, []byte(key)); err != nil {
 					t.Fatalf("failed to delete key: %v", err)
 				}
 			}
 			// Make sure they are indeed gone
 			for key := range snapshotKV {
-				_, err := meshStorage.GetValue(ctx, key)
+				_, err := meshStorage.GetValue(ctx, []byte(key))
 				if !storage.IsKeyNotFoundError(err) {
 					t.Errorf("expected ErrKeyNotFound, got %v", err)
 				}
@@ -444,17 +444,17 @@ func TestConsensusStorageConformance(ctx context.Context, t *testing.T, raftStor
 			}
 			// Make sure we can get the keys back
 			for key, value := range snapshotKV {
-				got, err := meshStorage.GetValue(ctx, key)
+				got, err := meshStorage.GetValue(ctx, []byte(key))
 				if err != nil {
 					t.Fatalf("failed to get key: %v", err)
 				}
-				if got != value {
-					t.Errorf("expected %q, got %q", value, got)
+				if !bytes.Equal(got, value) {
+					t.Errorf("expected %q, got %q", string(value), string(got))
 				}
 			}
 			// Make sure the keys we don't want to see are still gone
 			for key := range restoreKV {
-				_, err := meshStorage.GetValue(ctx, key)
+				_, err := meshStorage.GetValue(ctx, []byte(key))
 				if !storage.IsKeyNotFoundError(err) {
 					t.Errorf("expected ErrKeyNotFound, got %v", err)
 				}
@@ -473,12 +473,12 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 
 	t.Run("GetValue", func(t *testing.T) {
 		// Try to get a non-existent key and ensure it returns ErrKeyNotFound.
-		_, err := meshStorage.GetValue(ctx, "non-existent-key")
+		_, err := meshStorage.GetValue(ctx, []byte("non-existent-key"))
 		if !storage.IsKeyNotFoundError(err) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 		// Put a key and make sure it survives a round trip.
-		key, value := "key", "value"
+		key, value := []byte("key"), []byte("value")
 		if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
 			t.Fatalf("failed to put key: %v", err)
 		}
@@ -486,8 +486,8 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		if err != nil {
 			t.Fatalf("failed to get key: %v", err)
 		}
-		if got != value {
-			t.Errorf("expected %q, got %q", value, got)
+		if !bytes.Equal(got, value) {
+			t.Errorf("expected %q, got %q", string(value), (got))
 		}
 		// Clean up
 		if err := meshStorage.Delete(ctx, key); err != nil {
@@ -497,7 +497,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 
 	t.Run("PutValue", func(t *testing.T) {
 		// Pretty simple, just put a key and make sure it survives a round trip.
-		key, value := "key", "value"
+		key, value := []byte("key"), []byte("value")
 		if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
 			t.Fatalf("failed to put key: %v", err)
 		}
@@ -505,8 +505,8 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		if err != nil {
 			t.Fatalf("failed to get key: %v", err)
 		}
-		if got != value {
-			t.Errorf("expected %q, got %q", value, got)
+		if !bytes.Equal(got, value) {
+			t.Errorf("expected %q, got %q", string(value), string(got))
 		}
 		// Clean up
 		if err := meshStorage.Delete(ctx, key); err != nil {
@@ -517,7 +517,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 	t.Run("Delete", func(t *testing.T) {
 		// Delete should never error, but it should also work
 		// if the key does in fact exist.
-		key := "key"
+		key := []byte("key")
 		if err := meshStorage.Delete(ctx, key); err != nil {
 			t.Fatalf("failed to delete key: %v", err)
 		}
@@ -527,7 +527,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 		// Put a key and make sure it survives a round trip, and then delete it.
-		value := "value"
+		value := []byte("value")
 		if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
 			t.Fatalf("failed to put key: %v", err)
 		}
@@ -544,7 +544,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 	})
 
-	t.Run("List", func(t *testing.T) {
+	t.Run("ListKeys", func(t *testing.T) {
 		// Place a few keys and make sure we get the full list of them back
 		// when we list them.
 		kv := map[string]string{
@@ -552,11 +552,11 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 			"prefix1/key2": "value2",
 		}
 		for key, value := range kv {
-			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
+			if err := meshStorage.PutValue(ctx, []byte(key), []byte(value), 0); err != nil {
 				t.Fatalf("failed to put key: %v", err)
 			}
 		}
-		keysl, err := meshStorage.List(ctx, "prefix1/")
+		keysl, err := meshStorage.ListKeys(ctx, []byte("prefix1/"))
 		if err != nil {
 			t.Fatalf("failed to list keys: %v", err)
 		}
@@ -574,7 +574,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		// Clean up
 		for key := range kv {
-			if err := meshStorage.Delete(ctx, key); err != nil {
+			if err := meshStorage.Delete(ctx, []byte(key)); err != nil {
 				t.Fatalf("failed to delete key: %v", err)
 			}
 		}
@@ -590,13 +590,13 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 			"IterPrefix2/key2": "value2",
 		}
 		for key, value := range kv {
-			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
+			if err := meshStorage.PutValue(ctx, []byte(key), []byte(value), 0); err != nil {
 				t.Fatalf("failed to put key: %v", err)
 			}
 		}
 		seen := map[string]struct{}{}
-		err := meshStorage.IterPrefix(ctx, "IterPrefix1/", func(key, value string) error {
-			seen[key] = struct{}{}
+		err := meshStorage.IterPrefix(ctx, []byte("IterPrefix1/"), func(key, value []byte) error {
+			seen[string(key)] = struct{}{}
 			return nil
 		})
 		if err != nil {
@@ -612,7 +612,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		// Clean up
 		for key := range kv {
-			if err := meshStorage.Delete(ctx, key); err != nil {
+			if err := meshStorage.Delete(ctx, []byte(key)); err != nil {
 				t.Fatalf("failed to delete key: %v", err)
 			}
 		}
@@ -623,9 +623,9 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		var subscribeTimeout = 30 * time.Second
 		var hitCount atomic.Int64
 		var seen sync.Map
-		subCancel, err := meshStorage.Subscribe(ctx, "Subscribe/", func(key, value string) {
+		subCancel, err := meshStorage.Subscribe(ctx, []byte("Subscribe/"), func(key, value []byte) {
 			hitCount.Add(1)
-			seen.Store(key, value)
+			seen.Store(string(key), string(value))
 		})
 		if err != nil {
 			t.Fatalf("failed to subscribe: %v", err)
@@ -637,7 +637,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 			"Subscribe/key2": "value2",
 		}
 		for key, value := range kv {
-			if err := meshStorage.PutValue(ctx, key, value, 0); err != nil {
+			if err := meshStorage.PutValue(ctx, []byte(key), []byte(value), 0); err != nil {
 				t.Fatalf("failed to put key: %v", err)
 			}
 		}
@@ -666,7 +666,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		hitCount = atomic.Int64{}
 		seen = sync.Map{}
 		for key := range kv {
-			if err := meshStorage.Delete(ctx, key); err != nil {
+			if err := meshStorage.Delete(ctx, []byte(key)); err != nil {
 				t.Fatalf("failed to delete key: %v", err)
 			}
 		}

@@ -39,7 +39,7 @@ func TestDeleteGroup(t *testing.T) {
 		{
 			name: "system group",
 			code: codes.InvalidArgument,
-			req:  &v1.Group{Name: rbac.VotersGroup},
+			req:  &v1.Group{Name: string(rbac.VotersGroup)},
 		},
 		{
 			name: "any other group",

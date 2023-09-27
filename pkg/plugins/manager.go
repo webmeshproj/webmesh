@@ -342,7 +342,7 @@ func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queri
 			if err != nil {
 				result.Error = err.Error()
 			} else {
-				result.Value = []string{val}
+				result.Value = [][]byte{val}
 			}
 			err = queries.Send(&result)
 			if err != nil {
@@ -352,7 +352,7 @@ func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queri
 			var result v1.PluginQueryResult
 			result.Id = query.GetId()
 			result.Key = query.GetQuery()
-			keys, err := db.List(queries.Context(), query.GetQuery())
+			keys, err := db.ListKeys(queries.Context(), query.GetQuery())
 			if err != nil {
 				result.Error = err.Error()
 			} else {
@@ -363,11 +363,11 @@ func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queri
 				m.log.Error("send query result", "plugin", plugin, "error", err)
 			}
 		case v1.PluginQuery_ITER:
-			err := db.IterPrefix(queries.Context(), query.GetQuery(), func(key, val string) error {
+			err := db.IterPrefix(queries.Context(), query.GetQuery(), func(key, val []byte) error {
 				var result v1.PluginQueryResult
 				result.Id = query.GetId()
 				result.Key = key
-				result.Value = []string{val}
+				result.Value = [][]byte{val}
 				err := queries.Send(&result)
 				return err
 			})

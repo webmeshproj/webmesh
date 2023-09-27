@@ -185,7 +185,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	// Register an update hook to watch for network changes.
 	if s.storage.Consensus().IsMember() {
 		s.log.Debug("Subscribing to peer updates from local storage")
-		s.kvSubCancel, err = s.storage.MeshStorage().Subscribe(context.Background(), "", s.onDBUpdate)
+		s.kvSubCancel, err = s.storage.MeshStorage().Subscribe(context.Background(), nil, s.onDBUpdate)
 		if err != nil {
 			return handleErr(fmt.Errorf("subscribe: %w", err))
 		}

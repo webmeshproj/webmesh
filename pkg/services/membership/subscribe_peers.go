@@ -64,7 +64,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	var lastConfig []*v1.WireGuardPeer
 
 	var notifymu sync.Mutex
-	notify := func(_, _ string) {
+	notify := func(_, _ []byte) {
 		log.Debug("Checking for wireguard peers changes for remote peer")
 		notifymu.Lock()
 		defer notifymu.Unlock()
@@ -107,12 +107,12 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		}
 	}
 
-	nodeCancel, err := st.Subscribe(ctx, meshgraph.NodesPrefix.String(), notify)
+	nodeCancel, err := st.Subscribe(ctx, meshgraph.NodesPrefix, notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to node changes: %v", err)
 	}
 	defer nodeCancel()
-	edgeCancel, err := st.Subscribe(ctx, meshgraph.EdgesPrefix.String(), notify)
+	edgeCancel, err := st.Subscribe(ctx, meshgraph.EdgesPrefix, notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to edge changes: %v", err)
 	}
@@ -125,7 +125,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		case <-ctx.Done():
 			return nil
 		case <-t.C:
-			notify("", "")
+			notify(nil, nil)
 		}
 	}
 }

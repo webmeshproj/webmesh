@@ -133,7 +133,7 @@ func (db *badgerDB) DropAll(ctx context.Context) error {
 }
 
 // GetValue returns the value of a key.
-func (db *badgerDB) GetValue(ctx context.Context, key string) (string, error) {
+func (db *badgerDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	var value []byte
@@ -147,19 +147,19 @@ func (db *badgerDB) GetValue(ctx context.Context, key string) (string, error) {
 	})
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return "", storage.ErrKeyNotFound
+			return nil, storage.ErrKeyNotFound
 		}
-		return "", err
+		return nil, err
 	}
-	return string(value), nil
+	return value, nil
 }
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
-func (db *badgerDB) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
+func (db *badgerDB) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return db.db.Update(func(txn *badger.Txn) error {
-		entry := badger.NewEntry([]byte(key), []byte(value))
+		entry := badger.NewEntry(key, value)
 		if ttl > 0 {
 			entry = entry.WithTTL(ttl)
 		}
@@ -168,11 +168,11 @@ func (db *badgerDB) PutValue(ctx context.Context, key, value string, ttl time.Du
 }
 
 // Delete removes a key.
-func (db *badgerDB) Delete(ctx context.Context, key string) error {
+func (db *badgerDB) Delete(ctx context.Context, key []byte) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	err := db.db.Update(func(txn *badger.Txn) error {
-		return txn.Delete([]byte(key))
+		return txn.Delete(key)
 	})
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
@@ -183,23 +183,24 @@ func (db *badgerDB) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// List returns all keys with a given prefix.
-func (db *badgerDB) List(ctx context.Context, prefix string) ([]string, error) {
+// ListKeys returns all keys with a given prefix.
+func (db *badgerDB) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
-	var out []string
+	var out [][]byte
 	err := db.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
-		prefix := []byte(prefix)
+		prefix := prefix
 		opts.Prefix = prefix
 		opts.PrefetchValues = false
 		it := txn.NewIterator(opts)
 		defer it.Close()
 		for it.Rewind(); it.Valid(); it.Next() {
-			item := it.Item()
-			k := item.Key()
+			k := it.Item().Key()
+			key := make([]byte, len(k))
+			copy(key, k)
 			if bytes.HasPrefix(k, []byte(prefix)) {
-				out = append(out, string(k))
+				out = append(out, key)
 			}
 		}
 		return nil
@@ -216,18 +217,21 @@ func (db *badgerDB) List(ctx context.Context, prefix string) ([]string, error) {
 // IterPrefix iterates over all keys with a given prefix. It is important
 // that the iterator not attempt any write operations as this will cause
 // a deadlock. The iteration will stop if the iterator returns an error.
-func (db *badgerDB) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
+func (db *badgerDB) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	err := db.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
-		prefix := []byte(prefix)
+		prefix := prefix
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
 			k := item.Key()
 			err := item.Value(func(v []byte) error {
-				return fn(string(k), string(v))
+				key, val := make([]byte, len(k)), make([]byte, len(v))
+				copy(key, k)
+				copy(val, v)
+				return fn(key, val)
 			})
 			if err != nil {
 				return err
@@ -243,18 +247,21 @@ func (db *badgerDB) IterPrefix(ctx context.Context, prefix string, fn storage.Pr
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (db *badgerDB) Subscribe(ctx context.Context, prefix string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (db *badgerDB) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
-		match := []pb.Match{{Prefix: []byte(prefix)}}
+		match := []pb.Match{{Prefix: prefix}}
 		var mu sync.Mutex
 		_ = db.db.Subscribe(ctx, func(kv *pb.KVList) error {
 			mu.Lock()
 			defer mu.Unlock()
 			for _, kv := range kv.Kv {
-				fn(string(kv.Key), string(kv.Value))
+				key, value := make([]byte, len(kv.Key)), make([]byte, len(kv.Value))
+				copy(key, kv.Key)
+				copy(value, kv.Value)
+				fn(key, value)
 			}
 			return nil
 		}, match)
@@ -266,9 +273,7 @@ func (db *badgerDB) Subscribe(ctx context.Context, prefix string, fn storage.Sub
 func (db *badgerDB) Snapshot(ctx context.Context) (io.Reader, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	snapshot := &v1.RaftSnapshot{
-		Kv: make(map[string]*v1.RaftDataItem),
-	}
+	snapshot := &v1.RaftSnapshot{}
 	err := db.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.Prefix = []byte(storage.RegistryPrefix)
@@ -288,12 +293,11 @@ func (db *badgerDB) Snapshot(ctx context.Context) (io.Reader, error) {
 			if err != nil {
 				return err
 			}
-			snapshot.Kv[string(k)] = &v1.RaftDataItem{
-				Key:   string(k),
-				Value: string(value),
+			snapshot.Kv = append(snapshot.Kv, &v1.RaftDataItem{
+				Key:   k,
+				Value: value,
 				Ttl:   durationpb.New(ttl),
-			}
-			fmt.Println(snapshot.Kv[string(k)])
+			})
 			if err != nil {
 				return err
 			}
@@ -362,7 +366,7 @@ func (db *badgerDB) Close() error {
 
 // Raft Log Storage Operations
 
-var RaftLogPrefix = storage.ConsensusPrefix.For("/log/")
+var RaftLogPrefix = storage.ConsensusPrefix.For([]byte("/log/"))
 
 // FirstIndex returns the first index written. 0 for no entries.
 func (db *badgerDB) FirstIndex() (uint64, error) {
@@ -485,7 +489,7 @@ func (db *badgerDB) DeleteRange(min, max uint64) error {
 
 // Raft Stable Storage Operations
 
-var StableStorePrefix = storage.ConsensusPrefix.For("/stable/")
+var StableStorePrefix = storage.ConsensusPrefix.For([]byte("/stable/"))
 
 func (db *badgerDB) Set(key []byte, val []byte) error {
 	db.mu.Lock()

@@ -44,7 +44,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.StorageQueryService_Query
 		if err != nil {
 			result.Error = err.Error()
 		} else {
-			result.Value = []string{val}
+			result.Value = [][]byte{val}
 		}
 		err = stream.Send(&result)
 		if err != nil {
@@ -53,7 +53,7 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.StorageQueryService_Query
 	case v1.QueryRequest_LIST:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		vals, err := s.storage.MeshStorage().List(stream.Context(), req.GetQuery())
+		vals, err := s.storage.MeshStorage().ListKeys(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -64,10 +64,10 @@ func (s *Server) Query(req *v1.QueryRequest, stream v1.StorageQueryService_Query
 			return err
 		}
 	case v1.QueryRequest_ITER:
-		err := s.storage.MeshStorage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
+		err := s.storage.MeshStorage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value []byte) error {
 			var result v1.QueryResponse
 			result.Key = key
-			result.Value = []string{value}
+			result.Value = [][]byte{value}
 			return stream.Send(&result)
 		})
 		if err != nil {

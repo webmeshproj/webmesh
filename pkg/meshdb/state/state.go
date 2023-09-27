@@ -48,15 +48,15 @@ type State interface {
 // ErrNodeNotFound is returned when a node is not found.
 var ErrNodeNotFound = sql.ErrNoRows
 
-const (
+var (
 	// MeshStatePrefix is the prefix for mesh state keys.
-	MeshStatePrefix = "/registry/meshstate"
+	MeshStatePrefix = []byte("/registry/meshstate")
 	// IPv6PrefixKey is the key for the IPv6 prefix.
-	IPv6PrefixKey = MeshStatePrefix + "/ipv6prefix"
+	IPv6PrefixKey = append(MeshStatePrefix, []byte("/ipv6prefix")...)
 	// IPv4PrefixKey is the key for the IPv4 prefix.
-	IPv4PrefixKey = MeshStatePrefix + "/ipv4prefix"
+	IPv4PrefixKey = append(MeshStatePrefix, []byte("/ipv4prefix")...)
 	// MeshDomainKey is the key for the mesh domain.
-	MeshDomainKey = MeshStatePrefix + "/meshdomain"
+	MeshDomainKey = append(MeshStatePrefix, []byte("/meshdomain")...)
 )
 
 type state struct {
@@ -73,7 +73,7 @@ func (s *state) GetIPv6Prefix(ctx context.Context) (netip.Prefix, error) {
 	if err != nil {
 		return netip.Prefix{}, err
 	}
-	return netip.ParsePrefix(prefix)
+	return netip.ParsePrefix(string(prefix))
 }
 
 func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
@@ -81,11 +81,15 @@ func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
 	if err != nil {
 		return netip.Prefix{}, err
 	}
-	return netip.ParsePrefix(prefix)
+	return netip.ParsePrefix(string(prefix))
 }
 
 func (s *state) GetMeshDomain(ctx context.Context) (string, error) {
-	return s.GetValue(ctx, MeshDomainKey)
+	resp, err := s.GetValue(ctx, MeshDomainKey)
+	if err != nil {
+		return "", err
+	}
+	return string(resp), nil
 }
 
 func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {

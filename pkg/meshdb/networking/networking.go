@@ -18,6 +18,7 @@ limitations under the License.
 package networking
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -29,13 +30,13 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
-const (
+var (
 	// BootstrapNodesNetworkACLName is the name of the bootstrap nodes NetworkACL.
-	BootstrapNodesNetworkACLName = "bootstrap-nodes"
+	BootstrapNodesNetworkACLName = []byte("bootstrap-nodes")
 	// NetworkACLsPrefix is where NetworkACLs are stored in the database.
-	NetworkACLsPrefix = storage.RegistryPrefix + "network-acls"
+	NetworkACLsPrefix = storage.RegistryPrefix.For([]byte("network-acls"))
 	// RoutesPrefix is where Routes are stored in the database.
-	RoutesPrefix = storage.RegistryPrefix + "routes"
+	RoutesPrefix = storage.RegistryPrefix.For([]byte("routes"))
 	// GroupReference is the prefix of a node name that indicates it is a group reference.
 	GroupReference = "group:"
 )
@@ -97,12 +98,12 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidACL, err)
 	}
-	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, acl.GetName())
+	key := NetworkACLsPrefix.For([]byte(acl.GetName()))
 	data, err := (ACL{NetworkACL: acl}).MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal network acl: %w", err)
 	}
-	err = n.PutValue(ctx, key, string(data), 0)
+	err = n.PutValue(ctx, key, data, 0)
 	if err != nil {
 		return fmt.Errorf("put network acl: %w", err)
 	}
@@ -111,7 +112,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 
 // GetNetworkACL returns a NetworkACL by name.
 func (n *networking) GetNetworkACL(ctx context.Context, name string) (ACL, error) {
-	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, name)
+	key := NetworkACLsPrefix.For([]byte(name))
 	data, err := n.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
@@ -120,7 +121,7 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (ACL, error
 		return ACL{}, fmt.Errorf("get network acl: %w", err)
 	}
 	var acl ACL
-	err = acl.UnmarshalJSON([]byte(data))
+	err = acl.UnmarshalJSON(data)
 	if err != nil {
 		return ACL{}, fmt.Errorf("unmarshal network acl: %w", err)
 	}
@@ -130,7 +131,7 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (ACL, error
 
 // DeleteNetworkACL deletes a NetworkACL by name.
 func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
-	key := fmt.Sprintf("%s/%s", NetworkACLsPrefix, name)
+	key := NetworkACLsPrefix.For([]byte(name))
 	err := n.Delete(ctx, key)
 	if err != nil && !errors.Is(err, storage.ErrKeyNotFound) {
 		return fmt.Errorf("delete network acl: %w", err)
@@ -141,12 +142,12 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 // ListNetworkACLs returns a list of NetworkACLs.
 func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 	out := make(ACLs, 0)
-	err := n.IterPrefix(ctx, NetworkACLsPrefix.String(), func(key, value string) error {
-		if key == NetworkACLsPrefix.String() {
+	err := n.IterPrefix(ctx, NetworkACLsPrefix, func(key, value []byte) error {
+		if bytes.Equal(key, NetworkACLsPrefix) {
 			return nil
 		}
 		var acl ACL
-		err := acl.UnmarshalJSON([]byte(value))
+		err := acl.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal network acl: %w", err)
 		}
@@ -163,12 +164,12 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidRoute, err)
 	}
-	key := fmt.Sprintf("%s/%s", RoutesPrefix, route.GetName())
+	key := RoutesPrefix.For([]byte(route.GetName()))
 	data, err := (Route{route}).MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
 	}
-	err = n.PutValue(ctx, key, string(data), 0)
+	err = n.PutValue(ctx, key, data, 0)
 	if err != nil {
 		return fmt.Errorf("put network route: %w", err)
 	}
@@ -177,7 +178,7 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 
 // GetRoute returns a Route by name.
 func (n *networking) GetRoute(ctx context.Context, name string) (Route, error) {
-	key := fmt.Sprintf("%s/%s", RoutesPrefix, name)
+	key := RoutesPrefix.For([]byte(name))
 	data, err := n.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
@@ -186,7 +187,7 @@ func (n *networking) GetRoute(ctx context.Context, name string) (Route, error) {
 		return Route{}, fmt.Errorf("get network route: %w", err)
 	}
 	var rt Route
-	err = rt.UnmarshalJSON([]byte(data))
+	err = rt.UnmarshalJSON(data)
 	if err != nil {
 		return Route{}, fmt.Errorf("unmarshal network route: %w", err)
 	}
@@ -233,7 +234,7 @@ func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (Ro
 
 // DeleteRoute deletes a Route by name.
 func (n *networking) DeleteRoute(ctx context.Context, name string) error {
-	key := fmt.Sprintf("%s/%s", RoutesPrefix, name)
+	key := RoutesPrefix.For([]byte(name))
 	err := n.Delete(ctx, key)
 	if err != nil && !errors.Is(err, storage.ErrKeyNotFound) {
 		return fmt.Errorf("delete network route: %w", err)
@@ -244,12 +245,12 @@ func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 // ListRoutes returns a list of Routes.
 func (n *networking) ListRoutes(ctx context.Context) (Routes, error) {
 	out := make([]Route, 0)
-	err := n.IterPrefix(ctx, RoutesPrefix.String(), func(key, value string) error {
-		if key == RoutesPrefix.String() {
+	err := n.IterPrefix(ctx, RoutesPrefix, func(key, value []byte) error {
+		if bytes.Equal(key, RoutesPrefix) {
 			return nil
 		}
 		var rt Route
-		err := rt.UnmarshalJSON([]byte(value))
+		err := rt.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal network route: %w", err)
 		}

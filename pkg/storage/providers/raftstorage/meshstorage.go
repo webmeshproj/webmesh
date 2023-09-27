@@ -50,23 +50,23 @@ func (rs *RaftStorage) Close() error {
 }
 
 // GetValue gets the value of a key.
-func (rs *RaftStorage) GetValue(ctx context.Context, key string) (string, error) {
+func (rs *RaftStorage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	if !rs.raft.started.Load() {
-		return "", storage.ErrClosed
+		return nil, storage.ErrClosed
 	}
 	return rs.storage.GetValue(ctx, key)
 }
 
-// List returns a list of keys.
-func (rs *RaftStorage) List(ctx context.Context, prefix string) ([]string, error) {
+// ListKeys returns a list of keys.
+func (rs *RaftStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
 	if !rs.raft.started.Load() {
 		return nil, storage.ErrClosed
 	}
-	return rs.storage.List(ctx, prefix)
+	return rs.storage.ListKeys(ctx, prefix)
 }
 
 // IterPrefix iterates over all keys with a given prefix.
-func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix string, fn storage.PrefixIterator) error {
+func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
 	}
@@ -74,7 +74,7 @@ func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix string, fn storage
 }
 
 // Subscribe subscribes to changes to a key.
-func (rs *RaftStorage) Subscribe(ctx context.Context, key string, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (rs *RaftStorage) Subscribe(ctx context.Context, key []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	if !rs.raft.started.Load() {
 		return func() {}, storage.ErrClosed
 	}
@@ -82,7 +82,7 @@ func (rs *RaftStorage) Subscribe(ctx context.Context, key string, fn storage.Sub
 }
 
 // Put sets the value of a key.
-func (rs *RaftStorage) PutValue(ctx context.Context, key, value string, ttl time.Duration) error {
+func (rs *RaftStorage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
 	}
@@ -104,7 +104,7 @@ func (rs *RaftStorage) PutValue(ctx context.Context, key, value string, ttl time
 }
 
 // Delete removes a key.
-func (rs *RaftStorage) Delete(ctx context.Context, key string) error {
+func (rs *RaftStorage) Delete(ctx context.Context, key []byte) error {
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
 	}

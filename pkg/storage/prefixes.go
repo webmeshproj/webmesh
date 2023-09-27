@@ -16,17 +16,19 @@ limitations under the License.
 
 package storage
 
-import "strings"
+import (
+	"bytes"
+)
 
 // Prefix is a prefix in the storage.
-type Prefix string
+type Prefix []byte
 
-const (
+var (
 	// RegistryPrefix is the prefix for all data stored in the mesh registry.
-	RegistryPrefix Prefix = "/registry/"
+	RegistryPrefix Prefix = []byte("/registry")
 
 	// ConsensusPrefix is the prefix for all data stored related to consensus.
-	ConsensusPrefix Prefix = "/raft/"
+	ConsensusPrefix Prefix = []byte("/raft")
 )
 
 // String returns the string representation of the prefix.
@@ -35,13 +37,23 @@ func (p Prefix) String() string {
 }
 
 // Contains returns true if the given key is contained in the prefix.
-func (p Prefix) Contains(key string) bool {
-	return strings.HasPrefix(key, p.String())
+func (p Prefix) Contains(key []byte) bool {
+	return bytes.HasPrefix(key, p)
 }
 
 // For is a helper method for creating a key for the prefix.
-func (p Prefix) For(key string) Prefix {
-	return Prefix(p.String() + strings.TrimSuffix(key, "/"))
+func (p Prefix) For(key []byte) Prefix {
+	return Prefix(bytes.Join([][]byte{p, bytes.TrimPrefix(key, []byte("/"))}, []byte("/")))
+}
+
+// ForString is a helper method for creating a key for the prefix.
+func (p Prefix) ForString(key string) Prefix {
+	return p.For([]byte(key))
+}
+
+// TrimFrom returns the key without the prefix.
+func (p Prefix) TrimFrom(key []byte) []byte {
+	return bytes.TrimPrefix(key, append(p, '/'))
 }
 
 // ReservedPrefixes is a list of all reserved prefixes.
@@ -51,7 +63,7 @@ var ReservedPrefixes = []Prefix{
 }
 
 // IsReservedPrefix returns true if the given key is reserved.
-func IsReservedPrefix(key string) bool {
+func IsReservedPrefix(key []byte) bool {
 	for _, prefix := range ReservedPrefixes {
 		if prefix.Contains(key) {
 			return true

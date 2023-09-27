@@ -43,7 +43,7 @@ func TestGetGroup(t *testing.T) {
 		},
 		{
 			name: "existing system group",
-			req:  &v1.Group{Name: rbac.VotersGroup},
+			req:  &v1.Group{Name: string(rbac.VotersGroup)},
 			code: codes.OK,
 		},
 	}

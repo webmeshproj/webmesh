@@ -43,7 +43,7 @@ func TestGetRoleBinding(t *testing.T) {
 		},
 		{
 			name: "existing system rolebinding",
-			req:  &v1.RoleBinding{Name: rbac.MeshAdminRoleBinding},
+			req:  &v1.RoleBinding{Name: string(rbac.MeshAdminRoleBinding)},
 			code: codes.OK,
 		},
 	}

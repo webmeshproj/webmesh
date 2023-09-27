@@ -43,7 +43,7 @@ func TestGetRole(t *testing.T) {
 		},
 		{
 			name: "existing system role",
-			req:  &v1.Role{Name: rbac.MeshAdminRole},
+			req:  &v1.Role{Name: string(rbac.MeshAdminRole)},
 			code: codes.OK,
 		},
 	}

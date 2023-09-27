@@ -45,7 +45,7 @@ func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.Publi
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return nil, status.Error(codes.Unavailable, "node not available to publish")
 	}
-	allowed, err := s.rbac.Evaluate(ctx, canPublishAction.For(req.GetKey()))
+	allowed, err := s.rbac.Evaluate(ctx, canPublishAction.For(string(req.GetKey())))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to evaluate publish permissions: %v", err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package testutil
 
 import (
+	"bytes"
 	"context"
 	"runtime"
 	"testing"
@@ -80,13 +81,13 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			if leader == nil {
 				t.Fatal("No leader found")
 			}
-			kv := map[string]string{
-				"Test/key1": "value1",
-				"Test/key2": "value2",
-				"Test/key3": "value3",
+			kv := map[string][]byte{
+				"Test/key1": []byte("value1"),
+				"Test/key2": []byte("value2"),
+				"Test/key3": []byte("value3"),
 			}
 			for k, v := range kv {
-				err := leader.MeshStorage().PutValue(ctx, k, v, 0)
+				err := leader.MeshStorage().PutValue(ctx, []byte(k), []byte(v), 0)
 				if err != nil {
 					t.Fatalf("Failed to put key %s: %v", k, err)
 				}
@@ -95,7 +96,7 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			for name, provider := range providers {
 				p := provider
 				ok := Eventually[int](func() int {
-					items, err := p.MeshStorage().List(ctx, "Test/")
+					items, err := p.MeshStorage().ListKeys(ctx, []byte("Test/"))
 					if err != nil {
 						t.Log("Error fetching keys", err)
 						return 0
@@ -107,18 +108,18 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 				}
 				// Each key should have the correct value
 				for k, v := range kv {
-					val, err := p.MeshStorage().GetValue(ctx, k)
+					val, err := p.MeshStorage().GetValue(ctx, []byte(k))
 					if err != nil {
 						t.Fatalf("Failed to get key %s: %v", k, err)
 					}
-					if val != v {
+					if !bytes.Equal(val, v) {
 						t.Fatalf("Expected key %s to have value %s, got %s", k, v, val)
 					}
 				}
 			}
 			// Delete the keys and it should propagate
 			for k := range kv {
-				err := leader.MeshStorage().Delete(ctx, k)
+				err := leader.MeshStorage().Delete(ctx, []byte(k))
 				if err != nil {
 					t.Fatalf("Failed to delete key %s: %v", k, err)
 				}
@@ -127,7 +128,7 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			for name, provider := range providers {
 				p := provider
 				ok := Eventually[int](func() int {
-					items, err := p.MeshStorage().List(ctx, "Test/")
+					items, err := p.MeshStorage().ListKeys(ctx, []byte("Test/"))
 					if err != nil {
 						t.Log("Error fetching keys", err)
 						return 0

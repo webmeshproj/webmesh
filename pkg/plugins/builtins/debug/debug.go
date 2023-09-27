@@ -19,6 +19,7 @@ limitations under the License.
 package debug
 
 import (
+	"bytes"
 	"fmt"
 	"log/slog"
 	"net"
@@ -82,6 +83,10 @@ func (c *Config) AsMapStructure() map[string]any {
 		"pprof-profiles":    c.PprofProfiles,
 		"enable-db-querier": c.EnableDBQuerier,
 	}
+}
+
+func (c *Config) SetMapStructure(in map[string]any) {
+	_ = mapstructure.Decode(in, c)
 }
 
 // BindFlags binds the debug plugin flags.
@@ -165,14 +170,16 @@ func (p *Plugin) serve(opts Config) {
 	if !opts.DisablePProf {
 		pprofProfiles := opts.PprofProfiles
 		profiles := strings.Split(pprofProfiles, ",")
-		if len(profiles) == 0 {
+		if len(profiles) == 0 || (len(profiles) == 1 && profiles[0] == "") {
 			profiles = []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex"}
 		}
+		log.Info("Enabling pprof", "profiles", profiles)
 		for _, profile := range profiles {
 			mux.Handle(fmt.Sprintf("%s/pprof/%s", pathPrefix, profile), pprof.Handler(profile))
 		}
 	}
 	if opts.EnableDBQuerier {
+		log.Info("Enabling database querier")
 		mux.HandleFunc(fmt.Sprintf("%s/db/list", pathPrefix), p.handleDBList)
 		mux.HandleFunc(fmt.Sprintf("%s/db/get", pathPrefix), p.handleDBGet)
 		mux.HandleFunc(fmt.Sprintf("%s/db/iter-prefix", pathPrefix), p.handleDBIterPrefix)
@@ -187,13 +194,13 @@ func (p *Plugin) serve(opts Config) {
 	go func() {
 		log.Info("Starting debug server", "listen-address", opts.ListenAddress)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error("error running debug server", "err", err.Error())
+			log.Error("Error running debug server", "error", err.Error())
 		}
 	}()
 	<-p.closec
 	log.Info("Shutting down debug server")
 	if err := server.Shutdown(context.Background()); err != nil {
-		log.Error("error closing debug server", "err", err.Error())
+		log.Error("Error closing debug server", "error", err.Error())
 	}
 }
 
@@ -208,14 +215,14 @@ func (p *Plugin) handleDBList(w http.ResponseWriter, r *http.Request) {
 	log := context.LoggerFrom(r.Context())
 	prefix := r.URL.Query().Get("q")
 	// We are okay with empty prefix, will return all keys
-	log.Info("listing keys for prefix from database", "prefix", prefix)
-	resp, err := p.data.List(r.Context(), prefix)
+	log.Info("Listing keys for prefix from database", "prefix", prefix)
+	resp, err := p.data.ListKeys(r.Context(), []byte(prefix))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	log.Debug("got keys", "resp", resp)
-	fmt.Fprint(w, strings.Join(resp, "\n"))
+	fmt.Fprint(w, string(bytes.Join(resp, []byte("\n"))))
 }
 
 func (p *Plugin) handleDBGet(w http.ResponseWriter, r *http.Request) {
@@ -229,19 +236,19 @@ func (p *Plugin) handleDBGet(w http.ResponseWriter, r *http.Request) {
 	log := context.LoggerFrom(r.Context())
 	key := r.URL.Query().Get("q")
 	if key == "" {
-		log.Error("missing key parameter in request")
+		log.Error("Missing key parameter in request")
 		http.Error(w, "missing key", http.StatusBadRequest)
 		return
 	}
-	log.Info("getting key from database", "key", key)
-	resp, err := p.data.GetValue(r.Context(), key)
+	log.Info("Getting key from database", "key", key)
+	resp, err := p.data.GetValue(r.Context(), []byte(key))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	resp = strings.TrimSpace(resp)
-	log.Debug("got key", "key", key, "resp", resp)
-	fmt.Fprint(w, resp)
+	resp = bytes.TrimSpace(resp)
+	log.Debug("Got key", "key", key, "resp", string(resp))
+	fmt.Fprint(w, string(resp))
 }
 
 func (p *Plugin) handleDBIterPrefix(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +266,7 @@ func (p *Plugin) handleDBIterPrefix(w http.ResponseWriter, r *http.Request) {
 func logRequest(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log := context.LoggerFrom(r.Context())
-		log.Info("request", "method", r.Method, "url", r.URL.String())
+		log.Info("Debug Request", "method", r.Method, "url", r.URL.String())
 		next.ServeHTTP(w, r)
 	}
 }

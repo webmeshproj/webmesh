@@ -47,7 +47,7 @@ func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.StorageQueryService_
 	}
 	if !storage.IsReservedPrefix(req.GetPrefix()) {
 		// Don't allow subscriptions to generic prefixes without permissions
-		allowed, err := s.rbac.Evaluate(srv.Context(), canSubscribeAction.For(req.GetPrefix()))
+		allowed, err := s.rbac.Evaluate(srv.Context(), canSubscribeAction.For(string(req.GetPrefix())))
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to evaluate subscribe permissions: %v", err)
 		}
@@ -56,7 +56,7 @@ func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.StorageQueryService_
 			return status.Error(codes.PermissionDenied, "not allowed")
 		}
 	}
-	cancel, err := s.storage.MeshStorage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
+	cancel, err := s.storage.MeshStorage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value []byte) {
 		err := srv.Send(&v1.SubscriptionEvent{
 			Key:   key,
 			Value: value,

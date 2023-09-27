@@ -35,13 +35,13 @@ func TestSnapshotter(t *testing.T) {
 	defer db.Close()
 
 	// Create a test table and populate it with some data.
-	testValues := map[string]string{
-		"/registry/foo": "bar",
-		"/registry/baz": "qux",
-		"/registry/abc": "def",
+	testValues := map[string][]byte{
+		"/registry/foo": []byte("bar"),
+		"/registry/baz": []byte("qux"),
+		"/registry/abc": []byte("def"),
 	}
 	for key, val := range testValues {
-		if err := db.PutValue(context.Background(), key, val, 0); err != nil {
+		if err := db.PutValue(context.Background(), []byte(key), val, 0); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -55,7 +55,7 @@ func TestSnapshotter(t *testing.T) {
 
 	// Drop the keys
 	for key := range testValues {
-		if err := db.Delete(context.Background(), key); err != nil {
+		if err := db.Delete(context.Background(), []byte(key)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -76,11 +76,11 @@ func TestSnapshotter(t *testing.T) {
 
 	// Ensure the keys were restored.
 	for key, val := range testValues {
-		got, err := db.GetValue(context.Background(), key)
+		got, err := db.GetValue(context.Background(), []byte(key))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got != val {
+		if !bytes.Equal(got, val) {
 			t.Errorf("got %q, want %q", got, val)
 		}
 	}

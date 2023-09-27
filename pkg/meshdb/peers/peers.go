@@ -18,11 +18,11 @@ limitations under the License.
 package peers
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/dominikbraun/graph"
@@ -168,12 +168,12 @@ func (p *peerDB) Delete(ctx context.Context, id string) error {
 
 func (p *peerDB) List(ctx context.Context) ([]peergraph.MeshNode, error) {
 	out := make([]peergraph.MeshNode, 0)
-	err := p.db.IterPrefix(ctx, peergraph.NodesPrefix.String(), func(key, value string) error {
-		if key == peergraph.NodesPrefix.String() {
+	err := p.db.IterPrefix(ctx, peergraph.NodesPrefix, func(key, value []byte) error {
+		if bytes.Equal(key, peergraph.NodesPrefix) {
 			return nil
 		}
 		var node peergraph.MeshNode
-		err := node.UnmarshalJSON([]byte(value))
+		err := node.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal node: %w", err)
 		}
@@ -184,13 +184,16 @@ func (p *peerDB) List(ctx context.Context) ([]peergraph.MeshNode, error) {
 }
 
 func (p *peerDB) ListIDs(ctx context.Context) ([]string, error) {
-	keys, err := p.db.List(ctx, peergraph.NodesPrefix.String())
+	keys, err := p.db.ListKeys(ctx, peergraph.NodesPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("list keys: %w", err)
 	}
 	ids := make([]string, 0)
 	for _, key := range keys {
-		ids = append(ids, strings.TrimPrefix(key, peergraph.NodesPrefix.String()+"/"))
+		if bytes.Equal(key, peergraph.NodesPrefix) {
+			continue
+		}
+		ids = append(ids, string(peergraph.NodesPrefix.TrimFrom(key)))
 	}
 	return ids, nil
 }

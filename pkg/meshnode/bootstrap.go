@@ -114,11 +114,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		slog.String("ipv4-network", opts.Bootstrap.IPv4Network),
 		slog.String("ipv6-network", meshnetworkv6.String()))
 	meshStorage := s.Storage().MeshStorage()
-	err = meshStorage.PutValue(ctx, state.IPv6PrefixKey, meshnetworkv6.String(), 0)
+	err = meshStorage.PutValue(ctx, state.IPv6PrefixKey, []byte(meshnetworkv6.String()), 0)
 	if err != nil {
 		return fmt.Errorf("set IPv6 prefix to db: %w", err)
 	}
-	err = meshStorage.PutValue(ctx, state.IPv4PrefixKey, meshnetworkv4.String(), 0)
+	err = meshStorage.PutValue(ctx, state.IPv4PrefixKey, []byte(meshnetworkv4.String()), 0)
 	if err != nil {
 		return fmt.Errorf("set IPv4 prefix to db: %w", err)
 	}
@@ -126,7 +126,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if !strings.HasSuffix(s.meshDomain, ".") {
 		s.meshDomain += "."
 	}
-	err = meshStorage.PutValue(ctx, state.MeshDomainKey, s.meshDomain, 0)
+	err = meshStorage.PutValue(ctx, state.MeshDomainKey, []byte(s.meshDomain), 0)
 	if err != nil {
 		return fmt.Errorf("set mesh domain to db: %w", err)
 	}
@@ -136,7 +136,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 
 	// Create an admin role and add the admin user/node to it.
 	err = rb.PutRole(ctx, &v1.Role{
-		Name: rbac.MeshAdminRole,
+		Name: string(rbac.MeshAdminRole),
 		Rules: []*v1.Rule{
 			{
 				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
@@ -148,8 +148,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		return fmt.Errorf("create admin role: %w", err)
 	}
 	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
-		Name: rbac.MeshAdminRole,
-		Role: rbac.MeshAdminRoleBinding,
+		Name: string(rbac.MeshAdminRole),
+		Role: string(rbac.MeshAdminRoleBinding),
 		Subjects: []*v1.Subject{
 			{
 				Name: opts.Bootstrap.Admin,
@@ -168,7 +168,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// Create a "voters" role and group then add ourselves and all the bootstrap servers
 	// to it.
 	err = rb.PutRole(ctx, &v1.Role{
-		Name: rbac.VotersRole,
+		Name: string(rbac.VotersRole),
 		Rules: []*v1.Rule{
 			{
 				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_VOTES},
@@ -180,7 +180,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		return fmt.Errorf("create voters role: %w", err)
 	}
 	err = rb.PutGroup(ctx, &v1.Group{
-		Name: rbac.VotersGroup,
+		Name: string(rbac.VotersGroup),
 		Subjects: func() []*v1.Subject {
 			out := make([]*v1.Subject, 0)
 			out = append(out, &v1.Subject{
@@ -208,12 +208,12 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		return fmt.Errorf("create voters group: %w", err)
 	}
 	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
-		Name: rbac.BootstrapVotersRoleBinding,
-		Role: rbac.VotersRole,
+		Name: string(rbac.BootstrapVotersRoleBinding),
+		Role: string(rbac.VotersRole),
 		Subjects: []*v1.Subject{
 			{
 				Type: v1.SubjectType_SUBJECT_GROUP,
-				Name: rbac.VotersGroup,
+				Name: string(rbac.VotersGroup),
 			},
 		},
 	})
@@ -236,10 +236,10 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// communicate with each other.
 	// TODO: This should be filtered to only apply to internal traffic.
 	err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
-		Name:             networking.BootstrapNodesNetworkACLName,
+		Name:             string(networking.BootstrapNodesNetworkACLName),
 		Priority:         math.MaxInt32,
-		SourceNodes:      []string{"group:" + rbac.VotersGroup},
-		DestinationNodes: []string{"group:" + rbac.VotersGroup},
+		SourceNodes:      []string{"group:" + string(rbac.VotersGroup)},
+		DestinationNodes: []string{"group:" + string(rbac.VotersGroup)},
 		Action:           v1.ACLAction_ACTION_ACCEPT,
 	})
 

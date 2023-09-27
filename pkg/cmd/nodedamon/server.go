@@ -234,7 +234,7 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 		if err != nil {
 			result.Error = err.Error()
 		} else {
-			result.Value = []string{val}
+			result.Value = [][]byte{val}
 		}
 		err = stream.Send(&result)
 		if err != nil {
@@ -243,7 +243,7 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 	case v1.QueryRequest_LIST:
 		var result v1.QueryResponse
 		result.Key = req.GetQuery()
-		vals, err := app.mesh.Storage().MeshStorage().List(stream.Context(), req.GetQuery())
+		vals, err := app.mesh.Storage().MeshStorage().ListKeys(stream.Context(), req.GetQuery())
 		if err != nil {
 			result.Error = err.Error()
 		} else {
@@ -254,10 +254,10 @@ func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServe
 			return err
 		}
 	case v1.QueryRequest_ITER:
-		err := app.mesh.Storage().MeshStorage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value string) error {
+		err := app.mesh.Storage().MeshStorage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value []byte) error {
 			var result v1.QueryResponse
 			result.Key = key
-			result.Value = []string{value}
+			result.Value = [][]byte{value}
 			return stream.Send(&result)
 		})
 		if err != nil {
@@ -323,7 +323,7 @@ func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_Subsc
 		app.mu.Unlock()
 		return ErrNotConnected
 	}
-	cancel, err := app.mesh.Storage().MeshStorage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value string) {
+	cancel, err := app.mesh.Storage().MeshStorage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value []byte) {
 		err := srv.Send(&v1.SubscriptionEvent{
 			Key:   key,
 			Value: value,
