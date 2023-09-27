@@ -72,7 +72,6 @@ func TestPeers(t *testing.T) {
 		for _, c := range tc {
 			testCase := c
 			t.Run(testCase.name, func(t *testing.T) {
-				t.Parallel()
 				err := p.Put(ctx, testCase.node)
 				if err != nil && !testCase.invalid {
 					t.Fatal(err)
@@ -132,7 +131,7 @@ func TestPeers(t *testing.T) {
 				t.Fatal(err)
 			}
 			if len(got.WireguardEndpoints) != 2 {
-				t.Fatal("wireguard endpoints not deduped")
+				t.Fatal("wireguard endpoints not deduped, wanted 2, got", len(got.WireguardEndpoints))
 			}
 			// Make sure the endpoints were deduped correctly
 			for _, endpoint := range []string{"127.0.0.1:51820", "127.0.0.2:51820"} {
@@ -151,7 +150,6 @@ func TestPeers(t *testing.T) {
 	})
 
 	t.Run("GetNodeByPubKey", func(t *testing.T) {
-		t.Parallel()
 		ctx := context.Background()
 		p := setupPeersTest(t)
 		key := mustGeneratePublicKey(t)
@@ -235,7 +233,6 @@ func TestPeers(t *testing.T) {
 		}
 
 		t.Run("WithEdges", func(t *testing.T) {
-			t.Parallel()
 			nodeA := &v1.MeshNode{
 				Id:                 "node-a",
 				PublicKey:          mustGeneratePublicKey(t),
