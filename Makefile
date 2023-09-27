@@ -76,7 +76,7 @@ docker-push-distroless: docker-build-distroless ## Push the distroless node dock
 
 CI ?= false
 ifeq ($(CI),true)
-# We are running in CI, so skip fmt and vet on Windows and macOS.
+# We are running in CI, so skip fmt and vet on Windows and macOS, lint happens in CI.
 ifeq ($(OS),linux)
 CI_TARGETS := mod-download fmt vet test
 else
@@ -93,7 +93,7 @@ endif
 endif
 
 ci-test: ## Run all CI tests.
-	set -eo pipefail ; $(MAKE) $(CI_TARGETS) | xargs -IL date +"[%Y-%m-%d %H:%M:%S]: L"
+	set -eo pipefail ; make $(CI_TARGETS) | xargs -IL date +"[%Y-%m-%d %H:%M:%S]: L"
 
 RICHGO_INSTALLED := $(shell test -f $(RICHGO) && echo true || echo false)
 COVERAGE_FILE    := coverage.out
