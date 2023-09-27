@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -96,6 +97,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	rftOpts.SnapshotThreshold = 1024
 	rftOpts.TrailingLogs = 1024
 	rftOpts.LogOutput = io.Discard
+	rftOpts.Logger = logging.NewHCLogAdapter("", "", logging.NewLogger(""))
 
 	// Resolve our advertise address
 	addr, err := netutil.ResolveTCPAddr(ctx, t.Advertise, 15)
