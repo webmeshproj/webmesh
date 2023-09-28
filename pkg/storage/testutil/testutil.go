@@ -35,10 +35,10 @@ type DropStorage interface {
 	DropAll(ctx context.Context) error
 }
 
-// NewProvidersFunc is a function that returns new started storage providers.
-// Each should have unique identifying properties for and not be bootstrapped.
-// The providers listen port must be available on localhost if applicable to
-// the storage provider. It must at least not be zero.
+// NewProvidersFunc is a function that returns new storage providers.
+// Each should have unique identifying properties for and not be started or
+// bootstrapped. The providers listen port must be available on localhost
+// if applicable to the storage provider. It must at least not be zero.
 type NewProvidersFunc func(t *testing.T, count int) []storage.Provider
 
 // SkipOnCI skips the test if the CI environment variable is set for the given
@@ -50,9 +50,19 @@ func SkipOnCI(t *testing.T, reason string) {
 	}
 }
 
-// MustBootstrap is a helper function that calls Bootstrap and fails the test if there
+// MustStartProvider is a helper function that calls Start and fails the test if there
 // is an error.
-func MustBootstrap(ctx context.Context, t *testing.T, provider storage.Provider) {
+func MustStartProvider(ctx context.Context, t *testing.T, provider storage.Provider) {
+	t.Helper()
+	err := provider.Start(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start provider: %v", err)
+	}
+}
+
+// MustBootstrapProvider is a helper function that calls Bootstrap and fails the test if there
+// is an error.
+func MustBootstrapProvider(ctx context.Context, t *testing.T, provider storage.Provider) {
 	t.Helper()
 	err := provider.Bootstrap(ctx)
 	if err != nil {

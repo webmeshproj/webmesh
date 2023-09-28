@@ -30,7 +30,8 @@ import (
 func TestSingleNodeProviderConformance(ctx context.Context, t *testing.T, provider storage.Provider) {
 	t.Run("SingleNodeStorageConformance", func(t *testing.T) {
 		defer provider.Close()
-		MustBootstrap(ctx, t, provider)
+		MustStartProvider(ctx, t, provider)
+		MustBootstrapProvider(ctx, t, provider)
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
 }
@@ -41,7 +42,8 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 	t.Run("SingleNodeStorageConformance", func(t *testing.T) {
 		provider := newProviders(t, 1)[0]
 		defer provider.Close()
-		MustBootstrap(ctx, t, provider)
+		MustStartProvider(ctx, t, provider)
+		MustBootstrapProvider(ctx, t, provider)
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
 
@@ -58,7 +60,8 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			for _, provider := range providers {
 				defer provider.Close()
 			}
-			MustBootstrap(ctx, t, providers["provider1"])
+			MustStartProvider(ctx, t, providers["provider1"])
+			MustBootstrapProvider(ctx, t, providers["provider1"])
 			// Provider 1 must be the leader
 			ok := Eventually[bool](func() bool {
 				return providers["provider1"].Consensus().IsLeader()
@@ -66,6 +69,8 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			if !ok {
 				t.Fatal("Provider 1 is not the leader")
 			}
+			MustStartProvider(ctx, t, providers["provider2"])
+			MustStartProvider(ctx, t, providers["provider3"])
 			// Add the others to the group.
 			for _, provider := range []storage.Provider{providers["provider2"], providers["provider3"]} {
 				addFunc(ctx, t, providers["provider1"], provider)

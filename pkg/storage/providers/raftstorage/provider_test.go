@@ -47,12 +47,7 @@ func (b *builder) newProviders(t *testing.T, count int) []storage.Provider {
 		if err != nil {
 			t.Fatalf("failed to create raft transport: %v", err)
 		}
-		p := NewProvider(newTestOptions(transport))
-		err = p.Start(context.Background())
-		if err != nil {
-			t.Fatalf("failed to start provider: %v", err)
-		}
-		out = append(out, p)
+		out = append(out, NewProvider(newTestOptions(transport)))
 	}
 
 	return out
