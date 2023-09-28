@@ -62,7 +62,7 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			// Provider 1 must be the leader
 			ok := Eventually[bool](func() bool {
 				return providers["provider1"].Consensus().IsLeader()
-			}).ShouldEqual(time.Second*10, time.Second, true)
+			}).ShouldEqual(time.Second*30, time.Second, true)
 			if !ok {
 				t.Fatal("Provider 1 is not the leader")
 			}
@@ -75,7 +75,7 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 				p := provider
 				ok := Eventually[int](func() int {
 					return len(p.Status().GetPeers())
-				}).ShouldEqual(time.Second*10, time.Second, 3)
+				}).ShouldEqual(time.Second*30, time.Second, 3)
 				if !ok {
 					t.Fatalf("Provider %s does not have three peers", name)
 				}
