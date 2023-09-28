@@ -26,17 +26,26 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
+// TestSingleNodeProviderConformance is a helper for testing a single node provider.
+func TestSingleNodeProviderConformance(ctx context.Context, t *testing.T, provider storage.Provider) {
+	t.Run("SingleNodeStorageConformance", func(t *testing.T) {
+		defer provider.Close()
+		MustBootstrap(ctx, t, provider)
+		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
+	})
+}
+
 // TestStorageProviderConformance tests that the storage provider conforms to the
 // storage provider interface.
 func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvider NewProviderFunc) {
-	t.Run("TestSingleNodeStorageConformance", func(t *testing.T) {
+	t.Run("SingleNodeStorageConformance", func(t *testing.T) {
 		provider := newProvider(ctx, t)
 		defer provider.Close()
 		MustBootstrap(ctx, t, provider)
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
 
-	t.Run("TestThreeNodeStorageConformance", func(t *testing.T) {
+	t.Run("ThreeNodeStorageConformance", func(t *testing.T) {
 		// We define a single test function that we run with different
 		// add functions.
 		runTest := func(t *testing.T, addFunc func(ctx context.Context, t *testing.T, leader, voter storage.Provider)) {
