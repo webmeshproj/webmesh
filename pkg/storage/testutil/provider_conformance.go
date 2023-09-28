@@ -73,7 +73,8 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			MustStartProvider(ctx, t, providers["provider3"])
 			// Add the others to the group.
 			for _, provider := range []storage.Provider{providers["provider2"], providers["provider3"]} {
-				addFunc(ctx, t, providers["provider1"], provider)
+				p := provider
+				addFunc(ctx, t, providers["provider1"], p)
 			}
 			// Each provider should eventually contain three peers.
 			for name, provider := range providers {
