@@ -27,9 +27,9 @@ import (
 	"github.com/dominikbraun/graph"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 // Graph is the graph.Graph implementation for the mesh network.
@@ -108,7 +108,7 @@ func (g *GraphStore) AddVertex(nodeID NodeID, node MeshNode, props graph.VertexP
 	if nodeID.IsEmpty() {
 		return ErrEmptyNodeID
 	}
-	if !dbutil.IsValidNodeID(nodeID.String()) {
+	if !storageutil.IsValidNodeID(nodeID.String()) {
 		return fmt.Errorf("%w: %s", ErrInvalidNodeID, nodeID)
 	}
 	if node.PublicKey != "" {
@@ -139,7 +139,7 @@ func (g *GraphStore) Vertex(nodeID NodeID) (node MeshNode, props graph.VertexPro
 		err = ErrEmptyNodeID
 		return
 	}
-	if !dbutil.IsValidNodeID(nodeID.String()) {
+	if !storageutil.IsValidNodeID(nodeID.String()) {
 		err = fmt.Errorf("%w: %s", ErrInvalidNodeID, nodeID)
 		return
 	}
@@ -168,7 +168,7 @@ func (g *GraphStore) RemoveVertex(nodeID NodeID) error {
 	if nodeID.IsEmpty() {
 		return ErrEmptyNodeID
 	}
-	if !dbutil.IsValidNodeID(nodeID.String()) {
+	if !storageutil.IsValidNodeID(nodeID.String()) {
 		return fmt.Errorf("%w: %s", ErrInvalidNodeID, nodeID)
 	}
 	key := NodesPrefix.For(nodeID.Bytes())

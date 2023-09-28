@@ -24,8 +24,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 var putEdgeAction = rbac.Actions{
@@ -52,7 +52,7 @@ func (s *Server) PutEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty
 			}
 			return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put the given edge")
 		}
-		if !dbutil.IsValidNodeID(id) {
+		if !storageutil.IsValidNodeID(id) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid node ID: %s", id)
 		}
 	}

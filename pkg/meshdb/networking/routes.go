@@ -25,7 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 // ValidateRoute validates a Route.
@@ -39,14 +39,14 @@ func ValidateRoute(route *v1.Route) error {
 	if len(route.GetDestinationCidrs()) == 0 {
 		return errors.New("route destination CIDRs are required")
 	}
-	if !dbutil.IsValidID(route.GetName()) {
+	if !storageutil.IsValidID(route.GetName()) {
 		return errors.New("route name must be a valid ID")
 	}
-	if !dbutil.IsValidID(route.GetNode()) {
+	if !storageutil.IsValidID(route.GetNode()) {
 		return errors.New("route node must be a valid ID")
 	}
 	if route.GetNextHopNode() != "" {
-		if !dbutil.IsValidID(route.GetNextHopNode()) {
+		if !storageutil.IsValidID(route.GetNextHopNode()) {
 			return errors.New("route next hop node must be a valid ID")
 		}
 	}

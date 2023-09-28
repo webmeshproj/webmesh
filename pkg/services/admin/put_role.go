@@ -25,8 +25,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 var putRoleAction = rbac.Actions{
@@ -43,7 +43,7 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
-	if !dbutil.IsValidID(role.GetName()) {
+	if !storageutil.IsValidID(role.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "role name must be a valid ID")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRoleAction.For(role.GetName())); !ok {

@@ -32,9 +32,9 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/logging"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 // Ensure we satisfy the provider interface.
@@ -220,7 +220,7 @@ func (p *Storage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer close()
-	if !util.IsValidKey(string(key)) {
+	if !storageutil.IsValidKey(string(key)) {
 		return nil, storage.ErrInvalidKey
 	}
 	resp, err := cli.Query(ctx, &v1.QueryRequest{
@@ -247,7 +247,7 @@ func (p *Storage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
 func (p *Storage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
-	if !util.IsValidKey(string(key)) {
+	if !storageutil.IsValidKey(string(key)) {
 		return storage.ErrInvalidKey
 	}
 	// We pass this through to the publish API. Should only be called by non-raft nodes wanting to publish
@@ -272,7 +272,7 @@ func (p *Storage) Delete(ctx context.Context, key []byte) error {
 
 // ListKeys returns all keys with a given prefix.
 func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return nil, storage.ErrInvalidPrefix
 	}
 	cli, close, err := p.newStorageClient(ctx)
@@ -303,7 +303,7 @@ func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error)
 // that the iterator not attempt any write operations as this will cause
 // a deadlock.
 func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return storage.ErrInvalidPrefix
 	}
 	cli, close, err := p.newStorageClient(ctx)
@@ -343,7 +343,7 @@ func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pref
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (p *Storage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return func() {}, storage.ErrInvalidPrefix
 	}
 	ctx, cancel := context.WithCancel(ctx)

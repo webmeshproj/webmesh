@@ -39,8 +39,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/logging"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 // Ensure we satisfy the provider interface.
@@ -329,7 +329,7 @@ func (ext *ExternalStorage) GetValue(ctx context.Context, key []byte) ([]byte, e
 	if ext.cli == nil {
 		return nil, storage.ErrClosed
 	}
-	if !util.IsValidKey(string(key)) {
+	if !storageutil.IsValidKey(string(key)) {
 		return nil, storage.ErrInvalidKey
 	}
 	resp, err := ext.cli.GetValue(ctx, &v1.GetValueRequest{Key: key})
@@ -349,7 +349,7 @@ func (ext *ExternalStorage) PutValue(ctx context.Context, key, value []byte, ttl
 	if ext.cli == nil {
 		return storage.ErrClosed
 	}
-	if !util.IsValidKey(string(key)) {
+	if !storageutil.IsValidKey(string(key)) {
 		return storage.ErrInvalidKey
 	}
 	_, err := ext.cli.PutValue(ctx, &v1.PutValueRequest{
@@ -375,7 +375,7 @@ func (ext *ExternalStorage) Delete(ctx context.Context, key []byte) error {
 	if ext.cli == nil {
 		return storage.ErrClosed
 	}
-	if !util.IsValidKey(string(key)) {
+	if !storageutil.IsValidKey(string(key)) {
 		return storage.ErrInvalidKey
 	}
 	_, err := ext.cli.DeleteValue(ctx, &v1.DeleteValueRequest{Key: key})
@@ -395,7 +395,7 @@ func (ext *ExternalStorage) ListKeys(ctx context.Context, prefix []byte) ([][]by
 	if ext.cli == nil {
 		return nil, storage.ErrClosed
 	}
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return nil, storage.ErrInvalidPrefix
 	}
 	resp, err := ext.cli.ListKeys(ctx, &v1.ListKeysRequest{Prefix: prefix})
@@ -417,7 +417,7 @@ func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix []byte, fn st
 	if ext.cli == nil {
 		return storage.ErrClosed
 	}
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return storage.ErrInvalidPrefix
 	}
 	resp, err := ext.cli.ListValues(ctx, &v1.ListValuesRequest{Prefix: prefix})
@@ -443,7 +443,7 @@ func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix []byte, fn sto
 	if ext.cli == nil {
 		return func() {}, storage.ErrClosed
 	}
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return func() {}, storage.ErrInvalidPrefix
 	}
 	ctx, cancel := context.WithCancel(ctx)

@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package util contains utility functions for mesh database interactions.
-package util
+// Package storageutil contains utility functions for mesh database interactions.
+package storageutil
 
 import (
 	"strings"

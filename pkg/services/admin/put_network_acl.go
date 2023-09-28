@@ -25,8 +25,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 var putNetworkACLAction = rbac.Actions{
@@ -43,7 +43,7 @@ func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptyp
 	if acl.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "acl name is required")
 	}
-	if !dbutil.IsValidID(acl.GetName()) {
+	if !storageutil.IsValidID(acl.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "acl name must be a valid ID")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putNetworkACLAction.For(acl.GetName())); !ok {

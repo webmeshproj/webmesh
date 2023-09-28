@@ -30,8 +30,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 // ValidateACL validates a NetworkACL.
@@ -39,7 +39,7 @@ func ValidateACL(acl *v1.NetworkACL) error {
 	if acl.GetName() == "" {
 		return errors.New("acl name is required")
 	}
-	if !dbutil.IsValidID(acl.GetName()) {
+	if !storageutil.IsValidID(acl.GetName()) {
 		return errors.New("acl name must be a valid ID")
 	}
 	if _, ok := v1.ACLAction_name[int32(acl.GetAction())]; !ok {
@@ -50,7 +50,7 @@ func ValidateACL(acl *v1.NetworkACL) error {
 			continue
 		}
 		node = strings.TrimPrefix(node, GroupReference)
-		if !dbutil.IsValidID(node) {
+		if !storageutil.IsValidID(node) {
 			return fmt.Errorf("invalid source node: %s", node)
 		}
 	}

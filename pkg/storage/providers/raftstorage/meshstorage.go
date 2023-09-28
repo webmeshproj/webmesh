@@ -28,8 +28,8 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 // Ensure we satisfy the MeshStorage interface.
@@ -55,7 +55,7 @@ func (rs *RaftStorage) GetValue(ctx context.Context, key []byte) ([]byte, error)
 	if !rs.raft.started.Load() {
 		return nil, storage.ErrClosed
 	}
-	if !util.IsValidKey(string(key)) {
+	if !storageutil.IsValidKey(string(key)) {
 		return nil, storage.ErrInvalidKey
 	}
 	return rs.storage.GetValue(ctx, key)
@@ -66,7 +66,7 @@ func (rs *RaftStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, e
 	if !rs.raft.started.Load() {
 		return nil, storage.ErrClosed
 	}
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return nil, storage.ErrInvalidPrefix
 	}
 	return rs.storage.ListKeys(ctx, prefix)
@@ -77,7 +77,7 @@ func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
 	}
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return storage.ErrInvalidPrefix
 	}
 	return rs.storage.IterPrefix(ctx, prefix, fn)
@@ -88,7 +88,7 @@ func (rs *RaftStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.
 	if !rs.raft.started.Load() {
 		return func() {}, storage.ErrClosed
 	}
-	if !util.IsValidKey(string(prefix)) {
+	if !storageutil.IsValidKey(string(prefix)) {
 		return func() {}, storage.ErrInvalidPrefix
 	}
 	return rs.storage.Subscribe(ctx, prefix, fn)
@@ -99,7 +99,7 @@ func (rs *RaftStorage) PutValue(ctx context.Context, key, value []byte, ttl time
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
 	}
-	if !util.IsValidKey(string(key)) {
+	if !storageutil.IsValidKey(string(key)) {
 		return storage.ErrInvalidKey
 	}
 	if !rs.raft.isVoter() {
@@ -124,7 +124,7 @@ func (rs *RaftStorage) Delete(ctx context.Context, key []byte) error {
 	if !rs.raft.started.Load() {
 		return storage.ErrClosed
 	}
-	if !util.IsValidKey(string(key)) {
+	if !storageutil.IsValidKey(string(key)) {
 		return storage.ErrInvalidKey
 	}
 	if !rs.raft.isVoter() {

@@ -25,8 +25,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
-	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 var putRoleBindingAction = rbac.Actions{
@@ -43,7 +43,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 	if rb.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "rolebinding name cannot be empty")
 	}
-	if !dbutil.IsValidID(rb.GetName()) {
+	if !storageutil.IsValidID(rb.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "rolebinding name must be a valid ID")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRoleBindingAction.For(rb.GetName())); !ok {
@@ -70,7 +70,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 		if _, ok := v1.SubjectType_name[int32(subject.GetType())]; !ok {
 			return nil, status.Error(codes.InvalidArgument, "subject type must be valid")
 		}
-		if !dbutil.IsValidID(subject.GetName()) {
+		if !storageutil.IsValidID(subject.GetName()) {
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}

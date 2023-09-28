@@ -32,10 +32,10 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
-	dbutil "github.com/webmeshproj/webmesh/pkg/meshdb/util"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 var canVoteAction = &rbac.Action{
@@ -77,7 +77,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Validate inputs
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node id required")
-	} else if !dbutil.IsValidNodeID(req.GetId()) {
+	} else if !storageutil.IsValidNodeID(req.GetId()) {
 		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if len(req.GetRoutes()) > 0 {
@@ -293,7 +293,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				Source:     peer,
 				Target:     req.GetId(),
 				Weight:     1,
-				Attributes: dbutil.EdgeAttrsForConnectProto(proto),
+				Attributes: storageutil.EdgeAttrsForConnectProto(proto),
 			})
 			if err != nil {
 				return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
