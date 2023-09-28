@@ -31,26 +31,31 @@ import (
 
 func TestInMemoryProviderConformance(t *testing.T) {
 	builder := &builder{}
-	testutil.TestStorageProviderConformance(context.Background(), t, builder.newProvider)
+	testutil.TestStorageProviderConformance(context.Background(), t, builder.newProviders)
 }
 
 type builder struct{}
 
-func (b *builder) newProvider(ctx context.Context, t *testing.T) storage.Provider {
-	transport, err := tcp.NewRaftTransport(nil, tcp.RaftTransportOptions{
-		Addr:    "[::]:0",
-		MaxPool: 10,
-		Timeout: time.Second,
-	})
-	if err != nil {
-		t.Fatalf("failed to create raft transport: %v", err)
+func (b *builder) newProviders(t *testing.T, count int) []storage.Provider {
+	var out []storage.Provider
+	for i := 0; i < count; i++ {
+		transport, err := tcp.NewRaftTransport(nil, tcp.RaftTransportOptions{
+			Addr:    "[::]:0",
+			MaxPool: 10,
+			Timeout: time.Second,
+		})
+		if err != nil {
+			t.Fatalf("failed to create raft transport: %v", err)
+		}
+		p := NewProvider(newTestOptions(transport))
+		err = p.Start(context.Background())
+		if err != nil {
+			t.Fatalf("failed to start provider: %v", err)
+		}
+		out = append(out, p)
 	}
-	p := NewProvider(newTestOptions(transport))
-	err = p.Start(ctx)
-	if err != nil {
-		t.Fatalf("failed to start provider: %v", err)
-	}
-	return p
+
+	return out
 }
 
 func newTestOptions(transport transport.RaftTransport) Options {

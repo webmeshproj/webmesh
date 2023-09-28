@@ -37,9 +37,9 @@ func TestSingleNodeProviderConformance(ctx context.Context, t *testing.T, provid
 
 // TestStorageProviderConformance tests that the storage provider conforms to the
 // storage provider interface.
-func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvider NewProviderFunc) {
+func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProviders NewProvidersFunc) {
 	t.Run("SingleNodeStorageConformance", func(t *testing.T) {
-		provider := newProvider(ctx, t)
+		provider := newProviders(t, 1)[0]
 		defer provider.Close()
 		MustBootstrap(ctx, t, provider)
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
@@ -49,10 +49,11 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 		// We define a single test function that we run with different
 		// add functions.
 		runTest := func(t *testing.T, addFunc func(ctx context.Context, t *testing.T, leader, voter storage.Provider)) {
+			p := newProviders(t, 3)
 			providers := map[string]storage.Provider{
-				"provider1": newProvider(ctx, t),
-				"provider2": newProvider(ctx, t),
-				"provider3": newProvider(ctx, t),
+				"provider1": p[0],
+				"provider2": p[1],
+				"provider3": p[2],
 			}
 			for _, provider := range providers {
 				defer provider.Close()

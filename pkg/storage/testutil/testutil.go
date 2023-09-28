@@ -35,10 +35,11 @@ type DropStorage interface {
 	DropAll(ctx context.Context) error
 }
 
-// NewProviderFunc is a function that returns a new started storage provider.
-// It should have unique identifying properties for each call and not be
-// bootstrapped. The providers listen port must be available on localhost.
-type NewProviderFunc func(ctx context.Context, t *testing.T) storage.Provider
+// NewProvidersFunc is a function that returns new started storage providers.
+// Each should have unique identifying properties for and not be bootstrapped.
+// The providers listen port must be available on localhost if applicable to
+// the storage provider. It must at least not be zero.
+type NewProvidersFunc func(t *testing.T, count int) []storage.Provider
 
 // SkipOnCI skips the test if the CI environment variable is set for the given
 // reason.
