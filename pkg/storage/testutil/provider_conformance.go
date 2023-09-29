@@ -19,6 +19,7 @@ package testutil
 import (
 	"bytes"
 	"context"
+	"errors"
 	"runtime"
 	"testing"
 	"time"
@@ -32,6 +33,11 @@ func TestSingleNodeProviderConformance(ctx context.Context, t *testing.T, provid
 		defer provider.Close()
 		MustStartProvider(ctx, t, provider)
 		MustBootstrapProvider(ctx, t, provider)
+		// Bootstrapping again should return the proper error.
+		err := provider.Bootstrap(ctx)
+		if !errors.Is(err, storage.ErrAlreadyBootstrapped) {
+			t.Fatalf("Expected error %v, got %v", storage.ErrAlreadyBootstrapped, err)
+		}
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
 }
@@ -44,6 +50,10 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 		defer provider.Close()
 		MustStartProvider(ctx, t, provider)
 		MustBootstrapProvider(ctx, t, provider)
+		err := provider.Bootstrap(ctx)
+		if !errors.Is(err, storage.ErrAlreadyBootstrapped) {
+			t.Fatalf("Expected error %v, got %v", storage.ErrAlreadyBootstrapped, err)
+		}
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
 
@@ -60,8 +70,9 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			for _, provider := range providers {
 				defer provider.Close()
 			}
-			MustStartProvider(ctx, t, providers["provider1"])
-			MustBootstrapProvider(ctx, t, providers["provider1"])
+			provider1 := providers["provider1"]
+			MustStartProvider(ctx, t, provider1)
+			MustBootstrapProvider(ctx, t, provider1)
 			// Provider 1 must be the leader
 			ok := Eventually[bool](func() bool {
 				return providers["provider1"].Consensus().IsLeader()
@@ -69,12 +80,17 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			if !ok {
 				t.Fatal("Provider 1 is not the leader")
 			}
-			MustStartProvider(ctx, t, providers["provider2"])
-			MustStartProvider(ctx, t, providers["provider3"])
+			err := provider1.Bootstrap(ctx)
+			if !errors.Is(err, storage.ErrAlreadyBootstrapped) {
+				t.Fatalf("Expected error %v, got %v", storage.ErrAlreadyBootstrapped, err)
+			}
+			provider2, provider3 := providers["provider2"], providers["provider3"]
+			MustStartProvider(ctx, t, provider2)
+			MustStartProvider(ctx, t, provider3)
 			// Add the others to the group.
-			for _, provider := range []storage.Provider{providers["provider2"], providers["provider3"]} {
+			for _, provider := range []storage.Provider{provider2, provider3} {
 				p := provider
-				addFunc(ctx, t, providers["provider1"], p)
+				addFunc(ctx, t, provider1, p)
 			}
 			// Each provider should eventually contain three peers.
 			for name, provider := range providers {
@@ -84,6 +100,14 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 				}).ShouldEqual(time.Second*30, time.Second, 3)
 				if !ok {
 					t.Fatalf("Provider %s does not have three peers", name)
+				}
+			}
+			// Both of the others should believe themselves to be already bootstrapped
+			for _, provider := range []storage.Provider{provider2, provider3} {
+				p := provider
+				err := p.Bootstrap(ctx)
+				if !errors.Is(err, storage.ErrAlreadyBootstrapped) {
+					t.Fatalf("Expected error %v, got %v", storage.ErrAlreadyBootstrapped, err)
 				}
 			}
 			// We should be able to write keys to a leader and have them propagate to the followers.
