@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"errors"
 	"net/netip"
 	"slices"
 	"strings"
@@ -25,6 +24,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -83,7 +83,7 @@ func ExpandACL(ctx context.Context, rbac RBAC, acl types.NetworkACL) error {
 		context.LoggerFrom(ctx).Debug("Expanding group reference", "group", groupName)
 		group, err := rbac.GetGroup(ctx, groupName)
 		if err != nil {
-			if !errors.Is(err, ErrGroupNotFound) {
+			if !errors.Is(err, errors.ErrGroupNotFound) {
 				context.LoggerFrom(ctx).Error("Failed to lookup group", "group", groupName, "error", err.Error())
 				return err
 			}
@@ -108,7 +108,7 @@ func ExpandACL(ctx context.Context, rbac RBAC, acl types.NetworkACL) error {
 		context.LoggerFrom(ctx).Debug("Expanding group reference", "group", groupName)
 		group, err := rbac.GetGroup(ctx, groupName)
 		if err != nil {
-			if !errors.Is(err, ErrGroupNotFound) {
+			if !errors.IsGroupNotFound(err) {
 				context.LoggerFrom(ctx).Error("Failed to lookup group", "group", groupName, "error", err.Error())
 				return err
 			}

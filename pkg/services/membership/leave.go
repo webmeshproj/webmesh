@@ -17,7 +17,6 @@ limitations under the License.
 package membership
 
 import (
-	"errors"
 	"log/slog"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -26,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
@@ -65,7 +64,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	// Lookup the peer first to make sure they exist
 	leaving, err := peers.New(s.storage.MeshStorage()).Get(ctx, req.GetId())
 	if err != nil {
-		if errors.Is(err, storage.ErrNodeNotFound) {
+		if errors.IsNodeNotFound(err) {
 			// We're done here if they don't exist
 			return &v1.LeaveResponse{}, nil
 		}

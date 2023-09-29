@@ -23,7 +23,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 type errNoIPv4 struct{}
@@ -44,7 +45,7 @@ func errToRcode(err error) int {
 		return dns.RcodeSuccess
 	case context.DeadlineExceeded:
 		return dns.RcodeServerFailure
-	case storage.ErrNodeNotFound, errNoIPv4{}, errNoIPv6{}:
+	case errors.ErrNodeNotFound, errNoIPv4{}, errNoIPv6{}:
 		return dns.RcodeNameError
 	default:
 		return dns.RcodeServerFailure

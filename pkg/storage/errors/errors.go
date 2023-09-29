@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+// Package errors contains error definitions for storage providers.
+package errors
 
 import (
 	"errors"
@@ -22,6 +23,9 @@ import (
 
 	"github.com/dominikbraun/graph"
 )
+
+// Is is a shortcut for errors.Is.
+var Is = errors.Is
 
 // Common errors for storage providers to use.
 var (
@@ -71,6 +75,10 @@ var (
 	ErrInvalidACL = errors.New("invalid network acl")
 	// ErrInvalidRoute is returned when a Route is invalid.
 	ErrInvalidRoute = errors.New("invalid route")
+	// ErrEmptyNodeID is returned when a node ID is empty.
+	ErrEmptyNodeID = errors.New("node ID must not be empty")
+	// ErrInvalidNodeID is returned when a node ID is invalid.
+	ErrInvalidNodeID = errors.New("node ID is invalid")
 )
 
 // NewKeyNotFoundError returns a new ErrKeyNotFound error.
@@ -79,6 +87,61 @@ func NewKeyNotFoundError(key []byte) error {
 }
 
 // IsKeyNotFoundError returns true if the given error is a ErrKeyNotFound error.
-func IsKeyNotFoundError(err error) bool {
-	return errors.Is(err, ErrKeyNotFound)
+func IsKeyNotFound(err error) bool {
+	return Is(err, ErrKeyNotFound)
+}
+
+// IsNodeNotFound returns true if the given error is a ErrNodeNotFound error.
+func IsNodeNotFound(err error) bool {
+	return Is(err, ErrNodeNotFound)
+}
+
+// IsAlreadyBootstrappedError returns true if the given error is a ErrAlreadyBootstrapped error.
+func IsAlreadyBootstrapped(err error) bool {
+	return Is(err, ErrAlreadyBootstrapped)
+}
+
+// IsInvalidACL returns true if the given error is a ErrInvalidACL error.
+func IsInvalidACL(err error) bool {
+	return Is(err, ErrInvalidACL)
+}
+
+// IsACLNotFound returns true if the given error is a ErrACLNotFound error.
+func IsACLNotFound(err error) bool {
+	return Is(err, ErrACLNotFound)
+}
+
+// IsInvalidRoute returns true if the given error is a ErrInvalidRoute error.
+func IsInvalidRoute(err error) bool {
+	return Is(err, ErrInvalidRoute)
+}
+
+// IsRouteNotFound returns true if the given error is a ErrRouteNotFound error.
+func IsRouteNotFound(err error) bool {
+	return Is(err, ErrRouteNotFound)
+}
+
+// IsEdgeNotFound returns true if the given error is a ErrEdgeNotFound error.
+func IsEdgeNotFound(err error) bool {
+	return Is(err, ErrEdgeNotFound)
+}
+
+// IsRoleNotFound returns true if the given error is a ErrRoleNotFound error.
+func IsRoleNotFound(err error) bool {
+	return Is(err, ErrRoleNotFound)
+}
+
+// IsRoleBindingNotFound returns true if the given error is a ErrRoleBindingNotFound error.
+func IsRoleBindingNotFound(err error) bool {
+	return Is(err, ErrRoleBindingNotFound)
+}
+
+// IsGroupNotFoundError returns true if the given error is a ErrGroupNotFound error.
+func IsGroupNotFound(err error) bool {
+	return Is(err, ErrGroupNotFound)
+}
+
+// IsNoLeader returns true if the given error is a ErrNoLeader error.
+func IsNoLeader(err error) bool {
+	return Is(err, ErrNoLeader)
 }

@@ -27,6 +27,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
@@ -45,7 +46,7 @@ func NewServer(storage storage.MeshStorage) *Server {
 func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshNode, error) {
 	node, err := s.peers.Get(ctx, req.GetId())
 	if err != nil {
-		if err == storage.ErrNodeNotFound {
+		if errors.IsNodeNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "node %s not found", req.GetId())
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get node: %v", err)

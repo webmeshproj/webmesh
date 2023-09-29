@@ -18,7 +18,6 @@ package meshnode
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -34,6 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
@@ -47,7 +47,7 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	_, err := s.Storage().MeshStorage().GetValue(ctx, state.IPv6PrefixKey)
 	var firstBootstrap bool
 	if err != nil {
-		if !storage.IsKeyNotFoundError(err) {
+		if !errors.IsKeyNotFound(err) {
 			return fmt.Errorf("get mesh network: %w", err)
 		}
 		firstBootstrap = true
@@ -62,7 +62,7 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	s.log.Debug("Cluster not yet bootstrapped, attempting to bootstrap")
 	isLeader, joinRT, err := opts.Bootstrap.Transport.LeaderElect(ctx)
 	if err != nil {
-		if errors.Is(err, storage.ErrAlreadyBootstrapped) && joinRT != nil {
+		if errors.IsAlreadyBootstrapped(err) && joinRT != nil {
 			s.log.Info("cluster already bootstrapped, attempting to rejoin as voter")
 			opts.JoinRoundTripper = joinRT
 			return s.join(ctx, opts)

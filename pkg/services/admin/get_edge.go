@@ -18,14 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"errors"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -38,7 +36,7 @@ func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, 
 	}
 	graphEdge, err := s.peers.Graph().Edge(types.NodeID(edge.GetSource()), types.NodeID(edge.GetTarget()))
 	if err != nil {
-		if errors.Is(err, storage.ErrEdgeNotFound) {
+		if errors.IsEdgeNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "edge %q to %q not found", edge.GetSource(), edge.GetTarget())
 		}
 		return nil, status.Error(codes.Internal, err.Error())

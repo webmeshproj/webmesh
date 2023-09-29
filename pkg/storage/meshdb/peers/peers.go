@@ -20,7 +20,6 @@ package peers
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -33,6 +32,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	peergraph "github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
@@ -83,7 +83,7 @@ func (p *peerDB) Get(ctx context.Context, id string) (types.MeshNode, error) {
 	node, err := p.graph.Vertex(types.NodeID(id))
 	if err != nil {
 		if errors.Is(err, graph.ErrVertexNotFound) {
-			return types.MeshNode{}, storage.ErrNodeNotFound
+			return types.MeshNode{}, errors.ErrNodeNotFound
 		}
 		return types.MeshNode{}, fmt.Errorf("get node: %w", err)
 	}
@@ -107,7 +107,7 @@ func (p *peerDB) GetByPubKey(ctx context.Context, key crypto.PublicKey) (types.M
 			}
 		}
 	}
-	return types.MeshNode{}, storage.ErrNodeNotFound
+	return types.MeshNode{}, errors.ErrNodeNotFound
 }
 
 func (p *peerDB) Delete(ctx context.Context, id string) error {
@@ -260,7 +260,7 @@ func PutMeshEdgeInto(e types.MeshEdge, g types.PeerGraph) error {
 		}
 		return nil
 	}
-	if !errors.Is(err, storage.ErrEdgeNotFound) {
+	if !errors.IsEdgeNotFound(err) {
 		return fmt.Errorf("get edge: %w", err)
 	}
 	err = g.AddEdge(e.SourceID(), e.TargetID(), opts...)

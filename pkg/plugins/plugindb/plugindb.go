@@ -20,7 +20,7 @@ package plugindb
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -29,6 +29,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 // Open opens a new database connection to a plugin query stream.
@@ -63,19 +64,19 @@ func (p *pluginDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	}
 	if len(resp.GetValue()) == 0 {
 		// This should never happen, but just in case.
-		return nil, storage.ErrKeyNotFound
+		return nil, errors.ErrKeyNotFound
 	}
 	return resp.GetValue()[0], nil
 }
 
 // Put sets the value of a key.
 func (p *pluginDB) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
-	return errors.New("put not implemented")
+	return fmt.Errorf("put not implemented")
 }
 
 // Delete removes a key.
 func (p *pluginDB) Delete(ctx context.Context, key []byte) error {
-	return errors.New("delete not implemented")
+	return fmt.Errorf("delete not implemented")
 }
 
 // ListKeys returns all keys with a given prefix.
@@ -137,18 +138,18 @@ func (p *pluginDB) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pre
 
 // Snapshot returns a snapshot of the storage.
 func (p *pluginDB) Snapshot(ctx context.Context) (io.Reader, error) {
-	return nil, errors.New("snapshot not implemented")
+	return nil, fmt.Errorf("snapshot not implemented")
 }
 
 // Restore restores a snapshot of the storage.
 func (p *pluginDB) Restore(ctx context.Context, r io.Reader) error {
-	return errors.New("restore not implemented")
+	return fmt.Errorf("restore not implemented")
 }
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (p *pluginDB) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
-	return nil, errors.New("subscribe not implemented")
+	return nil, fmt.Errorf("subscribe not implemented")
 }
 
 // Close closes the storage.
@@ -158,5 +159,5 @@ func (p *pluginDB) Close() error {
 
 // DropAll deletes all keys in the storage.
 func (p *pluginDB) DropAll(ctx context.Context) error {
-	return errors.New("drop all not implemented")
+	return fmt.Errorf("drop all not implemented")
 }

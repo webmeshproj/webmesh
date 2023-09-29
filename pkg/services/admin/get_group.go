@@ -18,14 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"errors"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 func (s *Server) GetGroup(ctx context.Context, group *v1.Group) (*v1.Group, error) {
@@ -34,7 +32,7 @@ func (s *Server) GetGroup(ctx context.Context, group *v1.Group) (*v1.Group, erro
 	}
 	group, err := s.rbac.GetGroup(ctx, group.GetName())
 	if err != nil {
-		if errors.Is(err, storage.ErrGroupNotFound) {
+		if errors.IsGroupNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "group %q not found", group.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())

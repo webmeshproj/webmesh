@@ -19,7 +19,6 @@ package networking
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/netip"
 
@@ -27,6 +26,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
@@ -35,9 +35,9 @@ var (
 	// BootstrapNodesNetworkACLName is the name of the bootstrap nodes NetworkACL.
 	BootstrapNodesNetworkACLName = []byte("bootstrap-nodes")
 	// NetworkACLsPrefix is where NetworkACLs are stored in the database.
-	NetworkACLsPrefix = storage.RegistryPrefix.For([]byte("network-acls"))
+	NetworkACLsPrefix = types.RegistryPrefix.For([]byte("network-acls"))
 	// RoutesPrefix is where Routes are stored in the database.
-	RoutesPrefix = storage.RegistryPrefix.For([]byte("routes"))
+	RoutesPrefix = types.RegistryPrefix.For([]byte("routes"))
 	// GroupReference is the prefix of a node name that indicates it is a group reference.
 	GroupReference = "group:"
 )
@@ -57,7 +57,7 @@ type networking struct {
 func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error {
 	err := types.ValidateACL(acl)
 	if err != nil {
-		return fmt.Errorf("%w: %w", storage.ErrInvalidACL, err)
+		return fmt.Errorf("%w: %w", errors.ErrInvalidACL, err)
 	}
 	key := NetworkACLsPrefix.For([]byte(acl.GetName()))
 	data, err := (types.NetworkACL{NetworkACL: acl}).MarshalJSON()
@@ -76,8 +76,8 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (types.Netw
 	key := NetworkACLsPrefix.For([]byte(name))
 	data, err := n.GetValue(ctx, key)
 	if err != nil {
-		if errors.Is(err, storage.ErrKeyNotFound) {
-			return types.NetworkACL{}, storage.ErrACLNotFound
+		if errors.IsKeyNotFound(err) {
+			return types.NetworkACL{}, errors.ErrACLNotFound
 		}
 		return types.NetworkACL{}, fmt.Errorf("get network acl: %w", err)
 	}
@@ -93,7 +93,7 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (types.Netw
 func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 	key := NetworkACLsPrefix.For([]byte(name))
 	err := n.Delete(ctx, key)
-	if err != nil && !errors.Is(err, storage.ErrKeyNotFound) {
+	if err != nil && !errors.IsKeyNotFound(err) {
 		return fmt.Errorf("delete network acl: %w", err)
 	}
 	return nil
@@ -121,7 +121,7 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (types.NetworkACLs, er
 func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 	err := types.ValidateRoute(route)
 	if err != nil {
-		return fmt.Errorf("%w: %w", storage.ErrInvalidRoute, err)
+		return fmt.Errorf("%w: %w", errors.ErrInvalidRoute, err)
 	}
 	key := RoutesPrefix.For([]byte(route.GetName()))
 	data, err := (types.Route{Route: route}).MarshalJSON()
@@ -140,8 +140,8 @@ func (n *networking) GetRoute(ctx context.Context, name string) (types.Route, er
 	key := RoutesPrefix.For([]byte(name))
 	data, err := n.GetValue(ctx, key)
 	if err != nil {
-		if errors.Is(err, storage.ErrKeyNotFound) {
-			return types.Route{}, storage.ErrRouteNotFound
+		if errors.IsKeyNotFound(err) {
+			return types.Route{}, errors.ErrRouteNotFound
 		}
 		return types.Route{}, fmt.Errorf("get network route: %w", err)
 	}
@@ -195,7 +195,7 @@ func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (ty
 func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 	key := RoutesPrefix.For([]byte(name))
 	err := n.Delete(ctx, key)
-	if err != nil && !errors.Is(err, storage.ErrKeyNotFound) {
+	if err != nil && !errors.IsKeyNotFound(err) {
 		return fmt.Errorf("delete network route: %w", err)
 	}
 	return nil

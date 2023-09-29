@@ -36,8 +36,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // AppDaemon is the app daemon RPC server.
@@ -307,7 +307,7 @@ func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	if storage.IsReservedPrefix(req.GetKey()) {
+	if types.IsReservedPrefix(req.GetKey()) {
 		return nil, status.Errorf(codes.InvalidArgument, "key %q is reserved", req.GetKey())
 	}
 	err := app.mesh.Storage().MeshStorage().PutValue(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())

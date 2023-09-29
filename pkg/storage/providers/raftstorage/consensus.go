@@ -17,7 +17,6 @@ limitations under the License.
 package raftstorage
 
 import (
-	"errors"
 	"time"
 
 	"github.com/hashicorp/raft"
@@ -25,6 +24,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 // Ensure we satisfy the Consensus interface.
@@ -51,7 +51,7 @@ func (r *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.started.Load() {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	cfg := r.GetRaftConfiguration()
 	leader, err := r.GetLeader(ctx)
@@ -86,7 +86,7 @@ func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.started.Load() {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	if r.IsLeader() {
 		// Fast path for leader.
@@ -99,7 +99,7 @@ func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 	// Slow path for non-leaders.
 	leaderAddr, leaderID := r.raft.LeaderWithID()
 	if leaderAddr == "" && leaderID == "" {
-		return nil, storage.ErrNoLeader
+		return nil, errors.ErrNoLeader
 	}
 	return &v1.StoragePeer{
 		Id:            string(leaderID),
@@ -113,10 +113,10 @@ func (r *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !r.IsLeader() {
-		return storage.ErrNotLeader
+		return errors.ErrNotLeader
 	}
 	defer func() {
 		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
@@ -131,7 +131,7 @@ func (r *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
 	f := r.raft.AddVoter(raft.ServerID(peer.GetId()), raft.ServerAddress(peer.GetAddress()), 0, timeout)
 	err := f.Error()
 	if err != nil && errors.Is(err, raft.ErrNotLeader) {
-		return storage.ErrNotLeader
+		return errors.ErrNotLeader
 	}
 	return err
 }
@@ -141,10 +141,10 @@ func (r *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !r.IsLeader() {
-		return storage.ErrNotLeader
+		return errors.ErrNotLeader
 	}
 	defer func() {
 		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
@@ -159,7 +159,7 @@ func (r *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error
 	f := r.raft.AddNonvoter(raft.ServerID(peer.GetId()), raft.ServerAddress(peer.GetAddress()), 0, timeout)
 	err := f.Error()
 	if err != nil && errors.Is(err, raft.ErrNotLeader) {
-		return storage.ErrNotLeader
+		return errors.ErrNotLeader
 	}
 	return err
 }
@@ -169,10 +169,10 @@ func (r *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !r.IsLeader() {
-		return storage.ErrNotLeader
+		return errors.ErrNotLeader
 	}
 	defer func() {
 		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
@@ -187,7 +187,7 @@ func (r *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error
 	f := r.raft.DemoteVoter(raft.ServerID(peer.GetId()), 0, timeout)
 	err := f.Error()
 	if err != nil && errors.Is(err, raft.ErrNotLeader) {
-		return storage.ErrNotLeader
+		return errors.ErrNotLeader
 	}
 	return err
 }
@@ -197,10 +197,10 @@ func (r *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait b
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !r.IsLeader() {
-		return storage.ErrNotLeader
+		return errors.ErrNotLeader
 	}
 	defer func() {
 		err := r.raft.Barrier(r.Options.ApplyTimeout).Error()
@@ -218,7 +218,7 @@ func (r *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait b
 	}
 	err := f.Error()
 	if err != nil && errors.Is(err, raft.ErrNotLeader) {
-		return storage.ErrNotLeader
+		return errors.ErrNotLeader
 	}
 	return err
 }

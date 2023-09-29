@@ -21,7 +21,7 @@ package passthrough
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -34,6 +34,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -109,14 +110,14 @@ func (p *Provider) Close() error {
 }
 
 func (p *Provider) Bootstrap(ctx context.Context) error {
-	return storage.ErrNotStorageNode
+	return errors.ErrNotStorageNode
 }
 
 func (p *Provider) Status() *v1.StorageStatus {
 	status := v1.StorageStatus{
 		IsWritable:    false,
 		ClusterStatus: v1.ClusterStatus_CLUSTER_NODE,
-		Message:       storage.ErrNotStorageNode.Error(),
+		Message:       errors.ErrNotStorageNode.Error(),
 	}
 	config, err := p.getConfiguration()
 	if err != nil {
@@ -183,30 +184,30 @@ func (p *Consensus) GetLeader(context.Context) (*v1.StoragePeer, error) {
 	}
 	if leader == nil {
 		p.log.Warn("No leader found in storage group", "status", status)
-		return nil, storage.ErrNoLeader
+		return nil, errors.ErrNoLeader
 	}
 	return leader, nil
 }
 
 // AddVoter adds a voter to the consensus group.
 func (p *Consensus) AddVoter(context.Context, *v1.StoragePeer) error {
-	return storage.ErrNotStorageNode
+	return errors.ErrNotStorageNode
 }
 
 // AddObserver adds an observer to the consensus group.
 func (p *Consensus) AddObserver(context.Context, *v1.StoragePeer) error {
-	return storage.ErrNotStorageNode
+	return errors.ErrNotStorageNode
 }
 
 // DemoteVoter demotes a voter to an observer.
 func (p *Consensus) DemoteVoter(context.Context, *v1.StoragePeer) error {
-	return storage.ErrNotStorageNode
+	return errors.ErrNotStorageNode
 }
 
 // RemovePeer removes a peer from the consensus group. If wait
 // is true, the function will wait for the peer to be removed.
 func (p *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
-	return storage.ErrNotStorageNode
+	return errors.ErrNotStorageNode
 }
 
 type Storage struct {
@@ -221,7 +222,7 @@ func (p *Storage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	}
 	defer close()
 	if !storageutil.IsValidKey(string(key)) {
-		return nil, storage.ErrInvalidKey
+		return nil, errors.ErrInvalidKey
 	}
 	resp, err := cli.Query(ctx, &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
@@ -237,10 +238,10 @@ func (p *Storage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	}
 	if result.GetError() != "" {
 		// TODO: Should find a way to type assert this error
-		if strings.Contains(result.GetError(), storage.ErrKeyNotFound.Error()) {
-			return nil, storage.NewKeyNotFoundError(key)
+		if strings.Contains(result.GetError(), errors.ErrKeyNotFound.Error()) {
+			return nil, errors.NewKeyNotFoundError(key)
 		}
-		return nil, errors.New(result.GetError())
+		return nil, fmt.Errorf(result.GetError())
 	}
 	return result.GetValue()[0], nil
 }
@@ -248,7 +249,7 @@ func (p *Storage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
 func (p *Storage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
 	if !storageutil.IsValidKey(string(key)) {
-		return storage.ErrInvalidKey
+		return errors.ErrInvalidKey
 	}
 	// We pass this through to the publish API. Should only be called by non-raft nodes wanting to publish
 	// non-internal values. The server will enforce permissions and other restrictions.
@@ -267,13 +268,13 @@ func (p *Storage) PutValue(ctx context.Context, key, value []byte, ttl time.Dura
 
 // Delete removes a key.
 func (p *Storage) Delete(ctx context.Context, key []byte) error {
-	return storage.ErrNotStorageNode
+	return errors.ErrNotStorageNode
 }
 
 // ListKeys returns all keys with a given prefix.
 func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
 	if !storageutil.IsValidKey(string(prefix)) {
-		return nil, storage.ErrInvalidPrefix
+		return nil, errors.ErrInvalidPrefix
 	}
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
@@ -294,7 +295,7 @@ func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error)
 	}
 	if result.GetError() != "" {
 		// TODO: Should find a way to type assert this error
-		return nil, errors.New(result.GetError())
+		return nil, fmt.Errorf(result.GetError())
 	}
 	return result.GetValue(), nil
 }
@@ -304,7 +305,7 @@ func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error)
 // a deadlock.
 func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
 	if !storageutil.IsValidKey(string(prefix)) {
-		return storage.ErrInvalidPrefix
+		return errors.ErrInvalidPrefix
 	}
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
@@ -332,7 +333,7 @@ func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pref
 		}
 		if result.GetError() != "" {
 			// Should not happen
-			return errors.New(result.GetError())
+			return fmt.Errorf(result.GetError())
 		}
 		if err := fn(result.GetKey(), result.GetValue()[0]); err != nil {
 			return err
@@ -344,7 +345,7 @@ func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pref
 // The returned function can be called to unsubscribe.
 func (p *Storage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	if !storageutil.IsValidKey(string(prefix)) {
-		return func() {}, storage.ErrInvalidPrefix
+		return func() {}, errors.ErrInvalidPrefix
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	p.mu.Lock()
@@ -442,7 +443,7 @@ func (p *Storage) Close() error {
 func (p *Storage) newStorageClient(ctx context.Context) (v1.StorageQueryServiceClient, func(), error) {
 	select {
 	case <-p.closec:
-		return nil, nil, storage.ErrClosed
+		return nil, nil, errors.ErrClosed
 	default:
 	}
 	c, err := p.Options.Dialer.DialNode(ctx, "")

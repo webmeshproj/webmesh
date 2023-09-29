@@ -41,7 +41,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 const LineFeed = '\x00'
@@ -233,7 +233,7 @@ LeaderElect:
 					Rendezvous: electionResult,
 					Method:     v1.Membership_Join_FullMethodName,
 				}, b.close)
-				return false, rt, storage.ErrAlreadyBootstrapped
+				return false, rt, errors.ErrAlreadyBootstrapped
 			}
 		}
 	}

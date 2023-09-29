@@ -22,7 +22,6 @@ package badgerdb
 import (
 	"bytes"
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -41,6 +40,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // BadgerGoRoutines is the maximum number of goroutines to use for BadgerDB.
@@ -147,7 +148,7 @@ func (db *badgerDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	})
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, storage.ErrKeyNotFound
+			return nil, errors.ErrKeyNotFound
 		}
 		return nil, err
 	}
@@ -276,7 +277,7 @@ func (db *badgerDB) Snapshot(ctx context.Context) (io.Reader, error) {
 	snapshot := &v1.RaftSnapshot{}
 	err := db.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
-		opts.Prefix = []byte(storage.RegistryPrefix)
+		opts.Prefix = types.RegistryPrefix
 		it := txn.NewIterator(opts)
 		defer it.Close()
 		for it.Rewind(); it.Valid(); it.Next() {
@@ -366,7 +367,7 @@ func (db *badgerDB) Close() error {
 
 // Raft Log Storage Operations
 
-var RaftLogPrefix = storage.ConsensusPrefix.For([]byte("/log/"))
+var RaftLogPrefix = types.ConsensusPrefix.For([]byte("/log/"))
 
 // FirstIndex returns the first index written. 0 for no entries.
 func (db *badgerDB) FirstIndex() (uint64, error) {
@@ -489,7 +490,7 @@ func (db *badgerDB) DeleteRange(min, max uint64) error {
 
 // Raft Stable Storage Operations
 
-var StableStorePrefix = storage.ConsensusPrefix.For([]byte("/stable/"))
+var StableStorePrefix = types.ConsensusPrefix.For([]byte("/stable/"))
 
 func (db *badgerDB) Set(key []byte, val []byte) error {
 	db.mu.Lock()

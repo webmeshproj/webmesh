@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var canSubscribeAction = rbac.Actions{
@@ -45,7 +45,7 @@ func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.StorageQueryService_
 		// In theory - non-raft members shouldn't even expose the Node service.
 		return status.Error(codes.Unavailable, "current node not available to subscribe")
 	}
-	if !storage.IsReservedPrefix(req.GetPrefix()) {
+	if !types.IsReservedPrefix(req.GetPrefix()) {
 		// Don't allow subscriptions to generic prefixes without permissions
 		allowed, err := s.rbac.Evaluate(srv.Context(), canSubscribeAction.For(string(req.GetPrefix())))
 		if err != nil {

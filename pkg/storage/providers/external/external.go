@@ -21,7 +21,6 @@ package external
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -40,6 +39,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -100,7 +100,7 @@ func (ext *Provider) Start(ctx context.Context) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.conn != nil {
-		return storage.ErrStarted
+		return errors.ErrStarted
 	}
 	var opts []grpc.DialOption
 	if ext.TLSConfig != nil {
@@ -129,12 +129,12 @@ func (ext *Provider) Bootstrap(ctx context.Context) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	_, err := ext.cli.Bootstrap(ctx, &v1.BootstrapRequest{})
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
-			return storage.ErrAlreadyBootstrapped
+			return errors.ErrAlreadyBootstrapped
 		}
 		return fmt.Errorf("bootstrap: %w", err)
 	}
@@ -163,7 +163,7 @@ func (ext *Provider) Status() *v1.StorageStatus {
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return &v1.StorageStatus{
-			Message: storage.ErrClosed.Error(),
+			Message: errors.ErrClosed.Error(),
 		}
 	}
 	status, err := ext.cli.GetStatus(context.Background(), &v1.StorageStatusRequest{})
@@ -180,7 +180,7 @@ func (ext *Provider) Close() error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.conn == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	defer func() {
 		err := ext.conn.Close()
@@ -225,7 +225,7 @@ func (ext *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	resp, err := ext.cli.GetPeers(ctx, &v1.GetPeersRequest{})
 	if err != nil {
@@ -239,7 +239,7 @@ func (ext *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	leader, err := ext.cli.GetLeader(ctx, &v1.GetLeaderRequest{})
 	if err != nil {
@@ -253,12 +253,12 @@ func (ext *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error 
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	_, err := ext.cli.AddVoter(ctx, peer)
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
-			return storage.ErrNotLeader
+			return errors.ErrNotLeader
 		}
 		return fmt.Errorf("add voter: %w", err)
 	}
@@ -270,12 +270,12 @@ func (ext *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) err
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	_, err := ext.cli.AddObserver(ctx, peer)
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
-			return storage.ErrNotLeader
+			return errors.ErrNotLeader
 		}
 		return fmt.Errorf("add observer: %w", err)
 	}
@@ -287,12 +287,12 @@ func (ext *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) err
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	_, err := ext.cli.DemoteVoter(ctx, peer)
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
-			return storage.ErrNotLeader
+			return errors.ErrNotLeader
 		}
 		return fmt.Errorf("demote voter: %w", err)
 	}
@@ -305,12 +305,12 @@ func (ext *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	_, err := ext.cli.RemovePeer(ctx, peer)
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
-			return storage.ErrNotLeader
+			return errors.ErrNotLeader
 		}
 		return fmt.Errorf("remove peer: %w", err)
 	}
@@ -327,15 +327,15 @@ func (ext *ExternalStorage) GetValue(ctx context.Context, key []byte) ([]byte, e
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(key)) {
-		return nil, storage.ErrInvalidKey
+		return nil, errors.ErrInvalidKey
 	}
 	resp, err := ext.cli.GetValue(ctx, &v1.GetValueRequest{Key: key})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			return nil, storage.ErrKeyNotFound
+			return nil, errors.ErrKeyNotFound
 		}
 		return nil, fmt.Errorf("get value: %w", err)
 	}
@@ -347,10 +347,10 @@ func (ext *ExternalStorage) PutValue(ctx context.Context, key, value []byte, ttl
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(key)) {
-		return storage.ErrInvalidKey
+		return errors.ErrInvalidKey
 	}
 	_, err := ext.cli.PutValue(ctx, &v1.PutValueRequest{
 		Value: &v1.StorageValue{
@@ -361,7 +361,7 @@ func (ext *ExternalStorage) PutValue(ctx context.Context, key, value []byte, ttl
 	})
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
-			return storage.ErrNotVoter
+			return errors.ErrNotVoter
 		}
 		return fmt.Errorf("put value: %w", err)
 	}
@@ -373,15 +373,15 @@ func (ext *ExternalStorage) Delete(ctx context.Context, key []byte) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(key)) {
-		return storage.ErrInvalidKey
+		return errors.ErrInvalidKey
 	}
 	_, err := ext.cli.DeleteValue(ctx, &v1.DeleteValueRequest{Key: key})
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
-			return storage.ErrNotVoter
+			return errors.ErrNotVoter
 		}
 		return fmt.Errorf("delete value: %w", err)
 	}
@@ -393,15 +393,15 @@ func (ext *ExternalStorage) ListKeys(ctx context.Context, prefix []byte) ([][]by
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(prefix)) {
-		return nil, storage.ErrInvalidPrefix
+		return nil, errors.ErrInvalidPrefix
 	}
 	resp, err := ext.cli.ListKeys(ctx, &v1.ListKeysRequest{Prefix: prefix})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			return nil, storage.ErrKeyNotFound
+			return nil, errors.ErrKeyNotFound
 		}
 		return nil, fmt.Errorf("list keys: %w", err)
 	}
@@ -415,15 +415,15 @@ func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix []byte, fn st
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(prefix)) {
-		return storage.ErrInvalidPrefix
+		return errors.ErrInvalidPrefix
 	}
 	resp, err := ext.cli.ListValues(ctx, &v1.ListValuesRequest{Prefix: prefix})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			return storage.ErrKeyNotFound
+			return errors.ErrKeyNotFound
 		}
 		return fmt.Errorf("list values: %w", err)
 	}
@@ -441,10 +441,10 @@ func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix []byte, fn sto
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
-		return func() {}, storage.ErrClosed
+		return func() {}, errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(prefix)) {
-		return func() {}, storage.ErrInvalidPrefix
+		return func() {}, errors.ErrInvalidPrefix
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	stream, err := ext.cli.SubscribePrefix(ctx, &v1.SubscribePrefixRequest{Prefix: prefix})

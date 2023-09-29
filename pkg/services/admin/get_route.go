@@ -18,14 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"errors"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, error) {
@@ -34,7 +32,7 @@ func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, erro
 	}
 	rt, err := s.networking.GetRoute(ctx, route.GetName())
 	if err != nil {
-		if errors.Is(err, storage.ErrRouteNotFound) {
+		if errors.IsRouteNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "network route %q not found", route.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())

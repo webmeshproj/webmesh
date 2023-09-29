@@ -18,14 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"errors"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 func (s *Server) GetRole(ctx context.Context, role *v1.Role) (*v1.Role, error) {
@@ -34,7 +32,7 @@ func (s *Server) GetRole(ctx context.Context, role *v1.Role) (*v1.Role, error) {
 	}
 	role, err := s.rbac.GetRole(ctx, role.GetName())
 	if err != nil {
-		if errors.Is(err, storage.ErrRoleNotFound) {
+		if errors.IsRoleNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "role %q not found", role.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())

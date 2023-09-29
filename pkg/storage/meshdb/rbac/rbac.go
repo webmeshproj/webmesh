@@ -26,14 +26,15 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var (
-	rolesPrefix        = storage.RegistryPrefix.ForString("roles")
-	rolebindingsPrefix = storage.RegistryPrefix.ForString("rolebindings")
-	groupsPrefix       = storage.RegistryPrefix.ForString("groups")
-	rbacDisabledKey    = storage.RegistryPrefix.ForString("rbac-disabled")
+	rolesPrefix        = types.RegistryPrefix.ForString("roles")
+	rolebindingsPrefix = types.RegistryPrefix.ForString("rolebindings")
+	groupsPrefix       = types.RegistryPrefix.ForString("groups")
+	rbacDisabledKey    = types.RegistryPrefix.ForString("rbac-disabled")
 )
 
 type RBAC = storage.RBAC
@@ -60,7 +61,7 @@ func (r *rbac) Disable(ctx context.Context) error {
 func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
 	_, err := r.GetValue(ctx, rbacDisabledKey)
 	if err != nil {
-		if storage.IsKeyNotFoundError(err) {
+		if errors.IsKeyNotFound(err) {
 			return false, nil
 		}
 		return false, fmt.Errorf("get rbac disabled: %w", err)
@@ -82,11 +83,11 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 	if storage.IsSystemRole(role.GetName()) {
 		// Allow if the role doesn't exist yet.
 		_, err := r.GetRole(ctx, role.GetName())
-		if err != nil && err != storage.ErrRoleNotFound {
+		if err != nil && !errors.IsRoleNotFound(err) {
 			return err
 		}
 		if err == nil {
-			return fmt.Errorf("%w %q", storage.ErrIsSystemRole, role.GetName())
+			return fmt.Errorf("%w %q", errors.ErrIsSystemRole, role.GetName())
 		}
 	}
 	if role.GetName() == "" {
@@ -112,8 +113,8 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 	key := rolesPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
-		if storage.IsKeyNotFoundError(err) {
-			return nil, storage.ErrRoleNotFound
+		if errors.IsKeyNotFound(err) {
+			return nil, errors.ErrRoleNotFound
 		}
 		return nil, fmt.Errorf("get role: %w", err)
 	}
@@ -128,7 +129,7 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 // DeleteRole deletes a role by name.
 func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 	if storage.IsSystemRole(name) {
-		return fmt.Errorf("%w %q", storage.ErrIsSystemRole, name)
+		return fmt.Errorf("%w %q", errors.ErrIsSystemRole, name)
 	}
 	key := rolesPrefix.ForString(name)
 	err := r.Delete(ctx, key)
@@ -161,11 +162,11 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 	if storage.IsSystemRoleBinding(rolebinding.GetName()) {
 		// Allow if the rolebinding doesn't exist yet.
 		_, err := r.GetRoleBinding(ctx, rolebinding.GetName())
-		if err != nil && err != storage.ErrRoleBindingNotFound {
+		if err != nil && !errors.IsRoleBindingNotFound(err) {
 			return err
 		}
 		if err == nil {
-			return fmt.Errorf("%w %q", storage.ErrIsSystemRoleBinding, rolebinding.GetName())
+			return fmt.Errorf("%w %q", errors.ErrIsSystemRoleBinding, rolebinding.GetName())
 		}
 	}
 	if rolebinding.GetName() == "" {
@@ -194,8 +195,8 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding
 	key := rolebindingsPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
-		if storage.IsKeyNotFoundError(err) {
-			return nil, storage.ErrRoleBindingNotFound
+		if errors.IsKeyNotFound(err) {
+			return nil, errors.ErrRoleBindingNotFound
 		}
 		return nil, fmt.Errorf("get rolebinding: %w", err)
 	}
@@ -210,7 +211,7 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding
 // DeleteRoleBinding deletes a rolebinding by name.
 func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 	if storage.IsSystemRoleBinding(name) {
-		return fmt.Errorf("%w %q", storage.ErrIsSystemRoleBinding, name)
+		return fmt.Errorf("%w %q", errors.ErrIsSystemRoleBinding, name)
 	}
 	key := rolebindingsPrefix.ForString(name)
 	err := r.Delete(ctx, key)
@@ -263,8 +264,8 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 	key := groupsPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
-		if storage.IsKeyNotFoundError(err) {
-			return nil, storage.ErrGroupNotFound
+		if errors.IsKeyNotFound(err) {
+			return nil, errors.ErrGroupNotFound
 		}
 		return nil, fmt.Errorf("get group: %w", err)
 	}
@@ -279,7 +280,7 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 // DeleteGroup deletes a group by name.
 func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 	if storage.IsSystemGroup(name) {
-		return fmt.Errorf("%w %q", storage.ErrIsSystemGroup, name)
+		return fmt.Errorf("%w %q", errors.ErrIsSystemGroup, name)
 	}
 	key := groupsPrefix.ForString(name)
 	err := r.Delete(ctx, key)

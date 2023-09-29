@@ -19,13 +19,13 @@ package rbac
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 const admin = "admin"
@@ -139,7 +139,7 @@ func TestPutRole(t *testing.T) {
 			name:    "modify system role",
 			role:    &v1.Role{Name: string(storage.MeshAdminRole)},
 			ok:      false,
-			wantErr: storage.ErrIsSystemRole,
+			wantErr: errors.ErrIsSystemRole,
 		},
 		{
 			name: "no role name",
@@ -228,7 +228,7 @@ func TestGetRole(t *testing.T) {
 			name:    "non existing role",
 			role:    "foo",
 			ok:      false,
-			wantErr: storage.ErrRoleNotFound,
+			wantErr: errors.ErrRoleNotFound,
 		},
 	}
 
@@ -265,7 +265,7 @@ func TestDeleteRole(t *testing.T) {
 			name:    "delete system role",
 			role:    string(storage.MeshAdminRole),
 			ok:      false,
-			wantErr: storage.ErrIsSystemRole,
+			wantErr: errors.ErrIsSystemRole,
 		},
 		{
 			name: "delete any other role",
@@ -321,7 +321,7 @@ func TestPutRoleBinding(t *testing.T) {
 			name:    "modify system rolebinding",
 			rb:      &v1.RoleBinding{Name: string(storage.MeshAdminRoleBinding)},
 			ok:      false,
-			wantErr: storage.ErrIsSystemRoleBinding,
+			wantErr: errors.ErrIsSystemRoleBinding,
 		},
 		{
 			name: "no rolebinding name",
@@ -435,7 +435,7 @@ func TestGetRoleBinding(t *testing.T) {
 			name:    "non existing rolebinding",
 			rb:      "foo",
 			ok:      false,
-			wantErr: storage.ErrRoleBindingNotFound,
+			wantErr: errors.ErrRoleBindingNotFound,
 		},
 	}
 
@@ -472,7 +472,7 @@ func TestDeleteRoleBinding(t *testing.T) {
 			name:    "delete system rolebinding",
 			rb:      string(storage.MeshAdminRole),
 			ok:      false,
-			wantErr: storage.ErrIsSystemRoleBinding,
+			wantErr: errors.ErrIsSystemRoleBinding,
 		},
 		{
 			name: "delete any other rolebinding",
@@ -616,7 +616,7 @@ func TestGetGroup(t *testing.T) {
 			name:    "non existing rolebinding",
 			group:   "foo",
 			ok:      false,
-			wantErr: storage.ErrGroupNotFound,
+			wantErr: errors.ErrGroupNotFound,
 		},
 	}
 
@@ -653,7 +653,7 @@ func TestDeleteGroup(t *testing.T) {
 			name:    "delete system group",
 			group:   string(storage.VotersGroup),
 			ok:      false,
-			wantErr: storage.ErrIsSystemGroup,
+			wantErr: errors.ErrIsSystemGroup,
 		},
 		{
 			name:  "delete any other group",

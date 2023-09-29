@@ -31,6 +31,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 // TestDualStorageConformance tests that the DualStorage interface is implemented correctly.
@@ -434,7 +435,7 @@ func TestConsensusStorageConformance(ctx context.Context, t *testing.T, raftStor
 			// Make sure they are indeed gone
 			for key := range snapshotKV {
 				_, err := meshStorage.GetValue(ctx, []byte(key))
-				if !storage.IsKeyNotFoundError(err) {
+				if !errors.IsKeyNotFound(err) {
 					t.Errorf("expected ErrKeyNotFound, got %v", err)
 				}
 			}
@@ -455,7 +456,7 @@ func TestConsensusStorageConformance(ctx context.Context, t *testing.T, raftStor
 			// Make sure the keys we don't want to see are still gone
 			for key := range restoreKV {
 				_, err := meshStorage.GetValue(ctx, []byte(key))
-				if !storage.IsKeyNotFoundError(err) {
+				if !errors.IsKeyNotFound(err) {
 					t.Errorf("expected ErrKeyNotFound, got %v", err)
 				}
 			}
@@ -474,7 +475,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 	t.Run("GetValue", func(t *testing.T) {
 		// Try to get a non-existent key and ensure it returns ErrKeyNotFound.
 		_, err := meshStorage.GetValue(ctx, []byte("non-existent-key"))
-		if !storage.IsKeyNotFoundError(err) {
+		if !errors.IsKeyNotFound(err) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 		// Put a key and make sure it survives a round trip.
@@ -523,7 +524,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 		}
 		// Try to get a non-existent key and ensure it returns ErrKeyNotFound.
 		_, err := meshStorage.GetValue(ctx, key)
-		if !storage.IsKeyNotFoundError(err) {
+		if !errors.IsKeyNotFound(err) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 		// Put a key and make sure it survives a round trip, and then delete it.
@@ -535,7 +536,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 			t.Fatalf("failed to delete key: %v", err)
 		}
 		_, err = meshStorage.GetValue(ctx, key)
-		if !storage.IsKeyNotFoundError(err) {
+		if !errors.IsKeyNotFound(err) {
 			t.Errorf("expected ErrKeyNotFound, got %v", err)
 		}
 		// Cleanup should not error

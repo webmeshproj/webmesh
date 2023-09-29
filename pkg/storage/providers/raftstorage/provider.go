@@ -19,7 +19,6 @@ package raftstorage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -36,6 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage/fsm"
 )
 
@@ -140,7 +140,7 @@ func (r *Provider) Start(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.started.Load() {
-		return storage.ErrStarted
+		return errors.ErrStarted
 	}
 	r.log.Debug("Starting raft storage provider")
 	storage, err := r.createStorage()
@@ -260,7 +260,7 @@ func (r *Provider) Bootstrap(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	port := r.Options.Transport.AddrPort().Port()
 	cfg := raft.Configuration{
@@ -276,7 +276,7 @@ func (r *Provider) Bootstrap(ctx context.Context) error {
 	err := f.Error()
 	if err != nil {
 		if err == raft.ErrCantBootstrap {
-			return storage.ErrAlreadyBootstrapped
+			return errors.ErrAlreadyBootstrapped
 		}
 		return fmt.Errorf("bootstrap cluster: %w", err)
 	}
@@ -352,10 +352,10 @@ func (r *Provider) ApplyRaftLog(ctx context.Context, log *v1.RaftLogEntry) (*v1.
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	if !r.Consensus().IsLeader() {
-		return nil, storage.ErrNotLeader
+		return nil, errors.ErrNotLeader
 	}
 	var timeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {

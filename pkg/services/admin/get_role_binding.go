@@ -18,14 +18,12 @@ limitations under the License.
 package admin
 
 import (
-	"errors"
-
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 func (s *Server) GetRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*v1.RoleBinding, error) {
@@ -34,7 +32,7 @@ func (s *Server) GetRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*v1.Ro
 	}
 	rb, err := s.rbac.GetRoleBinding(ctx, rb.GetName())
 	if err != nil {
-		if errors.Is(err, storage.ErrRoleBindingNotFound) {
+		if errors.IsRoleBindingNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "rolebinding %q not found", rb.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())

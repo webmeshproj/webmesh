@@ -19,12 +19,12 @@ package testutil
 import (
 	"bytes"
 	"context"
-	"errors"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 // TestSingleNodeProviderConformance is a helper for testing a single node provider.
@@ -35,8 +35,8 @@ func TestSingleNodeProviderConformance(ctx context.Context, t *testing.T, provid
 		MustBootstrapProvider(ctx, t, provider)
 		// Bootstrapping again should return the proper error.
 		err := provider.Bootstrap(ctx)
-		if !errors.Is(err, storage.ErrAlreadyBootstrapped) {
-			t.Fatalf("Expected error %v, got %v", storage.ErrAlreadyBootstrapped, err)
+		if !errors.IsAlreadyBootstrapped(err) {
+			t.Fatalf("Expected error %v, got %v", errors.ErrAlreadyBootstrapped, err)
 		}
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
@@ -51,8 +51,8 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 		MustStartProvider(ctx, t, provider)
 		MustBootstrapProvider(ctx, t, provider)
 		err := provider.Bootstrap(ctx)
-		if !errors.Is(err, storage.ErrAlreadyBootstrapped) {
-			t.Fatalf("Expected error %v, got %v", storage.ErrAlreadyBootstrapped, err)
+		if !errors.IsAlreadyBootstrapped(err) {
+			t.Fatalf("Expected error %v, got %v", errors.ErrAlreadyBootstrapped, err)
 		}
 		TestMeshStorageConformance(ctx, t, provider.MeshStorage())
 	})
@@ -81,8 +81,8 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 				t.Fatal("Provider 1 is not the leader")
 			}
 			err := provider1.Bootstrap(ctx)
-			if !errors.Is(err, storage.ErrAlreadyBootstrapped) {
-				t.Fatalf("Expected error %v, got %v", storage.ErrAlreadyBootstrapped, err)
+			if !errors.IsAlreadyBootstrapped(err) {
+				t.Fatalf("Expected error %v, got %v", errors.ErrAlreadyBootstrapped, err)
 			}
 			provider2, provider3 := providers["provider2"], providers["provider3"]
 			MustStartProvider(ctx, t, provider2)
@@ -106,8 +106,8 @@ func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProvid
 			for _, provider := range []storage.Provider{provider2, provider3} {
 				p := provider
 				err := p.Bootstrap(ctx)
-				if !errors.Is(err, storage.ErrAlreadyBootstrapped) {
-					t.Fatalf("Expected error %v, got %v", storage.ErrAlreadyBootstrapped, err)
+				if !errors.IsAlreadyBootstrapped(err) {
+					t.Fatalf("Expected error %v, got %v", errors.ErrAlreadyBootstrapped, err)
 				}
 			}
 			// We should be able to write keys to a leader and have them propagate to the followers.

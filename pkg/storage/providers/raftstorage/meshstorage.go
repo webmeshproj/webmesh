@@ -17,7 +17,6 @@ limitations under the License.
 package raftstorage
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync/atomic"
@@ -29,6 +28,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -45,7 +45,7 @@ type RaftStorage struct {
 // Close closes the storage.
 func (rs *RaftStorage) Close() error {
 	if !rs.raft.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	return rs.storage.Close()
 }
@@ -53,10 +53,10 @@ func (rs *RaftStorage) Close() error {
 // GetValue gets the value of a key.
 func (rs *RaftStorage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	if !rs.raft.started.Load() {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(key)) {
-		return nil, storage.ErrInvalidKey
+		return nil, errors.ErrInvalidKey
 	}
 	return rs.storage.GetValue(ctx, key)
 }
@@ -64,10 +64,10 @@ func (rs *RaftStorage) GetValue(ctx context.Context, key []byte) ([]byte, error)
 // ListKeys returns a list of keys.
 func (rs *RaftStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
 	if !rs.raft.started.Load() {
-		return nil, storage.ErrClosed
+		return nil, errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(prefix)) {
-		return nil, storage.ErrInvalidPrefix
+		return nil, errors.ErrInvalidPrefix
 	}
 	return rs.storage.ListKeys(ctx, prefix)
 }
@@ -75,10 +75,10 @@ func (rs *RaftStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, e
 // IterPrefix iterates over all keys with a given prefix.
 func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
 	if !rs.raft.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(prefix)) {
-		return storage.ErrInvalidPrefix
+		return errors.ErrInvalidPrefix
 	}
 	return rs.storage.IterPrefix(ctx, prefix, fn)
 }
@@ -86,10 +86,10 @@ func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage
 // Subscribe subscribes to changes to a prefix.
 func (rs *RaftStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
 	if !rs.raft.started.Load() {
-		return func() {}, storage.ErrClosed
+		return func() {}, errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(prefix)) {
-		return func() {}, storage.ErrInvalidPrefix
+		return func() {}, errors.ErrInvalidPrefix
 	}
 	return rs.storage.Subscribe(ctx, prefix, fn)
 }
@@ -97,13 +97,13 @@ func (rs *RaftStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.
 // Put sets the value of a key.
 func (rs *RaftStorage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
 	if !rs.raft.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(key)) {
-		return storage.ErrInvalidKey
+		return errors.ErrInvalidKey
 	}
 	if !rs.raft.isVoter() {
-		return storage.ErrNotVoter
+		return errors.ErrNotVoter
 	}
 	logEntry := v1.RaftLogEntry{
 		Type:  v1.RaftCommandType_PUT,
@@ -122,13 +122,13 @@ func (rs *RaftStorage) PutValue(ctx context.Context, key, value []byte, ttl time
 // Delete removes a key.
 func (rs *RaftStorage) Delete(ctx context.Context, key []byte) error {
 	if !rs.raft.started.Load() {
-		return storage.ErrClosed
+		return errors.ErrClosed
 	}
 	if !storageutil.IsValidKey(string(key)) {
-		return storage.ErrInvalidKey
+		return errors.ErrInvalidKey
 	}
 	if !rs.raft.isVoter() {
-		return storage.ErrNotVoter
+		return errors.ErrNotVoter
 	}
 	logEntry := v1.RaftLogEntry{
 		Type: v1.RaftCommandType_DELETE,
@@ -175,7 +175,7 @@ func (rs *RaftStorage) applyLog(ctx context.Context, logEntry *v1.RaftLogEntry) 
 	res, err := rs.raft.ApplyRaftLog(ctx, logEntry)
 	if err != nil {
 		if errors.Is(err, raft.ErrNotLeader) {
-			return storage.ErrNotLeader
+			return errors.ErrNotLeader
 		}
 		return fmt.Errorf("apply log entry: %w", err)
 	}

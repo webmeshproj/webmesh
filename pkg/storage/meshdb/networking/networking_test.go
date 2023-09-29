@@ -18,14 +18,13 @@ package networking
 
 import (
 	"context"
-	"errors"
 	"net/netip"
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -231,8 +230,8 @@ func TestNetworkACLs(t *testing.T) {
 					if err == nil {
 						t.Fatalf("expected error, got nil")
 					}
-					if !errors.Is(err, storage.ErrInvalidACL) {
-						t.Errorf("expected %v, got %v", storage.ErrInvalidACL, err)
+					if !errors.IsInvalidACL(err) {
+						t.Errorf("expected %v, got %v", errors.ErrInvalidACL, err)
 					}
 				})
 			}
@@ -268,8 +267,8 @@ func TestNetworkACLs(t *testing.T) {
 		_, err = nw.GetNetworkACL(context.Background(), acl.GetName())
 		if err == nil {
 			t.Fatalf("expected error, got nil")
-		} else if !errors.Is(err, storage.ErrACLNotFound) {
-			t.Fatalf("expected %v, got %v", storage.ErrACLNotFound, err)
+		} else if !errors.IsACLNotFound(err) {
+			t.Fatalf("expected %v, got %v", errors.ErrACLNotFound, err)
 		}
 		// Further calls to delete should not error
 		err = nw.DeleteNetworkACL(context.Background(), acl.GetName())
@@ -514,8 +513,8 @@ func TestNetworkRoutes(t *testing.T) {
 					if err == nil {
 						t.Fatalf("expected error, got nil")
 					}
-					if !errors.Is(err, storage.ErrInvalidRoute) {
-						t.Errorf("expected %v, got %v", storage.ErrInvalidRoute, err)
+					if !errors.IsInvalidRoute(err) {
+						t.Errorf("expected %v, got %v", errors.ErrInvalidRoute, err)
 					}
 				})
 			}
@@ -651,8 +650,8 @@ func TestNetworkRoutes(t *testing.T) {
 		_, err = nw.GetRoute(context.Background(), route.GetName())
 		if err == nil {
 			t.Fatalf("expected error, got nil")
-		} else if !errors.Is(err, storage.ErrRouteNotFound) {
-			t.Fatalf("expected %v, got %v", storage.ErrRouteNotFound, err)
+		} else if !errors.IsRouteNotFound(err) {
+			t.Fatalf("expected %v, got %v", errors.ErrRouteNotFound, err)
 		}
 		// Further delete calls should not error
 		err = nw.DeleteRoute(context.Background(), route.GetName())

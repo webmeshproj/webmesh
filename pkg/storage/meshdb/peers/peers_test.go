@@ -18,14 +18,13 @@ package peers
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -106,7 +105,7 @@ func TestPeers(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			if !errors.Is(err, storage.ErrNodeNotFound) {
+			if !errors.IsNodeNotFound(err) {
 				t.Fatal("expected node not found error")
 			}
 		})
@@ -224,7 +223,7 @@ func TestPeers(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error")
 		}
-		if !errors.Is(err, storage.ErrNodeNotFound) {
+		if !errors.IsNodeNotFound(err) {
 			t.Fatal("expected node not found error")
 		}
 		// Further calls to delete should not fail.

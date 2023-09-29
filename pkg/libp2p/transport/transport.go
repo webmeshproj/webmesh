@@ -18,7 +18,6 @@ limitations under the License.
 package transport
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -48,7 +47,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
@@ -452,7 +451,7 @@ func (t *WebmeshTransport) Close() error {
 	}
 	err := t.node.Close(ctx)
 	if err != nil {
-		if errors.Is(err, storage.ErrNoLeader) {
+		if errors.IsNoLeader(err) {
 			// This error could possibly mean we were a single node cluster.
 			// Silently ignore it.
 			t.log.Debug("failed to close node", "error", err.Error())
