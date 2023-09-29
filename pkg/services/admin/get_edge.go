@@ -25,7 +25,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, error) {
@@ -35,9 +36,9 @@ func (s *Server) GetEdge(ctx context.Context, edge *v1.MeshEdge) (*v1.MeshEdge, 
 	if edge.GetTarget() == "" {
 		return nil, status.Error(codes.InvalidArgument, "edge target is required")
 	}
-	graphEdge, err := s.peers.Graph().Edge(graph.NodeID(edge.GetSource()), graph.NodeID(edge.GetTarget()))
+	graphEdge, err := s.peers.Graph().Edge(types.NodeID(edge.GetSource()), types.NodeID(edge.GetTarget()))
 	if err != nil {
-		if errors.Is(err, graph.ErrEdgeNotFound) {
+		if errors.Is(err, storage.ErrEdgeNotFound) {
 			return nil, status.Errorf(codes.NotFound, "edge %q to %q not found", edge.GetSource(), edge.GetTarget())
 		}
 		return nil, status.Error(codes.Internal, err.Error())

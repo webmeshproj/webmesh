@@ -23,7 +23,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 func TestPutEdge(t *testing.T) {

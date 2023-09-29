@@ -17,6 +17,7 @@ limitations under the License.
 package membership
 
 import (
+	"errors"
 	"log/slog"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -24,8 +25,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResponse, error) {
@@ -63,7 +65,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	// Lookup the peer first to make sure they exist
 	leaving, err := peers.New(s.storage.MeshStorage()).Get(ctx, req.GetId())
 	if err != nil {
-		if err == peers.ErrNodeNotFound {
+		if errors.Is(err, storage.ErrNodeNotFound) {
 			// We're done here if they don't exist
 			return &v1.LeaveResponse{}, nil
 		}

@@ -24,7 +24,7 @@ import (
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 

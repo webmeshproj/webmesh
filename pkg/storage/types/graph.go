@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,21 +14,53 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package graph
+package types
 
 import (
-	"errors"
-	"fmt"
 	"reflect"
 
 	"github.com/dominikbraun/graph"
-	"github.com/google/go-cmp/cmp"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// ErrEdgeNotFound is returned when an edge is not found.
-var ErrEdgeNotFound = graph.ErrEdgeNotFound
+// PeerGraph is the graph.Graph implementation for the mesh network.
+type PeerGraph graph.Graph[NodeID, MeshNode]
+
+// PeerGraphStore is the graph.Store implementation for the mesh network.
+type PeerGraphStore graph.Store[NodeID, MeshNode]
+
+// AdjacencyMap is a map of node names to a map of node names to edges.
+type AdjacencyMap map[NodeID]EdgeMap
+
+// DeepEqual returns true if the given AdjacencyMap is equal to this AdjacencyMap.
+func (a AdjacencyMap) DeepEqual(b AdjacencyMap) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if !v.DeepEqual(b[k]) {
+			return false
+		}
+	}
+	return true
+}
+
+// EdgeMap is a map of node names to edges.
+type EdgeMap map[NodeID]Edge
+
+// DeepEqual returns true if the given EdgeMap is equal to this EdgeMap.
+func (e EdgeMap) DeepEqual(other EdgeMap) bool {
+	if len(e) != len(other) {
+		return false
+	}
+	for k, v := range e {
+		if !v.DeepEqual(other[k]) {
+			return false
+		}
+	}
+	return true
+}
 
 // Edge is the graph.Edge implementation for the mesh network.
 type Edge graph.Edge[NodeID]
@@ -89,36 +121,6 @@ func (e MeshEdge) ToEdge() Edge {
 		Target:     e.TargetID(),
 		Properties: e.EdgeProperties(),
 	}
-}
-
-// PutInto puts the MeshEdge into the given graph.
-func (e MeshEdge) PutInto(g Graph) error {
-	opts := []func(*graph.EdgeProperties){graph.EdgeWeight(int(e.Weight))}
-	if len(e.Attributes) > 0 {
-		for k, v := range e.Attributes {
-			opts = append(opts, graph.EdgeAttribute(k, v))
-		}
-	}
-	// Save the raft log some trouble by checking if the edge already exists.
-	graphEdge, err := g.Edge(e.SourceID(), e.TargetID())
-	if err == nil {
-		// Check if the weight or attributes changed
-		if !cmp.Equal(graphEdge.Properties.Attributes, e.Attributes) {
-			return g.UpdateEdge(e.SourceID(), e.TargetID(), opts...)
-		}
-		if graphEdge.Properties.Weight != int(e.Weight) {
-			return g.UpdateEdge(e.SourceID(), e.TargetID(), opts...)
-		}
-		return nil
-	}
-	if !errors.Is(err, ErrEdgeNotFound) {
-		return fmt.Errorf("get edge: %w", err)
-	}
-	err = g.AddEdge(e.SourceID(), e.TargetID(), opts...)
-	if err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {
-		return fmt.Errorf("add edge: %w", err)
-	}
-	return nil
 }
 
 // MarshalJSON marshals a MeshEdge to JSON.

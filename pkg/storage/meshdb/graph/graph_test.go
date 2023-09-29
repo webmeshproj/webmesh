@@ -25,6 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestGraphStore(t *testing.T) {
@@ -40,24 +41,24 @@ func TestGraphStore(t *testing.T) {
 		t.Run("InvalidVertex", func(t *testing.T) {
 			tc := []struct {
 				name string
-				node MeshNode
+				node types.MeshNode
 			}{
 				{
 					name: "no node ID",
-					node: MeshNode{&v1.MeshNode{
+					node: types.MeshNode{MeshNode: &v1.MeshNode{
 						PublicKey: mustGeneratePublicKey(t),
 					}},
 				},
 				{
 					name: "invalid node ID",
-					node: MeshNode{&v1.MeshNode{
+					node: types.MeshNode{MeshNode: &v1.MeshNode{
 						Id:        "invalid/node-id",
 						PublicKey: mustGeneratePublicKey(t),
 					}},
 				},
 				{
 					name: "invalid public key",
-					node: MeshNode{&v1.MeshNode{
+					node: types.MeshNode{MeshNode: &v1.MeshNode{
 						Id:        "node-id",
 						PublicKey: "invalid",
 					}},
@@ -76,25 +77,25 @@ func TestGraphStore(t *testing.T) {
 		t.Run("ValidVertex", func(t *testing.T) {
 			tc := []struct {
 				name string
-				node MeshNode
+				node types.MeshNode
 			}{
 				{
 					name: "node-a",
-					node: MeshNode{&v1.MeshNode{
+					node: types.MeshNode{MeshNode: &v1.MeshNode{
 						Id:        "node-a",
 						PublicKey: mustGeneratePublicKey(t),
 					}},
 				},
 				{
 					name: "node-b",
-					node: MeshNode{&v1.MeshNode{
+					node: types.MeshNode{MeshNode: &v1.MeshNode{
 						Id:        "node-b",
 						PublicKey: mustGeneratePublicKey(t),
 					}},
 				},
 				{
 					name: "node-c",
-					node: MeshNode{&v1.MeshNode{
+					node: types.MeshNode{MeshNode: &v1.MeshNode{
 						Id:        "node-c",
 						PublicKey: mustGeneratePublicKey(t),
 					}},
@@ -142,7 +143,7 @@ func TestGraphStore(t *testing.T) {
 		})
 
 		t.Run("ListVerticies", func(t *testing.T) {
-			nodes := []MeshNode{
+			nodes := []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
 						Id:        "node-a",
@@ -192,7 +193,7 @@ func TestGraphStore(t *testing.T) {
 		})
 
 		t.Run("RemoveNonExistingVertex", func(t *testing.T) {
-			err := store.RemoveVertex(NodeID("non-existing"))
+			err := store.RemoveVertex(types.NodeID("non-existing"))
 			if err == nil {
 				t.Errorf("RemoveVertex did not fail")
 			}
@@ -202,7 +203,7 @@ func TestGraphStore(t *testing.T) {
 		})
 
 		t.Run("VertexWithEdges", func(t *testing.T) {
-			nodes := []MeshNode{
+			nodes := []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
 						Id:        "node-a",
@@ -221,12 +222,12 @@ func TestGraphStore(t *testing.T) {
 					t.Fatalf("AddVertex failed: %v", err)
 				}
 			}
-			if err := store.AddEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[NodeID]{}); err != nil {
+			if err := store.AddEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[types.NodeID]{}); err != nil {
 				t.Fatalf("AddEdge failed: %v", err)
 			}
 			// We should not be able to delete either node
 			for _, node := range []string{"node-a", "node-b"} {
-				err := store.RemoveVertex(NodeID(node))
+				err := store.RemoveVertex(types.NodeID(node))
 				if err == nil {
 					t.Errorf("RemoveVertex did not fail")
 				}
@@ -240,11 +241,11 @@ func TestGraphStore(t *testing.T) {
 			}
 			// We should now be able to delete both nodes
 			for _, node := range []string{"node-a", "node-b"} {
-				if err := store.RemoveVertex(NodeID(node)); err != nil {
+				if err := store.RemoveVertex(types.NodeID(node)); err != nil {
 					t.Errorf("RemoveVertex failed: %v", err)
 				}
 				// The node should actually be gone
-				_, _, err := store.Vertex(NodeID(node))
+				_, _, err := store.Vertex(types.NodeID(node))
 				if err == nil {
 					t.Errorf("Vertex did not fail")
 				}
@@ -256,7 +257,7 @@ func TestGraphStore(t *testing.T) {
 	})
 
 	t.Run("AddAndRemoveEdges", func(t *testing.T) {
-		nodes := []MeshNode{
+		nodes := []types.MeshNode{
 			{
 				MeshNode: &v1.MeshNode{
 					Id:        "node-a",
@@ -277,7 +278,7 @@ func TestGraphStore(t *testing.T) {
 		}
 
 		// Try to place an edge betwen two non-existing nodes
-		err := store.AddEdge(NodeID("non-existing-a"), NodeID("non-existing-b"), graph.Edge[NodeID]{})
+		err := store.AddEdge(types.NodeID("non-existing-a"), types.NodeID("non-existing-b"), graph.Edge[types.NodeID]{})
 		if err == nil {
 			t.Errorf("AddEdge did not fail")
 		}
@@ -285,7 +286,7 @@ func TestGraphStore(t *testing.T) {
 			t.Errorf("Expected ErrVertexNotFound, got %v", err)
 		}
 		// Try to update a non-existing edge
-		err = store.UpdateEdge(NodeID("non-existing-a"), NodeID("non-existing-b"), graph.Edge[NodeID]{})
+		err = store.UpdateEdge(types.NodeID("non-existing-a"), types.NodeID("non-existing-b"), graph.Edge[types.NodeID]{})
 		if err == nil {
 			t.Errorf("UpdateEdge did not fail")
 		}
@@ -294,7 +295,7 @@ func TestGraphStore(t *testing.T) {
 		}
 
 		// Place an empty edge between the two nodes
-		if err := store.AddEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[NodeID]{}); err != nil {
+		if err := store.AddEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[types.NodeID]{}); err != nil {
 			t.Fatalf("AddEdge failed: %v", err)
 		}
 		// We should be able to retrieve the edge
@@ -326,7 +327,7 @@ func TestGraphStore(t *testing.T) {
 		}
 
 		// We should not be able to call AddEdge again
-		err = store.AddEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[NodeID]{})
+		err = store.AddEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[types.NodeID]{})
 		if err == nil {
 			t.Errorf("AddEdge did not fail")
 		}
@@ -335,7 +336,7 @@ func TestGraphStore(t *testing.T) {
 		}
 
 		// We _should_ be able to update the edge with a new weight and properties
-		if err := store.UpdateEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[NodeID]{
+		if err := store.UpdateEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[types.NodeID]{
 			Properties: graph.EdgeProperties{
 				Weight:     1,
 				Attributes: map[string]string{"foo": "bar"},

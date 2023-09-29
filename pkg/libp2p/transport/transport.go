@@ -46,11 +46,12 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/logging"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // TransportBuilder is the signature of a function that builds a webmesh transport.
@@ -576,7 +577,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	t.log.Debug("Subscribing to peer updates")
 	_, err = node.Storage().MeshStorage().Subscribe(context.Background(), graph.NodesPrefix, func(key []byte, value []byte) {
 		log := context.LoggerFrom(ctx)
-		peer := graph.MeshNode{MeshNode: &v1.MeshNode{}}
+		peer := types.MeshNode{MeshNode: &v1.MeshNode{}}
 		err = protojson.Unmarshal([]byte(value), peer.MeshNode)
 		if err != nil {
 			log.Error("Failed to unmarshal peer", "error", err.Error())
@@ -700,7 +701,7 @@ func (t *WebmeshTransport) multiaddrsForLocalListenAddr(listenAddr net.Addr) ([]
 	return addrs, nil
 }
 
-func (t *WebmeshTransport) registerNode(ctx context.Context, node graph.MeshNode) error {
+func (t *WebmeshTransport) registerNode(ctx context.Context, node types.MeshNode) error {
 	ps := t.host.Peerstore()
 	pubkey, err := wmcrypto.DecodePublicKey(node.GetPublicKey())
 	if err != nil {
@@ -725,7 +726,7 @@ func (t *WebmeshTransport) registerNode(ctx context.Context, node graph.MeshNode
 	return nil
 }
 
-func peerToIPMultiaddrs(peer graph.MeshNode, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+func peerToIPMultiaddrs(peer types.MeshNode, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	var peerv4addr, peerv6addr netip.Prefix
 	var err error
 	if peer.PrivateIpv4 != "" {

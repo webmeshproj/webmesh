@@ -22,28 +22,11 @@ import (
 	"database/sql"
 	"net/netip"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
-// State is the interface for querying mesh state.
-type State interface {
-	// GetIPv6Prefix returns the IPv6 prefix.
-	GetIPv6Prefix(ctx context.Context) (netip.Prefix, error)
-	// GetIPv4Prefix returns the IPv4 prefix.
-	GetIPv4Prefix(ctx context.Context) (netip.Prefix, error)
-	// GetMeshDomain returns the mesh domain.
-	GetMeshDomain(ctx context.Context) (string, error)
-	// ListPublicRPCAddresses returns all public gRPC addresses in the mesh.
-	// The map key is the node ID.
-	ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error)
-	// ListPeerPublicRPCAddresses returns all public gRPC addresses in the mesh excluding a node.
-	// The map key is the node ID.
-	ListPeerPublicRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error)
-	// ListPeerPrivateRPCAddresses returns all private gRPC addresses in the mesh excluding a node.
-	// The map key is the node ID.
-	ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error)
-}
+type State = storage.MeshState
 
 // ErrNodeNotFound is returned when a node is not found.
 var ErrNodeNotFound = sql.ErrNoRows

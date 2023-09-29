@@ -24,9 +24,9 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/exp/slices"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func TestWireGuardPeersWithACLs(t *testing.T) {

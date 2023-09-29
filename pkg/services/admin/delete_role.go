@@ -24,8 +24,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 var deleteRoleAction = rbac.Actions{

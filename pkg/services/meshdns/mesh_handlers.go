@@ -17,6 +17,7 @@ limitations under the License.
 package meshdns
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -26,7 +27,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -77,7 +77,7 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 		nodeID := strings.Split(r.Question[0].Name, ".")[0]
 		err := s.appendPeerToMessage(ctx, mesh, r, m, nodeID, s.ipv6Only)
 		if err != nil {
-			if err == peers.ErrNodeNotFound {
+			if errors.Is(err, storage.ErrNodeNotFound) {
 				// Try the next mesh
 				continue
 			}

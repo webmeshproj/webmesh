@@ -22,9 +22,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 func (s *meshStore) onDBUpdate(key, value []byte) {

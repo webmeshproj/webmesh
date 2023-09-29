@@ -28,10 +28,10 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // ValidateACL validates a NetworkACL.
@@ -247,7 +247,7 @@ func (a *ACL) Expand(ctx context.Context) error {
 }
 
 // AllowNodesToCommunicate checks if the given nodes are allowed to communicate.
-func (a ACLs) AllowNodesToCommunicate(ctx context.Context, nodeA, nodeB peergraph.MeshNode) bool {
+func (a ACLs) AllowNodesToCommunicate(ctx context.Context, nodeA, nodeB types.MeshNode) bool {
 	v4action := Action{
 		NetworkAction: &v1.NetworkAction{
 			SrcNode: nodeA.Id,

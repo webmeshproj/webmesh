@@ -29,10 +29,10 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	dnsutil "github.com/webmeshproj/webmesh/pkg/meshnet/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 // DefaultAdvertisePort is the default port to advertise for Mesh DNS.
@@ -204,7 +204,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 			s.meshforwarders = newForwarders
 		})
 		if err != nil {
-			return fmt.Errorf("failed to subscribe to meshdb: %w", err)
+			return fmt.Errorf("failed to subscribe to storage/meshdb: %w", err)
 		}
 		s.subCancels = append(s.subCancels, cancel)
 	}

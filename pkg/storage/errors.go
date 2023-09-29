@@ -19,10 +19,14 @@ package storage
 import (
 	"errors"
 	"fmt"
+
+	"github.com/dominikbraun/graph"
 )
 
 // Common errors for storage providers to use.
 var (
+	// ErrNodeNotFound is returned when a node is not found.
+	ErrNodeNotFound = errors.New("node not found")
 	// ErrNotStorageNode is returned when a storage operation is attempted on a non-storage node.
 	ErrNotStorageNode = fmt.Errorf("not a storage node")
 	// ErrStarted is returned when the storage provider is already started.
@@ -45,6 +49,8 @@ var (
 	ErrInvalidKey = errors.New("invalid key")
 	// ErrInvalidPrefix is the error returned when a prefix is invalid.
 	ErrInvalidPrefix = errors.New("invalid prefix")
+	// ErrEdgeNotFound is returned when an edge is not found.
+	ErrEdgeNotFound = graph.ErrEdgeNotFound
 )
 
 // NewKeyNotFoundError returns a new ErrKeyNotFound error.

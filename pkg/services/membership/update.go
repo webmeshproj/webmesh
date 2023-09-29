@@ -29,8 +29,9 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -116,7 +117,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	p := peers.New(s.storage.MeshStorage())
 	peer, err := p.Get(ctx, req.GetId())
 	if err != nil {
-		if errors.Is(err, peers.ErrNodeNotFound) {
+		if errors.Is(err, storage.ErrNodeNotFound) {
 			return nil, status.Errorf(codes.Internal, "failed to lookup peer: %v", err)
 		}
 		// Peer doesn't exist, they need to call Join first

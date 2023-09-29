@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 )
 
 func (s *Server) GetNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*v1.NetworkACL, error) {

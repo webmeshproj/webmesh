@@ -17,6 +17,7 @@ limitations under the License.
 package membership
 
 import (
+	"errors"
 	"log/slog"
 	"net"
 	"net/netip"
@@ -30,11 +31,12 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -278,7 +280,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			// Check if the peer exists
 			_, err := p.Get(ctx, peer)
 			if err != nil {
-				if err != peers.ErrNodeNotFound {
+				if errors.Is(err, storage.ErrNodeNotFound) {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to get peer: %v", err))
 				}
 				// The peer doesn't exist, so create a placeholder for it

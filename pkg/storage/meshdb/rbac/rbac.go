@@ -26,6 +26,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var (
@@ -79,47 +80,7 @@ var ErrIsSystemRoleBinding = fmt.Errorf("cannot modify system rolebinding")
 // ErrIsSystemGroup is returned when a system group is being modified.
 var ErrIsSystemGroup = fmt.Errorf("cannot modify system group")
 
-// RBAC is the interface to the database models for RBAC.
-type RBAC interface {
-	// Enable enables RBAC.
-	Enable(ctx context.Context) error
-	// Disable disables RBAC.
-	Disable(ctx context.Context) error
-	// IsDisabled returns true if RBAC is disabled.
-	IsDisabled(ctx context.Context) (bool, error)
-
-	// PutRole creates or updates a role.
-	PutRole(ctx context.Context, role *v1.Role) error
-	// GetRole returns a role by name.
-	GetRole(ctx context.Context, name string) (*v1.Role, error)
-	// DeleteRole deletes a role by name.
-	DeleteRole(ctx context.Context, name string) error
-	// ListRoles returns a list of all roles.
-	ListRoles(ctx context.Context) (RolesList, error)
-
-	// PutRoleBinding creates or updates a rolebinding.
-	PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) error
-	// GetRoleBinding returns a rolebinding by name.
-	GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding, error)
-	// DeleteRoleBinding deletes a rolebinding by name.
-	DeleteRoleBinding(ctx context.Context, name string) error
-	// ListRoleBindings returns a list of all rolebindings.
-	ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error)
-
-	// PutGroup creates or updates a group.
-	PutGroup(ctx context.Context, group *v1.Group) error
-	// GetGroup returns a group by name.
-	GetGroup(ctx context.Context, name string) (*v1.Group, error)
-	// DeleteGroup deletes a group by name.
-	DeleteGroup(ctx context.Context, name string) error
-	// ListGroups returns a list of all groups.
-	ListGroups(ctx context.Context) ([]*v1.Group, error)
-
-	// ListNodeRoles returns a list of all roles for a node.
-	ListNodeRoles(ctx context.Context, nodeID string) (RolesList, error)
-	// ListUserRoles returns a list of all roles for a user.
-	ListUserRoles(ctx context.Context, user string) (RolesList, error)
-}
+type RBAC = storage.RBAC
 
 // New returns a new RBAC.
 func New(st storage.MeshStorage) RBAC {
@@ -222,8 +183,8 @@ func (r *rbac) DeleteRole(ctx context.Context, name string) error {
 }
 
 // ListRoles returns a list of all roles.
-func (r *rbac) ListRoles(ctx context.Context) (RolesList, error) {
-	out := make(RolesList, 0)
+func (r *rbac) ListRoles(ctx context.Context) (types.RolesList, error) {
+	out := make(types.RolesList, 0)
 	err := r.IterPrefix(ctx, rolesPrefix, func(key, value []byte) error {
 		if bytes.Equal(key, rolesPrefix) {
 			return nil
@@ -391,12 +352,12 @@ func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
 }
 
 // ListNodeRoles returns a list of all roles for a node.
-func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (RolesList, error) {
+func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (types.RolesList, error) {
 	rbs, err := r.ListRoleBindings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list rolebindings: %w", err)
 	}
-	out := make(RolesList, 0)
+	out := make(types.RolesList, 0)
 RoleBindings:
 	for _, rb := range rbs {
 		for _, subject := range rb.GetSubjects() {
@@ -416,12 +377,12 @@ RoleBindings:
 }
 
 // ListUserRoles returns a list of all roles for a user.
-func (r *rbac) ListUserRoles(ctx context.Context, user string) (RolesList, error) {
+func (r *rbac) ListUserRoles(ctx context.Context, user string) (types.RolesList, error) {
 	rbs, err := r.ListRoleBindings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list rolebindings: %w", err)
 	}
-	out := make(RolesList, 0)
+	out := make(types.RolesList, 0)
 RoleBindings:
 	for _, rb := range rbs {
 		for _, subject := range rb.GetSubjects() {

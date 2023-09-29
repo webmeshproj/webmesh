@@ -26,8 +26,9 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	peergraph "github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var (
@@ -80,7 +81,7 @@ type Networking interface {
 	// FilterGraph filters the adjacency map in the given graph for the given node ID according
 	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
 	// error is returned on faiure building the initial map or any database error.
-	FilterGraph(ctx context.Context, graph peergraph.Graph, nodeID string) (peergraph.AdjacencyMap, error)
+	FilterGraph(ctx context.Context, graph types.PeerGraph, nodeID string) (types.AdjacencyMap, error)
 }
 
 // New returns a new Networking interface.
@@ -266,11 +267,11 @@ func (n *networking) ListRoutes(ctx context.Context) (Routes, error) {
 // needs improvement to be more efficient and to allow edges so long as one of the routes encountered is
 // allowed. Currently if a single route provided by a destination node is not allowed, the entire node
 // is filtered out.
-func (n *networking) FilterGraph(ctx context.Context, graph peergraph.Graph, thisNodeID string) (peergraph.AdjacencyMap, error) {
+func (n *networking) FilterGraph(ctx context.Context, graph types.PeerGraph, thisNodeID string) (types.AdjacencyMap, error) {
 	log := context.LoggerFrom(ctx)
 
 	// Resolve the current node ID
-	thisNode, err := graph.Vertex(peergraph.NodeID(thisNodeID))
+	thisNode, err := graph.Vertex(types.NodeID(thisNodeID))
 	if err != nil {
 		return nil, fmt.Errorf("get node: %w", err)
 	}
@@ -296,7 +297,7 @@ func (n *networking) FilterGraph(ctx context.Context, graph peergraph.Graph, thi
 
 	// Start with a copy of the full map and filter out nodes that are not allowed to communicate
 	// with the current node.
-	filtered := make(peergraph.AdjacencyMap)
+	filtered := make(types.AdjacencyMap)
 	filtered[thisNode.NodeID()] = fullMap[thisNode.NodeID()]
 
 Nodes:
@@ -348,7 +349,7 @@ Nodes:
 				}
 			}
 		}
-		filtered[node.NodeID()] = make(peergraph.EdgeMap)
+		filtered[node.NodeID()] = make(types.EdgeMap)
 	}
 	for node := range filtered {
 		edges, ok := fullMap[node]

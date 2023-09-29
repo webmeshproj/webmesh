@@ -23,8 +23,8 @@ import (
 	"github.com/miekg/dns"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *dns.Msg, peerID string, ipv6Only bool) error {
@@ -84,7 +84,7 @@ func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *
 	return nil
 }
 
-func newPeerTXTRecord(name string, peer *graph.MeshNode) *dns.TXT {
+func newPeerTXTRecord(name string, peer *types.MeshNode) *dns.TXT {
 	txtData := []string{
 		fmt.Sprintf("id=%s", peer.GetId()),
 		fmt.Sprintf("storage_port=%d", peer.StoragePort()),

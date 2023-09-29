@@ -34,7 +34,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -48,6 +47,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/storage"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
+	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 // ServiceOptions contains the configuration for the mesh services.

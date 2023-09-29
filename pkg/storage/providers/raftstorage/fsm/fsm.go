@@ -31,9 +31,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/raftlogs"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/snapshots"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage/raftlogs"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage/snapshots"
 )
 
 // Ensure that RaftFSM implements the raft.FSM interface.

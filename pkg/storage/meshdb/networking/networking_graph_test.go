@@ -25,7 +25,8 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
+	peergraph "github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestFilteredGraph(t *testing.T) {
@@ -35,7 +36,7 @@ func TestFilteredGraph(t *testing.T) {
 		t.Parallel()
 
 		nw, pgraph := setupGraphTest(t, graphSetup{
-			nodes: []peergraph.MeshNode{
+			nodes: []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
 						Id:          "node-a",
@@ -53,7 +54,7 @@ func TestFilteredGraph(t *testing.T) {
 					},
 				},
 			},
-			edges: []peergraph.MeshEdge{
+			edges: []types.MeshEdge{
 				{
 					MeshEdge: &v1.MeshEdge{
 						Source: "node-a",
@@ -88,7 +89,7 @@ func TestFilteredGraph(t *testing.T) {
 		t.Parallel()
 
 		nw, pgraph := setupGraphTest(t, graphSetup{
-			nodes: []peergraph.MeshNode{
+			nodes: []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
 						Id:          "node-a",
@@ -106,7 +107,7 @@ func TestFilteredGraph(t *testing.T) {
 					},
 				},
 			},
-			edges: []peergraph.MeshEdge{
+			edges: []types.MeshEdge{
 				{
 					MeshEdge: &v1.MeshEdge{
 						Source: "node-a",
@@ -161,7 +162,7 @@ func TestFilteredGraph(t *testing.T) {
 		t.Parallel()
 
 		nw, pgraph := setupGraphTest(t, graphSetup{
-			nodes: []peergraph.MeshNode{
+			nodes: []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
 						Id:          "node-a",
@@ -179,7 +180,7 @@ func TestFilteredGraph(t *testing.T) {
 					},
 				},
 			},
-			edges: []peergraph.MeshEdge{
+			edges: []types.MeshEdge{
 				{
 					MeshEdge: &v1.MeshEdge{
 						Source: "node-a",
@@ -239,12 +240,12 @@ func TestFilteredGraph(t *testing.T) {
 
 type graphSetup struct {
 	acls   []*v1.NetworkACL
-	nodes  []peergraph.MeshNode
-	edges  []peergraph.MeshEdge
+	nodes  []types.MeshNode
+	edges  []types.MeshEdge
 	routes []*v1.Route
 }
 
-func setupGraphTest(t *testing.T, opts graphSetup) (Networking, peergraph.Graph) {
+func setupGraphTest(t *testing.T, opts graphSetup) (Networking, types.PeerGraph) {
 	t.Helper()
 	nw := setupTest(t)
 	for _, acl := range opts.acls {
@@ -257,8 +258,8 @@ func setupGraphTest(t *testing.T, opts graphSetup) (Networking, peergraph.Graph)
 			t.Fatalf("put route: %v", err)
 		}
 	}
-	storage := nw.(*networking).MeshStorage
-	pgraph := peergraph.NewGraph(storage)
+	st := nw.(*networking).MeshStorage
+	pgraph := peergraph.NewGraph(st)
 	for _, node := range opts.nodes {
 		if err := pgraph.AddVertex(node); err != nil {
 			t.Fatalf("add vertex: %v", err)
@@ -266,7 +267,7 @@ func setupGraphTest(t *testing.T, opts graphSetup) (Networking, peergraph.Graph)
 	}
 	for _, edge := range opts.edges {
 		if err := pgraph.AddEdge(
-			peergraph.NodeID(edge.Source), peergraph.NodeID(edge.Target),
+			types.NodeID(edge.Source), types.NodeID(edge.Target),
 			graph.EdgeAttributes(edge.Attributes),
 			graph.EdgeWeight(int(edge.Weight)),
 		); err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {

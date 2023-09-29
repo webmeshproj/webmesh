@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 )
 
 func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, error) {

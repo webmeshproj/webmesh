@@ -24,8 +24,9 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestPeers(t *testing.T) {
@@ -105,7 +106,7 @@ func TestPeers(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			if !errors.Is(err, ErrNodeNotFound) {
+			if !errors.Is(err, storage.ErrNodeNotFound) {
 				t.Fatal("expected node not found error")
 			}
 		})
@@ -223,7 +224,7 @@ func TestPeers(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error")
 		}
-		if !errors.Is(err, ErrNodeNotFound) {
+		if !errors.Is(err, storage.ErrNodeNotFound) {
 			t.Fatal("expected node not found error")
 		}
 		// Further calls to delete should not fail.
@@ -273,7 +274,7 @@ func TestPeers(t *testing.T) {
 				t.Fatal(err)
 			}
 			// The edge should be gone
-			_, err = p.Graph().Edge(peergraph.NodeID(nodeA.GetId()), peergraph.NodeID(nodeB.GetId()))
+			_, err = p.Graph().Edge(types.NodeID(nodeA.GetId()), types.NodeID(nodeB.GetId()))
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -557,7 +558,7 @@ func TestPeers(t *testing.T) {
 			t.Fatal("expected two nodes, got", len(got))
 		}
 		for _, node := range nodes {
-			if !(peergraph.MeshNode{MeshNode: node}).HasFeature(v1.Feature_ADMIN_API) {
+			if !(types.MeshNode{MeshNode: node}).HasFeature(v1.Feature_ADMIN_API) {
 				continue
 			}
 			found := false
@@ -579,7 +580,7 @@ func TestPeers(t *testing.T) {
 			t.Fatal("expected one node, got", len(got))
 		}
 		for _, node := range nodes {
-			if !(peergraph.MeshNode{MeshNode: node}).HasFeature(v1.Feature_ICE_NEGOTIATION) {
+			if !(types.MeshNode{MeshNode: node}).HasFeature(v1.Feature_ICE_NEGOTIATION) {
 				continue
 			}
 			found := false
@@ -601,7 +602,7 @@ func TestPeers(t *testing.T) {
 			t.Fatal("expected one node, got", len(got))
 		}
 		for _, node := range nodes {
-			if !(peergraph.MeshNode{MeshNode: node}).HasFeature(v1.Feature_MESH_DNS) {
+			if !(types.MeshNode{MeshNode: node}).HasFeature(v1.Feature_MESH_DNS) {
 				continue
 			}
 			found := false
@@ -647,7 +648,7 @@ func TestPeers(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Make sure the edge was actually stored
-		edge, err := p.Graph().Edge(peergraph.NodeID(nodes[0].GetId()), peergraph.NodeID(nodes[1].GetId()))
+		edge, err := p.Graph().Edge(types.NodeID(nodes[0].GetId()), types.NodeID(nodes[1].GetId()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -664,7 +665,7 @@ func TestPeers(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Make sure the edge was actually removed
-		_, err = p.Graph().Edge(peergraph.NodeID(nodes[0].GetId()), peergraph.NodeID(nodes[1].GetId()))
+		_, err = p.Graph().Edge(types.NodeID(nodes[0].GetId()), types.NodeID(nodes[1].GetId()))
 		if err == nil {
 			t.Fatal("expected error")
 		}

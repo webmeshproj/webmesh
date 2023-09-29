@@ -32,8 +32,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/graph"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/relay"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
@@ -42,6 +40,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // PeerManager is the interface for tracking and managing WireGuard peers.
@@ -473,7 +473,7 @@ func (m *peerManager) getSignalingTransport(ctx context.Context, peer *v1.WireGu
 	} else {
 		// We'll use our local storage
 		log.Debug("We'll use our local storage for ICE negotiation lookup")
-		resolver = peers.New(m.net.storage).Resolver().FeatureResolver(func(mn graph.MeshNode) bool {
+		resolver = peers.New(m.net.storage).Resolver().FeatureResolver(func(mn types.MeshNode) bool {
 			return mn.GetId() != peer.GetNode().GetId()
 		})
 	}

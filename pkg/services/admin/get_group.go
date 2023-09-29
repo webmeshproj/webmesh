@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func (s *Server) GetGroup(ctx context.Context, group *v1.Group) (*v1.Group, error) {

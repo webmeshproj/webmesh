@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 func TestGetEdge(t *testing.T) {

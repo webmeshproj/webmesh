@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/meshdb/rbac"
+	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func (s *Server) GetRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*v1.RoleBinding, error) {

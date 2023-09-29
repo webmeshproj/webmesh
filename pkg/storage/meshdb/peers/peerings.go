@@ -27,10 +27,10 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	peergraph "github.com/webmeshproj/webmesh/pkg/meshdb/graph"
-	"github.com/webmeshproj/webmesh/pkg/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
@@ -57,7 +57,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 			ourRoutes = append(ourRoutes, prefix)
 		}
 	}
-	directAdjacents := adjacencyMap[peergraph.NodeID(peerID)]
+	directAdjacents := adjacencyMap[types.NodeID(peerID)]
 	out := make([]*v1.WireGuardPeer, 0, len(directAdjacents))
 	for adjacent, edge := range directAdjacents {
 		node, err := graph.Vertex(adjacent)
@@ -117,11 +117,11 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshStorage, peerID strin
 func recursePeers(
 	ctx context.Context,
 	nw networking.Networking,
-	graph peergraph.Graph,
-	adjacencyMap peergraph.AdjacencyMap,
+	graph types.PeerGraph,
+	adjacencyMap types.AdjacencyMap,
 	thisPeer string,
 	thisRoutes []netip.Prefix,
-	node *peergraph.MeshNode,
+	node *types.MeshNode,
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
 	if node.PrivateAddrV4().IsValid() {
 		allowedIPs = append(allowedIPs, node.PrivateAddrV4())
@@ -167,19 +167,19 @@ func recursePeers(
 func recurseEdges(
 	ctx context.Context,
 	nw networking.Networking,
-	graph peergraph.Graph,
-	adjacencyMap peergraph.AdjacencyMap,
+	graph types.PeerGraph,
+	adjacencyMap types.AdjacencyMap,
 	thisPeer string,
 	thisRoutes []netip.Prefix,
-	node *peergraph.MeshNode,
-	visited map[peergraph.NodeID]struct{},
+	node *types.MeshNode,
+	visited map[types.NodeID]struct{},
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
 	if visited == nil {
-		visited = make(map[peergraph.NodeID]struct{})
+		visited = make(map[types.NodeID]struct{})
 	}
-	directAdjacents := adjacencyMap[peergraph.NodeID(thisPeer)]
-	visited[peergraph.NodeID(node.GetId())] = struct{}{}
-	targets := adjacencyMap[peergraph.NodeID(node.GetId())]
+	directAdjacents := adjacencyMap[types.NodeID(thisPeer)]
+	visited[types.NodeID(node.GetId())] = struct{}{}
+	targets := adjacencyMap[types.NodeID(node.GetId())]
 	for target := range targets {
 		if target.String() == thisPeer {
 			continue

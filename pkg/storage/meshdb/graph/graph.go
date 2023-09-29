@@ -30,13 +30,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
-
-// Graph is the graph.Graph implementation for the mesh network.
-type Graph graph.Graph[NodeID, MeshNode]
-
-// Store is the graph.Store implementation for the mesh network.
-type Store graph.Store[NodeID, MeshNode]
 
 // GraphStore implements the Store.
 type GraphStore struct {
@@ -60,13 +55,13 @@ var ErrEmptyNodeID = errors.New("node ID must not be empty")
 var ErrInvalidNodeID = errors.New("node ID is invalid")
 
 // NewGraph creates a new Graph instance.
-func NewGraph(st storage.MeshStorage) Graph {
+func NewGraph(st storage.MeshStorage) types.PeerGraph {
 	return NewGraphWithStore(st, &GraphStore{MeshStorage: st})
 }
 
 // NewTestGraph is an alias for creating a new graph with in-memory storage.
 // It also returns the underlying storage instance.
-func NewTestGraph() (Graph, *GraphStore, error) {
+func NewTestGraph() (types.PeerGraph, *GraphStore, error) {
 	memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("create in-memory database: %w", err)
@@ -75,24 +70,24 @@ func NewTestGraph() (Graph, *GraphStore, error) {
 }
 
 // NewGraphWithStore creates a new Graph instance with the given store.
-func NewGraphWithStore(st storage.MeshStorage, store Store) Graph {
+func NewGraphWithStore(st storage.MeshStorage, store types.PeerGraphStore) types.PeerGraph {
 	return graph.NewWithStore(graphHasher, store)
 }
 
 // graphHasher is the hash key function for the graph.
-func graphHasher(n MeshNode) NodeID { return NodeID(n.GetId()) }
+func graphHasher(n types.MeshNode) types.NodeID { return types.NodeID(n.GetId()) }
 
 // BuildAdjacencyMap returns the adjacency map for the graph.
-func BuildAdjacencyMap(g Graph) (AdjacencyMap, error) {
+func BuildAdjacencyMap(g types.PeerGraph) (types.AdjacencyMap, error) {
 	m, err := g.AdjacencyMap()
 	if err != nil {
 		return nil, fmt.Errorf("get adjacency map: %w", err)
 	}
-	out := make(AdjacencyMap, len(m))
+	out := make(types.AdjacencyMap, len(m))
 	for source, targets := range m {
-		out[source] = make(map[NodeID]Edge, len(targets))
+		out[source] = make(map[types.NodeID]types.Edge, len(targets))
 		for target, edge := range targets {
-			out[source][target] = Edge(edge)
+			out[source][target] = types.Edge(edge)
 		}
 	}
 	return out, nil
@@ -101,7 +96,7 @@ func BuildAdjacencyMap(g Graph) (AdjacencyMap, error) {
 // AddVertex should add the given vertex with the given hash value and vertex properties to the
 // graph. If the vertex already exists, it is up to you whether ErrVertexAlreadyExists or no
 // error should be returned.
-func (g *GraphStore) AddVertex(nodeID NodeID, node MeshNode, props graph.VertexProperties) error {
+func (g *GraphStore) AddVertex(nodeID types.NodeID, node types.MeshNode, props graph.VertexProperties) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	ctx := context.Background()
@@ -131,7 +126,7 @@ func (g *GraphStore) AddVertex(nodeID NodeID, node MeshNode, props graph.VertexP
 
 // Vertex should return the vertex and vertex properties with the given hash value. If the
 // vertex doesn't exist, ErrVertexNotFound should be returned.
-func (g *GraphStore) Vertex(nodeID NodeID) (node MeshNode, props graph.VertexProperties, err error) {
+func (g *GraphStore) Vertex(nodeID types.NodeID) (node types.MeshNode, props graph.VertexProperties, err error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	ctx := context.Background()
@@ -161,7 +156,7 @@ func (g *GraphStore) Vertex(nodeID NodeID) (node MeshNode, props graph.VertexPro
 // RemoveVertex should remove the vertex with the given hash value. If the vertex doesn't
 // exist, ErrVertexNotFound should be returned. If the vertex has edges to other vertices,
 // ErrVertexHasEdges should be returned.
-func (g *GraphStore) RemoveVertex(nodeID NodeID) error {
+func (g *GraphStore) RemoveVertex(nodeID types.NodeID) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	ctx := context.Background()
@@ -202,7 +197,7 @@ func (g *GraphStore) RemoveVertex(nodeID NodeID) error {
 }
 
 // ListVertices should return all vertices in the graph in a slice.
-func (g *GraphStore) ListVertices() ([]NodeID, error) {
+func (g *GraphStore) ListVertices() ([]types.NodeID, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	ctx := context.Background()
@@ -210,12 +205,12 @@ func (g *GraphStore) ListVertices() ([]NodeID, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	out := make([]NodeID, 0)
+	out := make([]types.NodeID, 0)
 	for _, key := range keys {
 		if bytes.Equal(key, NodesPrefix) {
 			continue
 		}
-		out = append(out, NodeID(bytes.TrimPrefix(key, append(NodesPrefix, '/'))))
+		out = append(out, types.NodeID(bytes.TrimPrefix(key, append(NodesPrefix, '/'))))
 	}
 	return out, nil
 }
@@ -236,7 +231,7 @@ func (g *GraphStore) VertexCount() (int, error) {
 //
 // If either vertex doesn't exit, ErrVertexNotFound should be returned for the respective
 // vertex. If the edge already exists, ErrEdgeAlreadyExists should be returned.
-func (g *GraphStore) AddEdge(sourceNode, targetNode NodeID, edge graph.Edge[NodeID]) error {
+func (g *GraphStore) AddEdge(sourceNode, targetNode types.NodeID, edge graph.Edge[types.NodeID]) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	ctx := context.Background()
@@ -282,7 +277,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode NodeID, edge graph.Edge[Node
 		return graph.ErrEdgeAlreadyExists
 	}
 	key := newEdgeKey(sourceNode, targetNode)
-	edgeData, err := Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalJSON()
+	edgeData, err := types.Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal edge: %w", err)
 	}
@@ -295,7 +290,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode NodeID, edge graph.Edge[Node
 
 // UpdateEdge should update the edge between the given vertices with the data of the given
 // Edge instance. If the edge doesn't exist, ErrEdgeNotFound should be returned.
-func (g *GraphStore) UpdateEdge(sourceNode, targetNode NodeID, edge graph.Edge[NodeID]) error {
+func (g *GraphStore) UpdateEdge(sourceNode, targetNode types.NodeID, edge graph.Edge[types.NodeID]) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	ctx := context.Background()
@@ -310,7 +305,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode NodeID, edge graph.Edge[N
 		}
 		return fmt.Errorf("get node edge: %w", err)
 	}
-	edgeData, err := Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalJSON()
+	edgeData, err := types.Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal edge: %w", err)
 	}
@@ -327,7 +322,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode NodeID, edge graph.Edge[N
 // If either vertex doesn't exist, it is up to you whether ErrVertexNotFound or no error should
 // be returned. If the edge doesn't exist, it is up to you whether ErrEdgeNotFound or no error
 // should be returned.
-func (g *GraphStore) RemoveEdge(sourceNode, targetNode NodeID) error {
+func (g *GraphStore) RemoveEdge(sourceNode, targetNode types.NodeID) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	ctx := context.Background()
@@ -354,40 +349,40 @@ func (g *GraphStore) RemoveEdge(sourceNode, targetNode NodeID) error {
 // that only contains the vertex hashes instead of the vertices themselves.
 //
 // If the edge doesn't exist, ErrEdgeNotFound should be returned.
-func (g *GraphStore) Edge(sourceNode, targetNode NodeID) (graph.Edge[NodeID], error) {
+func (g *GraphStore) Edge(sourceNode, targetNode types.NodeID) (graph.Edge[types.NodeID], error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	ctx := context.Background()
 	if sourceNode.IsEmpty() || targetNode.IsEmpty() {
-		return graph.Edge[NodeID]{}, fmt.Errorf("node ID must not be empty")
+		return graph.Edge[types.NodeID]{}, fmt.Errorf("node ID must not be empty")
 	}
 	key := newEdgeKey(sourceNode, targetNode)
 	data, err := g.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
-			return graph.Edge[NodeID]{}, graph.ErrEdgeNotFound
+			return graph.Edge[types.NodeID]{}, graph.ErrEdgeNotFound
 		}
-		return graph.Edge[NodeID]{}, fmt.Errorf("get node edge: %w", err)
+		return graph.Edge[types.NodeID]{}, fmt.Errorf("get node edge: %w", err)
 	}
-	var edge MeshEdge
+	var edge types.MeshEdge
 	err = edge.UnmarshalJSON(data)
 	if err != nil {
-		return graph.Edge[NodeID]{}, fmt.Errorf("unmarshal edge: %w", err)
+		return graph.Edge[types.NodeID]{}, fmt.Errorf("unmarshal edge: %w", err)
 	}
 	return edge.AsGraphEdge(), nil
 }
 
 // ListEdges should return all edges in the graph in a slice.
-func (g *GraphStore) ListEdges() ([]graph.Edge[NodeID], error) {
+func (g *GraphStore) ListEdges() ([]graph.Edge[types.NodeID], error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	ctx := context.Background()
-	edges := make([]graph.Edge[NodeID], 0)
+	edges := make([]graph.Edge[types.NodeID], 0)
 	err := g.IterPrefix(ctx, EdgesPrefix, func(key, value []byte) error {
 		if bytes.Equal(key, EdgesPrefix) {
 			return nil
 		}
-		var edge MeshEdge
+		var edge types.MeshEdge
 		err := edge.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal edge: %w", err)
@@ -398,6 +393,6 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[NodeID], error) {
 	return edges, err
 }
 
-func newEdgeKey(source, target NodeID) []byte {
+func newEdgeKey(source, target types.NodeID) []byte {
 	return EdgesPrefix.For(source.Bytes()).For(target.Bytes())
 }
