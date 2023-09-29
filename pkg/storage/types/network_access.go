@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package networking
+package types
 
 import (
 	"net/netip"
@@ -22,18 +22,18 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 )
 
-// Action wraps a NetworkAction.
-type Action struct {
+// NetworkAction wraps a NetworkAction.
+type NetworkAction struct {
 	*v1.NetworkAction
 }
 
 // Proto returns the protobuf representation of the action.
-func (a *Action) Proto() *v1.NetworkAction {
+func (a *NetworkAction) Proto() *v1.NetworkAction {
 	return a.NetworkAction
 }
 
 // SourcePrefix returns the source prefix for the action if it is valid.
-func (a *Action) SourcePrefix() netip.Prefix {
+func (a *NetworkAction) SourcePrefix() netip.Prefix {
 	if a.GetSrcCidr() == "" {
 		return netip.Prefix{}
 	}
@@ -45,7 +45,7 @@ func (a *Action) SourcePrefix() netip.Prefix {
 }
 
 // DestinationPrefix returns the destination prefix for the action if it is valid.
-func (a *Action) DestinationPrefix() netip.Prefix {
+func (a *NetworkAction) DestinationPrefix() netip.Prefix {
 	if a.GetDstCidr() == "" {
 		return netip.Prefix{}
 	}

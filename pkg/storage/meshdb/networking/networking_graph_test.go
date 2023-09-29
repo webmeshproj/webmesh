@@ -259,7 +259,7 @@ func setupGraphTest(t *testing.T, opts graphSetup) (Networking, types.PeerGraph)
 		}
 	}
 	st := nw.(*networking).MeshStorage
-	pgraph := peergraph.NewGraph(st)
+	pgraph := types.NewGraphWithStore(peergraph.NewGraphStore(st))
 	for _, node := range opts.nodes {
 		if err := pgraph.AddVertex(node); err != nil {
 			t.Fatalf("add vertex: %v", err)

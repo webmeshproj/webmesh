@@ -25,16 +25,21 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestGraphStore(t *testing.T) {
 	t.Parallel()
-	_, store, err := NewTestGraph()
+	memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = memdb.Close() })
+	store := &GraphStore{MeshStorage: memdb}
 	if err != nil {
 		t.Errorf("Failed to create graph: %v", err)
 	}
-	t.Cleanup(func() { _ = store.MeshStorage.Close() })
 
 	// We don't currently use vertex properties, but they may be used in the future.
 	t.Run("AddAndRemoveVerticies", func(t *testing.T) {

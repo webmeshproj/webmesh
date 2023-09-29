@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var putRouteAction = rbac.Actions{
@@ -39,7 +39,7 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
-	err := networking.ValidateRoute(route)
+	err := types.ValidateRoute(route)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

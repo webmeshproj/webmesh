@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/dominikbraun/graph"
@@ -32,6 +33,30 @@ type PeerGraphStore graph.Store[NodeID, MeshNode]
 
 // AdjacencyMap is a map of node names to a map of node names to edges.
 type AdjacencyMap map[NodeID]EdgeMap
+
+// NewGraphWithStore creates a new Graph instance with the given graph storage implementation.
+func NewGraphWithStore(store PeerGraphStore) PeerGraph {
+	return graph.NewWithStore(graphHasher, store)
+}
+
+// graphHasher is the hash key function for the graph.
+func graphHasher(n MeshNode) NodeID { return NodeID(n.GetId()) }
+
+// NewAdjacencyMap returns a new adjacency map for the graph.
+func NewAdjacencyMap(g PeerGraph) (AdjacencyMap, error) {
+	m, err := g.AdjacencyMap()
+	if err != nil {
+		return nil, fmt.Errorf("get adjacency map: %w", err)
+	}
+	out := make(AdjacencyMap, len(m))
+	for source, targets := range m {
+		out[source] = make(map[NodeID]Edge, len(targets))
+		for target, edge := range targets {
+			out[source][target] = Edge(edge)
+		}
+	}
+	return out, nil
+}
 
 // DeepEqual returns true if the given AdjacencyMap is equal to this AdjacencyMap.
 func (a AdjacencyMap) DeepEqual(b AdjacencyMap) bool {

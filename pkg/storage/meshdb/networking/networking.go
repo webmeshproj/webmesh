@@ -27,7 +27,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	peergraph "github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -68,15 +67,15 @@ type Networking interface {
 	// PutRoute creates or updates a Route.
 	PutRoute(ctx context.Context, route *v1.Route) error
 	// GetRoute returns a Route by name.
-	GetRoute(ctx context.Context, name string) (Route, error)
+	GetRoute(ctx context.Context, name string) (types.Route, error)
 	// GetRoutesByNode returns a list of Routes for a given Node.
-	GetRoutesByNode(ctx context.Context, nodeName string) (Routes, error)
+	GetRoutesByNode(ctx context.Context, nodeName string) (types.Routes, error)
 	// GetRoutesByCIDR returns a list of Routes for a given CIDR.
-	GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (Routes, error)
+	GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (types.Routes, error)
 	// DeleteRoute deletes a Route by name.
 	DeleteRoute(ctx context.Context, name string) error
 	// ListRoutes returns a list of Routes.
-	ListRoutes(ctx context.Context) (Routes, error)
+	ListRoutes(ctx context.Context) (types.Routes, error)
 
 	// FilterGraph filters the adjacency map in the given graph for the given node ID according
 	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
@@ -161,12 +160,12 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 
 // PutRoute creates or updates a Route.
 func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
-	err := ValidateRoute(route)
+	err := types.ValidateRoute(route)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidRoute, err)
 	}
 	key := RoutesPrefix.For([]byte(route.GetName()))
-	data, err := (Route{route}).MarshalJSON()
+	data, err := (types.Route{Route: route}).MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
 	}
@@ -178,30 +177,30 @@ func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 }
 
 // GetRoute returns a Route by name.
-func (n *networking) GetRoute(ctx context.Context, name string) (Route, error) {
+func (n *networking) GetRoute(ctx context.Context, name string) (types.Route, error) {
 	key := RoutesPrefix.For([]byte(name))
 	data, err := n.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
-			return Route{}, ErrRouteNotFound
+			return types.Route{}, ErrRouteNotFound
 		}
-		return Route{}, fmt.Errorf("get network route: %w", err)
+		return types.Route{}, fmt.Errorf("get network route: %w", err)
 	}
-	var rt Route
+	var rt types.Route
 	err = rt.UnmarshalJSON(data)
 	if err != nil {
-		return Route{}, fmt.Errorf("unmarshal network route: %w", err)
+		return types.Route{}, fmt.Errorf("unmarshal network route: %w", err)
 	}
 	return rt, nil
 }
 
 // GetRoutesByNode returns a list of Routes for a given Node.
-func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) (Routes, error) {
+func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) (types.Routes, error) {
 	routes, err := n.ListRoutes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes: %w", err)
 	}
-	out := make([]Route, 0)
+	out := make([]types.Route, 0)
 	for _, route := range routes {
 		r := route
 		if r.GetNode() == nodeName {
@@ -212,12 +211,12 @@ func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) (Rout
 }
 
 // GetRoutesByCIDR returns a list of Routes for a given CIDR.
-func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (Routes, error) {
+func (n *networking) GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (types.Routes, error) {
 	routes, err := n.ListRoutes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes: %w", err)
 	}
-	out := make([]Route, 0)
+	out := make([]types.Route, 0)
 	for _, route := range routes {
 		r := route
 		for _, destination := range r.DestinationPrefixes() {
@@ -244,13 +243,13 @@ func (n *networking) DeleteRoute(ctx context.Context, name string) error {
 }
 
 // ListRoutes returns a list of Routes.
-func (n *networking) ListRoutes(ctx context.Context) (Routes, error) {
-	out := make([]Route, 0)
+func (n *networking) ListRoutes(ctx context.Context) (types.Routes, error) {
+	out := make([]types.Route, 0)
 	err := n.IterPrefix(ctx, RoutesPrefix, func(key, value []byte) error {
 		if bytes.Equal(key, RoutesPrefix) {
 			return nil
 		}
-		var rt Route
+		var rt types.Route
 		err := rt.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal network route: %w", err)
@@ -289,7 +288,7 @@ func (n *networking) FilterGraph(ctx context.Context, graph types.PeerGraph, thi
 		return nil, fmt.Errorf("expand network acls: %w", err)
 	}
 	acls.Sort(SortDescending)
-	fullMap, err := peergraph.BuildAdjacencyMap(graph)
+	fullMap, err := types.NewAdjacencyMap(graph)
 	if err != nil {
 		return nil, fmt.Errorf("build adjacency map: %w", err)
 	}
@@ -322,9 +321,9 @@ Nodes:
 		}
 		for _, route := range routes {
 			for _, cidr := range route.DestinationPrefixes() {
-				var action Action
+				var action types.NetworkAction
 				if cidr.Addr().Is4() {
-					action = Action{
+					action = types.NetworkAction{
 						NetworkAction: &v1.NetworkAction{
 							SrcNode: thisNode.GetId(),
 							SrcCidr: thisNode.GetPrivateIpv4(),
@@ -333,7 +332,7 @@ Nodes:
 						},
 					}
 				} else {
-					action = Action{
+					action = types.NetworkAction{
 						NetworkAction: &v1.NetworkAction{
 							SrcNode: thisNode.GetId(),
 							SrcCidr: thisNode.GetPrivateIpv6(),
@@ -395,7 +394,7 @@ Nodes:
 							DstCidr: cidr.String(),
 						}
 					}
-					if !acls.Accept(ctx, Action{&action}) {
+					if !acls.Accept(ctx, types.NetworkAction{NetworkAction: &action}) {
 						log.Debug("filtering peer", "peer", peer, "reason", "route not allowed", "action", &action)
 						continue Peers
 					}

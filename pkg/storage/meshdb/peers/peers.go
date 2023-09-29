@@ -43,7 +43,7 @@ type Peers = storage.Peers
 func New(db storage.MeshStorage) Peers {
 	return &peerDB{
 		db:    db,
-		graph: peergraph.NewGraph(db),
+		graph: types.NewGraphWithStore(peergraph.NewGraphStore(db)),
 	}
 }
 

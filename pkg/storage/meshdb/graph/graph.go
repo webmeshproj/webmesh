@@ -28,7 +28,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
@@ -54,43 +53,9 @@ var ErrEmptyNodeID = errors.New("node ID must not be empty")
 // ErrInvalidNodeID is returned when a node ID is invalid.
 var ErrInvalidNodeID = errors.New("node ID is invalid")
 
-// NewGraph creates a new Graph instance.
-func NewGraph(st storage.MeshStorage) types.PeerGraph {
-	return NewGraphWithStore(st, &GraphStore{MeshStorage: st})
-}
-
-// NewTestGraph is an alias for creating a new graph with in-memory storage.
-// It also returns the underlying storage instance.
-func NewTestGraph() (types.PeerGraph, *GraphStore, error) {
-	memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("create in-memory database: %w", err)
-	}
-	return NewGraph(memdb), &GraphStore{MeshStorage: memdb}, nil
-}
-
-// NewGraphWithStore creates a new Graph instance with the given store.
-func NewGraphWithStore(st storage.MeshStorage, store types.PeerGraphStore) types.PeerGraph {
-	return graph.NewWithStore(graphHasher, store)
-}
-
-// graphHasher is the hash key function for the graph.
-func graphHasher(n types.MeshNode) types.NodeID { return types.NodeID(n.GetId()) }
-
-// BuildAdjacencyMap returns the adjacency map for the graph.
-func BuildAdjacencyMap(g types.PeerGraph) (types.AdjacencyMap, error) {
-	m, err := g.AdjacencyMap()
-	if err != nil {
-		return nil, fmt.Errorf("get adjacency map: %w", err)
-	}
-	out := make(types.AdjacencyMap, len(m))
-	for source, targets := range m {
-		out[source] = make(map[types.NodeID]types.Edge, len(targets))
-		for target, edge := range targets {
-			out[source][target] = types.Edge(edge)
-		}
-	}
-	return out, nil
+// NewGraphStore creates a new Graph storage instance.
+func NewGraphStore(st storage.MeshStorage) types.PeerGraphStore {
+	return &GraphStore{MeshStorage: st}
 }
 
 // AddVertex should add the given vertex with the given hash value and vertex properties to the

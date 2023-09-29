@@ -248,7 +248,7 @@ func (a *ACL) Expand(ctx context.Context) error {
 
 // AllowNodesToCommunicate checks if the given nodes are allowed to communicate.
 func (a ACLs) AllowNodesToCommunicate(ctx context.Context, nodeA, nodeB types.MeshNode) bool {
-	v4action := Action{
+	v4action := types.NetworkAction{
 		NetworkAction: &v1.NetworkAction{
 			SrcNode: nodeA.Id,
 			SrcCidr: nodeA.PrivateIpv4,
@@ -256,7 +256,7 @@ func (a ACLs) AllowNodesToCommunicate(ctx context.Context, nodeA, nodeB types.Me
 			DstCidr: nodeB.PrivateIpv4,
 		},
 	}
-	v6action := Action{
+	v6action := types.NetworkAction{
 		NetworkAction: &v1.NetworkAction{
 			SrcNode: nodeA.Id,
 			SrcCidr: nodeA.PrivateIpv6,
@@ -270,7 +270,7 @@ func (a ACLs) AllowNodesToCommunicate(ctx context.Context, nodeA, nodeB types.Me
 // Accept evaluates an action against the ACLs in the list. It assumes the ACLs
 // are sorted by priority. The first ACL that matches the action will be used.
 // If no ACL matches, the action is denied.
-func (a ACLs) Accept(ctx context.Context, action Action) bool {
+func (a ACLs) Accept(ctx context.Context, action types.NetworkAction) bool {
 	for _, acl := range a {
 		if acl.Matches(ctx, action) {
 			context.LoggerFrom(ctx).Debug("Network ACL matches action", "action", action, "acl", acl)
@@ -282,7 +282,7 @@ func (a ACLs) Accept(ctx context.Context, action Action) bool {
 }
 
 // Matches checks if an action matches this ACL.
-func (acl *ACL) Matches(ctx context.Context, action Action) bool {
+func (acl *ACL) Matches(ctx context.Context, action types.NetworkAction) bool {
 	if action.GetSrcNode() != "" && len(acl.GetSourceNodes()) >= 0 {
 		if !containsOrWildcardMatch(acl.GetSourceNodes(), action.GetSrcNode()) {
 			return false

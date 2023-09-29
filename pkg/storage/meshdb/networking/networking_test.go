@@ -25,6 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestNetworkACLs(t *testing.T) {
@@ -351,11 +352,11 @@ func TestNetworkRoutes(t *testing.T) {
 			t.Parallel()
 			tc := []struct {
 				name  string
-				route Route
+				route types.Route
 			}{
 				{
 					name: "full-ipv4-tunnel",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "full-ipv4-tunnel",
 							Node:             "nodea",
@@ -365,7 +366,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "full-ipv6-tunnel",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "full-ipv6-tunnel",
 							Node:             "nodea",
@@ -375,7 +376,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "full-tunnel",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "full-tunnel",
 							Node:             "nodea",
@@ -385,7 +386,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "internal-ipv4-route",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "internal-ipv4-route",
 							Node:             "nodea",
@@ -395,7 +396,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "internal-ipv6-route",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "internal-ipv6-route",
 							Node:             "nodea",
@@ -429,11 +430,11 @@ func TestNetworkRoutes(t *testing.T) {
 			nw := setupTest(t)
 			tc := []struct {
 				name  string
-				route Route
+				route types.Route
 			}{
 				{
 					name: "empty-name",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "",
 							Node:             "nodea",
@@ -443,7 +444,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "empty-node",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "route",
 							Node:             "",
@@ -453,7 +454,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "empty-cidrs",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "route",
 							Node:             "node-a",
@@ -463,7 +464,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "invalid-route-id",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "route/invalid",
 							Node:             "node-a",
@@ -473,7 +474,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "invalid-node-id",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "route",
 							Node:             "nodea/nodeb",
@@ -483,7 +484,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "invalid-next-hop-node-id",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "route",
 							Node:             "node-1",
@@ -494,7 +495,7 @@ func TestNetworkRoutes(t *testing.T) {
 				},
 				{
 					name: "invalid-network-cidrs",
-					route: Route{
+					route: types.Route{
 						Route: &v1.Route{
 							Name:             "route",
 							Node:             "node-1",
@@ -523,7 +524,7 @@ func TestNetworkRoutes(t *testing.T) {
 	t.Run("GetRoutesByNode", func(t *testing.T) {
 		t.Parallel()
 
-		routes := []Route{
+		routes := []types.Route{
 			{
 				Route: &v1.Route{
 					Name:             "node-a-route",
@@ -572,7 +573,7 @@ func TestNetworkRoutes(t *testing.T) {
 	t.Run("GetRoutesByCIDR", func(t *testing.T) {
 		t.Parallel()
 
-		routes := []Route{
+		routes := []types.Route{
 			{
 				Route: &v1.Route{
 					Name:             "node-a-route",
@@ -624,7 +625,7 @@ func TestNetworkRoutes(t *testing.T) {
 		t.Parallel()
 		// Put a route, make sure we can delete it, make sure further delete calls don't fail
 		nw := setupTest(t)
-		route := &Route{
+		route := &types.Route{
 			Route: &v1.Route{
 				Name:             "route",
 				Node:             "node-a",
@@ -661,7 +662,7 @@ func TestNetworkRoutes(t *testing.T) {
 
 	t.Run("ListRoutes", func(t *testing.T) {
 		t.Parallel()
-		routes := []Route{
+		routes := []types.Route{
 			{
 				Route: &v1.Route{
 					Name:             "node-a-route",
