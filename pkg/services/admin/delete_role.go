@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var deleteRoleAction = rbac.Actions{
@@ -48,7 +48,7 @@ func (s *Server) DeleteRole(ctx context.Context, role *v1.Role) (*emptypb.Empty,
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete roles")
 	}
-	if rbacdb.IsSystemRole(role.GetName()) {
+	if storage.IsSystemRole(role.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system roles")
 	}
 	err := s.rbac.DeleteRole(ctx, role.GetName())

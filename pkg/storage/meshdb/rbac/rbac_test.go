@@ -24,6 +24,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 )
 
@@ -31,7 +32,7 @@ const admin = "admin"
 
 var roleSeeds = []*v1.Role{
 	{
-		Name: string(MeshAdminRole),
+		Name: string(storage.MeshAdminRole),
 		Rules: []*v1.Rule{
 			{
 				Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
@@ -40,7 +41,7 @@ var roleSeeds = []*v1.Role{
 		},
 	},
 	{
-		Name: string(VotersRole),
+		Name: string(storage.VotersRole),
 		Rules: []*v1.Rule{
 			{
 				Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
@@ -52,8 +53,8 @@ var roleSeeds = []*v1.Role{
 
 var roleBindingSeeds = []*v1.RoleBinding{
 	{
-		Name: string(MeshAdminRoleBinding),
-		Role: string(MeshAdminRole),
+		Name: string(storage.MeshAdminRoleBinding),
+		Role: string(storage.MeshAdminRole),
 		Subjects: []*v1.Subject{
 			{
 				Name: admin,
@@ -66,11 +67,11 @@ var roleBindingSeeds = []*v1.RoleBinding{
 		},
 	},
 	{
-		Name: string(BootstrapVotersRoleBinding),
-		Role: string(VotersRole),
+		Name: string(storage.BootstrapVotersRoleBinding),
+		Role: string(storage.VotersRole),
 		Subjects: []*v1.Subject{
 			{
-				Name: string(VotersGroup),
+				Name: string(storage.VotersGroup),
 				Type: v1.SubjectType_SUBJECT_GROUP,
 			},
 		},
@@ -79,7 +80,7 @@ var roleBindingSeeds = []*v1.RoleBinding{
 
 var groupSeeds = []*v1.Group{
 	{
-		Name: string(VotersGroup),
+		Name: string(storage.VotersGroup),
 		Subjects: []*v1.Subject{
 			{
 				Name: admin,
@@ -136,9 +137,9 @@ func TestPutRole(t *testing.T) {
 	}{
 		{
 			name:    "modify system role",
-			role:    &v1.Role{Name: string(MeshAdminRole)},
+			role:    &v1.Role{Name: string(storage.MeshAdminRole)},
 			ok:      false,
-			wantErr: ErrIsSystemRole,
+			wantErr: storage.ErrIsSystemRole,
 		},
 		{
 			name: "no role name",
@@ -220,14 +221,14 @@ func TestGetRole(t *testing.T) {
 	}{
 		{
 			name: "get existing role",
-			role: string(MeshAdminRole),
+			role: string(storage.MeshAdminRole),
 			ok:   true,
 		},
 		{
 			name:    "non existing role",
 			role:    "foo",
 			ok:      false,
-			wantErr: ErrRoleNotFound,
+			wantErr: storage.ErrRoleNotFound,
 		},
 	}
 
@@ -262,9 +263,9 @@ func TestDeleteRole(t *testing.T) {
 	}{
 		{
 			name:    "delete system role",
-			role:    string(MeshAdminRole),
+			role:    string(storage.MeshAdminRole),
 			ok:      false,
-			wantErr: ErrIsSystemRole,
+			wantErr: storage.ErrIsSystemRole,
 		},
 		{
 			name: "delete any other role",
@@ -318,15 +319,15 @@ func TestPutRoleBinding(t *testing.T) {
 	}{
 		{
 			name:    "modify system rolebinding",
-			rb:      &v1.RoleBinding{Name: string(MeshAdminRoleBinding)},
+			rb:      &v1.RoleBinding{Name: string(storage.MeshAdminRoleBinding)},
 			ok:      false,
-			wantErr: ErrIsSystemRoleBinding,
+			wantErr: storage.ErrIsSystemRoleBinding,
 		},
 		{
 			name: "no rolebinding name",
 			rb: &v1.RoleBinding{
 				Name: "",
-				Role: string(MeshAdminRole),
+				Role: string(storage.MeshAdminRole),
 				Subjects: []*v1.Subject{
 					{
 						Type: v1.SubjectType_SUBJECT_ALL,
@@ -354,7 +355,7 @@ func TestPutRoleBinding(t *testing.T) {
 			name: "no subjects",
 			rb: &v1.RoleBinding{
 				Name:     "foo",
-				Role:     string(MeshAdminRole),
+				Role:     string(storage.MeshAdminRole),
 				Subjects: []*v1.Subject{},
 			},
 			ok: false,
@@ -363,7 +364,7 @@ func TestPutRoleBinding(t *testing.T) {
 			name: "valid rolebinding",
 			rb: &v1.RoleBinding{
 				Name: "foo",
-				Role: string(MeshAdminRole),
+				Role: string(storage.MeshAdminRole),
 				Subjects: []*v1.Subject{
 					{
 						Type: v1.SubjectType_SUBJECT_ALL,
@@ -400,8 +401,8 @@ func TestPutRoleBinding(t *testing.T) {
 	if rb.Name != "foo" {
 		t.Fatalf("expected foo, got: %v", rb.Name)
 	}
-	if rb.Role != string(MeshAdminRole) {
-		t.Fatalf("expected %s, got: %s", MeshAdminRole, rb.Role)
+	if rb.Role != string(storage.MeshAdminRole) {
+		t.Fatalf("expected %s, got: %s", storage.MeshAdminRole, rb.Role)
 	}
 	if len(rb.Subjects) != 1 {
 		t.Fatalf("expected 1 subject, got: %d", len(rb.Subjects))
@@ -427,14 +428,14 @@ func TestGetRoleBinding(t *testing.T) {
 	}{
 		{
 			name: "get existing rolebinding",
-			rb:   string(MeshAdminRole),
+			rb:   string(storage.MeshAdminRole),
 			ok:   true,
 		},
 		{
 			name:    "non existing rolebinding",
 			rb:      "foo",
 			ok:      false,
-			wantErr: ErrRoleBindingNotFound,
+			wantErr: storage.ErrRoleBindingNotFound,
 		},
 	}
 
@@ -469,9 +470,9 @@ func TestDeleteRoleBinding(t *testing.T) {
 	}{
 		{
 			name:    "delete system rolebinding",
-			rb:      string(MeshAdminRole),
+			rb:      string(storage.MeshAdminRole),
 			ok:      false,
-			wantErr: ErrIsSystemRoleBinding,
+			wantErr: storage.ErrIsSystemRoleBinding,
 		},
 		{
 			name: "delete any other rolebinding",
@@ -608,14 +609,14 @@ func TestGetGroup(t *testing.T) {
 	}{
 		{
 			name:  "get existing group",
-			group: string(VotersGroup),
+			group: string(storage.VotersGroup),
 			ok:    true,
 		},
 		{
 			name:    "non existing rolebinding",
 			group:   "foo",
 			ok:      false,
-			wantErr: ErrGroupNotFound,
+			wantErr: storage.ErrGroupNotFound,
 		},
 	}
 
@@ -650,9 +651,9 @@ func TestDeleteGroup(t *testing.T) {
 	}{
 		{
 			name:    "delete system group",
-			group:   string(VotersGroup),
+			group:   string(storage.VotersGroup),
 			ok:      false,
-			wantErr: ErrIsSystemGroup,
+			wantErr: storage.ErrIsSystemGroup,
 		},
 		{
 			name:  "delete any other group",
@@ -707,8 +708,8 @@ func TestListNodeRoles(t *testing.T) {
 	if len(roles) != 1 {
 		t.Fatalf("expected 1 role, got %d", len(roles))
 	}
-	if roles[0].Name != string(MeshAdminRole) {
-		t.Fatalf("expected %s role, got %s", MeshAdminRole, roles[0].Name)
+	if roles[0].Name != string(storage.MeshAdminRole) {
+		t.Fatalf("expected %s role, got %s", storage.MeshAdminRole, roles[0].Name)
 	}
 }
 
@@ -726,7 +727,7 @@ func TestListUserRoles(t *testing.T) {
 	if len(roles) != 1 {
 		t.Fatalf("expected 1 role, got %d", len(roles))
 	}
-	if roles[0].Name != string(MeshAdminRole) {
-		t.Fatalf("expected %s role, got %s", MeshAdminRole, roles[0].Name)
+	if roles[0].Name != string(storage.MeshAdminRole) {
+		t.Fatalf("expected %s role, got %s", storage.MeshAdminRole, roles[0].Name)
 	}
 }

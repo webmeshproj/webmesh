@@ -25,8 +25,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var putNetworkACLAction = rbac.Actions{
@@ -58,7 +58,7 @@ func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptyp
 	if allEmpty([][]string{acl.GetDestinationCidrs(), acl.GetSourceCidrs(), acl.GetSourceNodes(), acl.GetDestinationNodes()}) {
 		return nil, status.Error(codes.InvalidArgument, "at least one of destination_cidrs, source_cidrs, source_nodes, or destination_nodes must be set")
 	}
-	err := networking.ValidateACL(acl)
+	err := types.ValidateACL(acl)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

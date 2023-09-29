@@ -20,9 +20,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func TestGetRoleBinding(t *testing.T) {
@@ -43,7 +42,7 @@ func TestGetRoleBinding(t *testing.T) {
 		},
 		{
 			name: "existing system rolebinding",
-			req:  &v1.RoleBinding{Name: string(rbac.MeshAdminRoleBinding)},
+			req:  &v1.RoleBinding{Name: string(storage.MeshAdminRoleBinding)},
 			code: codes.OK,
 		},
 	}

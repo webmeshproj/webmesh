@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -52,7 +52,7 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put roles")
 	}
-	if rbacdb.IsSystemRole(role.GetName()) {
+	if storage.IsSystemRole(role.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot update system roles")
 	}
 	if len(role.GetRules()) == 0 {

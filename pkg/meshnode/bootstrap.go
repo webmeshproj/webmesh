@@ -136,7 +136,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 
 	// Create an admin role and add the admin user/node to it.
 	err = rb.PutRole(ctx, &v1.Role{
-		Name: string(rbac.MeshAdminRole),
+		Name: string(storage.MeshAdminRole),
 		Rules: []*v1.Rule{
 			{
 				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
@@ -148,8 +148,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		return fmt.Errorf("create admin role: %w", err)
 	}
 	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
-		Name: string(rbac.MeshAdminRole),
-		Role: string(rbac.MeshAdminRoleBinding),
+		Name: string(storage.MeshAdminRole),
+		Role: string(storage.MeshAdminRoleBinding),
 		Subjects: []*v1.Subject{
 			{
 				Name: opts.Bootstrap.Admin,
@@ -168,7 +168,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// Create a "voters" role and group then add ourselves and all the bootstrap servers
 	// to it.
 	err = rb.PutRole(ctx, &v1.Role{
-		Name: string(rbac.VotersRole),
+		Name: string(storage.VotersRole),
 		Rules: []*v1.Rule{
 			{
 				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_VOTES},
@@ -180,7 +180,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		return fmt.Errorf("create voters role: %w", err)
 	}
 	err = rb.PutGroup(ctx, &v1.Group{
-		Name: string(rbac.VotersGroup),
+		Name: string(storage.VotersGroup),
 		Subjects: func() []*v1.Subject {
 			out := make([]*v1.Subject, 0)
 			out = append(out, &v1.Subject{
@@ -208,12 +208,12 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		return fmt.Errorf("create voters group: %w", err)
 	}
 	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
-		Name: string(rbac.BootstrapVotersRoleBinding),
-		Role: string(rbac.VotersRole),
+		Name: string(storage.BootstrapVotersRoleBinding),
+		Role: string(storage.VotersRole),
 		Subjects: []*v1.Subject{
 			{
 				Type: v1.SubjectType_SUBJECT_GROUP,
-				Name: string(rbac.VotersGroup),
+				Name: string(storage.VotersGroup),
 			},
 		},
 	})
@@ -238,8 +238,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
 		Name:             string(networking.BootstrapNodesNetworkACLName),
 		Priority:         math.MaxInt32,
-		SourceNodes:      []string{"group:" + string(rbac.VotersGroup)},
-		DestinationNodes: []string{"group:" + string(rbac.VotersGroup)},
+		SourceNodes:      []string{"group:" + string(storage.VotersGroup)},
+		DestinationNodes: []string{"group:" + string(storage.VotersGroup)},
 		Action:           v1.ACLAction_ACTION_ACCEPT,
 	})
 

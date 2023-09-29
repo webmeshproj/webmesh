@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -52,7 +52,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put rolebindings")
 	}
-	if rbacdb.IsSystemRoleBinding(rb.GetName()) {
+	if storage.IsSystemRoleBinding(rb.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot update system rolebindings")
 	}
 	if rb.GetRole() == "" {

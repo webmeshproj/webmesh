@@ -25,5 +25,6 @@ type Database interface {
 	RBAC() RBAC
 	// MeshState returns the interface for querying mesh state.
 	MeshState() MeshState
-	// TODO: Networking
+	// Networking returns the interface for managing networking in the mesh.
+	Networking() Networking
 }

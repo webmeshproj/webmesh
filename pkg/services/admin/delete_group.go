@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var deleteGroupAction = rbac.Actions{
@@ -48,7 +48,7 @@ func (s *Server) DeleteGroup(ctx context.Context, group *v1.Group) (*emptypb.Emp
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete groups")
 	}
-	if rbacdb.IsSystemGroup(group.GetName()) {
+	if storage.IsSystemGroup(group.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system groups")
 	}
 	err := s.rbac.DeleteGroup(ctx, group.GetName())

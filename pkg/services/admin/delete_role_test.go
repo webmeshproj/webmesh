@@ -20,9 +20,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func TestDeleteRole(t *testing.T) {
@@ -39,7 +38,7 @@ func TestDeleteRole(t *testing.T) {
 		{
 			name: "system role",
 			code: codes.InvalidArgument,
-			req:  &v1.Role{Name: string(rbac.MeshAdminRole)},
+			req:  &v1.Role{Name: string(storage.MeshAdminRole)},
 		},
 		{
 			name: "any other role",

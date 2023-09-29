@@ -21,9 +21,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func TestPutRole(t *testing.T) {
@@ -42,14 +41,14 @@ func TestPutRole(t *testing.T) {
 			name: "system admin role",
 			code: codes.InvalidArgument,
 			req: &v1.Role{
-				Name: string(rbac.MeshAdminRole),
+				Name: string(storage.MeshAdminRole),
 			},
 		},
 		{
 			name: "system voters role",
 			code: codes.InvalidArgument,
 			req: &v1.Role{
-				Name: string(rbac.VotersRole),
+				Name: string(storage.VotersRole),
 			},
 		},
 		{

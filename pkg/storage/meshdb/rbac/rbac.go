@@ -30,55 +30,11 @@ import (
 )
 
 var (
-	// MeshAdminRole is the name of the mesh admin role.
-	MeshAdminRole = []byte("mesh-admin")
-	// MeshAdminRoleBinding is the name of the mesh admin rolebinding.
-	MeshAdminRoleBinding = []byte("mesh-admin")
-	// VotersRole is the name of the voters role.
-	VotersRole = []byte("voters")
-	// VotersGroup is the name of the voters group.
-	VotersGroup = []byte("voters")
-	// BootstrapVotersRoleBinding is the name of the bootstrap voters rolebinding.
-	BootstrapVotersRoleBinding = []byte("bootstrap-voters")
-
 	rolesPrefix        = storage.RegistryPrefix.ForString("roles")
 	rolebindingsPrefix = storage.RegistryPrefix.ForString("rolebindings")
 	groupsPrefix       = storage.RegistryPrefix.ForString("groups")
 	rbacDisabledKey    = storage.RegistryPrefix.ForString("rbac-disabled")
 )
-
-// IsSystemRole returns true if the role is a system role.
-func IsSystemRole(name string) bool {
-	return name == string(MeshAdminRole) || name == string(VotersRole)
-}
-
-// IsSystemRoleBinding returns true if the rolebinding is a system rolebinding.
-func IsSystemRoleBinding(name string) bool {
-	return name == string(MeshAdminRoleBinding) || name == string(BootstrapVotersRoleBinding)
-}
-
-// IsSystemGroup returns true if the group is a system group.
-func IsSystemGroup(name string) bool {
-	return name == string(VotersGroup)
-}
-
-// ErrRoleNotFound is returned when a role is not found.
-var ErrRoleNotFound = fmt.Errorf("role not found")
-
-// ErrRoleBindingNotFound is returned when a rolebinding is not found.
-var ErrRoleBindingNotFound = fmt.Errorf("rolebinding not found")
-
-// ErrGroupNotFound is returned when a group is not found.
-var ErrGroupNotFound = fmt.Errorf("group not found")
-
-// ErrIsSystemRole is returned when a system role is being modified.
-var ErrIsSystemRole = fmt.Errorf("cannot modify system role")
-
-// ErrIsSystemRoleBinding is returned when a system rolebinding is being modified.
-var ErrIsSystemRoleBinding = fmt.Errorf("cannot modify system rolebinding")
-
-// ErrIsSystemGroup is returned when a system group is being modified.
-var ErrIsSystemGroup = fmt.Errorf("cannot modify system group")
 
 type RBAC = storage.RBAC
 
@@ -123,14 +79,14 @@ func (r *rbac) Enable(ctx context.Context) error {
 
 // PutRole creates or updates a role.
 func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
-	if IsSystemRole(role.GetName()) {
+	if storage.IsSystemRole(role.GetName()) {
 		// Allow if the role doesn't exist yet.
 		_, err := r.GetRole(ctx, role.GetName())
-		if err != nil && err != ErrRoleNotFound {
+		if err != nil && err != storage.ErrRoleNotFound {
 			return err
 		}
 		if err == nil {
-			return fmt.Errorf("%w %q", ErrIsSystemRole, role.GetName())
+			return fmt.Errorf("%w %q", storage.ErrIsSystemRole, role.GetName())
 		}
 	}
 	if role.GetName() == "" {
@@ -157,7 +113,7 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if storage.IsKeyNotFoundError(err) {
-			return nil, ErrRoleNotFound
+			return nil, storage.ErrRoleNotFound
 		}
 		return nil, fmt.Errorf("get role: %w", err)
 	}
@@ -171,8 +127,8 @@ func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
 
 // DeleteRole deletes a role by name.
 func (r *rbac) DeleteRole(ctx context.Context, name string) error {
-	if IsSystemRole(name) {
-		return fmt.Errorf("%w %q", ErrIsSystemRole, name)
+	if storage.IsSystemRole(name) {
+		return fmt.Errorf("%w %q", storage.ErrIsSystemRole, name)
 	}
 	key := rolesPrefix.ForString(name)
 	err := r.Delete(ctx, key)
@@ -202,14 +158,14 @@ func (r *rbac) ListRoles(ctx context.Context) (types.RolesList, error) {
 
 // PutRoleBinding creates or updates a rolebinding.
 func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) error {
-	if IsSystemRoleBinding(rolebinding.GetName()) {
+	if storage.IsSystemRoleBinding(rolebinding.GetName()) {
 		// Allow if the rolebinding doesn't exist yet.
 		_, err := r.GetRoleBinding(ctx, rolebinding.GetName())
-		if err != nil && err != ErrRoleBindingNotFound {
+		if err != nil && err != storage.ErrRoleBindingNotFound {
 			return err
 		}
 		if err == nil {
-			return fmt.Errorf("%w %q", ErrIsSystemRoleBinding, rolebinding.GetName())
+			return fmt.Errorf("%w %q", storage.ErrIsSystemRoleBinding, rolebinding.GetName())
 		}
 	}
 	if rolebinding.GetName() == "" {
@@ -239,7 +195,7 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if storage.IsKeyNotFoundError(err) {
-			return nil, ErrRoleBindingNotFound
+			return nil, storage.ErrRoleBindingNotFound
 		}
 		return nil, fmt.Errorf("get rolebinding: %w", err)
 	}
@@ -253,8 +209,8 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding
 
 // DeleteRoleBinding deletes a rolebinding by name.
 func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
-	if IsSystemRoleBinding(name) {
-		return fmt.Errorf("%w %q", ErrIsSystemRoleBinding, name)
+	if storage.IsSystemRoleBinding(name) {
+		return fmt.Errorf("%w %q", storage.ErrIsSystemRoleBinding, name)
 	}
 	key := rolebindingsPrefix.ForString(name)
 	err := r.Delete(ctx, key)
@@ -308,7 +264,7 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if storage.IsKeyNotFoundError(err) {
-			return nil, ErrGroupNotFound
+			return nil, storage.ErrGroupNotFound
 		}
 		return nil, fmt.Errorf("get group: %w", err)
 	}
@@ -322,8 +278,8 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
 
 // DeleteGroup deletes a group by name.
 func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
-	if IsSystemGroup(name) {
-		return fmt.Errorf("%w %q", ErrIsSystemGroup, name)
+	if storage.IsSystemGroup(name) {
+		return fmt.Errorf("%w %q", storage.ErrIsSystemGroup, name)
 	}
 	key := groupsPrefix.ForString(name)
 	err := r.Delete(ctx, key)

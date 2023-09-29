@@ -21,9 +21,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func TestPutRoleBinding(t *testing.T) {
@@ -55,14 +54,14 @@ func TestPutRoleBinding(t *testing.T) {
 			name: "system admin rolebinding",
 			code: codes.InvalidArgument,
 			req: &v1.RoleBinding{
-				Name: string(rbac.MeshAdminRoleBinding),
+				Name: string(storage.MeshAdminRoleBinding),
 			},
 		},
 		{
 			name: "system voters rolebinding",
 			code: codes.InvalidArgument,
 			req: &v1.RoleBinding{
-				Name: string(rbac.BootstrapVotersRoleBinding),
+				Name: string(storage.BootstrapVotersRoleBinding),
 			},
 		},
 		{

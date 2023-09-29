@@ -27,6 +27,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -41,47 +42,7 @@ var (
 	GroupReference = "group:"
 )
 
-// ErrACLNotFound is returned when a NetworkACL is not found.
-var ErrACLNotFound = errors.New("network acl not found")
-
-// ErrRouteNotFound is returned when a Route is not found.
-var ErrRouteNotFound = errors.New("route not found")
-
-// ErrInvalidACL is returned when a NetworkACL is invalid.
-var ErrInvalidACL = errors.New("invalid network acl")
-
-// ErrInvalidRoute is returned when a Route is invalid.
-var ErrInvalidRoute = errors.New("invalid route")
-
-// Networking is the interface to the database models for network resources.
-type Networking interface {
-	// PutNetworkACL creates or updates a NetworkACL.
-	PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error
-	// GetNetworkACL returns a NetworkACL by name.
-	GetNetworkACL(ctx context.Context, name string) (ACL, error)
-	// DeleteNetworkACL deletes a NetworkACL by name.
-	DeleteNetworkACL(ctx context.Context, name string) error
-	// ListNetworkACLs returns a list of NetworkACLs.
-	ListNetworkACLs(ctx context.Context) (ACLs, error)
-
-	// PutRoute creates or updates a Route.
-	PutRoute(ctx context.Context, route *v1.Route) error
-	// GetRoute returns a Route by name.
-	GetRoute(ctx context.Context, name string) (types.Route, error)
-	// GetRoutesByNode returns a list of Routes for a given Node.
-	GetRoutesByNode(ctx context.Context, nodeName string) (types.Routes, error)
-	// GetRoutesByCIDR returns a list of Routes for a given CIDR.
-	GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (types.Routes, error)
-	// DeleteRoute deletes a Route by name.
-	DeleteRoute(ctx context.Context, name string) error
-	// ListRoutes returns a list of Routes.
-	ListRoutes(ctx context.Context) (types.Routes, error)
-
-	// FilterGraph filters the adjacency map in the given graph for the given node ID according
-	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
-	// error is returned on faiure building the initial map or any database error.
-	FilterGraph(ctx context.Context, graph types.PeerGraph, nodeID string) (types.AdjacencyMap, error)
-}
+type Networking = storage.Networking
 
 // New returns a new Networking interface.
 func New(st storage.MeshStorage) Networking {
@@ -94,12 +55,12 @@ type networking struct {
 
 // PutNetworkACL creates or updates a NetworkACL.
 func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error {
-	err := ValidateACL(acl)
+	err := types.ValidateACL(acl)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidACL, err)
+		return fmt.Errorf("%w: %w", storage.ErrInvalidACL, err)
 	}
 	key := NetworkACLsPrefix.For([]byte(acl.GetName()))
-	data, err := (ACL{NetworkACL: acl}).MarshalJSON()
+	data, err := (types.NetworkACL{NetworkACL: acl}).MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal network acl: %w", err)
 	}
@@ -111,21 +72,20 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) erro
 }
 
 // GetNetworkACL returns a NetworkACL by name.
-func (n *networking) GetNetworkACL(ctx context.Context, name string) (ACL, error) {
+func (n *networking) GetNetworkACL(ctx context.Context, name string) (types.NetworkACL, error) {
 	key := NetworkACLsPrefix.For([]byte(name))
 	data, err := n.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
-			return ACL{}, ErrACLNotFound
+			return types.NetworkACL{}, storage.ErrACLNotFound
 		}
-		return ACL{}, fmt.Errorf("get network acl: %w", err)
+		return types.NetworkACL{}, fmt.Errorf("get network acl: %w", err)
 	}
-	var acl ACL
+	var acl types.NetworkACL
 	err = acl.UnmarshalJSON(data)
 	if err != nil {
-		return ACL{}, fmt.Errorf("unmarshal network acl: %w", err)
+		return types.NetworkACL{}, fmt.Errorf("unmarshal network acl: %w", err)
 	}
-	acl.storage = n.MeshStorage
 	return acl, nil
 }
 
@@ -140,19 +100,18 @@ func (n *networking) DeleteNetworkACL(ctx context.Context, name string) error {
 }
 
 // ListNetworkACLs returns a list of NetworkACLs.
-func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
-	out := make(ACLs, 0)
+func (n *networking) ListNetworkACLs(ctx context.Context) (types.NetworkACLs, error) {
+	out := make(types.NetworkACLs, 0)
 	err := n.IterPrefix(ctx, NetworkACLsPrefix, func(key, value []byte) error {
 		if bytes.Equal(key, NetworkACLsPrefix) {
 			return nil
 		}
-		var acl ACL
+		var acl types.NetworkACL
 		err := acl.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal network acl: %w", err)
 		}
-		acl.storage = n.MeshStorage
-		out = append(out, &acl)
+		out = append(out, acl)
 		return nil
 	})
 	return out, err
@@ -162,7 +121,7 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (ACLs, error) {
 func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
 	err := types.ValidateRoute(route)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidRoute, err)
+		return fmt.Errorf("%w: %w", storage.ErrInvalidRoute, err)
 	}
 	key := RoutesPrefix.For([]byte(route.GetName()))
 	data, err := (types.Route{Route: route}).MarshalJSON()
@@ -182,7 +141,7 @@ func (n *networking) GetRoute(ctx context.Context, name string) (types.Route, er
 	data, err := n.GetValue(ctx, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrKeyNotFound) {
-			return types.Route{}, ErrRouteNotFound
+			return types.Route{}, storage.ErrRouteNotFound
 		}
 		return types.Route{}, fmt.Errorf("get network route: %w", err)
 	}
@@ -283,11 +242,11 @@ func (n *networking) FilterGraph(ctx context.Context, graph types.PeerGraph, thi
 	if len(acls) == 0 {
 		return nil, nil
 	}
-	err = acls.Expand(ctx)
+	err = storage.ExpandACLs(ctx, rbac.New(n.MeshStorage), acls)
 	if err != nil {
 		return nil, fmt.Errorf("expand network acls: %w", err)
 	}
-	acls.Sort(SortDescending)
+	acls.Sort(types.SortDescending)
 	fullMap, err := types.NewAdjacencyMap(graph)
 	if err != nil {
 		return nil, fmt.Errorf("build adjacency map: %w", err)
@@ -406,23 +365,4 @@ Nodes:
 
 	log.Debug("Filtered adjacency map", "from", thisNode.Id, "map", filtered)
 	return filtered, nil
-}
-
-func toPrefixes(ss []string) []netip.Prefix {
-	var out []netip.Prefix
-	for _, cidr := range ss {
-		var prefix netip.Prefix
-		var err error
-		if cidr == "*" {
-			out = append(out, netip.MustParsePrefix("0.0.0.0/0"))
-			out = append(out, netip.MustParsePrefix("::/0"))
-			continue
-		}
-		prefix, err = netip.ParsePrefix(cidr)
-		if err != nil {
-			continue
-		}
-		out = append(out, prefix)
-	}
-	return out
 }

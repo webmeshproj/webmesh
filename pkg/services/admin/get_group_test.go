@@ -20,9 +20,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func TestGetGroup(t *testing.T) {
@@ -43,7 +42,7 @@ func TestGetGroup(t *testing.T) {
 		},
 		{
 			name: "existing system group",
-			req:  &v1.Group{Name: string(rbac.VotersGroup)},
+			req:  &v1.Group{Name: string(storage.VotersGroup)},
 			code: codes.OK,
 		},
 	}

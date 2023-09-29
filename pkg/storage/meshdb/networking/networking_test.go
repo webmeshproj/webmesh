@@ -24,6 +24,7 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
@@ -38,11 +39,11 @@ func TestNetworkACLs(t *testing.T) {
 			t.Parallel()
 			tc := []struct {
 				name string
-				acl  *ACL
+				acl  *types.NetworkACL
 			}{
 				{
 					name: "wildcard-acl",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "wildcard-acl",
 							Priority:         0,
@@ -56,7 +57,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "nodes-acl",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "wildcard-acl",
 							Priority:         0,
@@ -70,7 +71,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "v4cidrs-acl",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "v4cidrs-acl",
 							Priority:         0,
@@ -84,7 +85,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "v6cidrs-acl",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "v6cidrs-acl",
 							Priority:         0,
@@ -109,7 +110,7 @@ func TestNetworkACLs(t *testing.T) {
 					if err != nil {
 						t.Fatalf("get network acl: %v", err)
 					}
-					if !testCase.acl.Equals(&got) {
+					if !testCase.acl.Equals(got) {
 						t.Fatalf("expected %v, got %v", testCase.acl, got)
 					}
 				})
@@ -121,11 +122,11 @@ func TestNetworkACLs(t *testing.T) {
 			nw := setupTest(t)
 			tc := []struct {
 				name string
-				acl  *ACL
+				acl  *types.NetworkACL
 			}{
 				{
 					name: "empty-name",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "",
 							Priority:         0,
@@ -139,7 +140,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "invalid-name",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "invalid/name",
 							Priority:         0,
@@ -153,7 +154,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "invalid-action",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "network-acl",
 							Priority:         0,
@@ -167,7 +168,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "invalid-src-node-ids",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "network-acl",
 							Priority:         0,
@@ -181,7 +182,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "invalid-dst-node-ids",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "network-acl",
 							Priority:         0,
@@ -195,7 +196,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "invalid-src-cidrs",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "network-acl",
 							Priority:         0,
@@ -209,7 +210,7 @@ func TestNetworkACLs(t *testing.T) {
 				},
 				{
 					name: "invalid-dst-cidrs",
-					acl: &ACL{
+					acl: &types.NetworkACL{
 						NetworkACL: &v1.NetworkACL{
 							Name:             "network-acl",
 							Priority:         0,
@@ -230,8 +231,8 @@ func TestNetworkACLs(t *testing.T) {
 					if err == nil {
 						t.Fatalf("expected error, got nil")
 					}
-					if !errors.Is(err, ErrInvalidACL) {
-						t.Errorf("expected %v, got %v", ErrInvalidACL, err)
+					if !errors.Is(err, storage.ErrInvalidACL) {
+						t.Errorf("expected %v, got %v", storage.ErrInvalidACL, err)
 					}
 				})
 			}
@@ -244,7 +245,7 @@ func TestNetworkACLs(t *testing.T) {
 
 		// Put a valid ACL, we should be able to delete it
 		// and further calls to delete should not error.
-		acl := &ACL{
+		acl := &types.NetworkACL{
 			NetworkACL: &v1.NetworkACL{
 				Name:             "wildcard-acl",
 				Priority:         0,
@@ -267,8 +268,8 @@ func TestNetworkACLs(t *testing.T) {
 		_, err = nw.GetNetworkACL(context.Background(), acl.GetName())
 		if err == nil {
 			t.Fatalf("expected error, got nil")
-		} else if !errors.Is(err, ErrACLNotFound) {
-			t.Fatalf("expected %v, got %v", ErrACLNotFound, err)
+		} else if !errors.Is(err, storage.ErrACLNotFound) {
+			t.Fatalf("expected %v, got %v", storage.ErrACLNotFound, err)
 		}
 		// Further calls to delete should not error
 		err = nw.DeleteNetworkACL(context.Background(), acl.GetName())
@@ -282,7 +283,7 @@ func TestNetworkACLs(t *testing.T) {
 
 		// Put a few ACLs
 		nw := setupTest(t)
-		acls := []*ACL{
+		acls := []types.NetworkACL{
 			{
 				NetworkACL: &v1.NetworkACL{
 					Name:             "acl1",
@@ -329,7 +330,7 @@ func TestNetworkACLs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("list network acls: %v", err)
 		}
-		got.Sort(SortAscending)
+		got.Sort(types.SortAscending)
 		if len(got) != len(acls) {
 			t.Fatalf("expected %d acls, got %d", len(acls), len(got))
 		}
@@ -513,8 +514,8 @@ func TestNetworkRoutes(t *testing.T) {
 					if err == nil {
 						t.Fatalf("expected error, got nil")
 					}
-					if !errors.Is(err, ErrInvalidRoute) {
-						t.Errorf("expected %v, got %v", ErrInvalidRoute, err)
+					if !errors.Is(err, storage.ErrInvalidRoute) {
+						t.Errorf("expected %v, got %v", storage.ErrInvalidRoute, err)
 					}
 				})
 			}
@@ -650,8 +651,8 @@ func TestNetworkRoutes(t *testing.T) {
 		_, err = nw.GetRoute(context.Background(), route.GetName())
 		if err == nil {
 			t.Fatalf("expected error, got nil")
-		} else if !errors.Is(err, ErrRouteNotFound) {
-			t.Fatalf("expected %v, got %v", ErrRouteNotFound, err)
+		} else if !errors.Is(err, storage.ErrRouteNotFound) {
+			t.Fatalf("expected %v, got %v", storage.ErrRouteNotFound, err)
 		}
 		// Further delete calls should not error
 		err = nw.DeleteRoute(context.Background(), route.GetName())

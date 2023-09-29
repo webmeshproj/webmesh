@@ -20,9 +20,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func TestDeleteGroup(t *testing.T) {
@@ -39,7 +38,7 @@ func TestDeleteGroup(t *testing.T) {
 		{
 			name: "system group",
 			code: codes.InvalidArgument,
-			req:  &v1.Group{Name: string(rbac.VotersGroup)},
+			req:  &v1.Group{Name: string(storage.VotersGroup)},
 		},
 		{
 			name: "any other group",

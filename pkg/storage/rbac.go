@@ -20,7 +20,21 @@ import (
 	"context"
 
 	v1 "github.com/webmeshproj/api/v1"
+
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
+)
+
+var (
+	// MeshAdminRole is the name of the mesh admin role.
+	MeshAdminRole = []byte("mesh-admin")
+	// MeshAdminRoleBinding is the name of the mesh admin rolebinding.
+	MeshAdminRoleBinding = []byte("mesh-admin")
+	// VotersRole is the name of the voters role.
+	VotersRole = []byte("voters")
+	// VotersGroup is the name of the voters group.
+	VotersGroup = []byte("voters")
+	// BootstrapVotersRoleBinding is the name of the bootstrap voters rolebinding.
+	BootstrapVotersRoleBinding = []byte("bootstrap-voters")
 )
 
 // RBAC is the interface to the database models for RBAC.
@@ -63,4 +77,19 @@ type RBAC interface {
 	ListNodeRoles(ctx context.Context, nodeID string) (types.RolesList, error)
 	// ListUserRoles returns a list of all roles for a user.
 	ListUserRoles(ctx context.Context, user string) (types.RolesList, error)
+}
+
+// IsSystemRole returns true if the role is a system role.
+func IsSystemRole(name string) bool {
+	return name == string(MeshAdminRole) || name == string(VotersRole)
+}
+
+// IsSystemRoleBinding returns true if the rolebinding is a system rolebinding.
+func IsSystemRoleBinding(name string) bool {
+	return name == string(MeshAdminRoleBinding) || name == string(BootstrapVotersRoleBinding)
+}
+
+// IsSystemGroup returns true if the group is a system group.
+func IsSystemGroup(name string) bool {
+	return name == string(VotersGroup)
 }

@@ -51,6 +51,26 @@ var (
 	ErrInvalidPrefix = errors.New("invalid prefix")
 	// ErrEdgeNotFound is returned when an edge is not found.
 	ErrEdgeNotFound = graph.ErrEdgeNotFound
+	// ErrRoleNotFound is returned when a role is not found.
+	ErrRoleNotFound = fmt.Errorf("role not found")
+	// ErrRoleBindingNotFound is returned when a rolebinding is not found.
+	ErrRoleBindingNotFound = fmt.Errorf("rolebinding not found")
+	// ErrGroupNotFound is returned when a group is not found.
+	ErrGroupNotFound = fmt.Errorf("group not found")
+	// ErrIsSystemRole is returned when a system role is being modified.
+	ErrIsSystemRole = fmt.Errorf("cannot modify system role")
+	// ErrIsSystemRoleBinding is returned when a system rolebinding is being modified.
+	ErrIsSystemRoleBinding = fmt.Errorf("cannot modify system rolebinding")
+	// ErrIsSystemGroup is returned when a system group is being modified.
+	ErrIsSystemGroup = fmt.Errorf("cannot modify system group")
+	// ErrACLNotFound is returned when a NetworkACL is not found.
+	ErrACLNotFound = errors.New("network acl not found")
+	// ErrRouteNotFound is returned when a Route is not found.
+	ErrRouteNotFound = errors.New("route not found")
+	// ErrInvalidACL is returned when a NetworkACL is invalid.
+	ErrInvalidACL = errors.New("invalid network acl")
+	// ErrInvalidRoute is returned when a Route is invalid.
+	ErrInvalidRoute = errors.New("invalid route")
 )
 
 // NewKeyNotFoundError returns a new ErrKeyNotFound error.

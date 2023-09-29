@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 var deleteRoleBindingAction = rbac.Actions{
@@ -48,7 +48,7 @@ func (s *Server) DeleteRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*em
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete rolebindings")
 	}
-	if rbacdb.IsSystemRoleBinding(rb.GetName()) {
+	if storage.IsSystemRoleBinding(rb.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system rolebindings")
 	}
 	err := s.rbac.DeleteRoleBinding(ctx, rb.GetName())

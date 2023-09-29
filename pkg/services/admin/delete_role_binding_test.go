@@ -20,9 +20,8 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 func TestDeleteRoleBinding(t *testing.T) {
@@ -39,7 +38,7 @@ func TestDeleteRoleBinding(t *testing.T) {
 		{
 			name: "system rolebinding",
 			code: codes.InvalidArgument,
-			req:  &v1.RoleBinding{Name: string(rbac.MeshAdminRoleBinding)},
+			req:  &v1.RoleBinding{Name: string(storage.MeshAdminRoleBinding)},
 		},
 		{
 			name: "any other rolebinding",
