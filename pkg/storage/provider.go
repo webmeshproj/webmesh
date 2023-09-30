@@ -14,12 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package storage defines the interfaces for the storage provider.
 package storage
 
 import (
 	"context"
 	"io"
+	"time"
 
+	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 )
 
@@ -50,6 +53,19 @@ type Provider interface {
 	MeshStorage() MeshStorage
 }
 
+// MeshDB is the interface for the mesh database. It provides access to all
+// storage interfaces.
+type MeshDB interface {
+	// Peers returns the interface for managing nodes in the mesh.
+	Peers() Peers
+	// RBAC returns the interface for managing RBAC policies in the mesh.
+	RBAC() RBAC
+	// MeshState returns the interface for querying mesh state.
+	MeshState() MeshState
+	// Networking returns the interface for managing networking in the mesh.
+	Networking() Networking
+}
+
 // Consensus is the interface for configuring storage consensus.
 type Consensus interface {
 	// IsLeader returns true if the node is the leader of the storage group.
@@ -69,4 +85,50 @@ type Consensus interface {
 	// RemovePeer removes a peer from the consensus group. If wait
 	// is true, the function will wait for the peer to be removed.
 	RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error
+}
+
+// MeshStorage is the interface for storing and retrieving data about the state of the mesh.
+type MeshStorage interface {
+	io.Closer
+
+	// GetValue returns the value of a key.
+	GetValue(ctx context.Context, key []byte) ([]byte, error)
+	// PutValue sets the value of a key. TTL is optional and can be set to 0.
+	PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error
+	// Delete removes a key.
+	Delete(ctx context.Context, key []byte) error
+	// ListKeys returns all keys with a given prefix.
+	ListKeys(ctx context.Context, prefix []byte) ([][]byte, error)
+	// IterPrefix iterates over all keys with a given prefix. It is important
+	// that the iterator not attempt any write operations as this will cause
+	// a deadlock. The iteration will stop if the iterator returns an error.
+	IterPrefix(ctx context.Context, prefix []byte, fn PrefixIterator) error
+	// Subscribe will call the given function whenever a key with the given prefix is changed.
+	// The returned function can be called to unsubscribe.
+	Subscribe(ctx context.Context, prefix []byte, fn SubscribeFunc) (context.CancelFunc, error)
+}
+
+// ConsensusStorage is the interface for storing and retrieving data about the state of consensus.
+// This is currently only used by the built-in raftstorage implementation.
+type ConsensusStorage interface {
+	io.Closer
+	raft.LogStore
+	raft.StableStore
+
+	// Snapshot returns a snapshot of the storage.
+	Snapshot(ctx context.Context) (io.Reader, error)
+	// Restore restores a snapshot of the storage.
+	Restore(ctx context.Context, r io.Reader) error
+}
+
+// SubscribeFunc is the function signature for subscribing to changes to a key.
+type SubscribeFunc func(key, value []byte)
+
+// PrefixIterator is the function signature for iterating over all keys with a given prefix.
+type PrefixIterator func(key, value []byte) error
+
+// DualStorage represents a storage interface that can serve as both a mesh and consensus storage.
+type DualStorage interface {
+	MeshStorage
+	ConsensusStorage
 }

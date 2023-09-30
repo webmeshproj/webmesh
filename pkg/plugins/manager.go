@@ -31,7 +31,7 @@ var (
 // Options are the options for creating a new plugin manager.
 type Options struct {
 	// Storage is the storage backend to use for plugins.
-	Storage storage.MeshStorage
+	Storage storage.Provider
 	// Plugins is a map of plugin names to plugin configs.
 	Plugins map[string]Plugin
 }
@@ -173,7 +173,7 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 }
 
 type manager struct {
-	storage storage.MeshStorage
+	storage storage.Provider
 	plugins map[string]*Plugin
 	auth    *Plugin
 	ipamv4  *Plugin
@@ -293,7 +293,7 @@ func (m *manager) Close() error {
 }
 
 // handleQueries handles SQL queries from plugins.
-func (m *manager) handleQueries(db storage.MeshStorage) {
+func (m *manager) handleQueries(db storage.Provider) {
 	for plugin, client := range m.plugins {
 		if !client.hasCapability(v1.PluginInfo_STORAGE_QUERIER) {
 			return
@@ -314,12 +314,13 @@ func (m *manager) handleQueries(db storage.MeshStorage) {
 }
 
 // handleQueryClient handles a query client.
-func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queries v1.StorageQuerierPlugin_InjectQuerierClient) {
+func (m *manager) handleQueryClient(plugin string, db storage.Provider, queries v1.StorageQuerierPlugin_InjectQuerierClient) {
 	defer func() {
 		if err := queries.CloseSend(); err != nil {
 			m.log.Error("close query stream", "plugin", plugin, "error", err)
 		}
 	}()
+	store := db.MeshStorage()
 	// TODO: This does not support multiplexed queries yet.
 	for {
 		query, err := queries.Recv()
@@ -338,7 +339,7 @@ func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queri
 			var result v1.PluginQueryResult
 			result.Id = query.GetId()
 			result.Key = query.GetQuery()
-			val, err := db.GetValue(queries.Context(), query.GetQuery())
+			val, err := store.GetValue(queries.Context(), query.GetQuery())
 			if err != nil {
 				result.Error = err.Error()
 			} else {
@@ -352,7 +353,7 @@ func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queri
 			var result v1.PluginQueryResult
 			result.Id = query.GetId()
 			result.Key = query.GetQuery()
-			keys, err := db.ListKeys(queries.Context(), query.GetQuery())
+			keys, err := store.ListKeys(queries.Context(), query.GetQuery())
 			if err != nil {
 				result.Error = err.Error()
 			} else {
@@ -363,7 +364,7 @@ func (m *manager) handleQueryClient(plugin string, db storage.MeshStorage, queri
 				m.log.Error("send query result", "plugin", plugin, "error", err)
 			}
 		case v1.PluginQuery_ITER:
-			err := db.IterPrefix(queries.Context(), query.GetQuery(), func(key, val []byte) error {
+			err := store.IterPrefix(queries.Context(), query.GetQuery(), func(key, val []byte) error {
 				var result v1.PluginQueryResult
 				result.Id = query.GetId()
 				result.Key = key

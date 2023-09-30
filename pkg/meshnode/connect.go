@@ -132,7 +132,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 
 	// Create the plugin manager
 	var pluginopts plugins.Options
-	pluginopts.Storage = s.Storage().MeshStorage()
+	pluginopts.Storage = s.Storage()
 	pluginopts.Plugins = opts.Plugins
 	s.plugins, err = plugins.NewManager(ctx, pluginopts)
 	if err != nil {

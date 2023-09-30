@@ -47,7 +47,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/storage"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 // ServiceOptions contains the configuration for the mesh services.
@@ -435,7 +434,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 	var err error
 	maxTries := 5
 	for i := 0; i < maxTries; i++ {
-		rbacDisabled, err = rbacdb.New(conn.Storage().MeshStorage()).IsDisabled(context.Background())
+		rbacDisabled, err = conn.Storage().MeshDB().RBAC().IsDisabled(context.Background())
 		if err != nil {
 			log.Error("Failed to check rbac status", "error", err.Error())
 			if i == maxTries-1 {
