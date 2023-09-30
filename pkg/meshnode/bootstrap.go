@@ -348,19 +348,19 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				slog.String("server-id", id),
 				slog.String("peer-id", peer),
 			)
-			err = p.PutEdge(ctx, &v1.MeshEdge{
+			err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 				Source: id,
 				Target: peer,
 				Weight: 99,
-			})
+			}})
 			if err != nil {
 				return fmt.Errorf("create edge: %w", err)
 			}
-			err = p.PutEdge(ctx, &v1.MeshEdge{
+			err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 				Source: id,
 				Target: peer,
 				Weight: 99,
-			})
+			}})
 			if err != nil {
 				return fmt.Errorf("create edge: %w", err)
 			}
@@ -376,12 +376,12 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)
 			}
-			err = p.PutEdge(ctx, &v1.MeshEdge{
+			err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 				Source:     s.ID().String(),
 				Target:     peer,
 				Weight:     0,
 				Attributes: storageutil.EdgeAttrsForConnectProto(proto),
-			})
+			}})
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)
 			}

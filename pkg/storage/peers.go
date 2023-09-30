@@ -57,7 +57,7 @@ type Peers interface {
 	// Subscribe subscribes to node changes.
 	Subscribe(ctx context.Context, fn PeerSubscribeFunc) (context.CancelFunc, error)
 	// AddEdge adds an edge between two nodes.
-	PutEdge(ctx context.Context, edge *v1.MeshEdge) error
+	PutEdge(ctx context.Context, edge types.MeshEdge) error
 	// GetEdge gets an edge between two nodes.
 	GetEdge(ctx context.Context, from, to types.NodeID) (types.MeshEdge, error)
 	// RemoveEdge removes an edge between two nodes.

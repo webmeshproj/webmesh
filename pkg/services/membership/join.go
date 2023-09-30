@@ -219,11 +219,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		joiningServer = types.NodeID(proxiedFrom)
 	}
 	log.Debug("Adding edge between caller and joining server", slog.String("join-edge", joiningServer.String()))
-	err = p.PutEdge(ctx, &v1.MeshEdge{
+	err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 		Source: joiningServer.String(),
 		Target: req.GetId(),
 		Weight: 1,
-	})
+	}})
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
 	}
@@ -237,11 +237,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		for _, peer := range allPeers {
 			if peer.GetId() != req.GetId() && peer.PrimaryEndpoint != "" {
 				log.Debug("adding edge from public peer to public caller", slog.String("peer", peer.GetId()))
-				err = p.PutEdge(ctx, &v1.MeshEdge{
+				err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 					Source: peer.GetId(),
 					Target: req.GetId(),
 					Weight: 99,
-				})
+				}})
 				if err != nil {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
 				}
@@ -262,11 +262,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 			log.Debug("Adding edges to peer in the same zone", slog.String("peer", peer.GetId()))
 			if peer.GetId() != req.GetId() {
-				err = p.PutEdge(ctx, &v1.MeshEdge{
+				err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 					Source: peer.GetId(),
 					Target: req.GetId(),
 					Weight: 1,
-				})
+				}})
 				if err != nil {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
 				}
@@ -294,12 +294,12 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 			}
 			log.Debug("Adding ICE edge to peer", slog.String("peer", peer))
-			err = p.PutEdge(ctx, &v1.MeshEdge{
+			err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 				Source:     peer,
 				Target:     req.GetId(),
 				Weight:     1,
 				Attributes: storageutil.EdgeAttrsForConnectProto(proto),
-			})
+			}})
 			if err != nil {
 				return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))
 			}

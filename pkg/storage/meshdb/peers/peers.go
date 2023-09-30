@@ -203,12 +203,11 @@ func (p *peerDB) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (c
 	})
 }
 
-func (p *peerDB) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
+func (p *peerDB) PutEdge(ctx context.Context, edge types.MeshEdge) error {
 	if edge.Source == edge.Target {
 		return nil
 	}
-	e := types.MeshEdge{MeshEdge: edge}
-	return e.PutInto(ctx, p.graph)
+	return edge.PutInto(ctx, p.graph)
 }
 
 func (p *peerDB) GetEdge(ctx context.Context, source, target types.NodeID) (types.MeshEdge, error) {

@@ -261,10 +261,10 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				t.Fatal(err)
 			}
 			// Add an edge between the two nodes
-			err = p.PutEdge(ctx, &v1.MeshEdge{
+			err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 				Source: nodeA.GetId(),
 				Target: nodeB.GetId(),
-			})
+			}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -666,10 +666,10 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			}
 		}
 		// Add an edge between the two nodes
-		err := p.PutEdge(ctx, &v1.MeshEdge{
+		err := p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 			Source: nodes[0].GetId(),
 			Target: nodes[1].GetId(),
-		})
+		}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -751,10 +751,10 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		}
 		// Add an edge between the two nodes and we should see
 		// each node again.
-		err = p.PutEdge(ctx, &v1.MeshEdge{
+		err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 			Source: nodes[0].GetId(),
 			Target: nodes[1].GetId(),
-		})
+		}})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -26,6 +26,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var putEdgeAction = rbac.Actions{
@@ -56,7 +57,7 @@ func (s *Server) PutEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty
 			return nil, status.Errorf(codes.InvalidArgument, "invalid node ID: %s", id)
 		}
 	}
-	err := s.db.Peers().PutEdge(ctx, edge)
+	err := s.db.Peers().PutEdge(ctx, types.MeshEdge{MeshEdge: edge})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

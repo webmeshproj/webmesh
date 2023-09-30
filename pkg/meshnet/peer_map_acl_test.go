@@ -214,10 +214,10 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			}
 			for peerID, edges := range testCase.edges {
 				for _, edge := range edges {
-					err := db.Peers().PutEdge(ctx, &v1.MeshEdge{
+					err := db.Peers().PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 						Source: peerID,
 						Target: edge,
-					})
+					}})
 					if err != nil {
 						t.Fatalf("put edge from %q to %q: %v", peerID, edge, err)
 					}
