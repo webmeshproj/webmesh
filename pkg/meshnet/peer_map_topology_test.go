@@ -27,6 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestWireGuardTopologies(t *testing.T) {
@@ -472,7 +473,7 @@ func TestWireGuardTopologies(t *testing.T) {
 				}
 			}
 			for peer, want := range testCase.wantIPs {
-				peers, err := WireGuardPeersFor(ctx, db, peer)
+				peers, err := WireGuardPeersFor(ctx, db, types.NodeID(peer))
 				if err != nil {
 					t.Fatalf("get peers for %q: %v", peer, err)
 				}

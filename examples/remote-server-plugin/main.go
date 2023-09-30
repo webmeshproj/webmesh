@@ -13,6 +13,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -62,7 +63,7 @@ func (p *Plugin) Emit(ctx context.Context, ev *v1.Event) (*emptypb.Empty, error)
 	// This is a redundant query as the event will contain the information.
 	// However, we can demonstrate the injected querier here by looking up
 	// the node that emitted the event.
-	node, err := peers.New(p.data).Get(ctx, ev.GetNode().GetId())
+	node, err := peers.New(p.data).Get(ctx, types.NodeID(ev.GetNode().GetId()))
 	if err != nil {
 		return nil, fmt.Errorf("get node: %w", err)
 	}

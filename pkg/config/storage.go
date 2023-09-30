@@ -33,6 +33,7 @@ import (
 	extstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/external"
 	passthroughstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/passthrough"
 	raftstorage "github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // StorageProvider is a type of storage provider.
@@ -154,7 +155,7 @@ func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, node meshno
 }
 
 // NewExternalStorageProvider returns a new external storage provider for the current configuration.
-func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID string) (storage.Provider, error) {
+func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID types.NodeID) (storage.Provider, error) {
 	opts, err := o.NewExternalStorageOptions(ctx, nodeID)
 	if err != nil {
 		return nil, err
@@ -197,7 +198,7 @@ func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, node meshnod
 }
 
 // NewExternalStorageOptions creates a new external storage options.
-func (o *StorageOptions) NewExternalStorageOptions(ctx context.Context, nodeID string) (extstorage.Options, error) {
+func (o *StorageOptions) NewExternalStorageOptions(ctx context.Context, nodeID types.NodeID) (extstorage.Options, error) {
 	opts := extstorage.Options{
 		NodeID:   nodeID,
 		Server:   o.External.Server,

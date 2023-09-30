@@ -87,7 +87,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					return
 				}
 				// Make sure the peer was actually stored
-				node, err := peers.Get(ctx, testCase.node.GetId())
+				node, err := peers.Get(ctx, types.NodeID(testCase.node.GetId()))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -129,7 +129,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				t.Fatal(err)
 			}
 			// Make sure the peer was actually stored
-			got, err := peers.Get(ctx, node.GetId())
+			got, err := peers.Get(ctx, types.NodeID(node.GetId()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -174,7 +174,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal(err)
 		}
 		// Make sure the peer was actually stored
-		got, err := p.Get(ctx, node.GetId())
+		got, err := p.Get(ctx, types.NodeID(node.GetId()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -208,7 +208,8 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal(err)
 		}
 		// Make sure the peer was actually stored
-		got, err := p.Get(ctx, node.GetId())
+		id := types.NodeID(node.GetId())
+		got, err := p.Get(ctx, id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -216,12 +217,12 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal("nodes not equal")
 		}
 		// Delete the node
-		err = p.Delete(ctx, node.GetId())
+		err = p.Delete(ctx, id)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Make sure the node was actually deleted
-		_, err = p.Get(ctx, node.GetId())
+		_, err = p.Get(ctx, id)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -229,7 +230,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal("expected node not found error")
 		}
 		// Further calls to delete should not fail.
-		err = p.Delete(ctx, node.GetId())
+		err = p.Delete(ctx, id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -270,12 +271,12 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				t.Fatal(err)
 			}
 			// Delete nodeA
-			err = p.Delete(ctx, nodeA.GetId())
+			err = p.Delete(ctx, types.NodeID(nodeA.GetId()))
 			if err != nil {
 				t.Fatal(err)
 			}
 			// The edge should be gone
-			_, err = p.Graph().Edge(types.NodeID(nodeA.GetId()), types.NodeID(nodeB.GetId()))
+			_, err = p.GetEdge(ctx, types.NodeID(nodeA.GetId()), types.NodeID(nodeB.GetId()))
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -371,7 +372,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		for _, node := range nodes {
 			found := false
 			for _, gotNode := range got {
-				if gotNode == node.GetId() {
+				if gotNode.String() == node.GetId() {
 					found = true
 					break
 				}
@@ -643,29 +644,29 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal(err)
 		}
 		// Make sure the edge was actually stored
-		edge, err := p.Graph().Edge(types.NodeID(nodes[0].GetId()), types.NodeID(nodes[1].GetId()))
+		edge, err := p.GetEdge(ctx, types.NodeID(nodes[0].GetId()), types.NodeID(nodes[1].GetId()))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !types.MeshNodesEqual(edge.Source.MeshNode, nodes[0]) {
+		if edge.Source != nodes[0].GetId() {
 			t.Fatal("source nodes not equal")
 		}
-		if !types.MeshNodesEqual(edge.Target.MeshNode, nodes[1]) {
+		if edge.Target != nodes[1].GetId() {
 			t.Fatal("target nodes not equal")
 		}
 
 		// Remove the edge
-		err = p.RemoveEdge(ctx, nodes[0].GetId(), nodes[1].GetId())
+		err = p.RemoveEdge(ctx, types.NodeID(nodes[0].GetId()), types.NodeID(nodes[1].GetId()))
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Make sure the edge was actually removed
-		_, err = p.Graph().Edge(types.NodeID(nodes[0].GetId()), types.NodeID(nodes[1].GetId()))
+		_, err = p.GetEdge(ctx, types.NodeID(nodes[0].GetId()), types.NodeID(nodes[1].GetId()))
 		if err == nil {
 			t.Fatal("expected error")
 		}
 		// Further calls to delete edge should not error
-		err = p.RemoveEdge(ctx, nodes[0].GetId(), nodes[1].GetId())
+		err = p.RemoveEdge(ctx, types.NodeID(nodes[0].GetId()), types.NodeID(nodes[1].GetId()))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -37,6 +37,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Node is an embedded webmesh node.
@@ -222,7 +223,7 @@ func (s *node) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 	return s.mesh.DialLeader(ctx)
 }
 
-func (s *node) DialNode(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
+func (s *node) DialNode(ctx context.Context, nodeID types.NodeID) (*grpc.ClientConn, error) {
 	return s.mesh.DialNode(ctx, nodeID)
 }
 

@@ -424,7 +424,7 @@ func (r *Provider) createStorage() (storage.DualStorage, error) {
 		return db, nil
 	}
 	// Make sure the data directory exists
-	dataDir := filepath.Join(r.Options.DataDir, r.Options.NodeID, "data")
+	dataDir := filepath.Join(r.Options.DataDir, r.Options.NodeID.String(), "data")
 	// If we are forcing bootstrap, delete the data directory
 	if r.Options.ClearDataDir {
 		if err := os.RemoveAll(dataDir); err != nil && !os.IsNotExist(err) {

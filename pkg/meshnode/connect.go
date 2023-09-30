@@ -207,7 +207,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 				defer c.Close()
 				s.log.Debug("Subscribing to peer updates from the network leader")
 				stream, err := v1.NewMembershipClient(c).SubscribePeers(subctx, &v1.SubscribePeersRequest{
-					Id: s.ID(),
+					Id: s.ID().String(),
 				})
 				if err != nil {
 					s.log.Error("Failed to subscribe to peers", slog.String("error", err.Error()))

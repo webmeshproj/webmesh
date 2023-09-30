@@ -42,6 +42,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Ensure we satisfy the provider interface.
@@ -52,7 +53,7 @@ var _ storage.MeshStorage = &ExternalStorage{}
 // Options are the options for the external storage provider.
 type Options struct {
 	// NodeID is the ID of the node.
-	NodeID string
+	NodeID types.NodeID
 	// Config is the configuration for the storage provider plugin.
 	Config *v1.PluginConfiguration
 	// Server is the address of a server for the storage provider.
@@ -150,7 +151,7 @@ func (ext *Provider) Bootstrap(ctx context.Context) error {
 func (ext *Provider) ListenPort() uint16 {
 	status := ext.Status()
 	for _, peer := range status.GetPeers() {
-		if peer.GetId() == ext.NodeID {
+		if peer.GetId() == ext.NodeID.String() {
 			addrport, err := netip.ParseAddrPort(peer.GetAddress())
 			if err != nil {
 				ext.log.Error("Failed to parse peer address", "error", err.Error())
@@ -216,7 +217,7 @@ func (ext *Consensus) IsLeader() bool {
 		ext.log.Error("Failed to get leader", "error", err.Error())
 		return false
 	}
-	return leader.GetId() == ext.NodeID
+	return leader.GetId() == ext.NodeID.String()
 }
 
 // IsMember returns true if the node is a member of the storage group.

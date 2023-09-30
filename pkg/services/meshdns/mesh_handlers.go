@@ -28,6 +28,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 type meshLookupMux struct {
@@ -40,7 +41,7 @@ type meshLookupMux struct {
 }
 
 type meshDomain struct {
-	nodeID   string
+	nodeID   types.NodeID
 	domain   string
 	storage  storage.Provider
 	ipv6Only bool

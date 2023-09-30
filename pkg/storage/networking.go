@@ -53,7 +53,7 @@ type Networking interface {
 	// GetRoute returns a Route by name.
 	GetRoute(ctx context.Context, name string) (types.Route, error)
 	// GetRoutesByNode returns a list of Routes for a given Node.
-	GetRoutesByNode(ctx context.Context, nodeName string) (types.Routes, error)
+	GetRoutesByNode(ctx context.Context, nodeID types.NodeID) (types.Routes, error)
 	// GetRoutesByCIDR returns a list of Routes for a given CIDR.
 	GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (types.Routes, error)
 	// DeleteRoute deletes a Route by name.
@@ -64,7 +64,7 @@ type Networking interface {
 	// FilterGraph filters the adjacency map in the given graph for the given node ID according
 	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
 	// error is returned on faiure building the initial map or any database error.
-	FilterGraph(ctx context.Context, graph types.PeerGraph, nodeID string) (types.AdjacencyMap, error)
+	FilterGraph(ctx context.Context, graph types.PeerGraph, nodeID types.NodeID) (types.AdjacencyMap, error)
 }
 
 // ExpandACLs will use the given RBAC interface to expand any group references

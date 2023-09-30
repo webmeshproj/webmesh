@@ -98,7 +98,7 @@ func (s *meshStoreAnnouncer) proxyJoin(ctx context.Context, req *v1.JoinRequest)
 		return nil, err
 	}
 	defer c.Close()
-	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedFromMeta, s.st.ID())
+	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedFromMeta, s.st.ID().String())
 	// We are not autneticating the request beyond whatever pre-shared key was used to get
 	// here. So for now we'll assume the ID is valid. This is a TODO.
 	ctx = metadata.AppendToOutgoingContext(ctx, leaderproxy.ProxiedForMeta, req.GetId())

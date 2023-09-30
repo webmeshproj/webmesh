@@ -41,6 +41,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Ensure we implement the interface
@@ -98,7 +99,7 @@ func New(id protocol.ID, host host.Host, psk pnet.PSK, privkey crypto.PrivKey) (
 	// We go ahead and create an interface for ourself. If we can't do this we'll fail to
 	// do pretty much everything.
 	wgopts := wireguard.Options{
-		NodeID: host.ID().String(),
+		NodeID: types.NodeID(host.ID().String()),
 		// Will only work on Linux/Windows, needs to be utun+ on macOS.
 		Name: func() string {
 			if runtime.GOOS == "darwin" {

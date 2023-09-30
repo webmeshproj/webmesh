@@ -31,11 +31,12 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Interceptor is the leaderproxy interceptor.
 type Interceptor struct {
-	nodeID    string
+	nodeID    types.NodeID
 	consensus storage.Consensus
 	dialer    Dialer
 	network   context.Network
@@ -48,7 +49,7 @@ type Dialer interface {
 }
 
 // New returns a new leader proxy interceptor.
-func New(nodeID string, consensus storage.Consensus, dialer Dialer, network context.Network) *Interceptor {
+func New(nodeID types.NodeID, consensus storage.Consensus, dialer Dialer, network context.Network) *Interceptor {
 	return &Interceptor{
 		nodeID:    nodeID,
 		consensus: consensus,
@@ -133,7 +134,7 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return nil, err
 	}
 	defer conn.Close()
-	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, i.nodeID)
+	ctx = metadata.AppendToOutgoingContext(ctx, ProxiedFromMeta, i.nodeID.String())
 	if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}
@@ -234,7 +235,7 @@ func (i *Interceptor) proxyStreamToLeader(srv any, ss grpc.ServerStream, info *g
 		return err
 	}
 	defer conn.Close()
-	ctx := metadata.AppendToOutgoingContext(ss.Context(), ProxiedFromMeta, i.nodeID)
+	ctx := metadata.AppendToOutgoingContext(ss.Context(), ProxiedFromMeta, i.nodeID.String())
 	if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 		ctx = metadata.AppendToOutgoingContext(ctx, ProxiedForMeta, peer)
 	}

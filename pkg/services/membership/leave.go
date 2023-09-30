@@ -26,6 +26,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResponse, error) {
@@ -36,6 +38,9 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
+	}
+	if !storageutil.IsValidNodeID(req.GetId()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid node id")
 	}
 	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Errorf(codes.FailedPrecondition, "not leader")
@@ -61,7 +66,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 
 	// Lookup the peer first to make sure they exist
-	leaving, err := s.storage.MeshDB().Peers().Get(ctx, req.GetId())
+	leaving, err := s.storage.MeshDB().Peers().Get(ctx, types.NodeID(req.GetId()))
 	if err != nil {
 		if errors.IsNodeNotFound(err) {
 			// We're done here if they don't exist
@@ -79,7 +84,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 
 	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
-	err = s.storage.MeshDB().Peers().Delete(ctx, req.GetId())
+	err = s.storage.MeshDB().Peers().Delete(ctx, types.NodeID(req.GetId()))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}

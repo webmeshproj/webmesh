@@ -366,12 +366,12 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		fqdn := strings.TrimSuffix(value, ".")
 		dom := strings.TrimSuffix(t.node.Domain(), ".")
 		nodeID := strings.TrimSuffix(strings.TrimSuffix(fqdn, dom), ".")
-		if nodeID == t.node.ID() {
+		if nodeID == t.node.ID().String() {
 			t.log.Warn("Cannot resolve self")
 			return nil, fmt.Errorf("cannot resolve self")
 		}
 		t.log.Debug("Resolving DNS6 address", "fqdn", fqdn, "nodeID", nodeID)
-		peer, err := t.node.Storage().MeshDB().Peers().Get(ctx, nodeID)
+		peer, err := t.node.Storage().MeshDB().Peers().Get(ctx, types.NodeID(nodeID))
 		if err != nil {
 			t.log.Error("Failed to get peer", "error", err.Error(), "nodeID", nodeID)
 			return nil, fmt.Errorf("failed to get peer: %w", err)
@@ -384,12 +384,12 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		fqdn := strings.TrimSuffix(value, ".")
 		dom := strings.TrimSuffix(t.node.Domain(), ".")
 		nodeID := strings.TrimSuffix(strings.TrimSuffix(fqdn, dom), ".")
-		if nodeID == t.node.ID() {
+		if nodeID == t.node.ID().String() {
 			t.log.Warn("Cannot resolve self")
 			return nil, fmt.Errorf("cannot resolve self")
 		}
 		t.log.Debug("Resolving DNS4 address", "fqdn", fqdn, "nodeID", nodeID)
-		peer, err := t.node.Storage().MeshDB().Peers().Get(ctx, nodeID)
+		peer, err := t.node.Storage().MeshDB().Peers().Get(ctx, types.NodeID(nodeID))
 		if err != nil {
 			t.log.Error("Failed to get peer", "error", err.Error(), "nodeID", nodeID)
 			return nil, fmt.Errorf("failed to get peer: %w", err)
@@ -620,7 +620,7 @@ func (t *WebmeshTransport) registerMultiaddrsForListener(ctx context.Context, li
 		}
 		defer c.Close()
 		_, err = v1.NewMembershipClient(c).Update(ctx, &v1.UpdateRequest{
-			Id:         t.node.ID(),
+			Id:         t.node.ID().String(),
 			Multiaddrs: addrstrs,
 		})
 		if err != nil {

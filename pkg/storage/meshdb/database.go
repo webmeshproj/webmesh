@@ -23,17 +23,20 @@ import (
 	"io"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // New returns a new storage.Database instance using the given underlying MeshStorage.
 func New(store storage.MeshStorage) storage.MeshDB {
 	return &database{
 		peers:      peers.New(store),
+		graph:      types.NewGraphWithStore(graph.NewGraphStore(store)),
 		rbac:       rbac.New(store),
 		meshState:  state.New(store),
 		networking: networking.New(store),
@@ -65,6 +68,7 @@ type databaseCloser struct {
 
 type database struct {
 	peers      storage.Peers
+	graph      types.PeerGraph
 	rbac       storage.RBAC
 	meshState  storage.MeshState
 	networking storage.Networking
@@ -72,6 +76,10 @@ type database struct {
 
 func (d *database) Peers() storage.Peers {
 	return d.peers
+}
+
+func (d *database) PeerGraph() types.PeerGraph {
+	return d.graph
 }
 
 func (d *database) RBAC() storage.RBAC {

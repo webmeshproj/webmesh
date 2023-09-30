@@ -143,7 +143,7 @@ func (n *networking) GetRoute(ctx context.Context, name string) (types.Route, er
 }
 
 // GetRoutesByNode returns a list of Routes for a given Node.
-func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) (types.Routes, error) {
+func (n *networking) GetRoutesByNode(ctx context.Context, nodeID types.NodeID) (types.Routes, error) {
 	routes, err := n.ListRoutes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list network routes: %w", err)
@@ -151,7 +151,7 @@ func (n *networking) GetRoutesByNode(ctx context.Context, nodeName string) (type
 	out := make([]types.Route, 0)
 	for _, route := range routes {
 		r := route
-		if r.GetNode() == nodeName {
+		if r.GetNode() == nodeID.String() {
 			out = append(out, r)
 		}
 	}
@@ -214,11 +214,11 @@ func (n *networking) ListRoutes(ctx context.Context) (types.Routes, error) {
 // needs improvement to be more efficient and to allow edges so long as one of the routes encountered is
 // allowed. Currently if a single route provided by a destination node is not allowed, the entire node
 // is filtered out.
-func (n *networking) FilterGraph(ctx context.Context, graph types.PeerGraph, thisNodeID string) (types.AdjacencyMap, error) {
+func (n *networking) FilterGraph(ctx context.Context, graph types.PeerGraph, thisNodeID types.NodeID) (types.AdjacencyMap, error) {
 	log := context.LoggerFrom(ctx)
 
 	// Resolve the current node ID
-	thisNode, err := graph.Vertex(types.NodeID(thisNodeID))
+	thisNode, err := graph.Vertex(thisNodeID)
 	if err != nil {
 		return nil, fmt.Errorf("get node: %w", err)
 	}
@@ -263,7 +263,7 @@ Nodes:
 		}
 		// If the destination node exposes additional routes, check if the nodes can communicate
 		// via any of those routes.
-		routes, err := n.GetRoutesByNode(ctx, node.GetId())
+		routes, err := n.GetRoutesByNode(ctx, node.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("get routes by node: %w", err)
 		}
@@ -320,7 +320,7 @@ Nodes:
 			}
 			// If the peer exposes additional routes, check if the nodes can communicate
 			// via any of those routes.
-			routes, err := n.GetRoutesByNode(ctx, peerID.String())
+			routes, err := n.GetRoutesByNode(ctx, peerID)
 			if err != nil {
 				return nil, fmt.Errorf("get routes by node: %w", err)
 			}

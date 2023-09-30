@@ -29,6 +29,8 @@ import (
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
+
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Dialer is a generic interface for dialing a target address over the given network.
@@ -55,10 +57,10 @@ func (f ResolverFunc[T]) Resolve(ctx context.Context, lookup T) ([]netip.AddrPor
 }
 
 // NodeIDResolver is a resolver that resolves node addresses by node ID.
-type NodeIDResolver = Resolver[string]
+type NodeIDResolver = Resolver[types.NodeID]
 
 // NodeIDResolverFunc is a function that implements NodeIDResolver.
-type NodeIDResolverFunc = ResolverFunc[string]
+type NodeIDResolverFunc = ResolverFunc[types.NodeID]
 
 // FeatureResolver is a resolver that resolves node addresses by feature.
 type FeatureResolver = Resolver[v1.Feature]
@@ -172,16 +174,16 @@ func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, err
 // NodeDialer is an interface for dialing an arbitrary node. The node ID
 // is optional and if empty, implementations can choose the node to dial.
 type NodeDialer interface {
-	DialNode(ctx context.Context, id string) (*grpc.ClientConn, error)
+	DialNode(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error)
 }
 
 // NodeDialerFunc is the function signature for dialing an arbitrary node.
 // It is supplied by the mesh during startup. It can be used as an
 // alternative to the NodeDialer interface.
-type NodeDialerFunc func(ctx context.Context, id string) (*grpc.ClientConn, error)
+type NodeDialerFunc func(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error)
 
 // Dial implements NodeDialer.
-func (f NodeDialerFunc) DialNode(ctx context.Context, id string) (*grpc.ClientConn, error) {
+func (f NodeDialerFunc) DialNode(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error) {
 	return f(ctx, id)
 }
 

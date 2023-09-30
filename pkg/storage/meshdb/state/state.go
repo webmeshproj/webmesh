@@ -23,7 +23,6 @@ import (
 	"net/netip"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 type State = storage.MeshState
@@ -97,56 +96,4 @@ func (s *state) SetMeshDomain(ctx context.Context, domain string) error {
 		return err
 	}
 	return nil
-}
-
-func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {
-	nodes, err := peers.New(s).List(ctx, storage.IsPublicFilter())
-	if err != nil {
-		return nil, err
-	}
-	if len(nodes) == 0 {
-		return nil, nil
-	}
-	out := make(map[string]netip.AddrPort)
-	for _, node := range nodes {
-		if addr := node.PublicRPCAddr(); addr.IsValid() {
-			out[node.GetId()] = addr
-		}
-	}
-	return out, nil
-}
-
-func (s *state) ListPeerPublicRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error) {
-	nodes, err := s.ListPublicRPCAddresses(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for node := range nodes {
-		if node == nodeID {
-			delete(nodes, node)
-			break
-		}
-	}
-	return nodes, nil
-}
-
-func (s *state) ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error) {
-	nodes, err := peers.New(s).List(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[string]netip.AddrPort)
-	for _, node := range nodes {
-		if node.GetId() == nodeID {
-			continue
-		}
-		var addr netip.AddrPort
-		if node.PrivateRPCAddrV4().IsValid() {
-			addr = node.PrivateRPCAddrV4()
-		} else {
-			addr = node.PrivateRPCAddrV6()
-		}
-		out[node.GetId()] = addr
-	}
-	return out, nil
 }

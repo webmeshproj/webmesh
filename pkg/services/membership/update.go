@@ -31,6 +31,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateResponse, error) {
@@ -113,7 +114,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	var currentAddress string
 	storageStatus := s.storage.Status()
 	p := s.storage.MeshDB().Peers()
-	peer, err := p.Get(ctx, req.GetId())
+	peer, err := p.Get(ctx, types.NodeID(req.GetId()))
 	if err != nil {
 		if errors.IsNodeNotFound(err) {
 			return nil, status.Errorf(codes.Internal, "failed to lookup peer: %v", err)
@@ -130,7 +131,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		}
 	}
 	// Ensure any new routes
-	_, err = s.ensurePeerRoutes(ctx, peer.GetId(), req.GetRoutes())
+	_, err = s.ensurePeerRoutes(ctx, peer.NodeID(), req.GetRoutes())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err)
 	}

@@ -42,26 +42,26 @@ type PeerSubscribeFunc func([]types.MeshNode)
 
 // Peers is the peers interface.
 type Peers interface {
-	// Graph returns the graph of nodes.
-	Graph() types.PeerGraph
 	// Put creates or updates a node.
 	Put(ctx context.Context, n *v1.MeshNode) error
 	// Get gets a node by ID.
-	Get(ctx context.Context, id string) (types.MeshNode, error)
+	Get(ctx context.Context, id types.NodeID) (types.MeshNode, error)
 	// GetByPubKey gets a node by their public key.
 	GetByPubKey(ctx context.Context, key crypto.PublicKey) (types.MeshNode, error)
 	// Delete deletes a node.
-	Delete(ctx context.Context, id string) error
+	Delete(ctx context.Context, id types.NodeID) error
 	// List lists all nodes.
 	List(ctx context.Context, filters ...PeerFilter) ([]types.MeshNode, error)
 	// ListIDs lists all node IDs.
-	ListIDs(ctx context.Context) ([]string, error)
+	ListIDs(ctx context.Context) ([]types.NodeID, error)
 	// Subscribe subscribes to node changes.
 	Subscribe(ctx context.Context, fn PeerSubscribeFunc) (context.CancelFunc, error)
 	// AddEdge adds an edge between two nodes.
 	PutEdge(ctx context.Context, edge *v1.MeshEdge) error
+	// GetEdge gets an edge between two nodes.
+	GetEdge(ctx context.Context, from, to types.NodeID) (types.MeshEdge, error)
 	// RemoveEdge removes an edge between two nodes.
-	RemoveEdge(ctx context.Context, from, to string) error
+	RemoveEdge(ctx context.Context, from, to types.NodeID) error
 }
 
 // PeerFilter is a filter for nodes.

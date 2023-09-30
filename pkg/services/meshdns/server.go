@@ -122,7 +122,7 @@ type cacheValue struct {
 
 type DomainOptions struct {
 	// NodeID is the node ID to use for this domain.
-	NodeID string
+	NodeID types.NodeID
 	// MeshDomain is the domain to serve.
 	MeshDomain string
 	// MeshStorage is the storage for the mesh that this domain belongs to.

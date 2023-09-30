@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *dns.Msg, peerID string, ipv6Only bool) error {
-	peer, err := dom.storage.MeshDB().Peers().Get(ctx, peerID)
+	peer, err := dom.storage.MeshDB().Peers().Get(ctx, types.NodeID(peerID))
 	if err != nil {
 		return err
 	}

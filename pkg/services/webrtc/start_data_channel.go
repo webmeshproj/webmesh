@@ -33,6 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var canNegDataChannelAction = rbac.Actions{
@@ -102,7 +103,7 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 		log.Error("Request has invalid port")
 		return status.Error(codes.InvalidArgument, "invalid port provided in request")
 	}
-	if r.GetNodeId() == s.opts.ID {
+	if r.GetNodeId() == s.opts.ID.String() {
 		// We are the destination node.
 		return s.handleLocalNegotiation(log, stream, r, remoteAddr)
 	}
@@ -226,7 +227,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	var conn *grpc.ClientConn
 	var err error
 	for tries < maxRetries {
-		conn, err = s.opts.NodeDialer.DialNode(clientStream.Context(), r.GetNodeId())
+		conn, err = s.opts.NodeDialer.DialNode(clientStream.Context(), types.NodeID(r.GetNodeId()))
 		if err == nil {
 			break
 		}

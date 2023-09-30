@@ -35,13 +35,4 @@ type MeshState interface {
 	GetMeshDomain(ctx context.Context) (string, error)
 	// SetMeshDomain sets the mesh domain.
 	SetMeshDomain(ctx context.Context, domain string) error
-	// ListPublicRPCAddresses returns all public gRPC addresses in the mesh.
-	// The map key is the node ID.
-	ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error)
-	// ListPeerPublicRPCAddresses returns all public gRPC addresses in the mesh excluding a node.
-	// The map key is the node ID.
-	ListPeerPublicRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error)
-	// ListPeerPrivateRPCAddresses returns all private gRPC addresses in the mesh excluding a node.
-	// The map key is the node ID.
-	ListPeerPrivateRPCAddresses(ctx context.Context, nodeID string) (map[string]netip.AddrPort, error)
 }

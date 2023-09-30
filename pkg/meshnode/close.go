@@ -77,7 +77,7 @@ func (s *meshStore) leaveCluster(ctx context.Context) error {
 	defer conn.Close()
 	client := v1.NewMembershipClient(conn)
 	_, err = client.Leave(ctx, &v1.LeaveRequest{
-		Id: s.ID(),
+		Id: s.ID().String(),
 	})
 	return err
 }

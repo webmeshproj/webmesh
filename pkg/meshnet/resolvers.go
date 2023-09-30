@@ -24,6 +24,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // NewResolver returns a new Resolver instance.
@@ -37,7 +38,7 @@ type peerResolver struct {
 
 // NodeIDResolver returns a resolver that resolves node addresses by node ID.
 func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
-	return transport.NodeIDResolverFunc(func(ctx context.Context, lookup string) ([]netip.AddrPort, error) {
+	return transport.NodeIDResolverFunc(func(ctx context.Context, lookup types.NodeID) ([]netip.AddrPort, error) {
 		node, err := r.st.Peers().Get(ctx, lookup)
 		if err != nil {
 			return nil, err

@@ -179,7 +179,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	app.mesh = meshConn
 	app.svcs = srv
 	return &v1.ConnectResponse{
-		NodeId:     meshConn.ID(),
+		NodeId:     meshConn.ID().String(),
 		MeshDomain: meshConn.Domain(),
 		Ipv4:       meshConn.Network().NetworkV4().String(),
 		Ipv6:       meshConn.Network().NetworkV6().String(),

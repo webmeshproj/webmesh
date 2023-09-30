@@ -37,6 +37,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // DefaultMeshDomain is the default domain for the mesh network.
@@ -77,7 +78,7 @@ type Node interface {
 	transport.LeaderDialer
 
 	// ID returns the node ID.
-	ID() string
+	ID() types.NodeID
 	// Domain returns the domain of the mesh network.
 	Domain() string
 	// Key returns the private key used for WireGuard and libp2p connections.
@@ -93,7 +94,7 @@ type Node interface {
 	// Credentials returns the gRPC credentials to use for dialing the mesh.
 	Credentials() []grpc.DialOption
 	// LeaderID returns the current Raft leader ID.
-	LeaderID() (string, error)
+	LeaderID() (types.NodeID, error)
 	// Storage returns the underlying storage provider.
 	Storage() storage.Provider
 	// Network returns the Network manager.
@@ -187,8 +188,8 @@ type meshStore struct {
 }
 
 // ID returns the node ID.
-func (s *meshStore) ID() string {
-	return string(s.nodeID)
+func (s *meshStore) ID() types.NodeID {
+	return types.NodeID(s.nodeID)
 }
 
 // Key returns the private key used for WireGuard and libp2p connections.
@@ -240,7 +241,7 @@ func (s *meshStore) Ready() <-chan struct{} {
 			_, err = s.Storage().MeshDB().Peers().Get(ctx, leader)
 			cancel()
 			if err != nil {
-				s.log.Debug("waiting for leader", slog.String("leader", leader), slog.String("error", err.Error()))
+				s.log.Debug("waiting for leader", slog.String("leader", leader.String()), slog.String("error", err.Error()))
 				time.Sleep(time.Millisecond * 500)
 				continue
 			}
@@ -250,8 +251,8 @@ func (s *meshStore) Ready() <-chan struct{} {
 	return ch
 }
 
-// Leader returns the current Raft leader.
-func (s *meshStore) LeaderID() (string, error) {
+// Leader returns the current network leader.
+func (s *meshStore) LeaderID() (types.NodeID, error) {
 	if s.storage == nil || !s.open.Load() {
 		return "", ErrNotOpen
 	}
@@ -259,7 +260,7 @@ func (s *meshStore) LeaderID() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("get leader: %w", err)
 	}
-	return leader.GetId(), nil
+	return types.NodeID(leader.GetId()), nil
 }
 
 // Dial is a generic dial method.
@@ -283,7 +284,7 @@ func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
 }
 
 // Dial opens a new gRPC connection to the given node.
-func (s *meshStore) DialNode(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
+func (s *meshStore) DialNode(ctx context.Context, nodeID types.NodeID) (*grpc.ClientConn, error) {
 	if s.storage == nil || !s.open.Load() {
 		return nil, ErrNotOpen
 	}
@@ -299,7 +300,7 @@ func (s *meshStore) Credentials() []grpc.DialOption {
 	return s.opts.Credentials
 }
 
-func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
+func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID types.NodeID) (*grpc.ClientConn, error) {
 	node, err := s.Storage().MeshDB().Peers().Get(ctx, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("get node private rpc address: %w", err)
@@ -325,7 +326,7 @@ func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID string) (*g
 	return s.newGRPCConn(ctx, node.PrivateRPCAddrV4().String())
 }
 
-func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
+func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID types.NodeID) (*grpc.ClientConn, error) {
 	peers := s.Network().WireGuard().Peers()
 	if len(peers) == 0 {
 		return nil, fmt.Errorf("no wireguard peers")
@@ -339,7 +340,7 @@ func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID string) (
 		}
 		// An empty node ID means any peer is acceptable, but this should be more controlled
 		// so retries can ensure a connection to a different peer.
-		if nodeID == "" || id == nodeID {
+		if nodeID == "" || id == nodeID.String() {
 			toDial = &peer
 			break
 		}

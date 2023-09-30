@@ -24,6 +24,7 @@ import (
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Provider is a provider of MeshStorage.
@@ -58,6 +59,8 @@ type Provider interface {
 type MeshDB interface {
 	// Peers returns the interface for managing nodes in the mesh.
 	Peers() Peers
+	// PeerGraph returns the interface for querying the peer graph.
+	PeerGraph() types.PeerGraph
 	// RBAC returns the interface for managing RBAC policies in the mesh.
 	RBAC() RBAC
 	// MeshState returns the interface for querying mesh state.

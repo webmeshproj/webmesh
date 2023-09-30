@@ -187,7 +187,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				Type: v1.SubjectType_SUBJECT_NODE,
 				Name: opts.Bootstrap.Admin,
 			})
-			for _, id := range append(opts.Bootstrap.Servers, s.ID()) {
+			for _, id := range append(opts.Bootstrap.Servers, s.ID().String()) {
 				out = append(out, &v1.Subject{
 					Type: v1.SubjectType_SUBJECT_NODE,
 					Name: string(id),
@@ -267,7 +267,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if len(opts.Routes) > 0 {
 		err = nw.PutRoute(ctx, &v1.Route{
 			Name: fmt.Sprintf("%s-auto", s.nodeID),
-			Node: s.ID(),
+			Node: s.ID().String(),
 			DestinationCidrs: func() []string {
 				out := make([]string, 0)
 				for _, r := range opts.Routes {
@@ -284,7 +284,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// We need to officially "join" ourselves to the cluster with a wireguard
 	// address. This is done by creating a new node in the database and then
 	// readding it to the cluster as a voter with the acquired address.
-	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
+	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID().String()))
 	p := meshDB.Peers()
 	encodedPubKey, err := s.key.PublicKey().Encode()
 	if err != nil {
@@ -292,7 +292,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	}
 	privatev6 := netutil.AssignToPrefix(meshnetworkv6, s.key.PublicKey())
 	self := &v1.MeshNode{
-		Id:              s.ID(),
+		Id:              s.ID().String(),
 		PrimaryEndpoint: opts.PrimaryEndpoint.String(),
 		WireguardEndpoints: func() []string {
 			out := make([]string, 0)
@@ -311,7 +311,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	var privatev4 netip.Prefix
 	if !s.opts.DisableIPv4 {
 		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeId: s.ID(),
+			NodeId: s.ID().String(),
 			Subnet: opts.Bootstrap.IPv4Network,
 		})
 		if err != nil {
@@ -338,7 +338,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		}
 	}
 	// Do the loop again for edges
-	for _, id := range append(opts.Bootstrap.Servers, s.ID()) {
+	for _, id := range append(opts.Bootstrap.Servers, s.ID().String()) {
 		for _, peer := range opts.Bootstrap.Servers {
 			if id == peer {
 				continue
@@ -368,7 +368,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// If we have direct-peerings, add them to the db
 	if len(opts.DirectPeers) > 0 {
 		for peer, proto := range opts.DirectPeers {
-			if peer == s.ID() {
+			if peer == s.ID().String() {
 				continue
 			}
 			err = p.Put(ctx, &v1.MeshNode{Id: peer})
@@ -376,7 +376,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				return fmt.Errorf("create direct peerings: %w", err)
 			}
 			err = p.PutEdge(ctx, &v1.MeshEdge{
-				Source:     s.ID(),
+				Source:     s.ID().String(),
 				Target:     peer,
 				Weight:     0,
 				Attributes: storageutil.EdgeAttrsForConnectProto(proto),

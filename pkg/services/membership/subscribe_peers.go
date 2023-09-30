@@ -52,12 +52,12 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		}
 	}
 
-	peerID := req.GetId()
+	peerID := types.NodeID(req.GetId())
 	log := s.log.With("remote-peer", peerID)
 	ctx := stream.Context()
 	db := s.storage.MeshDB()
 
-	log.Debug("Received subscribe peers request for peer", slog.String("peer", peerID))
+	log.Debug("Received subscribe peers request for peer", slog.String("peer", peerID.String()))
 
 	var lastIceServers []string
 	var lastDnsServers []string
@@ -125,14 +125,14 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	}
 }
 
-func listDNSServers(ctx context.Context, st storage.MeshDB, peerID string) ([]string, error) {
+func listDNSServers(ctx context.Context, st storage.MeshDB, peerID types.NodeID) ([]string, error) {
 	var servers []string
 	dnsServers, err := st.Peers().List(ctx, storage.FeatureFilter(v1.Feature_MESH_DNS))
 	if err != nil {
 		return nil, err
 	}
 	for _, peer := range dnsServers {
-		if peer.GetId() == peerID {
+		if peer.NodeID() == peerID {
 			continue
 		}
 		switch {
@@ -146,14 +146,14 @@ func listDNSServers(ctx context.Context, st storage.MeshDB, peerID string) ([]st
 	return servers, nil
 }
 
-func listICEServers(ctx context.Context, st storage.MeshDB, peerID string) ([]string, error) {
+func listICEServers(ctx context.Context, st storage.MeshDB, peerID types.NodeID) ([]string, error) {
 	var servers []string
 	iceServers, err := st.Peers().List(ctx, storage.FeatureFilter(v1.Feature_ICE_NEGOTIATION))
 	if err != nil {
 		return nil, err
 	}
 	for _, peer := range iceServers {
-		if peer.GetId() == peerID {
+		if peer.NodeID() == peerID {
 			continue
 		}
 		if peer.PublicRPCAddr().IsValid() {

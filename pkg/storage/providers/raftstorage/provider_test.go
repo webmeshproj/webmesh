@@ -27,6 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/testutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestInMemoryProviderConformance(t *testing.T) {
@@ -55,7 +56,7 @@ func (b *builder) newProviders(t *testing.T, count int) []storage.Provider {
 
 func newTestOptions(transport transport.RaftTransport) Options {
 	return Options{
-		NodeID:             uuid.NewString(),
+		NodeID:             types.NodeID(uuid.NewString()),
 		Transport:          transport,
 		InMemory:           true,
 		ConnectionTimeout:  time.Millisecond * 500,

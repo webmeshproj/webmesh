@@ -49,8 +49,6 @@ type peerDB struct {
 	graph types.PeerGraph
 }
 
-func (p *peerDB) Graph() types.PeerGraph { return p.graph }
-
 func (p *peerDB) Put(ctx context.Context, node *v1.MeshNode) error {
 	// Dedup the wireguard endpoints.
 	seen := make(map[string]struct{})
@@ -72,8 +70,8 @@ func (p *peerDB) Put(ctx context.Context, node *v1.MeshNode) error {
 	return nil
 }
 
-func (p *peerDB) Get(ctx context.Context, id string) (types.MeshNode, error) {
-	node, err := p.graph.Vertex(types.NodeID(id))
+func (p *peerDB) Get(ctx context.Context, id types.NodeID) (types.MeshNode, error) {
+	node, err := p.graph.Vertex(id)
 	if err != nil {
 		if errors.Is(err, graph.ErrVertexNotFound) {
 			return types.MeshNode{}, errors.ErrNodeNotFound
@@ -103,13 +101,13 @@ func (p *peerDB) GetByPubKey(ctx context.Context, key crypto.PublicKey) (types.M
 	return types.MeshNode{}, errors.ErrNodeNotFound
 }
 
-func (p *peerDB) Delete(ctx context.Context, id string) error {
+func (p *peerDB) Delete(ctx context.Context, id types.NodeID) error {
 	edges, err := p.graph.Edges()
 	if err != nil {
 		return fmt.Errorf("get edges: %w", err)
 	}
 	for _, edge := range edges {
-		if edge.Source.String() == id || edge.Target.String() == id {
+		if edge.Source.String() == id.String() || edge.Target.String() == id.String() {
 			err = p.graph.RemoveEdge(edge.Source, edge.Target)
 			if err != nil {
 				return fmt.Errorf("remove edge: %w", err)
@@ -145,17 +143,17 @@ func (p *peerDB) List(ctx context.Context, filters ...storage.PeerFilter) ([]typ
 	return storage.PeerFilters(filters).Filter(out), err
 }
 
-func (p *peerDB) ListIDs(ctx context.Context) ([]string, error) {
+func (p *peerDB) ListIDs(ctx context.Context) ([]types.NodeID, error) {
 	keys, err := p.db.ListKeys(ctx, storage.NodesPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("list keys: %w", err)
 	}
-	ids := make([]string, 0)
+	ids := make([]types.NodeID, 0)
 	for _, key := range keys {
 		if bytes.Equal(key, storage.NodesPrefix) {
 			continue
 		}
-		ids = append(ids, string(storage.NodesPrefix.TrimFrom(key)))
+		ids = append(ids, types.NodeID(storage.NodesPrefix.TrimFrom(key)))
 	}
 	return ids, nil
 }
@@ -213,8 +211,24 @@ func (p *peerDB) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
 	return e.PutInto(ctx, p.graph)
 }
 
-func (p *peerDB) RemoveEdge(ctx context.Context, from, to string) error {
-	err := p.graph.RemoveEdge(types.NodeID(from), types.NodeID(to))
+func (p *peerDB) GetEdge(ctx context.Context, source, target types.NodeID) (types.MeshEdge, error) {
+	edge, err := p.graph.Edge(source, target)
+	if err != nil {
+		if errors.Is(err, graph.ErrEdgeNotFound) {
+			return types.MeshEdge{}, errors.ErrEdgeNotFound
+		}
+		return types.MeshEdge{}, fmt.Errorf("get edge: %w", err)
+	}
+	return types.MeshEdge{MeshEdge: &v1.MeshEdge{
+		Source:     edge.Source.GetId(),
+		Target:     edge.Target.GetId(),
+		Weight:     int32(edge.Properties.Weight),
+		Attributes: edge.Properties.Attributes,
+	}}, nil
+}
+
+func (p *peerDB) RemoveEdge(ctx context.Context, from, to types.NodeID) error {
+	err := p.graph.RemoveEdge(from, to)
 	if err != nil {
 		if err == graph.ErrEdgeNotFound {
 			return nil

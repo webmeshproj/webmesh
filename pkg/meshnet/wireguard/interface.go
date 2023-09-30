@@ -37,6 +37,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/link"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/routes"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // DefaultListenPort is the default listen port for the WireGuard interface.
@@ -83,7 +84,7 @@ type Interface interface {
 // Options are options for configuring the wireguard interface.
 type Options struct {
 	// NodeID is the ID of the node. This is only used for metrics.
-	NodeID string
+	NodeID types.NodeID
 	// ListenPort is the port to listen on.
 	ListenPort int
 	// Name is the name of the interface.

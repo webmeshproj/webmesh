@@ -229,7 +229,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			// Will need to subscribe to route updates from the other meshes.
 			meshConfig := config.Meshes[otherID]
 			req := &v1.UpdateRequest{
-				Id:       meshConn.ID(),
+				Id:       meshConn.ID().String(),
 				Routes:   toBroadcast,
 				Features: meshConfig.NewFeatureSet(),
 			}

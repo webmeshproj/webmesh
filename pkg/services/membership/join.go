@@ -37,6 +37,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var canVoteAction = &rbac.Action{
@@ -159,12 +160,12 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// Handle any new routes
 	if len(req.GetRoutes()) > 0 {
-		created, err := s.ensurePeerRoutes(ctx, req.GetId(), req.GetRoutes())
+		created, err := s.ensurePeerRoutes(ctx, types.NodeID(req.GetId()), req.GetRoutes())
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err))
 		} else if created {
 			cleanFuncs = append(cleanFuncs, func() {
-				err := s.storage.MeshDB().Networking().DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
+				err := s.storage.MeshDB().Networking().DeleteRoute(ctx, nodeAutoRoute(types.NodeID(req.GetId())))
 				if err != nil {
 					log.Warn("Failed to delete route", slog.String("error", err.Error()))
 				}
@@ -206,7 +207,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to raft log: %v", err))
 	}
 	cleanFuncs = append(cleanFuncs, func() {
-		err := p.Delete(ctx, req.GetId())
+		err := p.Delete(ctx, types.NodeID(req.GetId()))
 		if err != nil {
 			log.Warn("failed to delete peer", slog.String("error", err.Error()))
 		}
@@ -215,11 +216,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Add an edge from the joining server to the caller
 	joiningServer := s.nodeID
 	if proxiedFrom, ok := leaderproxy.ProxiedFrom(ctx); ok {
-		joiningServer = proxiedFrom
+		joiningServer = types.NodeID(proxiedFrom)
 	}
-	log.Debug("Adding edge between caller and joining server", slog.String("joining_server", joiningServer))
+	log.Debug("Adding edge between caller and joining server", slog.String("join-edge", joiningServer.String()))
 	err = p.PutEdge(ctx, &v1.MeshEdge{
-		Source: joiningServer,
+		Source: joiningServer.String(),
 		Target: req.GetId(),
 		Weight: 1,
 	})
@@ -277,7 +278,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Put an edge between the caller and all direct peers
 		for peer, proto := range req.GetDirectPeers() {
 			// Check if the peer exists
-			_, err := p.Get(ctx, peer)
+			if !storageutil.IsValidNodeID(peer) {
+				return nil, handleErr(status.Errorf(codes.InvalidArgument, "invalid peer id %q", peer))
+			}
+			_, err := p.Get(ctx, types.NodeID(peer))
 			if err != nil {
 				if errors.IsNodeNotFound(err) {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to get peer: %v", err))
@@ -303,7 +307,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// Collect the list of peers we will send to the new node
-	peers, err := meshnet.WireGuardPeersFor(ctx, s.storage.MeshDB(), req.GetId())
+	peers, err := meshnet.WireGuardPeersFor(ctx, s.storage.MeshDB(), types.NodeID(req.GetId()))
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
 	}

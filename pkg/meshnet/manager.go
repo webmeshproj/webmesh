@@ -36,12 +36,13 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Options are the options for the network manager.
 type Options struct {
 	// NodeID is the ID of the node.
-	NodeID string
+	NodeID types.NodeID
 	// InterfaceName is the name of the wireguard interface.
 	InterfaceName string
 	// ForceReplace is whether to force replace the wireguard interface.
@@ -194,7 +195,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		return err
 	}
 	fwopts := &firewall.Options{
-		ID: m.opts.NodeID,
+		ID: m.opts.NodeID.String(),
 		// TODO: Make this configurable
 		DefaultPolicy: firewall.PolicyAccept,
 		WireguardPort: uint16(m.opts.ListenPort),
@@ -305,7 +306,7 @@ func (m *manager) Dial(ctx context.Context, network, address string) (net.Conn, 
 			}
 		} else {
 			// We gotta hit the database
-			peer, err := m.storage.Peers().Get(ctx, host)
+			peer, err := m.storage.Peers().Get(ctx, types.NodeID(host))
 			if err != nil {
 				return nil, fmt.Errorf("get peer: %w", err)
 			}

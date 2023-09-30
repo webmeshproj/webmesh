@@ -33,6 +33,9 @@ import (
 // PeerGraph is the graph.Graph implementation for the mesh network.
 type PeerGraph graph.Graph[NodeID, MeshNode]
 
+// PeerGraphStore is the graph.Store implementation for the mesh network.
+type PeerGraphStore graph.Store[NodeID, MeshNode]
+
 // DrawPeerGraph draws a PeerGraph to the given writer in DOT format.
 func DrawPeerGraph(ctx context.Context, g PeerGraph, w io.Writer) error {
 	err := draw.DOT(g, w)
@@ -42,12 +45,6 @@ func DrawPeerGraph(ctx context.Context, g PeerGraph, w io.Writer) error {
 	return nil
 }
 
-// PeerGraphStore is the graph.Store implementation for the mesh network.
-type PeerGraphStore graph.Store[NodeID, MeshNode]
-
-// AdjacencyMap is a map of node names to a map of node names to edges.
-type AdjacencyMap map[NodeID]EdgeMap
-
 // NewGraphWithStore creates a new Graph instance with the given graph storage implementation.
 func NewGraphWithStore(store PeerGraphStore) PeerGraph {
 	return graph.NewWithStore(graphHasher, store)
@@ -55,6 +52,9 @@ func NewGraphWithStore(store PeerGraphStore) PeerGraph {
 
 // graphHasher is the hash key function for the graph.
 func graphHasher(n MeshNode) NodeID { return NodeID(n.GetId()) }
+
+// AdjacencyMap is a map of node names to a map of node names to edges.
+type AdjacencyMap map[NodeID]EdgeMap
 
 // NewAdjacencyMap returns a new adjacency map for the graph.
 func NewAdjacencyMap(g PeerGraph) (AdjacencyMap, error) {

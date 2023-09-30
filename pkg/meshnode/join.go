@@ -158,7 +158,7 @@ func (s *meshStore) newJoinRequest(opts ConnectOptions, encodedKey string) *v1.J
 		opts.GRPCAdvertisePort = services.DefaultGRPCPort
 	}
 	req := &v1.JoinRequest{
-		Id:        s.ID(),
+		Id:        s.ID().String(),
 		PublicKey: encodedKey,
 		PrimaryEndpoint: func() string {
 			if opts.PrimaryEndpoint.IsValid() {

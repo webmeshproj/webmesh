@@ -26,6 +26,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // DefaultDataDir is the default data directory.
@@ -49,7 +50,7 @@ const (
 // Options are the raft options.
 type Options struct {
 	// NodeID is the node ID.
-	NodeID string
+	NodeID types.NodeID
 	// Transport is the Raft transport to use for communicating with
 	// other Raft nodes.
 	Transport transport.RaftTransport
@@ -90,7 +91,7 @@ type Options struct {
 }
 
 // NewOptions returns new raft options with sensible defaults.
-func NewOptions(nodeID string, transport transport.RaftTransport) Options {
+func NewOptions(nodeID types.NodeID, transport transport.RaftTransport) Options {
 	return Options{
 		NodeID:             nodeID,
 		Transport:          transport,

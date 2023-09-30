@@ -28,6 +28,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Server is the webmesh node service.
@@ -40,7 +41,7 @@ type Server struct {
 
 // Options are options for the Node service.
 type Options struct {
-	NodeID     string
+	NodeID     types.NodeID
 	Storage    storage.Provider
 	WireGuard  wireguard.Interface
 	NodeDialer transport.NodeDialer

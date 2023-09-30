@@ -31,13 +31,14 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Server is the webmesh Membership service.
 type Server struct {
 	v1.UnimplementedMembershipServer
 
-	nodeID     string
+	nodeID     types.NodeID
 	storage    storage.Provider
 	plugins    plugins.Manager
 	rbac       rbac.Evaluator
@@ -51,7 +52,7 @@ type Server struct {
 
 // Options are the options for the Membership service.
 type Options struct {
-	NodeID    string
+	NodeID    types.NodeID
 	Storage   storage.Provider
 	Plugins   plugins.Manager
 	RBAC      rbac.Evaluator
@@ -97,7 +98,7 @@ func (s *Server) loadMeshState(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) ensurePeerRoutes(ctx context.Context, nodeID string, routes []string) (created bool, err error) {
+func (s *Server) ensurePeerRoutes(ctx context.Context, nodeID types.NodeID, routes []string) (created bool, err error) {
 	nw := s.storage.MeshDB().Networking()
 	current, err := nw.GetRoutesByNode(ctx, nodeID)
 	if err != nil {
@@ -115,7 +116,7 @@ Routes:
 		// This is a new route, start managing an auto route for the node.
 		rt := v1.Route{
 			Name:             nodeAutoRoute(nodeID),
-			Node:             nodeID,
+			Node:             nodeID.String(),
 			DestinationCidrs: routes,
 		}
 		s.log.Debug("Adding new route for node", "node", nodeID, "route", &rt)
@@ -128,7 +129,7 @@ Routes:
 	return false, nil
 }
 
-func nodeAutoRoute(nodeID string) string {
+func nodeAutoRoute(nodeID types.NodeID) string {
 	return fmt.Sprintf("%s-auto", nodeID)
 }
 

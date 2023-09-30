@@ -34,11 +34,10 @@ import (
 
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
 // Peers are filtered by network ACLs.
-func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID string) ([]*v1.WireGuardPeer, error) {
-	peers := st.Peers()
-	graph := peers.Graph()
+func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.NodeID) ([]*v1.WireGuardPeer, error) {
+	graph := st.PeerGraph()
 	nw := st.Networking()
-	adjacencyMap, err := nw.FilterGraph(ctx, peers.Graph(), peerID)
+	adjacencyMap, err := nw.FilterGraph(ctx, graph, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)
 	}
@@ -118,7 +117,7 @@ func recursePeers(
 	nw networking.Networking,
 	graph types.PeerGraph,
 	adjacencyMap types.AdjacencyMap,
-	thisPeer string,
+	thisPeer types.NodeID,
 	thisRoutes []netip.Prefix,
 	node *types.MeshNode,
 ) (allowedIPs, allowedRoutes []netip.Prefix, err error) {
@@ -129,7 +128,7 @@ func recursePeers(
 		allowedIPs = append(allowedIPs, node.PrivateAddrV6())
 	}
 	// Does this peer expose routes?
-	routes, err := nw.GetRoutesByNode(ctx, node.GetId())
+	routes, err := nw.GetRoutesByNode(ctx, types.NodeID(node.GetId()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("get routes by node: %w", err)
 	}
@@ -168,7 +167,7 @@ func recurseEdges(
 	nw networking.Networking,
 	graph types.PeerGraph,
 	adjacencyMap types.AdjacencyMap,
-	thisPeer string,
+	thisPeer types.NodeID,
 	thisRoutes []netip.Prefix,
 	node *types.MeshNode,
 	visited map[types.NodeID]struct{},
@@ -180,7 +179,7 @@ func recurseEdges(
 	visited[types.NodeID(node.GetId())] = struct{}{}
 	targets := adjacencyMap[types.NodeID(node.GetId())]
 	for target := range targets {
-		if target.String() == thisPeer {
+		if target.String() == thisPeer.String() {
 			continue
 		}
 		if _, ok := directAdjacents[target]; ok {
@@ -204,7 +203,7 @@ func recurseEdges(
 			allowedIPs = append(allowedIPs, targetNode.PrivateAddrV6())
 		}
 		// Does this peer expose routes?
-		routes, err := nw.GetRoutesByNode(ctx, targetNode.GetId())
+		routes, err := nw.GetRoutesByNode(ctx, targetNode.NodeID())
 		if err != nil {
 			return nil, nil, fmt.Errorf("get routes by node: %w", err)
 		}

@@ -23,6 +23,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // DefaultSTUNServers are the default STUN servers to use.
@@ -41,7 +42,7 @@ type Server struct {
 
 // Options are options for the WebRTC service.
 type Options struct {
-	ID          string
+	ID          types.NodeID
 	Wireguard   wireguard.Interface
 	NodeDialer  transport.NodeDialer
 	RBAC        rbac.Evaluator

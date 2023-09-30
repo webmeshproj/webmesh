@@ -134,8 +134,8 @@ func (m *MetricsRecorder) updateMetrics() error {
 	} else {
 		rcvdDiff = metrics.TotalReceiveBytes
 	}
-	BytesSentTotal.WithLabelValues(nodeID).Add(float64(sentDiff))
-	BytesRecvdTotal.WithLabelValues(nodeID).Add(float64(rcvdDiff))
+	BytesSentTotal.WithLabelValues(nodeID.String()).Add(float64(sentDiff))
+	BytesRecvdTotal.WithLabelValues(nodeID.String()).Add(float64(rcvdDiff))
 
 	// Update peer metrics.
 	seen := make(map[string]struct{})
@@ -151,7 +151,7 @@ func (m *MetricsRecorder) updateMetrics() error {
 		seen[peerID] = struct{}{}
 		m.connected[peerID] = struct{}{}
 		// Set the peer as connected.
-		ConnectedPeers.WithLabelValues(nodeID, peerID).Set(1)
+		ConnectedPeers.WithLabelValues(nodeID.String(), peerID).Set(1)
 		// Update the peer metrics.
 		var sentDiff, rcvdDiff uint64
 		if m.peerSent[peerID] > 0 {
@@ -166,14 +166,14 @@ func (m *MetricsRecorder) updateMetrics() error {
 		}
 		m.peerSent[peerID] = peer.TransmitBytes
 		m.peerRcvd[peerID] = peer.ReceiveBytes
-		PeerBytesSentTotal.WithLabelValues(nodeID, peerID).Add(float64(sentDiff))
-		PeerBytesRecvdTotal.WithLabelValues(nodeID, peerID).Add(float64(rcvdDiff))
+		PeerBytesSentTotal.WithLabelValues(nodeID.String(), peerID).Add(float64(sentDiff))
+		PeerBytesRecvdTotal.WithLabelValues(nodeID.String(), peerID).Add(float64(rcvdDiff))
 	}
 
 	// Decrement the connected peers that are no longer connected.
 	for peerID := range m.connected {
 		if _, ok := seen[peerID]; !ok {
-			ConnectedPeers.WithLabelValues(nodeID, peerID).Set(0)
+			ConnectedPeers.WithLabelValues(nodeID.String(), peerID).Set(0)
 			delete(m.connected, peerID)
 		}
 	}

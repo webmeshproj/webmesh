@@ -25,6 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestWireGuardPeersWithACLs(t *testing.T) {
@@ -224,7 +225,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			}
 			// Run the test cases
 			for peerID := range testCase.wantPeers {
-				peers, err := WireGuardPeersFor(ctx, db, peerID)
+				peers, err := WireGuardPeersFor(ctx, db, types.NodeID(peerID))
 				if err != nil {
 					t.Fatalf("get WireGuard peers for %q: %v", peerID, err)
 				}

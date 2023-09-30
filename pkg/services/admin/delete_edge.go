@@ -25,6 +25,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var deleteEdgeAction = rbac.Actions{
@@ -45,6 +47,9 @@ func (s *Server) DeleteEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Em
 		return nil, status.Error(codes.InvalidArgument, "edge target is required")
 	}
 	for _, id := range []string{edge.GetSource(), edge.GetTarget()} {
+		if !storageutil.IsValidNodeID(id) {
+			return nil, status.Error(codes.InvalidArgument, "invalid node id")
+		}
 		if ok, err := s.rbacEval.Evaluate(ctx, deleteEdgeAction.For(id)); !ok {
 			if err != nil {
 				context.LoggerFrom(ctx).Error("failed to evaluate put edge action", "error", err)
@@ -52,7 +57,7 @@ func (s *Server) DeleteEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Em
 			return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put the given edge")
 		}
 	}
-	err := s.db.Peers().RemoveEdge(ctx, edge.GetSource(), edge.GetTarget())
+	err := s.db.Peers().RemoveEdge(ctx, types.NodeID(edge.GetSource()), types.NodeID(edge.GetTarget()))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
