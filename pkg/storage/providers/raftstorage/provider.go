@@ -34,8 +34,8 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage/fsm"
 )
 

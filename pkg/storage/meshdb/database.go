@@ -27,7 +27,7 @@ import (
 )
 
 // New returns a new storage.Database instance using the given underlying MeshStorage.
-func New(store storage.MeshStorage) storage.Database {
+func New(store storage.MeshStorage) storage.MeshDB {
 	return &database{
 		peers:      peers.New(store),
 		rbac:       rbac.New(store),

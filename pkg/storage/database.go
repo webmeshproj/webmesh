@@ -16,9 +16,9 @@ limitations under the License.
 
 package storage
 
-// Database is the interface for the mesh database. It provides access to all
+// MeshDB is the interface for the mesh database. It provides access to all
 // storage interfaces.
-type Database interface {
+type MeshDB interface {
 	// Peers returns the interface for managing nodes in the mesh.
 	Peers() Peers
 	// RBAC returns the interface for managing RBAC policies in the mesh.

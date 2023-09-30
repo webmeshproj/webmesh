@@ -25,7 +25,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/storage/backends/badgerdb"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
