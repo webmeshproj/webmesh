@@ -29,20 +29,24 @@ type NewMeshDBFunc func(t *testing.T) (storage.MeshDB, types.PeerGraphStore)
 // TestMeshDBConformance is a helper for running all database conformance
 // tests against a MeshDB implementation.
 func TestMeshDBConformance(t *testing.T, builder NewMeshDBFunc) {
-	db, graph := builder(t)
 	TestPeerGraphstoreConformance(t, func(t *testing.T) types.PeerGraphStore {
+		_, graph := builder(t)
 		return graph
 	})
 	TestMeshStateStorageConformance(t, func(t *testing.T) storage.MeshState {
+		db, _ := builder(t)
 		return db.MeshState()
 	})
 	TestRBACStorageConformance(t, func(t *testing.T) storage.RBAC {
+		db, _ := builder(t)
 		return db.RBAC()
 	})
 	TestPeerStorageConformance(t, func(t *testing.T) storage.Peers {
+		db, _ := builder(t)
 		return db.Peers()
 	})
 	TestNetworkingStorageConformance(t, func(t *testing.T) storage.Networking {
+		db, _ := builder(t)
 		return db.Networking()
 	})
 }
