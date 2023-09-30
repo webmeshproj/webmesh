@@ -255,8 +255,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			Priority:         math.MinInt32,
 			SourceNodes:      []string{"*"},
 			DestinationNodes: []string{"*"},
-			SourceCidrs:      []string{"*"},
-			DestinationCidrs: []string{"*"},
+			SourceCIDRs:      []string{"*"},
+			DestinationCIDRs: []string{"*"},
 			Action:           v1.ACLAction_ACTION_ACCEPT,
 		}})
 		if err != nil {
@@ -269,7 +269,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		err = nw.PutRoute(ctx, types.Route{Route: &v1.Route{
 			Name: fmt.Sprintf("%s-auto", s.nodeID),
 			Node: s.ID().String(),
-			DestinationCidrs: func() []string {
+			DestinationCIDRs: func() []string {
 				out := make([]string, 0)
 				for _, r := range opts.Routes {
 					out = append(out, r.String())
@@ -302,9 +302,9 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			}
 			return out
 		}(),
-		ZoneAwarenessId: s.opts.ZoneAwarenessID,
+		ZoneAwarenessID: s.opts.ZoneAwarenessID,
 		PublicKey:       encodedPubKey,
-		PrivateIpv6:     privatev6.String(),
+		PrivateIPv6:     privatev6.String(),
 		Features:        opts.Features,
 		JoinedAt:        timestamppb.New(time.Now().UTC()),
 	}}
@@ -312,13 +312,13 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	var privatev4 netip.Prefix
 	if !s.opts.DisableIPv4 {
 		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeId: s.ID().String(),
+			NodeID: s.ID().String(),
 			Subnet: opts.Bootstrap.IPv4Network,
 		})
 		if err != nil {
 			return fmt.Errorf("allocate IPv4 address: %w", err)
 		}
-		self.PrivateIpv4 = privatev4.String()
+		self.PrivateIPv4 = privatev4.String()
 	}
 	s.log.Debug("Creating ourself in the database", slog.Any("params", self))
 	err = p.Put(ctx, self)

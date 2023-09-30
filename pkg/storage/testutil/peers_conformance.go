@@ -65,9 +65,9 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					PublicKey:          mustGeneratePublicKey(t),
 					PrimaryEndpoint:    "127.0.0.1",
 					WireguardEndpoints: []string{"127.0.0.1:51820"},
-					ZoneAwarenessId:    "zone-a",
-					PrivateIpv4:        "172.16.0.1/32",
-					PrivateIpv6:        "2001:db8::1/128",
+					ZoneAwarenessID:    "zone-a",
+					PrivateIPv4:        "172.16.0.1/32",
+					PrivateIPv6:        "2001:db8::1/128",
 				}},
 			},
 		}
@@ -118,9 +118,9 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				PublicKey:          mustGeneratePublicKey(t),
 				PrimaryEndpoint:    "127.0.0.1",
 				WireguardEndpoints: []string{"127.0.0.1:51820", "127.0.0.2:51820", "127.0.0.1:51820"},
-				ZoneAwarenessId:    "zone-a",
-				PrivateIpv4:        "172.16.0.1/32",
-				PrivateIpv6:        "2001:db8::1/128",
+				ZoneAwarenessID:    "zone-a",
+				PrivateIPv4:        "172.16.0.1/32",
+				PrivateIPv6:        "2001:db8::1/128",
 			}}
 			err := peers.Put(ctx, node)
 			if err != nil {
@@ -163,9 +163,9 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			PublicKey:          key,
 			PrimaryEndpoint:    "127.0.0.1",
 			WireguardEndpoints: []string{"127.0.0.1:51820"},
-			ZoneAwarenessId:    "zone-a",
-			PrivateIpv4:        "172.16.0.1/32",
-			PrivateIpv6:        "2001:db8::1/128",
+			ZoneAwarenessID:    "zone-a",
+			PrivateIPv4:        "172.16.0.1/32",
+			PrivateIPv6:        "2001:db8::1/128",
 		}}
 		err = p.Put(ctx, node)
 		if err != nil {
@@ -197,9 +197,9 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			PublicKey:          mustGeneratePublicKey(t),
 			PrimaryEndpoint:    "127.0.0.1",
 			WireguardEndpoints: []string{"127.0.0.1:51820"},
-			ZoneAwarenessId:    "zone-a",
-			PrivateIpv4:        "172.16.0.1/32",
-			PrivateIpv6:        "2001:db8::1/128",
+			ZoneAwarenessID:    "zone-a",
+			PrivateIPv4:        "172.16.0.1/32",
+			PrivateIPv6:        "2001:db8::1/128",
 		}}
 		err := p.Put(ctx, node)
 		if err != nil {
@@ -239,18 +239,18 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				PublicKey:          mustGeneratePublicKey(t),
 				PrimaryEndpoint:    "127.0.0.1",
 				WireguardEndpoints: []string{"127.0.0.1:51820"},
-				ZoneAwarenessId:    "zone-a",
-				PrivateIpv4:        "172.16.0.1/32",
-				PrivateIpv6:        "2001:db8::1/128",
+				ZoneAwarenessID:    "zone-a",
+				PrivateIPv4:        "172.16.0.1/32",
+				PrivateIPv6:        "2001:db8::1/128",
 			}}
 			nodeB := types.MeshNode{MeshNode: &v1.MeshNode{
 				Id:                 "node-b",
 				PublicKey:          mustGeneratePublicKey(t),
 				PrimaryEndpoint:    "127.0.0.1",
 				WireguardEndpoints: []string{"127.0.0.1:51820"},
-				ZoneAwarenessId:    "zone-a",
-				PrivateIpv4:        "172.16.0.2/32",
-				PrivateIpv6:        "2001:db8::2/128",
+				ZoneAwarenessID:    "zone-a",
+				PrivateIPv4:        "172.16.0.2/32",
+				PrivateIPv6:        "2001:db8::2/128",
 			}}
 			err := p.Put(ctx, nodeA)
 			if err != nil {
@@ -291,9 +291,9 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					PublicKey:          mustGeneratePublicKey(t),
 					PrimaryEndpoint:    "127.0.0.1",
 					WireguardEndpoints: []string{"127.0.0.1:51820"},
-					ZoneAwarenessId:    "zone-a",
-					PrivateIpv4:        "172.16.0.1/32",
-					PrivateIpv6:        "2001:db8::1/128",
+					ZoneAwarenessID:    "zone-a",
+					PrivateIPv4:        "172.16.0.1/32",
+					PrivateIPv6:        "2001:db8::1/128",
 				},
 			},
 			{
@@ -302,9 +302,9 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					PublicKey:          mustGeneratePublicKey(t),
 					PrimaryEndpoint:    "127.0.0.1",
 					WireguardEndpoints: []string{"127.0.0.1:51820"},
-					ZoneAwarenessId:    "zone-a",
-					PrivateIpv4:        "172.16.0.2/32",
-					PrivateIpv6:        "2001:db8::2/128",
+					ZoneAwarenessID:    "zone-a",
+					PrivateIPv4:        "172.16.0.2/32",
+					PrivateIPv6:        "2001:db8::2/128",
 				},
 			},
 		}
@@ -345,9 +345,9 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					PublicKey:          mustGeneratePublicKey(t),
 					PrimaryEndpoint:    "127.0.0.1",
 					WireguardEndpoints: []string{"127.0.0.1:51820"},
-					ZoneAwarenessId:    "zone-a",
-					PrivateIpv4:        "172.16.0.1/32",
-					PrivateIpv6:        "2001:db8::1/128",
+					ZoneAwarenessID:    "zone-a",
+					PrivateIPv4:        "172.16.0.1/32",
+					PrivateIPv6:        "2001:db8::1/128",
 				},
 			},
 			{
@@ -356,9 +356,9 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					PublicKey:          mustGeneratePublicKey(t),
 					PrimaryEndpoint:    "127.0.0.1",
 					WireguardEndpoints: []string{"127.0.0.1:51820"},
-					ZoneAwarenessId:    "zone-a",
-					PrivateIpv4:        "172.16.0.2/32",
-					PrivateIpv6:        "2001:db8::2/128",
+					ZoneAwarenessID:    "zone-a",
+					PrivateIPv4:        "172.16.0.2/32",
+					PrivateIPv6:        "2001:db8::2/128",
 				},
 			},
 		}
@@ -399,14 +399,14 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					PublicKey:          mustGeneratePublicKey(t),
 					PrimaryEndpoint:    "8.8.8.8",
 					WireguardEndpoints: []string{"8.8.8.8:51820"},
-					ZoneAwarenessId:    "zone-a",
+					ZoneAwarenessID:    "zone-a",
 				},
 			},
 			{
 				MeshNode: &v1.MeshNode{
 					Id:              "node-b-private",
 					PublicKey:       mustGeneratePublicKey(t),
-					ZoneAwarenessId: "zone-a",
+					ZoneAwarenessID: "zone-a",
 				},
 			},
 		}
@@ -436,28 +436,28 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				MeshNode: &v1.MeshNode{
 					Id:              "node-a-zone-a",
 					PublicKey:       mustGeneratePublicKey(t),
-					ZoneAwarenessId: "zone-a",
+					ZoneAwarenessID: "zone-a",
 				},
 			},
 			{
 				MeshNode: &v1.MeshNode{
 					Id:              "node-b-zone-a",
 					PublicKey:       mustGeneratePublicKey(t),
-					ZoneAwarenessId: "zone-a",
+					ZoneAwarenessID: "zone-a",
 				},
 			},
 			{
 				MeshNode: &v1.MeshNode{
 					Id:              "node-a-zone-b",
 					PublicKey:       mustGeneratePublicKey(t),
-					ZoneAwarenessId: "zone-b",
+					ZoneAwarenessID: "zone-b",
 				},
 			},
 			{
 				MeshNode: &v1.MeshNode{
 					Id:              "node-b-zone-b",
 					PublicKey:       mustGeneratePublicKey(t),
-					ZoneAwarenessId: "zone-b",
+					ZoneAwarenessID: "zone-b",
 				},
 			},
 		}
@@ -475,7 +475,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal("expected two nodes got", len(got))
 		}
 		for _, node := range nodes {
-			if node.GetZoneAwarenessId() != "zone-a" {
+			if node.GetZoneAwarenessID() != "zone-a" {
 				continue
 			}
 			found := false
@@ -497,7 +497,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal("expected two nodes, got", len(got))
 		}
 		for _, node := range nodes {
-			if node.GetZoneAwarenessId() != "zone-b" {
+			if node.GetZoneAwarenessID() != "zone-b" {
 				continue
 			}
 			found := false
@@ -649,7 +649,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				MeshNode: &v1.MeshNode{
 					Id:              "node-a",
 					PublicKey:       mustGeneratePublicKey(t),
-					ZoneAwarenessId: "zone-a",
+					ZoneAwarenessID: "zone-a",
 				},
 			},
 			{

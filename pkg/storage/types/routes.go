@@ -57,7 +57,7 @@ func ValidateRoute(route Route) error {
 	if route.GetNode() == "" {
 		return errors.New("route node is required")
 	}
-	if len(route.GetDestinationCidrs()) == 0 {
+	if len(route.GetDestinationCIDRs()) == 0 {
 		return errors.New("route destination CIDRs are required")
 	}
 	if !storageutil.IsValidID(route.GetName()) {
@@ -71,7 +71,7 @@ func ValidateRoute(route Route) error {
 			return errors.New("route next hop node must be a valid ID")
 		}
 	}
-	for _, cidr := range route.GetDestinationCidrs() {
+	for _, cidr := range route.GetDestinationCIDRs() {
 		if _, err := netip.ParsePrefix(cidr); err != nil {
 			return fmt.Errorf("parse prefix %q: %w", cidr, err)
 		}
@@ -157,11 +157,11 @@ func (r *Route) Equals(other *Route) bool {
 	if r.GetNextHopNode() != other.GetNextHopNode() {
 		return false
 	}
-	if len(r.GetDestinationCidrs()) != len(other.GetDestinationCidrs()) {
+	if len(r.GetDestinationCIDRs()) != len(other.GetDestinationCIDRs()) {
 		return false
 	}
-	for i, cidr := range r.GetDestinationCidrs() {
-		if cidr != other.GetDestinationCidrs()[i] {
+	for i, cidr := range r.GetDestinationCIDRs() {
+		if cidr != other.GetDestinationCIDRs()[i] {
 			return false
 		}
 	}
@@ -170,5 +170,5 @@ func (r *Route) Equals(other *Route) bool {
 
 // DestinationPrefixes returns the destination prefixes for the route.
 func (r *Route) DestinationPrefixes() []netip.Prefix {
-	return ToPrefixes(r.GetDestinationCidrs())
+	return ToPrefixes(r.GetDestinationCIDRs())
 }

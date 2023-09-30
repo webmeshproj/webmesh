@@ -36,7 +36,7 @@ func TestListNetworkACLs(t *testing.T) {
 	_, err := server.PutNetworkACL(ctx, &v1.NetworkACL{
 		Name:             "test-acl",
 		SourceNodes:      []string{"foo"},
-		DestinationCidrs: []string{"0.0.0.0/0"},
+		DestinationCIDRs: []string{"0.0.0.0/0"},
 	})
 	if err != nil {
 		t.Errorf("PutNetworkACL() error = %v", err)
@@ -62,9 +62,9 @@ func TestListNetworkACLs(t *testing.T) {
 	} else if acl.GetSourceNodes()[0] != "foo" {
 		t.Errorf("ListNetworkACLs() returned an ACL with unexpected source nodes")
 	}
-	if len(acl.GetDestinationCidrs()) != 1 {
+	if len(acl.GetDestinationCIDRs()) != 1 {
 		t.Errorf("ListNetworkACLs() returned an ACL with unexpected destination cidrs")
-	} else if acl.GetDestinationCidrs()[0] != "0.0.0.0/0" {
+	} else if acl.GetDestinationCIDRs()[0] != "0.0.0.0/0" {
 		t.Errorf("ListNetworkACLs() returned an ACL with unexpected destination cidrs")
 	}
 }

@@ -35,7 +35,7 @@ func TestGetRoute(t *testing.T) {
 	_, err := server.PutRoute(ctx, &v1.Route{
 		Name:             "foo",
 		Node:             "foo",
-		DestinationCidrs: []string{"0.0.0.0/0"},
+		DestinationCIDRs: []string{"0.0.0.0/0"},
 	})
 	if err != nil {
 		t.Fatalf("failed to put route: %v", err)

@@ -93,18 +93,18 @@ Nodes:
 					action = types.NetworkAction{
 						NetworkAction: &v1.NetworkAction{
 							SrcNode: thisNode.GetId(),
-							SrcCidr: thisNode.GetPrivateIpv4(),
+							SrcCIDR: thisNode.GetPrivateIPv4(),
 							DstNode: node.GetId(),
-							DstCidr: cidr.String(),
+							DstCIDR: cidr.String(),
 						},
 					}
 				} else {
 					action = types.NetworkAction{
 						NetworkAction: &v1.NetworkAction{
 							SrcNode: thisNode.GetId(),
-							SrcCidr: thisNode.GetPrivateIpv6(),
+							SrcCIDR: thisNode.GetPrivateIPv6(),
 							DstNode: node.GetId(),
-							DstCidr: cidr.String(),
+							DstCIDR: cidr.String(),
 						},
 					}
 				}
@@ -149,16 +149,16 @@ Nodes:
 					if cidr.Addr().Is4() {
 						action = v1.NetworkAction{
 							SrcNode: thisNode.GetId(),
-							SrcCidr: thisNode.GetPrivateIpv4(),
+							SrcCIDR: thisNode.GetPrivateIPv4(),
 							DstNode: peerID.String(),
-							DstCidr: cidr.String(),
+							DstCIDR: cidr.String(),
 						}
 					} else {
 						action = v1.NetworkAction{
 							SrcNode: thisNode.GetId(),
-							SrcCidr: thisNode.GetPrivateIpv6(),
+							SrcCIDR: thisNode.GetPrivateIPv6(),
 							DstNode: peerID.String(),
-							DstCidr: cidr.String(),
+							DstCIDR: cidr.String(),
 						}
 					}
 					if !acls.Accept(ctx, types.NetworkAction{NetworkAction: &action}) {

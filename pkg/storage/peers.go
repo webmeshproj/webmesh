@@ -108,6 +108,6 @@ func IsPublicFilter() PeerFilter {
 // ZoneIDFilter returns a new filter that matches nodes in a given zone.
 func ZoneIDFilter(zoneID string) PeerFilter {
 	return func(node types.MeshNode) bool {
-		return node.GetZoneAwarenessId() == zoneID
+		return node.GetZoneAwarenessID() == zoneID
 	}
 }

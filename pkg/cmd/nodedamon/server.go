@@ -90,11 +90,11 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if req.GetDisableBootstrap() {
 		conf.Bootstrap.Enabled = false
 	}
-	if req.GetJoinPsk() != "" {
+	if req.GetJoinPSK() != "" {
 		conf.Bootstrap.Enabled = false
 		conf.Mesh.JoinAddress = ""
 		conf.Discovery = config.DiscoveryOptions{
-			Rendezvous: req.GetJoinPsk(),
+			Rendezvous: req.GetJoinPSK(),
 			Discover:   true,
 		}
 	}
@@ -179,7 +179,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	app.mesh = meshConn
 	app.svcs = srv
 	return &v1.ConnectResponse{
-		NodeId:     meshConn.ID().String(),
+		NodeID:     meshConn.ID().String(),
 		MeshDomain: meshConn.Domain(),
 		Ipv4:       meshConn.Network().NetworkV4().String(),
 		Ipv6:       meshConn.Network().NetworkV6().String(),

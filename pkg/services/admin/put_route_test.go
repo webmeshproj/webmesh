@@ -41,7 +41,7 @@ func TestPutRoute(t *testing.T) {
 			code: codes.InvalidArgument,
 			req: &v1.Route{
 				Name:             "test",
-				DestinationCidrs: []string{"0.0.0.0/0"},
+				DestinationCIDRs: []string{"0.0.0.0/0"},
 			},
 		},
 		{
@@ -58,7 +58,7 @@ func TestPutRoute(t *testing.T) {
 			req: &v1.Route{
 				Name:             "test",
 				Node:             "test",
-				DestinationCidrs: []string{""},
+				DestinationCIDRs: []string{""},
 			},
 		},
 		{
@@ -67,7 +67,7 @@ func TestPutRoute(t *testing.T) {
 			req: &v1.Route{
 				Name:             "test",
 				Node:             ",test",
-				DestinationCidrs: []string{"0.0.0.0/0"},
+				DestinationCIDRs: []string{"0.0.0.0/0"},
 			},
 		},
 		{
@@ -76,7 +76,7 @@ func TestPutRoute(t *testing.T) {
 			req: &v1.Route{
 				Name:             "test",
 				Node:             "test",
-				DestinationCidrs: []string{"0.0.0.0/0", ""},
+				DestinationCIDRs: []string{"0.0.0.0/0", ""},
 			},
 		},
 		{
@@ -85,7 +85,7 @@ func TestPutRoute(t *testing.T) {
 			req: &v1.Route{
 				Name:             "test-v4",
 				Node:             "test",
-				DestinationCidrs: []string{"0.0.0.0/0"},
+				DestinationCIDRs: []string{"0.0.0.0/0"},
 			},
 			tval: func(t *testing.T) {
 				route, err := server.GetRoute(ctx, &v1.Route{Name: "test-v4"})
@@ -97,10 +97,10 @@ func TestPutRoute(t *testing.T) {
 					t.Errorf("expected route name to be 'test', got: %s", route.Name)
 				} else if route.Node != "test" {
 					t.Errorf("expected route node to be 'test', got: %s", route.Node)
-				} else if len(route.DestinationCidrs) != 1 {
-					t.Errorf("expected route to have 1 destination cidr, got: %d", len(route.DestinationCidrs))
-				} else if route.DestinationCidrs[0] != "0.0.0.0/0" {
-					t.Errorf("expected route destination cidr to be '0.0.0.0/0', got %s", route.DestinationCidrs[0])
+				} else if len(route.DestinationCIDRs) != 1 {
+					t.Errorf("expected route to have 1 destination cidr, got: %d", len(route.DestinationCIDRs))
+				} else if route.DestinationCIDRs[0] != "0.0.0.0/0" {
+					t.Errorf("expected route destination cidr to be '0.0.0.0/0', got %s", route.DestinationCIDRs[0])
 				}
 			},
 		},
@@ -110,7 +110,7 @@ func TestPutRoute(t *testing.T) {
 			req: &v1.Route{
 				Name:             "test-v6",
 				Node:             "test",
-				DestinationCidrs: []string{"::/0"},
+				DestinationCIDRs: []string{"::/0"},
 			},
 			tval: func(t *testing.T) {
 				route, err := server.GetRoute(ctx, &v1.Route{Name: "test-v6"})
@@ -122,10 +122,10 @@ func TestPutRoute(t *testing.T) {
 					t.Errorf("expected route name to be 'test', got: %s", route.Name)
 				} else if route.Node != "test" {
 					t.Errorf("expected route node to be 'test', got: %s", route.Node)
-				} else if len(route.DestinationCidrs) != 1 {
-					t.Errorf("expected route to have 1 destination cidr, got: %d", len(route.DestinationCidrs))
-				} else if route.DestinationCidrs[0] != "::/0" {
-					t.Errorf("expected route destination cidr to be '::/0', got %s", route.DestinationCidrs[0])
+				} else if len(route.DestinationCIDRs) != 1 {
+					t.Errorf("expected route to have 1 destination cidr, got: %d", len(route.DestinationCIDRs))
+				} else if route.DestinationCIDRs[0] != "::/0" {
+					t.Errorf("expected route destination cidr to be '::/0', got %s", route.DestinationCIDRs[0])
 				}
 			},
 		},

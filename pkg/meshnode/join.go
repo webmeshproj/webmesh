@@ -79,21 +79,21 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 	var addressv4, addressv6, networkv4, networkv6 netip.Prefix
 	var err error
 	// We always parse addresses and let the net manager decide what to use
-	if resp.AddressIpv4 != "" {
-		addressv4, err = netip.ParsePrefix(resp.AddressIpv4)
+	if resp.GetAddressIPv4() != "" {
+		addressv4, err = netip.ParsePrefix(resp.GetAddressIPv4())
 		if err != nil {
 			return fmt.Errorf("parse ipv4 address: %w", err)
 		}
 	}
-	networkv4, err = netip.ParsePrefix(resp.NetworkIpv4)
+	networkv4, err = netip.ParsePrefix(resp.GetNetworkIPv4())
 	if err != nil {
 		return fmt.Errorf("parse ipv4 network: %w", err)
 	}
-	addressv6, err = netip.ParsePrefix(resp.AddressIpv6)
+	addressv6, err = netip.ParsePrefix(resp.GetAddressIPv6())
 	if err != nil {
 		return fmt.Errorf("parse ipv6 address: %w", err)
 	}
-	networkv6, err = netip.ParsePrefix(resp.NetworkIpv6)
+	networkv6, err = netip.ParsePrefix(resp.GetNetworkIPv6())
 	if err != nil {
 		return fmt.Errorf("parse ipv6 network: %w", err)
 	}
@@ -173,9 +173,9 @@ func (s *meshStore) newJoinRequest(opts ConnectOptions, encodedKey string) *v1.J
 			}
 			return eps
 		}(),
-		ZoneAwarenessId:   s.opts.ZoneAwarenessID,
-		AssignIpv4:        !s.opts.DisableIPv4,
-		PreferStorageIpv6: !s.opts.DisableIPv6 && opts.PreferIPv6,
+		ZoneAwarenessID:   s.opts.ZoneAwarenessID,
+		AssignIPv4:        !s.opts.DisableIPv4,
+		PreferStorageIPv6: !s.opts.DisableIPv6 && opts.PreferIPv6,
 		AsVoter:           opts.RequestVote,
 		AsObserver:        opts.RequestObserver,
 		Routes: func() []string {

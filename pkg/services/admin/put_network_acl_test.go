@@ -62,7 +62,7 @@ func TestPutNetworkACL(t *testing.T) {
 			req: &v1.NetworkACL{
 				Name:        "foo",
 				Action:      v1.ACLAction_ACTION_ACCEPT,
-				SourceCidrs: []string{"0.0.0.0/0", "foo"},
+				SourceCIDRs: []string{"0.0.0.0/0", "foo"},
 			},
 		},
 		{
@@ -71,7 +71,7 @@ func TestPutNetworkACL(t *testing.T) {
 			req: &v1.NetworkACL{
 				Name:             "foo",
 				Action:           v1.ACLAction_ACTION_ACCEPT,
-				DestinationCidrs: []string{"0.0.0.0/0", "foo"},
+				DestinationCIDRs: []string{"0.0.0.0/0", "foo"},
 			},
 		},
 		{
@@ -81,7 +81,7 @@ func TestPutNetworkACL(t *testing.T) {
 				Name:             "foo",
 				Action:           v1.ACLAction_ACTION_ACCEPT,
 				SourceNodes:      []string{"foo", "bar", "baz,qux"},
-				DestinationCidrs: []string{"0.0.0.0/0"},
+				DestinationCIDRs: []string{"0.0.0.0/0"},
 			},
 		},
 		{
@@ -91,7 +91,7 @@ func TestPutNetworkACL(t *testing.T) {
 				Name:             "foo",
 				Action:           v1.ACLAction_ACTION_ACCEPT,
 				DestinationNodes: []string{"foo", "bar", "baz,qux"},
-				DestinationCidrs: []string{"0.0.0.0/0"},
+				DestinationCIDRs: []string{"0.0.0.0/0"},
 			},
 		},
 		{
@@ -101,7 +101,7 @@ func TestPutNetworkACL(t *testing.T) {
 				Name:             "foo",
 				Action:           v1.ACLAction_ACTION_ACCEPT,
 				DestinationNodes: []string{"foo"},
-				DestinationCidrs: []string{"0.0.0.0/0"},
+				DestinationCIDRs: []string{"0.0.0.0/0"},
 			},
 			tval: func(t *testing.T) {
 				acl, err := server.GetNetworkACL(context.Background(), &v1.NetworkACL{Name: "foo"})
@@ -121,10 +121,10 @@ func TestPutNetworkACL(t *testing.T) {
 				} else if acl.DestinationNodes[0] != "foo" {
 					t.Errorf("expected acl destination node to be foo, got %s", acl.DestinationNodes[0])
 				}
-				if len(acl.DestinationCidrs) != 1 {
-					t.Errorf("expected acl to have 1 destination cidr, got %d", len(acl.DestinationCidrs))
-				} else if acl.DestinationCidrs[0] != "0.0.0.0/0" {
-					t.Errorf("expected acl destination cidr to be %s, got %s", "0.0.0.0/0", acl.DestinationCidrs[0])
+				if len(acl.DestinationCIDRs) != 1 {
+					t.Errorf("expected acl to have 1 destination cidr, got %d", len(acl.DestinationCIDRs))
+				} else if acl.DestinationCIDRs[0] != "0.0.0.0/0" {
+					t.Errorf("expected acl destination cidr to be %s, got %s", "0.0.0.0/0", acl.DestinationCIDRs[0])
 				}
 			},
 		},

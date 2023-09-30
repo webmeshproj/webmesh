@@ -65,13 +65,13 @@ func WireGuardPeerEqual(a, b *v1.WireGuardPeer) bool {
 	if a == nil && b == nil {
 		return true
 	}
-	sort.Strings(a.AllowedIps)
-	sort.Strings(b.AllowedIps)
+	sort.Strings(a.AllowedIPs)
+	sort.Strings(b.AllowedIPs)
 	sort.Strings(a.AllowedRoutes)
 	sort.Strings(b.AllowedRoutes)
 	return a.Proto == b.Proto &&
 		MeshNodesEqual(MeshNode{a.Node}, MeshNode{b.Node}) &&
-		slices.Equal(a.AllowedIps, b.AllowedIps) &&
+		slices.Equal(a.AllowedIPs, b.AllowedIPs) &&
 		slices.Equal(a.AllowedRoutes, b.AllowedRoutes)
 
 }

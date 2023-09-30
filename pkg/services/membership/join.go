@@ -178,10 +178,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	leasev6 = netutil.AssignToPrefix(s.ipv6Prefix, publicKey)
 	log.Debug("Assigned IPv6 address to peer", slog.String("ipv6", leasev6.String()))
 	// Acquire an IPv4 address for the peer only if requested
-	if req.GetAssignIpv4() {
+	if req.GetAssignIPv4() {
 		log.Debug("Assigning IPv4 address to peer")
 		leasev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeId: req.GetId(),
+			NodeID: req.GetId(),
 			Subnet: s.ipv4Prefix.String(),
 		})
 		if err != nil {
@@ -195,10 +195,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		Id:                 req.GetId(),
 		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
 		WireguardEndpoints: req.GetWireguardEndpoints(),
-		ZoneAwarenessId:    req.GetZoneAwarenessId(),
+		ZoneAwarenessID:    req.GetZoneAwarenessID(),
 		PublicKey:          req.GetPublicKey(),
-		PrivateIpv4:        leasev4.String(),
-		PrivateIpv6:        leasev6.String(),
+		PrivateIPv4:        leasev4.String(),
+		PrivateIPv6:        leasev6.String(),
 		Features:           req.GetFeatures(),
 		Multiaddrs:         req.GetMultiaddrs(),
 		JoinedAt:           timestamppb.New(time.Now().UTC()),
@@ -248,11 +248,11 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 		}
 	}
-	if req.GetZoneAwarenessId() != "" {
+	if req.GetZoneAwarenessID() != "" {
 		// Add an edge between the caller and all other nodes in the same zone
 		// with public endpoints.
 		// TODO: Same as above - this should be done according to network policy and batched
-		zonePeers, err := p.List(ctx, storage.ZoneIDFilter(req.GetZoneAwarenessId()))
+		zonePeers, err := p.List(ctx, storage.ZoneIDFilter(req.GetZoneAwarenessID()))
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
@@ -315,10 +315,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Start building the response
 	resp := &v1.JoinResponse{
 		MeshDomain:  s.meshDomain,
-		NetworkIpv4: s.ipv4Prefix.String(),
-		NetworkIpv6: s.ipv6Prefix.String(),
-		AddressIpv6: leasev6.String(),
-		AddressIpv4: func() string {
+		NetworkIPv4: s.ipv4Prefix.String(),
+		NetworkIPv6: s.ipv6Prefix.String(),
+		AddressIPv6: leasev6.String(),
+		AddressIPv4: func() string {
 			if leasev4.IsValid() {
 				return leasev4.String()
 			}
@@ -338,7 +338,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			// first heartbeat.
 			<-ctx.Done()
 			var storageAddress string
-			if req.GetAssignIpv4() && !req.GetPreferStorageIpv6() {
+			if req.GetAssignIPv4() && !req.GetPreferStorageIPv6() {
 				// Prefer IPv4 for raft
 				storageAddress = net.JoinHostPort(leasev4.Addr().String(), strconv.Itoa(int(storagePort)))
 			} else {
@@ -428,10 +428,10 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 						Id:                 req.GetId(),
 						PrimaryEndpoint:    req.GetPrimaryEndpoint(),
 						WireguardEndpoints: req.GetWireguardEndpoints(),
-						ZoneAwarenessId:    req.GetZoneAwarenessId(),
+						ZoneAwarenessID:    req.GetZoneAwarenessID(),
 						PublicKey:          req.GetPublicKey(),
-						PrivateIpv4:        leasev4.String(),
-						PrivateIpv6:        leasev6.String(),
+						PrivateIPv4:        leasev4.String(),
+						PrivateIPv6:        leasev6.String(),
 						Features:           req.GetFeatures(),
 						JoinedAt:           timestamppb.New(time.Now().UTC()),
 					},

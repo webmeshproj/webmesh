@@ -164,8 +164,8 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		}
 	}
 	// Zone awareness
-	if req.GetZoneAwarenessId() != "" && req.GetZoneAwarenessId() != peer.ZoneAwarenessId {
-		toUpdate.ZoneAwarenessId = req.GetZoneAwarenessId()
+	if req.GetZoneAwarenessID() != "" && req.GetZoneAwarenessID() != peer.GetZoneAwarenessID() {
+		toUpdate.ZoneAwarenessID = req.GetZoneAwarenessID()
 		hasChanges = true
 	}
 	// Multiaddrs

@@ -128,12 +128,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private addr to be invalid, got %s", addr)
 		}
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv4 = "invalid"
+		node.PrivateIPv4 = "invalid"
 		if addr := node.PrivateAddrV4(); addr.IsValid() {
 			t.Errorf("expected private addr to be invalid, got %s", addr)
 		}
 		addr := netip.MustParsePrefix("172.16.0.1/32")
-		node.PrivateIpv4 = addr.String()
+		node.PrivateIPv4 = addr.String()
 		if got := node.PrivateAddrV4(); got != addr {
 			t.Errorf("expected private addr to be %s, got %s", addr, got)
 		}
@@ -146,12 +146,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private addr to be invalid, got %s", addr)
 		}
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv6 = "invalid"
+		node.PrivateIPv6 = "invalid"
 		if addr := node.PrivateAddrV6(); addr.IsValid() {
 			t.Errorf("expected private addr to be invalid, got %s", addr)
 		}
 		addr := netip.MustParsePrefix("2001:db8::1/128")
-		node.PrivateIpv6 = addr.String()
+		node.PrivateIPv6 = addr.String()
 		if got := node.PrivateAddrV6(); got != addr {
 			t.Errorf("expected private addr to be %s, got %s", addr, got)
 		}
@@ -193,7 +193,7 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private rpc addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address but dont define an RPC port
-		node.PrivateIpv4 = "172.16.0.1/32"
+		node.PrivateIPv4 = "172.16.0.1/32"
 		if addr := node.PrivateRPCAddrV4(); addr.IsValid() {
 			t.Errorf("expected private rpc addr to be invalid, got %s", addr)
 		}
@@ -203,12 +203,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			Port:    1,
 		})
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv4 = "invalid"
+		node.PrivateIPv4 = "invalid"
 		if addr := node.PrivateRPCAddrV4(); addr.IsValid() {
 			t.Errorf("expected private rpc addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address and should be valid.
-		node.PrivateIpv4 = "172.16.0.1/32"
+		node.PrivateIPv4 = "172.16.0.1/32"
 		expected := netip.MustParseAddrPort("172.16.0.1:1")
 		if got := node.PrivateRPCAddrV4(); got != expected {
 			t.Errorf("expected private rpc addr to be %s, got %s", expected, got)
@@ -222,7 +222,7 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private rpc addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address but dont define an RPC port
-		node.PrivateIpv6 = "2001:db8::1/128"
+		node.PrivateIPv6 = "2001:db8::1/128"
 		if addr := node.PrivateRPCAddrV6(); addr.IsValid() {
 			t.Errorf("expected private rpc addr to be invalid, got %s", addr)
 		}
@@ -232,12 +232,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			Port:    1,
 		})
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv6 = "invalid"
+		node.PrivateIPv6 = "invalid"
 		if addr := node.PrivateRPCAddrV6(); addr.IsValid() {
 			t.Errorf("expected private rpc addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address and should be valid.
-		node.PrivateIpv6 = "2001:db8::1/128"
+		node.PrivateIPv6 = "2001:db8::1/128"
 		expected := netip.MustParseAddrPort("[2001:db8::1]:1")
 		if got := node.PrivateRPCAddrV6(); got != expected {
 			t.Errorf("expected private rpc addr to be %s, got %s", expected, got)
@@ -251,7 +251,7 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private storage addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address but dont define an RPC port
-		node.PrivateIpv4 = "172.16.0.1/32"
+		node.PrivateIPv4 = "172.16.0.1/32"
 		if addr := node.PrivateStorageAddrV4(); addr.IsValid() {
 			t.Errorf("expected private storage addr to be invalid, got %s", addr)
 		}
@@ -261,12 +261,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			Port:    1,
 		})
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv4 = "invalid"
+		node.PrivateIPv4 = "invalid"
 		if addr := node.PrivateStorageAddrV4(); addr.IsValid() {
 			t.Errorf("expected private storage addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address and should be valid.
-		node.PrivateIpv4 = "172.16.0.1/32"
+		node.PrivateIPv4 = "172.16.0.1/32"
 		expected := netip.MustParseAddrPort("172.16.0.1:1")
 		if got := node.PrivateStorageAddrV4(); got != expected {
 			t.Errorf("expected private storage addr to be %s, got %s", expected, got)
@@ -280,7 +280,7 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private storage addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address but dont define an RPC port
-		node.PrivateIpv6 = "2001:db8::1/128"
+		node.PrivateIPv6 = "2001:db8::1/128"
 		if addr := node.PrivateStorageAddrV6(); addr.IsValid() {
 			t.Errorf("expected private storage addr to be invalid, got %s", addr)
 		}
@@ -290,12 +290,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			Port:    1,
 		})
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv6 = "invalid"
+		node.PrivateIPv6 = "invalid"
 		if addr := node.PrivateStorageAddrV6(); addr.IsValid() {
 			t.Errorf("expected private storage addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address and should be valid.
-		node.PrivateIpv6 = "2001:db8::1/128"
+		node.PrivateIPv6 = "2001:db8::1/128"
 		expected := netip.MustParseAddrPort("[2001:db8::1]:1")
 		if got := node.PrivateStorageAddrV6(); got != expected {
 			t.Errorf("expected private storage addr to be %s, got %s", expected, got)
@@ -338,7 +338,7 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private dns addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address but dont define an RPC port
-		node.PrivateIpv4 = "172.16.0.1/32"
+		node.PrivateIPv4 = "172.16.0.1/32"
 		if addr := node.PrivateDNSAddrV4(); addr.IsValid() {
 			t.Errorf("expected private dns addr to be invalid, got %s", addr)
 		}
@@ -348,12 +348,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			Port:    1,
 		})
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv4 = "invalid"
+		node.PrivateIPv4 = "invalid"
 		if addr := node.PrivateDNSAddrV4(); addr.IsValid() {
 			t.Errorf("expected private dns addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address and should be valid.
-		node.PrivateIpv4 = "172.16.0.1/32"
+		node.PrivateIPv4 = "172.16.0.1/32"
 		expected := netip.MustParseAddrPort("172.16.0.1:1")
 		if got := node.PrivateDNSAddrV4(); got != expected {
 			t.Errorf("expected private dns addr to be %s, got %s", expected, got)
@@ -367,7 +367,7 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private dns addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address but dont define an RPC port
-		node.PrivateIpv6 = "2001:db8::1/128"
+		node.PrivateIPv6 = "2001:db8::1/128"
 		if addr := node.PrivateDNSAddrV6(); addr.IsValid() {
 			t.Errorf("expected private dns addr to be invalid, got %s", addr)
 		}
@@ -377,12 +377,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			Port:    1,
 		})
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv6 = "invalid"
+		node.PrivateIPv6 = "invalid"
 		if addr := node.PrivateDNSAddrV6(); addr.IsValid() {
 			t.Errorf("expected private dns addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address and should be valid.
-		node.PrivateIpv6 = "2001:db8::1/128"
+		node.PrivateIPv6 = "2001:db8::1/128"
 		expected := netip.MustParseAddrPort("[2001:db8::1]:1")
 		if got := node.PrivateDNSAddrV6(); got != expected {
 			t.Errorf("expected private dns addr to be %s, got %s", expected, got)
@@ -396,7 +396,7 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private turn addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address but dont define an RPC port
-		node.PrivateIpv4 = "172.16.0.1/32"
+		node.PrivateIPv4 = "172.16.0.1/32"
 		if addr := node.PrivateTURNAddrV4(); addr.IsValid() {
 			t.Errorf("expected private turn addr to be invalid, got %s", addr)
 		}
@@ -406,12 +406,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			Port:    1,
 		})
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv4 = "invalid"
+		node.PrivateIPv4 = "invalid"
 		if addr := node.PrivateTURNAddrV4(); addr.IsValid() {
 			t.Errorf("expected private turn addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address and should be valid.
-		node.PrivateIpv4 = "172.16.0.1/32"
+		node.PrivateIPv4 = "172.16.0.1/32"
 		expected := netip.MustParseAddrPort("172.16.0.1:1")
 		if got := node.PrivateTURNAddrV4(); got != expected {
 			t.Errorf("expected private turn addr to be %s, got %s", expected, got)
@@ -425,7 +425,7 @@ func TestMeshNodeWrapper(t *testing.T) {
 			t.Errorf("expected private turn addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address but dont define an RPC port
-		node.PrivateIpv6 = "2001:db8::1/128"
+		node.PrivateIPv6 = "2001:db8::1/128"
 		if addr := node.PrivateTURNAddrV6(); addr.IsValid() {
 			t.Errorf("expected private turn addr to be invalid, got %s", addr)
 		}
@@ -435,12 +435,12 @@ func TestMeshNodeWrapper(t *testing.T) {
 			Port:    1,
 		})
 		// Set to an invalid address and should still be invalid.
-		node.PrivateIpv6 = "invalid"
+		node.PrivateIPv6 = "invalid"
 		if addr := node.PrivateTURNAddrV6(); addr.IsValid() {
 			t.Errorf("expected private turn addr to be invalid, got %s", addr)
 		}
 		// Set to a valid address and should be valid.
-		node.PrivateIpv6 = "2001:db8::1/128"
+		node.PrivateIPv6 = "2001:db8::1/128"
 		expected := netip.MustParseAddrPort("[2001:db8::1]:1")
 		if got := node.PrivateTURNAddrV6(); got != expected {
 			t.Errorf("expected private turn addr to be %s, got %s", expected, got)

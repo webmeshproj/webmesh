@@ -169,7 +169,7 @@ func (p *Plugin) Allocate(ctx context.Context, r *v1.AllocateIPRequest) (*v1.All
 		// is opened.
 		return nil, fmt.Errorf("plugin not configured")
 	}
-	if addr, ok := p.config.StaticIPv4[r.GetNodeId()]; ok {
+	if addr, ok := p.config.StaticIPv4[r.GetNodeID()]; ok {
 		return &v1.AllocatedIP{
 			Ip: addr.(string),
 		}, nil

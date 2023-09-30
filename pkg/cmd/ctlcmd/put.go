@@ -332,8 +332,8 @@ var putNetworkACLCmd = &cobra.Command{
 			Action:           action,
 			SourceNodes:      putNetworkACLSrcNodes,
 			DestinationNodes: putNetworkACLDstNodes,
-			SourceCidrs:      putNetworkACLSrcCIDRs,
-			DestinationCidrs: putNetworkACLDstCIDRs,
+			SourceCIDRs:      putNetworkACLSrcCIDRs,
+			DestinationCIDRs: putNetworkACLDstCIDRs,
 		}
 		client, closer, err := cliConfig.NewAdminClient()
 		if err != nil {
@@ -362,7 +362,7 @@ var putRouteCmd = &cobra.Command{
 		route := &v1.Route{
 			Name:             args[0],
 			Node:             putRouteNode,
-			DestinationCidrs: putRouteCIDRs,
+			DestinationCIDRs: putRouteCIDRs,
 			NextHopNode:      putRouteNextHop,
 		}
 		client, closer, err := cliConfig.NewAdminClient()

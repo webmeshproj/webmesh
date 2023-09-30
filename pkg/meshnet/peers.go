@@ -163,14 +163,14 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		return fmt.Errorf("parse peer key: %w", err)
 	}
 	var priv4, priv6 netip.Prefix
-	if peer.GetNode().GetPrivateIpv4() != "" {
-		priv4, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv4())
+	if peer.GetNode().GetPrivateIPv4() != "" {
+		priv4, err = netip.ParsePrefix(peer.GetNode().GetPrivateIPv4())
 		if err != nil {
 			return fmt.Errorf("parse peer ipv4: %w", err)
 		}
 	}
-	if peer.GetNode().GetPrivateIpv6() != "" {
-		priv6, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv6())
+	if peer.GetNode().GetPrivateIPv6() != "" {
+		priv6, err = netip.ParsePrefix(peer.GetNode().GetPrivateIPv6())
 		if err != nil {
 			return fmt.Errorf("parse peer ipv6: %w", err)
 		}
@@ -185,7 +185,7 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		log.Warn("Error determining peer endpoint, will wait for incoming connection", "error", err.Error())
 	}
 	allowedIPs := make([]netip.Prefix, 0)
-	for _, ip := range peer.GetAllowedIps() {
+	for _, ip := range peer.GetAllowedIPs() {
 		prefix, err := netip.ParsePrefix(ip)
 		if err != nil {
 			return fmt.Errorf("parse peer allowed ip: %w", err)
@@ -253,10 +253,10 @@ func (m *peerManager) addPeer(ctx context.Context, peer *v1.WireGuardPeer, iceSe
 		defer cancel()
 		var addr netip.Prefix
 		var err error
-		if !m.net.opts.DisableIPv4 && peer.GetNode().GetPrivateIpv4() != "" {
-			addr, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv4())
+		if !m.net.opts.DisableIPv4 && peer.GetNode().GetPrivateIPv4() != "" {
+			addr, err = netip.ParsePrefix(peer.GetNode().GetPrivateIPv4())
 		} else {
-			addr, err = netip.ParsePrefix(peer.GetNode().GetPrivateIpv6())
+			addr, err = netip.ParsePrefix(peer.GetNode().GetPrivateIPv6())
 		}
 		if err != nil {
 			log.Warn("Could not parse peer address", slog.String("error", err.Error()))
@@ -299,7 +299,7 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 		endpoint = addr.AddrPort()
 	}
 	// Check if we are using zone awareness and the peer is in the same zone
-	if m.net.opts.ZoneAwarenessID != "" && peer.GetNode().GetZoneAwarenessId() == m.net.opts.ZoneAwarenessID {
+	if m.net.opts.ZoneAwarenessID != "" && peer.GetNode().GetZoneAwarenessID() == m.net.opts.ZoneAwarenessID {
 		log.Debug("Using zone awareness, collecting local CIDRs")
 		localCIDRs, err := endpoints.Detect(ctx, endpoints.DetectOpts{
 			DetectPrivate:  true,
@@ -328,7 +328,7 @@ func (m *peerManager) determinePeerEndpoint(ctx context.Context, peer *v1.WireGu
 				}
 				log.Debug("Evalauting zone awareness endpoint",
 					slog.String("endpoint", addr.String()),
-					slog.String("zone", peer.GetNode().GetZoneAwarenessId()))
+					slog.String("zone", peer.GetNode().GetZoneAwarenessID()))
 				ep := addr.AddrPort()
 				if localCIDRs.Contains(ep.Addr()) {
 					// We found an additional endpoint that is in one of our local

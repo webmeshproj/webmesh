@@ -107,7 +107,7 @@ func (s *Server) ensurePeerRoutes(ctx context.Context, nodeID types.NodeID, rout
 Routes:
 	for _, route := range routes {
 		for _, r := range current {
-			for _, cidr := range r.DestinationCidrs {
+			for _, cidr := range r.DestinationCIDRs {
 				if cidr == route {
 					continue Routes
 				}
@@ -117,7 +117,7 @@ Routes:
 		rt := types.Route{Route: &v1.Route{
 			Name:             nodeAutoRoute(nodeID),
 			Node:             nodeID.String(),
-			DestinationCidrs: routes,
+			DestinationCIDRs: routes,
 		}}
 		s.log.Debug("Adding new route for node", "node", nodeID, "route", &rt)
 		err = nw.PutRoute(ctx, rt)

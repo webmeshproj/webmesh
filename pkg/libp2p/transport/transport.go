@@ -716,14 +716,14 @@ func (t *WebmeshTransport) registerNode(ctx context.Context, node types.MeshNode
 func peerToIPMultiaddrs(peer types.MeshNode, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	var peerv4addr, peerv6addr netip.Prefix
 	var err error
-	if peer.PrivateIpv4 != "" {
-		peerv4addr, err = netip.ParsePrefix(peer.PrivateIpv4)
+	if peer.PrivateIPv4 != "" {
+		peerv4addr, err = netip.ParsePrefix(peer.PrivateIPv4)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse peer address: %w", err)
 		}
 	}
-	if peer.PrivateIpv6 != "" {
-		peerv6addr, err = netip.ParsePrefix(peer.PrivateIpv6)
+	if peer.PrivateIPv6 != "" {
+		peerv6addr, err = netip.ParsePrefix(peer.PrivateIPv6)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse peer address: %w", err)
 		}

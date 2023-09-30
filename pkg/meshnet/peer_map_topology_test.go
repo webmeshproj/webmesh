@@ -441,8 +441,8 @@ func TestWireGuardTopologies(t *testing.T) {
 				Action:           v1.ACLAction_ACTION_ACCEPT,
 				SourceNodes:      []string{"*"},
 				DestinationNodes: []string{"*"},
-				SourceCidrs:      []string{"*"},
-				DestinationCidrs: []string{"*"},
+				SourceCIDRs:      []string{"*"},
+				DestinationCIDRs: []string{"*"},
 			}})
 			if err != nil {
 				t.Fatalf("put network acl: %v", err)
@@ -451,8 +451,8 @@ func TestWireGuardTopologies(t *testing.T) {
 				err = db.Peers().Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{
 					Id:          peerID,
 					PublicKey:   mustGeneratePublicKey(t),
-					PrivateIpv4: netip.MustParsePrefix(addrs[0]).String(),
-					PrivateIpv6: netip.MustParsePrefix(addrs[1]).String(),
+					PrivateIPv4: netip.MustParsePrefix(addrs[0]).String(),
+					PrivateIPv6: netip.MustParsePrefix(addrs[1]).String(),
 				}})
 				if err != nil {
 					t.Fatalf("put peer %q: %v", peerID, err)
@@ -480,8 +480,8 @@ func TestWireGuardTopologies(t *testing.T) {
 				}
 				got := make(map[string][]string)
 				for _, p := range peers {
-					sort.Strings(p.AllowedIps)
-					got[p.Node.Id] = p.AllowedIps
+					sort.Strings(p.AllowedIPs)
+					got[p.Node.Id] = p.AllowedIPs
 				}
 				if !reflect.DeepEqual(got, want) {
 					t.Errorf("peer: %s got %v, want %v", peer, got, want)

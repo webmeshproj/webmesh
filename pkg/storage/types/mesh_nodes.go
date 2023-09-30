@@ -49,9 +49,9 @@ func MeshNodesEqual(a, b MeshNode) bool {
 	return a.Id == b.Id &&
 		a.PublicKey == b.PublicKey &&
 		a.PrimaryEndpoint == b.PrimaryEndpoint &&
-		a.ZoneAwarenessId == b.ZoneAwarenessId &&
-		a.PrivateIpv4 == b.PrivateIpv4 &&
-		a.PrivateIpv6 == b.PrivateIpv6 &&
+		a.ZoneAwarenessID == b.ZoneAwarenessID &&
+		a.PrivateIPv4 == b.PrivateIPv4 &&
+		a.PrivateIPv6 == b.PrivateIPv6 &&
 		slices.Equal(a.WireguardEndpoints, b.WireguardEndpoints) &&
 		FeaturePortsEqual(a.Features, b.Features)
 }
@@ -135,10 +135,10 @@ func (n MeshNode) StoragePort() uint16 {
 // PrivateAddrV4 returns the node's private IPv4 address.
 // Be sure to check if the returned Addr IsValid.
 func (n MeshNode) PrivateAddrV4() netip.Prefix {
-	if n.GetPrivateIpv4() == "" {
+	if n.GetPrivateIPv4() == "" {
 		return netip.Prefix{}
 	}
-	addr, err := netip.ParsePrefix(n.GetPrivateIpv4())
+	addr, err := netip.ParsePrefix(n.GetPrivateIPv4())
 	if err != nil {
 		return netip.Prefix{}
 	}
@@ -148,10 +148,10 @@ func (n MeshNode) PrivateAddrV4() netip.Prefix {
 // PrivateAddrV6 returns the node's private IPv6 address.
 // Be sure to check if the returned Addr IsValid.
 func (n MeshNode) PrivateAddrV6() netip.Prefix {
-	if n.GetPrivateIpv6() == "" {
+	if n.GetPrivateIPv6() == "" {
 		return netip.Prefix{}
 	}
-	addr, err := netip.ParsePrefix(n.GetPrivateIpv6())
+	addr, err := netip.ParsePrefix(n.GetPrivateIPv6())
 	if err != nil {
 		return netip.Prefix{}
 	}

@@ -34,24 +34,24 @@ func (a *NetworkAction) Proto() *v1.NetworkAction {
 
 // SourcePrefix returns the source prefix for the action if it is valid.
 func (a *NetworkAction) SourcePrefix() netip.Prefix {
-	if a.GetSrcCidr() == "" {
+	if a.GetSrcCIDR() == "" {
 		return netip.Prefix{}
 	}
-	if a.GetSrcCidr() == "*" {
+	if a.GetSrcCIDR() == "*" {
 		return netip.MustParsePrefix("0.0.0.0/0")
 	}
-	out, _ := netip.ParsePrefix(a.GetSrcCidr())
+	out, _ := netip.ParsePrefix(a.GetSrcCIDR())
 	return out
 }
 
 // DestinationPrefix returns the destination prefix for the action if it is valid.
 func (a *NetworkAction) DestinationPrefix() netip.Prefix {
-	if a.GetDstCidr() == "" {
+	if a.GetDstCIDR() == "" {
 		return netip.Prefix{}
 	}
-	if a.GetDstCidr() == "*" {
+	if a.GetDstCIDR() == "*" {
 		return netip.MustParsePrefix("0.0.0.0/0")
 	}
-	out, _ := netip.ParsePrefix(a.GetDstCidr())
+	out, _ := netip.ParsePrefix(a.GetDstCIDR())
 	return out
 }

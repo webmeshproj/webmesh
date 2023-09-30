@@ -40,7 +40,7 @@ func ValidateACL(acl NetworkACL) error {
 			return fmt.Errorf("invalid source node: %s", node)
 		}
 	}
-	for _, cidr := range append(acl.GetSourceCidrs(), acl.GetDestinationCidrs()...) {
+	for _, cidr := range append(acl.GetSourceCIDRs(), acl.GetDestinationCIDRs()...) {
 		if cidr == "*" {
 			continue
 		}
@@ -106,17 +106,17 @@ func (a NetworkACLs) AllowNodesToCommunicate(ctx context.Context, nodeA, nodeB M
 	v4action := NetworkAction{
 		NetworkAction: &v1.NetworkAction{
 			SrcNode: nodeA.Id,
-			SrcCidr: nodeA.PrivateIpv4,
+			SrcCIDR: nodeA.PrivateIPv4,
 			DstNode: nodeB.Id,
-			DstCidr: nodeB.PrivateIpv4,
+			DstCIDR: nodeB.PrivateIPv4,
 		},
 	}
 	v6action := NetworkAction{
 		NetworkAction: &v1.NetworkAction{
 			SrcNode: nodeA.Id,
-			SrcCidr: nodeA.PrivateIpv6,
+			SrcCIDR: nodeA.PrivateIPv6,
 			DstNode: nodeB.Id,
-			DstCidr: nodeB.PrivateIpv6,
+			DstCIDR: nodeB.PrivateIPv6,
 		},
 	}
 	return a.Accept(ctx, v4action) || a.Accept(ctx, v6action)
@@ -186,8 +186,8 @@ func (a NetworkACL) Equals(other NetworkACL) bool {
 	slComps := [][][]string{
 		{a.GetSourceNodes(), other.GetSourceNodes()},
 		{a.GetDestinationNodes(), other.GetDestinationNodes()},
-		{a.GetSourceCidrs(), other.GetSourceCidrs()},
-		{a.GetDestinationCidrs(), other.GetDestinationCidrs()},
+		{a.GetSourceCIDRs(), other.GetSourceCIDRs()},
+		{a.GetDestinationCIDRs(), other.GetDestinationCIDRs()},
 	}
 	for _, toCompare := range slComps {
 		sort.Strings(toCompare[0])
@@ -202,13 +202,13 @@ func (a NetworkACL) Equals(other NetworkACL) bool {
 // SourcePrefixes returns the source prefixes for the ACL.
 // Invalid prefixes will be ignored.
 func (a NetworkACL) SourcePrefixes() []netip.Prefix {
-	return ToPrefixes(a.GetSourceCidrs())
+	return ToPrefixes(a.GetSourceCIDRs())
 }
 
 // DestinationPrefixes returns the destination prefixes for the ACL.
 // Invalid prefixes will be ignored.
 func (a NetworkACL) DestinationPrefixes() []netip.Prefix {
-	return ToPrefixes(a.GetDestinationCidrs())
+	return ToPrefixes(a.GetDestinationCIDRs())
 }
 
 // Matches checks if an action matches this ACL.
@@ -223,12 +223,12 @@ func (acl NetworkACL) Matches(ctx context.Context, action NetworkAction) bool {
 			return false
 		}
 	}
-	if action.SourcePrefix().IsValid() && len(acl.GetSourceCidrs()) > 0 {
+	if action.SourcePrefix().IsValid() && len(acl.GetSourceCIDRs()) > 0 {
 		if !containsAddress(acl.SourcePrefixes(), action.SourcePrefix().Addr()) {
 			return false
 		}
 	}
-	if action.DestinationPrefix().IsValid() && len(acl.GetDestinationCidrs()) > 0 {
+	if action.DestinationPrefix().IsValid() && len(acl.GetDestinationCIDRs()) > 0 {
 		if !containsAddress(acl.DestinationPrefixes(), action.DestinationPrefix().Addr()) {
 			return false
 		}

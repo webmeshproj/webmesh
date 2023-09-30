@@ -300,7 +300,7 @@ func (w *wginterface) Metrics() (*v1.InterfaceMetrics, error) {
 			Endpoint:            peer.Endpoint.String(),
 			PersistentKeepAlive: peer.PersistentKeepaliveInterval.String(),
 			LastHandshakeTime:   peer.LastHandshakeTime.UTC().Format(time.RFC3339),
-			AllowedIps: func() []string {
+			AllowedIPs: func() []string {
 				var ips []string
 				for _, ip := range peer.AllowedIPs {
 					ips = append(ips, ip.String())

@@ -43,7 +43,7 @@ func TestListRoutes(t *testing.T) {
 	_, err = server.PutRoute(ctx, &v1.Route{
 		Name:             "test-route",
 		Node:             "foo",
-		DestinationCidrs: []string{"0.0.0.0/0"},
+		DestinationCIDRs: []string{"0.0.0.0/0"},
 	})
 	if err != nil {
 		t.Errorf("PutRoute() error = %v", err)
@@ -67,12 +67,12 @@ func TestListRoutes(t *testing.T) {
 	if routes.GetItems()[0].Node != "foo" {
 		t.Errorf("ListRoutes() expected route node 'foo', got %v", routes.GetItems()[0].Node)
 	}
-	if len(routes.GetItems()[0].DestinationCidrs) != 1 {
-		t.Errorf("ListRoutes() expected route destination cidrs length 1, got %v", len(routes.GetItems()[0].DestinationCidrs))
+	if len(routes.GetItems()[0].DestinationCIDRs) != 1 {
+		t.Errorf("ListRoutes() expected route destination cidrs length 1, got %v", len(routes.GetItems()[0].DestinationCIDRs))
 	} else {
 		{
-			if routes.GetItems()[0].DestinationCidrs[0] != "0.0.0.0/0" {
-				t.Errorf("ListRoutes() expected route destination cidrs '0.0.0.0/0', got %v", routes.GetItems()[0].DestinationCidrs[0])
+			if routes.GetItems()[0].DestinationCIDRs[0] != "0.0.0.0/0" {
+				t.Errorf("ListRoutes() expected route destination cidrs '0.0.0.0/0', got %v", routes.GetItems()[0].DestinationCIDRs[0])
 			}
 		}
 	}

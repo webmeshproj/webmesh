@@ -47,7 +47,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 	}
 	ourRoutes := make([]netip.Prefix, 0)
 	for _, route := range routes {
-		for _, cidr := range route.GetDestinationCidrs() {
+		for _, cidr := range route.GetDestinationCIDRs() {
 			prefix, err := netip.ParsePrefix(cidr)
 			if err != nil {
 				return nil, fmt.Errorf("parse prefix %q: %w", cidr, err)
@@ -90,7 +90,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 		peer := &v1.WireGuardPeer{
 			Node:          node.MeshNode,
 			Proto:         storageutil.ConnectProtoFromEdgeAttrs(edge.Properties.Attributes),
-			AllowedIps:    []string{},
+			AllowedIPs:    []string{},
 			AllowedRoutes: []string{},
 		}
 		allowedIPs, allowedRoutes, err := recursePeers(ctx, nw, graph, adjacencyMap, peerID, ourRoutes, &node)
@@ -105,7 +105,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 		for _, route := range allowedRoutes {
 			ourAllowedRoutes = append(ourAllowedRoutes, route.String())
 		}
-		peer.AllowedIps = ourAllowedIPs
+		peer.AllowedIPs = ourAllowedIPs
 		peer.AllowedRoutes = ourAllowedRoutes
 		out = append(out, peer)
 	}
@@ -134,7 +134,7 @@ func recursePeers(
 	}
 	if len(routes) > 0 {
 		for _, route := range routes {
-			for _, cidr := range route.GetDestinationCidrs() {
+			for _, cidr := range route.GetDestinationCIDRs() {
 				prefix, err := netip.ParsePrefix(cidr)
 				if err != nil {
 					return nil, nil, fmt.Errorf("parse prefix: %w", err)
@@ -209,7 +209,7 @@ func recurseEdges(
 		}
 		if len(routes) > 0 {
 			for _, route := range routes {
-				for _, cidr := range route.GetDestinationCidrs() {
+				for _, cidr := range route.GetDestinationCIDRs() {
 					prefix, err := netip.ParsePrefix(cidr)
 					if err != nil {
 						return nil, nil, fmt.Errorf("parse prefix: %w", err)

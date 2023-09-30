@@ -55,7 +55,7 @@ func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptyp
 	if _, ok := v1.ACLAction_name[int32(acl.GetAction())]; !ok {
 		return nil, status.Error(codes.InvalidArgument, "invalid acl action")
 	}
-	if allEmpty([][]string{acl.GetDestinationCidrs(), acl.GetSourceCidrs(), acl.GetSourceNodes(), acl.GetDestinationNodes()}) {
+	if allEmpty([][]string{acl.GetDestinationCIDRs(), acl.GetSourceCIDRs(), acl.GetSourceNodes(), acl.GetDestinationNodes()}) {
 		return nil, status.Error(codes.InvalidArgument, "at least one of destination_cidrs, source_cidrs, source_nodes, or destination_nodes must be set")
 	}
 	nacl := types.NetworkACL{NetworkACL: acl}
