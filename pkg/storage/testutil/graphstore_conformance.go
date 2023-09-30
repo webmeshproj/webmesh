@@ -27,11 +27,11 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
-// NewPeerGraphStore is a function that creates a new PeerGraphStore implementation.
-type NewPeerGraphStore func(t *testing.T) types.PeerGraphStore
+// NewGraphStoreFunc is a function that creates a new PeerGraphStore implementation.
+type NewGraphStoreFunc func(t *testing.T) types.PeerGraphStore
 
 // TestPeerGraphstoreConformance tests that a PeerGraphStore implementation conforms to the interface.
-func TestPeerGraphstoreConformance(t *testing.T, builder NewPeerGraphStore) {
+func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 	store := builder(t)
 
 	// We don't currently use vertex properties, but they may be used in the future.

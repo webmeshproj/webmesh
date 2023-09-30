@@ -27,7 +27,7 @@ import (
 
 func TestRBACConformance(t *testing.T) {
 	t.Parallel()
-	testutil.TestRBACStorageConformance(t, func() storage.RBAC {
+	testutil.TestRBACStorageConformance(t, func(t *testing.T) storage.RBAC {
 		st := badgerdb.NewTestStorage(false)
 		p := New(st)
 		t.Cleanup(func() {

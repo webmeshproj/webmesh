@@ -28,7 +28,7 @@ import (
 )
 
 // NewRBACFunc is a function that creates a new RBAC implementation.
-type NewRBACFunc func() storage.RBAC
+type NewRBACFunc func(t *testing.T) storage.RBAC
 
 // TestRBACStorageConformance tests that an RBAC implementation conforms to the interface.
 func TestRBACStorageConformance(t *testing.T, builder NewRBACFunc) {
@@ -599,7 +599,7 @@ func TestRBACStorageConformance(t *testing.T, builder NewRBACFunc) {
 func setupRBACTest(t *testing.T, rbac NewRBACFunc) storage.RBAC {
 	t.Helper()
 	ctx := context.Background()
-	st := rbac()
+	st := rbac(t)
 	for _, role := range roleSeeds {
 		err := st.PutRole(ctx, types.Role{Role: role})
 		if err != nil {
