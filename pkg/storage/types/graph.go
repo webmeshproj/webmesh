@@ -125,7 +125,19 @@ func (e Edge) DeepEqual(other Edge) bool {
 }
 
 // MeshEdge wraps a mesh edge.
-type MeshEdge struct{ *v1.MeshEdge }
+type MeshEdge struct {
+	*v1.MeshEdge `json:",inline"`
+}
+
+// DeepCopy returns a deep copy of the edge.
+func (e MeshEdge) DeepCopy() MeshEdge {
+	return MeshEdge{MeshEdge: e.MeshEdge.DeepCopy()}
+}
+
+// DeepCopyInto copies the edge into the given edge.
+func (e MeshEdge) DeepCopyInto(edge *MeshEdge) {
+	*edge = e.DeepCopy()
+}
 
 // SourceID returns the source node's ID.
 func (e MeshEdge) SourceID() NodeID {
