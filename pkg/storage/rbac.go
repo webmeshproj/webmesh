@@ -39,12 +39,10 @@ var (
 
 // RBAC is the interface to the database models for RBAC.
 type RBAC interface {
-	// Enable enables RBAC.
-	Enable(ctx context.Context) error
-	// Disable disables RBAC.
-	Disable(ctx context.Context) error
-	// IsDisabled returns true if RBAC is disabled.
-	IsDisabled(ctx context.Context) (bool, error)
+	// SetEnabled sets the RBAC enabled state.
+	SetEnabled(ctx context.Context, enabled bool) error
+	// GetEnabled returns the RBAC enabled state.
+	GetEnabled(ctx context.Context) (bool, error)
 
 	// PutRole creates or updates a role.
 	PutRole(ctx context.Context, role *v1.Role) error

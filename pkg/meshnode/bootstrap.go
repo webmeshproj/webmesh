@@ -223,7 +223,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 
 	// We initialized rbac, but if the caller wants, we'll go ahead and disable it.
 	if opts.Bootstrap.DisableRBAC {
-		err = rb.Disable(ctx)
+		err = rb.SetEnabled(ctx, false)
 		if err != nil {
 			return fmt.Errorf("disable rbac: %w", err)
 		}

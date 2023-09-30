@@ -434,7 +434,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 	var err error
 	maxTries := 5
 	for i := 0; i < maxTries; i++ {
-		rbacDisabled, err = conn.Storage().MeshDB().RBAC().IsDisabled(context.Background())
+		rbacDisabled, err = conn.Storage().MeshDB().RBAC().GetEnabled(context.Background())
 		if err != nil {
 			log.Error("Failed to check rbac status", "error", err.Error())
 			if i == maxTries-1 {

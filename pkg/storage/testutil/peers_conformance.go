@@ -31,13 +31,12 @@ import (
 )
 
 // NewPeersFunc is a function that creates a new Peers implementation.
-type NewPeersFunc func() storage.Peers
+type NewPeersFunc func(t *testing.T) storage.Peers
 
-// TestPeerStorageConformance tests that a Peers implementation conforms to the
-// Peers interface.
+// TestPeerStorageConformance tests that a Peers implementation conforms to the interface.
 func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("PutAndGetNode", func(t *testing.T) {
-		peers := builder()
+		peers := builder(t)
 		ctx := context.Background()
 
 		tc := []struct {
@@ -154,7 +153,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 
 	t.Run("GetNodeByPubKey", func(t *testing.T) {
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		key := mustGeneratePublicKey(t)
 		raw, err := crypto.DecodePublicKey(key)
 		if err != nil {
@@ -193,7 +192,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 
 	t.Run("DeleteNode", func(t *testing.T) {
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		node := &v1.MeshNode{
 			Id:                 "node-id",
 			PublicKey:          mustGeneratePublicKey(t),
@@ -285,7 +284,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 
 	t.Run("ListNodes", func(t *testing.T) {
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		nodes := []*v1.MeshNode{
 			{
 				Id:                 "node-a",
@@ -335,7 +334,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 
 	t.Run("ListNodeIDs", func(t *testing.T) {
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		nodes := []*v1.MeshNode{
 			{
 				Id:                 "node-a",
@@ -385,7 +384,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 
 	t.Run("ListPublicNodes", func(t *testing.T) {
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		nodes := []*v1.MeshNode{
 			{
 				Id:                 "node-a-public",
@@ -420,7 +419,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 
 	t.Run("ListByZoneID", func(t *testing.T) {
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		nodes := []*v1.MeshNode{
 			{
 				Id:              "node-a-zone-a",
@@ -497,7 +496,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 
 	t.Run("ListByFeature", func(t *testing.T) {
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		nodes := []*v1.MeshNode{
 			{
 				Id:        "node-a",
@@ -617,7 +616,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 
 	t.Run("PutAndRemoveEdge", func(t *testing.T) {
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		nodes := []*v1.MeshNode{
 			{
 				Id:              "node-a",
@@ -675,7 +674,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("SubscribePeers", func(t *testing.T) {
 		SkipOnCI(t, "Subscription tests are flaky on CI")
 		ctx := context.Background()
-		p := builder()
+		p := builder(t)
 		nodes := []*v1.MeshNode{
 			{
 				Id:        "node-a",

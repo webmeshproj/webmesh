@@ -25,7 +25,8 @@ import (
 )
 
 func TestPeers(t *testing.T) {
-	testutil.TestPeerStorageConformance(t, func() storage.Peers {
+	t.Parallel()
+	testutil.TestPeerStorageConformance(t, func(t *testing.T) storage.Peers {
 		st := badgerdb.NewTestDiskStorage(false)
 		p := New(st)
 		t.Cleanup(func() {

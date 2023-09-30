@@ -42,8 +42,7 @@ func TestSingleNodeProviderConformance(ctx context.Context, t *testing.T, provid
 	})
 }
 
-// TestStorageProviderConformance tests that the storage provider conforms to the
-// storage provider interface.
+// TestStorageProviderConformance tests that the storage provider conforms to the storage provider interface.
 func TestStorageProviderConformance(ctx context.Context, t *testing.T, newProviders NewProvidersFunc) {
 	t.Run("SingleNodeStorageConformance", func(t *testing.T) {
 		provider := newProviders(t, 1)[0]

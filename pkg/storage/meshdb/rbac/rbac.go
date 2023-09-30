@@ -48,17 +48,8 @@ type rbac struct {
 	storage.MeshStorage
 }
 
-// Disable disables RBAC.
-func (r *rbac) Disable(ctx context.Context) error {
-	err := r.PutValue(ctx, rbacDisabledKey, []byte("true"), 0)
-	if err != nil {
-		return fmt.Errorf("put rbac disabled: %w", err)
-	}
-	return nil
-}
-
-// IsDisabled returns true if RBAC is disabled.
-func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
+// GetEnabled returns the RBAC enabled state.
+func (r *rbac) GetEnabled(ctx context.Context) (bool, error) {
 	_, err := r.GetValue(ctx, rbacDisabledKey)
 	if err != nil {
 		if errors.IsKeyNotFound(err) {
@@ -69,11 +60,14 @@ func (r *rbac) IsDisabled(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// Enable enables RBAC.
-func (r *rbac) Enable(ctx context.Context) error {
-	err := r.Delete(ctx, rbacDisabledKey)
+// SetEnabled sets the RBAC enabled state.
+func (r *rbac) SetEnabled(ctx context.Context, enabled bool) error {
+	if enabled {
+		return r.Delete(ctx, rbacDisabledKey)
+	}
+	err := r.PutValue(ctx, rbacDisabledKey, []byte("true"), 0)
 	if err != nil {
-		return fmt.Errorf("delete rbac disabled: %w", err)
+		return fmt.Errorf("put rbac disabled: %w", err)
 	}
 	return nil
 }
