@@ -70,9 +70,9 @@ type RBAC interface {
 	ListGroups(ctx context.Context) ([]types.Group, error)
 
 	// ListNodeRoles returns a list of all roles for a node.
-	ListNodeRoles(ctx context.Context, nodeID string) (types.RolesList, error)
+	ListNodeRoles(ctx context.Context, nodeID types.NodeID) (types.RolesList, error)
 	// ListUserRoles returns a list of all roles for a user.
-	ListUserRoles(ctx context.Context, user string) (types.RolesList, error)
+	ListUserRoles(ctx context.Context, user types.NodeID) (types.RolesList, error)
 }
 
 // IsSystemRole returns true if the role is a system role.

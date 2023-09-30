@@ -56,11 +56,17 @@ func (rb *RoleBinding) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ContainsID returns true if the rolebinding contains the given id either as a
+// node or user.
+func (rb RoleBinding) ContainsID(id NodeID) bool {
+	return rb.ContainsNodeID(id) || rb.ContainsUserID(id)
+}
+
 // ContainsUserID returns true if the rolebinding contains the given user id.
-func (rb RoleBinding) ContainsUserID(userID string) bool {
+func (rb RoleBinding) ContainsUserID(userID NodeID) bool {
 	for _, subject := range rb.GetSubjects() {
 		if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_USER {
-			if subject.GetName() == "*" || subject.GetName() == userID {
+			if subject.GetName() == "*" || subject.GetName() == userID.String() {
 				return true
 			}
 		}
@@ -69,10 +75,10 @@ func (rb RoleBinding) ContainsUserID(userID string) bool {
 }
 
 // ContainsNodeID returns true if the rolebinding contains the given node id.
-func (rb RoleBinding) ContainsNodeID(nodeID string) bool {
+func (rb RoleBinding) ContainsNodeID(nodeID NodeID) bool {
 	for _, subject := range rb.GetSubjects() {
 		if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_NODE {
-			if subject.GetName() == "*" || subject.GetName() == nodeID {
+			if subject.GetName() == "*" || subject.GetName() == nodeID.String() {
 				return true
 			}
 		}

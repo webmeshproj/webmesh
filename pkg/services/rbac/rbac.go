@@ -26,6 +26,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Evaluator is an interface for evaluating actions.
@@ -94,11 +95,11 @@ func (s *storeEvaluator) Evaluate(ctx context.Context, actions Actions) (bool, e
 		return false, fmt.Errorf("no peer information in context")
 	}
 	// We treat nodes and users as the same entity for the purpose of authorization.
-	nodeRoles, err := s.rbac.ListNodeRoles(ctx, peerName)
+	nodeRoles, err := s.rbac.ListNodeRoles(ctx, types.NodeID(peerName))
 	if err != nil {
 		return false, err
 	}
-	userRoles, err := s.rbac.ListUserRoles(ctx, peerName)
+	userRoles, err := s.rbac.ListUserRoles(ctx, types.NodeID(peerName))
 	if err != nil {
 		return false, err
 	}

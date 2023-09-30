@@ -303,7 +303,7 @@ func (r *rbac) ListGroups(ctx context.Context) ([]types.Group, error) {
 }
 
 // ListNodeRoles returns a list of all roles for a node.
-func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (types.RolesList, error) {
+func (r *rbac) ListNodeRoles(ctx context.Context, nodeID types.NodeID) (types.RolesList, error) {
 	rbs, err := r.ListRoleBindings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list rolebindings: %w", err)
@@ -322,7 +322,7 @@ func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (types.RolesLis
 }
 
 // ListUserRoles returns a list of all roles for a user.
-func (r *rbac) ListUserRoles(ctx context.Context, user string) (types.RolesList, error) {
+func (r *rbac) ListUserRoles(ctx context.Context, user types.NodeID) (types.RolesList, error) {
 	rbs, err := r.ListRoleBindings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list rolebindings: %w", err)

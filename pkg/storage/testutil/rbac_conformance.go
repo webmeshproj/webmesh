@@ -569,7 +569,7 @@ func TestRBACStorageConformance(t *testing.T, builder NewRBACFunc) {
 
 	t.Run("ListNodeRoles", func(t *testing.T) {
 		rbac := setupRBACTest(t, builder)
-		roles, err := rbac.ListUserRoles(context.Background(), rbacTestAdmin)
+		roles, err := rbac.ListUserRoles(context.Background(), types.NodeID(rbacTestAdmin))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -583,7 +583,7 @@ func TestRBACStorageConformance(t *testing.T, builder NewRBACFunc) {
 
 	t.Run("ListUserRoles", func(t *testing.T) {
 		rbac := setupRBACTest(t, builder)
-		roles, err := rbac.ListUserRoles(context.Background(), rbacTestAdmin)
+		roles, err := rbac.ListUserRoles(context.Background(), types.NodeID(rbacTestAdmin))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
