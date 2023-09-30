@@ -47,7 +47,6 @@ type Networking interface {
 	DeleteNetworkACL(ctx context.Context, name string) error
 	// ListNetworkACLs returns a list of NetworkACLs.
 	ListNetworkACLs(ctx context.Context) (types.NetworkACLs, error)
-
 	// PutRoute creates or updates a Route.
 	PutRoute(ctx context.Context, route *v1.Route) error
 	// GetRoute returns a Route by name.
@@ -60,11 +59,6 @@ type Networking interface {
 	DeleteRoute(ctx context.Context, name string) error
 	// ListRoutes returns a list of Routes.
 	ListRoutes(ctx context.Context) (types.Routes, error)
-
-	// FilterGraph filters the adjacency map in the given graph for the given node ID according
-	// to the current network ACLs. If the ACL list is nil, an empty adjacency map is returned. An
-	// error is returned on faiure building the initial map or any database error.
-	FilterGraph(ctx context.Context, graph types.PeerGraph, nodeID types.NodeID) (types.AdjacencyMap, error)
 }
 
 // ExpandACLs will use the given RBAC interface to expand any group references

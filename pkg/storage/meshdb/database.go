@@ -55,13 +55,13 @@ func NewTestDB() (MeshDBCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create in-memory database: %w", err)
 	}
-	return &databaseCloser{
+	return &TestDB{
 		MeshDB: New(memdb),
 		Closer: memdb,
 	}, nil
 }
 
-type databaseCloser struct {
+type TestDB struct {
 	storage.MeshDB
 	io.Closer
 }

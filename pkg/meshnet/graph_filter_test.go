@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package networking
+package meshnet
 
 import (
 	"context"
@@ -25,7 +25,8 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	peergraph "github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -35,7 +36,7 @@ func TestFilteredGraph(t *testing.T) {
 	t.Run("NoNetworkACLs", func(t *testing.T) {
 		t.Parallel()
 
-		nw, pgraph := setupGraphTest(t, graphSetup{
+		db := setupGraphTest(t, graphSetup{
 			nodes: []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
@@ -70,11 +71,11 @@ func TestFilteredGraph(t *testing.T) {
 			},
 		})
 
-		filteredA, err := nw.FilterGraph(context.Background(), pgraph, "node-a")
+		filteredA, err := FilterGraph(context.Background(), db, "node-a")
 		if err != nil {
 			t.Fatalf("filter graph: %v", err)
 		}
-		filteredB, err := nw.FilterGraph(context.Background(), pgraph, "node-b")
+		filteredB, err := FilterGraph(context.Background(), db, "node-b")
 		if err != nil {
 			t.Fatalf("filter graph: %v", err)
 		}
@@ -88,7 +89,7 @@ func TestFilteredGraph(t *testing.T) {
 	t.Run("DenyAll", func(t *testing.T) {
 		t.Parallel()
 
-		nw, pgraph := setupGraphTest(t, graphSetup{
+		db := setupGraphTest(t, graphSetup{
 			nodes: []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
@@ -133,11 +134,11 @@ func TestFilteredGraph(t *testing.T) {
 			},
 		})
 
-		filteredA, err := nw.FilterGraph(context.Background(), pgraph, "node-a")
+		filteredA, err := FilterGraph(context.Background(), db, "node-a")
 		if err != nil {
 			t.Fatalf("filter graph: %v", err)
 		}
-		filteredB, err := nw.FilterGraph(context.Background(), pgraph, "node-b")
+		filteredB, err := FilterGraph(context.Background(), db, "node-b")
 		if err != nil {
 			t.Fatalf("filter graph: %v", err)
 		}
@@ -161,7 +162,7 @@ func TestFilteredGraph(t *testing.T) {
 	t.Run("AllowAll", func(t *testing.T) {
 		t.Parallel()
 
-		nw, pgraph := setupGraphTest(t, graphSetup{
+		db := setupGraphTest(t, graphSetup{
 			nodes: []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
@@ -206,11 +207,11 @@ func TestFilteredGraph(t *testing.T) {
 			},
 		})
 
-		filteredA, err := nw.FilterGraph(context.Background(), pgraph, "node-a")
+		filteredA, err := FilterGraph(context.Background(), db, "node-a")
 		if err != nil {
 			t.Fatalf("filter graph: %v", err)
 		}
-		filteredB, err := nw.FilterGraph(context.Background(), pgraph, "node-b")
+		filteredB, err := FilterGraph(context.Background(), db, "node-b")
 		if err != nil {
 			t.Fatalf("filter graph: %v", err)
 		}
@@ -245,9 +246,13 @@ type graphSetup struct {
 	routes []*v1.Route
 }
 
-func setupGraphTest(t *testing.T, opts graphSetup) (Networking, types.PeerGraph) {
+func setupGraphTest(t *testing.T, opts graphSetup) storage.MeshDB {
 	t.Helper()
-	nw := setupTest(t)
+	db, err := meshdb.NewTestDB()
+	if err != nil {
+		t.Fatalf("new test db: %v", err)
+	}
+	nw := db.Networking()
 	for _, acl := range opts.acls {
 		if err := nw.PutNetworkACL(context.Background(), acl); err != nil {
 			t.Fatalf("put network ACL: %v", err)
@@ -258,8 +263,7 @@ func setupGraphTest(t *testing.T, opts graphSetup) (Networking, types.PeerGraph)
 			t.Fatalf("put route: %v", err)
 		}
 	}
-	st := nw.(*networking).MeshStorage
-	pgraph := types.NewGraphWithStore(peergraph.NewGraphStore(st))
+	pgraph := db.PeerGraph()
 	for _, node := range opts.nodes {
 		if err := pgraph.AddVertex(node); err != nil {
 			t.Fatalf("add vertex: %v", err)
@@ -274,7 +278,7 @@ func setupGraphTest(t *testing.T, opts graphSetup) (Networking, types.PeerGraph)
 			t.Fatalf("add edge: %v", err)
 		}
 	}
-	return nw, pgraph
+	return db
 }
 
 func generateEncodedKey(t *testing.T) string {

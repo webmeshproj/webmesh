@@ -37,7 +37,7 @@ import (
 func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.NodeID) ([]*v1.WireGuardPeer, error) {
 	graph := st.PeerGraph()
 	nw := st.Networking()
-	adjacencyMap, err := nw.FilterGraph(ctx, graph, peerID)
+	adjacencyMap, err := FilterGraph(ctx, st, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)
 	}
