@@ -28,25 +28,26 @@ type Provider interface {
 	// Close should close the underlying storage as well as any other resources
 	// that the provider may have allocated.
 	io.Closer
-
-	// MeshDB returns the underlying MeshDB instance. The provider does not
-	// need to guarantee consistency on read operations.
-	MeshDB() MeshDB
-	// MeshStorage returns the underlying raw MeshStorage instance. The provider does
-	// not need to guarantee consistency on read operations. This should only be used
-	// for arbitrary key/value storage that has not been abstracted behind the MeshDB.
-	MeshStorage() MeshStorage
-	// Consensus returns the underlying Consensus instance.
-	Consensus() Consensus
-
 	// Start should start the provider and any resources that it may need.
 	Start(context.Context) error
 	// Bootstrap should bootstrap the provider for first-time usage.
 	Bootstrap(context.Context) error
-	// Status returns the status of the storage provider.
+	// Status returns the status of the storage provider. It should never error.
+	// If inaccurate status is available, the node should return itself as a peer
+	// with a message describing the inaccuracy.
 	Status() *v1.StorageStatus
 	// ListenPort should return the TCP port that the storage provider is listening on.
 	ListenPort() uint16
+	// MeshDB returns the underlying MeshDB instance. The provider does not
+	// need to guarantee consistency on read operations.
+	MeshDB() MeshDB
+	// Consensus returns the underlying Consensus instance for managing voting/observing
+	// nodes and leader election.
+	Consensus() Consensus
+	// MeshStorage returns the underlying raw MeshStorage instance. The provider does
+	// not need to guarantee consistency on read operations. This should only be used
+	// for arbitrary key/value storage that has not been abstracted behind the MeshDB.
+	MeshStorage() MeshStorage
 }
 
 // Consensus is the interface for configuring storage consensus.
