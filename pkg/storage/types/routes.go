@@ -112,7 +112,7 @@ func (a Routes) Proto() []*v1.Route {
 
 // Route wraps a Route.
 type Route struct {
-	*v1.Route
+	*v1.Route `json:",inline"`
 }
 
 // DeepCopy returns a deep copy of the route.

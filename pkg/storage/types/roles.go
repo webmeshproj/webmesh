@@ -26,7 +26,9 @@ import (
 type RolesList []Role
 
 // Role wraps a role.
-type Role struct{ *v1.Role }
+type Role struct {
+	*v1.Role `json:",inline"`
+}
 
 // Proto returns the underlying protobuf.
 func (n Role) Proto() *v1.Role {

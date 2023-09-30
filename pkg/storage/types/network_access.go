@@ -24,7 +24,7 @@ import (
 
 // NetworkAction wraps a NetworkAction.
 type NetworkAction struct {
-	*v1.NetworkAction
+	*v1.NetworkAction `json:",inline"`
 }
 
 // Proto returns the protobuf representation of the action.

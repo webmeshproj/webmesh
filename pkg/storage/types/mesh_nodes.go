@@ -38,7 +38,9 @@ func (id NodeID) Bytes() []byte { return []byte(id) }
 func (id NodeID) IsEmpty() bool { return id == "" }
 
 // MeshNode wraps a mesh node.
-type MeshNode struct{ *v1.MeshNode }
+type MeshNode struct {
+	*v1.MeshNode `json:",inline"`
+}
 
 // MeshNodesEqual compares two mesh nodes for equality.
 func MeshNodesEqual(a, b MeshNode) bool {

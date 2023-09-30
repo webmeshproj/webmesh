@@ -23,7 +23,7 @@ import (
 
 // RoleBinding wraps a rolebinding.
 type RoleBinding struct {
-	*v1.RoleBinding
+	*v1.RoleBinding `json:",inline"`
 }
 
 // Proto returns the underlying protobuf.

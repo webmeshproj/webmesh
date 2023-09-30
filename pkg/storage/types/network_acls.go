@@ -137,7 +137,9 @@ func (a NetworkACLs) Accept(ctx context.Context, action NetworkAction) bool {
 }
 
 // NetworkACL is a Network ACL.
-type NetworkACL struct{ *v1.NetworkACL }
+type NetworkACL struct {
+	*v1.NetworkACL `json:",inline"`
+}
 
 // DeepCopy returns a deep copy of the network ACL.
 func (n NetworkACL) DeepCopy() NetworkACL {

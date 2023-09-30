@@ -23,7 +23,7 @@ import (
 
 // Group wraps a group.
 type Group struct {
-	*v1.Group
+	*v1.Group `json:",inline"`
 }
 
 // Proto returns the underlying protobuf.
