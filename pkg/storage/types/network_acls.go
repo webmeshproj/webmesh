@@ -156,13 +156,13 @@ func (a NetworkACL) Proto() *v1.NetworkACL {
 	return a.NetworkACL
 }
 
-// Marshal marshals the ACL to protobuf json.
-func (a NetworkACL) MarshalJSON() ([]byte, error) {
+// MarshalProtoJSON marshals the ACL to protobuf json.
+func (a NetworkACL) MarshalProtoJSON() ([]byte, error) {
 	return protojson.Marshal(a.NetworkACL)
 }
 
-// Unmarshal unmarshals the ACL from a protobuf.
-func (a *NetworkACL) UnmarshalJSON(data []byte) error {
+// UnmarshalProtoJSON unmarshals the ACL from a protobuf JSON.
+func (a *NetworkACL) UnmarshalProtoJSON(data []byte) error {
 	var acl v1.NetworkACL
 	err := protojson.Unmarshal(data, &acl)
 	if err != nil {

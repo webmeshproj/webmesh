@@ -63,7 +63,7 @@ func (g *GraphStore) AddVertex(nodeID types.NodeID, node types.MeshNode, props g
 			return fmt.Errorf("invalid public key: %w", err)
 		}
 	}
-	data, err := node.MarshalJSON()
+	data, err := node.MarshalProtoJSON()
 	if err != nil {
 		return fmt.Errorf("marshal node: %w", err)
 	}
@@ -96,7 +96,7 @@ func (g *GraphStore) Vertex(nodeID types.NodeID) (node types.MeshNode, props gra
 		}
 		return
 	}
-	err = node.UnmarshalJSON(data)
+	err = node.UnmarshalProtoJSON(data)
 	if err != nil {
 		err = fmt.Errorf("unmarshal node: %w", err)
 	}
@@ -227,7 +227,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode types.NodeID, edge graph.Edg
 		return graph.ErrEdgeAlreadyExists
 	}
 	key := newEdgeKey(sourceNode, targetNode)
-	edgeData, err := types.Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalJSON()
+	edgeData, err := types.Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalProtoJSON()
 	if err != nil {
 		return fmt.Errorf("marshal edge: %w", err)
 	}
@@ -255,7 +255,7 @@ func (g *GraphStore) UpdateEdge(sourceNode, targetNode types.NodeID, edge graph.
 		}
 		return fmt.Errorf("get node edge: %w", err)
 	}
-	edgeData, err := types.Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalJSON()
+	edgeData, err := types.Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalProtoJSON()
 	if err != nil {
 		return fmt.Errorf("marshal edge: %w", err)
 	}
@@ -315,7 +315,7 @@ func (g *GraphStore) Edge(sourceNode, targetNode types.NodeID) (graph.Edge[types
 		return graph.Edge[types.NodeID]{}, fmt.Errorf("get node edge: %w", err)
 	}
 	var edge types.MeshEdge
-	err = edge.UnmarshalJSON(data)
+	err = edge.UnmarshalProtoJSON(data)
 	if err != nil {
 		return graph.Edge[types.NodeID]{}, fmt.Errorf("unmarshal edge: %w", err)
 	}
@@ -333,7 +333,7 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[types.NodeID], error) {
 			return nil
 		}
 		var edge types.MeshEdge
-		err := edge.UnmarshalJSON(value)
+		err := edge.UnmarshalProtoJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal edge: %w", err)
 		}

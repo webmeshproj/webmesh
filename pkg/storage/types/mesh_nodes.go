@@ -76,13 +76,13 @@ func (n MeshNode) NodeID() NodeID {
 	return NodeID(n.GetId())
 }
 
-// MarshalJSON marshals the node to JSON.
-func (n MeshNode) MarshalJSON() ([]byte, error) {
+// MarshalProtoJSON marshals the node to JSON.
+func (n MeshNode) MarshalProtoJSON() ([]byte, error) {
 	return protojson.Marshal(n.MeshNode)
 }
 
-// UnmarshalJSON unmarshals the node from JSON.
-func (n *MeshNode) UnmarshalJSON(data []byte) error {
+// UnmarshalProtoJSON unmarshals the node from JSON.
+func (n *MeshNode) UnmarshalProtoJSON(data []byte) error {
 	var node v1.MeshNode
 	if err := protojson.Unmarshal(data, &node); err != nil {
 		return err

@@ -174,13 +174,13 @@ func (e MeshEdge) ToEdge() Edge {
 	}
 }
 
-// MarshalJSON marshals a MeshEdge to JSON.
-func (e MeshEdge) MarshalJSON() ([]byte, error) {
+// MarshalProtoJSON marshals a MeshEdge to JSON.
+func (e MeshEdge) MarshalProtoJSON() ([]byte, error) {
 	return protojson.Marshal(e.MeshEdge)
 }
 
-// UnmarshalJSON unmarshals a MeshEdge from JSON.
-func (e *MeshEdge) UnmarshalJSON(data []byte) error {
+// UnmarshalProtoJSON unmarshals a MeshEdge from JSON.
+func (e *MeshEdge) UnmarshalProtoJSON(data []byte) error {
 	var edge v1.MeshEdge
 	if err := protojson.Unmarshal(data, &edge); err != nil {
 		return err

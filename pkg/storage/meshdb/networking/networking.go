@@ -46,7 +46,7 @@ func (n *networking) PutNetworkACL(ctx context.Context, acl types.NetworkACL) er
 		return fmt.Errorf("%w: %w", errors.ErrInvalidACL, err)
 	}
 	key := storage.NetworkACLsPrefix.For([]byte(acl.GetName()))
-	data, err := acl.MarshalJSON()
+	data, err := acl.MarshalProtoJSON()
 	if err != nil {
 		return fmt.Errorf("marshal network acl: %w", err)
 	}
@@ -68,7 +68,7 @@ func (n *networking) GetNetworkACL(ctx context.Context, name string) (types.Netw
 		return types.NetworkACL{}, fmt.Errorf("get network acl: %w", err)
 	}
 	var acl types.NetworkACL
-	err = acl.UnmarshalJSON(data)
+	err = acl.UnmarshalProtoJSON(data)
 	if err != nil {
 		return types.NetworkACL{}, fmt.Errorf("unmarshal network acl: %w", err)
 	}
@@ -93,7 +93,7 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (types.NetworkACLs, er
 			return nil
 		}
 		var acl types.NetworkACL
-		err := acl.UnmarshalJSON(value)
+		err := acl.UnmarshalProtoJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal network acl: %w", err)
 		}
@@ -110,7 +110,7 @@ func (n *networking) PutRoute(ctx context.Context, route types.Route) error {
 		return fmt.Errorf("%w: %w", errors.ErrInvalidRoute, err)
 	}
 	key := storage.RoutesPrefix.For([]byte(route.GetName()))
-	data, err := route.MarshalJSON()
+	data, err := route.MarshalProtoJSON()
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
 	}
@@ -132,7 +132,7 @@ func (n *networking) GetRoute(ctx context.Context, name string) (types.Route, er
 		return types.Route{}, fmt.Errorf("get network route: %w", err)
 	}
 	var rt types.Route
-	err = rt.UnmarshalJSON(data)
+	err = rt.UnmarshalProtoJSON(data)
 	if err != nil {
 		return types.Route{}, fmt.Errorf("unmarshal network route: %w", err)
 	}
@@ -195,7 +195,7 @@ func (n *networking) ListRoutes(ctx context.Context) (types.Routes, error) {
 			return nil
 		}
 		var rt types.Route
-		err := rt.UnmarshalJSON(value)
+		err := rt.UnmarshalProtoJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal network route: %w", err)
 		}

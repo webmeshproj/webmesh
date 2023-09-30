@@ -41,13 +41,13 @@ func (rb RoleBinding) DeepCopyInto(role *RoleBinding) {
 	*role = rb.DeepCopy()
 }
 
-// MarshalJSON marshals the rolebinding to JSON.
-func (rb RoleBinding) MarshalJSON() ([]byte, error) {
+// MarshalProtoJSON marshals the rolebinding to JSON.
+func (rb RoleBinding) MarshalProtoJSON() ([]byte, error) {
 	return protojson.Marshal(rb.RoleBinding)
 }
 
-// UnmarshalJSON unmarshals the rolebinding from JSON.
-func (rb *RoleBinding) UnmarshalJSON(data []byte) error {
+// UnmarshalProtoJSON unmarshals the rolebinding from JSON.
+func (rb *RoleBinding) UnmarshalProtoJSON(data []byte) error {
 	var rolebinding v1.RoleBinding
 	if err := protojson.Unmarshal(data, &rolebinding); err != nil {
 		return err

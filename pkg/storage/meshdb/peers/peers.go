@@ -133,7 +133,7 @@ func (p *peerDB) List(ctx context.Context, filters ...storage.PeerFilter) ([]typ
 			return nil
 		}
 		var node types.MeshNode
-		err := node.UnmarshalJSON(value)
+		err := node.UnmarshalProtoJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal node: %w", err)
 		}
@@ -168,7 +168,7 @@ func (p *peerDB) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (c
 				return
 			}
 			var edge types.MeshEdge
-			err := edge.UnmarshalJSON(value)
+			err := edge.UnmarshalProtoJSON(value)
 			if err != nil {
 				log.Error("Failed to unmarshal edge", "error", err.Error())
 				return
@@ -190,7 +190,7 @@ func (p *peerDB) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (c
 				return
 			}
 			var node types.MeshNode
-			err := node.UnmarshalJSON(value)
+			err := node.UnmarshalProtoJSON(value)
 			if err != nil {
 				log.Error("Failed to unmarshal node", "error", err.Error())
 				return

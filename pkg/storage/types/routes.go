@@ -130,13 +130,13 @@ func (r *Route) Proto() *v1.Route {
 	return r.Route
 }
 
-// Marshal marshals the route to protobuf json.
-func (r Route) MarshalJSON() ([]byte, error) {
+// MarshalProtoJSON marshals the route to protobuf json.
+func (r Route) MarshalProtoJSON() ([]byte, error) {
 	return protojson.Marshal(r.Route)
 }
 
-// Unmarshal unmarshals the route from a protobuf.
-func (r *Route) UnmarshalJSON(data []byte) error {
+// UnmarshalProtoJSON unmarshals the route from a protobuf.
+func (r *Route) UnmarshalProtoJSON(data []byte) error {
 	var rt v1.Route
 	err := protojson.Unmarshal(data, &rt)
 	if err != nil {

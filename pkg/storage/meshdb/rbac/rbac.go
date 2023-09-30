@@ -89,7 +89,7 @@ func (r *rbac) PutRole(ctx context.Context, role types.Role) error {
 	if len(role.GetRules()) == 0 {
 		return fmt.Errorf("role rules cannot be empty")
 	}
-	data, err := role.MarshalJSON()
+	data, err := role.MarshalProtoJSON()
 	if err != nil {
 		return fmt.Errorf("marshal role: %w", err)
 	}
@@ -111,7 +111,7 @@ func (r *rbac) GetRole(ctx context.Context, name string) (out types.Role, err er
 		}
 		return out, fmt.Errorf("get role: %w", err)
 	}
-	err = out.UnmarshalJSON(data)
+	err = out.UnmarshalProtoJSON(data)
 	if err != nil {
 		err = fmt.Errorf("unmarshal role: %w", err)
 	}
@@ -139,7 +139,7 @@ func (r *rbac) ListRoles(ctx context.Context) (types.RolesList, error) {
 			return nil
 		}
 		role := types.Role{Role: &v1.Role{}}
-		err := role.UnmarshalJSON(value)
+		err := role.UnmarshalProtoJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal role: %w", err)
 		}
@@ -171,7 +171,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding types.RoleBinding
 		return fmt.Errorf("rolebinding subjects cannot be empty")
 	}
 	key := rolebindingsPrefix.ForString(rolebinding.GetName())
-	data, err := rolebinding.MarshalJSON()
+	data, err := rolebinding.MarshalProtoJSON()
 	if err != nil {
 		return fmt.Errorf("marshal rolebinding: %w", err)
 	}
@@ -194,7 +194,7 @@ func (r *rbac) GetRoleBinding(ctx context.Context, name string) (out types.RoleB
 		err = fmt.Errorf("get rolebinding: %w", err)
 		return
 	}
-	err = out.UnmarshalJSON(data)
+	err = out.UnmarshalProtoJSON(data)
 	if err != nil {
 		err = fmt.Errorf("unmarshal rolebinding: %w", err)
 	}
@@ -222,7 +222,7 @@ func (r *rbac) ListRoleBindings(ctx context.Context) ([]types.RoleBinding, error
 			return nil
 		}
 		rolebinding := types.RoleBinding{RoleBinding: &v1.RoleBinding{}}
-		err := rolebinding.UnmarshalJSON(value)
+		err := rolebinding.UnmarshalProtoJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal rolebinding: %w", err)
 		}
@@ -241,7 +241,7 @@ func (r *rbac) PutGroup(ctx context.Context, group types.Group) error {
 		return fmt.Errorf("group subjects cannot be empty")
 	}
 	key := groupsPrefix.ForString(group.GetName())
-	data, err := group.MarshalJSON()
+	data, err := group.MarshalProtoJSON()
 	if err != nil {
 		return fmt.Errorf("marshal group: %w", err)
 	}
@@ -264,7 +264,7 @@ func (r *rbac) GetGroup(ctx context.Context, name string) (out types.Group, err 
 		err = fmt.Errorf("get group: %w", err)
 		return
 	}
-	err = out.UnmarshalJSON(data)
+	err = out.UnmarshalProtoJSON(data)
 	if err != nil {
 		err = fmt.Errorf("unmarshal group: %w", err)
 	}
@@ -292,7 +292,7 @@ func (r *rbac) ListGroups(ctx context.Context) ([]types.Group, error) {
 			return nil
 		}
 		group := types.Group{Group: &v1.Group{}}
-		err := group.UnmarshalJSON(value)
+		err := group.UnmarshalProtoJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal group: %w", err)
 		}

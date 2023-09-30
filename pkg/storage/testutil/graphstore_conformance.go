@@ -113,11 +113,11 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 					if node.MeshNode == nil {
 						t.Errorf("Vertex is nil")
 					}
-					expected, err := testCase.node.MarshalJSON()
+					expected, err := testCase.node.MarshalProtoJSON()
 					if err != nil {
 						t.Errorf("Failed to marshal node: %v", err)
 					}
-					actual, err := node.MarshalJSON()
+					actual, err := node.MarshalProtoJSON()
 					if err != nil {
 						t.Errorf("Failed to marshal node: %v", err)
 					}

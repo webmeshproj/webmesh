@@ -41,13 +41,13 @@ func (n Group) DeepCopyInto(group *Group) {
 	*group = n.DeepCopy()
 }
 
-// MarshalJSON marshals the group to JSON.
-func (n Group) MarshalJSON() ([]byte, error) {
+// MarshalProtoJSON marshals the group to JSON.
+func (n Group) MarshalProtoJSON() ([]byte, error) {
 	return protojson.Marshal(n.Group)
 }
 
-// UnmarshalJSON unmarshals the group from JSON.
-func (n *Group) UnmarshalJSON(data []byte) error {
+// UnmarshalProtoJSON unmarshals the group from JSON.
+func (n *Group) UnmarshalProtoJSON(data []byte) error {
 	var grp v1.Group
 	if err := protojson.Unmarshal(data, &grp); err != nil {
 		return err

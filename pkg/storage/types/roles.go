@@ -45,13 +45,13 @@ func (n Role) DeepCopyInto(role *Role) {
 	*role = n.DeepCopy()
 }
 
-// MarshalJSON marshals the role to JSON.
-func (n Role) MarshalJSON() ([]byte, error) {
+// MarshalProtoJSON marshals the role to JSON.
+func (n Role) MarshalProtoJSON() ([]byte, error) {
 	return protojson.Marshal(n.Role)
 }
 
-// UnmarshalJSON unmarshals the role from JSON.
-func (n *Role) UnmarshalJSON(data []byte) error {
+// UnmarshalProtoJSON unmarshals the role from JSON.
+func (n *Role) UnmarshalProtoJSON(data []byte) error {
 	var role v1.Role
 	if err := protojson.Unmarshal(data, &role); err != nil {
 		return err
