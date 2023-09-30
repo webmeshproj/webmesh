@@ -27,31 +27,55 @@ type RoleBinding struct {
 }
 
 // Proto returns the underlying protobuf.
-func (n RoleBinding) Proto() *v1.RoleBinding {
-	return n.RoleBinding
+func (rb RoleBinding) Proto() *v1.RoleBinding {
+	return rb.RoleBinding
 }
 
 // DeepCopy returns a deep copy of the rolebinding.
-func (n RoleBinding) DeepCopy() RoleBinding {
-	return RoleBinding{RoleBinding: n.RoleBinding.DeepCopy()}
+func (rb RoleBinding) DeepCopy() RoleBinding {
+	return RoleBinding{RoleBinding: rb.RoleBinding.DeepCopy()}
 }
 
 // DeepCopyInto copies the node into the given rolebinding.
-func (n RoleBinding) DeepCopyInto(role *RoleBinding) {
-	*role = n.DeepCopy()
+func (rb RoleBinding) DeepCopyInto(role *RoleBinding) {
+	*role = rb.DeepCopy()
 }
 
 // MarshalJSON marshals the rolebinding to JSON.
-func (n RoleBinding) MarshalJSON() ([]byte, error) {
-	return protojson.Marshal(n.RoleBinding)
+func (rb RoleBinding) MarshalJSON() ([]byte, error) {
+	return protojson.Marshal(rb.RoleBinding)
 }
 
 // UnmarshalJSON unmarshals the rolebinding from JSON.
-func (n *RoleBinding) UnmarshalJSON(data []byte) error {
-	var rb v1.RoleBinding
-	if err := protojson.Unmarshal(data, &rb); err != nil {
+func (rb *RoleBinding) UnmarshalJSON(data []byte) error {
+	var rolebinding v1.RoleBinding
+	if err := protojson.Unmarshal(data, &rolebinding); err != nil {
 		return err
 	}
-	n.RoleBinding = &rb
+	rb.RoleBinding = &rolebinding
 	return nil
+}
+
+// ContainsUserID returns true if the rolebinding contains the given user id.
+func (rb RoleBinding) ContainsUserID(userID string) bool {
+	for _, subject := range rb.GetSubjects() {
+		if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_USER {
+			if subject.GetName() == "*" || subject.GetName() == userID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ContainsNodeID returns true if the rolebinding contains the given node id.
+func (rb RoleBinding) ContainsNodeID(nodeID string) bool {
+	for _, subject := range rb.GetSubjects() {
+		if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_NODE {
+			if subject.GetName() == "*" || subject.GetName() == nodeID {
+				return true
+			}
+		}
+	}
+	return false
 }

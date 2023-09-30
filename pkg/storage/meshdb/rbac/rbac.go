@@ -309,19 +309,13 @@ func (r *rbac) ListNodeRoles(ctx context.Context, nodeID string) (types.RolesLis
 		return nil, fmt.Errorf("list rolebindings: %w", err)
 	}
 	out := make(types.RolesList, 0)
-RoleBindings:
 	for _, rb := range rbs {
-		for _, subject := range rb.GetSubjects() {
-			if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_NODE {
-				if subject.GetName() == "*" || subject.GetName() == nodeID {
-					role, err := r.GetRole(ctx, rb.GetRole())
-					if err != nil {
-						return nil, fmt.Errorf("get role: %w", err)
-					}
-					out = append(out, role)
-					continue RoleBindings
-				}
+		if rb.ContainsNodeID(nodeID) {
+			role, err := r.GetRole(ctx, rb.GetRole())
+			if err != nil {
+				return nil, fmt.Errorf("get role: %w", err)
 			}
+			out = append(out, role)
 		}
 	}
 	return out, nil
@@ -334,19 +328,13 @@ func (r *rbac) ListUserRoles(ctx context.Context, user string) (types.RolesList,
 		return nil, fmt.Errorf("list rolebindings: %w", err)
 	}
 	out := make(types.RolesList, 0)
-RoleBindings:
 	for _, rb := range rbs {
-		for _, subject := range rb.GetSubjects() {
-			if subject.GetType() == v1.SubjectType_SUBJECT_ALL || subject.GetType() == v1.SubjectType_SUBJECT_USER {
-				if subject.GetName() == "*" || subject.GetName() == user {
-					role, err := r.GetRole(ctx, rb.GetRole())
-					if err != nil {
-						return nil, fmt.Errorf("get role: %w", err)
-					}
-					out = append(out, role)
-					continue RoleBindings
-				}
+		if rb.ContainsUserID(user) {
+			role, err := r.GetRole(ctx, rb.GetRole())
+			if err != nil {
+				return nil, fmt.Errorf("get role: %w", err)
 			}
+			out = append(out, role)
 		}
 	}
 	return out, nil
