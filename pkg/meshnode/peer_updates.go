@@ -17,47 +17,30 @@ limitations under the License.
 package meshnode
 
 import (
-	"bytes"
 	"context"
 	"log/slog"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/meshnet"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
-func (s *meshStore) onDBUpdate(key, value []byte) {
-	s.log.Debug("Store update triggered", "key", string(key))
+func (s *meshStore) onPeerUpdate(peers []types.MeshNode) {
+	s.log.Debug("Peer update triggered")
 	if s.testStore {
 		return
 	}
-	switch {
-	case isNodeChangeKey(key):
-		// Potentially need to update wireguard peers
-		go s.queuePeersUpdate()
-		if s.opts.UseMeshDNS {
-			// Peer update, we want to use meshdns, and we dont have our own server
-			// so we need to refresh the meshdns servers
-			go s.queueMeshDNSUpdate()
-		}
-	case isRouteChangeKey(key):
-		// Potentially need to update wireguard routes and peers
-		go s.queuePeersUpdate()
-		go s.queueRouteUpdate()
+	go s.queuePeersUpdate()
+	go s.queueRouteUpdate()
+	if s.opts.UseMeshDNS {
+		go s.queueMeshDNSUpdate()
 	}
-}
-
-func isNodeChangeKey(key []byte) bool {
-	return bytes.HasPrefix(key, storage.NodesPrefix) || bytes.HasPrefix(key, storage.EdgesPrefix)
-}
-
-func isRouteChangeKey(key []byte) bool {
-	return bytes.HasPrefix(key, storage.RoutesPrefix)
 }
 
 // TODO: Make all waits and timeouts below configurable
 
 func (s *meshStore) queueRouteUpdate() {
+	s.log.Debug("Queuing updates for routes")
 	time.Sleep(time.Second * 2)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	s.routeUpdateGroup.TryGo(func() error {
@@ -80,6 +63,7 @@ func (s *meshStore) queueRouteUpdate() {
 }
 
 func (s *meshStore) queuePeersUpdate() {
+	s.log.Debug("Queuing updates for peers")
 	time.Sleep(time.Second * 2)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	s.peerUpdateGroup.TryGo(func() error {
@@ -98,6 +82,7 @@ func (s *meshStore) queuePeersUpdate() {
 }
 
 func (s *meshStore) queueMeshDNSUpdate() {
+	s.log.Debug("Queuing updates for meshdns")
 	time.Sleep(time.Second * 2)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	s.dnsUpdateGroup.TryGo(func() error {

@@ -190,13 +190,13 @@ func (a NetworkACL) Equals(other NetworkACL) bool {
 // SourcePrefixes returns the source prefixes for the ACL.
 // Invalid prefixes will be ignored.
 func (a NetworkACL) SourcePrefixes() []netip.Prefix {
-	return toPrefixes(a.GetSourceCidrs())
+	return ToPrefixes(a.GetSourceCidrs())
 }
 
 // DestinationPrefixes returns the destination prefixes for the ACL.
 // Invalid prefixes will be ignored.
 func (a NetworkACL) DestinationPrefixes() []netip.Prefix {
-	return toPrefixes(a.GetDestinationCidrs())
+	return ToPrefixes(a.GetDestinationCidrs())
 }
 
 // Matches checks if an action matches this ACL.

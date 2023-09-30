@@ -37,7 +37,6 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -47,7 +46,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
@@ -573,21 +571,12 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 
 	// Subscribe to peer updates
 	t.log.Debug("Subscribing to peer updates")
-	_, err = node.Storage().MeshStorage().Subscribe(context.Background(), storage.NodesPrefix, func(key []byte, value []byte) {
-		log := context.LoggerFrom(ctx)
-		peer := types.MeshNode{MeshNode: &v1.MeshNode{}}
-		err = protojson.Unmarshal([]byte(value), peer.MeshNode)
-		if err != nil {
-			log.Error("Failed to unmarshal peer", "error", err.Error())
-			return
-		}
-		if peer.Id == node.ID() {
-			log.Debug("Ignoring self")
-			return
-		}
-		err := t.registerNode(context.Background(), peer)
-		if err != nil {
-			log.Error("Failed to register node to peerstore", "error", err.Error())
+	_, err = node.Storage().MeshDB().Peers().Subscribe(context.Background(), func(peers []types.MeshNode) {
+		for _, peer := range peers {
+			err := t.registerNode(context.Background(), peer)
+			if err != nil {
+				t.log.Error("Failed to register node to peerstore", "error", err.Error())
+			}
 		}
 	})
 	if err != nil {

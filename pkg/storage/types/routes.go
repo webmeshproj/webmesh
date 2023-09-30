@@ -28,6 +28,27 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
+// ToPrefixes converts a list of CIDRs to a list of Prefixes.
+// It silently ignores invalid CIDRs.
+func ToPrefixes(ss []string) []netip.Prefix {
+	var out []netip.Prefix
+	for _, cidr := range ss {
+		var prefix netip.Prefix
+		var err error
+		if cidr == "*" {
+			out = append(out, netip.MustParsePrefix("0.0.0.0/0"))
+			out = append(out, netip.MustParsePrefix("::/0"))
+			continue
+		}
+		prefix, err = netip.ParsePrefix(cidr)
+		if err != nil {
+			continue
+		}
+		out = append(out, prefix)
+	}
+	return out
+}
+
 // ValidateRoute validates a Route.
 func ValidateRoute(route *v1.Route) error {
 	if route.GetName() == "" {
@@ -139,24 +160,5 @@ func (r *Route) Equals(other *Route) bool {
 
 // DestinationPrefixes returns the destination prefixes for the route.
 func (r *Route) DestinationPrefixes() []netip.Prefix {
-	return toPrefixes(r.GetDestinationCidrs())
-}
-
-func toPrefixes(ss []string) []netip.Prefix {
-	var out []netip.Prefix
-	for _, cidr := range ss {
-		var prefix netip.Prefix
-		var err error
-		if cidr == "*" {
-			out = append(out, netip.MustParsePrefix("0.0.0.0/0"))
-			out = append(out, netip.MustParsePrefix("::/0"))
-			continue
-		}
-		prefix, err = netip.ParsePrefix(cidr)
-		if err != nil {
-			continue
-		}
-		out = append(out, prefix)
-	}
-	return out
+	return ToPrefixes(r.GetDestinationCidrs())
 }
