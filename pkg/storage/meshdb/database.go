@@ -19,7 +19,6 @@ limitations under the License.
 package meshdb
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -36,7 +35,7 @@ import (
 func New(store storage.MeshStorage) storage.MeshDB {
 	return &database{
 		peers:      peers.New(store),
-		graph:      types.NewGraphWithStore(graph.NewGraphStore(store)),
+		graph:      types.NewGraphWithStore(graph.NewStore(store)),
 		rbac:       rbac.New(store),
 		meshState:  state.New(store),
 		networking: networking.New(store),
@@ -50,15 +49,12 @@ type MeshDBCloser interface {
 }
 
 // NewTestDB returns a new in-memory storage.Database instance for testing.
-func NewTestDB() (MeshDBCloser, error) {
-	memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
-	if err != nil {
-		return nil, fmt.Errorf("create in-memory database: %w", err)
-	}
+func NewTestDB() MeshDBCloser {
+	memdb := badgerdb.NewTestStorage(false)
 	return &TestDB{
 		MeshDB: New(memdb),
 		Closer: memdb,
-	}, nil
+	}
 }
 
 type TestDB struct {

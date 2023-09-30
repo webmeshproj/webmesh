@@ -433,13 +433,10 @@ func TestWireGuardTopologies(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			db, err := meshdb.NewTestDB()
-			if err != nil {
-				t.Fatalf("new test db: %v", err)
-			}
+			db := meshdb.NewTestDB()
 			defer db.Close()
 			// Create an allow-all traffic policy.
-			err = db.Networking().PutNetworkACL(ctx, &v1.NetworkACL{
+			err := db.Networking().PutNetworkACL(ctx, &v1.NetworkACL{
 				Name:             "allow-all",
 				Action:           v1.ACLAction_ACTION_ACCEPT,
 				SourceNodes:      []string{"*"},

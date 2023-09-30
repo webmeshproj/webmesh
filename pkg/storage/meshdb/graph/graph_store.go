@@ -38,8 +38,8 @@ type GraphStore struct {
 	mu sync.RWMutex
 }
 
-// NewGraphStore creates a new Graph storage instance.
-func NewGraphStore(st storage.MeshStorage) types.PeerGraphStore {
+// NewStore creates a new Graph storage instance.
+func NewStore(st storage.MeshStorage) types.PeerGraphStore {
 	return &GraphStore{MeshStorage: st}
 }
 

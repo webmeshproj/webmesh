@@ -178,10 +178,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			t.Parallel()
 			// Prepare the test database
 			ctx := context.Background()
-			db, err := meshdb.NewTestDB()
-			if err != nil {
-				t.Fatalf("new test db: %v", err)
-			}
+			db := meshdb.NewTestDB()
 			defer db.Close()
 			for _, peer := range testCase.peers {
 				peer.PublicKey = mustGeneratePublicKey(t)
@@ -209,7 +206,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			}
 			for peerID, edges := range testCase.edges {
 				for _, edge := range edges {
-					err = db.Peers().PutEdge(ctx, &v1.MeshEdge{
+					err := db.Peers().PutEdge(ctx, &v1.MeshEdge{
 						Source: peerID,
 						Target: edge,
 					})

@@ -248,10 +248,7 @@ type graphSetup struct {
 
 func setupGraphTest(t *testing.T, opts graphSetup) storage.MeshDB {
 	t.Helper()
-	db, err := meshdb.NewTestDB()
-	if err != nil {
-		t.Fatalf("new test db: %v", err)
-	}
+	db := meshdb.NewTestDB()
 	nw := db.Networking()
 	for _, acl := range opts.acls {
 		if err := nw.PutNetworkACL(context.Background(), acl); err != nil {
