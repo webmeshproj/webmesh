@@ -52,10 +52,6 @@ type peerDB struct {
 	graph types.PeerGraph
 }
 
-func (p *peerDB) Resolver() storage.PeerResolver {
-	return &peerResolver{p.db}
-}
-
 func (p *peerDB) Graph() types.PeerGraph { return p.graph }
 
 func (p *peerDB) Put(ctx context.Context, node *v1.MeshNode) error {
@@ -210,6 +206,20 @@ func (p *peerDB) ListByFeature(ctx context.Context, feature v1.Feature) ([]types
 		}
 	}
 	return out, nil
+}
+
+func (p *peerDB) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (context.CancelFunc, error) {
+	return p.db.Subscribe(ctx, storage.NodesPrefix, func(key, value []byte) {
+		if bytes.Equal(key, storage.NodesPrefix) {
+			return
+		}
+		var node types.MeshNode
+		err := node.UnmarshalJSON(value)
+		if err != nil {
+			return
+		}
+		fn(node)
+	})
 }
 
 func (p *peerDB) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {

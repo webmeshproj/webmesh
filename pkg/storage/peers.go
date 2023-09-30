@@ -23,7 +23,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -36,22 +35,11 @@ var NodesPrefix = types.RegistryPrefix.ForString("nodes")
 // in the format /registry/edges/<source>/<target>.
 var EdgesPrefix = types.RegistryPrefix.ForString("edges")
 
-// PeerFilterFunc is a function that can be used to filter responses returned by a resolver.
-type PeerFilterFunc func(types.MeshNode) bool
-
-// PeerResolver provides facilities for creating various transport.Resolver instances.
-type PeerResolver interface {
-	// NodeIDResolver returns a resolver that resolves node addresses by node ID.
-	NodeIDResolver() transport.NodeIDResolver
-	// FeatureResolver returns a resolver that resolves node addresses by feature.
-	FeatureResolver(filterFn ...PeerFilterFunc) transport.FeatureResolver
-}
+// PeerSubscribeFunc is a function that can be used to subscribe to peer changes.
+type PeerSubscribeFunc func(types.MeshNode)
 
 // Peers is the peers interface.
 type Peers interface {
-	// Resolver returns a resolver backed by the storage
-	// of this instance.
-	Resolver() PeerResolver
 	// Graph returns the graph of nodes.
 	Graph() types.PeerGraph
 	// Put creates or updates a node.
@@ -72,6 +60,8 @@ type Peers interface {
 	ListByZoneID(ctx context.Context, zoneID string) ([]types.MeshNode, error)
 	// ListByFeature lists all nodes with a given feature.
 	ListByFeature(ctx context.Context, feature v1.Feature) ([]types.MeshNode, error)
+	// Subscribe subscribes to node changes.
+	Subscribe(ctx context.Context, fn PeerSubscribeFunc) (context.CancelFunc, error)
 	// AddEdge adds an edge between two nodes.
 	PutEdge(ctx context.Context, edge *v1.MeshEdge) error
 	// RemoveEdge removes an edge between two nodes.

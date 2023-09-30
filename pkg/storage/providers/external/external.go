@@ -442,7 +442,7 @@ func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix []byte, fn st
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {

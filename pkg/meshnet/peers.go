@@ -52,6 +52,20 @@ type PeerManager interface {
 	// RefreshPeers walks all peers against the provided list and makes sure
 	// they are up to date.
 	Refresh(ctx context.Context, peers []*v1.WireGuardPeer) error
+	// Resolver returns a resolver backed by the storage
+	// of this instance.
+	Resolver() PeerResolver
+}
+
+// PeerFilterFunc is a function that can be used to filter responses returned by a resolver.
+type PeerFilterFunc func(types.MeshNode) bool
+
+// PeerResolver provides facilities for creating various transport.Resolver instances.
+type PeerResolver interface {
+	// NodeIDResolver returns a resolver that resolves node addresses by node ID.
+	NodeIDResolver() transport.NodeIDResolver
+	// FeatureResolver returns a resolver that resolves node addresses by feature.
+	FeatureResolver(filterFn ...PeerFilterFunc) transport.FeatureResolver
 }
 
 type peerManager struct {
@@ -83,6 +97,10 @@ func (m *peerManager) Close(ctx context.Context) {
 		}
 	}
 	m.p2pConns = make(map[string]clientPeerConn)
+}
+
+func (m *peerManager) Resolver() PeerResolver {
+	return NewResolver(m.net.storage)
 }
 
 func (m *peerManager) Add(ctx context.Context, peer *v1.WireGuardPeer, iceServers []string) error {
@@ -472,7 +490,7 @@ func (m *peerManager) getSignalingTransport(ctx context.Context, peer *v1.WireGu
 	} else {
 		// We'll use our local storage
 		log.Debug("We'll use our local storage for ICE negotiation lookup")
-		resolver = m.net.storage.Peers().Resolver().FeatureResolver(func(mn types.MeshNode) bool {
+		resolver = m.Resolver().FeatureResolver(func(mn types.MeshNode) bool {
 			return mn.GetId() != peer.GetNode().GetId()
 		})
 	}

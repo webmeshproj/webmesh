@@ -87,8 +87,17 @@ type Consensus interface {
 	RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error
 }
 
+// KVSubscribeFunc is the function signature for subscribing to changes to a key.
+type KVSubscribeFunc func(key, value []byte)
+
+// PrefixIterator is the function signature for iterating over all keys with a given prefix.
+type PrefixIterator func(key, value []byte) error
+
 // MeshStorage is the interface for storing and retrieving data about the state of the mesh.
 type MeshStorage interface {
+	// Close should close the underlying storage as well as any other resources
+	// that the provider may have allocated. This should be called automatically
+	// by the provider.
 	io.Closer
 
 	// GetValue returns the value of a key.
@@ -105,7 +114,7 @@ type MeshStorage interface {
 	IterPrefix(ctx context.Context, prefix []byte, fn PrefixIterator) error
 	// Subscribe will call the given function whenever a key with the given prefix is changed.
 	// The returned function can be called to unsubscribe.
-	Subscribe(ctx context.Context, prefix []byte, fn SubscribeFunc) (context.CancelFunc, error)
+	Subscribe(ctx context.Context, prefix []byte, fn KVSubscribeFunc) (context.CancelFunc, error)
 }
 
 // ConsensusStorage is the interface for storing and retrieving data about the state of consensus.
@@ -121,13 +130,7 @@ type ConsensusStorage interface {
 	Restore(ctx context.Context, r io.Reader) error
 }
 
-// SubscribeFunc is the function signature for subscribing to changes to a key.
-type SubscribeFunc func(key, value []byte)
-
-// PrefixIterator is the function signature for iterating over all keys with a given prefix.
-type PrefixIterator func(key, value []byte) error
-
-// DualStorage represents a storage interface that can serve as both a mesh and consensus storage.
+// DualStorage represents a storage interface that can serve as both mesh and consensus storage.
 type DualStorage interface {
 	MeshStorage
 	ConsensusStorage

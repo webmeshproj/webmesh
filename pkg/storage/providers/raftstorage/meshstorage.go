@@ -84,7 +84,7 @@ func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage
 }
 
 // Subscribe subscribes to changes to a prefix.
-func (rs *RaftStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (rs *RaftStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
 	if !rs.raft.started.Load() {
 		return func() {}, errors.ErrClosed
 	}

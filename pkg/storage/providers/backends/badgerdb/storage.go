@@ -248,7 +248,7 @@ func (db *badgerDB) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pr
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (db *badgerDB) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (db *badgerDB) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	ctx, cancel := context.WithCancel(ctx)

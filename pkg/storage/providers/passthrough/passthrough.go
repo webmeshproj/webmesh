@@ -348,7 +348,7 @@ func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pref
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
-func (p *Storage) Subscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) (context.CancelFunc, error) {
+func (p *Storage) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
 	if !storageutil.IsValidKey(string(prefix)) {
 		return func() {}, errors.ErrInvalidPrefix
 	}
@@ -411,7 +411,7 @@ func (p *Storage) Subscribe(ctx context.Context, prefix []byte, fn storage.Subsc
 	return cancel, nil
 }
 
-func (p *Storage) doSubscribe(ctx context.Context, prefix []byte, fn storage.SubscribeFunc) error {
+func (p *Storage) doSubscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) error {
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err
