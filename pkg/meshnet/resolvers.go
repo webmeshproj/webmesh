@@ -57,7 +57,7 @@ func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 func (r *peerResolver) FeatureResolver(filterFn ...PeerFilterFunc) transport.FeatureResolver {
 	return transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
 		var addrs []netip.AddrPort
-		nodes, err := r.st.Peers().ListByFeature(ctx, lookup)
+		nodes, err := r.st.Peers().List(ctx, storage.FeatureFilter(lookup))
 		if err != nil {
 			return nil, err
 		}

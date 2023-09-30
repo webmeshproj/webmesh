@@ -100,7 +100,7 @@ func (s *state) SetMeshDomain(ctx context.Context, domain string) error {
 }
 
 func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {
-	nodes, err := peers.New(s).ListPublicNodes(ctx)
+	nodes, err := peers.New(s).List(ctx, storage.IsPublicFilter())
 	if err != nil {
 		return nil, err
 	}

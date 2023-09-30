@@ -20,12 +20,9 @@ package peers
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"reflect"
 	"time"
 
 	"github.com/dominikbraun/graph"
-	"github.com/dominikbraun/graph/draw"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -131,7 +128,7 @@ func (p *peerDB) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (p *peerDB) List(ctx context.Context) ([]types.MeshNode, error) {
+func (p *peerDB) List(ctx context.Context, filters ...storage.PeerFilter) ([]types.MeshNode, error) {
 	out := make([]types.MeshNode, 0)
 	err := p.db.IterPrefix(ctx, storage.NodesPrefix, func(key, value []byte) error {
 		if bytes.Equal(key, storage.NodesPrefix) {
@@ -145,7 +142,7 @@ func (p *peerDB) List(ctx context.Context) ([]types.MeshNode, error) {
 		out = append(out, node)
 		return nil
 	})
-	return out, err
+	return storage.PeerFilters(filters).Filter(out), err
 }
 
 func (p *peerDB) ListIDs(ctx context.Context) ([]string, error) {
@@ -161,51 +158,6 @@ func (p *peerDB) ListIDs(ctx context.Context) ([]string, error) {
 		ids = append(ids, string(storage.NodesPrefix.TrimFrom(key)))
 	}
 	return ids, nil
-}
-
-func (p *peerDB) ListPublicNodes(ctx context.Context) ([]types.MeshNode, error) {
-	nodes, err := p.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list nodes: %w", err)
-	}
-	out := make([]types.MeshNode, 0)
-	for _, node := range nodes {
-		n := node
-		if n.PrimaryEndpoint != "" {
-			out = append(out, n)
-		}
-	}
-	return out, nil
-}
-
-func (p *peerDB) ListByZoneID(ctx context.Context, zoneID string) ([]types.MeshNode, error) {
-	nodes, err := p.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list nodes: %w", err)
-	}
-	out := make([]types.MeshNode, 0)
-	for _, node := range nodes {
-		n := node
-		if n.GetZoneAwarenessId() == zoneID {
-			out = append(out, n)
-		}
-	}
-	return out, nil
-}
-
-func (p *peerDB) ListByFeature(ctx context.Context, feature v1.Feature) ([]types.MeshNode, error) {
-	nodes, err := p.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list nodes: %w", err)
-	}
-	out := make([]types.MeshNode, 0)
-	for _, node := range nodes {
-		n := node
-		if n.HasFeature(feature) {
-			out = append(out, n)
-		}
-	}
-	return out, nil
 }
 
 func (p *peerDB) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (context.CancelFunc, error) {
@@ -258,7 +210,7 @@ func (p *peerDB) PutEdge(ctx context.Context, edge *v1.MeshEdge) error {
 		return nil
 	}
 	e := types.MeshEdge{MeshEdge: edge}
-	return PutMeshEdgeInto(e, p.graph)
+	return e.PutInto(ctx, p.graph)
 }
 
 func (p *peerDB) RemoveEdge(ctx context.Context, from, to string) error {
@@ -268,45 +220,6 @@ func (p *peerDB) RemoveEdge(ctx context.Context, from, to string) error {
 			return nil
 		}
 		return fmt.Errorf("remove edge: %w", err)
-	}
-	return nil
-}
-
-func (p *peerDB) DrawDOTGraph(ctx context.Context, w io.Writer) error {
-	graph := graph.Graph[types.NodeID, types.MeshNode](p.graph)
-	err := draw.DOT(graph, w)
-	if err != nil {
-		return fmt.Errorf("draw graph: %w", err)
-	}
-	return nil
-}
-
-// PutMeshEdgeInto puts the MeshEdge into the given graph.
-func PutMeshEdgeInto(e types.MeshEdge, g types.PeerGraph) error {
-	opts := []func(*graph.EdgeProperties){graph.EdgeWeight(int(e.Weight))}
-	if len(e.Attributes) > 0 {
-		for k, v := range e.Attributes {
-			opts = append(opts, graph.EdgeAttribute(k, v))
-		}
-	}
-	// Save the raft log some trouble by checking if the edge already exists.
-	graphEdge, err := g.Edge(e.SourceID(), e.TargetID())
-	if err == nil {
-		// Check if the weight or attributes changed
-		if !reflect.DeepEqual(graphEdge.Properties.Attributes, e.Attributes) {
-			return g.UpdateEdge(e.SourceID(), e.TargetID(), opts...)
-		}
-		if graphEdge.Properties.Weight != int(e.Weight) {
-			return g.UpdateEdge(e.SourceID(), e.TargetID(), opts...)
-		}
-		return nil
-	}
-	if !errors.IsEdgeNotFound(err) {
-		return fmt.Errorf("get edge: %w", err)
-	}
-	err = g.AddEdge(e.SourceID(), e.TargetID(), opts...)
-	if err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {
-		return fmt.Errorf("add edge: %w", err)
 	}
 	return nil
 }

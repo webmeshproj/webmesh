@@ -93,7 +93,7 @@ func (m *dnsManager) RefreshServers(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	context.LoggerFrom(ctx).Debug("Refreshing MeshDNS servers")
-	servers, err := m.storage.Peers().ListByFeature(ctx, v1.Feature_MESH_DNS)
+	servers, err := m.storage.Peers().List(ctx, storage.FeatureFilter(v1.Feature_MESH_DNS))
 	if err != nil {
 		return fmt.Errorf("list peers with feature: %w", err)
 	}

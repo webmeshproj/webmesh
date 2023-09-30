@@ -405,7 +405,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				t.Fatal(err)
 			}
 		}
-		got, err := p.ListPublicNodes(ctx)
+		got, err := p.List(ctx, storage.IsPublicFilter())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -448,7 +448,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				t.Fatal(err)
 			}
 		}
-		got, err := p.ListByZoneID(ctx, "zone-a")
+		got, err := p.List(ctx, storage.ZoneIDFilter("zone-a"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -470,7 +470,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				t.Fatalf("node %q not found", node.GetId())
 			}
 		}
-		got, err = p.ListByZoneID(ctx, "zone-b")
+		got, err = p.List(ctx, storage.ZoneIDFilter("zone-b"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -546,7 +546,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			}
 		}
 		// Two nodes for admin API, one for ICE negotiation, one for mesh DNS
-		got, err := p.ListByFeature(ctx, v1.Feature_ADMIN_API)
+		got, err := p.List(ctx, storage.FeatureFilter(v1.Feature_ADMIN_API))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -568,7 +568,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				t.Fatalf("node %q not found", node.GetId())
 			}
 		}
-		got, err = p.ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
+		got, err = p.List(ctx, storage.FeatureFilter(v1.Feature_ICE_NEGOTIATION))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -590,7 +590,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				t.Fatalf("node %q not found", node.GetId())
 			}
 		}
-		got, err = p.ListByFeature(ctx, v1.Feature_MESH_DNS)
+		got, err = p.List(ctx, storage.FeatureFilter(v1.Feature_MESH_DNS))
 		if err != nil {
 			t.Fatal(err)
 		}

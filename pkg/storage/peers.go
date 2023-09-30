@@ -18,7 +18,6 @@ package storage
 
 import (
 	"context"
-	"io"
 
 	v1 "github.com/webmeshproj/api/v1"
 
@@ -54,21 +53,61 @@ type Peers interface {
 	// Delete deletes a node.
 	Delete(ctx context.Context, id string) error
 	// List lists all nodes.
-	List(ctx context.Context) ([]types.MeshNode, error)
+	List(ctx context.Context, filters ...PeerFilter) ([]types.MeshNode, error)
 	// ListIDs lists all node IDs.
 	ListIDs(ctx context.Context) ([]string, error)
-	// ListPublicNodes lists all public nodes.
-	ListPublicNodes(ctx context.Context) ([]types.MeshNode, error)
-	// ListByZoneID lists all nodes in a zone.
-	ListByZoneID(ctx context.Context, zoneID string) ([]types.MeshNode, error)
-	// ListByFeature lists all nodes with a given feature.
-	ListByFeature(ctx context.Context, feature v1.Feature) ([]types.MeshNode, error)
 	// Subscribe subscribes to node changes.
 	Subscribe(ctx context.Context, fn PeerSubscribeFunc) (context.CancelFunc, error)
 	// AddEdge adds an edge between two nodes.
 	PutEdge(ctx context.Context, edge *v1.MeshEdge) error
 	// RemoveEdge removes an edge between two nodes.
 	RemoveEdge(ctx context.Context, from, to string) error
-	// DrawDOTGraph draws the graph of nodes to the given Writer.
-	DrawDOTGraph(ctx context.Context, w io.Writer) error
+}
+
+// PeerFilter is a filter for nodes.
+type PeerFilter func(types.MeshNode) bool
+
+// PeerFilters is a list of filters.
+type PeerFilters []PeerFilter
+
+// Filter filters a list of nodes.
+func (f PeerFilters) Filter(nodes []types.MeshNode) []types.MeshNode {
+	var filtered []types.MeshNode
+	for _, node := range nodes {
+		if f.Match(node) {
+			filtered = append(filtered, node)
+		}
+	}
+	return filtered
+}
+
+// Match returns true if the node matches all filters.
+func (f PeerFilters) Match(node types.MeshNode) bool {
+	for _, filter := range f {
+		if !filter(node) {
+			return false
+		}
+	}
+	return true
+}
+
+// FeatureFilter returns a new filter that matches nodes with a given feature.
+func FeatureFilter(feature v1.Feature) PeerFilter {
+	return func(node types.MeshNode) bool {
+		return node.HasFeature(feature)
+	}
+}
+
+// IsPublicFilter returns a new filter that matches public nodes.
+func IsPublicFilter() PeerFilter {
+	return func(node types.MeshNode) bool {
+		return node.GetPrimaryEndpoint() != ""
+	}
+}
+
+// ZoneIDFilter returns a new filter that matches nodes in a given zone.
+func ZoneIDFilter(zoneID string) PeerFilter {
+	return func(node types.MeshNode) bool {
+		return node.GetZoneAwarenessId() == zoneID
+	}
 }

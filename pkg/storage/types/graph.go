@@ -18,15 +18,29 @@ package types
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 
 	"github.com/dominikbraun/graph"
+	"github.com/dominikbraun/graph/draw"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 // PeerGraph is the graph.Graph implementation for the mesh network.
 type PeerGraph graph.Graph[NodeID, MeshNode]
+
+// DrawPeerGraph draws a PeerGraph to the given writer in DOT format.
+func DrawPeerGraph(ctx context.Context, g PeerGraph, w io.Writer) error {
+	err := draw.DOT(g, w)
+	if err != nil {
+		return fmt.Errorf("draw graph: %w", err)
+	}
+	return nil
+}
 
 // PeerGraphStore is the graph.Store implementation for the mesh network.
 type PeerGraphStore graph.Store[NodeID, MeshNode]
@@ -160,5 +174,35 @@ func (e *MeshEdge) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	e.MeshEdge = &edge
+	return nil
+}
+
+// PutInto puts the MeshEdge into the given graph.
+func (e MeshEdge) PutInto(ctx context.Context, g PeerGraph) error {
+	opts := []func(*graph.EdgeProperties){graph.EdgeWeight(int(e.Weight))}
+	if len(e.Attributes) > 0 {
+		for k, v := range e.Attributes {
+			opts = append(opts, graph.EdgeAttribute(k, v))
+		}
+	}
+	// Save the raft log some trouble by checking if the edge already exists.
+	graphEdge, err := g.Edge(e.SourceID(), e.TargetID())
+	if err == nil {
+		// Check if the weight or attributes changed
+		if !reflect.DeepEqual(graphEdge.Properties.Attributes, e.Attributes) {
+			return g.UpdateEdge(e.SourceID(), e.TargetID(), opts...)
+		}
+		if graphEdge.Properties.Weight != int(e.Weight) {
+			return g.UpdateEdge(e.SourceID(), e.TargetID(), opts...)
+		}
+		return nil
+	}
+	if !errors.IsEdgeNotFound(err) {
+		return fmt.Errorf("get edge: %w", err)
+	}
+	err = g.AddEdge(e.SourceID(), e.TargetID(), opts...)
+	if err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {
+		return fmt.Errorf("add edge: %w", err)
+	}
 	return nil
 }

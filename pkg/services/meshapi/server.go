@@ -28,6 +28,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Server is the webmesh Mesh service.
@@ -88,7 +89,7 @@ func (s *Server) GetMeshGraph(ctx context.Context, _ *emptypb.Empty) (*v1.MeshGr
 		}
 	}
 	var buf bytes.Buffer
-	err = s.peers.DrawDOTGraph(ctx, &buf)
+	err = types.DrawPeerGraph(ctx, s.peers.Graph(), &buf)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to draw graph: %v", err)
 	}
