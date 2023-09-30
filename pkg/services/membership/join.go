@@ -191,7 +191,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 	// Write the peer to the database
 	p := s.storage.MeshDB().Peers()
-	err = p.Put(ctx, &v1.MeshNode{
+	err = p.Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{
 		Id:                 req.GetId(),
 		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
 		WireguardEndpoints: req.GetWireguardEndpoints(),
@@ -202,7 +202,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		Features:           req.GetFeatures(),
 		Multiaddrs:         req.GetMultiaddrs(),
 		JoinedAt:           timestamppb.New(time.Now().UTC()),
-	})
+	}})
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to raft log: %v", err))
 	}
@@ -288,7 +288,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				}
 				// The peer doesn't exist, so create a placeholder for it
 				log.Debug("Registering empty peer", slog.String("peer", peer))
-				err = p.Put(ctx, &v1.MeshNode{Id: peer})
+				err = p.Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{Id: peer}})
 				if err != nil {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to register peer: %v", err))
 				}

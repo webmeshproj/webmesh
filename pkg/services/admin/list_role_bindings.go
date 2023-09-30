@@ -31,5 +31,9 @@ func (s *Server) ListRoleBindings(ctx context.Context, _ *emptypb.Empty) (*v1.Ro
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.RoleBindings{Items: rbs}, nil
+	out := make([]*v1.RoleBinding, len(rbs))
+	for i, rb := range rbs {
+		out[i] = rb.Proto()
+	}
+	return &v1.RoleBindings{Items: out}, nil
 }

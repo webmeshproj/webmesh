@@ -21,8 +21,6 @@ import (
 	"slices"
 	"strings"
 
-	v1 "github.com/webmeshproj/api/v1"
-
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
@@ -40,7 +38,7 @@ var (
 // Networking is the interface to the database models for network resources.
 type Networking interface {
 	// PutNetworkACL creates or updates a NetworkACL.
-	PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error
+	PutNetworkACL(ctx context.Context, acl types.NetworkACL) error
 	// GetNetworkACL returns a NetworkACL by name.
 	GetNetworkACL(ctx context.Context, name string) (types.NetworkACL, error)
 	// DeleteNetworkACL deletes a NetworkACL by name.
@@ -48,7 +46,7 @@ type Networking interface {
 	// ListNetworkACLs returns a list of NetworkACLs.
 	ListNetworkACLs(ctx context.Context) (types.NetworkACLs, error)
 	// PutRoute creates or updates a Route.
-	PutRoute(ctx context.Context, route *v1.Route) error
+	PutRoute(ctx context.Context, route types.Route) error
 	// GetRoute returns a Route by name.
 	GetRoute(ctx context.Context, name string) (types.Route, error)
 	// GetRoutesByNode returns a list of Routes for a given Node.

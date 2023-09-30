@@ -33,25 +33,25 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 
 	tt := []struct {
 		name      string
-		peers     []*v1.MeshNode
+		peers     []types.MeshNode
 		groups    map[string][]string
-		acls      []*v1.NetworkACL
+		acls      []types.NetworkACL
 		edges     map[string][]string // peerID -> []peerID
 		wantPeers map[string][]string // peerID -> []peerID
 	}{
 		{
 			name: "no ACLs",
-			peers: []*v1.MeshNode{
-				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			peers: []types.MeshNode{
+				{MeshNode: &v1.MeshNode{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
 				"b": {"a", "c"},
 				"c": {"a", "b"},
 			},
-			acls: []*v1.NetworkACL{},
+			acls: []types.NetworkACL{},
 			wantPeers: map[string][]string{
 				"a": {},
 				"b": {},
@@ -60,25 +60,27 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 		},
 		{
 			name: "deny-all ACL",
-			peers: []*v1.MeshNode{
-				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			peers: []types.MeshNode{
+				{MeshNode: &v1.MeshNode{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
 				"b": {"a", "c"},
 				"c": {"a", "b"},
 			},
-			acls: []*v1.NetworkACL{
+			acls: []types.NetworkACL{
 				{
-					Name:             "deny-all",
-					Priority:         0,
-					Action:           v1.ACLAction_ACTION_DENY,
-					SourceNodes:      []string{"*"},
-					DestinationNodes: []string{"*"},
-					SourceCidrs:      []string{"*"},
-					DestinationCidrs: []string{"*"},
+					NetworkACL: &v1.NetworkACL{
+						Name:             "deny-all",
+						Priority:         0,
+						Action:           v1.ACLAction_ACTION_DENY,
+						SourceNodes:      []string{"*"},
+						DestinationNodes: []string{"*"},
+						SourceCidrs:      []string{"*"},
+						DestinationCidrs: []string{"*"},
+					},
 				},
 			},
 			wantPeers: map[string][]string{
@@ -89,25 +91,27 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 		},
 		{
 			name: "accept-all ACL",
-			peers: []*v1.MeshNode{
-				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			peers: []types.MeshNode{
+				{MeshNode: &v1.MeshNode{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
 				"b": {"a", "c"},
 				"c": {"a", "b"},
 			},
-			acls: []*v1.NetworkACL{
+			acls: []types.NetworkACL{
 				{
-					Name:             "allow-all",
-					Priority:         0,
-					Action:           v1.ACLAction_ACTION_ACCEPT,
-					SourceNodes:      []string{"*"},
-					DestinationNodes: []string{"*"},
-					SourceCidrs:      []string{"*"},
-					DestinationCidrs: []string{"*"},
+					NetworkACL: &v1.NetworkACL{
+						Name:             "allow-all",
+						Priority:         0,
+						Action:           v1.ACLAction_ACTION_ACCEPT,
+						SourceNodes:      []string{"*"},
+						DestinationNodes: []string{"*"},
+						SourceCidrs:      []string{"*"},
+						DestinationCidrs: []string{"*"},
+					},
 				},
 			},
 			wantPeers: map[string][]string{
@@ -118,23 +122,25 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 		},
 		{
 			name: "allow-a-b ACL",
-			peers: []*v1.MeshNode{
-				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			peers: []types.MeshNode{
+				{MeshNode: &v1.MeshNode{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
 				"b": {"a", "c"},
 				"c": {"a", "b"},
 			},
-			acls: []*v1.NetworkACL{
+			acls: []types.NetworkACL{
 				{
-					Name:             "allow-a-b",
-					Priority:         0,
-					Action:           v1.ACLAction_ACTION_ACCEPT,
-					SourceNodes:      []string{"a", "b"},
-					DestinationNodes: []string{"a", "b"},
+					NetworkACL: &v1.NetworkACL{
+						Name:             "allow-a-b",
+						Priority:         0,
+						Action:           v1.ACLAction_ACTION_ACCEPT,
+						SourceNodes:      []string{"a", "b"},
+						DestinationNodes: []string{"a", "b"},
+					},
 				},
 			},
 			wantPeers: map[string][]string{
@@ -145,23 +151,25 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 		},
 		{
 			name: "allow-a-b-c ACL",
-			peers: []*v1.MeshNode{
-				{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
-				{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"},
+			peers: []types.MeshNode{
+				{MeshNode: &v1.MeshNode{Id: "a", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "b", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{Id: "c", PrivateIpv4: "172.16.0.1/32", PrivateIpv6: "2001:db8::1/128"}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
 				"b": {"a", "c"},
 				"c": {"a", "b"},
 			},
-			acls: []*v1.NetworkACL{
+			acls: []types.NetworkACL{
 				{
-					Name:             "allow-a-b-c",
-					Priority:         0,
-					Action:           v1.ACLAction_ACTION_ACCEPT,
-					SourceNodes:      []string{"a", "b", "c"},
-					DestinationNodes: []string{"a", "b", "c"},
+					NetworkACL: &v1.NetworkACL{
+						Name:             "allow-a-b-c",
+						Priority:         0,
+						Action:           v1.ACLAction_ACTION_ACCEPT,
+						SourceNodes:      []string{"a", "b", "c"},
+						DestinationNodes: []string{"a", "b", "c"},
+					},
 				},
 			},
 			wantPeers: map[string][]string{
@@ -187,7 +195,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 				}
 			}
 			for groupName, peers := range testCase.groups {
-				err := db.RBAC().PutGroup(ctx, &v1.Group{
+				err := db.RBAC().PutGroup(ctx, types.Group{Group: &v1.Group{
 					Name: groupName,
 					Subjects: func() []*v1.Subject {
 						var out []*v1.Subject
@@ -199,7 +207,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 						}
 						return out
 					}(),
-				})
+				}})
 				if err != nil {
 					t.Fatalf("create group %q: %v", groupName, err)
 				}

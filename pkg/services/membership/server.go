@@ -114,13 +114,13 @@ Routes:
 			}
 		}
 		// This is a new route, start managing an auto route for the node.
-		rt := v1.Route{
+		rt := types.Route{Route: &v1.Route{
 			Name:             nodeAutoRoute(nodeID),
 			Node:             nodeID.String(),
 			DestinationCidrs: routes,
-		}
+		}}
 		s.log.Debug("Adding new route for node", "node", nodeID, "route", &rt)
-		err = nw.PutRoute(ctx, &rt)
+		err = nw.PutRoute(ctx, rt)
 		if err != nil {
 			return true, fmt.Errorf("put route for node %q: %w", nodeID, err)
 		}

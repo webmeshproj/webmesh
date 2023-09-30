@@ -35,6 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
@@ -135,7 +136,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	rb := meshDB.RBAC()
 
 	// Create an admin role and add the admin user/node to it.
-	err = rb.PutRole(ctx, &v1.Role{
+	err = rb.PutRole(ctx, types.Role{Role: &v1.Role{
 		Name: string(storage.MeshAdminRole),
 		Rules: []*v1.Rule{
 			{
@@ -143,11 +144,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
 			},
 		},
-	})
+	}})
 	if err != nil {
 		return fmt.Errorf("create admin role: %w", err)
 	}
-	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
+	err = rb.PutRoleBinding(ctx, types.RoleBinding{RoleBinding: &v1.RoleBinding{
 		Name: string(storage.MeshAdminRole),
 		Role: string(storage.MeshAdminRoleBinding),
 		Subjects: []*v1.Subject{
@@ -160,14 +161,14 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				Type: v1.SubjectType_SUBJECT_USER,
 			},
 		},
-	})
+	}})
 	if err != nil {
 		return fmt.Errorf("create admin role binding: %w", err)
 	}
 
 	// Create a "voters" role and group then add ourselves and all the bootstrap servers
 	// to it.
-	err = rb.PutRole(ctx, &v1.Role{
+	err = rb.PutRole(ctx, types.Role{Role: &v1.Role{
 		Name: string(storage.VotersRole),
 		Rules: []*v1.Rule{
 			{
@@ -175,11 +176,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_PUT},
 			},
 		},
-	})
+	}})
 	if err != nil {
 		return fmt.Errorf("create voters role: %w", err)
 	}
-	err = rb.PutGroup(ctx, &v1.Group{
+	err = rb.PutGroup(ctx, types.Group{Group: &v1.Group{
 		Name: string(storage.VotersGroup),
 		Subjects: func() []*v1.Subject {
 			out := make([]*v1.Subject, 0)
@@ -203,11 +204,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			}
 			return out
 		}(),
-	})
+	}})
 	if err != nil {
 		return fmt.Errorf("create voters group: %w", err)
 	}
-	err = rb.PutRoleBinding(ctx, &v1.RoleBinding{
+	err = rb.PutRoleBinding(ctx, types.RoleBinding{RoleBinding: &v1.RoleBinding{
 		Name: string(storage.BootstrapVotersRoleBinding),
 		Role: string(storage.VotersRole),
 		Subjects: []*v1.Subject{
@@ -216,7 +217,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				Name: string(storage.VotersGroup),
 			},
 		},
-	})
+	}})
 	if err != nil {
 		return fmt.Errorf("create voters role binding: %w", err)
 	}
@@ -235,13 +236,13 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
 	// TODO: This should be filtered to only apply to internal traffic.
-	err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
+	err = nw.PutNetworkACL(ctx, types.NetworkACL{NetworkACL: &v1.NetworkACL{
 		Name:             string(storage.BootstrapNodesNetworkACLName),
 		Priority:         math.MaxInt32,
 		SourceNodes:      []string{"group:" + string(storage.VotersGroup)},
 		DestinationNodes: []string{"group:" + string(storage.VotersGroup)},
 		Action:           v1.ACLAction_ACTION_ACCEPT,
-	})
+	}})
 
 	if err != nil {
 		return fmt.Errorf("create bootstrap nodes network ACL: %w", err)
@@ -249,7 +250,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 
 	// Apply a default accept policy if configured
 	if opts.Bootstrap.DefaultNetworkPolicy == "accept" {
-		err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
+		err = nw.PutNetworkACL(ctx, types.NetworkACL{NetworkACL: &v1.NetworkACL{
 			Name:             "default-accept",
 			Priority:         math.MinInt32,
 			SourceNodes:      []string{"*"},
@@ -257,7 +258,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			SourceCidrs:      []string{"*"},
 			DestinationCidrs: []string{"*"},
 			Action:           v1.ACLAction_ACTION_ACCEPT,
-		})
+		}})
 		if err != nil {
 			return fmt.Errorf("create default accept network ACL: %w", err)
 		}
@@ -265,7 +266,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 
 	// If we have routes configured, add them to the db
 	if len(opts.Routes) > 0 {
-		err = nw.PutRoute(ctx, &v1.Route{
+		err = nw.PutRoute(ctx, types.Route{Route: &v1.Route{
 			Name: fmt.Sprintf("%s-auto", s.nodeID),
 			Node: s.ID().String(),
 			DestinationCidrs: func() []string {
@@ -275,7 +276,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				}
 				return out
 			}(),
-		})
+		}})
 		if err != nil {
 			return fmt.Errorf("create routes: %w", err)
 		}
@@ -291,7 +292,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		return fmt.Errorf("encode public key: %w", err)
 	}
 	privatev6 := netutil.AssignToPrefix(meshnetworkv6, s.key.PublicKey())
-	self := &v1.MeshNode{
+	self := types.MeshNode{MeshNode: &v1.MeshNode{
 		Id:              s.ID().String(),
 		PrimaryEndpoint: opts.PrimaryEndpoint.String(),
 		WireguardEndpoints: func() []string {
@@ -306,7 +307,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		PrivateIpv6:     privatev6.String(),
 		Features:        opts.Features,
 		JoinedAt:        timestamppb.New(time.Now().UTC()),
-	}
+	}}
 	// Allocate addresses
 	var privatev4 netip.Prefix
 	if !s.opts.DisableIPv4 {
@@ -332,7 +333,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		s.log.Info("Creating node in database for bootstrap server",
 			slog.String("server-id", id),
 		)
-		err = p.Put(ctx, &v1.MeshNode{Id: id})
+		err = p.Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{Id: id}})
 		if err != nil {
 			return fmt.Errorf("create node: %w", err)
 		}
@@ -371,7 +372,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			if peer == s.ID().String() {
 				continue
 			}
-			err = p.Put(ctx, &v1.MeshNode{Id: peer})
+			err = p.Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{Id: peer}})
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)
 			}

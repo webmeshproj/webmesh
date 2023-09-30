@@ -39,7 +39,8 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 	if !s.storage.Consensus().IsLeader() {
 		return nil, status.Error(codes.FailedPrecondition, "not the leader")
 	}
-	err := types.ValidateRoute(route)
+	rt := types.Route{Route: route}
+	err := types.ValidateRoute(rt)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -49,7 +50,7 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put network routes")
 	}
-	err = s.db.Networking().PutRoute(ctx, route)
+	err = s.db.Networking().PutRoute(ctx, rt)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

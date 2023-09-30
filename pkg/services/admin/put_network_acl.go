@@ -58,11 +58,12 @@ func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptyp
 	if allEmpty([][]string{acl.GetDestinationCidrs(), acl.GetSourceCidrs(), acl.GetSourceNodes(), acl.GetDestinationNodes()}) {
 		return nil, status.Error(codes.InvalidArgument, "at least one of destination_cidrs, source_cidrs, source_nodes, or destination_nodes must be set")
 	}
-	err := types.ValidateACL(acl)
+	nacl := types.NetworkACL{NetworkACL: acl}
+	err := types.ValidateACL(nacl)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	err = s.db.Networking().PutNetworkACL(ctx, acl)
+	err = s.db.Networking().PutNetworkACL(ctx, nacl)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

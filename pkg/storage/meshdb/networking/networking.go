@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"net/netip"
 
-	v1 "github.com/webmeshproj/api/v1"
-
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
@@ -42,13 +40,13 @@ type networking struct {
 }
 
 // PutNetworkACL creates or updates a NetworkACL.
-func (n *networking) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) error {
+func (n *networking) PutNetworkACL(ctx context.Context, acl types.NetworkACL) error {
 	err := types.ValidateACL(acl)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errors.ErrInvalidACL, err)
 	}
 	key := storage.NetworkACLsPrefix.For([]byte(acl.GetName()))
-	data, err := (types.NetworkACL{NetworkACL: acl}).MarshalJSON()
+	data, err := acl.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal network acl: %w", err)
 	}
@@ -106,13 +104,13 @@ func (n *networking) ListNetworkACLs(ctx context.Context) (types.NetworkACLs, er
 }
 
 // PutRoute creates or updates a Route.
-func (n *networking) PutRoute(ctx context.Context, route *v1.Route) error {
+func (n *networking) PutRoute(ctx context.Context, route types.Route) error {
 	err := types.ValidateRoute(route)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errors.ErrInvalidRoute, err)
 	}
 	key := storage.RoutesPrefix.For([]byte(route.GetName()))
-	data, err := (types.Route{Route: route}).MarshalJSON()
+	data, err := route.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
 	}

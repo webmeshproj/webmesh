@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 	"google.golang.org/grpc/codes"
 )
 
@@ -32,10 +33,10 @@ func TestPutEdge(t *testing.T) {
 	// Pre register the nodes
 	p := server.storage.MeshDB().Peers()
 	for _, peer := range []string{"foo", "baz"} {
-		err := p.Put(context.Background(), &v1.MeshNode{
+		err := p.Put(context.Background(), types.MeshNode{MeshNode: &v1.MeshNode{
 			Id:        peer,
 			PublicKey: newEncodedPubKey(t),
-		})
+		}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

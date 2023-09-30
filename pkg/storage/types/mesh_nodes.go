@@ -18,6 +18,8 @@ package types
 
 import (
 	"net/netip"
+	"slices"
+	"sort"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -37,6 +39,35 @@ func (id NodeID) IsEmpty() bool { return id == "" }
 
 // MeshNode wraps a mesh node.
 type MeshNode struct{ *v1.MeshNode }
+
+// MeshNodesEqual compares two mesh nodes for equality.
+func MeshNodesEqual(a, b MeshNode) bool {
+	sort.Strings(a.WireguardEndpoints)
+	sort.Strings(b.WireguardEndpoints)
+	return a.Id == b.Id &&
+		a.PublicKey == b.PublicKey &&
+		a.PrimaryEndpoint == b.PrimaryEndpoint &&
+		a.ZoneAwarenessId == b.ZoneAwarenessId &&
+		a.PrivateIpv4 == b.PrivateIpv4 &&
+		a.PrivateIpv6 == b.PrivateIpv6 &&
+		slices.Equal(a.WireguardEndpoints, b.WireguardEndpoints) &&
+		FeaturePortsEqual(a.Features, b.Features)
+}
+
+// DeepCopy returns a deep copy of the node.
+func (n MeshNode) DeepCopy() MeshNode {
+	return MeshNode{MeshNode: n.MeshNode.DeepCopy()}
+}
+
+// DeepCopyInto copies the node into the given node.
+func (n MeshNode) DeepCopyInto(node *MeshNode) {
+	*node = n.DeepCopy()
+}
+
+// DeepEqual returns true if the node is deeply equal to the given node.
+func (n MeshNode) DeepEqual(node MeshNode) bool {
+	return MeshNodesEqual(n, node)
+}
 
 // NodeID returns the node's ID.
 func (n MeshNode) NodeID() NodeID {

@@ -49,7 +49,7 @@ type peerDB struct {
 	graph types.PeerGraph
 }
 
-func (p *peerDB) Put(ctx context.Context, node *v1.MeshNode) error {
+func (p *peerDB) Put(ctx context.Context, node types.MeshNode) error {
 	// Dedup the wireguard endpoints.
 	seen := make(map[string]struct{})
 	var wgendpoints []string
@@ -63,7 +63,7 @@ func (p *peerDB) Put(ctx context.Context, node *v1.MeshNode) error {
 	node.WireguardEndpoints = wgendpoints
 	// TODO: Track this separately or consider changing to UpdatedAt.
 	node.JoinedAt = timestamppb.New(time.Now().UTC())
-	err := p.graph.AddVertex(types.MeshNode{MeshNode: node})
+	err := p.graph.AddVertex(node)
 	if err != nil {
 		return fmt.Errorf("put node: %w", err)
 	}

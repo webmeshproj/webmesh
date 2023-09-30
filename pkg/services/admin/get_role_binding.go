@@ -30,12 +30,12 @@ func (s *Server) GetRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*v1.Ro
 	if rb.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
-	rb, err := s.db.RBAC().GetRoleBinding(ctx, rb.GetName())
+	out, err := s.db.RBAC().GetRoleBinding(ctx, rb.GetName())
 	if err != nil {
 		if errors.IsRoleBindingNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "rolebinding %q not found", rb.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return rb, nil
+	return out.Proto(), nil
 }

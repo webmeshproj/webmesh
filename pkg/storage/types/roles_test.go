@@ -54,10 +54,12 @@ func TestRolesListEval(t *testing.T) {
 			name: "allow all roles list",
 			roles: RolesList{
 				{
-					Rules: []*v1.Rule{
-						{
-							Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
-							Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
+					Role: &v1.Role{
+						Rules: []*v1.Rule{
+							{
+								Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
+								Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
+							},
 						},
 					},
 				},
@@ -79,10 +81,12 @@ func TestRolesListEval(t *testing.T) {
 			name: "single action roles list",
 			roles: RolesList{
 				{
-					Rules: []*v1.Rule{
-						{
-							Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_PUT},
-							Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_VOTES},
+					Role: &v1.Role{
+						Rules: []*v1.Rule{
+							{
+								Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_PUT},
+								Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_VOTES},
+							},
 						},
 					},
 				},
@@ -120,10 +124,12 @@ func TestRolesListEval(t *testing.T) {
 			name: "single resource allow all roles list",
 			roles: RolesList{
 				{
-					Rules: []*v1.Rule{
-						{
-							Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
-							Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ROLES},
+					Role: &v1.Role{
+						Rules: []*v1.Rule{
+							{
+								Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
+								Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ROLES},
+							},
 						},
 					},
 				},
@@ -162,11 +168,13 @@ func TestRolesListEval(t *testing.T) {
 			name: "single resource name allow all roles list",
 			roles: RolesList{
 				{
-					Rules: []*v1.Rule{
-						{
-							Verbs:         []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
-							ResourceNames: []string{"foo"},
-							Resources:     []v1.RuleResource{v1.RuleResource_RESOURCE_ROLES},
+					Role: &v1.Role{
+						Rules: []*v1.Rule{
+							{
+								Verbs:         []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
+								ResourceNames: []string{"foo"},
+								Resources:     []v1.RuleResource{v1.RuleResource_RESOURCE_ROLES},
+							},
 						},
 					},
 				},

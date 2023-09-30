@@ -31,5 +31,9 @@ func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Groups{Items: groups}, nil
+	out := make([]*v1.Group, len(groups))
+	for i, g := range groups {
+		out[i] = g.Proto()
+	}
+	return &v1.Groups{Items: out}, nil
 }

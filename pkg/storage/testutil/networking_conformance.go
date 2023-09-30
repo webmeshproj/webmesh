@@ -97,7 +97,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 				for _, tt := range tc {
 					testCase := tt
 					t.Run(tt.name, func(t *testing.T) {
-						err := nw.PutRoute(context.Background(), testCase.route.Route)
+						err := nw.PutRoute(context.Background(), types.Route{Route: testCase.route.Route})
 						if err != nil {
 							t.Fatalf("put route: %v", err)
 						}
@@ -194,7 +194,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 				for _, tt := range tc {
 					testCase := tt
 					t.Run(tt.name, func(t *testing.T) {
-						err := nw.PutRoute(context.Background(), testCase.route.Route)
+						err := nw.PutRoute(context.Background(), types.Route{Route: testCase.route.Route})
 						if err == nil {
 							t.Fatalf("expected error, got nil")
 						}
@@ -225,7 +225,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 			}
 			nw := builder(t)
 			for _, route := range routes {
-				err := nw.PutRoute(context.Background(), route.Route)
+				err := nw.PutRoute(context.Background(), types.Route{Route: route.Route})
 				if err != nil {
 					t.Fatalf("put route: %v", err)
 				}
@@ -272,7 +272,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 
 			nw := builder(t)
 			for _, route := range routes {
-				err := nw.PutRoute(context.Background(), route.Route)
+				err := nw.PutRoute(context.Background(), types.Route{Route: route.Route})
 				if err != nil {
 					t.Fatalf("put route: %v", err)
 				}
@@ -311,7 +311,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 					DestinationCidrs: []string{"::/0"},
 				},
 			}
-			err := nw.PutRoute(context.Background(), route.Route)
+			err := nw.PutRoute(context.Background(), types.Route{Route: route.Route})
 			if err != nil {
 				t.Fatalf("put route: %v", err)
 			}
@@ -358,7 +358,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 			}
 			nw := builder(t)
 			for _, route := range routes {
-				err := nw.PutRoute(context.Background(), route.Route)
+				err := nw.PutRoute(context.Background(), types.Route{Route: route.Route})
 				if err != nil {
 					t.Fatalf("put route: %v", err)
 				}
@@ -448,7 +448,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 				for _, tt := range tc {
 					testCase := tt
 					t.Run(tt.name, func(t *testing.T) {
-						err := nw.PutNetworkACL(context.Background(), testCase.acl.NetworkACL)
+						err := nw.PutNetworkACL(context.Background(), *testCase.acl)
 						if err != nil {
 							t.Fatalf("put network acl: %v", err)
 						}
@@ -571,7 +571,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 				for _, tt := range tc {
 					testCase := tt
 					t.Run(tt.name, func(t *testing.T) {
-						err := nw.PutNetworkACL(context.Background(), testCase.acl.NetworkACL)
+						err := nw.PutNetworkACL(context.Background(), *testCase.acl)
 						if err == nil {
 							t.Fatalf("expected error, got nil")
 						}
@@ -587,7 +587,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 			nw := builder(t)
 			// Put a valid ACL, we should be able to delete it
 			// and further calls to delete should not error.
-			acl := &types.NetworkACL{
+			acl := types.NetworkACL{
 				NetworkACL: &v1.NetworkACL{
 					Name:             "wildcard-acl",
 					Priority:         0,
@@ -598,7 +598,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 					DestinationCidrs: []string{"*"},
 				},
 			}
-			err := nw.PutNetworkACL(context.Background(), acl.NetworkACL)
+			err := nw.PutNetworkACL(context.Background(), acl)
 			if err != nil {
 				t.Fatalf("put network acl: %v", err)
 			}
@@ -659,7 +659,7 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 				},
 			}
 			for _, acl := range acls {
-				err := nw.PutNetworkACL(context.Background(), acl.NetworkACL)
+				err := nw.PutNetworkACL(context.Background(), acl)
 				if err != nil {
 					t.Fatalf("put network acl: %v", err)
 				}

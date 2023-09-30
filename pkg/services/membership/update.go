@@ -137,7 +137,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	}
 	// Overwrite any provided fields
 	var hasChanges bool
-	toUpdate := &peer
+	toUpdate := peer
 	// Check the public key
 
 	if publicKey != nil {
@@ -186,7 +186,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	// Apply any node changes
 	if hasChanges {
 		log.Debug("Updating peer", slog.Any("peer", toUpdate))
-		err = p.Put(ctx, toUpdate.MeshNode)
+		err = p.Put(ctx, toUpdate)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to update peer: %v", err)
 		}

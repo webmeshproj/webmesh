@@ -436,24 +436,24 @@ func TestWireGuardTopologies(t *testing.T) {
 			db := meshdb.NewTestDB()
 			defer db.Close()
 			// Create an allow-all traffic policy.
-			err := db.Networking().PutNetworkACL(ctx, &v1.NetworkACL{
+			err := db.Networking().PutNetworkACL(ctx, types.NetworkACL{NetworkACL: &v1.NetworkACL{
 				Name:             "allow-all",
 				Action:           v1.ACLAction_ACTION_ACCEPT,
 				SourceNodes:      []string{"*"},
 				DestinationNodes: []string{"*"},
 				SourceCidrs:      []string{"*"},
 				DestinationCidrs: []string{"*"},
-			})
+			}})
 			if err != nil {
 				t.Fatalf("put network acl: %v", err)
 			}
 			for peerID, addrs := range testCase.peers {
-				err = db.Peers().Put(ctx, &v1.MeshNode{
+				err = db.Peers().Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{
 					Id:          peerID,
 					PublicKey:   mustGeneratePublicKey(t),
 					PrivateIpv4: netip.MustParsePrefix(addrs[0]).String(),
 					PrivateIpv6: netip.MustParsePrefix(addrs[1]).String(),
-				})
+				}})
 				if err != nil {
 					t.Fatalf("put peer %q: %v", peerID, err)
 				}

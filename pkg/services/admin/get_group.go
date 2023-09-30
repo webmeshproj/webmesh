@@ -30,12 +30,12 @@ func (s *Server) GetGroup(ctx context.Context, group *v1.Group) (*v1.Group, erro
 	if group.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name is required")
 	}
-	group, err := s.db.RBAC().GetGroup(ctx, group.GetName())
+	out, err := s.db.RBAC().GetGroup(ctx, group.GetName())
 	if err != nil {
 		if errors.IsGroupNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "group %q not found", group.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return group, nil
+	return out.Proto(), nil
 }

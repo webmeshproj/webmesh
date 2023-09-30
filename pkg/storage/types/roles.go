@@ -16,11 +16,47 @@ limitations under the License.
 
 package types
 
-import v1 "github.com/webmeshproj/api/v1"
+import (
+	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/protobuf/encoding/protojson"
+)
 
 // RolesList is a list of roles. It contains methods for evaluating actions against
 // contained permissions.
-type RolesList []*v1.Role
+type RolesList []Role
+
+// Role wraps a role.
+type Role struct{ *v1.Role }
+
+// Proto returns the underlying protobuf.
+func (n Role) Proto() *v1.Role {
+	return n.Role
+}
+
+// DeepCopy returns a deep copy of the role.
+func (n Role) DeepCopy() Role {
+	return Role{Role: n.Role.DeepCopy()}
+}
+
+// DeepCopyInto copies the node into the given role.
+func (n Role) DeepCopyInto(role *Role) {
+	*role = n.DeepCopy()
+}
+
+// MarshalJSON marshals the role to JSON.
+func (n Role) MarshalJSON() ([]byte, error) {
+	return protojson.Marshal(n.Role)
+}
+
+// UnmarshalJSON unmarshals the role from JSON.
+func (n *Role) UnmarshalJSON(data []byte) error {
+	var role v1.Role
+	if err := protojson.Unmarshal(data, &role); err != nil {
+		return err
+	}
+	n.Role = &role
+	return nil
+}
 
 // Eval evaluates an action against the roles in the list.
 func (l RolesList) Eval(action *v1.RBACAction) bool {
@@ -36,7 +72,7 @@ func (l RolesList) Eval(action *v1.RBACAction) bool {
 }
 
 // EvalRole evaluates an action against a single role.
-func EvalRole(role *v1.Role, action *v1.RBACAction) bool {
+func EvalRole(role Role, action *v1.RBACAction) bool {
 	for _, p := range role.GetRules() {
 		if EvalRule(p, action) {
 			return true

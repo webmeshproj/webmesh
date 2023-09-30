@@ -27,6 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var putRoleBindingAction = rbac.Actions{
@@ -74,7 +75,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}
-	err := s.db.RBAC().PutRoleBinding(ctx, rb)
+	err := s.db.RBAC().PutRoleBinding(ctx, types.RoleBinding{RoleBinding: rb})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

@@ -30,12 +30,12 @@ func (s *Server) GetRole(ctx context.Context, role *v1.Role) (*v1.Role, error) {
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
-	role, err := s.db.RBAC().GetRole(ctx, role.GetName())
+	out, err := s.db.RBAC().GetRole(ctx, role.GetName())
 	if err != nil {
 		if errors.IsRoleNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "role %q not found", role.GetName())
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return role, nil
+	return out.Proto(), nil
 }

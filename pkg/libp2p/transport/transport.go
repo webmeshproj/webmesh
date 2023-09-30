@@ -634,7 +634,7 @@ func (t *WebmeshTransport) registerMultiaddrsForListener(ctx context.Context, li
 		return fmt.Errorf("failed to get self: %w", err)
 	}
 	self.Multiaddrs = addrstrs
-	err = t.node.Storage().MeshDB().Peers().Put(ctx, self.MeshNode)
+	err = t.node.Storage().MeshDB().Peers().Put(ctx, self)
 	if err != nil {
 		return fmt.Errorf("failed to update self: %w", err)
 	}

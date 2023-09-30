@@ -251,12 +251,12 @@ func setupGraphTest(t *testing.T, opts graphSetup) storage.MeshDB {
 	db := meshdb.NewTestDB()
 	nw := db.Networking()
 	for _, acl := range opts.acls {
-		if err := nw.PutNetworkACL(context.Background(), acl); err != nil {
+		if err := nw.PutNetworkACL(context.Background(), types.NetworkACL{NetworkACL: acl}); err != nil {
 			t.Fatalf("put network ACL: %v", err)
 		}
 	}
 	for _, route := range opts.routes {
-		if err := nw.PutRoute(context.Background(), route); err != nil {
+		if err := nw.PutRoute(context.Background(), types.Route{Route: route}); err != nil {
 			t.Fatalf("put route: %v", err)
 		}
 	}

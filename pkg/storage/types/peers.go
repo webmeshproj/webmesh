@@ -70,33 +70,10 @@ func WireGuardPeerEqual(a, b *v1.WireGuardPeer) bool {
 	sort.Strings(a.AllowedRoutes)
 	sort.Strings(b.AllowedRoutes)
 	return a.Proto == b.Proto &&
-		MeshNodesEqual(a.Node, b.Node) &&
+		MeshNodesEqual(MeshNode{a.Node}, MeshNode{b.Node}) &&
 		slices.Equal(a.AllowedIps, b.AllowedIps) &&
 		slices.Equal(a.AllowedRoutes, b.AllowedRoutes)
 
-}
-
-// MeshNodesEqual compares two mesh nodes for equality.
-func MeshNodesEqual(a, b *v1.MeshNode) bool {
-	if a == nil && b != nil {
-		return false
-	}
-	if a != nil && b == nil {
-		return false
-	}
-	if a == nil && b == nil {
-		return true
-	}
-	sort.Strings(a.WireguardEndpoints)
-	sort.Strings(b.WireguardEndpoints)
-	return a.Id == b.Id &&
-		a.PublicKey == b.PublicKey &&
-		a.PrimaryEndpoint == b.PrimaryEndpoint &&
-		a.ZoneAwarenessId == b.ZoneAwarenessId &&
-		a.PrivateIpv4 == b.PrivateIpv4 &&
-		a.PrivateIpv6 == b.PrivateIpv6 &&
-		slices.Equal(a.WireguardEndpoints, b.WireguardEndpoints) &&
-		FeaturePortsEqual(a.Features, b.Features)
 }
 
 // FeaturePortsEqual compares two feature ports for equality.

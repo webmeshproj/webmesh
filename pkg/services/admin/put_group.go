@@ -26,6 +26,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var putGroupAction = rbac.Actions{
@@ -68,7 +69,7 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}
-	err := s.db.RBAC().PutGroup(ctx, group)
+	err := s.db.RBAC().PutGroup(ctx, types.Group{Group: group})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

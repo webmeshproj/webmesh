@@ -42,25 +42,25 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		tc := []struct {
 			name    string
 			invalid bool
-			node    *v1.MeshNode
+			node    types.MeshNode
 		}{
 			{
 				name: "invalid-node-id",
-				node: &v1.MeshNode{
+				node: types.MeshNode{MeshNode: &v1.MeshNode{
 					Id: "invalid/node-id",
-				},
+				}},
 				invalid: true,
 			},
 			{
 				name: "valid-node",
-				node: &v1.MeshNode{
+				node: types.MeshNode{MeshNode: &v1.MeshNode{
 					Id:        "node-id",
 					PublicKey: mustGeneratePublicKey(t),
-				},
+				}},
 			},
 			{
 				name: "valid-node-with-data",
-				node: &v1.MeshNode{
+				node: types.MeshNode{MeshNode: &v1.MeshNode{
 					Id:                 "node-id",
 					PublicKey:          mustGeneratePublicKey(t),
 					PrimaryEndpoint:    "127.0.0.1",
@@ -68,7 +68,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					ZoneAwarenessId:    "zone-a",
 					PrivateIpv4:        "172.16.0.1/32",
 					PrivateIpv6:        "2001:db8::1/128",
-				},
+				}},
 			},
 		}
 
@@ -96,7 +96,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				} else if node.JoinedAt.AsTime().IsZero() {
 					t.Fatal("joined at not set")
 				}
-				if !types.MeshNodesEqual(node.MeshNode, testCase.node) {
+				if !types.MeshNodesEqual(node, testCase.node) {
 					t.Fatal("nodes not equal")
 				}
 			})
@@ -113,7 +113,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		})
 
 		t.Run("DedupWireguardEndpoints", func(t *testing.T) {
-			node := &v1.MeshNode{
+			node := types.MeshNode{MeshNode: &v1.MeshNode{
 				Id:                 "node-id",
 				PublicKey:          mustGeneratePublicKey(t),
 				PrimaryEndpoint:    "127.0.0.1",
@@ -121,7 +121,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				ZoneAwarenessId:    "zone-a",
 				PrivateIpv4:        "172.16.0.1/32",
 				PrivateIpv6:        "2001:db8::1/128",
-			}
+			}}
 			err := peers.Put(ctx, node)
 			if err != nil {
 				t.Fatal(err)
@@ -158,7 +158,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		node := &v1.MeshNode{
+		node := types.MeshNode{MeshNode: &v1.MeshNode{
 			Id:                 "node-id",
 			PublicKey:          key,
 			PrimaryEndpoint:    "127.0.0.1",
@@ -166,7 +166,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			ZoneAwarenessId:    "zone-a",
 			PrivateIpv4:        "172.16.0.1/32",
 			PrivateIpv6:        "2001:db8::1/128",
-		}
+		}}
 		err = p.Put(ctx, node)
 		if err != nil {
 			t.Fatal(err)
@@ -176,7 +176,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !types.MeshNodesEqual(got.MeshNode, node) {
+		if !got.DeepEqual(node) {
 			t.Fatal("nodes not equal")
 		}
 		// Make sure we can get the node by public key
@@ -184,7 +184,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !types.MeshNodesEqual(got.MeshNode, node) {
+		if !got.DeepEqual(node) {
 			t.Fatal("nodes not equal")
 		}
 	})
@@ -192,7 +192,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("DeleteNode", func(t *testing.T) {
 		ctx := context.Background()
 		p := builder(t)
-		node := &v1.MeshNode{
+		node := types.MeshNode{MeshNode: &v1.MeshNode{
 			Id:                 "node-id",
 			PublicKey:          mustGeneratePublicKey(t),
 			PrimaryEndpoint:    "127.0.0.1",
@@ -200,7 +200,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			ZoneAwarenessId:    "zone-a",
 			PrivateIpv4:        "172.16.0.1/32",
 			PrivateIpv6:        "2001:db8::1/128",
-		}
+		}}
 		err := p.Put(ctx, node)
 		if err != nil {
 			t.Fatal(err)
@@ -211,7 +211,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !types.MeshNodesEqual(got.MeshNode, node) {
+		if !got.DeepEqual(node) {
 			t.Fatal("nodes not equal")
 		}
 		// Delete the node
@@ -234,7 +234,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		}
 
 		t.Run("WithEdges", func(t *testing.T) {
-			nodeA := &v1.MeshNode{
+			nodeA := types.MeshNode{MeshNode: &v1.MeshNode{
 				Id:                 "node-a",
 				PublicKey:          mustGeneratePublicKey(t),
 				PrimaryEndpoint:    "127.0.0.1",
@@ -242,8 +242,8 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				ZoneAwarenessId:    "zone-a",
 				PrivateIpv4:        "172.16.0.1/32",
 				PrivateIpv6:        "2001:db8::1/128",
-			}
-			nodeB := &v1.MeshNode{
+			}}
+			nodeB := types.MeshNode{MeshNode: &v1.MeshNode{
 				Id:                 "node-b",
 				PublicKey:          mustGeneratePublicKey(t),
 				PrimaryEndpoint:    "127.0.0.1",
@@ -251,7 +251,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 				ZoneAwarenessId:    "zone-a",
 				PrivateIpv4:        "172.16.0.2/32",
 				PrivateIpv6:        "2001:db8::2/128",
-			}
+			}}
 			err := p.Put(ctx, nodeA)
 			if err != nil {
 				t.Fatal(err)
@@ -284,24 +284,28 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("ListNodes", func(t *testing.T) {
 		ctx := context.Background()
 		p := builder(t)
-		nodes := []*v1.MeshNode{
+		nodes := []types.MeshNode{
 			{
-				Id:                 "node-a",
-				PublicKey:          mustGeneratePublicKey(t),
-				PrimaryEndpoint:    "127.0.0.1",
-				WireguardEndpoints: []string{"127.0.0.1:51820"},
-				ZoneAwarenessId:    "zone-a",
-				PrivateIpv4:        "172.16.0.1/32",
-				PrivateIpv6:        "2001:db8::1/128",
+				MeshNode: &v1.MeshNode{
+					Id:                 "node-a",
+					PublicKey:          mustGeneratePublicKey(t),
+					PrimaryEndpoint:    "127.0.0.1",
+					WireguardEndpoints: []string{"127.0.0.1:51820"},
+					ZoneAwarenessId:    "zone-a",
+					PrivateIpv4:        "172.16.0.1/32",
+					PrivateIpv6:        "2001:db8::1/128",
+				},
 			},
 			{
-				Id:                 "node-b",
-				PublicKey:          mustGeneratePublicKey(t),
-				PrimaryEndpoint:    "127.0.0.1",
-				WireguardEndpoints: []string{"127.0.0.1:51820"},
-				ZoneAwarenessId:    "zone-a",
-				PrivateIpv4:        "172.16.0.2/32",
-				PrivateIpv6:        "2001:db8::2/128",
+				MeshNode: &v1.MeshNode{
+					Id:                 "node-b",
+					PublicKey:          mustGeneratePublicKey(t),
+					PrimaryEndpoint:    "127.0.0.1",
+					WireguardEndpoints: []string{"127.0.0.1:51820"},
+					ZoneAwarenessId:    "zone-a",
+					PrivateIpv4:        "172.16.0.2/32",
+					PrivateIpv6:        "2001:db8::2/128",
+				},
 			},
 		}
 		for _, node := range nodes {
@@ -320,7 +324,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		for _, node := range nodes {
 			found := false
 			for _, gotNode := range got {
-				if types.MeshNodesEqual(gotNode.MeshNode, node) {
+				if types.MeshNodesEqual(gotNode, node) {
 					found = true
 					break
 				}
@@ -334,24 +338,28 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("ListNodeIDs", func(t *testing.T) {
 		ctx := context.Background()
 		p := builder(t)
-		nodes := []*v1.MeshNode{
+		nodes := []types.MeshNode{
 			{
-				Id:                 "node-a",
-				PublicKey:          mustGeneratePublicKey(t),
-				PrimaryEndpoint:    "127.0.0.1",
-				WireguardEndpoints: []string{"127.0.0.1:51820"},
-				ZoneAwarenessId:    "zone-a",
-				PrivateIpv4:        "172.16.0.1/32",
-				PrivateIpv6:        "2001:db8::1/128",
+				MeshNode: &v1.MeshNode{
+					Id:                 "node-a",
+					PublicKey:          mustGeneratePublicKey(t),
+					PrimaryEndpoint:    "127.0.0.1",
+					WireguardEndpoints: []string{"127.0.0.1:51820"},
+					ZoneAwarenessId:    "zone-a",
+					PrivateIpv4:        "172.16.0.1/32",
+					PrivateIpv6:        "2001:db8::1/128",
+				},
 			},
 			{
-				Id:                 "node-b",
-				PublicKey:          mustGeneratePublicKey(t),
-				PrimaryEndpoint:    "127.0.0.1",
-				WireguardEndpoints: []string{"127.0.0.1:51820"},
-				ZoneAwarenessId:    "zone-a",
-				PrivateIpv4:        "172.16.0.2/32",
-				PrivateIpv6:        "2001:db8::2/128",
+				MeshNode: &v1.MeshNode{
+					Id:                 "node-b",
+					PublicKey:          mustGeneratePublicKey(t),
+					PrimaryEndpoint:    "127.0.0.1",
+					WireguardEndpoints: []string{"127.0.0.1:51820"},
+					ZoneAwarenessId:    "zone-a",
+					PrivateIpv4:        "172.16.0.2/32",
+					PrivateIpv6:        "2001:db8::2/128",
+				},
 			},
 		}
 		for _, node := range nodes {
@@ -384,18 +392,22 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("ListPublicNodes", func(t *testing.T) {
 		ctx := context.Background()
 		p := builder(t)
-		nodes := []*v1.MeshNode{
+		nodes := []types.MeshNode{
 			{
-				Id:                 "node-a-public",
-				PublicKey:          mustGeneratePublicKey(t),
-				PrimaryEndpoint:    "8.8.8.8",
-				WireguardEndpoints: []string{"8.8.8.8:51820"},
-				ZoneAwarenessId:    "zone-a",
+				MeshNode: &v1.MeshNode{
+					Id:                 "node-a-public",
+					PublicKey:          mustGeneratePublicKey(t),
+					PrimaryEndpoint:    "8.8.8.8",
+					WireguardEndpoints: []string{"8.8.8.8:51820"},
+					ZoneAwarenessId:    "zone-a",
+				},
 			},
 			{
-				Id:              "node-b-private",
-				PublicKey:       mustGeneratePublicKey(t),
-				ZoneAwarenessId: "zone-a",
+				MeshNode: &v1.MeshNode{
+					Id:              "node-b-private",
+					PublicKey:       mustGeneratePublicKey(t),
+					ZoneAwarenessId: "zone-a",
+				},
 			},
 		}
 		for _, node := range nodes {
@@ -411,7 +423,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		if len(got) != 1 {
 			t.Fatal("expected only one public node")
 		}
-		if !types.MeshNodesEqual(got[0].MeshNode, nodes[0]) {
+		if !types.MeshNodesEqual(got[0], nodes[0]) {
 			t.Fatal("nodes not equal")
 		}
 	})
@@ -419,26 +431,34 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("ListByZoneID", func(t *testing.T) {
 		ctx := context.Background()
 		p := builder(t)
-		nodes := []*v1.MeshNode{
+		nodes := []types.MeshNode{
 			{
-				Id:              "node-a-zone-a",
-				PublicKey:       mustGeneratePublicKey(t),
-				ZoneAwarenessId: "zone-a",
+				MeshNode: &v1.MeshNode{
+					Id:              "node-a-zone-a",
+					PublicKey:       mustGeneratePublicKey(t),
+					ZoneAwarenessId: "zone-a",
+				},
 			},
 			{
-				Id:              "node-b-zone-a",
-				PublicKey:       mustGeneratePublicKey(t),
-				ZoneAwarenessId: "zone-a",
+				MeshNode: &v1.MeshNode{
+					Id:              "node-b-zone-a",
+					PublicKey:       mustGeneratePublicKey(t),
+					ZoneAwarenessId: "zone-a",
+				},
 			},
 			{
-				Id:              "node-a-zone-b",
-				PublicKey:       mustGeneratePublicKey(t),
-				ZoneAwarenessId: "zone-b",
+				MeshNode: &v1.MeshNode{
+					Id:              "node-a-zone-b",
+					PublicKey:       mustGeneratePublicKey(t),
+					ZoneAwarenessId: "zone-b",
+				},
 			},
 			{
-				Id:              "node-b-zone-b",
-				PublicKey:       mustGeneratePublicKey(t),
-				ZoneAwarenessId: "zone-b",
+				MeshNode: &v1.MeshNode{
+					Id:              "node-b-zone-b",
+					PublicKey:       mustGeneratePublicKey(t),
+					ZoneAwarenessId: "zone-b",
+				},
 			},
 		}
 		for _, node := range nodes {
@@ -460,7 +480,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			}
 			found := false
 			for _, gotNode := range got {
-				if types.MeshNodesEqual(gotNode.MeshNode, node) {
+				if types.MeshNodesEqual(gotNode, node) {
 					found = true
 					break
 				}
@@ -482,7 +502,7 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			}
 			found := false
 			for _, gotNode := range got {
-				if types.MeshNodesEqual(gotNode.MeshNode, node) {
+				if types.MeshNodesEqual(gotNode, node) {
 					found = true
 					break
 				}
@@ -496,44 +516,52 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("ListByFeature", func(t *testing.T) {
 		ctx := context.Background()
 		p := builder(t)
-		nodes := []*v1.MeshNode{
+		nodes := []types.MeshNode{
 			{
-				Id:        "node-a",
-				PublicKey: mustGeneratePublicKey(t),
-				Features: []*v1.FeaturePort{
-					{
-						Feature: v1.Feature_ADMIN_API,
-						Port:    8080,
+				MeshNode: &v1.MeshNode{
+					Id:        "node-a",
+					PublicKey: mustGeneratePublicKey(t),
+					Features: []*v1.FeaturePort{
+						{
+							Feature: v1.Feature_ADMIN_API,
+							Port:    8080,
+						},
 					},
 				},
 			},
 			{
-				Id:        "node-b",
-				PublicKey: mustGeneratePublicKey(t),
-				Features: []*v1.FeaturePort{
-					{
-						Feature: v1.Feature_ADMIN_API,
-						Port:    8080,
+				MeshNode: &v1.MeshNode{
+					Id:        "node-b",
+					PublicKey: mustGeneratePublicKey(t),
+					Features: []*v1.FeaturePort{
+						{
+							Feature: v1.Feature_ADMIN_API,
+							Port:    8080,
+						},
 					},
 				},
 			},
 			{
-				Id:        "node-c",
-				PublicKey: mustGeneratePublicKey(t),
-				Features: []*v1.FeaturePort{
-					{
-						Feature: v1.Feature_ICE_NEGOTIATION,
-						Port:    8080,
+				MeshNode: &v1.MeshNode{
+					Id:        "node-c",
+					PublicKey: mustGeneratePublicKey(t),
+					Features: []*v1.FeaturePort{
+						{
+							Feature: v1.Feature_ICE_NEGOTIATION,
+							Port:    8080,
+						},
 					},
 				},
 			},
 			{
-				Id:        "node-d",
-				PublicKey: mustGeneratePublicKey(t),
-				Features: []*v1.FeaturePort{
-					{
-						Feature: v1.Feature_MESH_DNS,
-						Port:    8080,
+				MeshNode: &v1.MeshNode{
+					Id:        "node-d",
+					PublicKey: mustGeneratePublicKey(t),
+					Features: []*v1.FeaturePort{
+						{
+							Feature: v1.Feature_MESH_DNS,
+							Port:    8080,
+						},
 					},
 				},
 			},
@@ -553,12 +581,12 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal("expected two nodes, got", len(got))
 		}
 		for _, node := range nodes {
-			if !(types.MeshNode{MeshNode: node}).HasFeature(v1.Feature_ADMIN_API) {
+			if !node.HasFeature(v1.Feature_ADMIN_API) {
 				continue
 			}
 			found := false
 			for _, gotNode := range got {
-				if types.MeshNodesEqual(gotNode.MeshNode, node) {
+				if types.MeshNodesEqual(gotNode, node) {
 					found = true
 					break
 				}
@@ -575,12 +603,12 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal("expected one node, got", len(got))
 		}
 		for _, node := range nodes {
-			if !(types.MeshNode{MeshNode: node}).HasFeature(v1.Feature_ICE_NEGOTIATION) {
+			if !node.HasFeature(v1.Feature_ICE_NEGOTIATION) {
 				continue
 			}
 			found := false
 			for _, gotNode := range got {
-				if types.MeshNodesEqual(gotNode.MeshNode, node) {
+				if types.MeshNodesEqual(gotNode, node) {
 					found = true
 					break
 				}
@@ -597,12 +625,12 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 			t.Fatal("expected one node, got", len(got))
 		}
 		for _, node := range nodes {
-			if !(types.MeshNode{MeshNode: node}).HasFeature(v1.Feature_MESH_DNS) {
+			if !node.HasFeature(v1.Feature_MESH_DNS) {
 				continue
 			}
 			found := false
 			for _, gotNode := range got {
-				if types.MeshNodesEqual(gotNode.MeshNode, node) {
+				if types.MeshNodesEqual(gotNode, node) {
 					found = true
 					break
 				}
@@ -616,15 +644,19 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 	t.Run("PutAndRemoveEdge", func(t *testing.T) {
 		ctx := context.Background()
 		p := builder(t)
-		nodes := []*v1.MeshNode{
+		nodes := []types.MeshNode{
 			{
-				Id:              "node-a",
-				PublicKey:       mustGeneratePublicKey(t),
-				ZoneAwarenessId: "zone-a",
+				MeshNode: &v1.MeshNode{
+					Id:              "node-a",
+					PublicKey:       mustGeneratePublicKey(t),
+					ZoneAwarenessId: "zone-a",
+				},
 			},
 			{
-				Id:        "node-b",
-				PublicKey: mustGeneratePublicKey(t),
+				MeshNode: &v1.MeshNode{
+					Id:        "node-b",
+					PublicKey: mustGeneratePublicKey(t),
+				},
 			},
 		}
 		for _, node := range nodes {
@@ -674,14 +706,18 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		SkipOnCI(t, "Subscription tests are flaky on CI")
 		ctx := context.Background()
 		p := builder(t)
-		nodes := []*v1.MeshNode{
+		nodes := []types.MeshNode{
 			{
-				Id:        "node-a",
-				PublicKey: mustGeneratePublicKey(t),
+				MeshNode: &v1.MeshNode{
+					Id:        "node-a",
+					PublicKey: mustGeneratePublicKey(t),
+				},
 			},
 			{
-				Id:        "node-b",
-				PublicKey: mustGeneratePublicKey(t),
+				MeshNode: &v1.MeshNode{
+					Id:        "node-b",
+					PublicKey: mustGeneratePublicKey(t),
+				},
 			},
 		}
 		seen := map[string]*atomic.Int32{

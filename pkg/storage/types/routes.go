@@ -50,7 +50,7 @@ func ToPrefixes(ss []string) []netip.Prefix {
 }
 
 // ValidateRoute validates a Route.
-func ValidateRoute(route *v1.Route) error {
+func ValidateRoute(route Route) error {
 	if route.GetName() == "" {
 		return errors.New("route name is required")
 	}
@@ -113,6 +113,16 @@ func (a Routes) Proto() []*v1.Route {
 // Route wraps a Route.
 type Route struct {
 	*v1.Route
+}
+
+// DeepCopy returns a deep copy of the route.
+func (n Route) DeepCopy() Route {
+	return Route{Route: n.Route.DeepCopy()}
+}
+
+// DeepCopyInto copies the node into the given route.
+func (n Route) DeepCopyInto(route *Route) {
+	*route = n.DeepCopy()
 }
 
 // Proto returns the protobuf representation of the route.

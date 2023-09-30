@@ -43,7 +43,7 @@ type PeerSubscribeFunc func([]types.MeshNode)
 // Peers is the peers interface.
 type Peers interface {
 	// Put creates or updates a node.
-	Put(ctx context.Context, n *v1.MeshNode) error
+	Put(ctx context.Context, n types.MeshNode) error
 	// Get gets a node by ID.
 	Get(ctx context.Context, id types.NodeID) (types.MeshNode, error)
 	// GetByPubKey gets a node by their public key.

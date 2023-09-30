@@ -27,6 +27,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var putRoleAction = rbac.Actions{
@@ -87,7 +88,7 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 			}
 		}
 	}
-	err := s.db.RBAC().PutRole(ctx, role)
+	err := s.db.RBAC().PutRole(ctx, types.Role{Role: role})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

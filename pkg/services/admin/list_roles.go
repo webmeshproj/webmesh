@@ -31,5 +31,9 @@ func (s *Server) ListRoles(ctx context.Context, _ *emptypb.Empty) (*v1.Roles, er
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &v1.Roles{Items: roles}, nil
+	out := make([]*v1.Role, len(roles))
+	for i, r := range roles {
+		out[i] = r.Proto()
+	}
+	return &v1.Roles{Items: out}, nil
 }

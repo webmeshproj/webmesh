@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
@@ -73,7 +72,7 @@ func (r *rbac) SetEnabled(ctx context.Context, enabled bool) error {
 }
 
 // PutRole creates or updates a role.
-func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
+func (r *rbac) PutRole(ctx context.Context, role types.Role) error {
 	if storage.IsSystemRole(role.GetName()) {
 		// Allow if the role doesn't exist yet.
 		_, err := r.GetRole(ctx, role.GetName())
@@ -90,7 +89,7 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 	if len(role.GetRules()) == 0 {
 		return fmt.Errorf("role rules cannot be empty")
 	}
-	data, err := protojson.Marshal(role)
+	data, err := role.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal role: %w", err)
 	}
@@ -103,21 +102,20 @@ func (r *rbac) PutRole(ctx context.Context, role *v1.Role) error {
 }
 
 // GetRole returns a role by name.
-func (r *rbac) GetRole(ctx context.Context, name string) (*v1.Role, error) {
+func (r *rbac) GetRole(ctx context.Context, name string) (out types.Role, err error) {
 	key := rolesPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if errors.IsKeyNotFound(err) {
-			return nil, errors.ErrRoleNotFound
+			return out, errors.ErrRoleNotFound
 		}
-		return nil, fmt.Errorf("get role: %w", err)
+		return out, fmt.Errorf("get role: %w", err)
 	}
-	role := &v1.Role{}
-	err = protojson.Unmarshal(data, role)
+	err = out.UnmarshalJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal role: %w", err)
+		err = fmt.Errorf("unmarshal role: %w", err)
 	}
-	return role, nil
+	return
 }
 
 // DeleteRole deletes a role by name.
@@ -140,8 +138,8 @@ func (r *rbac) ListRoles(ctx context.Context) (types.RolesList, error) {
 		if bytes.Equal(key, rolesPrefix) {
 			return nil
 		}
-		role := &v1.Role{}
-		err := protojson.Unmarshal(value, role)
+		role := types.Role{Role: &v1.Role{}}
+		err := role.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal role: %w", err)
 		}
@@ -152,7 +150,7 @@ func (r *rbac) ListRoles(ctx context.Context) (types.RolesList, error) {
 }
 
 // PutRoleBinding creates or updates a rolebinding.
-func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) error {
+func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding types.RoleBinding) error {
 	if storage.IsSystemRoleBinding(rolebinding.GetName()) {
 		// Allow if the rolebinding doesn't exist yet.
 		_, err := r.GetRoleBinding(ctx, rolebinding.GetName())
@@ -173,7 +171,7 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 		return fmt.Errorf("rolebinding subjects cannot be empty")
 	}
 	key := rolebindingsPrefix.ForString(rolebinding.GetName())
-	data, err := protojson.Marshal(rolebinding)
+	data, err := rolebinding.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal rolebinding: %w", err)
 	}
@@ -185,21 +183,22 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) 
 }
 
 // GetRoleBinding returns a rolebinding by name.
-func (r *rbac) GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding, error) {
+func (r *rbac) GetRoleBinding(ctx context.Context, name string) (out types.RoleBinding, err error) {
 	key := rolebindingsPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if errors.IsKeyNotFound(err) {
-			return nil, errors.ErrRoleBindingNotFound
+			err = errors.ErrRoleBindingNotFound
+			return
 		}
-		return nil, fmt.Errorf("get rolebinding: %w", err)
+		err = fmt.Errorf("get rolebinding: %w", err)
+		return
 	}
-	rolebinding := &v1.RoleBinding{}
-	err = protojson.Unmarshal([]byte(data), rolebinding)
+	err = out.UnmarshalJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal rolebinding: %w", err)
+		err = fmt.Errorf("unmarshal rolebinding: %w", err)
 	}
-	return rolebinding, nil
+	return
 }
 
 // DeleteRoleBinding deletes a rolebinding by name.
@@ -216,14 +215,14 @@ func (r *rbac) DeleteRoleBinding(ctx context.Context, name string) error {
 }
 
 // ListRoleBindings returns a list of all rolebindings.
-func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) {
-	out := make([]*v1.RoleBinding, 0)
+func (r *rbac) ListRoleBindings(ctx context.Context) ([]types.RoleBinding, error) {
+	out := make([]types.RoleBinding, 0)
 	err := r.IterPrefix(ctx, rolebindingsPrefix, func(key, value []byte) error {
 		if bytes.Equal(key, rolebindingsPrefix) {
 			return nil
 		}
-		rolebinding := &v1.RoleBinding{}
-		err := protojson.Unmarshal(value, rolebinding)
+		rolebinding := types.RoleBinding{RoleBinding: &v1.RoleBinding{}}
+		err := rolebinding.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal rolebinding: %w", err)
 		}
@@ -234,7 +233,7 @@ func (r *rbac) ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error) 
 }
 
 // PutGroup creates or updates a group.
-func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
+func (r *rbac) PutGroup(ctx context.Context, group types.Group) error {
 	if group.GetName() == "" {
 		return fmt.Errorf("group name cannot be empty")
 	}
@@ -242,7 +241,7 @@ func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
 		return fmt.Errorf("group subjects cannot be empty")
 	}
 	key := groupsPrefix.ForString(group.GetName())
-	data, err := protojson.Marshal(group)
+	data, err := group.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal group: %w", err)
 	}
@@ -254,21 +253,22 @@ func (r *rbac) PutGroup(ctx context.Context, group *v1.Group) error {
 }
 
 // GetGroup returns a group by name.
-func (r *rbac) GetGroup(ctx context.Context, name string) (*v1.Group, error) {
+func (r *rbac) GetGroup(ctx context.Context, name string) (out types.Group, err error) {
 	key := groupsPrefix.ForString(name)
 	data, err := r.GetValue(ctx, key)
 	if err != nil {
 		if errors.IsKeyNotFound(err) {
-			return nil, errors.ErrGroupNotFound
+			err = errors.ErrGroupNotFound
+			return
 		}
-		return nil, fmt.Errorf("get group: %w", err)
+		err = fmt.Errorf("get group: %w", err)
+		return
 	}
-	group := &v1.Group{}
-	err = protojson.Unmarshal([]byte(data), group)
+	err = out.UnmarshalJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal group: %w", err)
+		err = fmt.Errorf("unmarshal group: %w", err)
 	}
-	return group, nil
+	return
 }
 
 // DeleteGroup deletes a group by name.
@@ -285,14 +285,14 @@ func (r *rbac) DeleteGroup(ctx context.Context, name string) error {
 }
 
 // ListGroups returns a list of all groups.
-func (r *rbac) ListGroups(ctx context.Context) ([]*v1.Group, error) {
-	out := make([]*v1.Group, 0)
+func (r *rbac) ListGroups(ctx context.Context) ([]types.Group, error) {
+	out := make([]types.Group, 0)
 	err := r.IterPrefix(ctx, groupsPrefix, func(key, value []byte) error {
 		if bytes.Equal(key, groupsPrefix) {
 			return nil
 		}
-		group := &v1.Group{}
-		err := protojson.Unmarshal(value, group)
+		group := types.Group{Group: &v1.Group{}}
+		err := group.UnmarshalJSON(value)
 		if err != nil {
 			return fmt.Errorf("unmarshal group: %w", err)
 		}

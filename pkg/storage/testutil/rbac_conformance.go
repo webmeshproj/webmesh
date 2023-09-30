@@ -24,6 +24,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // NewRBACFunc is a function that creates a new RBAC implementation.
@@ -96,7 +97,7 @@ func TestRBACStorageConformance(t *testing.T, builder NewRBACFunc) {
 		}
 		for _, tt := range tc {
 			t.Run(tt.name, func(t *testing.T) {
-				err := rbac.PutRole(context.Background(), tt.role)
+				err := rbac.PutRole(context.Background(), types.Role{Role: tt.role})
 				if tt.ok && err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -269,7 +270,7 @@ func TestRBACStorageConformance(t *testing.T, builder NewRBACFunc) {
 		}
 		for _, tt := range tc {
 			t.Run(tt.name, func(t *testing.T) {
-				err := rbac.PutRoleBinding(context.Background(), tt.rb)
+				err := rbac.PutRoleBinding(context.Background(), types.RoleBinding{RoleBinding: tt.rb})
 				if tt.ok && err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -441,7 +442,7 @@ func TestRBACStorageConformance(t *testing.T, builder NewRBACFunc) {
 		}
 		for _, tt := range tc {
 			t.Run(tt.name, func(t *testing.T) {
-				err := rbac.PutGroup(context.Background(), tt.group)
+				err := rbac.PutGroup(context.Background(), types.Group{Group: tt.group})
 				if tt.ok && err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -600,19 +601,19 @@ func setupRBACTest(t *testing.T, rbac NewRBACFunc) storage.RBAC {
 	ctx := context.Background()
 	st := rbac()
 	for _, role := range roleSeeds {
-		err := st.PutRole(ctx, role)
+		err := st.PutRole(ctx, types.Role{Role: role})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	for _, roleBinding := range roleBindingSeeds {
-		err := st.PutRoleBinding(ctx, roleBinding)
+		err := st.PutRoleBinding(ctx, types.RoleBinding{RoleBinding: roleBinding})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	for _, group := range groupSeeds {
-		err := st.PutGroup(ctx, group)
+		err := st.PutGroup(ctx, types.Group{Group: group})
 		if err != nil {
 			t.Fatal(err)
 		}

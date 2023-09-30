@@ -22,6 +22,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestListEdges(t *testing.T) {
@@ -34,18 +35,18 @@ func TestListEdges(t *testing.T) {
 
 	// Place a dummy peer
 	p := server.storage.MeshDB().Peers()
-	err := p.Put(ctx, &v1.MeshNode{
+	err := p.Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{
 		Id:        "foo",
 		PublicKey: newEncodedPubKey(t),
-	})
+	}})
 	if err != nil {
 		t.Errorf("Put() error = %v", err)
 		return
 	}
-	err = p.Put(ctx, &v1.MeshNode{
+	err = p.Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{
 		Id:        "bar",
 		PublicKey: newEncodedPubKey(t),
-	})
+	}})
 	if err != nil {
 		t.Errorf("Put() error = %v", err)
 		return

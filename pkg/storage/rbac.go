@@ -19,8 +19,6 @@ package storage
 import (
 	"context"
 
-	v1 "github.com/webmeshproj/api/v1"
-
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -45,31 +43,31 @@ type RBAC interface {
 	GetEnabled(ctx context.Context) (bool, error)
 
 	// PutRole creates or updates a role.
-	PutRole(ctx context.Context, role *v1.Role) error
+	PutRole(ctx context.Context, role types.Role) error
 	// GetRole returns a role by name.
-	GetRole(ctx context.Context, name string) (*v1.Role, error)
+	GetRole(ctx context.Context, name string) (types.Role, error)
 	// DeleteRole deletes a role by name.
 	DeleteRole(ctx context.Context, name string) error
 	// ListRoles returns a list of all roles.
 	ListRoles(ctx context.Context) (types.RolesList, error)
 
 	// PutRoleBinding creates or updates a rolebinding.
-	PutRoleBinding(ctx context.Context, rolebinding *v1.RoleBinding) error
+	PutRoleBinding(ctx context.Context, rolebinding types.RoleBinding) error
 	// GetRoleBinding returns a rolebinding by name.
-	GetRoleBinding(ctx context.Context, name string) (*v1.RoleBinding, error)
+	GetRoleBinding(ctx context.Context, name string) (types.RoleBinding, error)
 	// DeleteRoleBinding deletes a rolebinding by name.
 	DeleteRoleBinding(ctx context.Context, name string) error
 	// ListRoleBindings returns a list of all rolebindings.
-	ListRoleBindings(ctx context.Context) ([]*v1.RoleBinding, error)
+	ListRoleBindings(ctx context.Context) ([]types.RoleBinding, error)
 
 	// PutGroup creates or updates a group.
-	PutGroup(ctx context.Context, group *v1.Group) error
+	PutGroup(ctx context.Context, group types.Group) error
 	// GetGroup returns a group by name.
-	GetGroup(ctx context.Context, name string) (*v1.Group, error)
+	GetGroup(ctx context.Context, name string) (types.Group, error)
 	// DeleteGroup deletes a group by name.
 	DeleteGroup(ctx context.Context, name string) error
 	// ListGroups returns a list of all groups.
-	ListGroups(ctx context.Context) ([]*v1.Group, error)
+	ListGroups(ctx context.Context) ([]types.Group, error)
 
 	// ListNodeRoles returns a list of all roles for a node.
 	ListNodeRoles(ctx context.Context, nodeID string) (types.RolesList, error)

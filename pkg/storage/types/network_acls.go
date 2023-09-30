@@ -21,7 +21,7 @@ const (
 )
 
 // ValidateACL validates a NetworkACL.
-func ValidateACL(acl *v1.NetworkACL) error {
+func ValidateACL(acl NetworkACL) error {
 	if acl.GetName() == "" {
 		return errors.New("acl name is required")
 	}
@@ -138,6 +138,16 @@ func (a NetworkACLs) Accept(ctx context.Context, action NetworkAction) bool {
 
 // NetworkACL is a Network ACL.
 type NetworkACL struct{ *v1.NetworkACL }
+
+// DeepCopy returns a deep copy of the network ACL.
+func (n NetworkACL) DeepCopy() NetworkACL {
+	return NetworkACL{NetworkACL: n.NetworkACL.DeepCopy()}
+}
+
+// DeepCopyInto copies the node into the given acl.
+func (n NetworkACL) DeepCopyInto(acl *NetworkACL) {
+	*acl = n.DeepCopy()
+}
 
 // Proto returns the protobuf representation of the ACL.
 func (a NetworkACL) Proto() *v1.NetworkACL {
