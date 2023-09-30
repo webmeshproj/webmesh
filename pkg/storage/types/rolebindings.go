@@ -17,6 +17,8 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -84,4 +86,18 @@ func (rb RoleBinding) ContainsNodeID(nodeID NodeID) bool {
 		}
 	}
 	return false
+}
+
+// Validate returns an error if the rolebinding is invalid.
+func (rb RoleBinding) Validate() error {
+	if rb.GetName() == "" {
+		return fmt.Errorf("rolebinding name cannot be empty")
+	}
+	if rb.GetRole() == "" {
+		return fmt.Errorf("rolebinding role cannot be empty")
+	}
+	if len(rb.GetSubjects()) == 0 {
+		return fmt.Errorf("rolebinding subjects cannot be empty")
+	}
+	return nil
 }

@@ -146,6 +146,11 @@ func (r *Route) UnmarshalProtoJSON(data []byte) error {
 	return nil
 }
 
+// Validate validates the route.
+func (r Route) Validate() error {
+	return ValidateRoute(r)
+}
+
 // Equals returns whether the routes are equal.
 func (r *Route) Equals(other *Route) bool {
 	if r.GetName() != other.GetName() {

@@ -17,6 +17,8 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -57,6 +59,17 @@ func (n *Role) UnmarshalProtoJSON(data []byte) error {
 		return err
 	}
 	n.Role = &role
+	return nil
+}
+
+// Validate validates the role.
+func (n Role) Validate() error {
+	if n.GetName() == "" {
+		return fmt.Errorf("role name cannot be empty")
+	}
+	if len(n.GetRules()) == 0 {
+		return fmt.Errorf("role rules cannot be empty")
+	}
 	return nil
 }
 

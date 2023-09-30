@@ -17,6 +17,8 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -53,5 +55,16 @@ func (n *Group) UnmarshalProtoJSON(data []byte) error {
 		return err
 	}
 	n.Group = &grp
+	return nil
+}
+
+// Validate validates the group.
+func (n Group) Validate() error {
+	if n.GetName() == "" {
+		return fmt.Errorf("group name cannot be empty")
+	}
+	if len(n.GetSubjects()) == 0 {
+		return fmt.Errorf("group subjects cannot be empty")
+	}
 	return nil
 }

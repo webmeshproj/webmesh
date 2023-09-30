@@ -172,6 +172,11 @@ func (a *NetworkACL) UnmarshalProtoJSON(data []byte) error {
 	return nil
 }
 
+// Validate validates the ACL.
+func (a NetworkACL) Validate() error {
+	return ValidateACL(a)
+}
+
 // Equals returns whether the ACLs are equal.
 func (a NetworkACL) Equals(other NetworkACL) bool {
 	if a.GetName() != other.GetName() {

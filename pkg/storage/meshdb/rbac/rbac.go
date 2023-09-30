@@ -83,11 +83,9 @@ func (r *rbac) PutRole(ctx context.Context, role types.Role) error {
 			return fmt.Errorf("%w %q", errors.ErrIsSystemRole, role.GetName())
 		}
 	}
-	if role.GetName() == "" {
-		return fmt.Errorf("role name cannot be empty")
-	}
-	if len(role.GetRules()) == 0 {
-		return fmt.Errorf("role rules cannot be empty")
+	err := role.Validate()
+	if err != nil {
+		return fmt.Errorf("validate role: %w", err)
 	}
 	data, err := role.MarshalProtoJSON()
 	if err != nil {
@@ -161,14 +159,9 @@ func (r *rbac) PutRoleBinding(ctx context.Context, rolebinding types.RoleBinding
 			return fmt.Errorf("%w %q", errors.ErrIsSystemRoleBinding, rolebinding.GetName())
 		}
 	}
-	if rolebinding.GetName() == "" {
-		return fmt.Errorf("rolebinding name cannot be empty")
-	}
-	if rolebinding.GetRole() == "" {
-		return fmt.Errorf("rolebinding role cannot be empty")
-	}
-	if len(rolebinding.GetSubjects()) == 0 {
-		return fmt.Errorf("rolebinding subjects cannot be empty")
+	err := rolebinding.Validate()
+	if err != nil {
+		return fmt.Errorf("validate rolebinding: %w", err)
 	}
 	key := rolebindingsPrefix.ForString(rolebinding.GetName())
 	data, err := rolebinding.MarshalProtoJSON()
