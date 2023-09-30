@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package graph implements a graph data structure for the mesh network.
-package graph
+package graphstore
 
 import (
 	"bytes"

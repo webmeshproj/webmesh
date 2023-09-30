@@ -22,7 +22,7 @@ import (
 	"io"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graphstore"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
@@ -35,7 +35,7 @@ import (
 func New(store storage.MeshStorage) storage.MeshDB {
 	return &database{
 		peers:      peers.New(store),
-		graph:      types.NewGraphWithStore(graph.NewStore(store)),
+		graph:      types.NewGraphWithStore(graphstore.NewStore(store)),
 		rbac:       rbac.New(store),
 		meshState:  state.New(store),
 		networking: networking.New(store),

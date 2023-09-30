@@ -30,7 +30,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	peergraph "github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graphstore"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -40,7 +40,7 @@ type Peers = storage.Peers
 func New(db storage.MeshStorage) Peers {
 	return &peerDB{
 		db:    db,
-		graph: types.NewGraphWithStore(peergraph.NewStore(db)),
+		graph: types.NewGraphWithStore(graphstore.NewStore(db)),
 	}
 }
 
