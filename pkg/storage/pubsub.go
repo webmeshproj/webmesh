@@ -18,22 +18,11 @@ package storage
 
 import (
 	"context"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Topic represents a topic for a pubsub subscription. Generic
 // implementations can be made so long as they can be JSON encoded.
 type Topic[T any] string
-
-const (
-	// TopicAll is the topic for all changes.
-	TopicAll Topic[any] = ""
-	// TopicPeers is the topic for peer changes.
-	TopicPeers Topic[types.MeshNode] = "peers"
-	// TopicEdges is the topic for edge changes.
-	TopicEdges Topic[types.MeshEdge] = "edges"
-)
 
 // SubscribeFunc is a function that subscribes to a topic.
 type SubscribeFunc[T any] func(T)

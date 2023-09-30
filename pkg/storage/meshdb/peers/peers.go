@@ -19,7 +19,6 @@ package peers
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -30,6 +29,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
@@ -209,16 +209,47 @@ func (p *peerDB) ListByFeature(ctx context.Context, feature v1.Feature) ([]types
 }
 
 func (p *peerDB) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (context.CancelFunc, error) {
-	return p.db.Subscribe(ctx, storage.NodesPrefix, func(key, value []byte) {
-		if bytes.Equal(key, storage.NodesPrefix) {
-			return
+	log := context.LoggerFrom(ctx)
+	return p.db.Subscribe(ctx, []byte(""), func(key, value []byte) {
+		var nodes []types.MeshNode
+		switch {
+		case bytes.HasPrefix(key, storage.EdgesPrefix):
+			if bytes.Equal(key, storage.EdgesPrefix) {
+				return
+			}
+			var edge types.MeshEdge
+			err := edge.UnmarshalJSON(value)
+			if err != nil {
+				log.Error("Failed to unmarshal edge", "error", err.Error())
+				return
+			}
+			source, err := p.graph.Vertex(edge.SourceID())
+			if err != nil {
+				log.Error("Failed to get source node", "error", err.Error())
+			} else {
+				nodes = append(nodes, source)
+			}
+			target, err := p.graph.Vertex(edge.TargetID())
+			if err != nil {
+				log.Error("Failed to get target node", "error", err.Error())
+			} else {
+				nodes = append(nodes, target)
+			}
+		case bytes.HasPrefix(key, storage.NodesPrefix):
+			if bytes.Equal(key, storage.NodesPrefix) {
+				return
+			}
+			var node types.MeshNode
+			err := node.UnmarshalJSON(value)
+			if err != nil {
+				log.Error("Failed to unmarshal node", "error", err.Error())
+				return
+			}
+			nodes = append(nodes, node)
 		}
-		var node types.MeshNode
-		err := node.UnmarshalJSON(value)
-		if err != nil {
-			return
+		if len(nodes) > 0 {
+			fn(nodes)
 		}
-		fn(node)
 	})
 }
 

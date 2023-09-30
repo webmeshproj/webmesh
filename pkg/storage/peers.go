@@ -36,7 +36,10 @@ var NodesPrefix = types.RegistryPrefix.ForString("nodes")
 var EdgesPrefix = types.RegistryPrefix.ForString("edges")
 
 // PeerSubscribeFunc is a function that can be used to subscribe to peer changes.
-type PeerSubscribeFunc func(types.MeshNode)
+// The function is called with multiple peers when the change reflects a new edge
+// being added or removed. The function is called with a single peer when the
+// change reflects a node being added or removed.
+type PeerSubscribeFunc func([]types.MeshNode)
 
 // Peers is the peers interface.
 type Peers interface {

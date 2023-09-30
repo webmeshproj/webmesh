@@ -44,8 +44,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
-// BadgerGoRoutines is the maximum number of goroutines to use for BadgerDB.
-var BadgerGoRoutines = 16
+// BadgerGoRoutines is the number of goroutines to use for BadgerDB.
+var BadgerGoRoutines = 32
 
 func init() {
 	if val, ok := os.LookupEnv("WEBMESH_BADGER_GOROUTINES"); ok {
@@ -72,7 +72,7 @@ type badgerDB struct {
 	opts              Options
 	db                *badger.DB
 	firstIdx, lastIdx atomic.Uint64
-	mu                sync.RWMutex
+	mu                sync.Mutex
 }
 
 // New creates a new BadgerDB storage.
@@ -126,6 +126,50 @@ func NewInMemory(opts Options) (storage.DualStorage, error) {
 	}, nil
 }
 
+// NewTestStorage is a helper method for returning a new in-memory storage
+// and panicking on error.
+func NewTestStorage(debug bool) storage.DualStorage {
+	db, err := NewInMemory(Options{
+		Debug: debug,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+// NewTestDiskStorage is a helper method for returning a new disk storage
+// and panicking on error. The storage is created in a temporary directory
+// that is cleaned up when the storage is closed.
+func NewTestDiskStorage(debug bool) storage.DualStorage {
+	tmp, err := os.MkdirTemp("", "")
+	if err != nil {
+		panic(err)
+	}
+	db, err := New(Options{
+		DiskPath:   tmp,
+		Debug:      debug,
+		SyncWrites: true,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return &TempDiskStorage{
+		DualStorage: db,
+		tmp:         tmp,
+	}
+}
+
+type TempDiskStorage struct {
+	storage.DualStorage
+	tmp string
+}
+
+func (t *TempDiskStorage) Close() error {
+	_ = t.DualStorage.Close()
+	return os.RemoveAll(t.tmp)
+}
+
 // DropAll deletes all keys.
 func (db *badgerDB) DropAll(ctx context.Context) error {
 	db.mu.Lock()
@@ -135,8 +179,8 @@ func (db *badgerDB) DropAll(ctx context.Context) error {
 
 // GetValue returns the value of a key.
 func (db *badgerDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	var value []byte
 	err := db.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
@@ -186,8 +230,8 @@ func (db *badgerDB) Delete(ctx context.Context, key []byte) error {
 
 // ListKeys returns all keys with a given prefix.
 func (db *badgerDB) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	var out [][]byte
 	err := db.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -219,8 +263,8 @@ func (db *badgerDB) ListKeys(ctx context.Context, prefix []byte) ([][]byte, erro
 // that the iterator not attempt any write operations as this will cause
 // a deadlock. The iteration will stop if the iterator returns an error.
 func (db *badgerDB) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	err := db.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -249,8 +293,8 @@ func (db *badgerDB) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pr
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (db *badgerDB) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		match := []pb.Match{{Prefix: prefix}}
@@ -381,8 +425,8 @@ func (db *badgerDB) LastIndex() (uint64, error) {
 
 // GetLog gets a log entry at a given index.
 func (db *badgerDB) GetLog(index uint64, log *raft.Log) error {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	err := db.db.View(func(txn *badger.Txn) error {
 		idx := strconv.Itoa(int(index))
 		item, err := txn.Get(append([]byte(RaftLogPrefix), []byte(idx)...))
@@ -506,8 +550,8 @@ func (db *badgerDB) Set(key []byte, val []byte) error {
 
 // Get returns the value for key, or an empty byte slice if key was not found.
 func (db *badgerDB) Get(key []byte) ([]byte, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	var value []byte
 	err := db.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(append([]byte(StableStorePrefix), key...))
@@ -540,8 +584,8 @@ func (db *badgerDB) SetUint64(key []byte, val uint64) error {
 
 // GetUint64 returns the uint64 value for key, or 0 if key was not found.
 func (db *badgerDB) GetUint64(key []byte) (uint64, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	var value []byte
 	err := db.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(append([]byte(StableStorePrefix), key...))

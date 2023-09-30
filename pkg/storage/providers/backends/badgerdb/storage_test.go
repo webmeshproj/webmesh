@@ -35,31 +35,13 @@ func init() {
 }
 
 func TestInMemoryBadgerStorage(t *testing.T) {
-	st, err := NewInMemory(Options{
-		Debug: BadgerTestDebug,
-	})
-	if err != nil {
-		t.Fatalf("failed to create in-memory storage: %v", err)
-	}
+	st := NewTestStorage(BadgerTestDebug)
 	defer st.Close()
 	testutil.TestDualStorageConformance(context.Background(), t, st)
 }
 
 func TestDiskBadgerStorage(t *testing.T) {
-	tmp, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		os.RemoveAll(tmp)
-	})
-	st, err := New(Options{
-		DiskPath: tmp,
-		Debug:    BadgerTestDebug,
-	})
-	if err != nil {
-		t.Fatalf("failed to create disk storage: %v", err)
-	}
+	st := NewTestDiskStorage(BadgerTestDebug)
 	defer st.Close()
 	testutil.TestDualStorageConformance(context.Background(), t, st)
 }

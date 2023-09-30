@@ -29,8 +29,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	meshpeers "github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Membership_SubscribePeersServer) error {
@@ -86,7 +86,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		slices.Sort(iceNegServers)
 		slices.Sort(dnsServers)
 		if len(lastConfig) > 0 {
-			if slices.Equal(lastIceServers, iceNegServers) && slices.Equal(lastDnsServers, dnsServers) && meshpeers.WireGuardPeersEqual(lastConfig, peers) {
+			if slices.Equal(lastIceServers, iceNegServers) && slices.Equal(lastDnsServers, dnsServers) && types.WireGuardPeersEqual(lastConfig, peers) {
 				log.Debug("Skipping wireguard peers notification, no changes")
 				return
 			}

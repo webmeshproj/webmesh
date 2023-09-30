@@ -621,7 +621,7 @@ func TestMeshStorageConformance(ctx context.Context, t *testing.T, meshStorage s
 
 	t.Run("Subscribe", func(t *testing.T) {
 		SkipOnCI(t, "Skipping on CI due to flakiness")
-		var subscribeTimeout = 30 * time.Second
+		var subscribeTimeout = 15 * time.Second
 		var hitCount atomic.Int64
 		var seen sync.Map
 		subCancel, err := meshStorage.Subscribe(ctx, []byte("Subscribe/"), func(key, value []byte) {
