@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,17 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package peers
+package meshnet
 
 import (
-	"context"
+	"slices"
 	"sort"
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slices"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 )
@@ -179,14 +181,14 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			t.Parallel()
 			// Prepare the test database
 			ctx := context.Background()
-			db, err := badgerdb.NewInMemory(badgerdb.Options{})
+			memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
 			if err != nil {
 				t.Fatalf("create test db: %v", err)
 			}
-			defer db.Close()
-			peerdb := New(db)
-			rbacdb := rbac.New(db)
-			nwdb := networking.New(db)
+			defer memdb.Close()
+			peerdb := peers.New(memdb)
+			rbacdb := rbac.New(memdb)
+			nwdb := networking.New(memdb)
 			for _, peer := range testCase.peers {
 				peer.PublicKey = mustGeneratePublicKey(t)
 				if err := peerdb.Put(ctx, peer); err != nil {
@@ -229,7 +231,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			}
 			// Run the test cases
 			for peerID := range testCase.wantPeers {
-				peers, err := WireGuardPeersFor(ctx, db, peerID)
+				peers, err := WireGuardPeersFor(ctx, meshdb.New(memdb), peerID)
 				if err != nil {
 					t.Fatalf("get WireGuard peers for %q: %v", peerID, err)
 				}

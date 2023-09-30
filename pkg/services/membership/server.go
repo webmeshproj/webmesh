@@ -31,8 +31,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/state"
 )
 
 // Server is the webmesh Membership service.
@@ -74,7 +72,7 @@ func NewServer(ctx context.Context, opts Options) *Server {
 
 func (s *Server) loadMeshState(ctx context.Context) error {
 	var err error
-	state := state.New(s.storage.MeshStorage())
+	state := s.storage.MeshDB().MeshState()
 	if !s.ipv6Prefix.IsValid() {
 		s.log.Debug("Looking up mesh IPv6 prefix")
 		s.ipv6Prefix, err = state.GetIPv6Prefix(ctx)
@@ -100,7 +98,7 @@ func (s *Server) loadMeshState(ctx context.Context) error {
 }
 
 func (s *Server) ensurePeerRoutes(ctx context.Context, nodeID string, routes []string) (created bool, err error) {
-	nw := networking.New(s.storage.MeshStorage())
+	nw := s.storage.MeshDB().Networking()
 	current, err := nw.GetRoutesByNode(ctx, nodeID)
 	if err != nil {
 		return false, fmt.Errorf("get routes for node %q: %w", nodeID, err)

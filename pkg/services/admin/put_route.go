@@ -49,7 +49,7 @@ func (s *Server) PutRoute(ctx context.Context, route *v1.Route) (*emptypb.Empty,
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put network routes")
 	}
-	err = s.networking.PutRoute(ctx, route)
+	err = s.db.Networking().PutRoute(ctx, route)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

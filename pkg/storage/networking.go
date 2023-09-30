@@ -28,6 +28,15 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
+var (
+	// BootstrapNodesNetworkACLName is the name of the bootstrap nodes NetworkACL.
+	BootstrapNodesNetworkACLName = []byte("bootstrap-nodes")
+	// NetworkACLsPrefix is where NetworkACLs are stored in the database.
+	NetworkACLsPrefix = types.RegistryPrefix.For([]byte("network-acls"))
+	// RoutesPrefix is where Routes are stored in the database.
+	RoutesPrefix = types.RegistryPrefix.For([]byte("routes"))
+)
+
 // Networking is the interface to the database models for network resources.
 type Networking interface {
 	// PutNetworkACL creates or updates a NetworkACL.

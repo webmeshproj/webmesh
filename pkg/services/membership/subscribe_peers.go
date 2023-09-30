@@ -27,8 +27,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	meshgraph "github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
 	meshpeers "github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
@@ -56,6 +56,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	log := s.log.With("remote-peer", peerID)
 	ctx := stream.Context()
 	st := s.storage.MeshStorage()
+	db := s.storage.MeshDB()
 
 	log.Debug("Received subscribe peers request for peer", slog.String("peer", peerID))
 
@@ -78,7 +79,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 			log.Error("failed to get mdns servers", "error", err.Error())
 			return
 		}
-		peers, err := meshpeers.WireGuardPeersFor(ctx, st, peerID)
+		peers, err := meshnet.WireGuardPeersFor(ctx, db, peerID)
 		if err != nil {
 			log.Error("failed to get wireguard peers", "error", err.Error())
 			return
@@ -107,12 +108,12 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		}
 	}
 
-	nodeCancel, err := st.Subscribe(ctx, meshgraph.NodesPrefix, notify)
+	nodeCancel, err := st.Subscribe(ctx, storage.NodesPrefix, notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to node changes: %v", err)
 	}
 	defer nodeCancel()
-	edgeCancel, err := st.Subscribe(ctx, meshgraph.EdgesPrefix, notify)
+	edgeCancel, err := st.Subscribe(ctx, storage.EdgesPrefix, notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to edge changes: %v", err)
 	}

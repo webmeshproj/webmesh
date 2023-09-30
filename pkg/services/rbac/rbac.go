@@ -26,7 +26,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 // Evaluator is an interface for evaluating actions.
@@ -68,12 +67,12 @@ func (a *Action) action() *v1.RBACAction {
 
 // NewStoreEvaluator returns a ActionEvaluator that evaluates actions
 // against the roles in the given store.
-func NewStoreEvaluator(store storage.MeshStorage) Evaluator {
-	return &storeEvaluator{rbac: rbac.New(store)}
+func NewStoreEvaluator(store storage.MeshDB) Evaluator {
+	return &storeEvaluator{rbac: store.RBAC()}
 }
 
 type storeEvaluator struct {
-	rbac rbac.RBAC
+	rbac storage.RBAC
 }
 
 func (s *storeEvaluator) IsSecure() bool {

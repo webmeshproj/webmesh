@@ -68,7 +68,7 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}
-	err := s.rbac.PutGroup(ctx, group)
+	err := s.db.RBAC().PutGroup(ctx, group)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

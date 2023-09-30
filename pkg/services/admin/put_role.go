@@ -87,7 +87,7 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 			}
 		}
 	}
-	err := s.rbac.PutRole(ctx, role)
+	err := s.db.RBAC().PutRole(ctx, role)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

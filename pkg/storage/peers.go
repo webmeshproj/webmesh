@@ -27,6 +27,15 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
+// NodesPrefix is where nodes are stored in the database.
+// nodes are indexed by their ID in the format /registry/nodes/<id>.
+var NodesPrefix = types.RegistryPrefix.ForString("nodes")
+
+// EdgesPrefix is where edges are stored in the database.
+// edges are indexed by their source and target node IDs
+// in the format /registry/edges/<source>/<target>.
+var EdgesPrefix = types.RegistryPrefix.ForString("edges")
+
 // PeerFilterFunc is a function that can be used to filter responses returned by a resolver.
 type PeerFilterFunc func(types.MeshNode) bool
 

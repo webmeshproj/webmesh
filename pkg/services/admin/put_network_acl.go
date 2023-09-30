@@ -62,7 +62,7 @@ func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptyp
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	err = s.networking.PutNetworkACL(ctx, acl)
+	err = s.db.Networking().PutNetworkACL(ctx, acl)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

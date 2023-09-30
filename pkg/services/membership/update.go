@@ -30,7 +30,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -113,7 +112,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	var currentSuffrage v1.ClusterStatus
 	var currentAddress string
 	storageStatus := s.storage.Status()
-	p := peers.New(s.storage.MeshStorage())
+	p := s.storage.MeshDB().Peers()
 	peer, err := p.Get(ctx, req.GetId())
 	if err != nil {
 		if errors.IsNodeNotFound(err) {

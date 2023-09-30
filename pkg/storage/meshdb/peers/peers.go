@@ -137,8 +137,8 @@ func (p *peerDB) Delete(ctx context.Context, id string) error {
 
 func (p *peerDB) List(ctx context.Context) ([]types.MeshNode, error) {
 	out := make([]types.MeshNode, 0)
-	err := p.db.IterPrefix(ctx, peergraph.NodesPrefix, func(key, value []byte) error {
-		if bytes.Equal(key, peergraph.NodesPrefix) {
+	err := p.db.IterPrefix(ctx, storage.NodesPrefix, func(key, value []byte) error {
+		if bytes.Equal(key, storage.NodesPrefix) {
 			return nil
 		}
 		var node types.MeshNode
@@ -153,16 +153,16 @@ func (p *peerDB) List(ctx context.Context) ([]types.MeshNode, error) {
 }
 
 func (p *peerDB) ListIDs(ctx context.Context) ([]string, error) {
-	keys, err := p.db.ListKeys(ctx, peergraph.NodesPrefix)
+	keys, err := p.db.ListKeys(ctx, storage.NodesPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("list keys: %w", err)
 	}
 	ids := make([]string, 0)
 	for _, key := range keys {
-		if bytes.Equal(key, peergraph.NodesPrefix) {
+		if bytes.Equal(key, storage.NodesPrefix) {
 			continue
 		}
-		ids = append(ids, string(peergraph.NodesPrefix.TrimFrom(key)))
+		ids = append(ids, string(storage.NodesPrefix.TrimFrom(key)))
 	}
 	return ids, nil
 }

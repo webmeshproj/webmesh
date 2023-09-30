@@ -59,6 +59,14 @@ func (s *state) GetIPv6Prefix(ctx context.Context) (netip.Prefix, error) {
 	return netip.ParsePrefix(string(prefix))
 }
 
+func (s *state) SetIPv6Prefix(ctx context.Context, prefix netip.Prefix) error {
+	err := s.PutValue(ctx, IPv6PrefixKey, []byte(prefix.String()), 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
 	prefix, err := s.GetValue(ctx, IPv4PrefixKey)
 	if err != nil {
@@ -67,12 +75,28 @@ func (s *state) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
 	return netip.ParsePrefix(string(prefix))
 }
 
+func (s *state) SetIPv4Prefix(ctx context.Context, prefix netip.Prefix) error {
+	err := s.PutValue(ctx, IPv4PrefixKey, []byte(prefix.String()), 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *state) GetMeshDomain(ctx context.Context) (string, error) {
 	resp, err := s.GetValue(ctx, MeshDomainKey)
 	if err != nil {
 		return "", err
 	}
 	return string(resp), nil
+}
+
+func (s *state) SetMeshDomain(ctx context.Context, domain string) error {
+	err := s.PutValue(ctx, MeshDomainKey, []byte(domain), 0)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *state) ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error) {

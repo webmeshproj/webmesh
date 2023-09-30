@@ -22,7 +22,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 func TestGetNetworkACL(t *testing.T) {
@@ -43,7 +43,7 @@ func TestGetNetworkACL(t *testing.T) {
 		},
 		{
 			name: "existing system networkacl",
-			req:  &v1.NetworkACL{Name: string(networking.BootstrapNodesNetworkACLName)},
+			req:  &v1.NetworkACL{Name: string(storage.BootstrapNodesNetworkACLName)},
 			code: codes.OK,
 		},
 	}

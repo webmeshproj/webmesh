@@ -47,8 +47,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
@@ -574,7 +574,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 
 	// Subscribe to peer updates
 	t.log.Debug("Subscribing to peer updates")
-	_, err = node.Storage().MeshStorage().Subscribe(context.Background(), graph.NodesPrefix, func(key []byte, value []byte) {
+	_, err = node.Storage().MeshStorage().Subscribe(context.Background(), storage.NodesPrefix, func(key []byte, value []byte) {
 		log := context.LoggerFrom(ctx)
 		peer := types.MeshNode{MeshNode: &v1.MeshNode{}}
 		err = protojson.Unmarshal([]byte(value), peer.MeshNode)
@@ -641,12 +641,12 @@ func (t *WebmeshTransport) registerMultiaddrsForListener(ctx context.Context, li
 		return nil
 	}
 	// We can write it directly to storage
-	self, err := peers.New(t.node.Storage().MeshStorage()).Get(ctx, t.node.ID())
+	self, err := t.node.Storage().MeshDB().Peers().Get(ctx, t.node.ID())
 	if err != nil {
 		return fmt.Errorf("failed to get self: %w", err)
 	}
 	self.Multiaddrs = addrstrs
-	err = peers.New(t.node.Storage().MeshStorage()).Put(ctx, self.MeshNode)
+	err = t.node.Storage().MeshDB().Peers().Put(ctx, self.MeshNode)
 	if err != nil {
 		return fmt.Errorf("failed to update self: %w", err)
 	}

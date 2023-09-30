@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) ListEdges(ctx context.Context, _ *emptypb.Empty) (*v1.MeshEdges, error) {
-	edges, err := s.peers.Graph().Edges()
+	edges, err := s.db.Peers().Graph().Edges()
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) ListNetworkACLs(ctx context.Context, _ *emptypb.Empty) (*v1.NetworkACLs, error) {
-	acls, err := s.networking.ListNetworkACLs(ctx)
+	acls, err := s.db.Networking().ListNetworkACLs(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

@@ -28,19 +28,18 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 // Server is the webmesh Mesh service.
 type Server struct {
 	v1.UnimplementedMeshServer
 
-	peers peers.Peers
+	peers storage.Peers
 }
 
 // NewServer returns a new Server.
-func NewServer(storage storage.MeshStorage) *Server {
-	return &Server{peers: peers.New(storage)}
+func NewServer(storage storage.MeshDB) *Server {
+	return &Server{peers: storage.Peers()}
 }
 
 func (s *Server) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.MeshNode, error) {

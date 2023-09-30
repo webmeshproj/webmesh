@@ -25,10 +25,16 @@ import (
 type MeshState interface {
 	// GetIPv6Prefix returns the IPv6 prefix.
 	GetIPv6Prefix(ctx context.Context) (netip.Prefix, error)
+	// SetIPv6Prefix sets the IPv6 prefix.
+	SetIPv6Prefix(ctx context.Context, prefix netip.Prefix) error
 	// GetIPv4Prefix returns the IPv4 prefix.
 	GetIPv4Prefix(ctx context.Context) (netip.Prefix, error)
+	// SetIPv4Prefix sets the IPv4 prefix.
+	SetIPv4Prefix(ctx context.Context, prefix netip.Prefix) error
 	// GetMeshDomain returns the mesh domain.
 	GetMeshDomain(ctx context.Context) (string, error)
+	// SetMeshDomain sets the mesh domain.
+	SetMeshDomain(ctx context.Context, domain string) error
 	// ListPublicRPCAddresses returns all public gRPC addresses in the mesh.
 	// The map key is the node ID.
 	ListPublicRPCAddresses(ctx context.Context) (map[string]netip.AddrPort, error)

@@ -22,29 +22,22 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
-	rbacdb "github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 )
 
 // Server is the webmesh Admin service.
 type Server struct {
 	v1.UnimplementedAdminServer
 
-	storage    storage.Provider
-	peers      peers.Peers
-	rbac       rbacdb.RBAC
-	rbacEval   rbac.Evaluator
-	networking networking.Networking
+	storage  storage.Provider
+	db       storage.MeshDB
+	rbacEval rbac.Evaluator
 }
 
 // New creates a new admin server.
 func New(storage storage.Provider, rbac rbac.Evaluator) *Server {
 	return &Server{
-		storage:    storage,
-		peers:      peers.New(storage.MeshStorage()),
-		rbac:       rbacdb.New(storage.MeshStorage()),
-		rbacEval:   rbac,
-		networking: networking.New(storage.MeshStorage()),
+		storage:  storage,
+		db:       storage.MeshDB(),
+		rbacEval: rbac,
 	}
 }

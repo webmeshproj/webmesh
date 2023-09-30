@@ -27,7 +27,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	peergraph "github.com/webmeshproj/webmesh/pkg/storage/meshdb/graph"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -43,7 +42,7 @@ type peerResolver struct {
 // NodeIDResolver returns a resolver that resolves node addresses by node ID.
 func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 	return transport.NodeIDResolverFunc(func(ctx context.Context, lookup string) ([]netip.AddrPort, error) {
-		key := peergraph.NodesPrefix.For([]byte(lookup))
+		key := storage.NodesPrefix.For([]byte(lookup))
 		val, err := r.st.GetValue(ctx, key)
 		if err != nil {
 			return nil, err
@@ -69,8 +68,8 @@ func (r *peerResolver) NodeIDResolver() transport.NodeIDResolver {
 func (r *peerResolver) FeatureResolver(filterFn ...storage.PeerFilterFunc) transport.FeatureResolver {
 	return transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
 		var addrs []netip.AddrPort
-		err := r.st.IterPrefix(ctx, peergraph.NodesPrefix, func(key, val []byte) error {
-			if bytes.Equal(key, peergraph.NodesPrefix) {
+		err := r.st.IterPrefix(ctx, storage.NodesPrefix, func(key, val []byte) error {
+			if bytes.Equal(key, storage.NodesPrefix) {
 				return nil
 			}
 			mnode := &v1.MeshNode{}

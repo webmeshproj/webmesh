@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) ListGroups(ctx context.Context, _ *emptypb.Empty) (*v1.Groups, error) {
-	groups, err := s.rbac.ListGroups(ctx)
+	groups, err := s.db.RBAC().ListGroups(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

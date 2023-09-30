@@ -51,7 +51,7 @@ func (s *Server) DeleteRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*em
 	if storage.IsSystemRoleBinding(rb.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system rolebindings")
 	}
-	err := s.rbac.DeleteRoleBinding(ctx, rb.GetName())
+	err := s.db.RBAC().DeleteRoleBinding(ctx, rb.GetName())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

@@ -47,7 +47,7 @@ func (s *Server) DeleteRoute(ctx context.Context, route *v1.Route) (*emptypb.Emp
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete network routes")
 	}
-	err := s.networking.DeleteRoute(ctx, route.GetName())
+	err := s.db.Networking().DeleteRoute(ctx, route.GetName())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

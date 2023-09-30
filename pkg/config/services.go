@@ -452,7 +452,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 		log.Warn("Running services without authorization")
 		rbacEvaluator = rbac.NewNoopEvaluator()
 	} else {
-		rbacEvaluator = rbac.NewStoreEvaluator(conn.Storage().MeshStorage())
+		rbacEvaluator = rbac.NewStoreEvaluator(conn.Storage().MeshDB())
 	}
 	// Always register the node API
 	log.Debug("Registering node service")
@@ -481,7 +481,7 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 	// Register any other enabled APIs
 	if o.Services.API.MeshEnabled {
 		log.Debug("Registering mesh api")
-		v1.RegisterMeshServer(srv, meshapi.NewServer(conn.Storage().MeshStorage()))
+		v1.RegisterMeshServer(srv, meshapi.NewServer(conn.Storage().MeshDB()))
 	}
 	if o.Services.WebRTC.Enabled {
 		log.Debug("Registering WebRTC api")
@@ -494,7 +494,6 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 		}
 		v1.RegisterWebRTCServer(srv, webrtc.NewServer(webrtc.Options{
 			ID:          conn.ID(),
-			Storage:     conn.Storage().MeshStorage(),
 			Wireguard:   conn.Network().WireGuard(),
 			NodeDialer:  conn,
 			RBAC:        rbacEvaluator,

@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) ListRoleBindings(ctx context.Context, _ *emptypb.Empty) (*v1.RoleBindings, error) {
-	rbs, err := s.rbac.ListRoleBindings(ctx)
+	rbs, err := s.db.RBAC().ListRoleBindings(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

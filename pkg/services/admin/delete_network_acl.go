@@ -47,7 +47,7 @@ func (s *Server) DeleteNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emp
 		}
 		return nil, status.Error(codes.PermissionDenied, "caller does not have permission to delete network acls")
 	}
-	err := s.networking.DeleteNetworkACL(ctx, acl.GetName())
+	err := s.db.Networking().DeleteNetworkACL(ctx, acl.GetName())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

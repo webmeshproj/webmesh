@@ -40,6 +40,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -84,10 +85,14 @@ func NewProvider(opts Options) *Provider {
 	return p
 }
 
-// MeshStorage returns the underlying MeshStorage instance. The provider does not need to
-// guarantee consistency on read operations.
+// MeshStorage returns the underlying MeshStorage instance.
 func (ext *Provider) MeshStorage() storage.MeshStorage {
 	return ext.storage
+}
+
+// MeshDB returns the underlying MeshDB instance.
+func (ext *Provider) MeshDB() storage.MeshDB {
+	return meshdb.New(ext.storage)
 }
 
 // Consensus returns the underlying Consensus instance.

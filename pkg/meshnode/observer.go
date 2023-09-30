@@ -24,7 +24,7 @@ import (
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
 
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 
@@ -49,7 +49,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 					log.Warn("failed to remove peer", slog.String("error", err.Error()))
 					return
 				}
-				if err := peers.New(provider.MeshStorage()).Delete(ctx, string(data.PeerID)); err != nil {
+				if err := provider.MeshDB().Peers().Delete(ctx, string(data.PeerID)); err != nil {
 					log.Warn("failed to remove peer from database", slog.String("error", err.Error()))
 				}
 				delete(failedHeartBeats, data.PeerID)
@@ -65,7 +65,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 			if string(data.Peer.ID) == s.nodeID {
 				return
 			}
-			wgpeers, err := peers.WireGuardPeersFor(ctx, provider.MeshStorage(), s.ID())
+			wgpeers, err := meshnet.WireGuardPeersFor(ctx, provider.MeshDB(), s.ID())
 			if err != nil {
 				log.Warn("failed to get wireguard peers", slog.String("error", err.Error()))
 			} else {
@@ -74,8 +74,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 				}
 			}
 			if s.plugins.HasWatchers() {
-				p := peers.New(provider.MeshStorage())
-				node, err := p.Get(ctx, string(data.Peer.ID))
+				node, err := provider.MeshDB().Peers().Get(ctx, string(data.Peer.ID))
 				if err != nil {
 					log.Warn("failed to lookup peer, can't emit event", slog.String("error", err.Error()))
 					return
@@ -97,8 +96,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 			}
 		case raft.LeaderObservation:
 			if s.plugins.HasWatchers() {
-				p := peers.New(provider.MeshStorage())
-				node, err := p.Get(ctx, string(data.LeaderID))
+				node, err := provider.MeshDB().Peers().Get(ctx, string(data.LeaderID))
 				if err != nil {
 					log.Warn("failed to get leader, may be fresh cluster, can't emit event", slog.String("error", err.Error()))
 					return

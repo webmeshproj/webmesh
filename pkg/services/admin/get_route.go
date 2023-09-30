@@ -30,7 +30,7 @@ func (s *Server) GetRoute(ctx context.Context, route *v1.Route) (*v1.Route, erro
 	if route.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "route name is required")
 	}
-	rt, err := s.networking.GetRoute(ctx, route.GetName())
+	rt, err := s.db.Networking().GetRoute(ctx, route.GetName())
 	if err != nil {
 		if errors.IsRouteNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "network route %q not found", route.GetName())

@@ -30,12 +30,11 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -164,7 +163,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to ensure peer routes: %v", err))
 		} else if created {
 			cleanFuncs = append(cleanFuncs, func() {
-				err := networking.New(s.storage.MeshStorage()).DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
+				err := s.storage.MeshDB().Networking().DeleteRoute(ctx, nodeAutoRoute(req.GetId()))
 				if err != nil {
 					log.Warn("Failed to delete route", slog.String("error", err.Error()))
 				}
@@ -189,7 +188,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		log.Debug("Assigned IPv4 address to peer", slog.String("ipv4", leasev4.String()))
 	}
 	// Write the peer to the database
-	p := peers.New(s.storage.MeshStorage())
+	p := s.storage.MeshDB().Peers()
 	err = p.Put(ctx, &v1.MeshNode{
 		Id:                 req.GetId(),
 		PrimaryEndpoint:    req.GetPrimaryEndpoint(),
@@ -303,7 +302,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	}
 
 	// Collect the list of peers we will send to the new node
-	peers, err := peers.WireGuardPeersFor(ctx, s.storage.MeshStorage(), req.GetId())
+	peers, err := meshnet.WireGuardPeersFor(ctx, s.storage.MeshDB(), req.GetId())
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to get wireguard peers: %v", err))
 	}

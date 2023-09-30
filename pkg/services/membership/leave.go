@@ -26,7 +26,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResponse, error) {
@@ -62,7 +61,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 
 	// Lookup the peer first to make sure they exist
-	leaving, err := peers.New(s.storage.MeshStorage()).Get(ctx, req.GetId())
+	leaving, err := s.storage.MeshDB().Peers().Get(ctx, req.GetId())
 	if err != nil {
 		if errors.IsNodeNotFound(err) {
 			// We're done here if they don't exist
@@ -80,7 +79,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 
 	s.log.Info("Removing mesh node from peers DB", "id", req.GetId())
-	err = peers.New(s.storage.MeshStorage()).Delete(ctx, req.GetId())
+	err = s.storage.MeshDB().Peers().Delete(ctx, req.GetId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete peer: %v", err)
 	}

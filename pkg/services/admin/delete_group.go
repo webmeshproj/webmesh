@@ -51,7 +51,7 @@ func (s *Server) DeleteGroup(ctx context.Context, group *v1.Group) (*emptypb.Emp
 	if storage.IsSystemGroup(group.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system groups")
 	}
-	err := s.rbac.DeleteGroup(ctx, group.GetName())
+	err := s.db.RBAC().DeleteGroup(ctx, group.GetName())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

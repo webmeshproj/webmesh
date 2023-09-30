@@ -32,8 +32,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
 )
 
@@ -157,7 +155,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	// Create the network manager
 	opts.NetworkOptions.NodeID = s.ID()
 	opts.NetworkOptions.StoragePort = int(s.storage.ListenPort())
-	s.nw = meshnet.New(s.Storage().MeshStorage(), opts.NetworkOptions)
+	s.nw = meshnet.New(s.Storage().MeshDB(), opts.NetworkOptions)
 	// At this point we are open for business.
 	s.open.Store(true)
 	if opts.Bootstrap != nil {
@@ -260,19 +258,20 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	}
 	var meshnetworkv4, meshnetworkv6 netip.Prefix
 	var err error
+	state := s.Storage().MeshDB().MeshState()
 	if !s.opts.DisableIPv6 {
-		meshnetworkv6, err = state.New(s.Storage().MeshStorage()).GetIPv6Prefix(ctx)
+		meshnetworkv6, err = state.GetIPv6Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ula prefix: %w", err)
 		}
 	}
 	if !s.opts.DisableIPv4 {
-		meshnetworkv4, err = state.New(s.Storage().MeshStorage()).GetIPv4Prefix(ctx)
+		meshnetworkv4, err = state.GetIPv4Prefix(ctx)
 		if err != nil {
 			return fmt.Errorf("get ipv4 prefix: %w", err)
 		}
 	}
-	p := peers.New(s.Storage().MeshStorage())
+	p := s.Storage().MeshDB().Peers()
 	self, err := p.Get(ctx, s.ID())
 	if err != nil {
 		return fmt.Errorf("get self peer: %w", err)
@@ -298,7 +297,7 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("configure wireguard: %w", err)
 	}
-	wgpeers, err := peers.WireGuardPeersFor(ctx, s.Storage().MeshStorage(), s.ID())
+	wgpeers, err := meshnet.WireGuardPeersFor(ctx, s.Storage().MeshDB(), s.ID())
 	if err != nil {
 		return fmt.Errorf("get wireguard peers: %w", err)
 	}

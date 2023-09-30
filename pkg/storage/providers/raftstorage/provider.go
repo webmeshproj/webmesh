@@ -35,6 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage/fsm"
 )
@@ -123,6 +124,11 @@ func (r *Provider) OnObservation(cb ObservationCallback) {
 // MeshStorage returns the underlying MeshStorage instance.
 func (r *Provider) MeshStorage() storage.MeshStorage {
 	return r.raftStorage
+}
+
+// MeshDB returns the underlying MeshDB instance.
+func (r *Provider) MeshDB() storage.MeshDB {
+	return meshdb.New(r.raftStorage)
 }
 
 // Consensus returns the underlying Consensus instance.

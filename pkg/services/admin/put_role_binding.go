@@ -74,7 +74,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}
-	err := s.rbac.PutRoleBinding(ctx, rb)
+	err := s.db.RBAC().PutRoleBinding(ctx, rb)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

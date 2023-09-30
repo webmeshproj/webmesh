@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) ListRoles(ctx context.Context, _ *emptypb.Empty) (*v1.Roles, error) {
-	roles, err := s.rbac.ListRoles(ctx)
+	roles, err := s.db.RBAC().ListRoles(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

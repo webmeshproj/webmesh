@@ -38,15 +38,6 @@ type GraphStore struct {
 	mu sync.RWMutex
 }
 
-// NodesPrefix is where nodes are stored in the database.
-// nodes are indexed by their ID in the format /registry/nodes/<id>.
-var NodesPrefix = types.RegistryPrefix.ForString("nodes")
-
-// EdgesPrefix is where edges are stored in the database.
-// edges are indexed by their source and target node IDs
-// in the format /registry/edges/<source>/<target>.
-var EdgesPrefix = types.RegistryPrefix.ForString("edges")
-
 // NewGraphStore creates a new Graph storage instance.
 func NewGraphStore(st storage.MeshStorage) types.PeerGraphStore {
 	return &GraphStore{MeshStorage: st}
@@ -76,7 +67,7 @@ func (g *GraphStore) AddVertex(nodeID types.NodeID, node types.MeshNode, props g
 	if err != nil {
 		return fmt.Errorf("marshal node: %w", err)
 	}
-	key := NodesPrefix.For(nodeID.Bytes())
+	key := storage.NodesPrefix.For(nodeID.Bytes())
 	if err := g.PutValue(ctx, key, data, 0); err != nil {
 		return fmt.Errorf("put node: %w", err)
 	}
@@ -97,7 +88,7 @@ func (g *GraphStore) Vertex(nodeID types.NodeID) (node types.MeshNode, props gra
 		err = fmt.Errorf("%w: %s", errors.ErrInvalidNodeID, nodeID)
 		return
 	}
-	key := NodesPrefix.For(nodeID.Bytes())
+	key := storage.NodesPrefix.For(nodeID.Bytes())
 	data, err := g.GetValue(ctx, key)
 	if err != nil {
 		if errors.IsKeyNotFound(err) {
@@ -125,7 +116,7 @@ func (g *GraphStore) RemoveVertex(nodeID types.NodeID) error {
 	if !storageutil.IsValidNodeID(nodeID.String()) {
 		return fmt.Errorf("%w: %s", errors.ErrInvalidNodeID, nodeID)
 	}
-	key := NodesPrefix.For(nodeID.Bytes())
+	key := storage.NodesPrefix.For(nodeID.Bytes())
 	_, err := g.GetValue(ctx, key)
 	if err != nil {
 		if errors.IsKeyNotFound(err) {
@@ -134,12 +125,12 @@ func (g *GraphStore) RemoveVertex(nodeID types.NodeID) error {
 		return err
 	}
 	// Check if the node has edges.
-	keys, err := g.ListKeys(ctx, EdgesPrefix)
+	keys, err := g.ListKeys(ctx, storage.EdgesPrefix)
 	if err != nil {
 		return fmt.Errorf("list edges: %w", err)
 	}
 	for _, key := range keys {
-		key = EdgesPrefix.TrimFrom(key)
+		key = storage.EdgesPrefix.TrimFrom(key)
 		parts := bytes.Split(key, []byte("/"))
 		if len(parts) != 2 {
 			// Should never happen.
@@ -160,16 +151,16 @@ func (g *GraphStore) ListVertices() ([]types.NodeID, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	ctx := context.Background()
-	keys, err := g.ListKeys(ctx, NodesPrefix)
+	keys, err := g.ListKeys(ctx, storage.NodesPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 	out := make([]types.NodeID, 0)
 	for _, key := range keys {
-		if bytes.Equal(key, NodesPrefix) {
+		if bytes.Equal(key, storage.NodesPrefix) {
 			continue
 		}
-		out = append(out, types.NodeID(bytes.TrimPrefix(key, append(NodesPrefix, '/'))))
+		out = append(out, types.NodeID(bytes.TrimPrefix(key, append(storage.NodesPrefix, '/'))))
 	}
 	return out, nil
 }
@@ -200,17 +191,17 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode types.NodeID, edge graph.Edg
 	// We diverge from the suggested implementation and only check that one of the nodes
 	// exists. This is so joiners can add edges to nodes that are not yet in the graph.
 	// If this ends up causing problems, we can change it.
-	nodeKeys, err := g.ListKeys(ctx, NodesPrefix)
+	nodeKeys, err := g.ListKeys(ctx, storage.NodesPrefix)
 	if err != nil {
 		return fmt.Errorf("list nodes: %w", err)
 	}
-	edgeKeys, err := g.ListKeys(ctx, EdgesPrefix)
+	edgeKeys, err := g.ListKeys(ctx, storage.EdgesPrefix)
 	if err != nil {
 		return fmt.Errorf("list edges: %w", err)
 	}
 	var vertexExists bool
 	for _, key := range nodeKeys {
-		key = NodesPrefix.TrimFrom(key)
+		key = storage.NodesPrefix.TrimFrom(key)
 		if bytes.Equal(key, sourceNode.Bytes()) || bytes.Equal(key, targetNode.Bytes()) {
 			vertexExists = true
 			break
@@ -221,7 +212,7 @@ func (g *GraphStore) AddEdge(sourceNode, targetNode types.NodeID, edge graph.Edg
 	}
 	var edgeExists bool
 	for _, key := range edgeKeys {
-		key = EdgesPrefix.TrimFrom(key)
+		key = storage.EdgesPrefix.TrimFrom(key)
 		parts := bytes.Split(key, []byte("/"))
 		if len(parts) != 2 {
 			// Should never happen.
@@ -337,8 +328,8 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[types.NodeID], error) {
 	defer g.mu.RUnlock()
 	ctx := context.Background()
 	edges := make([]graph.Edge[types.NodeID], 0)
-	err := g.IterPrefix(ctx, EdgesPrefix, func(key, value []byte) error {
-		if bytes.Equal(key, EdgesPrefix) {
+	err := g.IterPrefix(ctx, storage.EdgesPrefix, func(key, value []byte) error {
+		if bytes.Equal(key, storage.EdgesPrefix) {
 			return nil
 		}
 		var edge types.MeshEdge
@@ -353,5 +344,5 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[types.NodeID], error) {
 }
 
 func newEdgeKey(source, target types.NodeID) []byte {
-	return EdgesPrefix.For(source.Bytes()).For(target.Bytes())
+	return storage.EdgesPrefix.For(source.Bytes()).For(target.Bytes())
 }

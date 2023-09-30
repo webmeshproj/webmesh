@@ -52,7 +52,7 @@ func (s *Server) DeleteEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Em
 			return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put the given edge")
 		}
 	}
-	err := s.peers.RemoveEdge(ctx, edge.GetSource(), edge.GetTarget())
+	err := s.db.Peers().RemoveEdge(ctx, edge.GetSource(), edge.GetTarget())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

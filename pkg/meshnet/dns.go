@@ -29,7 +29,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 // DNSManager is an interface for managing DNS nameservers on the local system.
@@ -45,7 +44,7 @@ type DNSManager interface {
 
 type dnsManager struct {
 	wg             wireguard.Interface
-	storage        storage.MeshStorage
+	storage        storage.MeshDB
 	localdnsaddr   netip.AddrPort
 	dnsservers     []netip.AddrPort
 	noIPv4, noIPv6 bool
@@ -94,7 +93,7 @@ func (m *dnsManager) RefreshServers(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	context.LoggerFrom(ctx).Debug("Refreshing MeshDNS servers")
-	servers, err := peers.New(m.storage).ListByFeature(ctx, v1.Feature_MESH_DNS)
+	servers, err := m.storage.Peers().ListByFeature(ctx, v1.Feature_MESH_DNS)
 	if err != nil {
 		return fmt.Errorf("list peers with feature: %w", err)
 	}

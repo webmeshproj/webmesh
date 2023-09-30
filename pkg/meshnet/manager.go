@@ -36,7 +36,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 // Options are the options for the network manager.
@@ -128,7 +127,7 @@ type Manager interface {
 }
 
 // New creates a new network manager.
-func New(store storage.MeshStorage, opts Options) Manager {
+func New(store storage.MeshDB, opts Options) Manager {
 	m := &manager{
 		storage: store,
 		opts:    opts,
@@ -142,7 +141,7 @@ type manager struct {
 	key                  crypto.PrivateKey
 	peers                *peerManager
 	dns                  *dnsManager
-	storage              storage.MeshStorage
+	storage              storage.MeshDB
 	fw                   firewall.Firewall
 	wg                   wireguard.Interface
 	networkv4, networkv6 netip.Prefix
@@ -306,7 +305,7 @@ func (m *manager) Dial(ctx context.Context, network, address string) (net.Conn, 
 			}
 		} else {
 			// We gotta hit the database
-			peer, err := peers.New(m.storage).Get(ctx, host)
+			peer, err := m.storage.Peers().Get(ctx, host)
 			if err != nil {
 				return nil, fmt.Errorf("get peer: %w", err)
 			}

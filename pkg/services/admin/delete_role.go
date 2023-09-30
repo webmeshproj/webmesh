@@ -51,7 +51,7 @@ func (s *Server) DeleteRole(ctx context.Context, role *v1.Role) (*emptypb.Empty,
 	if storage.IsSystemRole(role.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "cannot delete system roles")
 	}
-	err := s.rbac.DeleteRole(ctx, role.GetName())
+	err := s.db.RBAC().DeleteRole(ctx, role.GetName())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

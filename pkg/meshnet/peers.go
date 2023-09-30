@@ -40,7 +40,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -365,7 +364,7 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 		defer func() {
 			// This is a hacky way to attempt to reconnect to the peer if
 			// the ICE connection is closed and they are still in the store.
-			wgpeers, err := peers.WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
+			wgpeers, err := WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
 			if err != nil {
 				log.Error("Error getting wireguard peers after p2p connection closed", slog.String("error", err.Error()))
 				return
@@ -430,7 +429,7 @@ func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPe
 		defer func() {
 			// This is a hacky way to attempt to reconnect to the peer if
 			// the ICE connection is closed and they are still in the store.
-			wgpeers, err := peers.WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
+			wgpeers, err := WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
 			if err != nil {
 				log.Error("Error getting wireguard peers after ICE connection closed", slog.String("error", err.Error()))
 				return
@@ -473,7 +472,7 @@ func (m *peerManager) getSignalingTransport(ctx context.Context, peer *v1.WireGu
 	} else {
 		// We'll use our local storage
 		log.Debug("We'll use our local storage for ICE negotiation lookup")
-		resolver = peers.New(m.net.storage).Resolver().FeatureResolver(func(mn types.MeshNode) bool {
+		resolver = m.net.storage.Peers().Resolver().FeatureResolver(func(mn types.MeshNode) bool {
 			return mn.GetId() != peer.GetNode().GetId()
 		})
 	}

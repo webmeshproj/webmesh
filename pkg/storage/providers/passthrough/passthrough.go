@@ -35,6 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
@@ -79,6 +80,10 @@ func NewProvider(opts Options) *Provider {
 
 func (p *Provider) MeshStorage() storage.MeshStorage {
 	return p.storage
+}
+
+func (p *Provider) MeshDB() storage.MeshDB {
+	return meshdb.New(p.storage)
 }
 
 func (p *Provider) Consensus() storage.Consensus {

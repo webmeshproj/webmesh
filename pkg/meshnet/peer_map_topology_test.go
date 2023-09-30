@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package peers
+package meshnet
 
 import (
-	"context"
 	"net/netip"
 	"reflect"
 	"sort"
@@ -25,7 +24,11 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 )
 
@@ -432,13 +435,13 @@ func TestWireGuardTopologies(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			db, err := badgerdb.NewInMemory(badgerdb.Options{})
+			memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
 			if err != nil {
 				t.Fatalf("create test db: %v", err)
 			}
-			defer db.Close()
-			peerdb := New(db)
-			nw := networking.New(db)
+			defer memdb.Close()
+			peerdb := peers.New(memdb)
+			nw := networking.New(memdb)
 			// Create an allow-all traffic policy.
 			err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
 				Name:             "allow-all",
@@ -474,7 +477,7 @@ func TestWireGuardTopologies(t *testing.T) {
 				}
 			}
 			for peer, want := range testCase.wantIPs {
-				peers, err := WireGuardPeersFor(ctx, db, peer)
+				peers, err := WireGuardPeersFor(ctx, meshdb.New(memdb), peer)
 				if err != nil {
 					t.Fatalf("get peers for %q: %v", peer, err)
 				}
@@ -493,4 +496,16 @@ func TestWireGuardTopologies(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustGeneratePublicKey(t *testing.T) string {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := key.PublicKey().Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
 }

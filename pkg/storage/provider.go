@@ -29,8 +29,12 @@ type Provider interface {
 	// that the provider may have allocated.
 	io.Closer
 
-	// MeshStorage returns the underlying MeshStorage instance. The provider does not
+	// MeshDB returns the underlying MeshDB instance. The provider does not
 	// need to guarantee consistency on read operations.
+	MeshDB() MeshDB
+	// MeshStorage returns the underlying raw MeshStorage instance. The provider does
+	// not need to guarantee consistency on read operations. This should only be used
+	// for arbitrary key/value storage that has not been abstracted behind the MeshDB.
 	MeshStorage() MeshStorage
 	// Consensus returns the underlying Consensus instance.
 	Consensus() Consensus

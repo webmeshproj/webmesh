@@ -30,7 +30,7 @@ func (s *Server) GetNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*v1.Net
 	if acl.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "acl name is required")
 	}
-	out, err := s.networking.GetNetworkACL(ctx, acl.GetName())
+	out, err := s.db.Networking().GetNetworkACL(ctx, acl.GetName())
 	if err != nil {
 		if errors.IsACLNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "network acl %q not found", acl.GetName())

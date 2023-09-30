@@ -34,27 +34,23 @@ import (
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/state"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	// Check if the mesh network is defined
 	s.log.Debug("Checking if cluster is already bootstrapped")
-	_, err := s.Storage().MeshStorage().GetValue(ctx, state.IPv6PrefixKey)
-	var firstBootstrap bool
+	var bootstrapped bool = true
+	_, err := s.Storage().MeshDB().MeshState().GetIPv6Prefix(ctx)
 	if err != nil {
 		if !errors.IsKeyNotFound(err) {
 			return fmt.Errorf("get mesh network: %w", err)
 		}
-		firstBootstrap = true
+		bootstrapped = false
 	}
 	// We will always attempt to rejoin as a voter
 	opts.RequestVote = true
-	if !firstBootstrap {
+	if bootstrapped {
 		// We have data, so the cluster is already bootstrapped.
 		s.log.Info("Cluster already bootstrapped, attempting to rejoin as voter")
 		return s.join(ctx, opts)
@@ -110,29 +106,33 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if err != nil {
 		return fmt.Errorf("generate ULA: %w", err)
 	}
-	s.log.Info("Newly bootstrapped cluster, setting IPv4/IPv6 networks",
-		slog.String("ipv4-network", opts.Bootstrap.IPv4Network),
-		slog.String("ipv6-network", meshnetworkv6.String()))
-	meshStorage := s.Storage().MeshStorage()
-	err = meshStorage.PutValue(ctx, state.IPv6PrefixKey, []byte(meshnetworkv6.String()), 0)
-	if err != nil {
-		return fmt.Errorf("set IPv6 prefix to db: %w", err)
-	}
-	err = meshStorage.PutValue(ctx, state.IPv4PrefixKey, []byte(meshnetworkv4.String()), 0)
-	if err != nil {
-		return fmt.Errorf("set IPv4 prefix to db: %w", err)
-	}
 	s.meshDomain = opts.Bootstrap.MeshDomain
 	if !strings.HasSuffix(s.meshDomain, ".") {
 		s.meshDomain += "."
 	}
-	err = meshStorage.PutValue(ctx, state.MeshDomainKey, []byte(s.meshDomain), 0)
+
+	s.log.Info("Newly bootstrapped cluster, setting IPv4/IPv6 networks and mesh domain",
+		slog.String("ipv4-network", opts.Bootstrap.IPv4Network),
+		slog.String("ipv6-network", meshnetworkv6.String()),
+		slog.String("mesh-domain", s.meshDomain),
+	)
+
+	meshDB := s.Storage().MeshDB()
+	err = meshDB.MeshState().SetIPv6Prefix(ctx, meshnetworkv6)
+	if err != nil {
+		return fmt.Errorf("set IPv6 prefix to db: %w", err)
+	}
+	err = meshDB.MeshState().SetIPv4Prefix(ctx, meshnetworkv4)
+	if err != nil {
+		return fmt.Errorf("set IPv4 prefix to db: %w", err)
+	}
+	err = meshDB.MeshState().SetMeshDomain(ctx, s.meshDomain)
 	if err != nil {
 		return fmt.Errorf("set mesh domain to db: %w", err)
 	}
 
 	// Initialize the RBAC system.
-	rb := rbac.New(meshStorage)
+	rb := meshDB.RBAC()
 
 	// Create an admin role and add the admin user/node to it.
 	err = rb.PutRole(ctx, &v1.Role{
@@ -230,13 +230,13 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	}
 
 	// Initialize the Networking system.
-	nw := networking.New(meshStorage)
+	nw := meshDB.Networking()
 
 	// Create a network ACL that ensures bootstrap servers and admins can continue to
 	// communicate with each other.
 	// TODO: This should be filtered to only apply to internal traffic.
 	err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
-		Name:             string(networking.BootstrapNodesNetworkACLName),
+		Name:             string(storage.BootstrapNodesNetworkACLName),
 		Priority:         math.MaxInt32,
 		SourceNodes:      []string{"group:" + string(storage.VotersGroup)},
 		DestinationNodes: []string{"group:" + string(storage.VotersGroup)},
@@ -285,7 +285,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// address. This is done by creating a new node in the database and then
 	// readding it to the cluster as a voter with the acquired address.
 	s.log.Info("Registering ourselves as a node in the cluster", slog.String("server-id", s.ID()))
-	p := peers.New(meshStorage)
+	p := meshDB.Peers()
 	encodedPubKey, err := s.key.PublicKey().Encode()
 	if err != nil {
 		return fmt.Errorf("encode public key: %w", err)

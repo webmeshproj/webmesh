@@ -37,7 +37,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 // DefaultMeshDomain is the default domain for the mesh network.
@@ -238,7 +237,7 @@ func (s *meshStore) Ready() <-chan struct{} {
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_, err = peers.New(s.Storage().MeshStorage()).Get(ctx, leader)
+			_, err = s.Storage().MeshDB().Peers().Get(ctx, leader)
 			cancel()
 			if err != nil {
 				s.log.Debug("waiting for leader", slog.String("leader", leader), slog.String("error", err.Error()))
@@ -301,7 +300,7 @@ func (s *meshStore) Credentials() []grpc.DialOption {
 }
 
 func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID string) (*grpc.ClientConn, error) {
-	node, err := peers.New(s.Storage().MeshStorage()).Get(ctx, nodeID)
+	node, err := s.Storage().MeshDB().Peers().Get(ctx, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("get node private rpc address: %w", err)
 	}

@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) ListRoutes(ctx context.Context, _ *emptypb.Empty) (*v1.Routes, error) {
-	routes, err := s.networking.ListRoutes(ctx)
+	routes, err := s.db.Networking().ListRoutes(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

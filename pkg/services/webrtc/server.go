@@ -23,7 +23,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // DefaultSTUNServers are the default STUN servers to use.
@@ -35,7 +34,6 @@ var DefaultSTUNServers = []string{
 type Server struct {
 	v1.UnimplementedWebRTCServer
 
-	store    storage.MeshStorage
 	wg       wireguard.Interface
 	rbacEval rbac.Evaluator
 	opts     Options
@@ -44,7 +42,6 @@ type Server struct {
 // Options are options for the WebRTC service.
 type Options struct {
 	ID          string
-	Storage     storage.MeshStorage
 	Wireguard   wireguard.Interface
 	NodeDialer  transport.NodeDialer
 	RBAC        rbac.Evaluator
@@ -57,7 +54,6 @@ func NewServer(opts Options) *Server {
 		opts.STUNServers = DefaultSTUNServers
 	}
 	return &Server{
-		store:    opts.Storage,
 		wg:       opts.Wireguard,
 		rbacEval: opts.RBAC,
 		opts:     opts,
