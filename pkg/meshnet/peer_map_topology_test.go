@@ -27,9 +27,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 )
 
 func TestWireGuardTopologies(t *testing.T) {
@@ -435,15 +432,13 @@ func TestWireGuardTopologies(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
+			db, err := meshdb.NewTestDB()
 			if err != nil {
-				t.Fatalf("create test db: %v", err)
+				t.Fatalf("new test db: %v", err)
 			}
-			defer memdb.Close()
-			peerdb := peers.New(memdb)
-			nw := networking.New(memdb)
+			defer db.Close()
 			// Create an allow-all traffic policy.
-			err = nw.PutNetworkACL(ctx, &v1.NetworkACL{
+			err = db.Networking().PutNetworkACL(ctx, &v1.NetworkACL{
 				Name:             "allow-all",
 				Action:           v1.ACLAction_ACTION_ACCEPT,
 				SourceNodes:      []string{"*"},
@@ -455,7 +450,7 @@ func TestWireGuardTopologies(t *testing.T) {
 				t.Fatalf("put network acl: %v", err)
 			}
 			for peerID, addrs := range testCase.peers {
-				err = peerdb.Put(ctx, &v1.MeshNode{
+				err = db.Peers().Put(ctx, &v1.MeshNode{
 					Id:          peerID,
 					PublicKey:   mustGeneratePublicKey(t),
 					PrivateIpv4: netip.MustParsePrefix(addrs[0]).String(),
@@ -467,7 +462,7 @@ func TestWireGuardTopologies(t *testing.T) {
 			}
 			for peerID, edges := range testCase.edges {
 				for _, edge := range edges {
-					err = peerdb.PutEdge(ctx, &v1.MeshEdge{
+					err = db.Peers().PutEdge(ctx, &v1.MeshEdge{
 						Source: peerID,
 						Target: edge,
 					})
@@ -477,7 +472,7 @@ func TestWireGuardTopologies(t *testing.T) {
 				}
 			}
 			for peer, want := range testCase.wantIPs {
-				peers, err := WireGuardPeersFor(ctx, meshdb.New(memdb), peer)
+				peers, err := WireGuardPeersFor(ctx, db, peer)
 				if err != nil {
 					t.Fatalf("get peers for %q: %v", peer, err)
 				}

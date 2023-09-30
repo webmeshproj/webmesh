@@ -22,8 +22,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 func TestPutEdge(t *testing.T) {
@@ -32,7 +30,7 @@ func TestPutEdge(t *testing.T) {
 	server := newTestServer(t)
 
 	// Pre register the nodes
-	p := peers.New(server.storage.MeshStorage())
+	p := server.storage.MeshDB().Peers()
 	for _, peer := range []string{"foo", "baz"} {
 		err := p.Put(context.Background(), &v1.MeshNode{
 			Id:        peer,

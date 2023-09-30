@@ -22,7 +22,6 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 func TestListEdges(t *testing.T) {
@@ -34,7 +33,8 @@ func TestListEdges(t *testing.T) {
 	// No empty condition
 
 	// Place a dummy peer
-	err := peers.New(server.storage.MeshStorage()).Put(ctx, &v1.MeshNode{
+	p := server.storage.MeshDB().Peers()
+	err := p.Put(ctx, &v1.MeshNode{
 		Id:        "foo",
 		PublicKey: newEncodedPubKey(t),
 	})
@@ -42,7 +42,7 @@ func TestListEdges(t *testing.T) {
 		t.Errorf("Put() error = %v", err)
 		return
 	}
-	err = peers.New(server.storage.MeshStorage()).Put(ctx, &v1.MeshNode{
+	err = p.Put(ctx, &v1.MeshNode{
 		Id:        "bar",
 		PublicKey: newEncodedPubKey(t),
 	})

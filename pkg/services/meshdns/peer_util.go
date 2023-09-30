@@ -23,12 +23,11 @@ import (
 	"github.com/miekg/dns"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *dns.Msg, peerID string, ipv6Only bool) error {
-	peer, err := peers.New(dom.storage.MeshStorage()).Get(ctx, peerID)
+	peer, err := dom.storage.MeshDB().Peers().Get(ctx, peerID)
 	if err != nil {
 		return err
 	}

@@ -49,7 +49,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -374,7 +373,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 			return nil, fmt.Errorf("cannot resolve self")
 		}
 		t.log.Debug("Resolving DNS6 address", "fqdn", fqdn, "nodeID", nodeID)
-		peer, err := peers.New(t.node.Storage().MeshStorage()).Get(ctx, nodeID)
+		peer, err := t.node.Storage().MeshDB().Peers().Get(ctx, nodeID)
 		if err != nil {
 			t.log.Error("Failed to get peer", "error", err.Error(), "nodeID", nodeID)
 			return nil, fmt.Errorf("failed to get peer: %w", err)
@@ -392,7 +391,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 			return nil, fmt.Errorf("cannot resolve self")
 		}
 		t.log.Debug("Resolving DNS4 address", "fqdn", fqdn, "nodeID", nodeID)
-		peer, err := peers.New(t.node.Storage().MeshStorage()).Get(ctx, nodeID)
+		peer, err := t.node.Storage().MeshDB().Peers().Get(ctx, nodeID)
 		if err != nil {
 			t.log.Error("Failed to get peer", "error", err.Error(), "nodeID", nodeID)
 			return nil, fmt.Errorf("failed to get peer: %w", err)
@@ -414,7 +413,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		t.log.Error("Failed to cast public key to wireguard public key", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to cast public key to wireguard public key")
 	}
-	peer, err := peers.New(t.node.Storage().MeshStorage()).GetByPubKey(ctx, wgkey)
+	peer, err := t.node.Storage().MeshDB().Peers().GetByPubKey(ctx, wgkey)
 	if err != nil {
 		t.log.Error("Failed to lookup peer by their public key", "error", err.Error(), "id", id)
 		return nil, fmt.Errorf("failed to get peer: %w", err)

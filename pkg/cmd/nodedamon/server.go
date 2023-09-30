@@ -36,7 +36,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -291,7 +290,7 @@ func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.Stat
 			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
 		}, nil
 	}
-	p, err := peers.New(app.mesh.Storage().MeshStorage()).Get(ctx, app.mesh.ID())
+	p, err := app.mesh.Storage().MeshDB().Peers().Get(ctx, app.mesh.ID())
 	if err != nil {
 		return nil, err
 	}

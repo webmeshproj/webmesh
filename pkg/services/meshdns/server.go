@@ -31,7 +31,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	dnsutil "github.com/webmeshproj/webmesh/pkg/meshnet/system/dns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 // DefaultAdvertisePort is the default port to advertise for Mesh DNS.
@@ -161,7 +160,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 	}
 	if opts.SubscribeForwarders {
 		cancel, err := dom.storage.MeshStorage().Subscribe(context.Background(), storage.NodesPrefix, func(_, _ []byte) {
-			peers, err := peers.New(dom.storage.MeshStorage()).ListByFeature(context.Background(), v1.Feature_FORWARD_MESH_DNS)
+			peers, err := dom.storage.MeshDB().Peers().ListByFeature(context.Background(), v1.Feature_FORWARD_MESH_DNS)
 			if err != nil {
 				s.log.Warn("failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
 				return

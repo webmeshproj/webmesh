@@ -25,10 +25,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 )
 
 func TestWireGuardPeersWithACLs(t *testing.T) {
@@ -181,22 +177,19 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			t.Parallel()
 			// Prepare the test database
 			ctx := context.Background()
-			memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
+			db, err := meshdb.NewTestDB()
 			if err != nil {
-				t.Fatalf("create test db: %v", err)
+				t.Fatalf("new test db: %v", err)
 			}
-			defer memdb.Close()
-			peerdb := peers.New(memdb)
-			rbacdb := rbac.New(memdb)
-			nwdb := networking.New(memdb)
+			defer db.Close()
 			for _, peer := range testCase.peers {
 				peer.PublicKey = mustGeneratePublicKey(t)
-				if err := peerdb.Put(ctx, peer); err != nil {
+				if err := db.Peers().Put(ctx, peer); err != nil {
 					t.Fatalf("create peer: %v", err)
 				}
 			}
 			for groupName, peers := range testCase.groups {
-				err := rbacdb.PutGroup(ctx, &v1.Group{
+				err := db.RBAC().PutGroup(ctx, &v1.Group{
 					Name: groupName,
 					Subjects: func() []*v1.Subject {
 						var out []*v1.Subject
@@ -215,7 +208,7 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			}
 			for peerID, edges := range testCase.edges {
 				for _, edge := range edges {
-					err = peerdb.PutEdge(ctx, &v1.MeshEdge{
+					err = db.Peers().PutEdge(ctx, &v1.MeshEdge{
 						Source: peerID,
 						Target: edge,
 					})
@@ -225,13 +218,13 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 				}
 			}
 			for _, acl := range testCase.acls {
-				if err := nwdb.PutNetworkACL(ctx, acl); err != nil {
+				if err := db.Networking().PutNetworkACL(ctx, acl); err != nil {
 					t.Fatalf("create network ACL: %v", err)
 				}
 			}
 			// Run the test cases
 			for peerID := range testCase.wantPeers {
-				peers, err := WireGuardPeersFor(ctx, meshdb.New(memdb), peerID)
+				peers, err := WireGuardPeersFor(ctx, db, peerID)
 				if err != nil {
 					t.Fatalf("get WireGuard peers for %q: %v", peerID, err)
 				}

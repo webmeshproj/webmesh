@@ -55,7 +55,6 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	peerID := req.GetId()
 	log := s.log.With("remote-peer", peerID)
 	ctx := stream.Context()
-	st := s.storage.MeshStorage()
 	db := s.storage.MeshDB()
 
 	log.Debug("Received subscribe peers request for peer", slog.String("peer", peerID))
@@ -69,12 +68,12 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		log.Debug("Checking for wireguard peers changes for remote peer")
 		notifymu.Lock()
 		defer notifymu.Unlock()
-		iceNegServers, err := listICEServers(ctx, st, peerID)
+		iceNegServers, err := listICEServers(ctx, db, peerID)
 		if err != nil {
 			log.Error("failed to get ice negotiation servers", "error", err.Error())
 			return
 		}
-		dnsServers, err := listDNSServers(ctx, st, peerID)
+		dnsServers, err := listDNSServers(ctx, db, peerID)
 		if err != nil {
 			log.Error("failed to get mdns servers", "error", err.Error())
 			return
@@ -108,12 +107,12 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 		}
 	}
 
-	nodeCancel, err := st.Subscribe(ctx, storage.NodesPrefix, notify)
+	nodeCancel, err := s.storage.MeshStorage().Subscribe(ctx, storage.NodesPrefix, notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to node changes: %v", err)
 	}
 	defer nodeCancel()
-	edgeCancel, err := st.Subscribe(ctx, storage.EdgesPrefix, notify)
+	edgeCancel, err := s.storage.MeshStorage().Subscribe(ctx, storage.EdgesPrefix, notify)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to subscribe to edge changes: %v", err)
 	}
@@ -131,9 +130,9 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	}
 }
 
-func listDNSServers(ctx context.Context, st storage.MeshStorage, peerID string) ([]string, error) {
+func listDNSServers(ctx context.Context, st storage.MeshDB, peerID string) ([]string, error) {
 	var servers []string
-	dnsServers, err := meshpeers.New(st).ListByFeature(ctx, v1.Feature_MESH_DNS)
+	dnsServers, err := st.Peers().ListByFeature(ctx, v1.Feature_MESH_DNS)
 	if err != nil {
 		return nil, err
 	}
@@ -152,9 +151,9 @@ func listDNSServers(ctx context.Context, st storage.MeshStorage, peerID string) 
 	return servers, nil
 }
 
-func listICEServers(ctx context.Context, st storage.MeshStorage, peerID string) ([]string, error) {
+func listICEServers(ctx context.Context, st storage.MeshDB, peerID string) ([]string, error) {
 	var servers []string
-	iceServers, err := meshpeers.New(st).ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
+	iceServers, err := st.Peers().ListByFeature(ctx, v1.Feature_ICE_NEGOTIATION)
 	if err != nil {
 		return nil, err
 	}

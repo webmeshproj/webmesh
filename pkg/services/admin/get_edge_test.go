@@ -23,7 +23,6 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 )
 
 func TestGetEdge(t *testing.T) {
@@ -33,7 +32,8 @@ func TestGetEdge(t *testing.T) {
 	server := newTestServer(t)
 
 	// Place a dummy peer
-	err := peers.New(server.storage.MeshStorage()).Put(ctx, &v1.MeshNode{
+	p := server.storage.MeshDB().Peers()
+	err := p.Put(ctx, &v1.MeshNode{
 		Id:        "foo",
 		PublicKey: newEncodedPubKey(t),
 	})
@@ -41,7 +41,7 @@ func TestGetEdge(t *testing.T) {
 		t.Errorf("Put() error = %v", err)
 		return
 	}
-	err = peers.New(server.storage.MeshStorage()).Put(ctx, &v1.MeshNode{
+	err = p.Put(ctx, &v1.MeshNode{
 		Id:        "bar",
 		PublicKey: newEncodedPubKey(t),
 	})

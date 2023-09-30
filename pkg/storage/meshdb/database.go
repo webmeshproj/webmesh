@@ -19,11 +19,15 @@ limitations under the License.
 package meshdb
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/state"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 )
 
 // New returns a new storage.Database instance using the given underlying MeshStorage.
@@ -34,6 +38,29 @@ func New(store storage.MeshStorage) storage.MeshDB {
 		meshState:  state.New(store),
 		networking: networking.New(store),
 	}
+}
+
+// MeshDBCloser is a storage.MeshDB that can be closed.
+type MeshDBCloser interface {
+	storage.MeshDB
+	io.Closer
+}
+
+// NewTestDB returns a new in-memory storage.Database instance for testing.
+func NewTestDB() (MeshDBCloser, error) {
+	memdb, err := badgerdb.NewInMemory(badgerdb.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("create in-memory database: %w", err)
+	}
+	return &databaseCloser{
+		MeshDB: New(memdb),
+		Closer: memdb,
+	}, nil
+}
+
+type databaseCloser struct {
+	storage.MeshDB
+	io.Closer
 }
 
 type database struct {
