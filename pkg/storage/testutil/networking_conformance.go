@@ -194,7 +194,6 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 				for _, tt := range tc {
 					testCase := tt
 					t.Run(tt.name, func(t *testing.T) {
-						t.Parallel()
 						err := nw.PutRoute(context.Background(), testCase.route.Route)
 						if err == nil {
 							t.Fatalf("expected error, got nil")
@@ -385,7 +384,6 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 		t.Run("GetPutACL", func(t *testing.T) {
 			nw := builder(t)
 			t.Run("ValidACLs", func(t *testing.T) {
-				t.Parallel()
 				tc := []struct {
 					name string
 					acl  *types.NetworkACL

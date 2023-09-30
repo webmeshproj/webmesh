@@ -103,7 +103,6 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 		}
 
 		t.Run("NonExistingNode", func(t *testing.T) {
-			t.Parallel()
 			_, err := peers.Get(ctx, "non-exist-node")
 			if err == nil {
 				t.Fatal("expected error")
