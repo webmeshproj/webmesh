@@ -110,13 +110,13 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 						}
 						// Make sure we can eventually get the node back.
 						var node types.MeshNode
+						var err error
 						ok := Eventually[error](func() error {
-							var err error
 							node, _, err = store.Vertex(testCase.node.NodeID())
 							return err
 						}).ShouldNotError(time.Second*15, time.Second)
 						if !ok {
-							t.Fatalf("Vertex failed: %v", node)
+							t.Fatalf("Vertex failed: %v", err)
 						}
 						if node.MeshNode == nil {
 							t.Errorf("Vertex is nil")
@@ -129,7 +129,6 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 							t.Fatalf("RemoveVertex failed: %v", err)
 						}
 						// The node should eventually be gone
-						var err error
 						ok = Eventually[error](func() error {
 							_, _, err = store.Vertex(testCase.node.NodeID())
 							return err
