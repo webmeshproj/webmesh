@@ -227,11 +227,9 @@ func (r *rbac) ListRoleBindings(ctx context.Context) ([]types.RoleBinding, error
 
 // PutGroup creates or updates a group.
 func (r *rbac) PutGroup(ctx context.Context, group types.Group) error {
-	if group.GetName() == "" {
-		return fmt.Errorf("group name cannot be empty")
-	}
-	if len(group.GetSubjects()) == 0 {
-		return fmt.Errorf("group subjects cannot be empty")
+	err := group.Validate()
+	if err != nil {
+		return fmt.Errorf("validate group: %w", err)
 	}
 	key := groupsPrefix.ForString(group.GetName())
 	data, err := group.MarshalProtoJSON()
