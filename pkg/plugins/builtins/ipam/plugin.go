@@ -50,6 +50,14 @@ type Plugin struct {
 	closec  chan struct{}
 }
 
+// NewWithStore returns a new ipam plugin with the given storage.
+func NewWithStore(db storage.MeshStorage) *Plugin {
+	return &Plugin{
+		data:   db,
+		closec: make(chan struct{}),
+	}
+}
+
 // Config contains static address assignments for nodes.
 type Config struct {
 	// StaticIPv4 is a map of node names to IPv4 addresses.
