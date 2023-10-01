@@ -33,11 +33,10 @@ type NewGraphStoreFunc func(t *testing.T) types.PeerGraphStore
 
 // TestPeerGraphstoreConformance tests that a PeerGraphStore implementation conforms to the interface.
 func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
-	store := builder(t)
-
 	t.Run("PeerGraphStoreConformance", func(t *testing.T) {
 		// We don't currently use vertex properties, but they may be used in the future.
 		t.Run("AddAndRemoveVerticies", func(t *testing.T) {
+			store := builder(t)
 			t.Run("InvalidVertex", func(t *testing.T) {
 				tc := []struct {
 					name string
@@ -262,6 +261,7 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 		})
 
 		t.Run("AddAndRemoveEdges", func(t *testing.T) {
+			store := builder(t)
 			nodes := []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
