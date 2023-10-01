@@ -19,6 +19,7 @@ package testutil
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/v1"
@@ -107,35 +108,34 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 						if err := store.AddVertex(testCase.node.NodeID(), testCase.node, graph.VertexProperties{}); err != nil {
 							t.Fatalf("AddVertex failed: %v", err)
 						}
-						node, _, err := store.Vertex(testCase.node.NodeID())
-						if err != nil {
-							t.Errorf("Vertex failed: %v", err)
+						// Make sure we can eventually get the node back.
+						var node types.MeshNode
+						ok := Eventually[error](func() error {
+							var err error
+							node, _, err = store.Vertex(testCase.node.NodeID())
+							return err
+						}).ShouldNotError(time.Second*15, time.Second)
+						if !ok {
+							t.Fatalf("Vertex failed: %v", node)
 						}
 						if node.MeshNode == nil {
 							t.Errorf("Vertex is nil")
 						}
-						expected, err := testCase.node.MarshalProtoJSON()
-						if err != nil {
-							t.Errorf("Failed to marshal node: %v", err)
-						}
-						actual, err := node.MarshalProtoJSON()
-						if err != nil {
-							t.Errorf("Failed to marshal node: %v", err)
-						}
-						if string(expected) != string(actual) {
-							t.Errorf("Expected node %s, got %s", expected, actual)
+						if !testCase.node.DeepEqual(node) {
+							t.Errorf("Expected node %v, got %v", testCase.node, node)
 						}
 						// Remove the node.
 						if err := store.RemoveVertex(testCase.node.NodeID()); err != nil {
 							t.Errorf("RemoveVertex failed: %v", err)
 						}
-						// Make sure the node is gone.
-						_, _, err = store.Vertex(testCase.node.NodeID())
-						if err == nil {
-							t.Errorf("Vertex did not fail")
-						}
-						if !errors.Is(err, graph.ErrVertexNotFound) {
-							t.Errorf("Expected ErrVertexNotFound, got %v", err)
+						// The node should eventually be gone
+						var err error
+						ok = Eventually[error](func() error {
+							_, _, err = store.Vertex(testCase.node.NodeID())
+							return err
+						}).ShouldErrorWith(time.Second*15, time.Second, graph.ErrVertexNotFound)
+						if !ok {
+							t.Error("Vertex did not return ErrVertexNotFound, got:", err)
 						}
 					})
 				}
@@ -161,13 +161,18 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 						t.Fatalf("AddVertex failed: %v", err)
 					}
 				}
-				// List all verticies
-				count, err := store.VertexCount()
-				if err != nil {
-					t.Errorf("VertexCount failed: %v", err)
-				}
-				if count != 2 {
-					t.Errorf("Expected 2 verticies, got %d", count)
+				// We should eventually have 2 verticies
+				var count int
+				ok := Eventually[int](func() int {
+					var err error
+					count, err = store.VertexCount()
+					if err != nil {
+						t.Errorf("VertexCount failed: %v", err)
+					}
+					return count
+				}).ShouldEqual(time.Second*15, time.Second, 2)
+				if !ok {
+					t.Fatalf("Expected 2 verticies, got %d", count)
 				}
 				vertexIDs, err := store.ListVertices()
 				if err != nil {
@@ -243,12 +248,13 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 					if err := store.RemoveVertex(types.NodeID(node)); err != nil {
 						t.Errorf("RemoveVertex failed: %v", err)
 					}
-					// The node should actually be gone
-					_, _, err := store.Vertex(types.NodeID(node))
-					if err == nil {
-						t.Errorf("Vertex did not fail")
-					}
-					if !errors.Is(err, graph.ErrVertexNotFound) {
+					// The node should eventually be gone
+					var err error
+					ok := Eventually[error](func() error {
+						_, _, err = store.Vertex(types.NodeID(node))
+						return err
+					}).ShouldErrorWith(time.Second*15, time.Second, graph.ErrVertexNotFound)
+					if !ok {
 						t.Errorf("Expected ErrVertexNotFound, got %v", err)
 					}
 				}
@@ -297,10 +303,15 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 			if err := store.AddEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[types.NodeID]{}); err != nil {
 				t.Fatalf("AddEdge failed: %v", err)
 			}
-			// We should be able to retrieve the edge
-			edge, err := store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
-			if err != nil {
-				t.Errorf("Edge failed: %v", err)
+			// We should eventually be able to retrieve the edge
+			var edge graph.Edge[types.NodeID]
+			ok := Eventually[error](func() error {
+				var err error
+				edge, err = store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
+				return err
+			}).ShouldNotError(time.Second*15, time.Second)
+			if !ok {
+				t.Fatalf("Edge failed: %v", edge)
 			}
 			// It should be empty
 			if len(edge.Properties.Attributes) != 0 {
@@ -343,29 +354,51 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 			}); err != nil {
 				t.Errorf("UpdateEdge failed: %v", err)
 			}
-			// We should get it back with our new properties
-			edge, err = store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
-			if err != nil {
-				t.Errorf("Edge failed: %v", err)
+			// We should eventually get it back with our new weight
+			var weight int
+			ok = Eventually[int](func() int {
+				var err error
+				edge, err = store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
+				if err != nil {
+					t.Errorf("Edge failed: %v", err)
+					return 0
+				}
+				weight = edge.Properties.Weight
+				return edge.Properties.Weight
+			}).ShouldEqual(time.Second*15, time.Second, 1)
+			if !ok {
+				t.Errorf("Expected weight 1, got %d", weight)
 			}
-			if edge.Properties.Weight != 1 {
-				t.Errorf("Expected weight 1, got %d", edge.Properties.Weight)
+			// We should eventually get it back with our new properties
+			var attributes map[string]string
+			ok = Eventually[error](func() error {
+				var err error
+				edge, err = store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
+				if err != nil {
+					t.Errorf("Edge failed: %v", err)
+					return nil
+				}
+				attributes = edge.Properties.Attributes
+				return err
+			}).ShouldNotError(time.Second*15, time.Second)
+			if !ok {
+				t.Errorf("Expected attributes %v, got %v", map[string]string{"foo": "bar"}, attributes)
 			}
-			if edge.Properties.Attributes["foo"] != "bar" {
-				t.Errorf("Expected attribute foo=bar, got %v", edge.Properties.Attributes)
+			// The attributes should be correct
+			if attributes["foo"] != "bar" {
+				t.Errorf("Expected attributes %v, got %v", map[string]string{"foo": "bar"}, attributes)
 			}
-
 			// We should be able to delete the edge
 			if err := store.RemoveEdge(nodes[0].NodeID(), nodes[1].NodeID()); err != nil {
 				t.Errorf("RemoveEdge failed: %v", err)
 			}
-			// We should not be able to retrieve the edge
-			_, err = store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
-			if err == nil {
-				t.Errorf("Edge did not fail")
-			}
-			if !errors.Is(err, graph.ErrEdgeNotFound) {
-				t.Errorf("Expected ErrEdgeNotFound, got %v", err)
+			// It should eventually be gone
+			ok = Eventually[error](func() error {
+				_, err = store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
+				return err
+			}).ShouldErrorWith(time.Second*15, time.Second, graph.ErrEdgeNotFound)
+			if !ok {
+				t.Error("Edge did not return ErrEdgeNotFound, got:", err)
 			}
 			// Further deletes should not fail
 			if err := store.RemoveEdge(nodes[0].NodeID(), nodes[1].NodeID()); err != nil {
