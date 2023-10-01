@@ -344,3 +344,25 @@ func (n MeshNode) PrivateTURNAddrV6() netip.AddrPort {
 	}
 	return netip.AddrPortFrom(addr.Addr(), turnport)
 }
+
+// WireGuardEndpoints returns all valid WireGuard endpoints as
+// netip.AddrPorts.
+func (n MeshNode) WireGuardEndpoints() []netip.AddrPort {
+	var endpoints []netip.AddrPort
+	for _, endpoint := range n.MeshNode.WireguardEndpoints {
+		addr, err := netip.ParseAddrPort(endpoint)
+		if err == nil {
+			endpoints = append(endpoints, addr)
+		}
+	}
+	return endpoints
+}
+
+// WireGuardPort returns the first wireguard port encountered
+// for this peer.
+func (n MeshNode) WireGuardPort() uint16 {
+	for _, endpoint := range n.WireGuardEndpoints() {
+		return endpoint.Port()
+	}
+	return 0
+}
