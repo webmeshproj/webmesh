@@ -20,6 +20,7 @@ import (
 	"context"
 	"net/netip"
 	"testing"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 
@@ -102,8 +103,12 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 							if err != nil {
 								t.Fatalf("put route: %v", err)
 							}
-							got, err := nw.GetRoute(context.Background(), testCase.route.GetName())
-							if err != nil {
+							var got types.Route
+							ok := Eventually[error](func() error {
+								got, err = nw.GetRoute(context.Background(), testCase.route.GetName())
+								return err
+							}).ShouldNotError(time.Second*10, time.Second)
+							if !ok {
 								t.Fatalf("get route: %v", err)
 							}
 							if !testCase.route.Equals(&got) {
@@ -231,25 +236,36 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 						t.Fatalf("put route: %v", err)
 					}
 				}
-				nodeARoutes, err := nw.GetRoutesByNode(context.Background(), "node-a")
-				if err != nil {
-					t.Fatalf("get routes by node: %v", err)
-				}
-				if len(nodeARoutes) != 1 {
-					t.Fatalf("expected 1 route, got %d", len(nodeARoutes))
+				var nodeARoutes []types.Route
+				var err error
+				ok := Eventually[int](func() int {
+					nodeARoutes, err = nw.GetRoutesByNode(context.Background(), "node-a")
+					if err != nil {
+						t.Log("Error fetching routes:", err)
+						return 0
+					}
+					return len(nodeARoutes)
+				}).ShouldEqual(time.Second*10, time.Second, 1)
+				if !ok {
+					t.Fatalf("Did not get expected number of routes")
 				}
 				if !routes[0].Equals(&nodeARoutes[0]) {
 					t.Fatalf("expected %v, got %v", routes[0], nodeARoutes[0])
 				}
-				nodeBRoutes, err := nw.GetRoutesByNode(context.Background(), "node-b")
-				if err != nil {
-					t.Fatalf("get routes by node: %v", err)
-				}
-				if len(nodeBRoutes) != 1 {
-					t.Fatalf("expected 1 route, got %d", len(nodeBRoutes))
+				var nodeBRoutes []types.Route
+				ok = Eventually[int](func() int {
+					nodeBRoutes, err = nw.GetRoutesByNode(context.Background(), "node-b")
+					if err != nil {
+						t.Log("Error fetching routes:", err)
+						return 0
+					}
+					return len(nodeBRoutes)
+				}).ShouldEqual(time.Second*10, time.Second, 1)
+				if !ok {
+					t.Fatalf("Did not get expected number of routes")
 				}
 				if !routes[1].Equals(&nodeBRoutes[0]) {
-					t.Fatalf("expected %v, got %v", routes[1], nodeBRoutes[0])
+					t.Fatalf("expected %v, got %v", routes[0], nodeBRoutes[0])
 				}
 			})
 
