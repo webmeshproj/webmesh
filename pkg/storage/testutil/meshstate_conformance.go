@@ -34,9 +34,9 @@ func TestMeshStateStorageConformance(t *testing.T, builder NewMeshStateFunc) {
 	ctx := context.Background()
 
 	t.Run("MeshStateConformance", func(t *testing.T) {
+		st := builder(t)
 
 		t.Run("GetSetIPv6Prefix", func(t *testing.T) {
-			st := builder(t)
 			// There should be no prefix set.
 			_, err := st.GetIPv6Prefix(ctx)
 			if err == nil {
@@ -56,16 +56,17 @@ func TestMeshStateStorageConformance(t *testing.T, builder NewMeshStateFunc) {
 				got, err = st.GetIPv6Prefix(ctx)
 				if err != nil {
 					t.Logf("failed to get prefix: %v", err)
+				} else {
+					t.Logf("got prefix: %s", got)
 				}
 				return got
 			}).ShouldEqual(time.Second*15, time.Second, prefix)
 			if !ok {
-				t.Fatalf("failed to get same prefix back: %v", err)
+				t.Fatalf("failed to get same prefix back")
 			}
 		})
 
 		t.Run("GetSetIPv4Prefix", func(t *testing.T) {
-			st := builder(t)
 			// There should be no prefix set.
 			_, err := st.GetIPv4Prefix(ctx)
 			if err == nil {
@@ -85,16 +86,17 @@ func TestMeshStateStorageConformance(t *testing.T, builder NewMeshStateFunc) {
 				got, err = st.GetIPv4Prefix(ctx)
 				if err != nil {
 					t.Logf("failed to get prefix: %v", err)
+				} else {
+					t.Logf("got prefix: %s", got)
 				}
 				return got
 			}).ShouldEqual(time.Second*15, time.Second, prefix)
 			if !ok {
-				t.Fatalf("failed to get same prefix back: %v", err)
+				t.Fatalf("failed to get same prefix back")
 			}
 		})
 
 		t.Run("GetSetMeshDomain", func(t *testing.T) {
-			st := builder(t)
 			// There should be no domain set.
 			_, err := st.GetMeshDomain(ctx)
 			if err == nil {
@@ -113,12 +115,14 @@ func TestMeshStateStorageConformance(t *testing.T, builder NewMeshStateFunc) {
 				var got string
 				got, err = st.GetMeshDomain(ctx)
 				if err != nil {
-					t.Logf("failed to get prefix: %v", err)
+					t.Logf("failed to get domain: %v", err)
+				} else {
+					t.Logf("got domain: %s", got)
 				}
 				return got
 			}).ShouldEqual(time.Second*15, time.Second, domain)
 			if !ok {
-				t.Fatalf("failed to get same domain back: %v", err)
+				t.Fatalf("failed to get same domain back")
 			}
 		})
 	})
