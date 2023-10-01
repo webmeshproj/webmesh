@@ -40,24 +40,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
-// DefaultMeshDomain is the default domain for the mesh network.
-const DefaultMeshDomain = "webmesh.internal"
-
-// DefaultIPv4Network is the default IPv4 network for the mesh.
-const DefaultIPv4Network = "172.16.0.0/12"
-
-// DefaultNetworkPolicy is the default network policy for the mesh.
-const DefaultNetworkPolicy = "accept"
-
-// DefaultBootstrapListenAddress is the default listen address for the bootstrap transport.
-const DefaultBootstrapListenAddress = "[::]:9001"
-
-// DefaultBootstrapPort is the default port for the bootstrap transport.
-const DefaultBootstrapPort = 9001
-
-// DefaultMeshAdmin is the default mesh admin node ID.
-const DefaultMeshAdmin = "admin"
-
 var (
 	// ErrNotOpen is returned when attempting to close a store that is not open.
 	ErrNotOpen = fmt.Errorf("not open")

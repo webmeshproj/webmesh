@@ -32,6 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // BootstrapOptions are options for bootstrapping a new mesh.
@@ -95,11 +96,11 @@ func NewBootstrapOptions() BootstrapOptions {
 		Enabled:              false,
 		ElectionTimeout:      time.Second * 3,
 		Transport:            NewBootstrapTransportOptions(),
-		IPv4Network:          meshnode.DefaultIPv4Network,
-		MeshDomain:           meshnode.DefaultMeshDomain,
-		Admin:                meshnode.DefaultMeshAdmin,
+		IPv4Network:          storage.DefaultIPv4Network,
+		MeshDomain:           storage.DefaultMeshDomain,
+		Admin:                storage.DefaultMeshAdmin,
 		Voters:               nil,
-		DefaultNetworkPolicy: meshnode.DefaultNetworkPolicy,
+		DefaultNetworkPolicy: storage.DefaultNetworkPolicy,
 		DisableRBAC:          false,
 		Force:                false,
 	}
@@ -108,8 +109,8 @@ func NewBootstrapOptions() BootstrapOptions {
 // NewBootstrapTransportOptions returns a new BootstrapTransportOptions with the default values.
 func NewBootstrapTransportOptions() BootstrapTransportOptions {
 	return BootstrapTransportOptions{
-		TCPAdvertiseAddress: net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", meshnode.DefaultBootstrapPort)),
-		TCPListenAddress:    meshnode.DefaultBootstrapListenAddress,
+		TCPAdvertiseAddress: net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", storage.DefaultBootstrapPort)),
+		TCPListenAddress:    storage.DefaultBootstrapListenAddress,
 		TCPConnectTimeout:   3 * time.Second,
 		RendezvousLinger:    30 * time.Second,
 	}
@@ -119,11 +120,11 @@ func NewBootstrapTransportOptions() BootstrapTransportOptions {
 func (o *BootstrapOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, prefix+"bootstrap.enabled", false, "Attempt to bootstrap a new cluster")
 	fs.DurationVar(&o.ElectionTimeout, prefix+"bootstrap.election-timeout", time.Second*3, "Election timeout to use when bootstrapping a new cluster")
-	fs.StringVar(&o.IPv4Network, prefix+"bootstrap.ipv4-network", meshnode.DefaultIPv4Network, "IPv4 network of the mesh to write to the database when bootstraping a new cluster")
-	fs.StringVar(&o.MeshDomain, prefix+"bootstrap.mesh-domain", meshnode.DefaultMeshDomain, "Domain of the mesh to write to the database when bootstraping a new cluster")
-	fs.StringVar(&o.Admin, prefix+"bootstrap.admin", meshnode.DefaultMeshAdmin, "User and/or node name to assign administrator privileges to when bootstraping a new cluster")
+	fs.StringVar(&o.IPv4Network, prefix+"bootstrap.ipv4-network", storage.DefaultIPv4Network, "IPv4 network of the mesh to write to the database when bootstraping a new cluster")
+	fs.StringVar(&o.MeshDomain, prefix+"bootstrap.mesh-domain", storage.DefaultMeshDomain, "Domain of the mesh to write to the database when bootstraping a new cluster")
+	fs.StringVar(&o.Admin, prefix+"bootstrap.admin", storage.DefaultMeshAdmin, "User and/or node name to assign administrator privileges to when bootstraping a new cluster")
 	fs.StringSliceVar(&o.Voters, prefix+"bootstrap.voters", nil, "Comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster")
-	fs.StringVar(&o.DefaultNetworkPolicy, prefix+"bootstrap.default-network-policy", meshnode.DefaultNetworkPolicy, "Default network policy to apply to the mesh when bootstraping a new cluster")
+	fs.StringVar(&o.DefaultNetworkPolicy, prefix+"bootstrap.default-network-policy", storage.DefaultNetworkPolicy, "Default network policy to apply to the mesh when bootstraping a new cluster")
 	fs.BoolVar(&o.DisableRBAC, prefix+"bootstrap.disable-rbac", false, "Disable RBAC when bootstrapping a new cluster")
 	fs.BoolVar(&o.Force, prefix+"bootstrap.force", false, "Force new bootstrap")
 	o.Transport.BindFlags(prefix, fs)
@@ -132,7 +133,7 @@ func (o *BootstrapOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 // BindFlags binds the bootstrap transport options to a flag set.
 func (o *BootstrapTransportOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.TCPAdvertiseAddress, prefix+"bootstrap.transport.tcp-advertise-address", "", "Address to advertise for raft consensus")
-	fs.StringVar(&o.TCPListenAddress, prefix+"bootstrap.transport.tcp-listen-address", meshnode.DefaultBootstrapListenAddress, "Address to use when using TCP raft consensus to bootstrap")
+	fs.StringVar(&o.TCPListenAddress, prefix+"bootstrap.transport.tcp-listen-address", storage.DefaultBootstrapListenAddress, "Address to use when using TCP raft consensus to bootstrap")
 	fs.IntVar(&o.TCPConnectionPool, prefix+"bootstrap.transport.tcp-connection-pool", 0, "Maximum number of TCP connections to maintain to other nodes")
 	fs.DurationVar(&o.TCPConnectTimeout, prefix+"bootstrap.transport.tcp-connect-timeout", time.Second*3, "Maximum amount of time to wait for a TCP connection to be established")
 	fs.StringToStringVar(&o.TCPServers, prefix+"bootstrap.transport.tcp-servers", nil, "Map of node IDs to raft addresses to bootstrap with")
