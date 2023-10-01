@@ -79,6 +79,8 @@ type Node interface {
 
 	// ID returns the node ID.
 	ID() types.NodeID
+	// Started returns true if the mesh is started.
+	Started() bool
 	// Domain returns the domain of the mesh network.
 	Domain() string
 	// Key returns the private key used for WireGuard and libp2p connections.
@@ -190,6 +192,11 @@ type meshStore struct {
 // ID returns the node ID.
 func (s *meshStore) ID() types.NodeID {
 	return types.NodeID(s.nodeID)
+}
+
+// Started returns true if the mesh is started.
+func (s *meshStore) Started() bool {
+	return s.open.Load()
 }
 
 // Key returns the private key used for WireGuard and libp2p connections.

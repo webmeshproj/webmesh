@@ -117,7 +117,6 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	}
 	s.storage = opts.StorageProvider
 	log := s.log
-
 	log.Debug("Connecting to mesh network", slog.Any("options", opts))
 
 	// If our key is still nil, generate an ephemeral key.
@@ -156,8 +155,6 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	opts.NetworkOptions.NodeID = s.ID()
 	opts.NetworkOptions.StoragePort = int(s.storage.ListenPort())
 	s.nw = meshnet.New(s.Storage().MeshDB(), opts.NetworkOptions)
-	// At this point we are open for business.
-	s.open.Store(true)
 	if opts.Bootstrap != nil {
 		// Attempt bootstrap.
 		if err = s.bootstrap(ctx, opts); err != nil {
@@ -177,6 +174,8 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 			return fmt.Errorf("recover wireguard: %w", err)
 		}
 	}
+	// At this point we are open for business.
+	s.open.Store(true)
 	if s.testStore {
 		return nil
 	}
