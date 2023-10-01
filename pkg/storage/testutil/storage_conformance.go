@@ -36,8 +36,12 @@ import (
 
 // TestDualStorageConformance tests that the DualStorage interface is implemented correctly.
 func TestDualStorageConformance(ctx context.Context, t *testing.T, dualStorage storage.DualStorage) {
-	TestConsensusStorageConformance(ctx, t, dualStorage)
-	TestMeshStorageConformance(ctx, t, dualStorage)
+	t.Run("ConsensusStorage", func(t *testing.T) {
+		TestConsensusStorageConformance(ctx, t, dualStorage)
+	})
+	t.Run("MeshStorage", func(t *testing.T) {
+		TestMeshStorageConformance(ctx, t, dualStorage)
+	})
 }
 
 // TestConsensusStorageConformance tests that the ConsensusStorage interface is implemented correctly.
