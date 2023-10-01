@@ -35,6 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/peers"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -46,6 +47,7 @@ type Plugin struct {
 
 	config  Config
 	data    storage.MeshStorage
+	db      storage.MeshDB
 	datamux sync.Mutex
 	closec  chan struct{}
 }
@@ -54,6 +56,14 @@ type Plugin struct {
 func NewWithStore(db storage.MeshStorage) *Plugin {
 	return &Plugin{
 		data:   db,
+		closec: make(chan struct{}),
+	}
+}
+
+// NewWithDB returns a new ipam plugin with the given database.
+func NewWithDB(db storage.MeshDB) *Plugin {
+	return &Plugin{
+		db:     db,
 		closec: make(chan struct{}),
 	}
 }
@@ -172,7 +182,7 @@ func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty,
 func (p *Plugin) Allocate(ctx context.Context, r *v1.AllocateIPRequest) (*v1.AllocatedIP, error) {
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
-	if p.data == nil {
+	if p.data == nil || p.db == nil {
 		// Safeguard to make sure we don't get called before the query stream
 		// is opened.
 		return nil, fmt.Errorf("plugin not configured")
@@ -190,7 +200,14 @@ func (p *Plugin) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.A
 	if err != nil {
 		return nil, fmt.Errorf("parse subnet: %w", err)
 	}
-	nodes, err := peers.New(p.data).List(ctx)
+	var nodes []types.MeshNode
+	if p.db != nil {
+		// Use the database
+		nodes, err = p.db.Peers().List(ctx)
+	} else {
+		// Use native key/val store
+		nodes, err = peers.New(p.data).List(ctx)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
