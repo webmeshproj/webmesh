@@ -38,7 +38,17 @@ type DetectOpts struct {
 	SkipInterfaces []string
 }
 
+// PrefixList wraps a list of network prefixes with added functionality.
 type PrefixList []netip.Prefix
+
+func (a PrefixList) FirstPublicAddr() netip.Addr {
+	for _, prefix := range a {
+		if !prefix.Addr().IsPrivate() {
+			return prefix.Addr()
+		}
+	}
+	return netip.Addr{}
+}
 
 func (a PrefixList) Contains(addr netip.Addr) bool {
 	for _, prefix := range a {
