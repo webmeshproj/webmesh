@@ -80,23 +80,23 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 					node types.MeshNode
 				}{
 					{
-						name: "node-a",
+						name: "valid-node-a",
 						node: types.MeshNode{MeshNode: &v1.MeshNode{
-							Id:        "node-a",
+							Id:        "valid-node-a",
 							PublicKey: mustGeneratePublicKey(t),
 						}},
 					},
 					{
-						name: "node-b",
+						name: "valid-node-b",
 						node: types.MeshNode{MeshNode: &v1.MeshNode{
-							Id:        "node-b",
+							Id:        "valid-node-b",
 							PublicKey: mustGeneratePublicKey(t),
 						}},
 					},
 					{
-						name: "node-c",
+						name: "valid-node-c",
 						node: types.MeshNode{MeshNode: &v1.MeshNode{
-							Id:        "node-c",
+							Id:        "valid-node-c",
 							PublicKey: mustGeneratePublicKey(t),
 						}},
 					},
@@ -126,7 +126,7 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 						}
 						// Remove the node.
 						if err := store.RemoveVertex(testCase.node.NodeID()); err != nil {
-							t.Errorf("RemoveVertex failed: %v", err)
+							t.Fatalf("RemoveVertex failed: %v", err)
 						}
 						// The node should eventually be gone
 						var err error
@@ -145,13 +145,13 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 				nodes := []types.MeshNode{
 					{
 						MeshNode: &v1.MeshNode{
-							Id:        "node-a",
+							Id:        "list-node-a",
 							PublicKey: mustGeneratePublicKey(t),
 						},
 					},
 					{
 						MeshNode: &v1.MeshNode{
-							Id:        "node-b",
+							Id:        "list-node-b",
 							PublicKey: mustGeneratePublicKey(t),
 						},
 					},
@@ -210,13 +210,13 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 				nodes := []types.MeshNode{
 					{
 						MeshNode: &v1.MeshNode{
-							Id:        "node-a",
+							Id:        "linked-node-a",
 							PublicKey: mustGeneratePublicKey(t),
 						},
 					},
 					{
 						MeshNode: &v1.MeshNode{
-							Id:        "node-b",
+							Id:        "linked-node-b",
 							PublicKey: mustGeneratePublicKey(t),
 						},
 					},
@@ -230,7 +230,7 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 					t.Fatalf("AddEdge failed: %v", err)
 				}
 				// We should not be able to delete either node
-				for _, node := range []string{"node-a", "node-b"} {
+				for _, node := range []string{"linked-node-a", "linked-node-b"} {
 					err := store.RemoveVertex(types.NodeID(node))
 					if err == nil {
 						t.Errorf("RemoveVertex did not fail")
@@ -244,7 +244,7 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 					t.Errorf("RemoveEdge failed: %v", err)
 				}
 				// We should now be able to delete both nodes
-				for _, node := range []string{"node-a", "node-b"} {
+				for _, node := range []string{"linked-node-a", "linked-node-b"} {
 					if err := store.RemoveVertex(types.NodeID(node)); err != nil {
 						t.Errorf("RemoveVertex failed: %v", err)
 					}
@@ -265,13 +265,13 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 			nodes := []types.MeshNode{
 				{
 					MeshNode: &v1.MeshNode{
-						Id:        "node-a",
+						Id:        "edge-node-a",
 						PublicKey: mustGeneratePublicKey(t),
 					},
 				},
 				{
 					MeshNode: &v1.MeshNode{
-						Id:        "node-b",
+						Id:        "edge-node-b",
 						PublicKey: mustGeneratePublicKey(t),
 					},
 				},
