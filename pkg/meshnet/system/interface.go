@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/netip"
 	"runtime"
 	"strings"
@@ -203,4 +204,22 @@ func (l *sysInterface) AddRoute(ctx context.Context, network netip.Prefix) error
 // RemoveRoute removes the route for the given network.
 func (l *sysInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
 	return routes.Remove(ctx, l.opts.Name, network)
+}
+
+// Interface attempts to return the underling net.Interface.
+func (l *sysInterface) Interface() (*net.Interface, error) {
+	link, err := net.InterfaceByName(l.opts.Name)
+	if err != nil {
+		return nil, fmt.Errorf("get interface by name: %w", err)
+	}
+	return link, nil
+}
+
+// HardwareAddr attempts to return the hardware address of the interface.
+func (l *sysInterface) HardwareAddr() (net.HardwareAddr, error) {
+	link, err := l.Interface()
+	if err != nil {
+		return nil, fmt.Errorf("get interface by name: %w", err)
+	}
+	return link.HardwareAddr, nil
 }
