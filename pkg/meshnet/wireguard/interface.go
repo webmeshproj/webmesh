@@ -137,6 +137,9 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	if opts.Name == "" {
 		opts.Name = DefaultInterfaceName
 	}
+	if opts.MTU <= 0 {
+		opts.MTU = system.DefaultMTU
+	}
 	if opts.ForceName {
 		if !strings.HasSuffix(opts.Name, "+") {
 			log.Warn("Forcing wireguard interface name", "name", opts.Name)
