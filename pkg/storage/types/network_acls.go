@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 const (
@@ -25,7 +24,7 @@ func ValidateACL(acl NetworkACL) error {
 	if acl.GetName() == "" {
 		return errors.New("acl name is required")
 	}
-	if !storageutil.IsValidID(acl.GetName()) {
+	if !IsValidID(acl.GetName()) {
 		return errors.New("acl name must be a valid ID")
 	}
 	if _, ok := v1.ACLAction_name[int32(acl.GetAction())]; !ok {
@@ -36,7 +35,7 @@ func ValidateACL(acl NetworkACL) error {
 			continue
 		}
 		node = strings.TrimPrefix(node, GroupReference)
-		if !storageutil.IsValidID(node) {
+		if !IsValidID(node) {
 			return fmt.Errorf("invalid source node: %s", node)
 		}
 	}

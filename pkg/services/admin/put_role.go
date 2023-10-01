@@ -26,7 +26,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -44,7 +43,7 @@ func (s *Server) PutRole(ctx context.Context, role *v1.Role) (*emptypb.Empty, er
 	if role.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
-	if !storageutil.IsValidID(role.GetName()) {
+	if !types.IsValidID(role.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "role name must be a valid ID")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRoleAction.For(role.GetName())); !ok {

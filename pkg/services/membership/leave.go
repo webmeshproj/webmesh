@@ -26,7 +26,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -39,7 +38,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
-	if !storageutil.IsValidNodeID(req.GetId()) {
+	if !types.IsValidNodeID(req.GetId()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid node id")
 	}
 	if !s.storage.Consensus().IsLeader() {

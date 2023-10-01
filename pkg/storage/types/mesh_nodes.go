@@ -20,10 +20,43 @@ import (
 	"net/netip"
 	"slices"
 	"sort"
+	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
+
+// InvalidIDChars are the characters that are not allowed in node IDs.
+var InvalidIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', ','}
+
+// ReservedNodeIDs are reserved node IDs.
+var ReservedNodeIDs = []string{"self", "local", "localhost", "leader", "voters", "observers"}
+
+// IsValidID returns true if the given identifier is valid and safe to be saved to storage.
+func IsValidID(id string) bool {
+	// Make sure non-empty and all characters are valid UTF-8.
+	if len(id) == 0 {
+		return false
+	}
+	// Make sure all characters are valid UTF-8.
+	if validated := strings.ToValidUTF8(id, "/"); validated != id {
+		return false
+	}
+	for _, c := range InvalidIDChars {
+		if strings.ContainsRune(id, c) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsValidNodeID returns true if the given node ID is valid and safe to be saved to storage.
+func IsValidNodeID(id string) bool {
+	if !IsValidID(id) {
+		return false
+	}
+	return !slices.Contains(ReservedNodeIDs, id)
+}
 
 // NodeID is the type of a node ID.
 type NodeID string
@@ -36,6 +69,11 @@ func (id NodeID) Bytes() []byte { return []byte(id) }
 
 // IsEmpty returns true if the node ID is empty.
 func (id NodeID) IsEmpty() bool { return id == "" }
+
+// IsValid returns true if the node ID is valid.
+func (id NodeID) IsValid() bool {
+	return !id.IsEmpty() && IsValidNodeID(id.String())
+}
 
 // MeshNode wraps a mesh node.
 type MeshNode struct {

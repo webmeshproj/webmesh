@@ -25,7 +25,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -43,7 +42,7 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 	if group.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name is required")
 	}
-	if !storageutil.IsValidID(group.GetName()) {
+	if !types.IsValidID(group.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "group name must be a valid ID")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putGroupAction.For(group.GetName())); !ok {
@@ -65,7 +64,7 @@ func (s *Server) PutGroup(ctx context.Context, group *v1.Group) (*emptypb.Empty,
 			return nil, status.Error(codes.InvalidArgument, "subject type must be one of: USER, NODE, ALL")
 		}
 		// Make sure the subject name is a valid node ID
-		if !storageutil.IsValidNodeID(subject.GetName()) {
+		if !types.IsValidNodeID(subject.GetName()) {
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}

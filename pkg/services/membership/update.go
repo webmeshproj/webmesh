@@ -30,7 +30,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -58,7 +57,7 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	// Validate inputs
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node id required")
-	} else if !storageutil.IsValidNodeID(req.GetId()) {
+	} else if !types.IsValidNodeID(req.GetId()) {
 		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if len(req.GetRoutes()) > 0 {

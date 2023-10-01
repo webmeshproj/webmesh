@@ -25,7 +25,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -43,7 +42,7 @@ func (s *Server) PutNetworkACL(ctx context.Context, acl *v1.NetworkACL) (*emptyp
 	if acl.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "acl name is required")
 	}
-	if !storageutil.IsValidID(acl.GetName()) {
+	if !types.IsValidID(acl.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "acl name must be a valid ID")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putNetworkACLAction.For(acl.GetName())); !ok {

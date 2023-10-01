@@ -25,7 +25,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -47,7 +46,7 @@ func (s *Server) DeleteEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Em
 		return nil, status.Error(codes.InvalidArgument, "edge target is required")
 	}
 	for _, id := range []string{edge.GetSource(), edge.GetTarget()} {
-		if !storageutil.IsValidNodeID(id) {
+		if !types.IsValidNodeID(id) {
 			return nil, status.Error(codes.InvalidArgument, "invalid node id")
 		}
 		if ok, err := s.rbacEval.Evaluate(ctx, deleteEdgeAction.For(id)); !ok {

@@ -29,7 +29,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -42,7 +41,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	// Validate inputs
 	if req.GetId() == "" {
 		return status.Error(codes.InvalidArgument, "node id required")
-	} else if !storageutil.IsValidNodeID(req.GetId()) {
+	} else if !types.IsValidNodeID(req.GetId()) {
 		return status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if s.rbac.IsSecure() {

@@ -79,7 +79,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	// Validate inputs
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "node id required")
-	} else if !storageutil.IsValidNodeID(req.GetId()) {
+	} else if !types.IsValidNodeID(req.GetId()) {
 		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
 	}
 	if len(req.GetRoutes()) > 0 {
@@ -278,7 +278,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Put an edge between the caller and all direct peers
 		for peer, proto := range req.GetDirectPeers() {
 			// Check if the peer exists
-			if !storageutil.IsValidNodeID(peer) {
+			if !types.IsValidNodeID(peer) {
 				return nil, handleErr(status.Errorf(codes.InvalidArgument, "invalid peer id %q", peer))
 			}
 			_, err := p.Get(ctx, types.NodeID(peer))

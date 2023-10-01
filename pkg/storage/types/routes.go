@@ -24,8 +24,6 @@ import (
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
-
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 // ToPrefixes converts a list of CIDRs to a list of Prefixes.
@@ -60,14 +58,14 @@ func ValidateRoute(route Route) error {
 	if len(route.GetDestinationCIDRs()) == 0 {
 		return errors.New("route destination CIDRs are required")
 	}
-	if !storageutil.IsValidID(route.GetName()) {
+	if !IsValidID(route.GetName()) {
 		return errors.New("route name must be a valid ID")
 	}
-	if !storageutil.IsValidID(route.GetNode()) {
+	if !IsValidID(route.GetNode()) {
 		return errors.New("route node must be a valid ID")
 	}
 	if route.GetNextHopNode() != "" {
-		if !storageutil.IsValidID(route.GetNextHopNode()) {
+		if !IsValidID(route.GetNextHopNode()) {
 			return errors.New("route next hop node must be a valid ID")
 		}
 	}

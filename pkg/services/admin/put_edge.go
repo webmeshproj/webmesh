@@ -25,7 +25,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -53,7 +52,7 @@ func (s *Server) PutEdge(ctx context.Context, edge *v1.MeshEdge) (*emptypb.Empty
 			}
 			return nil, status.Error(codes.PermissionDenied, "caller does not have permission to put the given edge")
 		}
-		if !storageutil.IsValidNodeID(id) {
+		if !types.IsValidNodeID(id) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid node ID: %s", id)
 		}
 	}

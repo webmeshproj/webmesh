@@ -28,7 +28,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -53,7 +52,7 @@ func (g *GraphStore) AddVertex(nodeID types.NodeID, node types.MeshNode, props g
 	if nodeID.IsEmpty() {
 		return errors.ErrEmptyNodeID
 	}
-	if !storageutil.IsValidNodeID(nodeID.String()) {
+	if !nodeID.IsValid() {
 		return fmt.Errorf("%w: %s", errors.ErrInvalidNodeID, nodeID)
 	}
 	if node.PublicKey != "" {
@@ -84,7 +83,7 @@ func (g *GraphStore) Vertex(nodeID types.NodeID) (node types.MeshNode, props gra
 		err = errors.ErrEmptyNodeID
 		return
 	}
-	if !storageutil.IsValidNodeID(nodeID.String()) {
+	if !nodeID.IsValid() {
 		err = fmt.Errorf("%w: %s", errors.ErrInvalidNodeID, nodeID)
 		return
 	}
@@ -113,7 +112,7 @@ func (g *GraphStore) RemoveVertex(nodeID types.NodeID) error {
 	if nodeID.IsEmpty() {
 		return errors.ErrEmptyNodeID
 	}
-	if !storageutil.IsValidNodeID(nodeID.String()) {
+	if !nodeID.IsValid() {
 		return fmt.Errorf("%w: %s", errors.ErrInvalidNodeID, nodeID)
 	}
 	key := storage.NodesPrefix.For(nodeID.Bytes())

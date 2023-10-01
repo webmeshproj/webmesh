@@ -21,36 +21,7 @@ import (
 	"strings"
 
 	v1 "github.com/webmeshproj/api/v1"
-	"golang.org/x/exp/slices"
 )
-
-// InvalidIDChars are the characters that are not allowed in node IDs.
-var InvalidIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', ','}
-
-// ReservedNodeIDs are reserved node IDs.
-var ReservedNodeIDs = []string{"self", "local", "localhost", "leader", "voters", "observers"}
-
-// IsValidID returns true if the given identifier is valid and safe to be saved to storage.
-func IsValidID(id string) bool {
-	// Make sure non-empty and all characters are valid UTF-8.
-	if !IsValidKey(id) {
-		return false
-	}
-	for _, c := range InvalidIDChars {
-		if strings.ContainsRune(id, c) {
-			return false
-		}
-	}
-	return true
-}
-
-// IsValidNodeID returns true if the given node ID is valid and safe to be saved to storage.
-func IsValidNodeID(id string) bool {
-	if !IsValidID(id) {
-		return false
-	}
-	return !slices.Contains(ReservedNodeIDs, id)
-}
 
 // IsValidKey reports that a key is valid. All keys must be non-empty and valid UTF-8.
 func IsValidKey(key string) bool {

@@ -26,7 +26,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -44,7 +43,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 	if rb.GetName() == "" {
 		return nil, status.Error(codes.InvalidArgument, "rolebinding name cannot be empty")
 	}
-	if !storageutil.IsValidID(rb.GetName()) {
+	if !types.IsValidID(rb.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "rolebinding name must be a valid ID")
 	}
 	if ok, err := s.rbacEval.Evaluate(ctx, putRoleBindingAction.For(rb.GetName())); !ok {
@@ -71,7 +70,7 @@ func (s *Server) PutRoleBinding(ctx context.Context, rb *v1.RoleBinding) (*empty
 		if _, ok := v1.SubjectType_name[int32(subject.GetType())]; !ok {
 			return nil, status.Error(codes.InvalidArgument, "subject type must be valid")
 		}
-		if !storageutil.IsValidID(subject.GetName()) {
+		if !types.IsValidID(subject.GetName()) {
 			return nil, status.Error(codes.InvalidArgument, "subject name must be a valid node ID")
 		}
 	}
