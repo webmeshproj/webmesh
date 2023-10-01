@@ -54,6 +54,10 @@ type Interface interface {
 	AddRoute(context.Context, netip.Prefix) error
 	// RemoveRoute removes the route for the given network.
 	RemoveRoute(context.Context, netip.Prefix) error
+	// Link returns the underlying net.Interface.
+	Link() (*net.Interface, error)
+	// HardwareAddr returns the hardware address of the interface.
+	HardwareAddr() (net.HardwareAddr, error)
 }
 
 // Options represents the options for creating a new interface.
@@ -206,8 +210,8 @@ func (l *sysInterface) RemoveRoute(ctx context.Context, network netip.Prefix) er
 	return routes.Remove(ctx, l.opts.Name, network)
 }
 
-// Interface attempts to return the underling net.Interface.
-func (l *sysInterface) Interface() (*net.Interface, error) {
+// Link attempts to return the underling net.Interface.
+func (l *sysInterface) Link() (*net.Interface, error) {
 	link, err := net.InterfaceByName(l.opts.Name)
 	if err != nil {
 		return nil, fmt.Errorf("get interface by name: %w", err)
@@ -217,7 +221,7 @@ func (l *sysInterface) Interface() (*net.Interface, error) {
 
 // HardwareAddr attempts to return the hardware address of the interface.
 func (l *sysInterface) HardwareAddr() (net.HardwareAddr, error) {
-	link, err := l.Interface()
+	link, err := l.Link()
 	if err != nil {
 		return nil, fmt.Errorf("get interface by name: %w", err)
 	}
