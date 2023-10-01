@@ -301,7 +301,13 @@ func (fw *firewall) initInputChain() error {
 				Action: accept,
 			},
 		},
-		{
+	}
+	if fw.opts.GRPCPort > 0 {
+		rules = append(rules, struct {
+			comment string
+			cmd     string
+			rule    *nftableslib.Rule
+		}{
 			comment: "allow grpc",
 			rule: &nftableslib.Rule{
 				L4: &nftableslib.L4Rule{
@@ -312,28 +318,25 @@ func (fw *firewall) initInputChain() error {
 				},
 				Action: accept,
 			},
-		},
+		})
 	}
-
 	if fw.opts.StoragePort > 0 {
-		rules = append(rules, []struct {
+		rules = append(rules, struct {
 			comment string
 			cmd     string
 			rule    *nftableslib.Rule
 		}{
-			{
-				comment: "allow raft",
-				rule: &nftableslib.Rule{
-					L4: &nftableslib.L4Rule{
-						L4Proto: unix.IPPROTO_TCP,
-						Dst: &nftableslib.Port{
-							List: nftableslib.SetPortList([]int{int(fw.opts.StoragePort)}),
-						},
+			comment: "allow raft",
+			rule: &nftableslib.Rule{
+				L4: &nftableslib.L4Rule{
+					L4Proto: unix.IPPROTO_TCP,
+					Dst: &nftableslib.Port{
+						List: nftableslib.SetPortList([]int{int(fw.opts.StoragePort)}),
 					},
-					Action: accept,
 				},
+				Action: accept,
 			},
-		}...)
+		})
 	}
 
 	for _, rule := range rules {
