@@ -159,6 +159,22 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 					if err := store.AddVertex(node.NodeID(), node, graph.VertexProperties{}); err != nil {
 						t.Fatalf("AddVertex failed: %v", err)
 					}
+					// The vertex should eventually exist.
+					var vertex types.MeshNode
+					var err error
+					ok := Eventually[error](func() error {
+						vertex, _, err = store.Vertex(node.NodeID())
+						return err
+					}).ShouldNotError(time.Second*15, time.Second)
+					if !ok {
+						t.Fatalf("Vertex failed: %v", err)
+					}
+					if vertex.MeshNode == nil {
+						t.Fatalf("Vertex is nil")
+					}
+					if !node.DeepEqual(vertex) {
+						t.Errorf("Expected node %v, got %v", node, vertex)
+					}
 				}
 				// We should eventually have 2 verticies
 				var count int
