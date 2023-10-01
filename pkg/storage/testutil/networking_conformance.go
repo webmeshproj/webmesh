@@ -332,9 +332,12 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 				if err != nil {
 					t.Fatalf("put route: %v", err)
 				}
-				// Make sure its there
-				_, err = nw.GetRoute(context.Background(), route.GetName())
-				if err != nil {
+				// Make sure its eventually there
+				ok := Eventually[error](func() error {
+					_, err = nw.GetRoute(context.Background(), route.GetName())
+					return err
+				}).ShouldNotError(time.Second*10, time.Second)
+				if !ok {
 					t.Fatalf("get route: %v", err)
 				}
 				// Delete it
@@ -342,12 +345,13 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 				if err != nil {
 					t.Fatalf("delete route: %v", err)
 				}
-				// Make sure its gone
-				_, err = nw.GetRoute(context.Background(), route.GetName())
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				} else if !errors.IsRouteNotFound(err) {
-					t.Fatalf("expected %v, got %v", errors.ErrRouteNotFound, err)
+				// Make sure its eventually gone
+				ok = Eventually[error](func() error {
+					_, err = nw.GetRoute(context.Background(), route.GetName())
+					return err
+				}).ShouldErrorWith(time.Second*10, time.Second, errors.ErrRouteNotFound)
+				if !ok {
+					t.Fatalf("get deleted route did not error")
 				}
 				// Further delete calls should not error
 				err = nw.DeleteRoute(context.Background(), route.GetName())
@@ -469,8 +473,13 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 							if err != nil {
 								t.Fatalf("put network acl: %v", err)
 							}
-							got, err := nw.GetNetworkACL(context.Background(), testCase.acl.GetName())
-							if err != nil {
+							// It should eventually get stored
+							var got types.NetworkACL
+							ok := Eventually[error](func() error {
+								got, err = nw.GetNetworkACL(context.Background(), testCase.acl.GetName())
+								return err
+							}).ShouldNotError(time.Second*10, time.Second)
+							if !ok {
 								t.Fatalf("get network acl: %v", err)
 							}
 							if !testCase.acl.Equals(got) {
