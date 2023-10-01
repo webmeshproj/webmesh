@@ -20,11 +20,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math"
 	"net"
 	"net/netip"
 	"strconv"
-	"strings"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -79,194 +77,36 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 }
 
 func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOptions) error {
-	// We'll bootstrap the raft cluster as just ourselves.
-	s.log.Info("Bootstrapping raft cluster")
+	// We'll bootstrap the cluster as just ourselves.
+	s.log.Info("Bootstrapping mesh storage")
 	err := s.storage.Bootstrap(ctx)
 	if err != nil {
 		return fmt.Errorf("bootstrap raft: %w", err)
 	}
-
-	// Set initial cluster configurations to the raft log
-	if opts.Bootstrap.IPv4Network == "" {
-		opts.Bootstrap.IPv4Network = DefaultIPv4Network
+	bootstrapOpts := storage.BootstrapOptions{
+		MeshDomain:           opts.Bootstrap.MeshDomain,
+		IPv4Network:          opts.Bootstrap.IPv4Network,
+		Admin:                opts.Bootstrap.Admin,
+		DefaultNetworkPolicy: opts.Bootstrap.DefaultNetworkPolicy,
+		BootstrapNodes:       append(opts.Bootstrap.Servers, s.ID().String()),
+		Voters:               opts.Bootstrap.Voters,
+		DisableRBAC:          opts.Bootstrap.DisableRBAC,
 	}
-	if opts.Bootstrap.MeshDomain == "" {
-		opts.Bootstrap.MeshDomain = DefaultMeshDomain
-	}
-	if opts.Bootstrap.Admin == "" {
-		opts.Bootstrap.Admin = DefaultMeshAdmin
-	}
-	if opts.Bootstrap.DefaultNetworkPolicy == "" {
-		opts.Bootstrap.DefaultNetworkPolicy = DefaultNetworkPolicy
-	}
-	meshnetworkv4, err := netip.ParsePrefix(opts.Bootstrap.IPv4Network)
+	results, err := storage.Bootstrap(ctx, s.Storage().MeshDB(), bootstrapOpts)
 	if err != nil {
-		return fmt.Errorf("parse IPv4 network: %w", err)
+		return fmt.Errorf("bootstrap database: %w", err)
 	}
-	meshnetworkv6, err := netutil.GenerateULA()
-	if err != nil {
-		return fmt.Errorf("generate ULA: %w", err)
-	}
-	s.meshDomain = opts.Bootstrap.MeshDomain
-	if !strings.HasSuffix(s.meshDomain, ".") {
-		s.meshDomain += "."
-	}
-
-	s.log.Info("Newly bootstrapped cluster, setting IPv4/IPv6 networks and mesh domain",
+	s.meshDomain = results.MeshDomain
+	s.log.Info("Bootstrapped webmesh cluster database",
 		slog.String("ipv4-network", opts.Bootstrap.IPv4Network),
-		slog.String("ipv6-network", meshnetworkv6.String()),
+		slog.String("ipv6-network", results.NetworkV6.String()),
 		slog.String("mesh-domain", s.meshDomain),
 	)
 
-	meshDB := s.Storage().MeshDB()
-	err = meshDB.MeshState().SetIPv6Prefix(ctx, meshnetworkv6)
-	if err != nil {
-		return fmt.Errorf("set IPv6 prefix to db: %w", err)
-	}
-	err = meshDB.MeshState().SetIPv4Prefix(ctx, meshnetworkv4)
-	if err != nil {
-		return fmt.Errorf("set IPv4 prefix to db: %w", err)
-	}
-	err = meshDB.MeshState().SetMeshDomain(ctx, s.meshDomain)
-	if err != nil {
-		return fmt.Errorf("set mesh domain to db: %w", err)
-	}
-
-	// Initialize the RBAC system.
-	rb := meshDB.RBAC()
-
-	// Create an admin role and add the admin user/node to it.
-	err = rb.PutRole(ctx, types.Role{Role: &v1.Role{
-		Name: string(storage.MeshAdminRole),
-		Rules: []*v1.Rule{
-			{
-				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_ALL},
-				Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_ALL},
-			},
-		},
-	}})
-	if err != nil {
-		return fmt.Errorf("create admin role: %w", err)
-	}
-	err = rb.PutRoleBinding(ctx, types.RoleBinding{RoleBinding: &v1.RoleBinding{
-		Name: string(storage.MeshAdminRole),
-		Role: string(storage.MeshAdminRoleBinding),
-		Subjects: []*v1.Subject{
-			{
-				Name: opts.Bootstrap.Admin,
-				Type: v1.SubjectType_SUBJECT_NODE,
-			},
-			{
-				Name: opts.Bootstrap.Admin,
-				Type: v1.SubjectType_SUBJECT_USER,
-			},
-		},
-	}})
-	if err != nil {
-		return fmt.Errorf("create admin role binding: %w", err)
-	}
-
-	// Create a "voters" role and group then add ourselves and all the bootstrap servers
-	// to it.
-	err = rb.PutRole(ctx, types.Role{Role: &v1.Role{
-		Name: string(storage.VotersRole),
-		Rules: []*v1.Rule{
-			{
-				Resources: []v1.RuleResource{v1.RuleResource_RESOURCE_VOTES},
-				Verbs:     []v1.RuleVerb{v1.RuleVerb_VERB_PUT},
-			},
-		},
-	}})
-	if err != nil {
-		return fmt.Errorf("create voters role: %w", err)
-	}
-	err = rb.PutGroup(ctx, types.Group{Group: &v1.Group{
-		Name: string(storage.VotersGroup),
-		Subjects: func() []*v1.Subject {
-			out := make([]*v1.Subject, 0)
-			out = append(out, &v1.Subject{
-				Type: v1.SubjectType_SUBJECT_NODE,
-				Name: opts.Bootstrap.Admin,
-			})
-			for _, id := range append(opts.Bootstrap.Servers, s.ID().String()) {
-				out = append(out, &v1.Subject{
-					Type: v1.SubjectType_SUBJECT_NODE,
-					Name: string(id),
-				})
-			}
-			if opts.Bootstrap.Voters != nil {
-				for _, voter := range opts.Bootstrap.Voters {
-					out = append(out, &v1.Subject{
-						Type: v1.SubjectType_SUBJECT_NODE,
-						Name: voter,
-					})
-				}
-			}
-			return out
-		}(),
-	}})
-	if err != nil {
-		return fmt.Errorf("create voters group: %w", err)
-	}
-	err = rb.PutRoleBinding(ctx, types.RoleBinding{RoleBinding: &v1.RoleBinding{
-		Name: string(storage.BootstrapVotersRoleBinding),
-		Role: string(storage.VotersRole),
-		Subjects: []*v1.Subject{
-			{
-				Type: v1.SubjectType_SUBJECT_GROUP,
-				Name: string(storage.VotersGroup),
-			},
-		},
-	}})
-	if err != nil {
-		return fmt.Errorf("create voters role binding: %w", err)
-	}
-
-	// We initialized rbac, but if the caller wants, we'll go ahead and disable it.
-	if opts.Bootstrap.DisableRBAC {
-		err = rb.SetEnabled(ctx, false)
-		if err != nil {
-			return fmt.Errorf("disable rbac: %w", err)
-		}
-	}
-
-	// Initialize the Networking system.
-	nw := meshDB.Networking()
-
-	// Create a network ACL that ensures bootstrap servers and admins can continue to
-	// communicate with each other.
-	// TODO: This should be filtered to only apply to internal traffic.
-	err = nw.PutNetworkACL(ctx, types.NetworkACL{NetworkACL: &v1.NetworkACL{
-		Name:             string(storage.BootstrapNodesNetworkACLName),
-		Priority:         math.MaxInt32,
-		SourceNodes:      []string{"group:" + string(storage.VotersGroup)},
-		DestinationNodes: []string{"group:" + string(storage.VotersGroup)},
-		Action:           v1.ACLAction_ACTION_ACCEPT,
-	}})
-
-	if err != nil {
-		return fmt.Errorf("create bootstrap nodes network ACL: %w", err)
-	}
-
-	// Apply a default accept policy if configured
-	if opts.Bootstrap.DefaultNetworkPolicy == "accept" {
-		err = nw.PutNetworkACL(ctx, types.NetworkACL{NetworkACL: &v1.NetworkACL{
-			Name:             "default-accept",
-			Priority:         math.MinInt32,
-			SourceNodes:      []string{"*"},
-			DestinationNodes: []string{"*"},
-			SourceCIDRs:      []string{"*"},
-			DestinationCIDRs: []string{"*"},
-			Action:           v1.ACLAction_ACTION_ACCEPT,
-		}})
-		if err != nil {
-			return fmt.Errorf("create default accept network ACL: %w", err)
-		}
-	}
-
 	// If we have routes configured, add them to the db
+	meshDB := s.Storage().MeshDB()
 	if len(opts.Routes) > 0 {
-		err = nw.PutRoute(ctx, types.Route{Route: &v1.Route{
+		err = meshDB.Networking().PutRoute(ctx, types.Route{Route: &v1.Route{
 			Name: fmt.Sprintf("%s-auto", s.nodeID),
 			Node: s.ID().String(),
 			DestinationCIDRs: func() []string {
@@ -291,7 +131,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if err != nil {
 		return fmt.Errorf("encode public key: %w", err)
 	}
-	privatev6 := netutil.AssignToPrefix(meshnetworkv6, s.key.PublicKey())
+	privatev6 := netutil.AssignToPrefix(results.NetworkV6, s.key.PublicKey())
 	self := types.MeshNode{MeshNode: &v1.MeshNode{
 		Id:              s.ID().String(),
 		PrimaryEndpoint: opts.PrimaryEndpoint.String(),
@@ -415,8 +255,8 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 			}
 			return netip.Prefix{}
 		}(),
-		NetworkV4: meshnetworkv4,
-		NetworkV6: meshnetworkv6,
+		NetworkV4: results.NetworkV4,
+		NetworkV6: results.NetworkV6,
 	}
 	err = s.nw.Start(ctx, startopts)
 	if err != nil {
