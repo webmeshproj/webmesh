@@ -111,3 +111,10 @@ func ZoneIDFilter(zoneID string) PeerFilter {
 		return node.GetZoneAwarenessID() == zoneID
 	}
 }
+
+// NotNodeIDFilter returns a new filter that matches nodes that are not a given node ID.
+func NotNodeIDFilter(nodeID types.NodeID) PeerFilter {
+	return func(node types.MeshNode) bool {
+		return node.NodeID() != nodeID
+	}
+}
