@@ -182,7 +182,7 @@ func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty,
 func (p *Plugin) Allocate(ctx context.Context, r *v1.AllocateIPRequest) (*v1.AllocatedIP, error) {
 	p.datamux.Lock()
 	defer p.datamux.Unlock()
-	if p.data == nil || p.db == nil {
+	if p.data == nil && p.db == nil {
 		// Safeguard to make sure we don't get called before the query stream
 		// is opened.
 		return nil, fmt.Errorf("plugin not configured")
