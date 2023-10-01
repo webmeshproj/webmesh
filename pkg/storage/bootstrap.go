@@ -73,7 +73,8 @@ type BootstrapResults struct {
 }
 
 // Bootstrap attempts to bootstrap the given database. If data already exists,
-// ErrAlreadyBootstrapped will be returned.
+// ErrAlreadyBootstrapped will be returned, but with results populated with the
+// existing data.
 func Bootstrap(ctx context.Context, db MeshDB, opts BootstrapOptions) (results BootstrapResults, err error) {
 	if opts.IPv4Network == "" {
 		opts.IPv4Network = DefaultIPv4Network
@@ -95,6 +96,22 @@ func Bootstrap(ctx context.Context, db MeshDB, opts BootstrapOptions) (results B
 		err = fmt.Errorf("get mesh domain: %w", err)
 		return
 	} else if err == nil {
+		// Try to fetch the current prefixes and mesh domain
+		results.NetworkV4, err = db.MeshState().GetIPv4Prefix(ctx)
+		if err != nil {
+			err = fmt.Errorf("get IPv4 prefix: %w", err)
+			return
+		}
+		results.NetworkV6, err = db.MeshState().GetIPv6Prefix(ctx)
+		if err != nil {
+			err = fmt.Errorf("get IPv6 prefix: %w", err)
+			return
+		}
+		results.MeshDomain, err = db.MeshState().GetMeshDomain(ctx)
+		if err != nil {
+			err = fmt.Errorf("get mesh domain: %w", err)
+			return
+		}
 		return results, errors.ErrAlreadyBootstrapped
 	}
 
