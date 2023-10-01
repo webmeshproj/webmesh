@@ -295,22 +295,34 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 					}
 				}
 
-				nodeARoutes, err := nw.GetRoutesByCIDR(context.Background(), netip.MustParsePrefix("10.0.0.0/8"))
-				if err != nil {
-					t.Fatalf("get routes by cidr: %v", err)
-				}
-				if len(nodeARoutes) != 1 {
-					t.Fatalf("expected 1 route, got %d", len(nodeARoutes))
+				// We should eventually see node A's routes
+				var nodeARoutes types.Routes
+				var err error
+				ok := Eventually[int](func() int {
+					nodeARoutes, err = nw.GetRoutesByCIDR(context.Background(), netip.MustParsePrefix("10.0.0.0/8"))
+					if err != nil {
+						t.Log("Error fetching routes:", err)
+						return 0
+					}
+					return len(nodeARoutes)
+				}).ShouldEqual(time.Second*10, time.Second, 1)
+				if !ok {
+					t.Fatalf("Did not get expected number of routes")
 				}
 				if !routes[0].Equals(&nodeARoutes[0]) {
 					t.Fatalf("expected %v, got %v", routes[0], nodeARoutes[0])
 				}
-
-				nodeBRoutes, err := nw.GetRoutesByCIDR(context.Background(), netip.MustParsePrefix("192.168.0.0/16"))
-				if err != nil {
-					t.Fatalf("get routes by cidr: %v", err)
-				}
-				if len(nodeBRoutes) != 1 {
+				// Same for node B
+				var nodeBRoutes types.Routes
+				ok = Eventually[int](func() int {
+					nodeBRoutes, err = nw.GetRoutesByCIDR(context.Background(), netip.MustParsePrefix("192.168.0.0/16"))
+					if err != nil {
+						t.Log("Error fetching routes:", err)
+						return 0
+					}
+					return len(nodeBRoutes)
+				}).ShouldEqual(time.Second*10, time.Second, 1)
+				if !ok {
 					t.Fatalf("expected 1 route, got %d", len(nodeBRoutes))
 				}
 				if !routes[1].Equals(&nodeBRoutes[0]) {
