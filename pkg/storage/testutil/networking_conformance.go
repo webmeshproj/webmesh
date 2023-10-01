@@ -384,14 +384,24 @@ func TestNetworkingStorageConformance(t *testing.T, builder NewNetworkingFunc) {
 						t.Fatalf("put route: %v", err)
 					}
 				}
-				got, err := nw.ListRoutes(context.Background())
-				if err != nil {
-					t.Fatalf("list routes: %v", err)
+				// We should eventually see both routes
+				var got types.Routes
+				var err error
+				ok := Eventually[int](func() int {
+					got, err = nw.ListRoutes(context.Background())
+					if err != nil {
+						t.Log("Error fetching routes:", err)
+						return 0
+					}
+					return len(got)
+				}).ShouldEqual(time.Second*10, time.Second, 2)
+				if !ok {
+					t.Fatalf("Did not get expected number of routes")
 				}
-				got.Sort()
 				if len(got) != len(routes) {
 					t.Fatalf("expected %d routes, got %d", len(routes), len(got))
 				}
+				got.Sort()
 				for i, route := range routes {
 					if !route.Equals(&got[i]) {
 						t.Fatalf("expected %v, got %v", route, got[i])
