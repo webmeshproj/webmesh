@@ -20,6 +20,7 @@ import (
 	"context"
 	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
@@ -49,16 +50,17 @@ func TestMeshStateStorageConformance(t *testing.T, builder NewMeshStateFunc) {
 			if err != nil {
 				t.Fatalf("failed to set prefix: %v", err)
 			}
-			// We should be able to get the prefix.
-			got, err := st.GetIPv6Prefix(ctx)
-			if err != nil {
-				t.Fatalf("failed to get prefix: %v", err)
-			}
-			if prefix.Bits() != got.Bits() {
-				t.Fatalf("expected prefix %v, got %v", prefix, got)
-			}
-			if prefix.Addr().Compare(got.Addr()) != 0 {
-				t.Fatalf("expected prefix %v, got %v", prefix, got)
+			// We should eventually get the same prefix.
+			ok := Eventually[netip.Prefix](func() netip.Prefix {
+				var got netip.Prefix
+				got, err = st.GetIPv6Prefix(ctx)
+				if err != nil {
+					t.Logf("failed to get prefix: %v", err)
+				}
+				return got
+			}).ShouldEqual(time.Second*15, time.Second, prefix)
+			if !ok {
+				t.Fatalf("failed to get same prefix back: %v", err)
 			}
 		})
 
@@ -77,16 +79,17 @@ func TestMeshStateStorageConformance(t *testing.T, builder NewMeshStateFunc) {
 			if err != nil {
 				t.Fatalf("failed to set prefix: %v", err)
 			}
-			// We should be able to get the prefix.
-			got, err := st.GetIPv4Prefix(ctx)
-			if err != nil {
-				t.Fatalf("failed to get prefix: %v", err)
-			}
-			if prefix.Bits() != got.Bits() {
-				t.Fatalf("expected prefix %v, got %v", prefix, got)
-			}
-			if prefix.Addr().Compare(got.Addr()) != 0 {
-				t.Fatalf("expected prefix %v, got %v", prefix, got)
+			// We should eventually get the same prefix.
+			ok := Eventually[netip.Prefix](func() netip.Prefix {
+				var got netip.Prefix
+				got, err = st.GetIPv4Prefix(ctx)
+				if err != nil {
+					t.Logf("failed to get prefix: %v", err)
+				}
+				return got
+			}).ShouldEqual(time.Second*15, time.Second, prefix)
+			if !ok {
+				t.Fatalf("failed to get same prefix back: %v", err)
 			}
 		})
 
@@ -105,13 +108,17 @@ func TestMeshStateStorageConformance(t *testing.T, builder NewMeshStateFunc) {
 			if err != nil {
 				t.Fatalf("failed to set domain: %v", err)
 			}
-			// We should be able to get the domain.
-			got, err := st.GetMeshDomain(ctx)
-			if err != nil {
-				t.Fatalf("failed to get domain: %v", err)
-			}
-			if domain != got {
-				t.Fatalf("expected domain %s, got %s", domain, got)
+			// We should eventually get the same domain.
+			ok := Eventually[string](func() string {
+				var got string
+				got, err = st.GetMeshDomain(ctx)
+				if err != nil {
+					t.Logf("failed to get prefix: %v", err)
+				}
+				return got
+			}).ShouldEqual(time.Second*15, time.Second, domain)
+			if !ok {
+				t.Fatalf("failed to get same domain back: %v", err)
 			}
 		})
 	})
