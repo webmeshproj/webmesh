@@ -225,9 +225,42 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 					if err := store.AddVertex(node.NodeID(), node, graph.VertexProperties{}); err != nil {
 						t.Fatalf("AddVertex failed: %v", err)
 					}
+					// The vertex should eventually exist.
+					var vertex types.MeshNode
+					ok := Eventually[error](func() error {
+						var err error
+						vertex, _, err = store.Vertex(node.NodeID())
+						return err
+					}).ShouldNotError(time.Second*15, time.Second)
+					if !ok {
+						t.Fatalf("Vertex failed: %v", vertex)
+					}
+					if vertex.MeshNode == nil {
+						t.Fatalf("Vertex is nil")
+					}
+					if !node.DeepEqual(vertex) {
+						t.Errorf("Expected node %v, got %v", node, vertex)
+					}
 				}
 				if err := store.AddEdge(nodes[0].NodeID(), nodes[1].NodeID(), graph.Edge[types.NodeID]{}); err != nil {
 					t.Fatalf("AddEdge failed: %v", err)
+				}
+				// We should eventually be able to retrieve the edge
+				var edge graph.Edge[types.NodeID]
+				ok := Eventually[error](func() error {
+					var err error
+					edge, err = store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
+					return err
+				}).ShouldNotError(time.Second*15, time.Second)
+				if !ok {
+					t.Fatalf("Edge failed: %v", edge)
+				}
+				// It should be empty
+				if len(edge.Properties.Attributes) != 0 {
+					t.Errorf("Expected empty edge, got %v", edge)
+				}
+				if edge.Properties.Weight != 0 {
+					t.Errorf("Expected empty edge, got %v", edge)
 				}
 				// We should not be able to delete either node
 				for _, node := range []string{"linked-node-a", "linked-node-b"} {
@@ -279,6 +312,22 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 			for _, node := range nodes {
 				if err := store.AddVertex(node.NodeID(), node, graph.VertexProperties{}); err != nil {
 					t.Fatalf("AddVertex failed: %v", err)
+				}
+				// The vertex should eventually exist.
+				var vertex types.MeshNode
+				ok := Eventually[error](func() error {
+					var err error
+					vertex, _, err = store.Vertex(node.NodeID())
+					return err
+				}).ShouldNotError(time.Second*15, time.Second)
+				if !ok {
+					t.Fatalf("Vertex failed: %v", vertex)
+				}
+				if vertex.MeshNode == nil {
+					t.Fatalf("Vertex is nil")
+				}
+				if !node.DeepEqual(vertex) {
+					t.Errorf("Expected node %v, got %v", node, vertex)
 				}
 			}
 
