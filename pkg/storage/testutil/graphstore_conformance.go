@@ -246,13 +246,13 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 				}
 				// We should eventually be able to retrieve the edge
 				var edge graph.Edge[types.NodeID]
+				var err error
 				ok := Eventually[error](func() error {
-					var err error
 					edge, err = store.Edge(nodes[0].NodeID(), nodes[1].NodeID())
 					return err
 				}).ShouldNotError(time.Second*15, time.Second)
 				if !ok {
-					t.Fatalf("Edge failed: %v", edge)
+					t.Fatalf("Edge failed: %v", err)
 				}
 				// It should be empty
 				if len(edge.Properties.Attributes) != 0 {
@@ -314,13 +314,13 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 				}
 				// The vertex should eventually exist.
 				var vertex types.MeshNode
+				var err error
 				ok := Eventually[error](func() error {
-					var err error
 					vertex, _, err = store.Vertex(node.NodeID())
 					return err
 				}).ShouldNotError(time.Second*15, time.Second)
 				if !ok {
-					t.Fatalf("Vertex failed: %v", vertex)
+					t.Fatalf("Vertex failed: %v", err)
 				}
 				if vertex.MeshNode == nil {
 					t.Fatalf("Vertex is nil")
