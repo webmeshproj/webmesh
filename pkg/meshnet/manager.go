@@ -21,12 +21,14 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 
+	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
@@ -47,6 +49,8 @@ type Options struct {
 	ForceReplace bool
 	// ListenPort is the port to use for wireguard.
 	ListenPort int
+	// Modprobe is whether to attempt to load the wireguard kernel module.
+	Modprobe bool
 	// PersistentKeepAlive is the persistent keepalive to use for wireguard.
 	PersistentKeepAlive time.Duration
 	// ForceTUN is whether to force the use of TUN.
@@ -180,6 +184,13 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 	m.key = opts.Key
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	log.Info("Starting mesh network manager")
+	if m.opts.Modprobe && runtime.GOOS == "linux" {
+		log.Debug("Attempting to load wireguard kernel module")
+		err := common.Exec(ctx, "modprobe", "wireguard")
+		if err != nil {
+			log.Warn("Failed to load wireguard kernel module", slog.String("error", err.Error()))
+		}
+	}
 	log.Debug("Network manager stasrt options", slog.Any("start-opts", opts))
 	handleErr := func(err error) error {
 		if m.wg != nil {

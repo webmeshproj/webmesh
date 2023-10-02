@@ -484,6 +484,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 			}
 		}(),
 		NetworkOptions: meshnet.Options{
+			Modprobe:              o.WireGuard.Modprobe,
 			InterfaceName:         o.WireGuard.InterfaceName,
 			ForceReplace:          o.WireGuard.ForceInterfaceName,
 			ListenPort:            o.WireGuard.ListenPort,

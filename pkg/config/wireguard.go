@@ -30,6 +30,8 @@ import (
 type WireGuardOptions struct {
 	// ListenPort is the port to listen on.
 	ListenPort int `koanf:"listen-port,omitempty"`
+	// Modprobe attempts to load the wireguard kernel module on linux systems.
+	Modprobe bool `koanf:"modprobe,omitempty"`
 	// InterfaceName is the name of the interface.
 	InterfaceName string `koanf:"interface-name,omitempty"`
 	// ForceInterfaceName forces the use of the given name by deleting
@@ -81,6 +83,7 @@ func NewWireGuardOptions() WireGuardOptions {
 // BindFlags binds the flags.
 func (o *WireGuardOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.IntVar(&o.ListenPort, prefix+"wireguard.listen-port", wireguard.DefaultListenPort, "The port to listen on.")
+	fs.BoolVar(&o.Modprobe, prefix+"wireguard.modprobe", false, "Attempt to load the wireguard kernel module on linux systems.")
 	fs.StringVar(&o.InterfaceName, prefix+"wireguard.interface-name", wireguard.DefaultInterfaceName, "The name of the interface.")
 	fs.BoolVar(&o.ForceInterfaceName, prefix+"wireguard.force-interface-name", false, "Force the use of the given name by deleting any pre-existing interface with the same name.")
 	fs.BoolVar(&o.ForceTUN, prefix+"wireguard.force-tun", false, "Force the use of a TUN interface.")
