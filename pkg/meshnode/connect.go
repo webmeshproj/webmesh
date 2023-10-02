@@ -152,9 +152,8 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		return cause
 	}
 	// Create the network manager
-	opts.NetworkOptions.NodeID = s.ID()
 	opts.NetworkOptions.StoragePort = int(s.storage.ListenPort())
-	s.nw = meshnet.New(s.Storage().MeshDB(), opts.NetworkOptions)
+	s.nw = meshnet.New(s.Storage().MeshDB(), opts.NetworkOptions, s.ID())
 	if opts.Bootstrap != nil {
 		// Attempt bootstrap.
 		if err = s.bootstrap(ctx, opts); err != nil {

@@ -48,7 +48,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // MeshOptions are the options for participating in a mesh.
@@ -485,7 +484,6 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 			}
 		}(),
 		NetworkOptions: meshnet.Options{
-			NodeID:                types.NodeID(nodeid),
 			InterfaceName:         o.WireGuard.InterfaceName,
 			ForceReplace:          o.WireGuard.ForceInterfaceName,
 			ListenPort:            o.WireGuard.ListenPort,

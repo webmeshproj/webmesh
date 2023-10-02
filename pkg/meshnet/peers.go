@@ -40,6 +40,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -52,6 +53,8 @@ type PeerManager interface {
 	// RefreshPeers walks all peers against the provided list and makes sure
 	// they are up to date.
 	Refresh(ctx context.Context, peers []*v1.WireGuardPeer) error
+	// Sync is like refresh but uses the storage to get the list of peers.
+	Sync(ctx context.Context) error
 	// Resolver returns a resolver backed by the storage
 	// of this instance.
 	Resolver() PeerResolver
@@ -70,6 +73,7 @@ type PeerResolver interface {
 
 type peerManager struct {
 	net      *manager
+	storage  storage.MeshDB
 	p2pConns map[string]clientPeerConn
 	peermu   sync.Mutex
 	p2pmu    sync.Mutex
@@ -78,6 +82,7 @@ type peerManager struct {
 func newPeerManager(m *manager) *peerManager {
 	return &peerManager{
 		net:      m,
+		storage:  m.storage,
 		p2pConns: make(map[string]clientPeerConn),
 	}
 }
@@ -112,6 +117,14 @@ func (m *peerManager) Add(ctx context.Context, peer *v1.WireGuardPeer, iceServer
 	log := context.LoggerFrom(ctx).With("component", "net-manager")
 	ctx = context.WithLogger(ctx, log)
 	return m.addPeer(ctx, peer, iceServers)
+}
+
+func (m *peerManager) Sync(ctx context.Context) error {
+	peers, err := WireGuardPeersFor(ctx, m.net.storage, m.net.nodeID)
+	if err != nil {
+		return fmt.Errorf("get wireguard peers: %w", err)
+	}
+	return m.Refresh(ctx, peers)
 }
 
 func (m *peerManager) Refresh(ctx context.Context, wgpeers []*v1.WireGuardPeer) error {
@@ -382,7 +395,7 @@ func (m *peerManager) negotiateP2PRelay(ctx context.Context, peer *v1.WireGuardP
 		defer func() {
 			// This is a hacky way to attempt to reconnect to the peer if
 			// the ICE connection is closed and they are still in the store.
-			wgpeers, err := WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
+			wgpeers, err := WireGuardPeersFor(ctx, m.net.storage, m.net.nodeID)
 			if err != nil {
 				log.Error("Error getting wireguard peers after p2p connection closed", slog.String("error", err.Error()))
 				return
@@ -447,7 +460,7 @@ func (m *peerManager) negotiateICEConn(ctx context.Context, peer *v1.WireGuardPe
 		defer func() {
 			// This is a hacky way to attempt to reconnect to the peer if
 			// the ICE connection is closed and they are still in the store.
-			wgpeers, err := WireGuardPeersFor(ctx, m.net.storage, m.net.opts.NodeID)
+			wgpeers, err := WireGuardPeersFor(ctx, m.net.storage, m.net.nodeID)
 			if err != nil {
 				log.Error("Error getting wireguard peers after ICE connection closed", slog.String("error", err.Error()))
 				return

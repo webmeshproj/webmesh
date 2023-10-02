@@ -41,8 +41,6 @@ import (
 
 // Options are the options for the network manager.
 type Options struct {
-	// NodeID is the ID of the node.
-	NodeID types.NodeID
 	// InterfaceName is the name of the wireguard interface.
 	InterfaceName string
 	// ForceReplace is whether to force replace the wireguard interface.
@@ -128,8 +126,9 @@ type Manager interface {
 }
 
 // New creates a new network manager.
-func New(store storage.MeshDB, opts Options) Manager {
+func New(store storage.MeshDB, opts Options, nodeID types.NodeID) Manager {
 	m := &manager{
+		nodeID:  nodeID,
 		storage: store,
 		opts:    opts,
 	}
@@ -139,6 +138,7 @@ func New(store storage.MeshDB, opts Options) Manager {
 
 type manager struct {
 	opts                 Options
+	nodeID               types.NodeID
 	key                  crypto.PrivateKey
 	peers                *peerManager
 	dns                  *dnsManager
@@ -195,7 +195,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		return err
 	}
 	fwopts := &firewall.Options{
-		ID: m.opts.NodeID.String(),
+		ID: m.nodeID.String(),
 		// TODO: Make this configurable
 		DefaultPolicy: firewall.PolicyAccept,
 		WireguardPort: uint16(m.opts.ListenPort),
@@ -209,7 +209,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		return fmt.Errorf("new firewall: %w", err)
 	}
 	wgopts := &wireguard.Options{
-		NodeID:              m.opts.NodeID,
+		NodeID:              m.nodeID,
 		ListenPort:          m.opts.ListenPort,
 		Name:                m.opts.InterfaceName,
 		ForceName:           m.opts.ForceReplace,
