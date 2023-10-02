@@ -19,6 +19,7 @@ package testutil
 import (
 	"context"
 	"testing"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 
@@ -33,6 +34,51 @@ type NewRBACFunc func(t *testing.T) storage.RBAC
 // TestRBACStorageConformance tests that an RBAC implementation conforms to the interface.
 func TestRBACStorageConformance(t *testing.T, builder NewRBACFunc) {
 	t.Run("RBACStorageConformance", func(t *testing.T) {
+		t.Run("SetGetEnabled", func(t *testing.T) {
+			rbac := setupRBACTest(t, builder)
+			var enabled bool
+			var err error
+			ok := Eventually[error](func() error {
+				enabled, err = rbac.GetEnabled(context.Background())
+				return err
+			}).ShouldNotError(time.Second*10, time.Second)
+			if !ok {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !enabled {
+				t.Errorf("Expected default enabled to be true, got: %v", enabled)
+			}
+			err = rbac.SetEnabled(context.Background(), false)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			ok = Eventually[bool](func() bool {
+				enabled, err = rbac.GetEnabled(context.Background())
+				if err != nil {
+					t.Logf("unexpected error: %v", err)
+					return true
+				}
+				return enabled
+			}).ShouldEqual(time.Second*10, time.Second, false)
+			if !ok {
+				t.Errorf("expected enabled to be false, got: %v", enabled)
+			}
+			err = rbac.SetEnabled(context.Background(), true)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			ok = Eventually[bool](func() bool {
+				enabled, err = rbac.GetEnabled(context.Background())
+				if err != nil {
+					t.Logf("unexpected error: %v", err)
+					return false
+				}
+				return enabled
+			}).ShouldEqual(time.Second*10, time.Second, true)
+			if !ok {
+				t.Errorf("expected enabled to be true, got: %v", enabled)
+			}
+		})
 		t.Run("PutRole", func(t *testing.T) {
 			rbac := setupRBACTest(t, builder)
 			tc := []struct {

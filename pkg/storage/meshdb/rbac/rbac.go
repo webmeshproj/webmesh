@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 
 	v1 "github.com/webmeshproj/api/v1"
 
@@ -49,22 +50,20 @@ type rbac struct {
 
 // GetEnabled returns the RBAC enabled state.
 func (r *rbac) GetEnabled(ctx context.Context) (bool, error) {
-	_, err := r.GetValue(ctx, rbacDisabledKey)
+	val, err := r.GetValue(ctx, rbacDisabledKey)
 	if err != nil {
+		// Not present we assume is true.
 		if errors.IsKeyNotFound(err) {
-			return false, nil
+			return true, nil
 		}
 		return false, fmt.Errorf("get rbac disabled: %w", err)
 	}
-	return true, nil
+	return strconv.ParseBool(string(val))
 }
 
 // SetEnabled sets the RBAC enabled state.
 func (r *rbac) SetEnabled(ctx context.Context, enabled bool) error {
-	if enabled {
-		return r.Delete(ctx, rbacDisabledKey)
-	}
-	err := r.PutValue(ctx, rbacDisabledKey, []byte("true"), 0)
+	err := r.PutValue(ctx, rbacDisabledKey, []byte(fmt.Sprintf("%v", enabled)), 0)
 	if err != nil {
 		return fmt.Errorf("put rbac disabled: %w", err)
 	}
