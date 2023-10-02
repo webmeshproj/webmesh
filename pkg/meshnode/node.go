@@ -222,7 +222,12 @@ func (s *meshStore) Ready() <-chan struct{} {
 		for {
 			leader, err := s.LeaderID()
 			if err != nil {
-				s.log.Debug("waiting for leader", slog.String("error", err.Error()))
+				s.log.Debug("Waiting for leader", slog.String("error", err.Error()))
+				time.Sleep(time.Millisecond * 500)
+				continue
+			}
+			if leader == "" {
+				s.log.Debug("Waiting for leader", slog.String("error", ErrNoLeader.Error()))
 				time.Sleep(time.Millisecond * 500)
 				continue
 			}
@@ -230,7 +235,7 @@ func (s *meshStore) Ready() <-chan struct{} {
 			_, err = s.Storage().MeshDB().Peers().Get(ctx, leader)
 			cancel()
 			if err != nil {
-				s.log.Debug("waiting for leader", slog.String("leader", leader.String()), slog.String("error", err.Error()))
+				s.log.Debug("Unable to fetch current leader", slog.String("leader", leader.String()), slog.String("error", err.Error()))
 				time.Sleep(time.Millisecond * 500)
 				continue
 			}
