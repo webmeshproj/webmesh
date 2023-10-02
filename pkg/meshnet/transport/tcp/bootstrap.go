@@ -97,7 +97,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	rftOpts.SnapshotThreshold = 1024
 	rftOpts.TrailingLogs = 1024
 	rftOpts.LogOutput = io.Discard
-	rftOpts.Logger = logging.NewHCLogAdapter("", "", logging.NewLogger(""))
+	rftOpts.Logger = logging.NewHCLogAdapter("", "", logging.NewLogger("", ""))
 
 	// Resolve our advertise address
 	addr, err := netutil.ResolveTCPAddr(ctx, t.Advertise, 15)

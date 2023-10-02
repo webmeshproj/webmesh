@@ -37,7 +37,7 @@ import (
 func TestBootstrapTransport(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	nooplog := logging.NewLogger("")
+	nooplog := logging.NewLogger("", "")
 	ctx = context.WithLogger(ctx, nooplog)
 
 	t.Run("SingleNode", func(t *testing.T) {

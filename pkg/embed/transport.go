@@ -38,6 +38,7 @@ type TransportOptions struct {
 	Laddrs     []ma.Multiaddr
 	Rendezvous string
 	LogLevel   string
+	LogFormat  string
 }
 
 // WithWebmeshTransport returns a libp2p option that configures the transport to use an
@@ -54,7 +55,7 @@ func WithWebmeshTransport(topts TransportOptions) config.Option {
 		StartTimeout:  time.Second * 30,
 		StopTimeout:   time.Second * 30,
 		ListenTimeout: time.Second * 30,
-		Logger:        logging.NewLogger(topts.LogLevel),
+		Logger:        logging.NewLogger(topts.LogLevel, topts.LogFormat),
 	})
 	opts := []config.Option{
 		libp2p.ProtocolVersion(p2pproto.SecurityID),

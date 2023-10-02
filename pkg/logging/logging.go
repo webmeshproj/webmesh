@@ -26,34 +26,46 @@ import (
 )
 
 // SetupLogging sets up logging for the application.
-func SetupLogging(logLevel string) *slog.Logger {
-	log := NewLogger(logLevel)
+func SetupLogging(logLevel string, format string) *slog.Logger {
+	log := NewLogger(logLevel, format)
 	slog.SetDefault(log)
 	return log
 }
 
-// NewLogger returns a new logger with the given log level.
+// NewLogger returns a new logger with the given log level. Format can be one of "text" or "json".
 // If log level is empty or "silent" then the logger will be silent.
-func NewLogger(logLevel string) *slog.Logger {
+func NewLogger(logLevel string, format string) *slog.Logger {
 	if logLevel == "" || strings.ToLower(logLevel) == "silent" {
 		return slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: func() slog.Level {
-			switch strings.ToLower(logLevel) {
-			case "debug":
-				return slog.LevelDebug
-			case "info":
-				return slog.LevelInfo
-			case "warn":
-				return slog.LevelWarn
-			case "error":
-				return slog.LevelError
-			default:
-				slog.Default().Warn("Invalid log level specified, defaulting to info", "log-level", logLevel)
-			}
+	level := func() slog.Level {
+		switch strings.ToLower(logLevel) {
+		case "debug":
+			return slog.LevelDebug
+		case "info":
 			return slog.LevelInfo
-		}(),
-	}))
+		case "warn":
+			return slog.LevelWarn
+		case "error":
+			return slog.LevelError
+		default:
+			slog.Default().Warn("Invalid log level specified, defaulting to info", "log-level", logLevel)
+		}
+		return slog.LevelInfo
+	}()
+	var handler slog.Handler
+	switch format {
+	case "text":
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: level,
+		})
+	case "json":
+		fallthrough
+	default:
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			Level: level,
+		})
+	}
+	log := slog.New(handler)
 	return log
 }

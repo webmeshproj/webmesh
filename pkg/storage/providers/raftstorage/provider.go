@@ -107,7 +107,7 @@ func NewProvider(opts Options) *Provider {
 	p := &Provider{
 		Options: opts,
 		nodeID:  raft.ServerID(opts.NodeID),
-		log:     logging.NewLogger(opts.LogLevel).With("component", "raftstorage"),
+		log:     logging.NewLogger(opts.LogLevel, opts.LogFormat).With("component", "raftstorage"),
 	}
 	p.consensus = &Consensus{Provider: p}
 	p.raftStorage = &RaftStorage{raft: p}

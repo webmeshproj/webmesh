@@ -86,9 +86,9 @@ func New(opts Options) (storage.DualStorage, error) {
 	if opts.SyncWrites {
 		badgeropts = badgeropts.WithSyncWrites(true)
 	}
-	badgeropts = badgeropts.WithLogger(logging.NewBadgerLogger(""))
+	badgeropts = badgeropts.WithLogger(logging.NewBadgerLogger("", ""))
 	if opts.Debug {
-		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(logging.NewBadgerLogger("debug"))
+		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(logging.NewBadgerLogger("debug", "text"))
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {
@@ -112,9 +112,9 @@ func NewInMemory(opts Options) (storage.DualStorage, error) {
 	badgeropts := badger.DefaultOptions("").
 		WithInMemory(true).
 		WithNumGoroutines(BadgerGoRoutines)
-	badgeropts = badgeropts.WithLogger(logging.NewBadgerLogger(""))
+	badgeropts = badgeropts.WithLogger(logging.NewBadgerLogger("", ""))
 	if opts.Debug {
-		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(logging.NewBadgerLogger("debug"))
+		badgeropts = badgeropts.WithLoggingLevel(badger.DEBUG).WithLogger(logging.NewBadgerLogger("debug", "text"))
 	}
 	db, err := badger.Open(badgeropts)
 	if err != nil {

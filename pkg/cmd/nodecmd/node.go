@@ -119,7 +119,7 @@ func Execute() error {
 
 	// Time to get going
 
-	log := logging.SetupLogging(conf.Global.LogLevel)
+	log := logging.SetupLogging(conf.Global.LogLevel, conf.Global.LogFormat)
 	ctx := context.WithLogger(context.Background(), log)
 
 	log.Info("Starting webmesh node",

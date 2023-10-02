@@ -99,7 +99,7 @@ func run() error {
 	}
 
 	// Setup the speed test handler
-	ctx := context.WithLogger(context.Background(), logging.NewLogger(logLevel))
+	ctx := context.WithLogger(context.Background(), logging.NewLogger(logLevel, "text"))
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 

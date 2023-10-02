@@ -29,8 +29,8 @@ type badgerLogAdapter struct {
 
 // NewBadgerLogger returns a badger log adapter backed by slog with the given
 // log level.
-func NewBadgerLogger(logLevel string) badger.Logger {
-	return NewBadgerAdapter(NewLogger(logLevel))
+func NewBadgerLogger(logLevel string, format string) badger.Logger {
+	return NewBadgerAdapter(NewLogger(logLevel, format))
 }
 
 // NewBadgerAdapter returns a badger log adapter for the given logger.

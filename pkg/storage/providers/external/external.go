@@ -62,6 +62,8 @@ type Options struct {
 	TLSConfig *tls.Config
 	// LogLevel is the log level for the storage provider.
 	LogLevel string
+	// LogFormat is the log format for the storage provider.
+	LogFormat string
 }
 
 // Provider is a storage provider that uses a storage plugin.
@@ -79,7 +81,7 @@ type Provider struct {
 func NewProvider(opts Options) *Provider {
 	p := &Provider{
 		Options: opts,
-		log:     logging.NewLogger(opts.LogLevel).With("component", "storage-provider", "provider", "external"),
+		log:     logging.NewLogger(opts.LogLevel, opts.LogFormat).With("component", "storage-provider", "provider", "external"),
 	}
 	p.storage = &ExternalStorage{p}
 	p.consensus = &Consensus{p}

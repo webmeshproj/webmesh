@@ -83,7 +83,7 @@ func NewNode(ctx context.Context, opts Options) (Node, error) {
 	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
 		return nil, fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
-	log := logging.SetupLogging(config.Global.LogLevel)
+	log := logging.SetupLogging(config.Global.LogLevel, config.Global.LogFormat)
 	if config.Global.LogLevel == "" || config.Global.LogLevel == "silent" {
 		log = slog.New(slog.NewTextHandler(io.Discard, nil))
 		ctx = context.WithLogger(ctx, log)

@@ -33,7 +33,7 @@ import (
 // It should not be run in parallel with other tests to avoid port conflicts.
 func TestBootstrapTransport(t *testing.T) {
 	ctx := context.Background()
-	nooplog := logging.NewLogger("")
+	nooplog := logging.NewLogger("", "")
 	ctx = context.WithLogger(ctx, nooplog)
 
 	// Test a single node transport.

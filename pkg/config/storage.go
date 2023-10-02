@@ -73,6 +73,8 @@ type StorageOptions struct {
 	External ExternalStorageOptions `koanf:"external,omitempty"`
 	// LogLevel is the log level for the storage provider.
 	LogLevel string `koanf:"log-level,omitempty"`
+	// LogFormat is the log format for the storage provider.
+	LogFormat string `koanf:"log-format,omitempty"`
 }
 
 // NewStorageOptions creates a new storage options.
@@ -93,6 +95,7 @@ func (o *StorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.Path, prefix+"path", raftstorage.DefaultDataDir, "Path to the storage directory")
 	fs.StringVar(&o.Provider, prefix+"provider", string(StorageProviderRaft), "Storage provider (defaults to raftstorage or passthrough depending on other options)")
 	fs.StringVar(&o.LogLevel, prefix+"log-level", "info", "Log level for the storage provider")
+	fs.StringVar(&o.LogFormat, prefix+"log-format", "text", "Log format for the storage provider")
 	o.Raft.BindFlags(prefix+"raft.", fs)
 	o.External.BindFlags(prefix+"external.", fs)
 }
@@ -186,23 +189,26 @@ func (o *StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node,
 	opts.SnapshotRetention = o.Raft.SnapshotRetention
 	opts.ObserverChanBuffer = o.Raft.ObserverChanBuffer
 	opts.LogLevel = o.LogLevel
+	opts.LogFormat = o.LogFormat
 	return opts, nil
 }
 
 // NewPassthroughOptions returns a new passthrough options for the current configuration.
 func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, node meshnode.Node) passthroughstorage.Options {
 	return passthroughstorage.Options{
-		Dialer:   node,
-		LogLevel: o.LogLevel,
+		Dialer:    node,
+		LogLevel:  o.LogLevel,
+		LogFormat: o.LogFormat,
 	}
 }
 
 // NewExternalStorageOptions creates a new external storage options.
 func (o *StorageOptions) NewExternalStorageOptions(ctx context.Context, nodeID types.NodeID) (extstorage.Options, error) {
 	opts := extstorage.Options{
-		NodeID:   nodeID,
-		Server:   o.External.Server,
-		LogLevel: o.LogLevel,
+		NodeID:    nodeID,
+		Server:    o.External.Server,
+		LogLevel:  o.LogLevel,
+		LogFormat: o.LogFormat,
 	}
 	if len(o.External.Config) > 0 {
 		config, err := structpb.NewStruct(o.External.Config)

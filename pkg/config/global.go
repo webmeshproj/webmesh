@@ -33,6 +33,8 @@ import (
 type GlobalOptions struct {
 	// LogLevel is the log level.
 	LogLevel string `koanf:"log-level,omitempty"`
+	// LogFormat is the log format. One of "text" or "json".
+	LogFormat string `koanf:"log-format,omitempty"`
 	// TLSCertFile is the TLS certificate file.
 	TLSCertFile string `koanf:"tls-cert-file,omitempty"`
 	// TLSKeyFile is the TLS key file.
@@ -76,6 +78,7 @@ type GlobalOptions struct {
 
 func (o *GlobalOptions) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.LogLevel, "global.log-level", "info", "Log level.")
+	fs.StringVar(&o.LogFormat, "global.log-format", "text", "Log format. One of 'text' or 'json'.")
 	fs.StringVar(&o.TLSCertFile, "global.tls-cert-file", "", "TLS certificate file.")
 	fs.StringVar(&o.TLSKeyFile, "global.tls-key-file", "", "TLS key file.")
 	fs.StringVar(&o.TLSCAFile, "global.tls-ca-file", "", "TLS CA file.")
@@ -152,6 +155,9 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 	// Apply global options
 	if global.LogLevel != "" {
 		o.Storage.LogLevel = global.LogLevel
+	}
+	if global.LogFormat != "" {
+		o.Storage.LogFormat = global.LogFormat
 	}
 
 	// If the primary endpoint was detected, set it to the appropriate places

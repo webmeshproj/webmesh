@@ -52,6 +52,8 @@ type Options struct {
 	Dialer transport.NodeDialer
 	// LogLevel is the log level to use.
 	LogLevel string
+	// LogFormat is the log format to use.
+	LogFormat string
 }
 
 // Provider is a storage provider that passes through all storage operations to another node
@@ -70,7 +72,7 @@ type Provider struct {
 func NewProvider(opts Options) *Provider {
 	p := &Provider{
 		Options: opts,
-		log:     logging.NewLogger(opts.LogLevel).With("component", "passthrough-storage"),
+		log:     logging.NewLogger(opts.LogLevel, opts.LogFormat).With("component", "passthrough-storage"),
 		closec:  make(chan struct{}),
 	}
 	p.storage = &Storage{Provider: p}

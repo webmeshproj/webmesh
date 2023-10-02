@@ -88,7 +88,7 @@ func New(opts Options) (TransportBuilder, *WebmeshTransport) {
 		panic("config is required")
 	}
 	if opts.Logger == nil {
-		opts.Logger = logging.NewLogger("")
+		opts.Logger = logging.NewLogger("", "")
 	}
 	rt := &WebmeshTransport{
 		opts: opts,
@@ -288,7 +288,8 @@ func (t *WebmeshTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error
 		// We use the background context to not let the listen timeout
 		// interfere with the start timeout
 		logLevel := t.opts.Config.Global.LogLevel
-		node, err := t.startNode(context.WithLogger(context.Background(), logging.NewLogger(logLevel)), laddr)
+		logFormat := t.opts.Config.Global.LogFormat
+		node, err := t.startNode(context.WithLogger(context.Background(), logging.NewLogger(logLevel, logFormat)), laddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to start node: %w", err)
 		}
@@ -499,7 +500,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 		return nil, fmt.Errorf("failed to create mesh config: %w", err)
 	}
 	meshConfig.Key = t.key
-	node := meshnode.NewWithLogger(logging.NewLogger(conf.Global.LogLevel).With("component", "webmesh-node"), meshConfig)
+	node := meshnode.NewWithLogger(logging.NewLogger(conf.Global.LogLevel, conf.Global.LogFormat).With("component", "webmesh-node"), meshConfig)
 	storageProvider, err := conf.NewStorageProvider(ctx, node, conf.Bootstrap.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage provider: %w", err)

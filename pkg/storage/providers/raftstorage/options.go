@@ -88,6 +88,8 @@ type Options struct {
 	BarrierThreshold int32
 	// LogLevel is the log level for the raft backend.
 	LogLevel string
+	// LogFormat is the log format for the raft backend.
+	LogFormat string
 }
 
 // NewOptions returns new raft options with sensible defaults.

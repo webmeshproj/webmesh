@@ -99,7 +99,7 @@ func NewOptions(log *slog.Logger) libp2p.Option {
 // NewWithLogger returns a new constructor for a webmesh transport using the given logger.
 func NewWithLogger(log *slog.Logger) Constructor {
 	if log == nil {
-		log = logging.NewLogger("")
+		log = logging.NewLogger("", "")
 	}
 	return func(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WireGuardTransport, error) {
 		return newWebmeshTransport(log, tu, host, key, psk, gater, rcmgr)
@@ -108,7 +108,7 @@ func NewWithLogger(log *slog.Logger) Constructor {
 
 // New is the standard constructor for a webmesh transport.
 func New(tu transport.Upgrader, host host.Host, key crypto.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (WireGuardTransport, error) {
-	return NewWithLogger(logging.NewLogger(""))(tu, host, key, psk, gater, rcmgr)
+	return NewWithLogger(logging.NewLogger("", ""))(tu, host, key, psk, gater, rcmgr)
 }
 
 // newWebmeshTransport is the constructor for the webmesh transport.
