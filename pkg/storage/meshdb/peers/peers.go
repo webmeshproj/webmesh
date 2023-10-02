@@ -160,7 +160,7 @@ func (p *peerDB) ListIDs(ctx context.Context) ([]types.NodeID, error) {
 
 func (p *peerDB) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (context.CancelFunc, error) {
 	log := context.LoggerFrom(ctx)
-	return p.db.Subscribe(ctx, []byte(""), func(key, value []byte) {
+	return p.db.Subscribe(ctx, nil, func(key, value []byte) {
 		var nodes []types.MeshNode
 		switch {
 		case bytes.HasPrefix(key, storage.EdgesPrefix):

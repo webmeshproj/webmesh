@@ -25,6 +25,7 @@ services:
     hostname: bootstrap-node
     entrypoint:
       - /webmesh-node
+      - --global.log-level=debug
       - --global.insecure
       - --global.detect-endpoints
       - --global.detect-private-endpoints

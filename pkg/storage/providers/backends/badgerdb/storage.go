@@ -297,7 +297,16 @@ func (db *badgerDB) Subscribe(ctx context.Context, prefix []byte, fn storage.KVS
 	defer db.mu.Unlock()
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
-		match := []pb.Match{{Prefix: prefix}}
+		match := []pb.Match{}
+		if len(prefix) > 0 {
+			match = append(match, pb.Match{
+				Prefix: prefix,
+			})
+		} else {
+			match = append(match, pb.Match{
+				Prefix: types.RegistryPrefix,
+			})
+		}
 		var mu sync.Mutex
 		_ = db.db.Subscribe(ctx, func(kv *pb.KVList) error {
 			mu.Lock()

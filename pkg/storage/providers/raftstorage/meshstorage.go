@@ -66,9 +66,6 @@ func (rs *RaftStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, e
 	if !rs.raft.started.Load() {
 		return nil, errors.ErrClosed
 	}
-	if !storageutil.IsValidKey(string(prefix)) {
-		return nil, errors.ErrInvalidPrefix
-	}
 	return rs.storage.ListKeys(ctx, prefix)
 }
 
@@ -77,9 +74,6 @@ func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage
 	if !rs.raft.started.Load() {
 		return errors.ErrClosed
 	}
-	if !storageutil.IsValidKey(string(prefix)) {
-		return errors.ErrInvalidPrefix
-	}
 	return rs.storage.IterPrefix(ctx, prefix, fn)
 }
 
@@ -87,9 +81,6 @@ func (rs *RaftStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage
 func (rs *RaftStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
 	if !rs.raft.started.Load() {
 		return func() {}, errors.ErrClosed
-	}
-	if !storageutil.IsValidKey(string(prefix)) {
-		return func() {}, errors.ErrInvalidPrefix
 	}
 	return rs.storage.Subscribe(ctx, prefix, fn)
 }
