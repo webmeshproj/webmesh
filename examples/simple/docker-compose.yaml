@@ -25,7 +25,6 @@ services:
     hostname: bootstrap-node
     entrypoint:
       - /webmesh-node
-      - --global.log-level=debug
       - --global.insecure
       - --global.detect-endpoints
       - --global.detect-private-endpoints
@@ -33,6 +32,8 @@ services:
       - --storage.in-memory
       - --plugins.debug.listen-address=0.0.0.0:6060
       - --plugins.debug.enable-db-querier=true
+    volumes:
+      - /dev/net/tun:/dev/net/tun
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     ports:
       - "8443:8443"
@@ -52,6 +53,8 @@ services:
       - --global.insecure
       - --mesh.join-address=bootstrap-node:8443
     restart: on-failure
+    volumes:
+      - /dev/net/tun:/dev/net/tun
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
