@@ -278,9 +278,6 @@ func (p *Storage) Delete(ctx context.Context, key []byte) error {
 
 // ListKeys returns all keys with a given prefix.
 func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
-	if !storageutil.IsValidKey(string(prefix)) {
-		return nil, errors.ErrInvalidPrefix
-	}
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return nil, err
@@ -309,9 +306,6 @@ func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error)
 // that the iterator not attempt any write operations as this will cause
 // a deadlock.
 func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
-	if !storageutil.IsValidKey(string(prefix)) {
-		return errors.ErrInvalidPrefix
-	}
 	cli, close, err := p.newStorageClient(ctx)
 	if err != nil {
 		return err
@@ -349,9 +343,6 @@ func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pref
 // Subscribe will call the given function whenever a key with the given prefix is changed.
 // The returned function can be called to unsubscribe.
 func (p *Storage) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
-	if !storageutil.IsValidKey(string(prefix)) {
-		return func() {}, errors.ErrInvalidPrefix
-	}
 	ctx, cancel := context.WithCancel(ctx)
 	p.mu.Lock()
 	p.subCancels = append(p.subCancels, cancel)

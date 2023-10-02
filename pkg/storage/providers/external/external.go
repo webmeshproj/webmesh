@@ -401,9 +401,6 @@ func (ext *ExternalStorage) ListKeys(ctx context.Context, prefix []byte) ([][]by
 	if ext.cli == nil {
 		return nil, errors.ErrClosed
 	}
-	if !storageutil.IsValidKey(string(prefix)) {
-		return nil, errors.ErrInvalidPrefix
-	}
 	resp, err := ext.cli.ListKeys(ctx, &v1.ListKeysRequest{Prefix: prefix})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -422,9 +419,6 @@ func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix []byte, fn st
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return errors.ErrClosed
-	}
-	if !storageutil.IsValidKey(string(prefix)) {
-		return errors.ErrInvalidPrefix
 	}
 	resp, err := ext.cli.ListValues(ctx, &v1.ListValuesRequest{Prefix: prefix})
 	if err != nil {
@@ -448,9 +442,6 @@ func (ext *ExternalStorage) Subscribe(ctx context.Context, prefix []byte, fn sto
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
 		return func() {}, errors.ErrClosed
-	}
-	if !storageutil.IsValidKey(string(prefix)) {
-		return func() {}, errors.ErrInvalidPrefix
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	stream, err := ext.cli.SubscribePrefix(ctx, &v1.SubscribePrefixRequest{Prefix: prefix})
