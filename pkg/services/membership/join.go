@@ -230,7 +230,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 	if req.GetPrimaryEndpoint() != "" {
 		// Add an edge between the caller and all other nodes with public endpoints
 		// TODO: This should be done according to network policy and batched
-		allPeers, err := p.List(ctx, storage.IsPublicFilter())
+		allPeers, err := p.List(ctx, storage.FilterByIsPublic())
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
@@ -252,7 +252,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		// Add an edge between the caller and all other nodes in the same zone
 		// with public endpoints.
 		// TODO: Same as above - this should be done according to network policy and batched
-		zonePeers, err := p.List(ctx, storage.ZoneIDFilter(req.GetZoneAwarenessID()))
+		zonePeers, err := p.List(ctx, storage.FilterByZoneID(req.GetZoneAwarenessID()))
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers: %v", err))
 		}
@@ -370,7 +370,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		go addStorageMember()
 	}
 
-	dnsServers, err := p.List(ctx, storage.FeatureFilter(v1.Feature_MESH_DNS))
+	dnsServers, err := p.List(ctx, storage.FilterByFeature(v1.Feature_MESH_DNS))
 	if err != nil {
 		log.Warn("could not lookup DNS servers", slog.String("error", err.Error()))
 	} else {
@@ -398,7 +398,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	// If the caller needs ICE servers, find all the eligible peers and return them
 	if requiresICE {
-		peers, err := p.List(ctx, storage.FeatureFilter(v1.Feature_ICE_NEGOTIATION))
+		peers, err := p.List(ctx, storage.FilterByFeature(v1.Feature_ICE_NEGOTIATION))
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to list peers by ICE feature: %v", err))
 		}

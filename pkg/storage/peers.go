@@ -91,29 +91,29 @@ func (f PeerFilters) Match(node types.MeshNode) bool {
 	return true
 }
 
-// FeatureFilter returns a new filter that matches nodes with a given feature.
-func FeatureFilter(feature v1.Feature) PeerFilter {
+// FilterByFeature returns a new filter that matches nodes with a given feature.
+func FilterByFeature(feature v1.Feature) PeerFilter {
 	return func(node types.MeshNode) bool {
 		return node.HasFeature(feature)
 	}
 }
 
-// IsPublicFilter returns a new filter that matches public nodes.
-func IsPublicFilter() PeerFilter {
+// FilterByIsPublic returns a new filter that matches public nodes.
+func FilterByIsPublic() PeerFilter {
 	return func(node types.MeshNode) bool {
 		return node.GetPrimaryEndpoint() != ""
 	}
 }
 
-// ZoneIDFilter returns a new filter that matches nodes in a given zone.
-func ZoneIDFilter(zoneID string) PeerFilter {
+// FilterByZoneID returns a new filter that matches nodes in a given zone.
+func FilterByZoneID(zoneID string) PeerFilter {
 	return func(node types.MeshNode) bool {
 		return node.GetZoneAwarenessID() == zoneID
 	}
 }
 
-// NotNodeIDFilter returns a new filter that matches nodes that are not a given node ID.
-func NotNodeIDFilter(nodeID types.NodeID) PeerFilter {
+// FilterAgainstNode returns a new filter that matches nodes that are not a given node ID.
+func FilterAgainstNode(nodeID types.NodeID) PeerFilter {
 	return func(node types.MeshNode) bool {
 		return node.NodeID() != nodeID
 	}

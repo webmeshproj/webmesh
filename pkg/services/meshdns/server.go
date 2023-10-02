@@ -161,7 +161,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 	}
 	if opts.SubscribeForwarders {
 		cancel, err := dom.storage.MeshDB().Peers().Subscribe(context.Background(), func([]types.MeshNode) {
-			peers, err := dom.storage.MeshDB().Peers().List(context.Background(), storage.FeatureFilter(v1.Feature_FORWARD_MESH_DNS))
+			peers, err := dom.storage.MeshDB().Peers().List(context.Background(), storage.FilterByFeature(v1.Feature_FORWARD_MESH_DNS))
 			if err != nil {
 				s.log.Warn("failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
 				return
