@@ -33,7 +33,7 @@ var InvalidIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', 
 var ReservedNodeIDs = []string{"self", "local", "localhost", "leader", "voters", "observers"}
 
 // MaxIDLength is the maximum length of a key ID.
-const MaxIDLength = 64
+const MaxIDLength = 63
 
 // IsValidID returns true if the given identifier is valid and safe to be saved to storage.
 func IsValidID(id string) bool {
