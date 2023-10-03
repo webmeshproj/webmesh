@@ -146,7 +146,7 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 		}
 		err = s.nw.DNS().AddServers(ctx, servers)
 		if err != nil {
-			log.Error("Failed to add dns servers", slog.String("error", err.Error()))
+			log.Error("Failed to add DNS servers", slog.String("error", err.Error()))
 		}
 	}
 	return nil

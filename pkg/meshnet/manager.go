@@ -191,7 +191,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 			log.Warn("Failed to load wireguard kernel module", slog.String("error", err.Error()))
 		}
 	}
-	log.Debug("Network manager stasrt options", slog.Any("start-opts", opts))
+	log.Debug("Network manager start options", slog.Any("start-opts", opts))
 	handleErr := func(err error) error {
 		if m.wg != nil {
 			if closeErr := m.wg.Close(ctx); closeErr != nil {
