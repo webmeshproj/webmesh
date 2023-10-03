@@ -144,10 +144,10 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	// Start serving storage queries for plugins.
 	handleErr := func(cause error) error {
 		s.kvSubCancel()
-		log.Error("failed to open mesh connection", slog.String("error", err.Error()))
+		log.Error("Failed to open mesh connection", slog.String("error", err.Error()))
 		perr := s.plugins.Close()
 		if perr != nil {
-			log.Error("failed to close plugin manager", slog.String("error", perr.Error()))
+			log.Error("Failed to close plugin manager", slog.String("error", perr.Error()))
 		}
 		return cause
 	}
