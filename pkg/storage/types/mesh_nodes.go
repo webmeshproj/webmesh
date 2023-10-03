@@ -59,8 +59,14 @@ func IsValidID(id string) bool {
 // TruncateID is a helper method to truncate IDs as needed when they are too long
 // and can be safely truncated.
 func TruncateID(id string) string {
-	if len(id) > MaxIDLength {
-		return id[:MaxIDLength]
+	return TruncateIDTo(id, MaxIDLength)
+}
+
+// TruncateIDTo is a helper method to truncate IDs as needed when they are too long
+// and can be safely truncated.
+func TruncateIDTo(id string, length int) string {
+	if len(id) > length {
+		return id[:length]
 	}
 	return id
 }
