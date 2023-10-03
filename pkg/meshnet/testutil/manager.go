@@ -57,6 +57,8 @@ func NewManagerWithDB(db storage.MeshDB, opts meshnet.Options, nodeID types.Node
 		nodeID: nodeID,
 		db:     db,
 		opts:   opts,
+		dns:    &DNSManager{},
+		fw:     &Firewall{},
 	}
 }
 
@@ -85,6 +87,7 @@ func (c *Manager) Start(ctx context.Context, opts meshnet.StartOptions) error {
 	if err != nil {
 		return err
 	}
+	c.peers = &PeerManager{wg: c.wg}
 	return nil
 }
 

@@ -48,6 +48,13 @@ type Resolver[T any] interface {
 	Resolve(ctx context.Context, lookup T) ([]netip.AddrPort, error)
 }
 
+// NewNoopResolver returns a no-op resolver of the specified type.
+func NewNoopResolver[T any]() Resolver[T] {
+	return ResolverFunc[T](func(ctx context.Context, lookup T) ([]netip.AddrPort, error) {
+		return nil, nil
+	})
+}
+
 // ResolverFunc is a function that implements Resolver.
 type ResolverFunc[T any] func(ctx context.Context, lookup T) ([]netip.AddrPort, error)
 
