@@ -28,10 +28,10 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
 )
 
-// TestSystemInterface is a test interface for use with testing.
+// SystemInterface is a test interface for use with testing.
 // It implements system.Interface but maintains state in-memory
 // and does not make any modifications to the system.
-type TestSystemInterface struct {
+type SystemInterface struct {
 	*system.Options
 	hwaddr  net.HardwareAddr
 	started bool
@@ -40,36 +40,36 @@ type TestSystemInterface struct {
 	mu      sync.Mutex
 }
 
-// NewTestSystemInterface creates a new test interface.
-func NewTestSystemInterface(ctx context.Context, opts *system.Options) (system.Interface, error) {
+// NewSystemInterface creates a new test system interface.
+func NewSystemInterface(ctx context.Context, opts *system.Options) (system.Interface, error) {
 	hwaddr := make([]byte, 6)
 	_, err := rand.Read(hwaddr)
 	if err != nil {
 		return nil, fmt.Errorf("generate random hardware address: %w", err)
 	}
-	return &TestSystemInterface{
+	return &SystemInterface{
 		Options: opts,
 		hwaddr:  hwaddr,
 	}, nil
 }
 
 // Name returns the real name of the interface.
-func (t *TestSystemInterface) Name() string {
+func (t *SystemInterface) Name() string {
 	return t.Options.Name
 }
 
 // AddressV4 should return the current private IPv4 address of this interface.
-func (t *TestSystemInterface) AddressV4() netip.Prefix {
+func (t *SystemInterface) AddressV4() netip.Prefix {
 	return t.Options.AddressV4
 }
 
 // AddressV6 should return the current private IPv6 address of this interface.
-func (t *TestSystemInterface) AddressV6() netip.Prefix {
+func (t *SystemInterface) AddressV6() netip.Prefix {
 	return t.Options.AddressV6
 }
 
 // Up activates the interface.
-func (t *TestSystemInterface) Up(context.Context) error {
+func (t *SystemInterface) Up(context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closed {
@@ -80,7 +80,7 @@ func (t *TestSystemInterface) Up(context.Context) error {
 }
 
 // Down deactivates the interface.
-func (t *TestSystemInterface) Down(context.Context) error {
+func (t *SystemInterface) Down(context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closed {
@@ -91,7 +91,7 @@ func (t *TestSystemInterface) Down(context.Context) error {
 }
 
 // Destroy destroys the interface.
-func (t *TestSystemInterface) Destroy(context.Context) error {
+func (t *SystemInterface) Destroy(context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closed {
@@ -102,7 +102,7 @@ func (t *TestSystemInterface) Destroy(context.Context) error {
 }
 
 // AddRoute adds a route for the given network.
-func (t *TestSystemInterface) AddRoute(_ context.Context, route netip.Prefix) error {
+func (t *SystemInterface) AddRoute(_ context.Context, route netip.Prefix) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closed {
@@ -113,7 +113,7 @@ func (t *TestSystemInterface) AddRoute(_ context.Context, route netip.Prefix) er
 }
 
 // RemoveRoute removes the route for the given network.
-func (t *TestSystemInterface) RemoveRoute(_ context.Context, route netip.Prefix) error {
+func (t *SystemInterface) RemoveRoute(_ context.Context, route netip.Prefix) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closed {
@@ -129,7 +129,7 @@ func (t *TestSystemInterface) RemoveRoute(_ context.Context, route netip.Prefix)
 }
 
 // Link returns the underlying net.Interface.
-func (t *TestSystemInterface) Link() (*net.Interface, error) {
+func (t *SystemInterface) Link() (*net.Interface, error) {
 	return &net.Interface{
 		Index:        1,
 		MTU:          system.DefaultMTU,
@@ -139,6 +139,6 @@ func (t *TestSystemInterface) Link() (*net.Interface, error) {
 }
 
 // HardwareAddr returns the hardware address of the interface.
-func (t *TestSystemInterface) HardwareAddr() (net.HardwareAddr, error) {
+func (t *SystemInterface) HardwareAddr() (net.HardwareAddr, error) {
 	return t.hwaddr, nil
 }
