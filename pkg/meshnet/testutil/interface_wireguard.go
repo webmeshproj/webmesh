@@ -55,6 +55,7 @@ func NewWireGuardInterface(ctx context.Context, opts *wireguard.Options) (wiregu
 	}
 	return &WireGuardInterface{
 		Interface: systemInterface,
+		peers:     make(map[string]wireguard.Peer),
 		opts:      opts,
 	}, nil
 }
