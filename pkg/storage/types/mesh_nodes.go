@@ -32,10 +32,16 @@ var InvalidIDChars = []rune{'/', '\\', ':', '*', '?', '"', '\'', '<', '>', '|', 
 // ReservedNodeIDs are reserved node IDs.
 var ReservedNodeIDs = []string{"self", "local", "localhost", "leader", "voters", "observers"}
 
+// MaxIDLength is the maximum length of a key ID.
+const MaxIDLength = 64
+
 // IsValidID returns true if the given identifier is valid and safe to be saved to storage.
 func IsValidID(id string) bool {
 	// Make sure non-empty and all characters are valid UTF-8.
 	if len(id) == 0 {
+		return false
+	}
+	if len(id) > MaxIDLength {
 		return false
 	}
 	// Make sure all characters are valid UTF-8.
@@ -48,6 +54,15 @@ func IsValidID(id string) bool {
 		}
 	}
 	return true
+}
+
+// TruncateID is a helper method to truncate IDs as needed when they are too long
+// and can be safely truncated.
+func TruncateID(id string) string {
+	if len(id) > MaxIDLength {
+		return id[:MaxIDLength]
+	}
+	return id
 }
 
 // IsValidNodeID returns true if the given node ID is valid and safe to be saved to storage.
