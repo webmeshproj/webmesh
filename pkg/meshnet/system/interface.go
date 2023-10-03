@@ -18,6 +18,7 @@ limitations under the License.
 package system
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,6 +26,7 @@ import (
 	"net/netip"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/link"
@@ -36,7 +38,7 @@ import (
 const DefaultMTU = 1420
 
 // Interface represents an underlying machine network interface for
-// use with wireguard.
+// use with WireGuard.
 type Interface interface {
 	// Name returns the real name of the interface.
 	Name() string
@@ -44,7 +46,7 @@ type Interface interface {
 	AddressV4() netip.Prefix
 	// AddressV6 should return the current private IPv6 address of this interface.
 	AddressV6() netip.Prefix
-	// Up activates the interface.
+	// Up activates the interface.https://kind.sigs.k8s.io/
 	Up(context.Context) error
 	// Down deactivates the interface.
 	Down(context.Context) error
@@ -226,4 +228,119 @@ func (l *sysInterface) HardwareAddr() (net.HardwareAddr, error) {
 		return nil, fmt.Errorf("get interface by name: %w", err)
 	}
 	return link.HardwareAddr, nil
+}
+
+// TestInterface is a test interface for use with testing.
+// It implements Interface but maintains state in-memory and
+// does not make any modifications to the system.
+type TestInterface struct {
+	*Options
+	hwaddr  net.HardwareAddr
+	started bool
+	closed  bool
+	routes  []netip.Prefix
+	mu      sync.Mutex
+}
+
+// NewTestInterface creates a new test interface.
+func NewTestInterface(ctx context.Context, opts *Options) (Interface, error) {
+	hwaddr := make([]byte, 6)
+	_, err := rand.Read(hwaddr)
+	if err != nil {
+		return nil, fmt.Errorf("generate random hardware address: %w", err)
+	}
+	return &TestInterface{
+		Options: opts,
+		hwaddr:  hwaddr,
+	}, nil
+}
+
+// Name returns the real name of the interface.
+func (t *TestInterface) Name() string {
+	return t.Options.Name
+}
+
+// AddressV4 should return the current private IPv4 address of this interface.
+func (t *TestInterface) AddressV4() netip.Prefix {
+	return t.Options.AddressV4
+}
+
+// AddressV6 should return the current private IPv6 address of this interface.
+func (t *TestInterface) AddressV6() netip.Prefix {
+	return t.Options.AddressV6
+}
+
+// Up activates the interface.
+func (t *TestInterface) Up(context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return errors.New("interface closed")
+	}
+	t.started = true
+	return nil
+}
+
+// Down deactivates the interface.
+func (t *TestInterface) Down(context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return errors.New("interface closed")
+	}
+	t.started = false
+	return nil
+}
+
+// Destroy destroys the interface.
+func (t *TestInterface) Destroy(context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return errors.New("interface closed")
+	}
+	t.closed = true
+	return nil
+}
+
+// AddRoute adds a route for the given network.
+func (t *TestInterface) AddRoute(_ context.Context, route netip.Prefix) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return errors.New("interface closed")
+	}
+	t.routes = append(t.routes, route)
+	return nil
+}
+
+// RemoveRoute removes the route for the given network.
+func (t *TestInterface) RemoveRoute(_ context.Context, route netip.Prefix) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return errors.New("interface closed")
+	}
+	for i, r := range t.routes {
+		if r.Bits() == route.Bits() && r.Addr().Compare(route.Addr()) == 0 {
+			t.routes = append(t.routes[:i], t.routes[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
+// Link returns the underlying net.Interface.
+func (t *TestInterface) Link() (*net.Interface, error) {
+	return &net.Interface{
+		Index:        1,
+		MTU:          DefaultMTU,
+		Name:         t.Options.Name,
+		HardwareAddr: t.hwaddr,
+	}, nil
+}
+
+// HardwareAddr returns the hardware address of the interface.
+func (t *TestInterface) HardwareAddr() (net.HardwareAddr, error) {
+	return t.hwaddr, nil
 }
