@@ -123,7 +123,7 @@ func (e Eventually[T]) ShouldError(after time.Duration, tick time.Duration) bool
 		if !ok {
 			return false
 		}
-		return er == nil
+		return er != nil
 	})
 }
 
