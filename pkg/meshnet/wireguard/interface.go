@@ -179,6 +179,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	if err != nil {
 		return nil, fmt.Errorf("new interface: %w", err)
 	}
+	opts.Name = iface.Name()
 	handleErr := func(err error) error {
 		if err := iface.Destroy(ctx); err != nil {
 			log.Warn("Failed to destroy interface", "error", err)
