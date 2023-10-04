@@ -212,7 +212,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 
 // ListenPort returns the current listen port of the wireguard interface.
 func (w *wginterface) ListenPort() (int, error) {
-	iface, err := w.cli.Device(w.opts.Name)
+	iface, err := w.cli.Device(w.Name())
 	if err != nil {
 		return 0, err
 	}

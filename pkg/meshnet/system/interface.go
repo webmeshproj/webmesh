@@ -92,7 +92,7 @@ func IsInterfaceNotExists(err error) bool {
 
 // New creates a new interface using the given options.
 func New(ctx context.Context, opts *Options) (Interface, error) {
-	if opts.MTU == 0 {
+	if opts.MTU <= 0 {
 		opts.MTU = DefaultMTU
 	}
 	log := context.LoggerFrom(ctx).With(slog.String("component", "wireguard"))
@@ -101,9 +101,11 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		opts: opts,
 	}
 	forceTUN := opts.ForceTUN || (runtime.GOOS != "linux" && runtime.GOOS != "freebsd")
+	ifName := opts.Name
+	mtu := opts.MTU
 	if forceTUN {
-		log.Debug("creating wireguard tun interface")
-		name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
+		log.Debug("Creating wireguard tun interface")
+		name, closer, err := link.NewTUN(ctx, ifName, mtu)
 		if err != nil {
 			return nil, fmt.Errorf("new tun: %w", err)
 		}
@@ -113,12 +115,12 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			return nil
 		}
 	} else {
-		log.Debug("creating wireguard kernel interface")
-		err := link.NewKernel(ctx, opts.Name, opts.MTU)
+		log.Debug("Creating wireguard kernel interface")
+		err := link.NewKernel(ctx, ifName, mtu)
 		if err != nil {
-			log.Error("create wireguard kernel interface failed, falling back to TUN interface", "error", err)
+			log.Error("Failed to create kernel interface failed, falling back to TUN driver", "error", err)
 			// Try the TUN device as a fallback
-			name, closer, err := link.NewTUN(ctx, opts.Name, opts.MTU)
+			name, closer, err := link.NewTUN(ctx, ifName, mtu)
 			if err != nil {
 				return nil, fmt.Errorf("new tun: %w", err)
 			}
@@ -129,7 +131,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			}
 		} else {
 			iface.close = func(ctx context.Context) error {
-				return link.RemoveInterface(ctx, opts.Name)
+				return link.RemoveInterface(ctx, ifName)
 			}
 		}
 	}
@@ -162,7 +164,7 @@ type sysInterface struct {
 }
 
 func (l *sysInterface) setInterfaceAddress(ctx context.Context, addr netip.Prefix) error {
-	context.LoggerFrom(ctx).Debug("setting interface address", "address", addr.String())
+	context.LoggerFrom(ctx).Debug("Setting interface address", "address", addr.String())
 	err := link.SetInterfaceAddress(ctx, l.opts.Name, addr)
 	if err != nil {
 		return fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
