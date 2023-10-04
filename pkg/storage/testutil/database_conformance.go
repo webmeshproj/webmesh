@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -31,19 +32,19 @@ type NewMeshDataStoreFunc func(t *testing.T) storage.MeshDataStore
 func TestMeshDataStoreConformance(t *testing.T, builder NewMeshDataStoreFunc) {
 	t.Run("MeshDBConformance", func(t *testing.T) {
 		TestPeerGraphstoreConformance(t, func(t *testing.T) types.PeerGraphStore {
-			db := builder(t)
+			db := meshdb.New(builder(t))
 			return db.GraphStore()
 		})
 		TestMeshStateStorageConformance(t, func(t *testing.T) storage.MeshState {
-			db := builder(t)
+			db := meshdb.New(builder(t))
 			return db.MeshState()
 		})
 		TestRBACStorageConformance(t, func(t *testing.T) storage.RBAC {
-			db := builder(t)
+			db := meshdb.New(builder(t))
 			return db.RBAC()
 		})
 		TestNetworkingStorageConformance(t, func(t *testing.T) storage.Networking {
-			db := builder(t)
+			db := meshdb.New(builder(t))
 			return db.Networking()
 		})
 	})

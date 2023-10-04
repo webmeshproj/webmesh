@@ -14,24 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package networking
+package meshdb
 
 import (
-	"testing"
+	"io"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
-	"github.com/webmeshproj/webmesh/pkg/storage/testutil"
 )
 
-func TestNetworkingConformance(t *testing.T) {
-	t.Parallel()
-	testutil.TestNetworkingStorageConformance(t, func(t *testing.T) storage.Networking {
-		st := badgerdb.NewTestStorage(false)
-		p := New(st)
-		t.Cleanup(func() {
-			_ = st.Close()
-		})
-		return p
-	})
+// MeshDBCloser is a storage.MeshDB that can be closed.
+type MeshDBCloser interface {
+	storage.MeshDB
+	io.Closer
+}
+
+// NewTestDB returns a new in-memory storage.Database instance for testing.
+func NewTestDB() *TestDB {
+	memdb := badgerdb.NewTestStorage(false)
+	return &TestDB{
+		MeshDB: NewFromStorage(memdb),
+		Closer: memdb,
+	}
+}
+
+type TestDB struct {
+	storage.MeshDB
+	io.Closer
 }

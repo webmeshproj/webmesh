@@ -21,7 +21,6 @@ package meshdb
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/netip"
 
 	"github.com/dominikbraun/graph"
@@ -34,7 +33,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/state"
-	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -669,24 +667,4 @@ func (v *ValidatingRBACStore) ListUserRoles(ctx context.Context, userID types.No
 		return nil, fmt.Errorf("%w: %s", errors.ErrInvalidNodeID, userID)
 	}
 	return v.RBAC.ListUserRoles(ctx, userID)
-}
-
-// MeshDBCloser is a storage.MeshDB that can be closed.
-type MeshDBCloser interface {
-	storage.MeshDB
-	io.Closer
-}
-
-// NewTestDB returns a new in-memory storage.Database instance for testing.
-func NewTestDB() *TestDB {
-	memdb := badgerdb.NewTestStorage(false)
-	return &TestDB{
-		MeshDB: NewFromStorage(memdb),
-		Closer: memdb,
-	}
-}
-
-type TestDB struct {
-	storage.MeshDB
-	io.Closer
 }
