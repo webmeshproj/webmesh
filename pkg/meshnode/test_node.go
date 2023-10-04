@@ -146,6 +146,32 @@ func (t *TestNode) Key() crypto.PrivateKey {
 	return t.cfg.Key
 }
 
+// Storage returns the underlying storage provider.
+func (t *TestNode) Storage() storage.Provider {
+	return t.storage
+}
+
+// Network returns the Network manager.
+func (t *TestNode) Network() meshnet.Manager {
+	return t.nw
+}
+
+// Plugins returns the Plugin manager.
+func (t *TestNode) Plugins() plugins.Manager {
+	return t.plugins
+}
+
+// Discovery returns the interface libp2p.Announcer for announcing
+// the mesh to the discovery service.
+func (t *TestNode) Discovery() libp2p.Announcer {
+	return t.discovery
+}
+
+// Credentials returns the gRPC credentials to use for dialing the mesh.
+func (t *TestNode) Credentials() []grpc.DialOption {
+	return nil
+}
+
 // Connect opens the connection to the mesh. This must be called before
 // other methods can be used.
 func (t *TestNode) Connect(ctx context.Context, opts ConnectOptions) error {
@@ -262,35 +288,18 @@ func (t *TestNode) Close(ctx context.Context) error {
 	return t.nw.Close(ctx)
 }
 
-// Credentials returns the gRPC credentials to use for dialing the mesh.
-func (t *TestNode) Credentials() []grpc.DialOption {
-	return nil
-}
-
 // LeaderID returns the current Raft leader ID.
 func (t *TestNode) LeaderID() (types.NodeID, error) {
-	return t.nodeID, nil
-}
-
-// Storage returns the underlying storage provider.
-func (t *TestNode) Storage() storage.Provider {
-	return t.storage
-}
-
-// Network returns the Network manager.
-func (t *TestNode) Network() meshnet.Manager {
-	return t.nw
-}
-
-// Plugins returns the Plugin manager.
-func (t *TestNode) Plugins() plugins.Manager {
-	return t.plugins
-}
-
-// Discovery returns the interface libp2p.Announcer for announcing
-// the mesh to the discovery service.
-func (t *TestNode) Discovery() libp2p.Announcer {
-	return t.discovery
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.started.Load() {
+		return "", ErrNotOpen
+	}
+	leader, err := t.storage.Consensus().GetLeader(context.Background())
+	if err != nil {
+		return "", err
+	}
+	return types.NodeID(leader.GetId()), nil
 }
 
 // MockAnnouncer is a mock announcer that tracks state internally but does
