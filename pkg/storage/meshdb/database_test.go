@@ -20,20 +20,22 @@ import (
 	"testing"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/graphstore"
-	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/testutil"
-	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 func TestBuiltinDBConformance(t *testing.T) {
-	testutil.TestMeshDBConformance(t, func(t *testing.T) (storage.MeshDB, types.PeerGraphStore) {
-		memdb := badgerdb.NewTestStorage(false)
+	testutil.TestMeshDataStoreConformance(t, func(t *testing.T) storage.MeshDataStore {
 		db := NewTestDB()
 		t.Cleanup(func() {
 			_ = db.Close()
-			_ = memdb.Close()
 		})
-		return db, graphstore.NewStore(memdb)
+		return db
+	})
+	testutil.TestPeerStorageConformance(t, func(t *testing.T) storage.Peers {
+		db := NewTestDB()
+		t.Cleanup(func() {
+			_ = db.Close()
+		})
+		return db.Peers()
 	})
 }

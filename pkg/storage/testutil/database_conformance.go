@@ -23,31 +23,27 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
-// NewMeshDBFunc is a function that creates a new MeshDB implementation.
-type NewMeshDBFunc func(t *testing.T) (storage.MeshDB, types.PeerGraphStore)
+// NewMeshDataStoreFunc is a function that creates a new MeshDataStore implementation.
+type NewMeshDataStoreFunc func(t *testing.T) storage.MeshDataStore
 
-// TestMeshDBConformance is a helper for running all database conformance
-// tests against a MeshDB implementation.
-func TestMeshDBConformance(t *testing.T, builder NewMeshDBFunc) {
+// TestMeshDataStoreConformance is a helper for running all database conformance
+// tests against a MeshDataStore implementation.
+func TestMeshDataStoreConformance(t *testing.T, builder NewMeshDataStoreFunc) {
 	t.Run("MeshDBConformance", func(t *testing.T) {
 		TestPeerGraphstoreConformance(t, func(t *testing.T) types.PeerGraphStore {
-			_, graph := builder(t)
-			return graph
+			db := builder(t)
+			return db.GraphStore()
 		})
 		TestMeshStateStorageConformance(t, func(t *testing.T) storage.MeshState {
-			db, _ := builder(t)
+			db := builder(t)
 			return db.MeshState()
 		})
 		TestRBACStorageConformance(t, func(t *testing.T) storage.RBAC {
-			db, _ := builder(t)
+			db := builder(t)
 			return db.RBAC()
 		})
-		TestPeerStorageConformance(t, func(t *testing.T) storage.Peers {
-			db, _ := builder(t)
-			return db.Peers()
-		})
 		TestNetworkingStorageConformance(t, func(t *testing.T) storage.Networking {
-			db, _ := builder(t)
+			db := builder(t)
 			return db.Networking()
 		})
 	})

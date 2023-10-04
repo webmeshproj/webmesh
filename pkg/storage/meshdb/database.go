@@ -678,7 +678,7 @@ type MeshDBCloser interface {
 }
 
 // NewTestDB returns a new in-memory storage.Database instance for testing.
-func NewTestDB() MeshDBCloser {
+func NewTestDB() *TestDB {
 	memdb := badgerdb.NewTestStorage(false)
 	return &TestDB{
 		MeshDB: NewFromStorage(memdb),
