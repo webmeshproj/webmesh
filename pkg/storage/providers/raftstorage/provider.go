@@ -93,6 +93,7 @@ type Provider struct {
 	started                     atomic.Bool
 	raft                        *raft.Raft
 	raftStorage                 *RaftStorage
+	meshDB                      storage.MeshDB
 	consensus                   *Consensus
 	observer                    *raft.Observer
 	observerChan                chan raft.Observation
@@ -111,6 +112,7 @@ func NewProvider(opts Options) *Provider {
 	}
 	p.consensus = &Consensus{Provider: p}
 	p.raftStorage = &RaftStorage{raft: p}
+	p.meshDB = meshdb.NewFromStorage(p.raftStorage)
 	return p
 }
 
@@ -128,7 +130,7 @@ func (r *Provider) MeshStorage() storage.MeshStorage {
 
 // MeshDB returns the underlying MeshDB instance.
 func (r *Provider) MeshDB() storage.MeshDB {
-	return meshdb.New(r.raftStorage)
+	return r.meshDB
 }
 
 // Consensus returns the underlying Consensus instance.

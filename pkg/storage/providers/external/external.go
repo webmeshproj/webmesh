@@ -70,6 +70,7 @@ type Options struct {
 type Provider struct {
 	Options
 	storage   storage.MeshStorage
+	meshdb    storage.MeshDB
 	consensus storage.Consensus
 	cli       v1.StorageProviderPluginClient
 	conn      *grpc.ClientConn
@@ -84,6 +85,7 @@ func NewProvider(opts Options) *Provider {
 		log:     logging.NewLogger(opts.LogLevel, opts.LogFormat).With("component", "storage-provider", "provider", "external"),
 	}
 	p.storage = &ExternalStorage{p}
+	p.meshdb = meshdb.NewFromStorage(p.storage)
 	p.consensus = &Consensus{p}
 	return p
 }
@@ -95,7 +97,7 @@ func (ext *Provider) MeshStorage() storage.MeshStorage {
 
 // MeshDB returns the underlying MeshDB instance.
 func (ext *Provider) MeshDB() storage.MeshDB {
-	return meshdb.New(ext.storage)
+	return ext.meshdb
 }
 
 // Consensus returns the underlying Consensus instance.

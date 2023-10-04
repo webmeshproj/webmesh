@@ -61,6 +61,7 @@ type Options struct {
 type Provider struct {
 	Options
 	storage    storage.MeshStorage
+	meshDB     storage.MeshDB
 	consensus  storage.Consensus
 	log        *slog.Logger
 	subCancels []func()
@@ -76,6 +77,7 @@ func NewProvider(opts Options) *Provider {
 		closec:  make(chan struct{}),
 	}
 	p.storage = &Storage{Provider: p}
+	p.meshDB = meshdb.NewFromStorage(p.storage)
 	p.consensus = &Consensus{Provider: p}
 	return p
 }
@@ -85,7 +87,7 @@ func (p *Provider) MeshStorage() storage.MeshStorage {
 }
 
 func (p *Provider) MeshDB() storage.MeshDB {
-	return meshdb.New(p.storage)
+	return p.meshDB
 }
 
 func (p *Provider) Consensus() storage.Consensus {

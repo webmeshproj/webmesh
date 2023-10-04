@@ -63,8 +63,16 @@ func (n Group) Validate() error {
 	if n.GetName() == "" {
 		return fmt.Errorf("group name cannot be empty")
 	}
+	if !IsValidID(n.GetName()) {
+		return fmt.Errorf("group name must be a valid ID")
+	}
 	if len(n.GetSubjects()) == 0 {
 		return fmt.Errorf("group subjects cannot be empty")
+	}
+	for _, subject := range n.GetSubjects() {
+		if !IsValidIDOrWildcard(subject.GetName()) {
+			return fmt.Errorf("group subject names must be a valid ID")
+		}
 	}
 	return nil
 }

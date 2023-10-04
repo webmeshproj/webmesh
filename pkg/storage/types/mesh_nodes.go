@@ -17,13 +17,19 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
 	"net/netip"
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
 
 // InvalidIDChars are the characters that are not allowed in node IDs.
@@ -54,6 +60,12 @@ func IsValidID(id string) bool {
 		}
 	}
 	return true
+}
+
+// IsValidIDOrWildcard returns true if the given identifier is valid and safe to be saved to storage.
+// It also allows the wildcard character.
+func IsValidIDOrWildcard(id string) bool {
+	return id == "*" || IsValidID(id)
 }
 
 // TruncateID is a helper method to truncate IDs as needed when they are too long
@@ -113,6 +125,50 @@ func MeshNodesEqual(a, b MeshNode) bool {
 		a.PrivateIPv6 == b.PrivateIPv6 &&
 		slices.Equal(a.WireguardEndpoints, b.WireguardEndpoints) &&
 		FeaturePortsEqual(a.Features, b.Features)
+}
+
+// ValidateMeshNode validates the mesh node. It also dedups wireguard
+// endpoints, adds a joined timestamp, and returns the modified node.
+func ValidateMeshNode(node MeshNode) (validated MeshNode, err error) {
+	if !IsValidNodeID(node.GetId()) {
+		err = fmt.Errorf("%w: %s", errors.ErrInvalidNodeID, node.GetId())
+		return
+	}
+	// Dedup the wireguard endpoints.
+	seen := make(map[string]struct{})
+	var wgendpoints []string
+	for _, endpoint := range node.GetWireguardEndpoints() {
+		if _, ok := seen[endpoint]; ok {
+			continue
+		}
+		seen[endpoint] = struct{}{}
+		wgendpoints = append(wgendpoints, endpoint)
+	}
+	validated = node
+	validated.WireguardEndpoints = wgendpoints
+	validated.JoinedAt = timestamppb.New(time.Now().UTC())
+	// If the public key is provided, make sure it is valid.
+	if node.GetPublicKey() != "" {
+		_, err = crypto.DecodePublicKey(node.GetPublicKey())
+		if err != nil {
+			return
+		}
+	}
+	// If the private IPv4 address is present, make sure it is valid
+	if node.GetPrivateIPv4() != "" {
+		_, err = netip.ParsePrefix(node.GetPrivateIPv4())
+		if err != nil {
+			return
+		}
+	}
+	// Same for the IPv6 address
+	if node.GetPrivateIPv6() != "" {
+		_, err = netip.ParsePrefix(node.GetPrivateIPv6())
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 // DeepCopy returns a deep copy of the node.

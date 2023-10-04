@@ -42,6 +42,8 @@ type PeerSubscribeFunc func([]types.MeshNode)
 
 // Peers is the peers interface.
 type Peers interface {
+	// Graph should return the underlying graph instance.
+	Graph() types.PeerGraph
 	// Put creates or updates a node.
 	Put(ctx context.Context, n types.MeshNode) error
 	// Get gets a node by ID.

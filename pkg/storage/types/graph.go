@@ -45,14 +45,6 @@ func DrawPeerGraph(ctx context.Context, g PeerGraph, w io.Writer) error {
 	return nil
 }
 
-// NewGraphWithStore creates a new Graph instance with the given graph storage implementation.
-func NewGraphWithStore(store PeerGraphStore) PeerGraph {
-	return graph.NewWithStore(graphHasher, store)
-}
-
-// graphHasher is the hash key function for the graph.
-func graphHasher(n MeshNode) NodeID { return NodeID(n.GetId()) }
-
 // AdjacencyMap is a map of node names to a map of node names to edges.
 type AdjacencyMap map[NodeID]EdgeMap
 

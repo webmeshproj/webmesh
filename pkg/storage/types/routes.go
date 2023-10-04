@@ -65,7 +65,7 @@ func ValidateRoute(route Route) error {
 		return errors.New("route node must be a valid ID")
 	}
 	if route.GetNextHopNode() != "" {
-		if !IsValidID(route.GetNextHopNode()) {
+		if !IsValidNodeID(route.GetNextHopNode()) {
 			return errors.New("route next hop node must be a valid ID")
 		}
 	}

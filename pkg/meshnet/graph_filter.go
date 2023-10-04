@@ -34,7 +34,7 @@ import (
 // is filtered out.
 func FilterGraph(ctx context.Context, db storage.MeshDB, thisNodeID types.NodeID) (types.AdjacencyMap, error) {
 	log := context.LoggerFrom(ctx)
-	graph := db.PeerGraph()
+	graph := db.Peers().Graph()
 
 	// Resolve the current node ID
 	thisNode, err := graph.Vertex(thisNodeID)

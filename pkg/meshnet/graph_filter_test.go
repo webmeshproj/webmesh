@@ -260,7 +260,7 @@ func setupGraphTest(t *testing.T, opts graphSetup) storage.MeshDB {
 			t.Fatalf("put route: %v", err)
 		}
 	}
-	pgraph := db.PeerGraph()
+	pgraph := db.Peers().Graph()
 	for _, node := range opts.nodes {
 		if err := pgraph.AddVertex(node); err != nil {
 			t.Fatalf("add vertex: %v", err)

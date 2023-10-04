@@ -96,8 +96,16 @@ func (rb RoleBinding) Validate() error {
 	if rb.GetRole() == "" {
 		return fmt.Errorf("rolebinding role cannot be empty")
 	}
+	if !IsValidID(rb.GetName()) {
+		return fmt.Errorf("rolebinding name must be a valid ID")
+	}
 	if len(rb.GetSubjects()) == 0 {
 		return fmt.Errorf("rolebinding subjects cannot be empty")
+	}
+	for _, subject := range rb.GetSubjects() {
+		if !IsValidIDOrWildcard(subject.GetName()) {
+			return fmt.Errorf("rolebinding subject names must be a valid ID")
+		}
 	}
 	return nil
 }

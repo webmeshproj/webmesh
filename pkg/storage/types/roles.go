@@ -67,6 +67,9 @@ func (n Role) Validate() error {
 	if n.GetName() == "" {
 		return fmt.Errorf("role name cannot be empty")
 	}
+	if !IsValidID(n.GetName()) {
+		return fmt.Errorf("role name must be a valid ID")
+	}
 	if len(n.GetRules()) == 0 {
 		return fmt.Errorf("role rules cannot be empty")
 	}

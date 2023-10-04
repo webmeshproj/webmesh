@@ -1,3 +1,20 @@
+/*
+Copyright 2023 Avi Zimmerman <avi.zimmerman@gmail.com>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package plugins contains the plugin manager.
 package plugins
 
 import (
@@ -17,7 +34,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ipam"
 	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
@@ -129,7 +145,7 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 	// We only support a single auth and IPv4 mechanism for now. So only
 	// track the first ones we see
 	var auth *Plugin
-	var ipamv4 *Plugin
+	var ipamv4 IPAMPlugin
 	for name, plugin := range plugins {
 		if plugin.hasCapability(v1.PluginInfo_AUTH) {
 			if auth != nil {
@@ -139,27 +155,14 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 		}
 		if plugin.hasCapability(v1.PluginInfo_IPAMV4) {
 			if ipamv4 != nil {
-				return nil, handleErr(fmt.Errorf("multiple IPAM plugins found: %s, %s", ipamv4.name, name))
+				return nil, handleErr(fmt.Errorf("extra IPAM plugin found: %s", name))
 			}
-			ipamv4 = plugin
+			ipamv4 = plugin.Client.IPAM()
 		}
 	}
 	// If we didn't find any IPAM plugins, register the default one
 	if ipamv4 == nil {
-		plug := &Plugin{
-			Client: clients.NewInProcessClient(&ipam.Plugin{}),
-			capabilities: []v1.PluginInfo_PluginCapability{
-				v1.PluginInfo_IPAMV4,
-				v1.PluginInfo_STORAGE_QUERIER,
-			},
-			name: "simple-ipam",
-		}
-		_, err := plug.Client.Configure(ctx, &v1.PluginConfiguration{})
-		if err != nil {
-			return nil, handleErr(fmt.Errorf("configure default IPAM plugin: %w", err))
-		}
-		plugins[plug.name] = plug
-		ipamv4 = plug
+		ipamv4 = NewBuiltinIPAM(opts.Storage.MeshDB())
 	}
 	m := &manager{
 		storage: opts.Storage,
@@ -181,11 +184,17 @@ func NewManagerWithDB(db storage.Provider) Manager {
 	}
 }
 
+// IPAMPlugin wraps the interface of the IPAM plugin only exposing the Allocate method.
+// This makes for ease of use with the built-in IPAM.
+type IPAMPlugin interface {
+	Allocate(ctx context.Context, r *v1.AllocateIPRequest, opts ...grpc.CallOption) (*v1.AllocatedIP, error)
+}
+
 type manager struct {
 	storage storage.Provider
 	plugins map[string]*Plugin
 	auth    *Plugin
-	ipamv4  *Plugin
+	ipamv4  IPAMPlugin
 	log     context.Logger
 }
 
@@ -254,7 +263,7 @@ func (m *manager) AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (ne
 	if m.ipamv4 == nil {
 		return addr, ErrUnsupported
 	}
-	res, err := m.ipamv4.Client.IPAM().Allocate(ctx, req)
+	res, err := m.ipamv4.Allocate(ctx, req)
 	if err != nil {
 		return addr, fmt.Errorf("allocate IPv4: %w", err)
 	}

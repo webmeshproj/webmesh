@@ -73,7 +73,7 @@ func (s *Server) GetMeshGraph(ctx context.Context, _ *emptypb.Empty) (*v1.MeshGr
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list node IDs: %v", err)
 	}
-	edges, err := s.storage.PeerGraph().Edges()
+	edges, err := s.storage.Peers().Graph().Edges()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list edges: %v", err)
 	}
@@ -93,7 +93,7 @@ func (s *Server) GetMeshGraph(ctx context.Context, _ *emptypb.Empty) (*v1.MeshGr
 		}
 	}
 	var buf bytes.Buffer
-	err = types.DrawPeerGraph(ctx, s.storage.PeerGraph(), &buf)
+	err = types.DrawPeerGraph(ctx, s.storage.Peers().Graph(), &buf)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to draw graph: %v", err)
 	}
