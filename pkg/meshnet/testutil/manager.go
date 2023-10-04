@@ -87,6 +87,10 @@ func (c *Manager) Start(ctx context.Context, opts meshnet.StartOptions) error {
 	if err != nil {
 		return err
 	}
+	err = c.wg.Configure(ctx, opts.Key)
+	if err != nil {
+		return err
+	}
 	c.peers = &PeerManager{wg: c.wg}
 	return nil
 }
