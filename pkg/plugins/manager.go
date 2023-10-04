@@ -172,6 +172,15 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 	return m, nil
 }
 
+// NewManagerWithDB creates a new plugin manager with a storage provider
+// and no plugins configured.
+func NewManagerWithDB(db storage.Provider) Manager {
+	return &manager{
+		storage: db,
+		plugins: make(map[string]*Plugin),
+	}
+}
+
 type manager struct {
 	storage storage.Provider
 	plugins map[string]*Plugin

@@ -178,6 +178,13 @@ func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, err
 	return f(ctx)
 }
 
+// NewNoOpLeaderDialer returns a dialer that always returns an error.
+func NewNoOpLeaderDialer() LeaderDialer {
+	return LeaderDialerFunc(func(ctx context.Context) (*grpc.ClientConn, error) {
+		return nil, fmt.Errorf("no-op leader dialer")
+	})
+}
+
 // NodeDialer is an interface for dialing an arbitrary node. The node ID
 // is optional and if empty, implementations can choose the node to dial.
 type NodeDialer interface {
@@ -192,6 +199,13 @@ type NodeDialerFunc func(ctx context.Context, id types.NodeID) (*grpc.ClientConn
 // Dial implements NodeDialer.
 func (f NodeDialerFunc) DialNode(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error) {
 	return f(ctx, id)
+}
+
+// NewNoOpNodeDialer returns a dialer that always returns an error.
+func NewNoOpNodeDialer() NodeDialer {
+	return NodeDialerFunc(func(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error) {
+		return nil, fmt.Errorf("no-op node dialer")
+	})
 }
 
 // ErrSignalTransportClosed is returned when a signal transport is closed

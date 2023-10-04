@@ -32,7 +32,7 @@ import (
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	ctx := context.Background()
-	store, err := meshnode.NewTestNode(ctx)
+	store, err := meshnode.NewSingleNodeTestMesh(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("error creating test store: %w", err))
 	}
