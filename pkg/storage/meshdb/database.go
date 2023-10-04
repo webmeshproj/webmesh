@@ -37,6 +37,10 @@ import (
 )
 
 // New returns a new MeshDB instance using the given underlying MeshDataStore.
+// Storage operations will be validated before being passed to the underlying
+// MeshDataStore. If the underlying MeshDataStore already performs validation,
+// this is redundant. Note that certain write operations will call into read
+// methods to perform validation. So any locks used internally must be reentrant.
 func New(db storage.MeshDataStore) storage.MeshDB {
 	graphStore := &ValidatingGraphStore{db.GraphStore()}
 	return &Database{
@@ -52,7 +56,8 @@ func New(db storage.MeshDataStore) storage.MeshDB {
 	}
 }
 
-// NewFromStorage creates a new MeshDB instance from the given MeshStorage.
+// NewFromStorage creates a new MeshDB instance from the given MeshStorage. The same
+// information applies as for New.
 func NewFromStorage(st storage.MeshStorage) storage.MeshDB {
 	return New(&MeshDataStore{
 		graph:   graphstore.NewStore(st),
@@ -90,7 +95,7 @@ func (m *MeshDataStore) Networking() storage.Networking {
 	return m.network
 }
 
-// ValidatingDB wraps a storage.MeshDB and automatically performs the necessary
+// Database wraps a storage.MeshDataStore and automatically performs the necessary
 // validation on all operations. Note that certain write operations will call into
 // read methods to perform validation. So any locks used internally must be reentrant.
 type Database struct {
