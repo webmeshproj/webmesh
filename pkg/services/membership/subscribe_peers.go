@@ -33,7 +33,7 @@ import (
 )
 
 func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Membership_SubscribePeersServer) error {
-	if !context.IsInNetwork(stream.Context(), s.wg) {
+	if !context.IsInNetwork(stream.Context(), s.meshnet) {
 		addr, _ := context.PeerAddrFrom(stream.Context())
 		s.log.Warn("Received SubscribePeers request from out of network", slog.String("peer", addr.String()))
 		return status.Errorf(codes.PermissionDenied, "request is not in-network")

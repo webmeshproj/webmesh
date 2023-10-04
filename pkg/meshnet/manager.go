@@ -108,6 +108,8 @@ type Manager interface {
 
 	// Start starts the network manager.
 	Start(ctx context.Context, opts StartOptions) error
+	// InNetwork returns true if the given address is in the network of this interface.
+	InNetwork(addr netip.Addr) bool
 	// NetworkV4 returns the current IPv4 network. The returned value may be invalid.
 	NetworkV4() netip.Prefix
 	// NetworkV6 returns the current IPv6 network, even if it is disabled.
@@ -168,6 +170,11 @@ func (m *manager) NetworkV4() netip.Prefix {
 
 func (m *manager) NetworkV6() netip.Prefix {
 	return m.networkv6
+}
+
+// InNetwork returns true if the given address is in the network of this interface.
+func (w *manager) InNetwork(addr netip.Addr) bool {
+	return w.NetworkV4().Contains(addr) || w.NetworkV6().Contains(addr)
 }
 
 func (m *manager) Firewall() firewall.Firewall {
@@ -254,6 +261,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		return handleErr(fmt.Errorf("configure wireguard: %w", err))
 	}
 	if opts.NetworkV6.IsValid() && !m.opts.DisableIPv6 {
+		m.networkv6 = opts.NetworkV6
 		log.Debug("Adding IPv6 network route", slog.String("network", opts.NetworkV6.String()))
 		err = m.wg.AddRoute(ctx, opts.NetworkV6)
 		if err != nil && !system.IsRouteExists(err) {
@@ -268,14 +276,13 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		}
 	}
 	if opts.NetworkV4.IsValid() && !m.opts.DisableIPv4 {
+		m.networkv4 = opts.NetworkV4
 		log.Debug("Adding IPv4 network route", slog.String("network", opts.NetworkV4.String()))
 		err = m.wg.AddRoute(ctx, opts.NetworkV4)
 		if err != nil && !system.IsRouteExists(err) {
 			return handleErr(fmt.Errorf("wireguard add mesh network route: %w", err))
 		}
 	}
-	m.networkv4 = opts.NetworkV4
-	m.networkv6 = opts.NetworkV6
 	log.Debug("Configuring forwarding on wireguard interface", slog.String("interface", m.wg.Name()))
 	err = m.fw.AddWireguardForwarding(ctx, m.wg.Name())
 	if err != nil {

@@ -24,8 +24,8 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
@@ -43,7 +43,7 @@ type Server struct {
 type Options struct {
 	NodeID     types.NodeID
 	Storage    storage.Provider
-	WireGuard  wireguard.Interface
+	Meshnet    meshnet.Manager
 	NodeDialer transport.NodeDialer
 	Plugins    plugins.Manager
 	Features   []*v1.FeaturePort

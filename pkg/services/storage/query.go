@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) Query(req *v1.QueryRequest, stream v1.StorageQueryService_QueryServer) error {
-	if !context.IsInNetwork(stream.Context(), s.wg) {
+	if !context.IsInNetwork(stream.Context(), s.mnet) {
 		addr, _ := context.PeerAddrFrom(stream.Context())
 		s.log.Warn("Received Query request from out of network", slog.String("peer", addr.String()))
 		return status.Errorf(codes.PermissionDenied, "request is not in-network")

@@ -457,9 +457,9 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 	log.Debug("Registering node service")
 	v1.RegisterNodeServer(srv, node.NewServer(ctx, node.Options{
 		NodeID:     conn.ID(),
-		Storage:    conn.Storage(),
-		WireGuard:  conn.Network().WireGuard(),
 		NodeDialer: conn,
+		Storage:    conn.Storage(),
+		Meshnet:    conn.Network(),
 		Plugins:    conn.Plugins(),
 		Features:   o.NewFeatureSet(),
 	}))
@@ -467,14 +467,14 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 	if o.IsStorageMember() {
 		log.Debug("Registering membership service")
 		v1.RegisterMembershipServer(srv, membership.NewServer(ctx, membership.Options{
-			NodeID:    conn.ID(),
-			Storage:   conn.Storage(),
-			Plugins:   conn.Plugins(),
-			RBAC:      rbacEvaluator,
-			WireGuard: conn.Network().WireGuard(),
+			NodeID:  conn.ID(),
+			Storage: conn.Storage(),
+			Plugins: conn.Plugins(),
+			RBAC:    rbacEvaluator,
+			Meshnet: conn.Network(),
 		}))
 		log.Debug("Registering storage service")
-		storageSrv := storage.NewServer(ctx, conn.Storage(), rbacEvaluator, conn.Network().WireGuard())
+		storageSrv := storage.NewServer(ctx, conn.Storage(), rbacEvaluator, conn.Network())
 		v1.RegisterStorageQueryServiceServer(srv, storageSrv)
 	}
 	// Register any other enabled APIs
@@ -618,7 +618,7 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (con
 		}
 
 		if !o.Services.API.DisableLeaderProxy {
-			leaderProxy := leaderproxy.New(conn.ID(), conn.Storage().Consensus(), conn, conn.Network().WireGuard())
+			leaderProxy := leaderproxy.New(conn.ID(), conn.Storage().Consensus(), conn, conn.Network())
 			unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
 			streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
 		}

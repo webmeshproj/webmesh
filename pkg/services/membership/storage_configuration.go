@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Server) GetStorageConfiguration(ctx context.Context, _ *v1.StorageConfigurationRequest) (*v1.StorageConfigurationResponse, error) {
-	if !context.IsInNetwork(ctx, s.wg) {
+	if !context.IsInNetwork(ctx, s.meshnet) {
 		addr, _ := context.PeerAddrFrom(ctx)
 		s.log.Warn("Received GetStorageConfiguration request from out of network", slog.String("peer", addr.String()))
 		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")

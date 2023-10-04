@@ -31,7 +31,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 	if req.GetId() != "" && req.GetId() != s.NodeID.String() {
 		return s.getRemoteNodeStatus(ctx, types.NodeID(req.GetId()))
 	}
-	ifaceMetrics, err := s.WireGuard.Metrics()
+	ifaceMetrics, err := s.Meshnet.WireGuard().Metrics()
 	if err != nil {
 		return nil, err
 	}

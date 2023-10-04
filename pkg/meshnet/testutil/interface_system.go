@@ -60,11 +60,17 @@ func (t *SystemInterface) Name() string {
 
 // AddressV4 should return the current private IPv4 address of this interface.
 func (t *SystemInterface) AddressV4() netip.Prefix {
+	if t.Options.DisableIPv4 {
+		return netip.Prefix{}
+	}
 	return t.Options.AddressV4
 }
 
 // AddressV6 should return the current private IPv6 address of this interface.
 func (t *SystemInterface) AddressV6() netip.Prefix {
+	if t.Options.DisableIPv6 {
+		return netip.Prefix{}
+	}
 	return t.Options.AddressV6
 }
 
@@ -107,6 +113,12 @@ func (t *SystemInterface) AddRoute(_ context.Context, route netip.Prefix) error 
 	defer t.mu.Unlock()
 	if t.closed {
 		return errors.New("interface closed")
+	}
+	if t.Options.DisableIPv4 && route.Addr().Is4() {
+		return nil
+	}
+	if t.Options.DisableIPv6 && route.Addr().Is6() {
+		return nil
 	}
 	t.routes = append(t.routes, route)
 	return nil

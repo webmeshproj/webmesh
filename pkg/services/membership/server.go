@@ -26,7 +26,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
@@ -42,7 +42,7 @@ type Server struct {
 	storage    storage.Provider
 	plugins    plugins.Manager
 	rbac       rbac.Evaluator
-	wg         wireguard.Interface
+	meshnet    meshnet.Manager
 	ipv4Prefix netip.Prefix
 	ipv6Prefix netip.Prefix
 	meshDomain string
@@ -52,11 +52,11 @@ type Server struct {
 
 // Options are the options for the Membership service.
 type Options struct {
-	NodeID    types.NodeID
-	Storage   storage.Provider
-	Plugins   plugins.Manager
-	RBAC      rbac.Evaluator
-	WireGuard wireguard.Interface
+	NodeID  types.NodeID
+	Storage storage.Provider
+	Plugins plugins.Manager
+	RBAC    rbac.Evaluator
+	Meshnet meshnet.Manager
 }
 
 // NewServer returns a new Server.
@@ -66,7 +66,7 @@ func NewServer(ctx context.Context, opts Options) *Server {
 		storage: opts.Storage,
 		plugins: opts.Plugins,
 		rbac:    opts.RBAC,
-		wg:      opts.WireGuard,
+		meshnet: opts.Meshnet,
 		log:     context.LoggerFrom(ctx).With("component", "membership-server"),
 	}
 }

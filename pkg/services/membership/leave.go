@@ -30,7 +30,7 @@ import (
 )
 
 func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResponse, error) {
-	if !context.IsInNetwork(ctx, s.wg) {
+	if !context.IsInNetwork(ctx, s.meshnet) {
 		addr, _ := context.PeerAddrFrom(ctx)
 		s.log.Warn("Received Leave request from out of network", slog.String("peer", addr.String()))
 		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")

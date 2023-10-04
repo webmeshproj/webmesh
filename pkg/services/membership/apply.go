@@ -33,7 +33,7 @@ import (
 
 func (s *Server) Apply(ctx context.Context, log *v1.RaftLogEntry) (*v1.RaftApplyResponse, error) {
 	// Make sure the request is coming from in-network
-	if !context.IsInNetwork(ctx, s.wg) {
+	if !context.IsInNetwork(ctx, s.meshnet) {
 		addr, _ := context.PeerAddrFrom(ctx)
 		s.log.Warn("Received Apply request from out of network", slog.String("peer", addr.String()))
 		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")

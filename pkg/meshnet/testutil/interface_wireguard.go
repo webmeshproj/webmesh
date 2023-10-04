@@ -18,7 +18,6 @@ package testutil
 
 import (
 	"context"
-	"net/netip"
 	"sync"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -58,27 +57,6 @@ func NewWireGuardInterface(ctx context.Context, opts *wireguard.Options) (wiregu
 		peers:     make(map[string]wireguard.Peer),
 		opts:      opts,
 	}, nil
-}
-
-// NetworkV4 returns the IPv4 network of this interface.
-func (wg *WireGuardInterface) NetworkV4() netip.Prefix {
-	return wg.opts.AddressV4
-}
-
-// NetworkV6 returns the IPv6 network of this interface.
-func (wg *WireGuardInterface) NetworkV6() netip.Prefix {
-	return wg.opts.AddressV6
-}
-
-// InNetwork returns true if the given address is in the network of this interface.
-func (wg *WireGuardInterface) InNetwork(addr netip.Addr) bool {
-	if wg.opts.NetworkV4.IsValid() && wg.opts.NetworkV4.Contains(addr) {
-		return true
-	}
-	if wg.opts.NetworkV6.IsValid() && wg.opts.NetworkV6.Contains(addr) {
-		return true
-	}
-	return false
 }
 
 // Configure configures the wireguard interface to use the given key and listen port.

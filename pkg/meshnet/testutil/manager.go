@@ -101,6 +101,17 @@ func (c *Manager) NetworkV6() netip.Prefix {
 	return c.netv6
 }
 
+// InNetwork returns true if the given address is in the network of this interface.
+func (c *Manager) InNetwork(addr netip.Addr) bool {
+	if c.NetworkV4().IsValid() && c.NetworkV4().Contains(addr) {
+		return true
+	}
+	if c.NetworkV6().IsValid() && c.NetworkV6().Contains(addr) {
+		return true
+	}
+	return false
+}
+
 // StartMasquerade ensures that masquerading is enabled.
 func (c *Manager) StartMasquerade(ctx context.Context) error {
 	c.mu.Lock()

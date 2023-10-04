@@ -23,7 +23,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
@@ -37,16 +37,16 @@ type Server struct {
 
 	storage storage.Provider
 	rbac    rbac.Evaluator
-	wg      wireguard.Interface
+	mnet    meshnet.Manager
 	log     *slog.Logger
 }
 
 // NewServer returns a new storage Server.
-func NewServer(ctx context.Context, storage storage.Provider, rbac rbac.Evaluator, wg wireguard.Interface) *Server {
+func NewServer(ctx context.Context, storage storage.Provider, rbac rbac.Evaluator, mnet meshnet.Manager) *Server {
 	return &Server{
 		storage: storage,
 		rbac:    rbac,
-		wg:      wg,
+		mnet:    mnet,
 		log:     context.LoggerFrom(ctx).With("component", "storage-server"),
 	}
 }

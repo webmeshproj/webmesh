@@ -32,7 +32,7 @@ import (
 
 func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer) error {
 	// Make sure the request is coming from in-network
-	if !context.IsInNetwork(stream.Context(), s.WireGuard) {
+	if !context.IsInNetwork(stream.Context(), s.Meshnet) {
 		addr, _ := context.PeerAddrFrom(stream.Context())
 		s.log.Warn("Received NegotiateDataChannel request from out of network", slog.String("peer", addr.String()))
 		return status.Errorf(codes.PermissionDenied, "request is not in-network")
@@ -49,7 +49,7 @@ func (s *Server) NegotiateDataChannel(stream v1.Node_NegotiateDataChannelServer)
 	if req.GetPort() == 0 && req.GetProto() == "udp" {
 		log.Info("Creating WireGuard proxy connection")
 		// Lookup our WireGuard port.
-		port, err := s.WireGuard.ListenPort()
+		port, err := s.Meshnet.WireGuard().ListenPort()
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to get WireGuard listen port: %v", err)
 		}

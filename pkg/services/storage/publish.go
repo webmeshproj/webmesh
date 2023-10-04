@@ -36,7 +36,7 @@ var canPublishAction = rbac.Actions{
 }
 
 func (s *Server) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
-	if !context.IsInNetwork(ctx, s.wg) {
+	if !context.IsInNetwork(ctx, s.mnet) {
 		addr, _ := context.PeerAddrFrom(ctx)
 		s.log.Warn("Received Publish request from out of network", slog.String("peer", addr.String()))
 		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")

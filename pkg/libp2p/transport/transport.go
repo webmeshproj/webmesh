@@ -345,7 +345,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse ip4 address: %w", err)
 		}
-		if t.node.Network().WireGuard().InNetwork(val) {
+		if t.node.Network().InNetwork(val) {
 			return []ma.Multiaddr{maddr}, nil
 		}
 		return nil, fmt.Errorf("ipv4 address not in network")
@@ -356,7 +356,7 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse ip6 address: %w", err)
 		}
-		if t.node.Network().WireGuard().InNetwork(val) {
+		if t.node.Network().InNetwork(val) {
 			return []ma.Multiaddr{maddr}, nil
 		}
 		return nil, fmt.Errorf("ipv6 address not in network")

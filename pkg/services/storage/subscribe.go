@@ -36,7 +36,7 @@ var canSubscribeAction = rbac.Actions{
 }
 
 func (s *Server) Subscribe(req *v1.SubscribeRequest, srv v1.StorageQueryService_SubscribeServer) error {
-	if !context.IsInNetwork(srv.Context(), s.wg) {
+	if !context.IsInNetwork(srv.Context(), s.mnet) {
 		addr, _ := context.PeerAddrFrom(srv.Context())
 		s.log.Warn("Received Subscribe request from out of network", slog.String("peer", addr.String()))
 		return status.Errorf(codes.PermissionDenied, "request is not in-network")

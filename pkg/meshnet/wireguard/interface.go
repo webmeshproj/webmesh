@@ -59,12 +59,6 @@ type Interface interface {
 	// Interface is the underlying system interface.
 	system.Interface
 
-	// NetworkV4 returns the IPv4 network of this interface.
-	NetworkV4() netip.Prefix
-	// NetworkV6 returns the IPv6 network of this interface.
-	NetworkV6() netip.Prefix
-	// InNetwork returns true if the given address is in the network of this interface.
-	InNetwork(addr netip.Addr) bool
 	// Configure configures the wireguard interface to use the given key and listen port.
 	Configure(ctx context.Context, key crypto.PrivateKey) error
 	// ListenPort returns the current listen port of the wireguard interface.
@@ -213,19 +207,6 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		go recorder.Run(rctx, opts.MetricsInterval)
 	}
 	return wg, nil
-}
-
-func (w *wginterface) NetworkV4() netip.Prefix {
-	return w.opts.NetworkV4
-}
-
-func (w *wginterface) NetworkV6() netip.Prefix {
-	return w.opts.NetworkV6
-}
-
-// InNetwork returns true if the given address is in the network of this interface.
-func (w *wginterface) InNetwork(addr netip.Addr) bool {
-	return w.opts.NetworkV4.Contains(addr) || w.opts.NetworkV6.Contains(addr)
 }
 
 // ListenPort returns the current listen port of the wireguard interface.
