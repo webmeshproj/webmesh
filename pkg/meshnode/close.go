@@ -25,7 +25,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
-// Close closes the store.
+// Close closes the connection to mesh and all underlying components.
 func (s *meshStore) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -69,15 +69,14 @@ func (s *meshStore) Close(ctx context.Context) error {
 // leaveCluster attempts to remove this node from the cluster. The node must
 // have already relinquished leadership before calling this method.
 func (s *meshStore) leaveCluster(ctx context.Context) error {
-	s.log.Info("leaving cluster")
-	conn, err := s.DialLeader(ctx)
-	if err != nil {
-		return fmt.Errorf("dial leader: %w", err)
+	if s.leaveRTT == nil {
+		return nil
 	}
-	defer conn.Close()
-	client := v1.NewMembershipClient(conn)
-	_, err = client.Leave(ctx, &v1.LeaveRequest{
-		Id: s.ID().String(),
+	_, err := s.leaveRTT.RoundTrip(ctx, &v1.LeaveRequest{
+		Id: s.nodeID,
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("leave cluster: %w", err)
+	}
+	return nil
 }

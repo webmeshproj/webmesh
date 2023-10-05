@@ -102,6 +102,12 @@ type JoinRoundTripper = RoundTripper[v1.JoinRequest, v1.JoinResponse]
 // JoinRoundTripperFunc is a function that implements JoinRoundTripper.
 type JoinRoundTripperFunc = RoundTripperFunc[v1.JoinRequest, v1.JoinResponse]
 
+// LeaveRoundTripper is the interface for leaving a cluster.
+type LeaveRoundTripper = RoundTripper[v1.LeaveRequest, v1.LeaveResponse]
+
+// LeaveRoundTripperFunc is a function that implements LeaveRoundTripper.
+type LeaveRoundTripperFunc = RoundTripperFunc[v1.LeaveRequest, v1.LeaveResponse]
+
 // UnaryServer is the interface for handling unary requests.
 type UnaryServer[REQ, RESP any] interface {
 	// Serve is executed when a unary request is received.

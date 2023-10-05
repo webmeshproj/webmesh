@@ -345,46 +345,50 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[types.NodeID], error) {
 // Subscribe subscribes to changes in the graph.
 func (g *GraphStore) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (context.CancelFunc, error) {
 	log := context.LoggerFrom(ctx)
-	return g.MeshStorage.Subscribe(ctx, nil, func(key, value []byte) {
+	return g.MeshStorage.Subscribe(ctx, types.RegistryPrefix, func(key, value []byte) {
 		var nodes []types.MeshNode
 		switch {
 		case bytes.HasPrefix(key, storage.EdgesPrefix):
 			if bytes.Equal(key, storage.EdgesPrefix) {
 				return
 			}
-			var edge types.MeshEdge
-			err := edge.UnmarshalProtoJSON(value)
-			if err != nil {
-				log.Error("Failed to unmarshal edge", "error", err.Error())
-				return
-			}
-			source, _, err := g.Vertex(edge.SourceID())
-			if err != nil {
-				log.Error("Failed to get source node", "error", err.Error())
-			} else {
-				nodes = append(nodes, source)
-			}
-			target, _, err := g.Vertex(edge.TargetID())
-			if err != nil {
-				log.Error("Failed to get target node", "error", err.Error())
-			} else {
-				nodes = append(nodes, target)
+			if len(value) != 0 {
+				var edge types.MeshEdge
+				err := edge.UnmarshalProtoJSON(value)
+				if err != nil {
+					log.Error("Failed to unmarshal edge", "error", err.Error())
+					return
+				}
+				source, _, err := g.Vertex(edge.SourceID())
+				if err != nil {
+					log.Error("Failed to get source node", "error", err.Error())
+				} else {
+					nodes = append(nodes, source)
+				}
+				target, _, err := g.Vertex(edge.TargetID())
+				if err != nil {
+					log.Error("Failed to get target node", "error", err.Error())
+				} else {
+					nodes = append(nodes, target)
+				}
 			}
 		case bytes.HasPrefix(key, storage.NodesPrefix):
 			if bytes.Equal(key, storage.NodesPrefix) {
 				return
 			}
-			var node types.MeshNode
-			err := node.UnmarshalProtoJSON(value)
-			if err != nil {
-				log.Error("Failed to unmarshal node", "error", err.Error())
-				return
+			if len(value) != 0 {
+				var node types.MeshNode
+				err := node.UnmarshalProtoJSON(value)
+				if err != nil {
+					log.Error("Failed to unmarshal node", "error", err.Error())
+					return
+				}
+				nodes = append(nodes, node)
 			}
-			nodes = append(nodes, node)
+		default:
+			return
 		}
-		if len(nodes) > 0 {
-			fn(nodes)
-		}
+		fn(nodes)
 	})
 }
 

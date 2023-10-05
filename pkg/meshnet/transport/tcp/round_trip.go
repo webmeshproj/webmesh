@@ -52,6 +52,11 @@ func NewJoinRoundTripper(opts RoundTripOptions) transport.JoinRoundTripper {
 	return NewRoundTripper[v1.JoinRequest, v1.JoinResponse](opts, v1.Membership_Join_FullMethodName)
 }
 
+// NewLeaveRoundTripper creates a new gRPC round tripper for issuing a Leave Request.
+func NewLeaveRoundTripper(opts RoundTripOptions) transport.LeaveRoundTripper {
+	return NewRoundTripper[v1.LeaveRequest, v1.LeaveResponse](opts, v1.Membership_Leave_FullMethodName)
+}
+
 type grpcRoundTripper[REQ, RESP any] struct {
 	RoundTripOptions
 	method string
@@ -60,15 +65,15 @@ type grpcRoundTripper[REQ, RESP any] struct {
 func (rt *grpcRoundTripper[REQ, RESP]) Close() error { return nil }
 
 func (rt *grpcRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
+	var dialCtx context.Context
+	var cancel context.CancelFunc
 	var err error
-	cancel := func() {}
 	for _, addr := range rt.Addrs {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 		log := context.LoggerFrom(ctx).With("join-addr", addr, "method", rt.method)
 		log.Debug("Attempting to dial node")
-		var dialCtx context.Context
 		if rt.AddressTimeout > 0 {
 			dialCtx, cancel = context.WithTimeout(ctx, rt.AddressTimeout)
 		} else {
@@ -86,7 +91,7 @@ func (rt *grpcRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) 
 		var resp RESP
 		err = conn.Invoke(ctx, rt.method, req, &resp)
 		if err != nil {
-			log.Debug("invoke request failed", "error", err)
+			log.Debug("Invoke request failed", "error", err)
 			continue
 		}
 		return &resp, nil

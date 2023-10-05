@@ -457,6 +457,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 	opts = meshnode.ConnectOptions{
 		StorageProvider:      provider,
 		JoinRoundTripper:     joinRT,
+		LeaveRoundTripper:    o.NewLeaveTransport(ctx, conn),
 		Features:             o.NewFeatureSet(),
 		Bootstrap:            bootstrap,
 		MaxJoinRetries:       o.Mesh.MaxJoinRetries,
@@ -515,6 +516,18 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 		},
 	}
 	return
+}
+
+func (o *Config) NewLeaveTransport(ctx context.Context, conn meshnode.Node) transport.LeaveRoundTripper {
+	return transport.LeaveRoundTripperFunc(func(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResponse, error) {
+		c, err := conn.DialLeader(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("dial leader: %w", err)
+		}
+		defer c.Close()
+		client := v1.NewMembershipClient(c)
+		return client.Leave(ctx, req)
+	})
 }
 
 func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn meshnode.Node, host host.Host) (transport.JoinRoundTripper, error) {

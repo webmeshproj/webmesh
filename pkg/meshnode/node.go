@@ -169,6 +169,7 @@ type meshStore struct {
 	peerUpdateGroup  *errgroup.Group
 	routeUpdateGroup *errgroup.Group
 	dnsUpdateGroup   *errgroup.Group
+	leaveRTT         transport.LeaveRoundTripper
 	closec           chan struct{}
 	log              *slog.Logger
 	mu               sync.Mutex

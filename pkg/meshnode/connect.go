@@ -47,6 +47,8 @@ type ConnectOptions struct {
 	Plugins map[string]plugins.Plugin
 	// JoinRoundTripper is the round tripper to use for joining the mesh.
 	JoinRoundTripper transport.JoinRoundTripper
+	// LeaveRoundTripper is the round tripper to use for leaving the mesh.
+	LeaveRoundTripper transport.LeaveRoundTripper
 	// NetworkOptions are options for the network manager
 	NetworkOptions meshnet.Options
 	// Discovery are options for broadcasting to others to join the mesh
@@ -158,6 +160,7 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		return ErrOpen
 	}
 	s.storage = opts.StorageProvider
+	s.leaveRTT = opts.LeaveRoundTripper
 	log := s.log
 	log.Debug("Connecting to mesh network", slog.Any("options", opts))
 
