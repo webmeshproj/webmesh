@@ -81,6 +81,9 @@ type Options struct {
 	NodeID types.NodeID
 	// ListenPort is the port to listen on.
 	ListenPort int
+	// NetNs is the network namespace to use for the interface.
+	// This is only used on Linux.
+	NetNs string
 	// Name is the name of the interface.
 	Name string
 	// ForceName forces the use of the given name by deleting
@@ -118,7 +121,6 @@ type wginterface struct {
 	system.Interface
 	defaultGateway netip.Addr
 	opts           *Options
-	cli            *wgctrl.Client
 	log            *slog.Logger
 	peers          map[string]Peer
 	peersMux       sync.Mutex
@@ -167,6 +169,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	log.Info("Creating wireguard interface", "name", opts.Name)
 	ifaceopts := &system.Options{
 		Name:        opts.Name,
+		NetNs:       opts.NetNs,
 		AddressV4:   opts.AddressV4,
 		AddressV6:   opts.AddressV6,
 		ForceTUN:    opts.ForceTUN,
@@ -180,21 +183,10 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		return nil, fmt.Errorf("new interface: %w", err)
 	}
 	opts.Name = iface.Name()
-	handleErr := func(err error) error {
-		if err := iface.Destroy(ctx); err != nil {
-			log.Warn("Failed to destroy interface", "error", err)
-		}
-		return err
-	}
-	cli, err := wgctrl.New()
-	if err != nil {
-		return nil, handleErr(fmt.Errorf("failed to create wireguard control client: %w", err))
-	}
 	wg := &wginterface{
 		Interface:      iface,
 		defaultGateway: gw,
 		opts:           opts,
-		cli:            cli,
 		peers:          make(map[string]Peer),
 		log:            log,
 	}
@@ -212,7 +204,24 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 
 // ListenPort returns the current listen port of the wireguard interface.
 func (w *wginterface) ListenPort() (int, error) {
-	iface, err := w.cli.Device(w.Name())
+	if runtime.GOOS == "linux" && w.opts.NetNs != "" {
+		var listenPort int
+		var err error
+		err = system.DoInNetNS(w.opts.NetNs, func() error {
+			listenPort, err = w.getListenPort()
+			return err
+		})
+		return listenPort, err
+	}
+	return w.getListenPort()
+}
+
+func (w *wginterface) getListenPort() (int, error) {
+	cli, err := wgctrl.New()
+	if err != nil {
+		return 0, err
+	}
+	iface, err := cli.Device(w.Name())
 	if err != nil {
 		return 0, err
 	}
@@ -237,18 +246,30 @@ func (w *wginterface) Close(ctx context.Context) error {
 	if w.recorderCancel != nil {
 		w.recorderCancel()
 	}
-	w.cli.Close()
 	return w.Interface.Destroy(ctx)
 }
 
 // Configure configures the wireguard interface to use the given key and listen port.
 func (w *wginterface) Configure(ctx context.Context, key crypto.PrivateKey) error {
+	if runtime.GOOS == "linux" && w.opts.NetNs != "" {
+		return system.DoInNetNS(w.opts.NetNs, func() error {
+			return w.configure(ctx, key)
+		})
+	}
+	return w.configure(ctx, key)
+}
+
+func (w *wginterface) configure(ctx context.Context, key crypto.PrivateKey) error {
+	cli, err := wgctrl.New()
+	if err != nil {
+		return err
+	}
 	var listenPort *int
 	if w.opts.ListenPort != 0 {
 		listenPort = &w.opts.ListenPort
 	}
 	wgKey := key.WireGuardKey()
-	err := w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
+	err = cli.ConfigureDevice(w.Name(), wgtypes.Config{
 		PrivateKey:   &wgKey,
 		ListenPort:   listenPort,
 		ReplacePeers: false,
@@ -261,7 +282,27 @@ func (w *wginterface) Configure(ctx context.Context, key crypto.PrivateKey) erro
 
 // Metrics returns the metrics for the wireguard interface.
 func (w *wginterface) Metrics() (*v1.InterfaceMetrics, error) {
-	device, err := w.cli.Device(w.Name())
+	var metrics *v1.InterfaceMetrics
+	if runtime.GOOS == "linux" && w.opts.NetNs != "" {
+		var err error
+		err = system.DoInNetNS(w.opts.NetNs, func() error {
+			metrics, err = w.getMetrics()
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		return metrics, nil
+	}
+	return w.getMetrics()
+}
+
+func (w *wginterface) getMetrics() (*v1.InterfaceMetrics, error) {
+	cli, err := wgctrl.New()
+	if err != nil {
+		return nil, err
+	}
+	device, err := cli.Device(w.Name())
 	if err != nil {
 		return nil, err
 	}

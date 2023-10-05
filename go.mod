@@ -3,6 +3,7 @@ module github.com/webmeshproj/webmesh
 go 1.21
 
 require (
+	github.com/containernetworking/plugins v1.3.0
 	github.com/dgraph-io/badger/v4 v4.2.0
 	github.com/dominikbraun/graph v0.23.0
 	github.com/go-ldap/ldap/v3 v3.4.6
@@ -44,7 +45,7 @@ require (
 	github.com/sbezverk/nftableslib v0.0.0-20221012061059-e05e022cec75
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/webmeshproj/api v0.7.0
 	golang.org/x/crypto v0.13.0
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9

@@ -43,6 +43,9 @@ import (
 
 // Options are the options for the network manager.
 type Options struct {
+	// NetNs is the network namespace to use for the wireguard interface.
+	// This is only used on Linux.
+	NetNs string
 	// InterfaceName is the name of the wireguard interface.
 	InterfaceName string
 	// ForceReplace is whether to force replace the wireguard interface.
@@ -227,6 +230,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		return fmt.Errorf("new firewall: %w", err)
 	}
 	wgopts := &wireguard.Options{
+		NetNs:               m.opts.NetNs,
 		NodeID:              m.nodeID,
 		ListenPort:          m.opts.ListenPort,
 		Name:                m.opts.InterfaceName,

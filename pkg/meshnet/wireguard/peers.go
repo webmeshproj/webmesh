@@ -23,9 +23,11 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"runtime"
 	"time"
 
 	"github.com/multiformats/go-multiaddr"
+	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -156,14 +158,20 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			return fmt.Errorf("failed to resolve endpoint: %w", err)
 		}
 	}
-	w.log.Debug("configuring device with peer",
-		slog.Any("peer", &peerConfigMarshaler{peerCfg}))
-	err = w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
-		Peers:        []wgtypes.PeerConfig{peerCfg},
-		ReplacePeers: false,
-	})
-	if err != nil {
-		return err
+	w.log.Debug("configuring device with peer", slog.Any("peer", &peerConfigMarshaler{peerCfg}))
+
+	if runtime.GOOS == "linux" && w.opts.NetNs != "" {
+		err = system.DoInNetNS(w.opts.NetNs, func() error {
+			return w.putPeer(peerCfg)
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		err = w.putPeer(peerCfg)
+		if err != nil {
+			return err
+		}
 	}
 	w.registerPeer(peer)
 	// Add routes to the allowed IPs
@@ -209,20 +217,45 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	return nil
 }
 
+func (w *wginterface) putPeer(cfg wgtypes.PeerConfig) error {
+	cli, err := wgctrl.New()
+	if err != nil {
+		return err
+	}
+	return cli.ConfigureDevice(w.Name(), wgtypes.Config{
+		Peers:        []wgtypes.PeerConfig{cfg},
+		ReplacePeers: false,
+	})
+}
+
 // DeletePeer removes a peer from the wireguard configuration.
 func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
 	if key, ok := w.popPeerKey(id); ok {
 		w.log.Debug("deleting peer", slog.String("id", id), slog.String("key", key.WireGuardKey().String()))
-		return w.cli.ConfigureDevice(w.Name(), wgtypes.Config{
-			Peers: []wgtypes.PeerConfig{
-				{
-					PublicKey: key.WireGuardKey(),
-					Remove:    true,
-				},
-			},
-		})
+		if runtime.GOOS == "linux" && w.opts.NetNs != "" {
+			return system.DoInNetNS(w.opts.NetNs, func() error {
+				return w.deletePeer(key)
+			})
+		}
+		return w.deletePeer(key)
 	}
 	return nil
+}
+
+func (w *wginterface) deletePeer(key crypto.PublicKey) error {
+	cli, err := wgctrl.New()
+	if err != nil {
+		return err
+	}
+	return cli.ConfigureDevice(w.Name(), wgtypes.Config{
+		Peers: []wgtypes.PeerConfig{
+			{
+				PublicKey: key.WireGuardKey(),
+				Remove:    true,
+			},
+		},
+		ReplacePeers: false,
+	})
 }
 
 // registerPeer adds a peer to the peer map.
