@@ -50,6 +50,9 @@ type Options struct {
 	// in which case it is assumed only a single mesh connection will
 	// be using the firewall.
 	ID string
+	// NetNs is the network namespace to use for the firewall.
+	// This is only applicable on Linux.
+	NetNs string
 	// DefaultPolicy is the default policy for the firewall.
 	DefaultPolicy Policy
 	// WireguardPort is the port to allow for wireguard traffic.
