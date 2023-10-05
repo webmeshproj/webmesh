@@ -231,7 +231,7 @@ func (l *sysInterface) Down(ctx context.Context) error {
 func (l *sysInterface) Destroy(ctx context.Context) error {
 	if runtime.GOOS == "linux" && l.netns != "" {
 		if err := moveLinkOut(l.netns, l.Name()); err != nil {
-			return fmt.Errorf("failed to move link out of container namespace: %w", err)
+			context.LoggerFrom(ctx).Error("Failed to move link out of network namespace", "error", err.Error())
 		}
 	}
 	return l.close(ctx)
