@@ -147,7 +147,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			if derr != nil {
 				return nil, fmt.Errorf("%w, destroy interface: %v", err, derr)
 			}
-			return nil, err
+			return nil, fmt.Errorf("set IPv4 address: %w", err)
 		}
 	}
 	if !opts.DisableIPv6 && opts.AddressV6.IsValid() {
@@ -157,7 +157,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			if derr != nil {
 				return nil, fmt.Errorf("%w, destroy interface: %v", err, derr)
 			}
-			return nil, err
+			return nil, fmt.Errorf("set IPv6 address: %w", err)
 		}
 	}
 	if runtime.GOOS == "linux" && opts.NetNs != "" {
