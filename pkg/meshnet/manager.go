@@ -232,27 +232,13 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 			}
 		}
 		if m.fw != nil {
-			if clearErr := m.fw.Clear(ctx); clearErr != nil {
+			if clearErr := m.fw.Close(ctx); clearErr != nil {
 				err = fmt.Errorf("%w: %v", err, clearErr)
 			}
 		}
 		return err
 	}
-	fwopts := &firewall.Options{
-		ID:    m.nodeID.String(),
-		NetNs: m.opts.NetNs,
-		// TODO: Make this configurable
-		DefaultPolicy: firewall.PolicyAccept,
-		WireguardPort: uint16(m.opts.ListenPort),
-		StoragePort:   uint16(m.opts.StoragePort),
-		GRPCPort:      uint16(m.opts.GRPCPort),
-	}
-	log.Debug("Configuring firewall", slog.Any("opts", fwopts))
 	var err error
-	m.fw, err = firewall.New(ctx, fwopts)
-	if err != nil {
-		return fmt.Errorf("new firewall manager: %w", err)
-	}
 	wgopts := &wireguard.Options{
 		NetNs:               m.opts.NetNs,
 		NodeID:              m.nodeID,
@@ -310,6 +296,23 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		if err != nil && !system.IsRouteExists(err) {
 			return handleErr(fmt.Errorf("wireguard add mesh network route: %w", err))
 		}
+	}
+	realPort, err := m.wg.ListenPort()
+	if err != nil {
+		return handleErr(fmt.Errorf("lookup wireguard listen port: %w", err))
+	}
+	fwopts := &firewall.Options{
+		ID:            m.nodeID.String(),
+		NetNs:         m.opts.NetNs,
+		DefaultPolicy: firewall.PolicyAccept, // TODO: Make this configurable
+		WireguardPort: uint16(realPort),
+		StoragePort:   uint16(m.opts.StoragePort),
+		GRPCPort:      uint16(m.opts.GRPCPort),
+	}
+	log.Debug("Configuring firewall", slog.Any("opts", fwopts))
+	m.fw, err = firewall.New(ctx, fwopts)
+	if err != nil {
+		return handleErr(fmt.Errorf("new firewall manager: %w", err))
 	}
 	log.Debug("Configuring forwarding on wireguard interface", slog.String("interface", m.wg.Name()))
 	err = m.fw.AddWireguardForwarding(ctx, m.wg.Name())
