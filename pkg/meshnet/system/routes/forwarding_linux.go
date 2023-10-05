@@ -19,25 +19,22 @@ package routes
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 )
 
 // EnableIPForwarding enables IP forwarding.
 func EnableIPForwarding() error {
-	on := []byte("1")
-	mode := fs.FileMode(0644)
 	errs := make([]error, 0, 3)
-	err := os.WriteFile("/proc/sys/net/ipv4/conf/all/forwarding", on, mode)
+	err := os.WriteFile("/proc/sys/net/ipv4/conf/all/forwarding", []byte("1"), 0o644)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("write net.ipv4.conf.all.forwarding: %w", err))
 	}
 	// Write to the legacy configuration file
-	err = os.WriteFile("/proc/sys/net/ipv4/ip_forward", on, mode)
+	err = os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0o644)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("write net.ipv4.ip_forward: %w", err))
 	}
-	err = os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", on, mode)
+	err = os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", []byte("1"), 0o644)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("write net.ipv6.conf.all.forwarding: %w", err))
 	}

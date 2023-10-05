@@ -17,17 +17,16 @@ limitations under the License.
 package buffers
 
 import (
-	"io/fs"
 	"os"
 	"strconv"
 )
 
 func setMaxReadBuffer(val int) error {
 	valStr := []byte(strconv.Itoa(val))
-	return os.WriteFile("/proc/sys/net/core/rmem_max", valStr, fs.FileMode(0644))
+	return os.WriteFile("/proc/sys/net/core/rmem_max", valStr, 0o644)
 }
 
 func setMaxWriteBuffer(val int) error {
 	valStr := []byte(strconv.Itoa(val))
-	return os.WriteFile("/proc/sys/net/core/wmem_max", valStr, fs.FileMode(0644))
+	return os.WriteFile("/proc/sys/net/core/wmem_max", valStr, 0o644)
 }
