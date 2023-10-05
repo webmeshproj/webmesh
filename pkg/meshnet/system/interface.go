@@ -140,6 +140,13 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			}
 		}
 	}
+	if runtime.GOOS == "linux" && opts.NetNs != "" {
+		log.Debug("Moving link into netns", "netns", opts.NetNs)
+		err := moveLinkIn(opts.NetNs, iface.ifname)
+		if err != nil {
+			return nil, fmt.Errorf("failed to move link %q into netns %q: %v", iface.ifname, opts.NetNs, err)
+		}
+	}
 	if !opts.DisableIPv4 && opts.AddressV4.IsValid() {
 		err := iface.setInterfaceAddress(ctx, opts.AddressV4)
 		if err != nil {
@@ -160,13 +167,6 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 			return nil, fmt.Errorf("set IPv6 address: %w", err)
 		}
 	}
-	if runtime.GOOS == "linux" && opts.NetNs != "" {
-		log.Debug("Moving link into netns", "netns", opts.NetNs)
-		err := moveLinkIn(opts.NetNs, iface.ifname)
-		if err != nil {
-			return nil, fmt.Errorf("failed to move link %q into netns %q: %v", iface.ifname, opts.NetNs, err)
-		}
-	}
 	return iface, nil
 }
 
@@ -179,15 +179,12 @@ type sysInterface struct {
 }
 
 func (l *sysInterface) setInterfaceAddress(ctx context.Context, addr netip.Prefix) error {
-	// Currently we do this before moving the interface into the netns, so we don't need to
-	// do anything special here. But we should eventually support adding addresses to interfaces
-	// in other netns's.
-	// context.LoggerFrom(ctx).Debug("Setting interface address", "address", addr.String())
-	// if runtime.GOOS == "linux" && l.netns != "" {
-	// 	return DoInNetNS(l.netns, func() error {
-	// 		return link.SetInterfaceAddress(ctx, l.Name(), addr)
-	// 	})
-	// }
+	context.LoggerFrom(ctx).Debug("Setting interface address", "address", addr.String())
+	if runtime.GOOS == "linux" && l.netns != "" {
+		return DoInNetNS(l.netns, func() error {
+			return link.SetInterfaceAddress(ctx, l.Name(), addr)
+		})
+	}
 	err := link.SetInterfaceAddress(ctx, l.Name(), addr)
 	if err != nil {
 		return fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
