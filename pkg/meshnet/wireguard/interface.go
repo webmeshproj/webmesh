@@ -120,6 +120,7 @@ type Options struct {
 type wginterface struct {
 	system.Interface
 	defaultGateway routes.Gateway
+	changedGateway bool
 	opts           *Options
 	log            *slog.Logger
 	peers          map[string]Peer
@@ -245,6 +246,21 @@ func (w *wginterface) Peers() map[string]Peer {
 func (w *wginterface) Close(ctx context.Context) error {
 	if w.recorderCancel != nil {
 		w.recorderCancel()
+	}
+	if w.changedGateway {
+		defer func() {
+			var err error
+			if w.opts.NetNs != "" {
+				err = system.DoInNetNS(w.opts.NetNs, func() error {
+					return routes.SetDefaultIPv4Gateway(ctx, w.defaultGateway)
+				})
+			} else {
+				err = routes.SetDefaultIPv4Gateway(ctx, w.defaultGateway)
+			}
+			if err != nil {
+				w.log.Warn("Failed to reset default gateway", "error", err.Error())
+			}
+		}()
 	}
 	return w.Interface.Destroy(ctx)
 }

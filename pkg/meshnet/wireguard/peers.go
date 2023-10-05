@@ -32,6 +32,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/routes"
 )
 
 // Peer contains configurations for a wireguard peer. When removing,
@@ -183,20 +184,43 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		// Skip adding routes to our own network
 		if w.opts.NetworkV4.IsValid() && addr.Is4() && !w.opts.DisableIPv4 {
 			if w.opts.NetworkV4.Contains(addr) {
-				w.log.Debug("skipping route to own network", slog.String("prefix", prefix.String()))
+				w.log.Debug("Skipping route to own network", slog.String("prefix", prefix.String()))
 				continue
 			}
 		}
 		if w.opts.NetworkV6.IsValid() && addr.Is6() && !w.opts.DisableIPv6 {
 			if w.opts.NetworkV6.Contains(addr) {
-				w.log.Debug("skipping route to own network", slog.String("prefix", prefix.String()))
+				w.log.Debug("Skipping route to own network", slog.String("prefix", prefix.String()))
 				continue
 			}
 		}
 
+		// If this is a default IPv4 gateway route set the system default route
+		if addr.Is4() && ones == 0 && !w.opts.DisableIPv4 && !w.changedGateway {
+			w.log.Debug("Adding ipv4 default route", slog.String("prefix", prefix.String()))
+			var err error
+			if w.opts.NetNs != "" {
+				err = system.DoInNetNS(w.opts.NetNs, func() error {
+					return routes.SetDefaultIPv4Gateway(ctx, routes.Gateway{
+						Name: w.Name(),
+						Addr: w.AddressV4().Addr(),
+					})
+				})
+			} else {
+				err = routes.SetDefaultIPv4Gateway(ctx, routes.Gateway{
+					Name: w.Name(),
+					Addr: w.AddressV4().Addr(),
+				})
+			}
+			if err != nil {
+				return fmt.Errorf("failed to set default ipv4 gateway: %w", err)
+			}
+			w.changedGateway = true
+		}
+
 		// Add any other routes
 		if prefix.Addr().Is4() && !w.opts.DisableIPv4 {
-			w.log.Debug("adding ipv4 route", slog.Any("prefix", prefix))
+			w.log.Debug("Adding ipv4 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
@@ -207,7 +231,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 				// Don't readd routes to our own network
 				continue
 			}
-			w.log.Debug("adding ipv6 route", slog.Any("prefix", prefix))
+			w.log.Debug("Adding ipv6 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
