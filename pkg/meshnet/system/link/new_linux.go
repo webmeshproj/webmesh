@@ -52,9 +52,7 @@ func NewKernel(ctx context.Context, name string, mtu uint32) error {
 			Info:  &rtnetlink.LinkInfo{Kind: "wireguard"},
 		},
 	}
-	context.LoggerFrom(ctx).Debug("creating wireguard interface",
-		slog.Any("request", req),
-		slog.String("name", name))
+	context.LoggerFrom(ctx).Debug("Creating kernel wireguard interface", slog.Any("request", req), slog.String("name", name))
 	err = conn.Link.New(req)
 	if err != nil {
 		return fmt.Errorf("create wireguard interface: %w", err)

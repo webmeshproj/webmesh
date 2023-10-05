@@ -27,9 +27,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jsimonetti/rtnetlink"
 	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
@@ -96,43 +94,22 @@ func SetDefaultIPv6Gateway(ctx context.Context, gateway Gateway) error {
 
 // Add adds a route to the interface with the given name.
 func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	iface, err := net.InterfaceByName(ifaceName)
+	link, err := netlink.LinkByName(ifaceName)
 	if err != nil {
-		return fmt.Errorf("get interface by name: %w", err)
+		return fmt.Errorf("get link by name: %w", err)
 	}
-
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Detect network family
-	family := unix.AF_INET6
-	if addr.Addr().Is4() {
-		family = unix.AF_INET
-	}
-
-	// Calculate the prefix length
 	ones := addr.Bits()
-
-	// Add the route to the interface
-	req := &rtnetlink.RouteMessage{
-		Family:    uint8(family),
-		Table:     unix.RT_TABLE_MAIN,
-		Protocol:  unix.RTPROT_BOOT,
-		Scope:     unix.RT_SCOPE_LINK,
-		Type:      unix.RTN_UNICAST,
-		DstLength: uint8(ones),
-		Attributes: rtnetlink.RouteAttributes{
-			Dst:      addr.Masked().Addr().AsSlice(),
-			OutIface: uint32(iface.Index),
+	rt := &netlink.Route{
+		LinkIndex: link.Attrs().Index,
+		Dst: &net.IPNet{
+			IP:   addr.Addr().AsSlice(),
+			Mask: net.CIDRMask(ones, 8*len(addr.Addr().AsSlice())),
 		},
 	}
-	context.LoggerFrom(ctx).With("route", "add").Debug("adding route", slog.Any("request", req))
-	err = conn.Route.Add(req)
+	context.LoggerFrom(ctx).Debug("Adding route to interface", slog.Any("route", rt.Dst))
+	err = netlink.RouteAdd(rt)
 	if err != nil {
-		if strings.Contains(err.Error(), "file exists") {
+		if strings.Contains(err.Error(), "file exists") || errors.Is(err, os.ErrExist) {
 			return ErrRouteExists
 		}
 		return fmt.Errorf("add route to interface: %w", err)
@@ -142,43 +119,25 @@ func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 
 // Remove removes a route from the interface with the given name.
 func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	iface, err := net.InterfaceByName(ifaceName)
+	link, err := netlink.LinkByName(ifaceName)
 	if err != nil {
-		return fmt.Errorf("get interface by name: %w", err)
+		return fmt.Errorf("get link by name: %w", err)
 	}
-
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Detect network family
-	family := unix.AF_INET6
-	if addr.Addr().Is4() {
-		family = unix.AF_INET
-	}
-
-	// Calculate the prefix length
 	ones := addr.Bits()
-
-	// Delete the route from the interface
-	req := &rtnetlink.RouteMessage{
-		Family:    uint8(family),
-		Table:     unix.RT_TABLE_MAIN,
-		Protocol:  unix.RTPROT_BOOT,
-		Scope:     unix.RT_SCOPE_LINK,
-		Type:      unix.RTN_UNICAST,
-		DstLength: uint8(ones),
-		Attributes: rtnetlink.RouteAttributes{
-			Dst:      addr.Masked().Addr().AsSlice(),
-			OutIface: uint32(iface.Index),
+	rt := &netlink.Route{
+		LinkIndex: link.Attrs().Index,
+		Dst: &net.IPNet{
+			IP:   addr.Addr().AsSlice(),
+			Mask: net.CIDRMask(ones, 8*len(addr.Addr().AsSlice())),
 		},
 	}
-	context.LoggerFrom(ctx).With("route", "del").Debug("removing route", slog.Any("request", req))
-	err = conn.Route.Delete(req)
+	context.LoggerFrom(ctx).Debug("Removing route from interface", slog.Any("route", rt.Dst))
+	err = netlink.RouteDel(rt)
 	if err != nil {
-		return fmt.Errorf("delete route from interface: %w", err)
+		if strings.Contains(err.Error(), "no such process") || errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("remove route from interface: %w", err)
 	}
 	return nil
 }

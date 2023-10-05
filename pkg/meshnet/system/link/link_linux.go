@@ -22,49 +22,24 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"os"
 	"strings"
 
-	"github.com/jsimonetti/rtnetlink"
 	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // ActivateInterface activates the interface with the given name.
 func ActivateInterface(ctx context.Context, name string) error {
-	iface, err := net.InterfaceByName(name)
+	link, err := netlink.LinkByName(name)
 	if err != nil {
 		if isNoSuchInterfaceErr(err) {
 			return ErrLinkNotExists
 		}
 		return fmt.Errorf("get interface: %w", err)
 	}
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	// Request the details of the interface
-	msg, err := conn.Link.Get(uint32(iface.Index))
-	if err != nil {
-		return fmt.Errorf("get interface details: %w", err)
-	}
-	// Check if the interface is already up
-	state := msg.Attributes.OperationalState
-	if state == rtnetlink.OperStateUp || state == rtnetlink.OperStateUnknown {
-		return nil
-	}
-	req := &rtnetlink.LinkMessage{
-		Family: unix.AF_UNSPEC,
-		Type:   msg.Type,
-		Index:  uint32(iface.Index),
-		Flags:  unix.IFF_UP,
-		Change: unix.IFF_UP,
-	}
-	context.LoggerFrom(ctx).Debug("set interface up", slog.Any("request", req), slog.String("interface", iface.Name))
-	err = conn.Link.Set(req)
-	if err != nil {
+	if err := netlink.LinkSetUp(link); err != nil {
 		return fmt.Errorf("set interface up: %w", err)
 	}
 	return nil
@@ -72,59 +47,33 @@ func ActivateInterface(ctx context.Context, name string) error {
 
 // DeactivateInterface deactivates the interface with the given name.
 func DeactivateInterface(ctx context.Context, name string) error {
-	iface, err := net.InterfaceByName(name)
+	link, err := netlink.LinkByName(name)
 	if err != nil {
 		if isNoSuchInterfaceErr(err) {
 			return ErrLinkNotExists
 		}
 		return fmt.Errorf("get interface: %w", err)
 	}
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	// Request the details of the interface
-	msg, err := conn.Link.Get(uint32(iface.Index))
-	if err != nil {
-		return fmt.Errorf("get interface details: %w", err)
-	}
-	// Check if the interface is already down
-	state := msg.Attributes.OperationalState
-	if state == rtnetlink.OperStateDown {
-		return nil
-	}
-	req := &rtnetlink.LinkMessage{
-		Family: 0x0,
-		Type:   msg.Type,
-		Index:  uint32(iface.Index),
-		Flags:  0x0,
-		Change: 0x1,
-	}
-	context.LoggerFrom(ctx).Debug("deactivate interface", slog.Any("request", req))
-	err = conn.Link.Set(req)
-	if err != nil {
+	if err := netlink.LinkSetDown(link); err != nil {
 		return fmt.Errorf("set interface down: %w", err)
 	}
 	return nil
 }
 
 // RemoveInterface removes the given interface.
-func RemoveInterface(ctx context.Context, ifaceName string) error {
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	iface, err := net.InterfaceByName(ifaceName)
+func RemoveInterface(ctx context.Context, name string) error {
+	link, err := netlink.LinkByName(name)
 	if err != nil {
 		if isNoSuchInterfaceErr(err) {
 			return ErrLinkNotExists
 		}
-		return fmt.Errorf("failed to get interface: %w", err)
+		return fmt.Errorf("get interface: %w", err)
 	}
-	context.LoggerFrom(ctx).Debug("remove interface", slog.String("interface", iface.Name))
-	return conn.Link.Delete(uint32(iface.Index))
+	context.LoggerFrom(ctx).Debug("Remove interface", slog.String("interface", name))
+	if err := netlink.LinkDel(link); err != nil {
+		return fmt.Errorf("delete interface: %w", err)
+	}
+	return nil
 }
 
 // InterfaceNetwork returns the network for the given interface and address.
@@ -162,5 +111,5 @@ func InterfaceNetwork(ifaceName string, forAddr netip.Addr, ipv6 bool) (netip.Pr
 func isNoSuchInterfaceErr(err error) bool {
 	opError := &net.OpError{}
 	ok := errors.As(err, &opError)
-	return ok && strings.Contains(opError.Unwrap().Error(), "no such network interface")
+	return ok && strings.Contains(opError.Unwrap().Error(), "no such network interface") || os.IsNotExist(err)
 }
