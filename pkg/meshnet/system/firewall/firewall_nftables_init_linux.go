@@ -278,18 +278,6 @@ func (fw *firewall) initInputChain() error {
 			},
 		},
 		{
-			comment: "allow ssh",
-			rule: &nftableslib.Rule{
-				L4: &nftableslib.L4Rule{
-					L4Proto: unix.IPPROTO_TCP,
-					Dst: &nftableslib.Port{
-						List: nftableslib.SetPortList([]int{22}),
-					},
-				},
-				Action: accept,
-			},
-		},
-		{
 			comment: "allow wireguard",
 			rule: &nftableslib.Rule{
 				L4: &nftableslib.L4Rule{
@@ -308,7 +296,7 @@ func (fw *firewall) initInputChain() error {
 			cmd     string
 			rule    *nftableslib.Rule
 		}{
-			comment: "allow grpc",
+			comment: "allow webmesh rpc",
 			rule: &nftableslib.Rule{
 				L4: &nftableslib.L4Rule{
 					L4Proto: unix.IPPROTO_TCP,
@@ -326,7 +314,7 @@ func (fw *firewall) initInputChain() error {
 			cmd     string
 			rule    *nftableslib.Rule
 		}{
-			comment: "allow raft",
+			comment: "allow storage",
 			rule: &nftableslib.Rule{
 				L4: &nftableslib.L4Rule{
 					L4Proto: unix.IPPROTO_TCP,

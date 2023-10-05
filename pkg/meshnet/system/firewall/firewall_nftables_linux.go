@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/google/nftables"
 	"github.com/google/nftables/expr"
 	"github.com/sbezverk/nftableslib"
@@ -30,38 +31,39 @@ import (
 type firewall struct {
 	opts *Options
 	conn *nftables.Conn
-
 	// nftables interfaces
 	ti           nftableslib.TableFuncs
 	natchains    nftableslib.ChainFuncs
 	filterchains nftableslib.ChainFuncs
 	rawchains    nftableslib.ChainFuncs
-
 	// nat chains
 	prerouting  nftableslib.RulesInterface
 	postrouting nftableslib.RulesInterface
 	output      nftableslib.RulesInterface
-
 	// filter chains
 	input   nftableslib.RulesInterface
 	forward nftableslib.RulesInterface
-
 	// raw chains
 	rawprerouting nftableslib.RulesInterface
-
-	// Maps of rule handles to nat options
-	dnats map[uint64][]byte
 }
 
 // newFirewall returns a new nftables firewall manager.
 func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 	// Initialize a long lasting connection to the nftables library
-	conn := nftableslib.InitConn()
+	var netns []int
+	if opts.NetNs != "" {
+		ns, err := ns.GetNS(opts.NetNs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get netns: %w", err)
+		}
+		defer ns.Close()
+		netns = []int{int(ns.Fd())}
+	}
+	conn := nftableslib.InitConn(netns...)
 	// Initialize tables
 	fw := &firewall{
-		opts:  opts,
-		conn:  conn,
-		dnats: make(map[uint64][]byte),
+		opts: opts,
+		conn: conn,
 	}
 	err := fw.initialize(opts)
 	if err != nil {

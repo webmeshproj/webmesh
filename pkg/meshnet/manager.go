@@ -239,9 +239,9 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		return err
 	}
 	fwopts := &firewall.Options{
-		ID: m.nodeID.String(),
+		ID:    m.nodeID.String(),
+		NetNs: m.opts.NetNs,
 		// TODO: Make this configurable
-		NetNs:         m.opts.NetNs,
 		DefaultPolicy: firewall.PolicyAccept,
 		WireguardPort: uint16(m.opts.ListenPort),
 		StoragePort:   uint16(m.opts.StoragePort),
