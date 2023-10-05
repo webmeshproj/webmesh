@@ -275,9 +275,6 @@ func (s *meshStore) Dial(ctx context.Context, network, address string) (net.Conn
 
 // DialLeader opens a new gRPC connection to the current Raft leader.
 func (s *meshStore) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
-	if s.storage == nil || !s.open.Load() {
-		return nil, ErrNotOpen
-	}
 	leader, err := s.LeaderID()
 	if err != nil {
 		return nil, err
