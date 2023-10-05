@@ -31,6 +31,7 @@ import (
 type firewall struct {
 	opts *Options
 	conn *nftables.Conn
+	ns   ns.NetNS
 	// nftables interfaces
 	ti           nftableslib.TableFuncs
 	natchains    nftableslib.ChainFuncs
@@ -49,6 +50,7 @@ type firewall struct {
 
 // newFirewall returns a new nftables firewall manager.
 func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
+	fw := &firewall{opts: opts}
 	// Initialize a long lasting connection to the nftables library
 	var netns []int
 	if opts.NetNs != "" {
@@ -56,15 +58,11 @@ func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get netns: %w", err)
 		}
-		defer ns.Close()
 		netns = []int{int(ns.Fd())}
+		fw.ns = ns
 	}
-	conn := nftableslib.InitConn(netns...)
 	// Initialize tables
-	fw := &firewall{
-		opts: opts,
-		conn: conn,
-	}
+	fw.conn = nftableslib.InitConn(netns...)
 	err := fw.initialize(opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "not supported") || strings.Contains(err.Error(), "no such file") {
@@ -94,7 +92,10 @@ func (fw *firewall) AddWireguardForwarding(ctx context.Context, ifaceName string
 		Action:   accept,
 		UserData: nftableslib.MakeRuleComment("Allow forwarding traffic on the wireguard interface"),
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to create wireguard forwarding rule: %w", err)
+	}
+	return fw.conn.Flush()
 }
 
 // AddMasquerade should configure the firewall to masquerade outbound traffic on the wireguard interface.
@@ -139,6 +140,9 @@ func (fw *firewall) Close(ctx context.Context) error {
 	err := fw.Clear(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to clear firewall: %w", err)
+	}
+	if fw.ns != nil {
+		defer fw.ns.Close()
 	}
 	return fw.conn.CloseLasting()
 }

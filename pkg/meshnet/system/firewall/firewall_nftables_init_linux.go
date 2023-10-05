@@ -94,7 +94,7 @@ func (fw *firewall) initTables(opts *Options) error {
 	fw.filterchains = filterchains.Chains()
 	fw.natchains = natchains.Chains()
 	fw.rawchains = rawchains.Chains()
-	return nil
+	return fw.conn.Flush()
 }
 
 func (fw *firewall) initChains() error {
@@ -189,7 +189,7 @@ func (fw *firewall) initChains() error {
 	if err != nil {
 		return fmt.Errorf("failed to load filter chain: %w", err)
 	}
-	return nil
+	return fw.conn.Flush()
 }
 
 func (fw *firewall) initInputChain() error {
@@ -335,5 +335,5 @@ func (fw *firewall) initInputChain() error {
 		}
 	}
 
-	return nil
+	return fw.conn.Flush()
 }
