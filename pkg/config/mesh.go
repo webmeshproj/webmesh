@@ -48,6 +48,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // MeshOptions are the options for participating in a mesh.
@@ -466,15 +467,15 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 		RequestVote:          o.Mesh.RequestVote,
 		RequestObserver:      o.Mesh.RequestObserver,
 		Routes:               routes,
-		DirectPeers: func() map[string]v1.ConnectProtocol {
-			peers := make(map[string]v1.ConnectProtocol)
+		DirectPeers: func() map[types.NodeID]v1.ConnectProtocol {
+			peers := make(map[types.NodeID]v1.ConnectProtocol)
 			for _, peer := range o.Mesh.ICEPeers {
 				p := peer
-				peers[p] = v1.ConnectProtocol_CONNECT_ICE
+				peers[types.NodeID(p)] = v1.ConnectProtocol_CONNECT_ICE
 			}
 			for _, peer := range o.Mesh.LibP2PPeers {
 				p := peer
-				peers[p] = v1.ConnectProtocol_CONNECT_LIBP2P
+				peers[types.NodeID(p)] = v1.ConnectProtocol_CONNECT_LIBP2P
 			}
 			return peers
 		}(),

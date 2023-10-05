@@ -181,8 +181,17 @@ func (s *meshStore) newJoinRequest(opts ConnectOptions, encodedKey string) *v1.J
 			}
 			return routes
 		}(),
-		DirectPeers: opts.DirectPeers,
-		Features:    opts.Features,
+		DirectPeers: func() map[string]v1.ConnectProtocol {
+			if len(opts.DirectPeers) == 0 {
+				return nil
+			}
+			out := make(map[string]v1.ConnectProtocol)
+			for id, proto := range opts.DirectPeers {
+				out[id.String()] = proto
+			}
+			return out
+		}(),
+		Features: opts.Features,
 		Multiaddrs: func() []string {
 			var out []string
 			for _, addr := range opts.Multiaddrs {

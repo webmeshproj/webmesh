@@ -200,8 +200,17 @@ func (t *TestNode) Connect(ctx context.Context, opts ConnectOptions) error {
 		AsVoter:            opts.RequestVote,
 		AsObserver:         opts.RequestObserver,
 		Routes:             routes,
-		DirectPeers:        opts.DirectPeers,
 		Features:           opts.Features,
+		DirectPeers: func() map[string]v1.ConnectProtocol {
+			if len(opts.DirectPeers) == 0 {
+				return nil
+			}
+			out := make(map[string]v1.ConnectProtocol)
+			for id, proto := range opts.DirectPeers {
+				out[id.String()] = proto
+			}
+			return out
+		}(),
 	})
 	if err != nil {
 		return fmt.Errorf("mock node join request: %w", err)

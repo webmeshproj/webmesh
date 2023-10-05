@@ -209,16 +209,16 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	// If we have direct-peerings, add them to the db
 	if len(opts.DirectPeers) > 0 {
 		for peer, proto := range opts.DirectPeers {
-			if peer == s.ID().String() {
+			if peer == s.ID() {
 				continue
 			}
-			err = p.Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{Id: peer}})
+			err = p.Put(ctx, types.MeshNode{MeshNode: &v1.MeshNode{Id: peer.String()}})
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)
 			}
 			err = p.PutEdge(ctx, types.MeshEdge{MeshEdge: &v1.MeshEdge{
 				Source:     s.ID().String(),
-				Target:     peer,
+				Target:     peer.String(),
 				Weight:     0,
 				Attributes: storageutil.EdgeAttrsForConnectProto(proto),
 			}})

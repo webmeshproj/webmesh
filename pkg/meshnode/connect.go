@@ -34,6 +34,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // ConnectOptions are options for opening the connection to the mesh.
@@ -72,7 +73,7 @@ type ConnectOptions struct {
 	Routes []netip.Prefix
 	// DirectPeers are a map of peers to connect to directly. The values
 	// are the prefered transport to use.
-	DirectPeers map[string]v1.ConnectProtocol
+	DirectPeers map[types.NodeID]v1.ConnectProtocol
 	// Bootstrap are options for bootstrapping the mesh when connecting for
 	// the first time.
 	Bootstrap *BootstrapOptions
