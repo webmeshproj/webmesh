@@ -18,6 +18,7 @@ package meshnode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/netip"
@@ -79,6 +80,33 @@ type ConnectOptions struct {
 	PreferIPv6 bool
 	// Multiaddrs are the multiaddrs to advertise for this node.
 	Multiaddrs []multiaddr.Multiaddr
+}
+
+func (c *ConnectOptions) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"features": c.Features,
+		"plugins": func() []string {
+			var plugins []string
+			for name := range c.Plugins {
+				plugins = append(plugins, name)
+			}
+			return plugins
+		},
+		"networkOptions":     c.NetworkOptions,
+		"discovery":          c.Discovery,
+		"maxJoinRetries":     c.MaxJoinRetries,
+		"advertisePort":      c.GRPCAdvertisePort,
+		"dnsPort":            c.MeshDNSAdvertisePort,
+		"primaryEndpoint":    c.PrimaryEndpoint,
+		"wireguardEndpoints": c.WireGuardEndpoints,
+		"requestVote":        c.RequestVote,
+		"requestObserver":    c.RequestObserver,
+		"routes":             c.Routes,
+		"directPeers":        c.DirectPeers,
+		"bootstrap":          c.Bootstrap,
+		"preferIPv6":         c.PreferIPv6,
+		"multiaddrs":         c.Multiaddrs,
+	})
 }
 
 // BootstrapOptions are options for bootstrapping the mesh when connecting for

@@ -19,6 +19,7 @@ limitations under the License.
 package libp2p
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -61,6 +62,19 @@ type AnnounceOptions struct {
 	Method string
 	// Host is a pre-started host to use for announcing.
 	Host host.Host
+}
+
+// MarshalJSON implements json.Marshaler.
+func (opts *AnnounceOptions) MarshalJSON() ([]byte, error) {
+	if opts == nil {
+		return []byte("{}"), nil
+	}
+	return json.Marshal(map[string]any{
+		"rendezvous":  opts.Rendezvous,
+		"announceTTL": opts.AnnounceTTL,
+		"hostOptions": opts.HostOptions,
+		"method":      opts.Method,
+	})
 }
 
 // NewAnnouncer creates a generic announcer for the given method, request, and response objects.

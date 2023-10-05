@@ -17,6 +17,7 @@ limitations under the License.
 package meshnet
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -81,6 +82,28 @@ type Options struct {
 	// Relays are options for when presented with the need to negotiate
 	// p2p data channels.
 	Relays RelayOptions
+}
+
+func (o *Options) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"netNs":                 o.NetNs,
+		"interfaceName":         o.InterfaceName,
+		"forceReplace":          o.ForceReplace,
+		"listenPort":            o.ListenPort,
+		"modprobe":              o.Modprobe,
+		"persistentKeepAlive":   o.PersistentKeepAlive,
+		"forceTUN":              o.ForceTUN,
+		"mtu":                   o.MTU,
+		"recordMetrics":         o.RecordMetrics,
+		"recordMetricsInterval": o.RecordMetricsInterval,
+		"storagePort":           o.StoragePort,
+		"grpcPort":              o.GRPCPort,
+		"zoneAwarenessID":       o.ZoneAwarenessID,
+		"localDNSAddr":          o.LocalDNSAddr,
+		"disableIPv4":           o.DisableIPv4,
+		"disableIPv6":           o.DisableIPv6,
+		"relays":                o.Relays,
+	})
 }
 
 // RelayOptions are options for when presented with the need to negotiate

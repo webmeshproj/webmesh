@@ -19,6 +19,7 @@ limitations under the License.
 package libp2p
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -58,6 +59,15 @@ type HostOptions struct {
 	LocalAddrs []multiaddr.Multiaddr
 	// ConnectTimeout is the timeout for connecting to peers when bootstrapping.
 	ConnectTimeout time.Duration
+}
+
+// MarshalJSON implements json.Marshaler.
+func (o *HostOptions) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"bootstrapPeers": o.BootstrapPeers,
+		"options":        o.Options,
+		"localAddrs":     o.LocalAddrs,
+	})
 }
 
 // NewDiscoveryHost creates a new libp2p host connected to the DHT with the given options.
