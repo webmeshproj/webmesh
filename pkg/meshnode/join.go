@@ -85,32 +85,28 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 			return fmt.Errorf("parse ipv4 address: %w", err)
 		}
 	}
-	networkv4, err = netip.ParsePrefix(resp.GetNetworkIPv4())
-	if err != nil {
-		return fmt.Errorf("parse ipv4 network: %w", err)
+	if resp.GetNetworkIPv4() != "" {
+		networkv4, err = netip.ParsePrefix(resp.GetNetworkIPv4())
+		if err != nil {
+			return fmt.Errorf("parse ipv4 network: %w", err)
+		}
 	}
-	addressv6, err = netip.ParsePrefix(resp.GetAddressIPv6())
-	if err != nil {
-		return fmt.Errorf("parse ipv6 address: %w", err)
+	if resp.GetAddressIPv6() != "" {
+		addressv6, err = netip.ParsePrefix(resp.GetAddressIPv6())
+		if err != nil {
+			return fmt.Errorf("parse ipv6 address: %w", err)
+		}
 	}
-	networkv6, err = netip.ParsePrefix(resp.GetNetworkIPv6())
-	if err != nil {
-		return fmt.Errorf("parse ipv6 network: %w", err)
+	if resp.GetNetworkIPv6() != "" {
+		networkv6, err = netip.ParsePrefix(resp.GetNetworkIPv6())
+		if err != nil {
+			return fmt.Errorf("parse ipv6 network: %w", err)
+		}
 	}
 	startopts := meshnet.StartOptions{
-		Key: s.key,
-		AddressV4: func() netip.Prefix {
-			if !s.opts.DisableIPv4 {
-				return addressv4
-			}
-			return netip.Prefix{}
-		}(),
-		AddressV6: func() netip.Prefix {
-			if !s.opts.DisableIPv6 {
-				return addressv6
-			}
-			return netip.Prefix{}
-		}(),
+		Key:       s.key,
+		AddressV4: addressv4,
+		AddressV6: addressv6,
 		NetworkV4: networkv4,
 		NetworkV6: networkv6,
 	}
