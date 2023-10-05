@@ -161,7 +161,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		}
 	}
 	if runtime.GOOS == "linux" && opts.NetNs != "" {
-		err := moveLinkIn(ifName, opts.NetNs)
+		err := moveLinkIn(opts.NetNs, ifName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to move link %q into netns %q: %v", ifName, opts.NetNs, err)
 		}
