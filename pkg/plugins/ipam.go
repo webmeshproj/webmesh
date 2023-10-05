@@ -35,28 +35,29 @@ import (
 type BuiltinIPAM struct {
 	v1.UnimplementedIPAMPluginServer
 
-	config  IPAMConfig
-	db      storage.MeshDB
-	datamux sync.Mutex
+	IPAMConfig
+	mu sync.Mutex
 }
 
 // IPAMConfig contains static address assignments for nodes.
 type IPAMConfig struct {
+	// Storage is the storage plugin to use for IPAM.
+	Storage storage.MeshDB
 	// StaticIPv4 is a map of node names to IPv4 addresses.
-	StaticIPv4 map[string]any `mapstructure:"static-ipv4,omitempty" koanf:"static-ipv4,omitempty"`
+	StaticIPv4 map[string]string
 }
 
 // NewBuiltinIPAM returns a new ipam plugin with the given database.
-func NewBuiltinIPAM(db storage.MeshDB) *BuiltinIPAM {
-	return &BuiltinIPAM{db: db}
+func NewBuiltinIPAM(opts IPAMConfig) *BuiltinIPAM {
+	return &BuiltinIPAM{IPAMConfig: opts}
 }
 
 func (p *BuiltinIPAM) Allocate(ctx context.Context, r *v1.AllocateIPRequest, opts ...grpc.CallOption) (*v1.AllocatedIP, error) {
-	p.datamux.Lock()
-	defer p.datamux.Unlock()
-	if addr, ok := p.config.StaticIPv4[r.GetNodeID()]; ok {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if addr, ok := p.StaticIPv4[r.GetNodeID()]; ok {
 		return &v1.AllocatedIP{
-			Ip: addr.(string),
+			Ip: addr,
 		}, nil
 	}
 	return p.allocateV4(ctx, r)
@@ -71,7 +72,7 @@ func (p *BuiltinIPAM) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("parse subnet: %w", err)
 	}
-	nodes, err := p.db.Peers().List(ctx)
+	nodes, err := p.Storage.Peers().List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
@@ -105,7 +106,7 @@ func (p *BuiltinIPAM) next32(cidr netip.Prefix, set map[netip.Prefix]struct{}) (
 
 func (p *BuiltinIPAM) isStaticAllocation(ip netip.Prefix) bool {
 	if ip.Addr().Is4() {
-		for _, addr := range p.config.StaticIPv4 {
+		for _, addr := range p.StaticIPv4 {
 			if addr == ip.String() {
 				return true
 			}

@@ -90,6 +90,10 @@ type MeshOptions struct {
 	DisableIPv6 bool `koanf:"disable-ipv6,omitempty"`
 	// DisableFeatureAdvertisement is true if feature advertisement should be disabled.
 	DisableFeatureAdvertisement bool `koanf:"disable-feature-advertisement,omitempty"`
+	// DisableDefaultIPAM is true if the default IPAM should be disabled.
+	DisableDefaultIPAM bool `koanf:"disable-default-ipam,omitempty"`
+	// DefaultIPAMStaticIPv4 are static IPv4 assignments to use for the default IPAM.
+	DefaultIPAMStaticIPv4 map[string]string `koanf:"default-ipam-static-ipv4,omitempty"`
 }
 
 // NewMeshOptions returns a new MeshOptions with the default values. If node id
@@ -130,6 +134,8 @@ func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.DisableIPv4, prefix+"mesh.disable-ipv4", false, "Disable IPv4 usage.")
 	fs.BoolVar(&o.DisableIPv6, prefix+"mesh.disable-ipv6", false, "Disable IPv6 usage.")
 	fs.BoolVar(&o.DisableFeatureAdvertisement, prefix+"mesh.disable-feature-advertisement", false, "Disable feature advertisement.")
+	fs.BoolVar(&o.DisableDefaultIPAM, prefix+"services.api.disable-default-ipam", false, "Disable the default IPAM.")
+	fs.StringToStringVar(&o.DefaultIPAMStaticIPv4, prefix+"services.api.default-ipam-static-ipv4", nil, "Static IPv4 assignments to use for the default IPAM.")
 }
 
 // Validate validates the options.
@@ -175,14 +181,16 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 	}
 	conf = meshnode.Config{
 		NodeID:                  nodeid,
+		Credentials:             []grpc.DialOption{},
 		Key:                     key,
 		HeartbeatPurgeThreshold: o.Storage.Raft.HeartbeatPurgeThreshold,
 		ZoneAwarenessID:         o.Mesh.ZoneAwarenessID,
 		UseMeshDNS:              o.Mesh.UseMeshDNS,
+		LocalMeshDNSAddr:        "",
 		DisableIPv4:             o.Mesh.DisableIPv4,
 		DisableIPv6:             o.Mesh.DisableIPv6,
-		LocalMeshDNSAddr:        "",
-		Credentials:             []grpc.DialOption{},
+		DisableDefaultIPAM:      o.Mesh.DisableDefaultIPAM,
+		DefaultIPAMStaticIPv4:   o.Mesh.DefaultIPAMStaticIPv4,
 	}
 	// Check if we are serving a local DNS server
 	if o.Services.MeshDNS.Enabled {

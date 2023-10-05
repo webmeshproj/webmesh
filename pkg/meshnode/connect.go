@@ -130,9 +130,12 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	}
 
 	// Create the plugin manager
-	var pluginopts plugins.Options
-	pluginopts.Storage = s.Storage()
-	pluginopts.Plugins = opts.Plugins
+	pluginopts := plugins.Options{
+		Storage:               s.Storage(),
+		Plugins:               opts.Plugins,
+		DisableDefaultIPAM:    s.opts.DisableDefaultIPAM,
+		DefaultIPAMStaticIPv4: s.opts.DefaultIPAMStaticIPv4,
+	}
 	s.plugins, err = plugins.NewManager(ctx, pluginopts)
 	if err != nil {
 		return fmt.Errorf("failed to load plugins: %w", err)

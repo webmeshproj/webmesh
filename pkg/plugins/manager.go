@@ -50,6 +50,10 @@ type Options struct {
 	Storage storage.Provider
 	// Plugins is a map of plugin names to plugin configs.
 	Plugins map[string]Plugin
+	// DisableDefaultIPAM disables the default IPAM plugin.
+	DisableDefaultIPAM bool
+	// DefaultIPAMStaticIPv4 is a map of node names to IPv4 addresses.
+	DefaultIPAMStaticIPv4 map[string]string
 }
 
 // Plugin represents a plugin client and its configuration.
@@ -161,8 +165,11 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 		}
 	}
 	// If we didn't find any IPAM plugins, register the default one
-	if ipamv4 == nil {
-		ipamv4 = NewBuiltinIPAM(opts.Storage.MeshDB())
+	if ipamv4 == nil && !opts.DisableDefaultIPAM {
+		ipamv4 = NewBuiltinIPAM(IPAMConfig{
+			Storage:    opts.Storage.MeshDB(),
+			StaticIPv4: opts.DefaultIPAMStaticIPv4,
+		})
 	}
 	m := &manager{
 		storage: opts.Storage,

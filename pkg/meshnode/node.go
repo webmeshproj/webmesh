@@ -120,6 +120,10 @@ type Config struct {
 	DisableIPv4 bool
 	// DisableIPv6 is true if IPv6 should be disabled.
 	DisableIPv6 bool
+	// DisableDefaultIPAM disables the default IPAM plugin.
+	DisableDefaultIPAM bool
+	// DefaultIPAMStaticIPv4 is a map of node names to IPv4 addresses.
+	DefaultIPAMStaticIPv4 map[string]string
 }
 
 // New creates a new Mesh. You must call Open() on the returned mesh
