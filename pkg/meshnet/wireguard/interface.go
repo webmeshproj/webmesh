@@ -119,7 +119,7 @@ type Options struct {
 
 type wginterface struct {
 	system.Interface
-	defaultGateway netip.Addr
+	defaultGateway routes.Gateway
 	opts           *Options
 	log            *slog.Logger
 	peers          map[string]Peer
@@ -160,7 +160,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		}
 	}
 	// Get the default gateway in case we change it later.
-	var gw netip.Addr
+	var gw routes.Gateway
 	var err error
 	gw, err = routes.GetDefaultGateway(ctx)
 	if err != nil {

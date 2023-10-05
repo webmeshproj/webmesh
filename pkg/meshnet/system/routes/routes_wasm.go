@@ -23,17 +23,17 @@ import (
 )
 
 // GetDefaultGateway returns the default gateway of the current system.
-func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
+func GetDefaultGateway(ctx context.Context) (Gateway, error) {
 	return netip.Addr{}, errors.New("not implemented")
 }
 
 // SetDefaultIPv4Gateway sets the default IPv4 gateway for the current system.
-func SetDefaultIPv4Gateway(ctx context.Context, gateway netip.Addr) error {
+func SetDefaultIPv4Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 
 // SetDefaultIPv6Gateway sets the default IPv6 gateway for the current system.
-func SetDefaultIPv6Gateway(ctx context.Context, gateway netip.Addr) error {
+func SetDefaultIPv6Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 

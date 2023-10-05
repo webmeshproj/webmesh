@@ -27,27 +27,34 @@ import (
 )
 
 // GetDefaultGateway returns the default gateway of the current system.
-func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
+func GetDefaultGateway(ctx context.Context) (Gateway, error) {
+	var gateway Gateway
 	out, err := common.ExecOutput(ctx, "route", "-n", "get", "default")
 	if err != nil {
-		return netip.Addr{}, fmt.Errorf("failed to get default gateway: %w", err)
+		return gateway, fmt.Errorf("failed to get default gateway: %w", err)
 	}
 	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "gateway:") {
-			return netip.ParseAddr(strings.TrimSpace(line[8:]))
+			var err error
+			gateway.Addr, err = netip.ParseAddr(strings.TrimSpace(line[8:]))
+			if err != nil {
+				return gateway, fmt.Errorf("failed to parse gateway address: %w", err)
+			}
+			gateway.Name = "default"
+			return gateway, nil
 		}
 	}
-	return netip.Addr{}, errors.New("no default gateway found")
+	return gateway, errors.New("no default gateway found")
 }
 
 // SetDefaultIPv4Gateway sets the default IPv4 gateway for the current system.
-func SetDefaultIPv4Gateway(ctx context.Context, gateway netip.Addr) error {
+func SetDefaultIPv4Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 
 // SetDefaultIPv6Gateway sets the default IPv6 gateway for the current system.
-func SetDefaultIPv6Gateway(ctx context.Context, gateway netip.Addr) error {
+func SetDefaultIPv6Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 

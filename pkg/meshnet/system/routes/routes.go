@@ -16,6 +16,19 @@ limitations under the License.
 
 package routes
 
-import "errors"
+import (
+	"errors"
+	"net/netip"
+)
 
+// ErrRouteExists is returned when a route already exists.
 var ErrRouteExists = errors.New("route already exists")
+
+// Gateway represents a gateway route. It contains the name and IP address
+// of a gateway interface.
+type Gateway struct {
+	// Name is the name of the gateway interface.
+	Name string
+	// Addr is the IP address of the gateway interface.
+	Addr netip.Addr
+}

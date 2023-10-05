@@ -34,10 +34,11 @@ import (
 )
 
 // GetDefaultGateway returns the default gateway of the current system.
-func GetDefaultGateway(_ context.Context) (netip.Addr, error) {
+func GetDefaultGateway(_ context.Context) (Gateway, error) {
+	var gateway Gateway
 	f, err := os.Open("/proc/net/route")
 	if err != nil {
-		return netip.Addr{}, fmt.Errorf("could not open /proc/net/route: %w", err)
+		return gateway, fmt.Errorf("could not open /proc/net/route: %w", err)
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
@@ -54,21 +55,26 @@ func GetDefaultGateway(_ context.Context) (netip.Addr, error) {
 			continue
 		}
 		// The gateway IP is in the 3rd field of the route encoded as a hex string.
-		return decodeKernelHexIP(fields[2])
+		gateway.Addr, err = decodeKernelHexIP(fields[2])
+		if err != nil {
+			return gateway, fmt.Errorf("could not decode gateway IP: %w", err)
+		}
+		gateway.Name = fields[0]
+		return gateway, nil
 	}
 	if err := scanner.Err(); err != nil {
-		return netip.Addr{}, fmt.Errorf("could not read /proc/net/route: %w", err)
+		return gateway, fmt.Errorf("could not read /proc/net/route: %w", err)
 	}
-	return netip.Addr{}, errors.New("could not determine current default gateway")
+	return gateway, errors.New("could not determine current default gateway")
 }
 
 // SetDefaultIPv4Gateway sets the default IPv4 gateway for the current system.
-func SetDefaultIPv4Gateway(ctx context.Context, gateway netip.Addr) error {
+func SetDefaultIPv4Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 
 // SetDefaultIPv6Gateway sets the default IPv6 gateway for the current system.
-func SetDefaultIPv6Gateway(ctx context.Context, gateway netip.Addr) error {
+func SetDefaultIPv6Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 

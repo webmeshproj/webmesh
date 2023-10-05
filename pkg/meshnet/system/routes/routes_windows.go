@@ -28,17 +28,17 @@ import (
 )
 
 // GetDefaultGateway returns the default gateway of the current system.
-func GetDefaultGateway(ctx context.Context) (netip.Addr, error) {
+func GetDefaultGateway(ctx context.Context) (Gateway, error) {
 	return defaultGatewayIPConfig(ctx)
 }
 
 // SetDefaultIPv4Gateway sets the default IPv4 gateway for the current system.
-func SetDefaultIPv4Gateway(ctx context.Context, gateway netip.Addr) error {
+func SetDefaultIPv4Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 
 // SetDefaultIPv6Gateway sets the default IPv6 gateway for the current system.
-func SetDefaultIPv6Gateway(ctx context.Context, gateway netip.Addr) error {
+func SetDefaultIPv6Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 
@@ -71,7 +71,8 @@ func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	return nil
 }
 
-func defaultGatewayIPConfig(ctx context.Context) (netip.Addr, error) {
+func defaultGatewayIPConfig(ctx context.Context) (Gateway, error) {
+	var gateway Gateway
 	out, err := common.ExecOutput(ctx, "ipconfig")
 	if err != nil {
 		return netip.Addr{}, err
@@ -81,8 +82,14 @@ func defaultGatewayIPConfig(ctx context.Context) (netip.Addr, error) {
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "Default Gateway") {
 			fields := strings.Fields(line)
-			return netip.ParseAddr(fields[len(fields)-1])
+			var err error
+			gateway.Addr, err = netip.ParseAddr(fields[len(fields)-1])
+			if err != nil {
+				return netip.Addr{}, err
+			}
+			gateway.Name = fields[2]
+			return gateway, nil
 		}
 	}
-	return netip.Addr{}, nil
+	return gateway, nil
 }
