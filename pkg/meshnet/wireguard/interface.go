@@ -180,7 +180,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	log.Debug("Creating system interface", "options", ifaceopts)
 	iface, err := system.New(ctx, ifaceopts)
 	if err != nil {
-		return nil, fmt.Errorf("new interface: %w", err)
+		return nil, fmt.Errorf("new system interface: %w", err)
 	}
 	opts.Name = iface.Name()
 	wg := &wginterface{

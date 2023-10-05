@@ -101,42 +101,42 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 	log := context.LoggerFrom(ctx).With(slog.String("component", "wireguard"))
 	ctx = context.WithLogger(ctx, log)
 	iface := &sysInterface{
-		opts: opts,
+		ifname: opts.Name,
+		addrv4: opts.AddressV4,
+		addrv6: opts.AddressV6,
+		netns:  opts.NetNs,
 	}
 	forceTUN := opts.ForceTUN || (runtime.GOOS != "linux" && runtime.GOOS != "freebsd")
-	ifName := opts.Name
 	mtu := opts.MTU
 	if forceTUN {
 		log.Debug("Creating wireguard tun interface")
-		name, closer, err := link.NewTUN(ctx, ifName, mtu)
+		name, closer, err := link.NewTUN(ctx, iface.ifname, mtu)
 		if err != nil {
 			return nil, fmt.Errorf("new tun: %w", err)
 		}
-		ifName = name
-		iface.opts.Name = name
+		iface.ifname = name
 		iface.close = func(context.Context) error {
 			closer()
 			return nil
 		}
 	} else {
 		log.Debug("Creating wireguard kernel interface")
-		err := link.NewKernel(ctx, ifName, mtu)
+		err := link.NewKernel(ctx, iface.ifname, mtu)
 		if err != nil {
 			log.Error("Failed to create kernel interface failed, falling back to TUN driver", "error", err)
 			// Try the TUN device as a fallback
-			name, closer, err := link.NewTUN(ctx, ifName, mtu)
+			name, closer, err := link.NewTUN(ctx, iface.ifname, mtu)
 			if err != nil {
 				return nil, fmt.Errorf("new tun: %w", err)
 			}
-			ifName = name
-			iface.opts.Name = name
+			iface.ifname = name
 			iface.close = func(context.Context) error {
 				closer()
 				return nil
 			}
 		} else {
 			iface.close = func(ctx context.Context) error {
-				return link.RemoveInterface(ctx, ifName)
+				return link.RemoveInterface(ctx, iface.ifname)
 			}
 		}
 	}
@@ -161,27 +161,31 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		}
 	}
 	if runtime.GOOS == "linux" && opts.NetNs != "" {
-		err := moveLinkIn(opts.NetNs, ifName)
+		log.Debug("Moving link into netns", "netns", opts.NetNs)
+		err := moveLinkIn(opts.NetNs, iface.ifname)
 		if err != nil {
-			return nil, fmt.Errorf("failed to move link %q into netns %q: %v", ifName, opts.NetNs, err)
+			return nil, fmt.Errorf("failed to move link %q into netns %q: %v", iface.ifname, opts.NetNs, err)
 		}
 	}
 	return iface, nil
 }
 
 type sysInterface struct {
-	opts  *Options
-	close func(context.Context) error
+	ifname string
+	addrv4 netip.Prefix
+	addrv6 netip.Prefix
+	netns  string
+	close  func(context.Context) error
 }
 
 func (l *sysInterface) setInterfaceAddress(ctx context.Context, addr netip.Prefix) error {
 	context.LoggerFrom(ctx).Debug("Setting interface address", "address", addr.String())
-	if runtime.GOOS == "linux" && l.opts.NetNs != "" {
-		return DoInNetNS(l.opts.NetNs, func() error {
-			return link.SetInterfaceAddress(ctx, l.opts.Name, addr)
+	if runtime.GOOS == "linux" && l.netns != "" {
+		return DoInNetNS(l.netns, func() error {
+			return link.SetInterfaceAddress(ctx, l.Name(), addr)
 		})
 	}
-	err := link.SetInterfaceAddress(ctx, l.opts.Name, addr)
+	err := link.SetInterfaceAddress(ctx, l.Name(), addr)
 	if err != nil {
 		return fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
 	}
@@ -190,43 +194,43 @@ func (l *sysInterface) setInterfaceAddress(ctx context.Context, addr netip.Prefi
 
 // Name returns the real name of the interface.
 func (l *sysInterface) Name() string {
-	return l.opts.Name
+	return l.ifname
 }
 
 // AddressV4 should return the current private address of this interface.
 func (l *sysInterface) AddressV4() netip.Prefix {
-	return l.opts.AddressV4
+	return l.addrv4
 }
 
 // AddressV6 should return the current private address of this interface.
 func (l *sysInterface) AddressV6() netip.Prefix {
-	return l.opts.AddressV6
+	return l.addrv6
 }
 
 // Up activates the interface
 func (l *sysInterface) Up(ctx context.Context) error {
-	if runtime.GOOS == "linux" && l.opts.NetNs != "" {
-		return DoInNetNS(l.opts.NetNs, func() error {
-			return link.ActivateInterface(ctx, l.opts.Name)
+	if runtime.GOOS == "linux" && l.netns != "" {
+		return DoInNetNS(l.netns, func() error {
+			return link.ActivateInterface(ctx, l.Name())
 		})
 	}
-	return link.ActivateInterface(ctx, l.opts.Name)
+	return link.ActivateInterface(ctx, l.Name())
 }
 
 // Down deactivates the interface
 func (l *sysInterface) Down(ctx context.Context) error {
-	if runtime.GOOS == "linux" && l.opts.NetNs != "" {
-		return DoInNetNS(l.opts.NetNs, func() error {
-			return link.DeactivateInterface(ctx, l.opts.Name)
+	if runtime.GOOS == "linux" && l.netns != "" {
+		return DoInNetNS(l.netns, func() error {
+			return link.DeactivateInterface(ctx, l.Name())
 		})
 	}
-	return link.DeactivateInterface(ctx, l.opts.Name)
+	return link.DeactivateInterface(ctx, l.Name())
 }
 
 // Destroy destroys the interface
 func (l *sysInterface) Destroy(ctx context.Context) error {
-	if runtime.GOOS == "linux" && l.opts.NetNs != "" {
-		if err := moveLinkOut(l.opts.NetNs, l.Name()); err != nil {
+	if runtime.GOOS == "linux" && l.netns != "" {
+		if err := moveLinkOut(l.netns, l.Name()); err != nil {
 			return fmt.Errorf("failed to move link out of container namespace: %w", err)
 		}
 	}
@@ -235,31 +239,31 @@ func (l *sysInterface) Destroy(ctx context.Context) error {
 
 // AddRoute adds a route for the given network.
 func (l *sysInterface) AddRoute(ctx context.Context, network netip.Prefix) error {
-	if runtime.GOOS == "linux" && l.opts.NetNs != "" {
-		return DoInNetNS(l.opts.NetNs, func() error {
-			return routes.Add(ctx, l.opts.Name, network)
+	if runtime.GOOS == "linux" && l.netns != "" {
+		return DoInNetNS(l.netns, func() error {
+			return routes.Add(ctx, l.Name(), network)
 		})
 	}
-	return routes.Add(ctx, l.opts.Name, network)
+	return routes.Add(ctx, l.Name(), network)
 }
 
 // RemoveRoute removes the route for the given network.
 func (l *sysInterface) RemoveRoute(ctx context.Context, network netip.Prefix) error {
-	if runtime.GOOS == "linux" && l.opts.NetNs != "" {
-		return DoInNetNS(l.opts.NetNs, func() error {
-			return routes.Remove(ctx, l.opts.Name, network)
+	if runtime.GOOS == "linux" && l.netns != "" {
+		return DoInNetNS(l.netns, func() error {
+			return routes.Remove(ctx, l.Name(), network)
 		})
 	}
-	return routes.Remove(ctx, l.opts.Name, network)
+	return routes.Remove(ctx, l.Name(), network)
 }
 
 // Link attempts to return the underling net.Interface.
 func (l *sysInterface) Link() (*net.Interface, error) {
-	if runtime.GOOS == "linux" && l.opts.NetNs != "" {
+	if runtime.GOOS == "linux" && l.netns != "" {
 		var link *net.Interface
 		var err error
-		err = DoInNetNS(l.opts.NetNs, func() error {
-			link, err = net.InterfaceByName(l.opts.Name)
+		err = DoInNetNS(l.netns, func() error {
+			link, err = net.InterfaceByName(l.Name())
 			return err
 		})
 		if err != nil {
@@ -267,7 +271,7 @@ func (l *sysInterface) Link() (*net.Interface, error) {
 		}
 		return link, nil
 	}
-	link, err := net.InterfaceByName(l.opts.Name)
+	link, err := net.InterfaceByName(l.Name())
 	if err != nil {
 		return nil, fmt.Errorf("get interface by name: %w", err)
 	}
@@ -276,10 +280,10 @@ func (l *sysInterface) Link() (*net.Interface, error) {
 
 // HardwareAddr attempts to return the hardware address of the interface.
 func (l *sysInterface) HardwareAddr() (net.HardwareAddr, error) {
-	if runtime.GOOS == "linux" && l.opts.NetNs != "" {
+	if runtime.GOOS == "linux" && l.netns != "" {
 		var link *net.Interface
 		var err error
-		err = DoInNetNS(l.opts.NetNs, func() error {
+		err = DoInNetNS(l.netns, func() error {
 			link, err = l.Link()
 			return err
 		})

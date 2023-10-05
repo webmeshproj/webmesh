@@ -91,7 +91,7 @@ func (c ConnectOptions) MarshalJSON() ([]byte, error) {
 				plugins = append(plugins, name)
 			}
 			return plugins
-		},
+		}(),
 		"networkOptions":     c.NetworkOptions,
 		"discovery":          c.Discovery,
 		"maxJoinRetries":     c.MaxJoinRetries,

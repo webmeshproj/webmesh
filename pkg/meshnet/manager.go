@@ -251,7 +251,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 	var err error
 	m.fw, err = firewall.New(ctx, fwopts)
 	if err != nil {
-		return fmt.Errorf("new firewall: %w", err)
+		return fmt.Errorf("new firewall manager: %w", err)
 	}
 	wgopts := &wireguard.Options{
 		NetNs:               m.opts.NetNs,
@@ -274,7 +274,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 	log.Debug("Configuring wireguard", slog.Any("opts", wgopts))
 	m.wg, err = wireguard.New(ctx, wgopts)
 	if err != nil {
-		return handleErr(fmt.Errorf("new wireguard: %w", err))
+		return handleErr(fmt.Errorf("new wireguard interface: %w", err))
 	}
 	m.dns = &dnsManager{
 		wg:           m.wg,
