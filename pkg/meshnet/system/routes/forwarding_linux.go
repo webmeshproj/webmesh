@@ -19,22 +19,23 @@ package routes
 import (
 	"errors"
 	"fmt"
-	"os"
+
+	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 )
 
 // EnableIPForwarding enables IP forwarding.
 func EnableIPForwarding() error {
 	errs := make([]error, 0, 3)
-	err := os.WriteFile("/proc/sys/net/ipv4/conf/all/forwarding", []byte("1"), 0o644)
+	_, err := sysctl.Sysctl("net/ipv4/conf/all/forwarding", "1")
 	if err != nil {
 		errs = append(errs, fmt.Errorf("write net.ipv4.conf.all.forwarding: %w", err))
 	}
 	// Write to the legacy configuration file
-	err = os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0o644)
+	_, err = sysctl.Sysctl("net/ipv4/ip_forward", "1")
 	if err != nil {
 		errs = append(errs, fmt.Errorf("write net.ipv4.ip_forward: %w", err))
 	}
-	err = os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", []byte("1"), 0o644)
+	_, err = sysctl.Sysctl("net/ipv6/conf/all/forwarding", "1")
 	if err != nil {
 		errs = append(errs, fmt.Errorf("write net.ipv6.conf.all.forwarding: %w", err))
 	}

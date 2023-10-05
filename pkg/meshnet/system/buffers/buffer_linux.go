@@ -17,16 +17,17 @@ limitations under the License.
 package buffers
 
 import (
-	"os"
 	"strconv"
+
+	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 )
 
 func setMaxReadBuffer(val int) error {
-	valStr := []byte(strconv.Itoa(val))
-	return os.WriteFile("/proc/sys/net/core/rmem_max", valStr, 0o644)
+	_, err := sysctl.Sysctl("net/core/rmem_max", strconv.Itoa(val))
+	return err
 }
 
 func setMaxWriteBuffer(val int) error {
-	valStr := []byte(strconv.Itoa(val))
-	return os.WriteFile("/proc/sys/net/core/wmem_max", valStr, 0o644)
+	_, err := sysctl.Sysctl("net/core/wmem_max", strconv.Itoa(val))
+	return err
 }
