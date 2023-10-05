@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	v1 "github.com/webmeshproj/api/v1"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
@@ -220,22 +221,16 @@ func (s *meshStore) Ready() <-chan struct{} {
 	go func() {
 		defer close(ch)
 		for {
-			leader, err := s.LeaderID()
-			if err != nil {
-				s.log.Debug("Waiting for leader", slog.String("error", err.Error()))
-				time.Sleep(time.Millisecond * 500)
-				continue
-			}
-			if leader == "" {
-				s.log.Debug("Waiting for leader", slog.String("error", ErrNoLeader.Error()))
-				time.Sleep(time.Millisecond * 500)
-				continue
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_, err = s.Storage().MeshDB().Peers().Get(ctx, leader)
+			ctx, cancel := context.WithTimeout(context.WithLogger(context.Background(), s.log), 5*time.Second)
+			leader, err := s.getLeader(ctx)
 			cancel()
 			if err != nil {
 				s.log.Debug("Unable to fetch current leader", slog.String("leader", leader.String()), slog.String("error", err.Error()))
+				time.Sleep(time.Millisecond * 500)
+				continue
+			}
+			if leader.GetId() == "" || leader.GetAddress() == "" {
+				s.log.Debug("Leader not ready", slog.String("leader", leader.String()))
 				time.Sleep(time.Millisecond * 500)
 				continue
 			}
@@ -247,14 +242,23 @@ func (s *meshStore) Ready() <-chan struct{} {
 
 // Leader returns the current network leader.
 func (s *meshStore) LeaderID() (types.NodeID, error) {
-	if s.storage == nil || !s.open.Load() {
-		return "", ErrNotOpen
-	}
-	leader, err := s.storage.Consensus().GetLeader(context.WithLogger(context.Background(), s.log))
+	leader, err := s.getLeader(context.WithLogger(context.Background(), s.log))
 	if err != nil {
 		return "", fmt.Errorf("get leader: %w", err)
 	}
 	return types.NodeID(leader.GetId()), nil
+}
+
+// getLeader returns the current network leader.
+func (s *meshStore) getLeader(ctx context.Context) (*v1.StoragePeer, error) {
+	if s.storage == nil || !s.open.Load() {
+		return nil, ErrNotOpen
+	}
+	leader, err := s.storage.Consensus().GetLeader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get leader: %w", err)
+	}
+	return leader, nil
 }
 
 // Dial is a generic dial method.
