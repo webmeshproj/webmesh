@@ -154,7 +154,7 @@ func New(ctx context.Context, opts *Options) (Interface, error) {
 		}
 	}
 	if os.Getuid() == 0 {
-		log.Debug("Enabling ip forwarding")
+		log.Debug("Enabling IP forwarding")
 		err := routes.EnableIPForwarding()
 		if err != nil {
 			log.Debug("Failed to enable ip forwarding", "error", err.Error())
