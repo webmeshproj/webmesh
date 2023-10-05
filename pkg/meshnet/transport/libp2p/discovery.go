@@ -62,7 +62,7 @@ type HostOptions struct {
 }
 
 // MarshalJSON implements json.Marshaler.
-func (o *HostOptions) MarshalJSON() ([]byte, error) {
+func (o HostOptions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"bootstrapPeers": o.BootstrapPeers,
 		"options":        o.Options,

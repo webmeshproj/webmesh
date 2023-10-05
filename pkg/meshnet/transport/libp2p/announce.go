@@ -65,10 +65,7 @@ type AnnounceOptions struct {
 }
 
 // MarshalJSON implements json.Marshaler.
-func (opts *AnnounceOptions) MarshalJSON() ([]byte, error) {
-	if opts == nil {
-		return []byte("{}"), nil
-	}
+func (opts AnnounceOptions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"rendezvous":  opts.Rendezvous,
 		"announceTTL": opts.AnnounceTTL,

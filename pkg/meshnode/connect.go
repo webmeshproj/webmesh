@@ -82,7 +82,7 @@ type ConnectOptions struct {
 	Multiaddrs []multiaddr.Multiaddr
 }
 
-func (c *ConnectOptions) MarshalJSON() ([]byte, error) {
+func (c ConnectOptions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"features": c.Features,
 		"plugins": func() []string {
@@ -134,6 +134,19 @@ type BootstrapOptions struct {
 	DefaultNetworkPolicy string
 	// Force is true if the node should force bootstrap.
 	Force bool
+}
+
+func (b BootstrapOptions) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"ipv4Network":          b.IPv4Network,
+		"meshDomain":           b.MeshDomain,
+		"admin":                b.Admin,
+		"servers":              b.Servers,
+		"voters":               b.Voters,
+		"disableRBAC":          b.DisableRBAC,
+		"defaultNetworkPolicy": b.DefaultNetworkPolicy,
+		"force":                b.Force,
+	})
 }
 
 // Connect opens the connection to the mesh.
