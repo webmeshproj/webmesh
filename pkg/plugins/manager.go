@@ -94,8 +94,11 @@ type Manager interface {
 	// If no plugin is configured, the returned function is a pass-through.
 	AuthStreamInterceptor() grpc.StreamServerInterceptor
 	// AllocateIP calls the configured IPAM plugin to allocate an IP address for the given request.
-	// If the requested version does not have a registered plugin, ErrUnsupported is returned.
+	// If no IPAM plugin is configured, ErrUnsupported is returned.
 	AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (netip.Prefix, error)
+	// ReleaseIP calls the configured IPAM plugin to release an IP address for the given request.
+	// If no IPAM plugin is configured, ErrUnsupported is returned.
+	ReleaseIP(ctx context.Context, req *v1.ReleaseIPRequest) error
 	// Emit emits an event to all watch plugins.
 	Emit(ctx context.Context, ev *v1.Event) error
 	// Close closes all plugins.
@@ -195,6 +198,7 @@ func NewManagerWithDB(db storage.Provider) Manager {
 // This makes for ease of use with the built-in IPAM.
 type IPAMPlugin interface {
 	Allocate(ctx context.Context, r *v1.AllocateIPRequest, opts ...grpc.CallOption) (*v1.AllocatedIP, error)
+	Release(ctx context.Context, r *v1.ReleaseIPRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type manager struct {
@@ -263,7 +267,7 @@ func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
 }
 
 // AllocateIP calls the configured IPAM plugin to allocate an IP address for the given request.
-// If the requested version does not have a registered plugin, ErrUnsupported is returned.
+// If no IPAM plugin is configured, ErrUnsupported is returned.
 func (m *manager) AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (netip.Prefix, error) {
 	var addr netip.Prefix
 	var err error
@@ -279,6 +283,16 @@ func (m *manager) AllocateIP(ctx context.Context, req *v1.AllocateIPRequest) (ne
 		return addr, fmt.Errorf("parse IPv4 address: %w", err)
 	}
 	return addr, err
+}
+
+// ReleaseIP calls the configured IPAM plugin to release an IP address for the given request.
+// If no IPAM plugin is configured, ErrUnsupported is returned.
+func (m *manager) ReleaseIP(ctx context.Context, req *v1.ReleaseIPRequest) error {
+	if m.ipamv4 == nil {
+		return ErrUnsupported
+	}
+	_, err := m.ipamv4.Release(ctx, req)
+	return err
 }
 
 // Emit emits an event to all watch plugins.

@@ -49,7 +49,9 @@ type IPAMConfig struct {
 
 // NewBuiltinIPAM returns a new ipam plugin with the given database.
 func NewBuiltinIPAM(opts IPAMConfig) *BuiltinIPAM {
-	return &BuiltinIPAM{IPAMConfig: opts}
+	return &BuiltinIPAM{
+		IPAMConfig: opts,
+	}
 }
 
 func (p *BuiltinIPAM) Allocate(ctx context.Context, r *v1.AllocateIPRequest, opts ...grpc.CallOption) (*v1.AllocatedIP, error) {
@@ -63,8 +65,10 @@ func (p *BuiltinIPAM) Allocate(ctx context.Context, r *v1.AllocateIPRequest, opt
 	return p.allocateV4(ctx, r)
 }
 
-func (p *BuiltinIPAM) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
+func (p *BuiltinIPAM) Release(ctx context.Context, req *v1.ReleaseIPRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return nil, ErrUnsupported
 }
 
 func (p *BuiltinIPAM) allocateV4(ctx context.Context, r *v1.AllocateIPRequest) (*v1.AllocatedIP, error) {
