@@ -179,12 +179,15 @@ type sysInterface struct {
 }
 
 func (l *sysInterface) setInterfaceAddress(ctx context.Context, addr netip.Prefix) error {
-	context.LoggerFrom(ctx).Debug("Setting interface address", "address", addr.String())
-	if runtime.GOOS == "linux" && l.netns != "" {
-		return DoInNetNS(l.netns, func() error {
-			return link.SetInterfaceAddress(ctx, l.Name(), addr)
-		})
-	}
+	// Currently we do this before moving the interface into the netns, so we don't need to
+	// do anything special here. But we should eventually support adding addresses to interfaces
+	// in other netns's.
+	// context.LoggerFrom(ctx).Debug("Setting interface address", "address", addr.String())
+	// if runtime.GOOS == "linux" && l.netns != "" {
+	// 	return DoInNetNS(l.netns, func() error {
+	// 		return link.SetInterfaceAddress(ctx, l.Name(), addr)
+	// 	})
+	// }
 	err := link.SetInterfaceAddress(ctx, l.Name(), addr)
 	if err != nil {
 		return fmt.Errorf("set address %q on wireguard interface: %w", addr.String(), err)
