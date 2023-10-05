@@ -75,7 +75,7 @@ func defaultGatewayIPConfig(ctx context.Context) (Gateway, error) {
 	var gateway Gateway
 	out, err := common.ExecOutput(ctx, "ipconfig")
 	if err != nil {
-		return netip.Addr{}, err
+		return gateway, err
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
@@ -85,7 +85,7 @@ func defaultGatewayIPConfig(ctx context.Context) (Gateway, error) {
 			var err error
 			gateway.Addr, err = netip.ParseAddr(fields[len(fields)-1])
 			if err != nil {
-				return netip.Addr{}, err
+				return gateway, err
 			}
 			gateway.Name = fields[2]
 			return gateway, nil

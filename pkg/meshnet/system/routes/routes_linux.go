@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/jsimonetti/rtnetlink"
+	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -70,7 +71,22 @@ func GetDefaultGateway(_ context.Context) (Gateway, error) {
 
 // SetDefaultIPv4Gateway sets the default IPv4 gateway for the current system.
 func SetDefaultIPv4Gateway(ctx context.Context, gateway Gateway) error {
-	return errors.New("not implemented")
+	link, err := netlink.LinkByName(gateway.Name)
+	if err != nil {
+		return fmt.Errorf("get link by name: %w", err)
+	}
+	err = netlink.RouteAdd(&netlink.Route{
+		LinkIndex: link.Attrs().Index,
+		Gw:        gateway.Addr.AsSlice(),
+		Dst: &net.IPNet{
+			IP:   net.IPv4zero,
+			Mask: net.IPv4Mask(0, 0, 0, 0),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("set default IPv4 gateway: %w", err)
+	}
+	return nil
 }
 
 // SetDefaultIPv6Gateway sets the default IPv6 gateway for the current system.
