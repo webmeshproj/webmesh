@@ -48,7 +48,7 @@ func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	if addr.Addr().Is6() {
 		family = "ipv6"
 	}
-	out, err := common.ExecOutput(ctx, "netsh", "interface", family, "add", "route", addr.String(), ifaceName, "metric=0", "store=active")
+	out, err := common.ExecOutput(ctx, "netsh", "interface", family, "add", "route", addr.Masked().String(), ifaceName, "metric=0", "store=active")
 	if err != nil {
 		if strings.Contains(string(out), "already in table") || strings.Contains(string(out), "exists") {
 			return ErrRouteExists
@@ -64,7 +64,7 @@ func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	if addr.Addr().Is6() {
 		family = "ipv6"
 	}
-	err := common.Exec(ctx, "netsh", "interface", family, "delete", "route", addr.String(), ifaceName, "metric=0", "store=active")
+	err := common.Exec(ctx, "netsh", "interface", family, "delete", "route", addr.Masked().String(), ifaceName, "metric=0", "store=active")
 	if err != nil {
 		return err
 	}

@@ -102,7 +102,7 @@ func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	rt := &netlink.Route{
 		LinkIndex: link.Attrs().Index,
 		Dst: &net.IPNet{
-			IP:   addr.Addr().AsSlice(),
+			IP:   addr.Masked().Addr().AsSlice(),
 			Mask: net.CIDRMask(ones, 8*len(addr.Addr().AsSlice())),
 		},
 	}
@@ -127,7 +127,7 @@ func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	rt := &netlink.Route{
 		LinkIndex: link.Attrs().Index,
 		Dst: &net.IPNet{
-			IP:   addr.Addr().AsSlice(),
+			IP:   addr.Masked().Addr().AsSlice(),
 			Mask: net.CIDRMask(ones, 8*len(addr.Addr().AsSlice())),
 		},
 	}

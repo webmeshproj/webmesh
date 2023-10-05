@@ -60,7 +60,7 @@ func SetDefaultIPv6Gateway(ctx context.Context, gateway Gateway) error {
 
 // Add adds a route to the interface with the given name.
 func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	out, err := common.ExecOutput(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
+	out, err := common.ExecOutput(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.Masked().String(), "-interface", ifaceName)
 	if err != nil {
 		if strings.Contains(string(out), "already in table") || strings.Contains(string(out), "exists") {
 			return ErrRouteExists
@@ -72,7 +72,7 @@ func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 
 // Remove removes a route from the interface with the given name.
 func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	return common.Exec(ctx, "route", "-n", "delete", "-"+getFamily(addr.Addr()), addr.String(), "-interface", ifaceName)
+	return common.Exec(ctx, "route", "-n", "delete", "-"+getFamily(addr.Addr()), addr.Masked().String(), "-interface", ifaceName)
 }
 
 func getFamily(addr netip.Addr) string {

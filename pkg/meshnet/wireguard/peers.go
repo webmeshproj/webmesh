@@ -197,7 +197,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 
 		// If this is a default IPv4 gateway route set the system default route
 		if addr.Is4() && ones == 0 && !w.opts.DisableIPv4 && !w.changedGateway {
-			w.log.Debug("Adding ipv4 default route", slog.String("prefix", prefix.String()))
+			w.log.Debug("Adding IPv4 default route", slog.String("prefix", prefix.String()))
 			var err error
 			if w.opts.NetNs != "" {
 				err = system.DoInNetNS(w.opts.NetNs, func() error {
@@ -213,14 +213,14 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 				})
 			}
 			if err != nil {
-				return fmt.Errorf("failed to set default ipv4 gateway: %w", err)
+				return fmt.Errorf("failed to set default IPv4 gateway: %w", err)
 			}
 			w.changedGateway = true
 		}
 
 		// Add any other routes
 		if prefix.Addr().Is4() && !w.opts.DisableIPv4 {
-			w.log.Debug("Adding ipv4 route", slog.Any("prefix", prefix))
+			w.log.Debug("Adding IPv4 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
@@ -231,7 +231,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 				// Don't readd routes to our own network
 				continue
 			}
-			w.log.Debug("Adding ipv6 route", slog.Any("prefix", prefix))
+			w.log.Debug("Adding IPv6 route", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
