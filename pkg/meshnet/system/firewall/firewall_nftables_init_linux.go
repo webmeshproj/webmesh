@@ -45,7 +45,7 @@ const (
 func (fw *firewall) initialize(opts *Options) error {
 	var err error
 	for _, f := range []func() error{
-		func() error { return fw.initTables(opts) },
+		fw.initTables,
 		fw.initChains,
 		fw.initInputChain,
 	} {
@@ -56,7 +56,8 @@ func (fw *firewall) initialize(opts *Options) error {
 	return fw.conn.Flush()
 }
 
-func (fw *firewall) initTables(opts *Options) error {
+func (fw *firewall) initTables() error {
+	opts := fw.opts
 	filterTable := inetFilterTable
 	natTable := inetNatTable
 	rawTable := inetRawTable
@@ -205,7 +206,6 @@ func (fw *firewall) initInputChain() error {
 	binary.BigEndian.PutUint32(ctInvalid[:], uint32(nftableslib.CTStateInvalid))
 	var ctEstablishedRelated [4]byte
 	binary.BigEndian.PutUint32(ctEstablishedRelated[:], uint32(nftableslib.CTStateEstablished|nftableslib.CTStateRelated))
-
 	rules := []struct {
 		comment string
 		cmd     string
@@ -326,7 +326,6 @@ func (fw *firewall) initInputChain() error {
 			},
 		})
 	}
-
 	for _, rule := range rules {
 		rule.rule.UserData = nftableslib.MakeRuleComment(rule.comment)
 		_, err = fw.input.Rules().CreateImm(rule.rule)
@@ -334,6 +333,5 @@ func (fw *firewall) initInputChain() error {
 			return fmt.Errorf("failed to add %s rule to input chain: %w", rule.comment, err)
 		}
 	}
-
 	return fw.conn.Flush()
 }
