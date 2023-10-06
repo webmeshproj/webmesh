@@ -142,6 +142,9 @@ func detectFromInterfaces(opts *DetectOpts) (PrefixList, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse address %s: %w", addr.String(), err)
 			}
+			if ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+				continue
+			}
 			addr, err := netip.ParseAddr(ip.String())
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse address %s: %w", ip.String(), err)
