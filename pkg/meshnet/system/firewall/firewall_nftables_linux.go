@@ -112,10 +112,14 @@ func (fw *firewall) AddMasquerade(ctx context.Context, ifaceName string) error {
 					Key:   uint32(expr.MetaKeyOIFNAME),
 					Value: []byte(ifaceName),
 				},
+				{
+					Key:   uint32(expr.MetaKeyIIFNAME),
+					Value: []byte(ifaceName),
+				},
 			},
 		},
 		Action:   masq,
-		UserData: nftableslib.MakeRuleComment("Masquerade outbound traffic from the wireguard interface"),
+		UserData: nftableslib.MakeRuleComment("Masquerade traffic on the wireguard interface"),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create wireguard masquerade rule: %w", err)
