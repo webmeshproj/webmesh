@@ -72,6 +72,89 @@ func TestWireGuardPeersWithRoutes(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "SiteToSiteFullTunnel",
+			peers: []types.MeshNode{
+				{MeshNode: &v1.MeshNode{
+					Id:          "site-a-leader",
+					PrivateIPv4: "172.16.0.1/32",
+					PrivateIPv6: "2001:db8::1/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "site-b-leader",
+					PrivateIPv4: "172.16.0.2/32",
+					PrivateIPv6: "2001:db8::2/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "site-c-leader",
+					PrivateIPv4: "172.16.0.3/32",
+					PrivateIPv6: "2001:db8::3/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "site-a-follower",
+					PrivateIPv4: "172.16.0.4/32",
+					PrivateIPv6: "2001:db8::4/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "site-b-follower",
+					PrivateIPv4: "172.16.0.5/32",
+					PrivateIPv6: "2001:db8::5/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "site-c-follower",
+					PrivateIPv4: "172.16.0.6/32",
+					PrivateIPv6: "2001:db8::6/128",
+				}},
+			},
+			routes: []types.Route{
+				{Route: &v1.Route{
+					Name:             "site-a-full-tunnel",
+					Node:             "site-a-leader",
+					DestinationCIDRs: []string{"0.0.0.0/0", "::/0"},
+				}},
+				{Route: &v1.Route{
+					Name:             "site-b-full-tunnel",
+					Node:             "site-b-leader",
+					DestinationCIDRs: []string{"0.0.0.0/0", "::/0"},
+				}},
+				{Route: &v1.Route{
+					Name:             "site-c-full-tunnel",
+					Node:             "site-c-leader",
+					DestinationCIDRs: []string{"0.0.0.0/0", "::/0"},
+				}},
+			},
+			edges: map[string][]string{
+				"site-a-leader": {"site-b-leader", "site-c-leader", "site-a-follower"},
+				"site-b-leader": {"site-a-leader", "site-c-leader", "site-b-follower"},
+				"site-c-leader": {"site-a-leader", "site-b-leader", "site-c-follower"},
+			},
+			wantRoutes: map[string]map[string][]string{
+				"site-a-leader": {
+					"site-b-leader":   {},
+					"site-c-leader":   {},
+					"site-a-follower": {},
+				},
+				"site-b-leader": {
+					"site-a-leader":   {},
+					"site-c-leader":   {},
+					"site-b-follower": {},
+				},
+				"site-c-leader": {
+					"site-a-leader":   {},
+					"site-b-leader":   {},
+					"site-c-follower": {},
+				},
+				"site-a-follower": {
+					"site-a-leader": {"0.0.0.0/0", "::/0"},
+				},
+				"site-b-follower": {
+					"site-b-leader": {"0.0.0.0/0", "::/0"},
+				},
+				"site-c-follower": {
+					"site-c-leader": {"0.0.0.0/0", "::/0"},
+				},
+			},
+		},
 	}
 
 	for _, testcase := range tt {
