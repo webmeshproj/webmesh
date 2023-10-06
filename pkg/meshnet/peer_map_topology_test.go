@@ -30,7 +30,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
-func TestWireGuardTopologies(t *testing.T) {
+func TestWireGuardPeersAllowedIPs(t *testing.T) {
 	t.Parallel()
 
 	tt := []struct {
@@ -40,7 +40,7 @@ func TestWireGuardTopologies(t *testing.T) {
 		wantIPs map[string]map[string][]string // peerID -> peerID -> []allowed ips
 	}{
 		{
-			name: "simple 1-to-1",
+			name: "OneToOne",
 			peers: map[string][]string{
 				"peer1": {"172.16.0.1/32", "2001:db8::1/128"},
 				"peer2": {"172.16.0.2/32", "2001:db8::2/128"},
@@ -58,7 +58,7 @@ func TestWireGuardTopologies(t *testing.T) {
 			},
 		},
 		{
-			name: "simple 1-to-1-to-1",
+			name: "OneToOneToOne",
 			peers: map[string][]string{
 				"peer1": {"172.16.0.1/32", "2001:db8::1/128"},
 				"peer2": {"172.16.0.2/32", "2001:db8::2/128"},
@@ -85,7 +85,7 @@ func TestWireGuardTopologies(t *testing.T) {
 			},
 		},
 		{
-			name: "simple star",
+			name: "Star",
 			peers: map[string][]string{
 				"router": {"172.16.0.1/32", "2001:db8::1/128"},
 				"peer1":  {"172.16.0.2/32", "2001:db8::2/128"},
@@ -155,7 +155,7 @@ func TestWireGuardTopologies(t *testing.T) {
 			},
 		},
 		{
-			name: "simple site-to-site",
+			name: "SiteToSite",
 			peers: map[string][]string{
 				"site1-router":   {"172.16.0.1/32", "2001:db8::1/128"},
 				"site2-router":   {"172.16.0.2/32", "2001:db8::2/128"},
@@ -202,7 +202,7 @@ func TestWireGuardTopologies(t *testing.T) {
 			},
 		},
 		{
-			name: "simple site-to-site-to-site",
+			name: "SiteToSiteToSite",
 			peers: map[string][]string{
 				"site1-router":     {"172.16.0.1/32", "2001:db8::1/128"},
 				"site2-router":     {"172.16.0.2/32", "2001:db8::2/128"},
@@ -431,7 +431,6 @@ func TestWireGuardTopologies(t *testing.T) {
 	for _, tc := range tt {
 		testCase := tc
 		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
 			ctx := context.Background()
 			db := meshdb.NewTestDB()
 			defer db.Close()

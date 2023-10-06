@@ -40,11 +40,23 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 		wantPeers map[string][]string // peerID -> []peerID
 	}{
 		{
-			name: "no ACLs",
+			name: "NoACLs",
 			peers: []types.MeshNode{
-				{MeshNode: &v1.MeshNode{Id: "a", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "b", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "c", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "a",
+					PrivateIPv4: "172.16.0.1/32",
+					PrivateIPv6: "2001:db8::1/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "b",
+					PrivateIPv4: "172.16.0.2/32",
+					PrivateIPv6: "2001:db8::2/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "c",
+					PrivateIPv4: "172.16.0.3/32",
+					PrivateIPv6: "2001:db8::3/128",
+				}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
@@ -59,11 +71,23 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			},
 		},
 		{
-			name: "deny-all ACL",
+			name: "DenyAllACL",
 			peers: []types.MeshNode{
-				{MeshNode: &v1.MeshNode{Id: "a", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "b", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "c", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "a",
+					PrivateIPv4: "172.16.0.1/32",
+					PrivateIPv6: "2001:db8::1/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "b",
+					PrivateIPv4: "172.16.0.2/32",
+					PrivateIPv6: "2001:db8::2/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "c",
+					PrivateIPv4: "172.16.0.3/32",
+					PrivateIPv6: "2001:db8::3/128",
+				}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
@@ -90,11 +114,23 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			},
 		},
 		{
-			name: "accept-all ACL",
+			name: "AcceptAllACL",
 			peers: []types.MeshNode{
-				{MeshNode: &v1.MeshNode{Id: "a", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "b", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "c", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "a",
+					PrivateIPv4: "172.16.0.1/32",
+					PrivateIPv6: "2001:db8::1/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "b",
+					PrivateIPv4: "172.16.0.2/32",
+					PrivateIPv6: "2001:db8::2/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "c",
+					PrivateIPv4: "172.16.0.3/32",
+					PrivateIPv6: "2001:db8::3/128",
+				}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
@@ -121,11 +157,23 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			},
 		},
 		{
-			name: "allow-a-b ACL",
+			name: "AllowAB",
 			peers: []types.MeshNode{
-				{MeshNode: &v1.MeshNode{Id: "a", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "b", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "c", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "a",
+					PrivateIPv4: "172.16.0.1/32",
+					PrivateIPv6: "2001:db8::1/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "b",
+					PrivateIPv4: "172.16.0.2/32",
+					PrivateIPv6: "2001:db8::2/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "c",
+					PrivateIPv4: "172.16.0.3/32",
+					PrivateIPv6: "2001:db8::3/128",
+				}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
@@ -150,11 +198,23 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 			},
 		},
 		{
-			name: "allow-a-b-c ACL",
+			name: "AllowABC",
 			peers: []types.MeshNode{
-				{MeshNode: &v1.MeshNode{Id: "a", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "b", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
-				{MeshNode: &v1.MeshNode{Id: "c", PrivateIPv4: "172.16.0.1/32", PrivateIPv6: "2001:db8::1/128"}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "a",
+					PrivateIPv4: "172.16.0.1/32",
+					PrivateIPv6: "2001:db8::1/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "b",
+					PrivateIPv4: "172.16.0.2/32",
+					PrivateIPv6: "2001:db8::2/128",
+				}},
+				{MeshNode: &v1.MeshNode{
+					Id:          "c",
+					PrivateIPv4: "172.16.0.3/32",
+					PrivateIPv6: "2001:db8::3/128",
+				}},
 			},
 			edges: map[string][]string{
 				"a": {"b", "c"},
@@ -183,7 +243,6 @@ func TestWireGuardPeersWithACLs(t *testing.T) {
 	for _, tc := range tt {
 		testCase := tc
 		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
 			// Prepare the test database
 			ctx := context.Background()
 			db := meshdb.NewTestDB()

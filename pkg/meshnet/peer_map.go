@@ -40,7 +40,7 @@ type GraphWalk struct {
 	AdjacencyMap types.AdjacencyMap
 	SourceNode   types.NodeID
 	TargetNode   *types.MeshNode
-	AllowedIPs   []netip.Prefix
+	AllowedIPs   []string
 	LocalRoutes  []netip.Prefix
 	Routes       []Route
 	Visited      map[types.NodeID]struct{}
@@ -83,6 +83,7 @@ type Route struct {
 // WireGuardPeersFor returns the WireGuard peers for the given peer ID.
 // Peers are filtered by network ACLs.
 func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.NodeID) ([]*v1.WireGuardPeer, error) {
+	log := context.LoggerFrom(ctx).With("source-peer", peerID)
 	graph := st.Peers().Graph()
 	nw := st.Networking()
 	adjacencyMap, err := FilterGraph(ctx, st, peerID)
@@ -97,88 +98,78 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 	for _, route := range routes {
 		ourRoutes = append(ourRoutes, route.DestinationPrefixes()...)
 	}
-	directAdjacents := adjacencyMap[types.NodeID(peerID)]
+	directAdjacents := adjacencyMap[peerID]
 	peers := make([]WalkedPeer, 0, len(directAdjacents))
 	for adjacent, edge := range directAdjacents {
-		node, err := graph.Vertex(adjacent)
+		directPeer, err := graph.Vertex(adjacent)
 		if err != nil {
 			return nil, fmt.Errorf("get vertex: %w", err)
 		}
-		if node.PublicKey == "" {
+		if directPeer.PublicKey == "" {
 			continue
 		}
-		_, err = crypto.DecodePublicKey(node.PublicKey)
+		_, err = crypto.DecodePublicKey(directPeer.GetPublicKey())
 		if err != nil {
-			context.LoggerFrom(ctx).Error("Node has invalid public key, ignoring", "node", node.Id, "public_key", node.PublicKey)
+			log.Error("Node has invalid public key, ignoring", "node", directPeer.GetId(), "public_key", directPeer.GetPublicKey())
 			continue
 		}
 		// Determine the preferred wireguard endpoint
 		// When returning a wireguard peer, we make sure the primary endpoint
 		// contains the port of the edge we're traversing.
 		var primaryEndpoint string
-		if node.PrimaryEndpoint != "" {
-			for _, endpoint := range node.GetWireguardEndpoints() {
-				if strings.HasPrefix(endpoint, node.PrimaryEndpoint) {
+		if directPeer.PrimaryEndpoint != "" {
+			for _, endpoint := range directPeer.GetWireguardEndpoints() {
+				if strings.HasPrefix(endpoint, directPeer.PrimaryEndpoint) {
 					primaryEndpoint = endpoint
 					break
 				}
 			}
 		}
-		if primaryEndpoint == "" && len(node.WireguardEndpoints) > 0 {
-			primaryEndpoint = node.WireguardEndpoints[0]
+		if primaryEndpoint == "" && len(directPeer.WireguardEndpoints) > 0 {
+			primaryEndpoint = directPeer.WireguardEndpoints[0]
 		}
-		node.MeshNode.PrimaryEndpoint = primaryEndpoint
+		directPeer.MeshNode.PrimaryEndpoint = primaryEndpoint
 		peer := WalkedPeer{
 			WireGuardPeer: &v1.WireGuardPeer{
-				Node:          node.MeshNode,
+				Node:          directPeer.MeshNode,
 				Proto:         storageutil.ConnectProtoFromEdgeAttrs(edge.Properties.Attributes),
 				AllowedIPs:    []string{},
 				AllowedRoutes: []string{},
 			},
 		}
+		var target types.MeshNode
+		directPeer.DeepCopyInto(&target)
 		walk := GraphWalk{
 			Graph:        graph,
 			Networking:   nw,
 			AdjacencyMap: adjacencyMap,
 			SourceNode:   peerID,
-			TargetNode:   &node,
+			TargetNode:   &target,
 			LocalRoutes:  ourRoutes,
+			AllowedIPs:   []string{},
+			Routes:       []Route{},
+			Visited:      map[types.NodeID]struct{}{},
 			Depth:        0,
 		}
 		err = recursePeers(ctx, &walk)
 		if err != nil {
-			return nil, fmt.Errorf("recurse allowed IPs: %w", err)
+			return nil, fmt.Errorf("recurse direct peer: %w", err)
 		}
-		for _, ip := range walk.AllowedIPs {
-			peer.AllowedIPs = append(peer.AllowedIPs, ip.String())
-		}
+		log.Debug("Walk results for graph edge", "target-peer", directPeer.GetId(), "results", walk)
 		peer.Routes = append(peer.Routes, walk.Routes...)
+		peer.AllowedIPs = append(peer.AllowedIPs, walk.AllowedIPs...)
 		peers = append(peers, peer)
 	}
 	// Walk our results and assign routes based on shortest path.
 	out := make([]*v1.WireGuardPeer, 0, len(peers))
 	for _, peer := range peers {
-		if len(peer.Routes) == 0 {
-			out = append(out, peer.WireGuardPeer)
-			continue
-		}
-		// For each route, check if its the shortest depth
-		// for that prefix.
-	Routes:
+		// For each route, check if its the shortest depth for that prefix.
 		for _, route := range peer.Routes {
-			peerRouteDepth := route.Depth
-			for _, otherPeer := range peers {
-				if otherPeer.Node.Id == peer.Node.Id {
-					continue
-				}
-				for _, otherRoute := range otherPeer.Routes {
-					if otherRoute.CIDR == route.CIDR && otherRoute.Depth < peerRouteDepth {
-						continue Routes
-					}
-				}
+			if isSmallestDepth(peers, route) {
+				// This is the shortest depth for this route.
+				peer.AllowedRoutes = append(peer.AllowedRoutes, route.CIDR.String())
+				peer.AllowedIPs = append(peer.AllowedIPs, route.CIDR.String())
 			}
-			// This is the shortest depth for this route
-			peer.AllowedRoutes = append(peer.AllowedRoutes, route.CIDR.String())
 		}
 		out = append(out, peer.WireGuardPeer)
 	}
@@ -187,20 +178,20 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 
 func recursePeers(ctx context.Context, walk *GraphWalk) error {
 	if walk.TargetNode.PrivateAddrV4().IsValid() {
-		walk.AllowedIPs = append(walk.AllowedIPs, walk.TargetNode.PrivateAddrV4())
+		walk.AllowedIPs = append(walk.AllowedIPs, walk.TargetNode.PrivateAddrV4().String())
 	}
 	if walk.TargetNode.PrivateAddrV6().IsValid() {
-		walk.AllowedIPs = append(walk.AllowedIPs, walk.TargetNode.PrivateAddrV6())
+		walk.AllowedIPs = append(walk.AllowedIPs, walk.TargetNode.PrivateAddrV6().String())
 	}
 	// Does this peer expose routes?
 	routes, err := walk.Networking.GetRoutesByNode(ctx, walk.TargetNode.NodeID())
 	if err != nil {
 		return fmt.Errorf("get routes by node: %w", err)
 	}
-	if len(routes) > 0 {
-		for _, route := range routes {
-			for _, cidr := range route.DestinationPrefixes() {
-				if !slices.Contains(walk.AllowedIPs, cidr) && !slices.Contains(walk.LocalRoutes, cidr) {
+	for _, route := range routes {
+		for _, cidr := range route.DestinationPrefixes() {
+			if !slices.Contains(walk.AllowedIPs, cidr.String()) && !slices.Contains(walk.LocalRoutes, cidr) {
+				if !routeExists(walk.Routes, cidr) {
 					walk.Routes = append(walk.Routes, Route{
 						CIDR:  cidr,
 						Depth: walk.Depth,
@@ -210,14 +201,14 @@ func recursePeers(ctx context.Context, walk *GraphWalk) error {
 		}
 	}
 	walk.Depth++
-	err = recurseEdges(ctx, walk)
+	err = recursePeerEdges(ctx, walk)
 	if err != nil {
-		return fmt.Errorf("recurse edge allowed IPs: %w", err)
+		return fmt.Errorf("recurse peer edges: %w", err)
 	}
 	return nil
 }
 
-func recurseEdges(ctx context.Context, walk *GraphWalk) (err error) {
+func recursePeerEdges(ctx context.Context, walk *GraphWalk) error {
 	if walk.Visited == nil {
 		walk.Visited = make(map[types.NodeID]struct{})
 	}
@@ -230,25 +221,25 @@ func recurseEdges(ctx context.Context, walk *GraphWalk) (err error) {
 		walk.Visited[target] = struct{}{}
 		targetNode, err := walk.Graph.Vertex(target)
 		if err != nil {
-			return fmt.Errorf("get vertex: %w", err)
+			return fmt.Errorf("get graph vertex: %w", err)
 		}
 		if targetNode.PublicKey == "" {
 			continue
 		}
 		if targetNode.PrivateAddrV4().IsValid() {
-			walk.AllowedIPs = append(walk.AllowedIPs, targetNode.PrivateAddrV4())
+			walk.AllowedIPs = append(walk.AllowedIPs, targetNode.PrivateAddrV4().String())
 		}
 		if targetNode.PrivateAddrV6().IsValid() {
-			walk.AllowedIPs = append(walk.AllowedIPs, targetNode.PrivateAddrV6())
+			walk.AllowedIPs = append(walk.AllowedIPs, targetNode.PrivateAddrV6().String())
 		}
 		routes, err := walk.Networking.GetRoutesByNode(ctx, targetNode.NodeID())
 		if err != nil {
 			return fmt.Errorf("get routes by node: %w", err)
 		}
-		if len(routes) > 0 {
-			for _, route := range routes {
-				for _, cidr := range route.DestinationPrefixes() {
-					if !slices.Contains(walk.AllowedIPs, cidr) && !slices.Contains(walk.LocalRoutes, cidr) {
+		for _, route := range routes {
+			for _, cidr := range route.DestinationPrefixes() {
+				if !slices.Contains(walk.AllowedIPs, cidr.String()) && !slices.Contains(walk.LocalRoutes, cidr) {
+					if !routeExists(walk.Routes, cidr) {
 						walk.Routes = append(walk.Routes, Route{
 							CIDR:  cidr,
 							Depth: walk.Depth,
@@ -259,10 +250,31 @@ func recurseEdges(ctx context.Context, walk *GraphWalk) (err error) {
 		}
 		walk.Depth++
 		walk.TargetNode = &targetNode
-		err = recurseEdges(ctx, walk)
+		err = recursePeerEdges(ctx, walk)
 		if err != nil {
-			return fmt.Errorf("recurse allowed IPs: %w", err)
+			return fmt.Errorf("recurse vertex edges: %w", err)
 		}
 	}
-	return
+	return nil
+}
+
+func isSmallestDepth(peers []WalkedPeer, rt Route) bool {
+	depth := rt.Depth
+	for _, peer := range peers {
+		for _, route := range peer.Routes {
+			if route.CIDR == rt.CIDR && route.Depth < depth {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func routeExists(routes []Route, rt netip.Prefix) bool {
+	for _, route := range routes {
+		if route.CIDR == rt {
+			return true
+		}
+	}
+	return false
 }
