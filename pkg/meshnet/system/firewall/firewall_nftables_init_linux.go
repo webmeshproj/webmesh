@@ -328,7 +328,7 @@ func (fw *firewall) initInputChain() error {
 	}
 	for _, rule := range rules {
 		rule.rule.UserData = nftableslib.MakeRuleComment(rule.comment)
-		_, err = fw.input.Rules().CreateImm(rule.rule)
+		_, err = fw.input.Rules().InsertImm(rule.rule)
 		if err != nil {
 			return fmt.Errorf("failed to add %s rule to input chain: %w", rule.comment, err)
 		}

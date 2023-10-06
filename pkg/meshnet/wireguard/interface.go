@@ -44,7 +44,7 @@ import (
 const DefaultListenPort = 51820
 
 // DefaultInterfaceName is the default name to use for the WireGuard interface.
-var DefaultInterfaceName = "webmesh+"
+var DefaultInterfaceName = "webmesh0"
 
 func init() {
 	switch runtime.GOOS {

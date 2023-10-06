@@ -76,11 +76,14 @@ func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 
 // AddWireguardForwarding should configure the firewall to allow forwarding traffic on the wireguard interface.
 func (fw *firewall) AddWireguardForwarding(ctx context.Context, ifaceName string) error {
+	if len(ifaceName) > 15 {
+		ifaceName = ifaceName[:15]
+	}
 	accept, err := nftableslib.SetVerdict(nftableslib.NFT_ACCEPT)
 	if err != nil {
 		return fmt.Errorf("failed to create accept verdict: %w", err)
 	}
-	_, err = fw.forward.Rules().CreateImm(&nftableslib.Rule{
+	_, err = fw.forward.Rules().InsertImm(&nftableslib.Rule{
 		Meta: &nftableslib.Meta{
 			Expr: []nftableslib.MetaExpr{
 				{
@@ -100,18 +103,33 @@ func (fw *firewall) AddWireguardForwarding(ctx context.Context, ifaceName string
 
 // AddMasquerade should configure the firewall to masquerade outbound traffic on the wireguard interface.
 func (fw *firewall) AddMasquerade(ctx context.Context, ifaceName string) error {
+	if len(ifaceName) > 15 {
+		ifaceName = ifaceName[:15]
+	}
 	// Masquearade outbound traffic from the wireguard interface
 	masq, err := nftableslib.SetMasq(false, false, false)
 	if err != nil {
 		return fmt.Errorf("failed to create masquerade verdict: %w", err)
 	}
-	_, err = fw.postrouting.Rules().CreateImm(&nftableslib.Rule{
+	_, err = fw.postrouting.Rules().InsertImm(&nftableslib.Rule{
 		Meta: &nftableslib.Meta{
 			Expr: []nftableslib.MetaExpr{
 				{
 					Key:   uint32(expr.MetaKeyOIFNAME),
 					Value: []byte(ifaceName),
 				},
+			},
+		},
+		Action:   masq,
+		UserData: nftableslib.MakeRuleComment("Masquerade outbound traffic on the wireguard interface"),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create outbound wireguard masquerade rule: %w", err)
+	}
+	// Masquearade inbound traffic from the wireguard interface
+	_, err = fw.postrouting.Rules().InsertImm(&nftableslib.Rule{
+		Meta: &nftableslib.Meta{
+			Expr: []nftableslib.MetaExpr{
 				{
 					Key:   uint32(expr.MetaKeyIIFNAME),
 					Value: []byte(ifaceName),
@@ -119,10 +137,10 @@ func (fw *firewall) AddMasquerade(ctx context.Context, ifaceName string) error {
 			},
 		},
 		Action:   masq,
-		UserData: nftableslib.MakeRuleComment("Masquerade traffic on the wireguard interface"),
+		UserData: nftableslib.MakeRuleComment("Masquerade inbound traffic on the wireguard interface"),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create wireguard masquerade rule: %w", err)
+		return fmt.Errorf("failed to create inbound wireguard masquerade rule: %w", err)
 	}
 	return fw.conn.Flush()
 }
