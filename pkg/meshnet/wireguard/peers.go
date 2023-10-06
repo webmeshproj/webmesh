@@ -84,12 +84,13 @@ func (p Peer) MarshalJSON() ([]byte, error) {
 
 // PutPeer updates a peer in the wireguard configuration.
 func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
-	w.log.Debug("put peer", slog.Any("peer", peer))
+	w.log.Debug("Ensuring peer in WireGuard interface", slog.Any("peer", peer))
 	// Check if we already have the peer under a different key
 	// and remove it if so.
 	if peerKey, ok := w.peerKeyByID(peer.ID); ok {
 		if peerKey.WireGuardKey().String() != peer.PublicKey.WireGuardKey().String() {
 			// Remove the peer first
+			w.log.Warn("Removing peer with same ID and different public key", slog.String("id", peer.ID))
 			if err := w.DeletePeer(ctx, peer.ID); err != nil {
 				return fmt.Errorf("remove peer: %w", err)
 			}
@@ -159,8 +160,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			return fmt.Errorf("failed to resolve endpoint: %w", err)
 		}
 	}
-	w.log.Debug("configuring device with peer", slog.Any("peer", &peerConfigMarshaler{peerCfg}))
-
+	w.log.Debug("Configuring device with peer", slog.Any("peer", &peerConfigMarshaler{peerCfg}))
 	if runtime.GOOS == "linux" && w.opts.NetNs != "" {
 		err = system.DoInNetNS(w.opts.NetNs, func() error {
 			return w.putPeer(peerCfg)
@@ -180,7 +180,6 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		addr, _ := netip.AddrFromSlice(ip.IP)
 		ones, _ := ip.Mask.Size()
 		prefix := netip.PrefixFrom(addr, ones)
-
 		// Skip adding routes to our own network
 		if w.opts.NetworkV4.IsValid() && addr.Is4() && !w.opts.DisableIPv4 {
 			if w.opts.NetworkV4.Contains(addr) {
@@ -194,10 +193,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 				continue
 			}
 		}
-
 		// If this is a default IPv4 gateway route set the system default route
-		if addr.Is4() && ones == 0 && !w.opts.DisableIPv4 && !w.changedGateway {
-			w.log.Debug("Adding IPv4 default route", slog.String("prefix", prefix.String()))
+		if addr.Is4() && addr.IsUnspecified() && ones == 0 && !w.opts.DisableIPv4 && !w.changedGateway {
+			w.log.Debug("Setting default IPv4 gateway", slog.String("prefix", prefix.String()))
 			var err error
 			if w.opts.NetNs != "" {
 				err = system.DoInNetNS(w.opts.NetNs, func() error {
@@ -217,10 +215,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 			w.changedGateway = true
 		}
-
 		// Add any other routes
 		if prefix.Addr().Is4() && !w.opts.DisableIPv4 {
-			w.log.Debug("Adding IPv4 route", slog.Any("prefix", prefix))
+			w.log.Debug("Adding IPv4 route to interface", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
@@ -231,7 +228,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 				// Don't readd routes to our own network
 				continue
 			}
-			w.log.Debug("Adding IPv6 route", slog.Any("prefix", prefix))
+			w.log.Debug("Adding IPv6 route to interface", slog.Any("prefix", prefix))
 			err = w.AddRoute(ctx, prefix)
 			if err != nil && !system.IsRouteExists(err) {
 				return fmt.Errorf("failed to add route: %w", err)
@@ -255,7 +252,10 @@ func (w *wginterface) putPeer(cfg wgtypes.PeerConfig) error {
 // DeletePeer removes a peer from the wireguard configuration.
 func (w *wginterface) DeletePeer(ctx context.Context, id string) error {
 	if key, ok := w.popPeerKey(id); ok {
-		w.log.Debug("deleting peer", slog.String("id", id), slog.String("key", key.WireGuardKey().String()))
+		w.log.Debug("Deleting peer from interface",
+			slog.String("id", id),
+			slog.String("key", key.WireGuardKey().String()),
+		)
 		if runtime.GOOS == "linux" && w.opts.NetNs != "" {
 			return system.DoInNetNS(w.opts.NetNs, func() error {
 				return w.deletePeer(key)
