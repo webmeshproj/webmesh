@@ -47,6 +47,32 @@ type GraphWalk struct {
 	Depth        int
 }
 
+// SkipNode reports if the given node ID should be skipped.
+func (g *GraphWalk) SkipNode(id types.NodeID) bool {
+	// Skip ourselves
+	if id == g.SourceNode {
+		return true
+	}
+	// Skip nodes we've already visited
+	if _, ok := g.Visited[id]; ok {
+		return true
+	}
+	// Skip direct edges to the source
+	directAdjacents := g.AdjacencyMap[g.SourceNode]
+	if _, ok := directAdjacents[id]; ok {
+		return true
+	}
+	return false
+}
+
+// WalkedPeer is a peer that has been walked. We track routes
+// separately so we can do a final iteration to determine the
+// smallest depth for each route.
+type WalkedPeer struct {
+	*v1.WireGuardPeer
+	Routes []Route
+}
+
 // Route tracks a route and the depth into the graph of the route.
 // Smallest depth wins in the end.
 type Route struct {
@@ -72,7 +98,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 		ourRoutes = append(ourRoutes, route.DestinationPrefixes()...)
 	}
 	directAdjacents := adjacencyMap[types.NodeID(peerID)]
-	out := make([]*v1.WireGuardPeer, 0, len(directAdjacents))
+	peers := make([]WalkedPeer, 0, len(directAdjacents))
 	for adjacent, edge := range directAdjacents {
 		node, err := graph.Vertex(adjacent)
 		if err != nil {
@@ -102,11 +128,13 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 			primaryEndpoint = node.WireguardEndpoints[0]
 		}
 		node.MeshNode.PrimaryEndpoint = primaryEndpoint
-		peer := &v1.WireGuardPeer{
-			Node:          node.MeshNode,
-			Proto:         storageutil.ConnectProtoFromEdgeAttrs(edge.Properties.Attributes),
-			AllowedIPs:    []string{},
-			AllowedRoutes: []string{},
+		peer := WalkedPeer{
+			WireGuardPeer: &v1.WireGuardPeer{
+				Node:          node.MeshNode,
+				Proto:         storageutil.ConnectProtoFromEdgeAttrs(edge.Properties.Attributes),
+				AllowedIPs:    []string{},
+				AllowedRoutes: []string{},
+			},
 		}
 		walk := GraphWalk{
 			Graph:        graph,
@@ -124,10 +152,35 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 		for _, ip := range walk.AllowedIPs {
 			peer.AllowedIPs = append(peer.AllowedIPs, ip.String())
 		}
-		for _, route := range walk.Routes {
+		peer.Routes = append(peer.Routes, walk.Routes...)
+		peers = append(peers, peer)
+	}
+	// Walk our results and assign routes based on shortest path.
+	out := make([]*v1.WireGuardPeer, 0, len(peers))
+	for _, peer := range peers {
+		if len(peer.Routes) == 0 {
+			out = append(out, peer.WireGuardPeer)
+			continue
+		}
+		// For each route, check if its the shortest depth
+		// for that prefix.
+	Routes:
+		for _, route := range peer.Routes {
+			peerRouteDepth := route.Depth
+			for _, otherPeer := range peers {
+				if otherPeer.Node.Id == peer.Node.Id {
+					continue
+				}
+				for _, otherRoute := range otherPeer.Routes {
+					if otherRoute.CIDR == route.CIDR && otherRoute.Depth < peerRouteDepth {
+						continue Routes
+					}
+				}
+			}
+			// This is the shortest depth for this route
 			peer.AllowedRoutes = append(peer.AllowedRoutes, route.CIDR.String())
 		}
-		out = append(out, peer)
+		out = append(out, peer.WireGuardPeer)
 	}
 	return out, nil
 }
@@ -156,6 +209,7 @@ func recursePeers(ctx context.Context, walk *GraphWalk) error {
 			}
 		}
 	}
+	walk.Depth++
 	err = recurseEdges(ctx, walk)
 	if err != nil {
 		return fmt.Errorf("recurse edge allowed IPs: %w", err)
@@ -167,20 +221,10 @@ func recurseEdges(ctx context.Context, walk *GraphWalk) (err error) {
 	if walk.Visited == nil {
 		walk.Visited = make(map[types.NodeID]struct{})
 	}
-	directAdjacents := walk.AdjacencyMap[walk.SourceNode]
 	walk.Visited[walk.TargetNode.NodeID()] = struct{}{}
 	targets := walk.AdjacencyMap[walk.TargetNode.NodeID()]
 	for target := range targets {
-		// Skip ourselves
-		if target == walk.SourceNode {
-			continue
-		}
-		// Skip direct edges to the source
-		if _, ok := directAdjacents[target]; ok {
-			continue
-		}
-		// Skip nodes we've already visited
-		if _, ok := walk.Visited[target]; ok {
+		if walk.SkipNode(target) {
 			continue
 		}
 		walk.Visited[target] = struct{}{}
