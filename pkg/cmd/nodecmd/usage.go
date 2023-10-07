@@ -33,7 +33,7 @@ var configPrefixes = []string{
 	"bootstrap",
 	"auth",
 	"mesh",
-	"raft",
+	"storage",
 	"services",
 	"tls",
 	"wireguard",
