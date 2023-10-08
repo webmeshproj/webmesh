@@ -29,7 +29,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Ensure we satisfy the MeshStorage interface.
@@ -55,7 +55,7 @@ func (rs *RaftStorage) GetValue(ctx context.Context, key []byte) ([]byte, error)
 	if !rs.raft.started.Load() {
 		return nil, errors.ErrClosed
 	}
-	if !storageutil.IsValidKey(string(key)) {
+	if !types.IsValidPathID(string(key)) {
 		return nil, errors.ErrInvalidKey
 	}
 	return rs.storage.GetValue(ctx, key)
@@ -90,7 +90,7 @@ func (rs *RaftStorage) PutValue(ctx context.Context, key, value []byte, ttl time
 	if !rs.raft.started.Load() {
 		return errors.ErrClosed
 	}
-	if !storageutil.IsValidKey(string(key)) {
+	if !types.IsValidPathID(string(key)) {
 		return errors.ErrInvalidKey
 	}
 	if !rs.raft.isVoter() {
@@ -115,7 +115,7 @@ func (rs *RaftStorage) Delete(ctx context.Context, key []byte) error {
 	if !rs.raft.started.Load() {
 		return errors.ErrClosed
 	}
-	if !storageutil.IsValidKey(string(key)) {
+	if !types.IsValidPathID(string(key)) {
 		return errors.ErrInvalidKey
 	}
 	if !rs.raft.isVoter() {

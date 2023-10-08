@@ -28,7 +28,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb/networking"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -132,7 +131,7 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 		peer := WalkedPeer{
 			WireGuardPeer: &v1.WireGuardPeer{
 				Node:          directPeer.MeshNode,
-				Proto:         storageutil.ConnectProtoFromEdgeAttrs(edge.Properties.Attributes),
+				Proto:         types.ConnectProtoFromEdgeAttrs(edge.Properties.Attributes),
 				AllowedIPs:    []string{},
 				AllowedRoutes: []string{},
 			},

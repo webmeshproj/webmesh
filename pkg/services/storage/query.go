@@ -24,60 +24,26 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
-func (s *Server) Query(req *v1.QueryRequest, stream v1.StorageQueryService_QueryServer) error {
-	if !context.IsInNetwork(stream.Context(), s.mnet) {
-		addr, _ := context.PeerAddrFrom(stream.Context())
+func (s *Server) Query(ctx context.Context, req *v1.QueryRequest) (*v1.QueryResponse, error) {
+	if !context.IsInNetwork(ctx, s.mnet) {
+		addr, _ := context.PeerAddrFrom(ctx)
 		s.log.Warn("Received Query request from out of network", slog.String("peer", addr.String()))
-		return status.Errorf(codes.PermissionDenied, "request is not in-network")
+		return nil, status.Errorf(codes.PermissionDenied, "request is not in-network")
 	}
 	if !s.storage.Consensus().IsMember() {
-		// In theory - non-raft members shouldn't even expose the Node service.
-		return status.Error(codes.Unavailable, "node not available to query")
+		// In theory - non-storage members shouldn't even expose the Node service.
+		return nil, status.Error(codes.Unavailable, "node not available to query")
 	}
-	switch req.GetCommand() {
-	case v1.QueryRequest_GET:
-		var result v1.QueryResponse
-		result.Key = req.GetQuery()
-		val, err := s.storage.MeshStorage().GetValue(stream.Context(), req.GetQuery())
-		if err != nil {
-			result.Error = err.Error()
-		} else {
-			result.Value = [][]byte{val}
+	resp, err := storageutil.ServeStorageQuery(ctx, s.storage, req)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, status.Error(codes.NotFound, err.Error())
 		}
-		err = stream.Send(&result)
-		if err != nil {
-			return err
-		}
-	case v1.QueryRequest_LIST:
-		var result v1.QueryResponse
-		result.Key = req.GetQuery()
-		vals, err := s.storage.MeshStorage().ListKeys(stream.Context(), req.GetQuery())
-		if err != nil {
-			result.Error = err.Error()
-		} else {
-			result.Value = vals
-		}
-		err = stream.Send(&result)
-		if err != nil {
-			return err
-		}
-	case v1.QueryRequest_ITER:
-		err := s.storage.MeshStorage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value []byte) error {
-			var result v1.QueryResponse
-			result.Key = key
-			result.Value = [][]byte{value}
-			return stream.Send(&result)
-		})
-		if err != nil {
-			return err
-		}
-		var result v1.QueryResponse
-		result.Error = "EOF"
-		return stream.Send(&result)
-	default:
-		return status.Errorf(codes.InvalidArgument, "unknown query command: %v", req.GetCommand())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return nil
+	return resp, nil
 }

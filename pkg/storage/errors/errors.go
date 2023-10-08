@@ -49,6 +49,8 @@ var (
 	ErrAlreadyBootstrapped = fmt.Errorf("already bootstrapped")
 	// ErrKeyNotFound is the error returned when a key is not found.
 	ErrKeyNotFound = errors.New("key not found")
+	// ErrNotFound is an alias to ErrKeyNotFound
+	ErrNotFound = ErrKeyNotFound
 	// ErrInvalidKey is the error returned when a key is invalid.
 	ErrInvalidKey = errors.New("invalid key")
 	// ErrInvalidPrefix is the error returned when a prefix is invalid.
@@ -79,11 +81,25 @@ var (
 	ErrEmptyNodeID = errors.New("node ID must not be empty")
 	// ErrInvalidNodeID is returned when a node ID is invalid.
 	ErrInvalidNodeID = errors.New("node ID is invalid")
+	// ErrInvalidQuery is returned when a query is invalid.
+	ErrInvalidQuery = errors.New("invalid query")
 )
 
 // NewKeyNotFoundError returns a new ErrKeyNotFound error.
 func NewKeyNotFoundError(key []byte) error {
 	return fmt.Errorf("%w: %s", ErrKeyNotFound, string(key))
+}
+
+// IsNotFound returns if the error matches any of the known not found errors.
+func IsNotFound(err error) bool {
+	return IsKeyNotFound(err) ||
+		IsNodeNotFound(err) ||
+		IsEdgeNotFound(err) ||
+		IsRoleNotFound(err) ||
+		IsRoleBindingNotFound(err) ||
+		IsGroupNotFound(err) ||
+		IsACLNotFound(err) ||
+		IsRouteNotFound(err)
 }
 
 // IsKeyNotFoundError returns true if the given error is a ErrKeyNotFound error.

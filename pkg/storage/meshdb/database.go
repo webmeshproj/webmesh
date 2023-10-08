@@ -182,6 +182,11 @@ func (v *ValidatingMeshStateStore) SetMeshDomain(ctx context.Context, domain str
 	return v.MeshState.SetMeshDomain(ctx, domain)
 }
 
+// GetMeshState returns the mesh state.
+func (v *ValidatingMeshStateStore) GetMeshState(ctx context.Context) (types.NetworkState, error) {
+	return v.MeshState.GetMeshState(ctx)
+}
+
 // ValidatingPeerStore wraps graph store implementation with a simpler to use
 // peer store interface.
 type ValidatingPeerStore struct {

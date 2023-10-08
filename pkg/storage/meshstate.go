@@ -19,6 +19,8 @@ package storage
 import (
 	"context"
 	"net/netip"
+
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // MeshState is the interface for querying mesh state.
@@ -35,4 +37,6 @@ type MeshState interface {
 	GetMeshDomain(ctx context.Context) (string, error)
 	// SetMeshDomain sets the mesh domain.
 	SetMeshDomain(ctx context.Context, domain string) error
+	// GetMeshState returns the full mesh state.
+	GetMeshState(ctx context.Context) (types.NetworkState, error)
 }

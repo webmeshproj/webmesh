@@ -21,14 +21,13 @@ package passthrough
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/webmeshproj/webmesh/pkg/logging"
@@ -36,7 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Ensure we satisfy the provider interface.
@@ -77,8 +76,8 @@ func NewProvider(opts Options) *Provider {
 		closec:  make(chan struct{}),
 	}
 	p.storage = &Storage{Provider: p}
-	p.meshDB = meshdb.NewFromStorage(p.storage)
 	p.consensus = &Consensus{Provider: p}
+	p.meshDB = meshdb.New(NewMeshDataStore(opts.Dialer))
 	return p
 }
 
@@ -95,7 +94,6 @@ func (p *Provider) Consensus() storage.Consensus {
 }
 
 func (p *Provider) Start(ctx context.Context) error {
-	// No-op
 	return nil
 }
 
@@ -235,34 +233,26 @@ func (p *Storage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer close()
-	if !storageutil.IsValidKey(string(key)) {
+	if !types.IsValidPathID(string(key)) {
 		return nil, errors.ErrInvalidKey
 	}
 	resp, err := cli.Query(ctx, &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
-		Query:   key,
+		Type:    v1.QueryRequest_VALUE,
+		Query:   types.NewQueryFilters().WithID(string(key)).Encode(),
 	})
 	if err != nil {
-		return nil, err
-	}
-	defer p.checkErr(resp.CloseSend)
-	result, err := resp.Recv()
-	if err != nil {
-		return nil, err
-	}
-	if result.GetError() != "" {
-		// TODO: Should find a way to type assert this error
-		if strings.Contains(result.GetError(), errors.ErrKeyNotFound.Error()) {
+		if status.Code(err) == codes.NotFound {
 			return nil, errors.NewKeyNotFoundError(key)
 		}
-		return nil, fmt.Errorf(result.GetError())
+		return nil, err
 	}
-	return result.GetValue()[0], nil
+	return resp.GetItems()[0], nil
 }
 
 // PutValue sets the value of a key. TTL is optional and can be set to 0.
 func (p *Storage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
-	if !storageutil.IsValidKey(string(key)) {
+	if !types.IsValidPathID(string(key)) {
 		return errors.ErrInvalidKey
 	}
 	// We pass this through to the publish API. Should only be called by non-raft nodes wanting to publish
@@ -294,59 +284,33 @@ func (p *Storage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error)
 	defer close()
 	resp, err := cli.Query(ctx, &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
-		Query:   prefix,
+		Type:    v1.QueryRequest_KEYS,
+		Query:   types.NewQueryFilters().WithID(string(prefix)).Encode(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	defer p.checkErr(resp.CloseSend)
-	result, err := resp.Recv()
-	if err != nil {
-		return nil, err
-	}
-	if result.GetError() != "" {
-		// TODO: Should find a way to type assert this error
-		return nil, fmt.Errorf(result.GetError())
-	}
-	return result.GetValue(), nil
+	return resp.GetItems(), nil
 }
 
 // IterPrefix iterates over all keys with a given prefix. It is important
 // that the iterator not attempt any write operations as this will cause
 // a deadlock.
 func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
-	cli, close, err := p.newStorageClient(ctx)
+	keys, err := p.ListKeys(ctx, prefix)
 	if err != nil {
 		return err
 	}
-	defer close()
-	resp, err := cli.Query(ctx, &v1.QueryRequest{
-		Command: v1.QueryRequest_ITER,
-		Query:   prefix,
-	})
-	if err != nil {
-		return err
-	}
-	defer p.checkErr(resp.CloseSend)
-	for {
-		result, err := resp.Recv()
+	for _, key := range keys {
+		value, err := p.GetValue(ctx, key)
 		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
 			return err
 		}
-		if result.GetError() == "EOF" {
-			return nil
-		}
-		if result.GetError() != "" {
-			// Should not happen
-			return fmt.Errorf(result.GetError())
-		}
-		if err := fn(result.GetKey(), result.GetValue()[0]); err != nil {
+		if err := fn(key, value); err != nil {
 			return err
 		}
 	}
+	return nil
 }
 
 // Subscribe will call the given function whenever a key with the given prefix is changed.

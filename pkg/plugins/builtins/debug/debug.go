@@ -140,7 +140,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 // InjectQuerier injects the querier.
 func (p *Plugin) InjectQuerier(srv v1.StorageQuerierPlugin_InjectQuerierServer) error {
 	p.datamux.Lock()
-	p.data = plugindb.Open(srv)
+	p.data = plugindb.OpenKeyVal(srv)
 	p.datamux.Unlock()
 	select {
 	case <-p.closec:

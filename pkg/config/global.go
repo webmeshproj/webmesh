@@ -209,8 +209,6 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 			CertFile: global.TLSCertFile,
 			KeyFile:  global.TLSKeyFile,
 		}
-		o.Services.API.TLSCertFile = global.TLSCertFile
-		o.Services.API.TLSKeyFile = global.TLSKeyFile
 		o.TLS = TLSOptions{
 			CAFile: global.TLSCAFile,
 		}

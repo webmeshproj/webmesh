@@ -36,6 +36,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -219,54 +220,13 @@ func (app *AppDaemon) Metrics(ctx context.Context, _ *v1.MetricsRequest) (*v1.Me
 	}, nil
 }
 
-func (app *AppDaemon) Query(req *v1.QueryRequest, stream v1.AppDaemon_QueryServer) error {
+func (app *AppDaemon) Query(ctx context.Context, req *v1.QueryRequest) (*v1.QueryResponse, error) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
 	if app.mesh == nil {
-		return ErrNotConnected
+		return nil, ErrNotConnected
 	}
-	switch req.GetCommand() {
-	case v1.QueryRequest_GET:
-		var result v1.QueryResponse
-		result.Key = req.GetQuery()
-		val, err := app.mesh.Storage().MeshStorage().GetValue(stream.Context(), req.GetQuery())
-		if err != nil {
-			result.Error = err.Error()
-		} else {
-			result.Value = [][]byte{val}
-		}
-		err = stream.Send(&result)
-		if err != nil {
-			return err
-		}
-	case v1.QueryRequest_LIST:
-		var result v1.QueryResponse
-		result.Key = req.GetQuery()
-		vals, err := app.mesh.Storage().MeshStorage().ListKeys(stream.Context(), req.GetQuery())
-		if err != nil {
-			result.Error = err.Error()
-		} else {
-			result.Value = vals
-		}
-		err = stream.Send(&result)
-		if err != nil {
-			return err
-		}
-	case v1.QueryRequest_ITER:
-		err := app.mesh.Storage().MeshStorage().IterPrefix(stream.Context(), req.GetQuery(), func(key, value []byte) error {
-			var result v1.QueryResponse
-			result.Key = key
-			result.Value = [][]byte{value}
-			return stream.Send(&result)
-		})
-		if err != nil {
-			return err
-		}
-		var result v1.QueryResponse
-		result.Error = "EOF"
-		return stream.Send(&result)
-	}
-	return status.Errorf(codes.Unimplemented, "unknown query command: %v", req.GetCommand())
+	return storageutil.ServeStorageQuery(ctx, app.mesh.Storage(), req)
 }
 
 func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.StatusResponse, error) {

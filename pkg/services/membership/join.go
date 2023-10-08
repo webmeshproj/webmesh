@@ -36,7 +36,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -298,7 +297,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 				Source:     peer,
 				Target:     req.GetId(),
 				Weight:     1,
-				Attributes: storageutil.EdgeAttrsForConnectProto(proto),
+				Attributes: types.EdgeAttrsForConnectProto(proto),
 			}})
 			if err != nil {
 				return nil, handleErr(status.Errorf(codes.Internal, "failed to add edge: %v", err))

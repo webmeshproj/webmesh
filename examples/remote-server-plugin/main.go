@@ -12,6 +12,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -30,7 +31,7 @@ type Plugin struct {
 	v1.UnimplementedWatchPluginServer
 	v1.UnimplementedStorageQuerierPluginServer
 	// data is the meshdb database.
-	data   storage.MeshStorage
+	data   storage.MeshDB
 	closec chan struct{}
 }
 
@@ -58,6 +59,12 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 func (p *Plugin) Emit(ctx context.Context, ev *v1.Event) (*emptypb.Empty, error) {
 	// The event will contain the event type and the node that it is about.
 	fmt.Println(ev.String())
+	// We can demonstrate usage of the injected meshdb here.
+	peer, err := p.data.Peers().Get(ctx, types.NodeID(ev.GetNode().GetId()))
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(peer.String())
 	return &emptypb.Empty{}, nil
 }
 
@@ -65,7 +72,7 @@ func (p *Plugin) Emit(ctx context.Context, ev *v1.Event) (*emptypb.Empty, error)
 // It is called after Configure and before any other methods are called. The stream
 // can be used with the plugindb package to open a database connection.
 func (p *Plugin) InjectQuerier(srv v1.StorageQuerierPlugin_InjectQuerierServer) error {
-	p.data = plugindb.Open(srv)
+	p.data = plugindb.OpenDB(srv)
 	select {
 	case <-p.closec:
 	case <-srv.Context().Done():

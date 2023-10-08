@@ -32,7 +32,6 @@ import (
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -42,7 +41,7 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	var bootstrapped bool = true
 	_, err := s.Storage().MeshDB().MeshState().GetIPv6Prefix(ctx)
 	if err != nil {
-		if !errors.IsKeyNotFound(err) {
+		if !errors.IsNotFound(err) {
 			return fmt.Errorf("get mesh network: %w", err)
 		}
 		bootstrapped = false
@@ -220,7 +219,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 				Source:     s.ID().String(),
 				Target:     peer.String(),
 				Weight:     0,
-				Attributes: storageutil.EdgeAttrsForConnectProto(proto),
+				Attributes: types.EdgeAttrsForConnectProto(proto),
 			}})
 			if err != nil {
 				return fmt.Errorf("create direct peerings: %w", err)

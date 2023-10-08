@@ -20,7 +20,6 @@ package plugins
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/netip"
 	"strings"
@@ -35,6 +34,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
+	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -354,110 +354,9 @@ func (m *manager) handleQueries(db storage.Provider) {
 
 // handleQueryClient handles a query client.
 func (m *manager) handleQueryClient(plugin string, db storage.Provider, queries v1.StorageQuerierPlugin_InjectQuerierClient) {
-	defer func() {
-		if err := queries.CloseSend(); err != nil {
-			m.log.Error("close query stream", "plugin", plugin, "error", err)
-		}
-	}()
-	store := db.MeshStorage()
-	// TODO: This does not support multiplexed queries yet.
-	for {
-		query, err := queries.Recv()
-		if err != nil {
-			if err == io.EOF {
-				m.log.Debug("query stream closed cleanly", "plugin", plugin)
-				return
-			}
-			// TODO: restart the stream?
-			m.log.Error("receive query", "plugin", plugin, "error", err)
-			return
-		}
-		m.log.Debug("handling plugin query", "plugin", plugin, "query", query.GetQuery(), "cmd", query.GetCommand().String())
-		switch query.GetCommand() {
-		case v1.PluginQuery_GET:
-			var result v1.PluginQueryResult
-			result.Id = query.GetId()
-			result.Key = query.GetQuery()
-			val, err := store.GetValue(queries.Context(), query.GetQuery())
-			if err != nil {
-				result.Error = err.Error()
-			} else {
-				result.Value = [][]byte{val}
-			}
-			err = queries.Send(&result)
-			if err != nil {
-				m.log.Error("send query result", "plugin", plugin, "error", err)
-			}
-		case v1.PluginQuery_LIST:
-			var result v1.PluginQueryResult
-			result.Id = query.GetId()
-			result.Key = query.GetQuery()
-			keys, err := store.ListKeys(queries.Context(), query.GetQuery())
-			if err != nil {
-				result.Error = err.Error()
-			} else {
-				result.Value = keys
-			}
-			err = queries.Send(&result)
-			if err != nil {
-				m.log.Error("send query result", "plugin", plugin, "error", err)
-			}
-		case v1.PluginQuery_ITER:
-			err := store.IterPrefix(queries.Context(), query.GetQuery(), func(key, val []byte) error {
-				var result v1.PluginQueryResult
-				result.Id = query.GetId()
-				result.Key = key
-				result.Value = [][]byte{val}
-				err := queries.Send(&result)
-				return err
-			})
-			if err != nil {
-				m.log.Error("stream query results", "plugin", plugin, "error", err)
-				continue
-			}
-			var result v1.PluginQueryResult
-			result.Id = query.GetId()
-			result.Error = "EOF"
-			err = queries.Send(&result)
-			if err != nil {
-				m.log.Error("send query results EOF", "plugin", plugin, "error", err)
-			}
-		case v1.PluginQuery_PUT:
-			// TODO: Implement
-			var result v1.PluginQueryResult
-			result.Id = query.GetId()
-			result.Error = fmt.Sprintf("unsupported command: %v", query.GetCommand())
-			err = queries.Send(&result)
-			if err != nil {
-				m.log.Error("send query result", "plugin", plugin, "error", err)
-			}
-		case v1.PluginQuery_DELETE:
-			// TODO: Implement
-			var result v1.PluginQueryResult
-			result.Id = query.GetId()
-			result.Error = fmt.Sprintf("unsupported command: %v", query.GetCommand())
-			err = queries.Send(&result)
-			if err != nil {
-				m.log.Error("send query result", "plugin", plugin, "error", err)
-			}
-		case v1.PluginQuery_SUBSCRIBE:
-			// TODO: Implement (this will require wraping the stream in a multiplexer)
-			var result v1.PluginQueryResult
-			result.Id = query.GetId()
-			result.Error = fmt.Sprintf("unsupported command: %v", query.GetCommand())
-			err = queries.Send(&result)
-			if err != nil {
-				m.log.Error("send query result", "plugin", plugin, "error", err)
-			}
-		default:
-			var result v1.PluginQueryResult
-			result.Id = query.GetId()
-			result.Error = fmt.Sprintf("unsupported command: %v", query.GetCommand())
-			err = queries.Send(&result)
-			if err != nil {
-				m.log.Error("send query result", "plugin", plugin, "error", err)
-			}
-		}
+	err := plugindb.Serve(context.WithLogger(context.Background(), m.log), db, queries)
+	if err != nil {
+		m.log.Error("Error handling query stream", "plugin", plugin, "error", err)
 	}
 }
 

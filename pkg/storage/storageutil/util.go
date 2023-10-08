@@ -18,47 +18,483 @@ limitations under the License.
 package storageutil
 
 import (
-	"strings"
+	"context"
+	"fmt"
 
+	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/v1"
+
+	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
-// IsValidKey reports that a key is valid. All keys must be non-empty and valid UTF-8.
-func IsValidKey(key string) bool {
-	if len(key) == 0 {
-		return false
-	}
-	// Make sure all characters are valid UTF-8.
-	if validated := strings.ToValidUTF8(key, "/"); validated != key {
-		return false
-	}
-	return true
-}
+var (
+	// ErrInvalidQuery is returned when a query is invalid.
+	ErrInvalidQuery = fmt.Errorf("invalid query")
+	// ErrInvalidArgument is returned when an argument is invalid.
+	ErrInvalidArgument = fmt.Errorf("invalid argument")
+)
 
-// EdgeAttrsForConnectProto returns the edge attributes for the given protocol.
-func EdgeAttrsForConnectProto(proto v1.ConnectProtocol) map[string]string {
-	attrs := map[string]string{}
-	switch proto {
-	case v1.ConnectProtocol_CONNECT_ICE:
-		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_ICE.String()] = "true"
-	case v1.ConnectProtocol_CONNECT_LIBP2P:
-		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_LIBP2P.String()] = "true"
+// ServeStorageQuery serves a storage query given a database and a query request.
+func ServeStorageQuery(ctx context.Context, db storage.Provider, req *v1.QueryRequest) (*v1.QueryResponse, error) {
+	// Parse the request
+	query, err := types.ParseStorageQuery(req)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidQuery, err)
+	}
+	switch req.GetCommand() {
+	case v1.QueryRequest_GET:
+		return doGetQuery(ctx, db, query)
+	case v1.QueryRequest_LIST:
+		return doListQuery(ctx, db, query)
 	default:
-		attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_NATIVE.String()] = "true"
+		return nil, fmt.Errorf("%w: unknown query command %s", ErrInvalidQuery, req.GetCommand().String())
 	}
-	return attrs
 }
 
-// ConnectProtoFromEdgeAttrs returns the protocol for the given edge attributes.
-func ConnectProtoFromEdgeAttrs(attrs map[string]string) v1.ConnectProtocol {
-	if attrs == nil {
-		return v1.ConnectProtocol_CONNECT_NATIVE
+func doGetQuery(ctx context.Context, db storage.Provider, req types.StorageQuery) (res *v1.QueryResponse, err error) {
+	res = &v1.QueryResponse{}
+	switch req.GetType() {
+	case v1.QueryRequest_VALUE:
+		// Legacy requests need to be handled here.
+		id, ok := req.Filters().GetID()
+		if !ok {
+			err = fmt.Errorf("%w: missing id", ErrInvalidArgument)
+			res.Error = err.Error()
+			return
+		}
+		var val []byte
+		val, err = db.MeshStorage().GetValue(ctx, []byte(id))
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, val)
+
+	case v1.QueryRequest_PEERS:
+		var peer types.MeshNode
+		var out []byte
+		id, ok := req.Filters().GetID()
+		if !ok {
+			// We can also get by public key.
+			if pubkey, ok := req.Filters().GetPubKey(); ok {
+				var decoded crypto.PublicKey
+				decoded, err = crypto.DecodePublicKey(pubkey)
+				if err != nil {
+					err = fmt.Errorf("%w: invalid public key", ErrInvalidArgument)
+					res.Error = err.Error()
+					return
+				}
+				peer, err = db.MeshDB().Peers().GetByPubKey(ctx, decoded)
+				if err != nil {
+					res.Error = err.Error()
+					return
+				}
+				out, err = peer.MarshalProtoJSON()
+				if err != nil {
+					err = fmt.Errorf("failed to marshal peer: %w", err)
+					res.Error = err.Error()
+					return
+				}
+				res.Items = append(res.Items, out)
+			}
+		} else {
+			peer, err = db.MeshDB().Peers().Get(ctx, types.NodeID(id))
+			if err != nil {
+				res.Error = err.Error()
+				return res, err
+			}
+			out, err = peer.MarshalProtoJSON()
+			if err != nil {
+				err = fmt.Errorf("failed to marshal peer: %w", err)
+				res.Error = err.Error()
+				return
+			}
+			res.Items = append(res.Items, out)
+		}
+
+	case v1.QueryRequest_EDGES:
+		source, ok := req.Filters().GetSourceNodeID()
+		if !ok {
+			err = fmt.Errorf("%w: missing source id", ErrInvalidArgument)
+			res.Error = err.Error()
+			return
+		}
+		target, ok := req.Filters().GetTargetNodeID()
+		if !ok {
+			err = fmt.Errorf("%w: missing target id", ErrInvalidArgument)
+			res.Error = err.Error()
+			return
+		}
+		var edge types.MeshEdge
+		edge, err = db.MeshDB().Peers().GetEdge(ctx, source, target)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		var out []byte
+		out, err = edge.MarshalProtoJSON()
+		if err != nil {
+			err = fmt.Errorf("failed to marshal edge: %w", err)
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, out)
+
+	case v1.QueryRequest_ROUTES:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			err = fmt.Errorf("%w: missing id", ErrInvalidArgument)
+			res.Error = err.Error()
+			return
+		}
+		var route types.Route
+		var out []byte
+		route, err = db.MeshDB().Networking().GetRoute(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		out, err = route.MarshalProtoJSON()
+		if err != nil {
+			err = fmt.Errorf("failed to marshal route: %w", err)
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, out)
+
+	case v1.QueryRequest_ACLS:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			err = fmt.Errorf("%w: missing id", ErrInvalidArgument)
+			res.Error = err.Error()
+			return
+		}
+		var acl types.NetworkACL
+		var out []byte
+		acl, err = db.MeshDB().Networking().GetNetworkACL(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		out, err = acl.MarshalProtoJSON()
+		if err != nil {
+			err = fmt.Errorf("failed to marshal network acl: %w", err)
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, out)
+
+	case v1.QueryRequest_ROLES:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			err = fmt.Errorf("%w: missing id", ErrInvalidArgument)
+			res.Error = err.Error()
+			return
+		}
+		var role types.Role
+		var out []byte
+		role, err = db.MeshDB().RBAC().GetRole(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		out, err = role.MarshalProtoJSON()
+		if err != nil {
+			err = fmt.Errorf("failed to marshal role: %w", err)
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, out)
+
+	case v1.QueryRequest_ROLEBINDINGS:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			err = fmt.Errorf("%w: missing id", ErrInvalidArgument)
+			res.Error = err.Error()
+			return
+		}
+		var rb types.RoleBinding
+		var out []byte
+		rb, err = db.MeshDB().RBAC().GetRoleBinding(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		out, err = rb.MarshalProtoJSON()
+		if err != nil {
+			err = fmt.Errorf("failed to marshal rolebinding: %w", err)
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, out)
+
+	case v1.QueryRequest_GROUPS:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			err = fmt.Errorf("%w: missing id", ErrInvalidArgument)
+			res.Error = err.Error()
+			return
+		}
+		var group types.Group
+		var out []byte
+		group, err = db.MeshDB().RBAC().GetGroup(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		out, err = group.MarshalProtoJSON()
+		if err != nil {
+			err = fmt.Errorf("failed to marshal group: %w", err)
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, out)
+
+	case v1.QueryRequest_NETWORK_STATE:
+		var state types.NetworkState
+		var out []byte
+		state, err = db.MeshDB().MeshState().GetMeshState(ctx)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		out, err = state.MarshalProtoJSON()
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, out)
+
+	default:
+		err = fmt.Errorf("%w: unsupported GET query type %s", ErrInvalidQuery, req.GetType().String())
+		res.Error = err.Error()
+		return
 	}
-	if _, ok := attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_ICE.String()]; ok {
-		return v1.ConnectProtocol_CONNECT_ICE
+	// Fallthrough not found for multi-select queries.
+	if len(res.Items) == 0 {
+		res.Error = errors.ErrNotFound.Error()
+		return res, errors.ErrNotFound
 	}
-	if _, ok := attrs[v1.EdgeAttribute_EDGE_ATTRIBUTE_LIBP2P.String()]; ok {
-		return v1.ConnectProtocol_CONNECT_LIBP2P
+	return
+}
+
+func doListQuery(ctx context.Context, db storage.Provider, req types.StorageQuery) (res *v1.QueryResponse, err error) {
+	res = &v1.QueryResponse{}
+	switch req.GetType() {
+	case v1.QueryRequest_VALUE:
+		// Support legacy iter queries.
+		prefix, _ := req.Filters().GetID()
+		err = db.MeshStorage().IterPrefix(ctx, []byte(prefix), func(key []byte, value []byte) error {
+			res.Items = append(res.Items, value)
+			return nil
+		})
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	case v1.QueryRequest_KEYS:
+		// Support legacy iter queries.
+		prefix, _ := req.Filters().GetID()
+		var keys [][]byte
+		keys, err = db.MeshStorage().ListKeys(ctx, []byte(prefix))
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, keys...)
+
+	case v1.QueryRequest_PEERS:
+		var peers []types.MeshNode
+		peers, err = db.MeshDB().Peers().List(ctx)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		for _, peer := range peers {
+			var out []byte
+			out, err = peer.MarshalProtoJSON()
+			if err != nil {
+				err = fmt.Errorf("failed to marshal peer: %w", err)
+				res.Error = err.Error()
+				return
+			}
+			res.Items = append(res.Items, out)
+		}
+
+	case v1.QueryRequest_EDGES:
+		var edges []graph.Edge[types.NodeID]
+		edges, err = db.MeshDB().GraphStore().ListEdges()
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		for _, edge := range edges {
+			var out []byte
+			out, err = types.Edge(edge).ToMeshEdge(edge.Source, edge.Target).MarshalProtoJSON()
+			if err != nil {
+				err = fmt.Errorf("failed to marshal edge: %w", err)
+				res.Error = err.Error()
+				return
+			}
+			res.Items = append(res.Items, out)
+		}
+
+	case v1.QueryRequest_ROUTES:
+		// Routes can optionally be filtered by node ID or CIDR.
+		var routes []types.Route
+		if nodeID, ok := req.Filters().GetNodeID(); ok {
+			routes, err = db.MeshDB().Networking().GetRoutesByNode(ctx, nodeID)
+			if err != nil {
+				res.Error = err.Error()
+				return
+			}
+			for _, route := range routes {
+				var out []byte
+				out, err = route.MarshalProtoJSON()
+				if err != nil {
+					err = fmt.Errorf("failed to marshal edge: %w", err)
+					res.Error = err.Error()
+					return
+				}
+				res.Items = append(res.Items, out)
+			}
+		} else if cidr, ok := req.Filters().GetCIDR(); ok {
+			routes, err = db.MeshDB().Networking().GetRoutesByCIDR(ctx, cidr)
+			if err != nil {
+				res.Error = err.Error()
+				return
+			}
+			for _, route := range routes {
+				var out []byte
+				out, err = route.MarshalProtoJSON()
+				if err != nil {
+					err = fmt.Errorf("failed to marshal route: %w", err)
+					res.Error = err.Error()
+					return
+				}
+				res.Items = append(res.Items, out)
+			}
+		} else {
+			// List all routes
+			routes, err = db.MeshDB().Networking().ListRoutes(ctx)
+			if err != nil {
+				res.Error = err.Error()
+				return
+			}
+			for _, route := range routes {
+				var out []byte
+				out, err = route.MarshalProtoJSON()
+				if err != nil {
+					err = fmt.Errorf("failed to marshal route: %w", err)
+					res.Error = err.Error()
+					return
+				}
+				res.Items = append(res.Items, out)
+			}
+		}
+
+	case v1.QueryRequest_ACLS:
+		// List all network ACLs.
+		var acls []types.NetworkACL
+		acls, err = db.MeshDB().Networking().ListNetworkACLs(ctx)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		for _, acl := range acls {
+			var out []byte
+			out, err = acl.MarshalProtoJSON()
+			if err != nil {
+				err = fmt.Errorf("failed to marshal network ACL: %w", err)
+				res.Error = err.Error()
+				return
+			}
+			res.Items = append(res.Items, out)
+		}
+
+	case v1.QueryRequest_ROLES:
+		// Roles can be filtered by node ID.
+		var roles []types.Role
+		if nodeID, ok := req.Filters().GetNodeID(); ok {
+			roles, err = db.MeshDB().RBAC().ListNodeRoles(ctx, nodeID)
+			if err != nil {
+				res.Error = err.Error()
+				return
+			}
+			for _, role := range roles {
+				var out []byte
+				out, err = role.MarshalProtoJSON()
+				if err != nil {
+					err = fmt.Errorf("failed to marshal role: %w", err)
+					res.Error = err.Error()
+					return
+				}
+				res.Items = append(res.Items, out)
+			}
+		} else {
+			// List all roles
+			roles, err = db.MeshDB().RBAC().ListRoles(ctx)
+			if err != nil {
+				res.Error = err.Error()
+				return
+			}
+			for _, role := range roles {
+				var out []byte
+				out, err = role.MarshalProtoJSON()
+				if err != nil {
+					err = fmt.Errorf("failed to marshal role: %w", err)
+					res.Error = err.Error()
+					return
+				}
+				res.Items = append(res.Items, out)
+			}
+		}
+
+	case v1.QueryRequest_ROLEBINDINGS:
+		var rbs []types.RoleBinding
+		rbs, err = db.MeshDB().RBAC().ListRoleBindings(ctx)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		for _, rb := range rbs {
+			var out []byte
+			out, err = rb.MarshalProtoJSON()
+			if err != nil {
+				err = fmt.Errorf("failed to marshal rolebinding: %w", err)
+				res.Error = err.Error()
+				return
+			}
+			res.Items = append(res.Items, out)
+		}
+
+	case v1.QueryRequest_GROUPS:
+		var groups []types.Group
+		groups, err = db.MeshDB().RBAC().ListGroups(ctx)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		for _, group := range groups {
+			var out []byte
+			out, err = group.MarshalProtoJSON()
+			if err != nil {
+				err = fmt.Errorf("failed to marshal group: %w", err)
+				res.Error = err.Error()
+				return
+			}
+			res.Items = append(res.Items, out)
+		}
+
+	default:
+		err = fmt.Errorf("%w: unsupported LIST query type %s", ErrInvalidQuery, req.GetType().String())
+		res.Error = err.Error()
+		return
 	}
-	return v1.ConnectProtocol_CONNECT_NATIVE
+
+	return
 }

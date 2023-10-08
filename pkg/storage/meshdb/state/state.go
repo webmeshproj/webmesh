@@ -19,16 +19,15 @@ package state
 
 import (
 	"context"
-	"database/sql"
 	"net/netip"
 
+	v1 "github.com/webmeshproj/api/v1"
+
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 type State = storage.MeshState
-
-// ErrNodeNotFound is returned when a node is not found.
-var ErrNodeNotFound = sql.ErrNoRows
 
 var (
 	// MeshStatePrefix is the prefix for mesh state keys.
@@ -96,4 +95,26 @@ func (s *state) SetMeshDomain(ctx context.Context, domain string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *state) GetMeshState(ctx context.Context) (types.NetworkState, error) {
+	state := types.NetworkState{
+		NetworkState: &v1.NetworkState{},
+	}
+	domain, err := s.GetMeshDomain(ctx)
+	if err != nil {
+		return state, err
+	}
+	state.NetworkState.Domain = domain
+	networkV4, err := s.GetIPv4Prefix(ctx)
+	if err != nil {
+		return state, err
+	}
+	state.NetworkState.NetworkV4 = networkV4.String()
+	networkv6, err := s.GetIPv6Prefix(ctx)
+	if err != nil {
+		return state, err
+	}
+	state.NetworkState.NetworkV6 = networkv6.String()
+	return state, nil
 }

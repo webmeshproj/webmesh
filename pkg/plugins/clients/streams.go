@@ -30,11 +30,11 @@ import (
 
 func inProcessQueryPipe(ctx context.Context, server v1.PluginServer) v1.StorageQuerierPlugin_InjectQuerierClient {
 	// TODO: Make this configurable
-	schan := make(chan *v1.PluginQuery, 100)
-	rchan := make(chan *v1.PluginQueryResult, 100)
+	schan := make(chan *v1.QueryRequest, 100)
+	rchan := make(chan *v1.QueryResponse, 100)
 	ctx, cancel := context.WithCancel(ctx)
-	srv := &inProcessStreamServer[v1.PluginQuery, v1.PluginQueryResult]{ctx, schan, rchan}
-	cli := &inProcessStreamClient[v1.PluginQuery, v1.PluginQueryResult]{ctx, cancel, schan, rchan}
+	srv := &inProcessStreamServer[v1.QueryRequest, v1.QueryResponse]{ctx, schan, rchan}
+	cli := &inProcessStreamClient[v1.QueryRequest, v1.QueryResponse]{ctx, cancel, schan, rchan}
 	go func() {
 		defer cancel()
 		err := server.(v1.StorageQuerierPluginServer).InjectQuerier(srv)
