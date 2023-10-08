@@ -259,6 +259,10 @@ func (r *RBACStore) SetEnabled(ctx context.Context, enabled bool) error {
 }
 
 func (r *RBACStore) GetEnabled(ctx context.Context) (bool, error) {
+	err := r.dial(ctx)
+	if err != nil {
+		return false, err
+	}
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_RBAC_STATE,
