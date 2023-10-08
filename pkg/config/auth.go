@@ -18,6 +18,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/spf13/pflag"
 )
@@ -56,7 +57,7 @@ type MTLSOptions struct {
 }
 
 // IsEmpty returns true if the options are empty.
-func (o MTLSOptions) IsEmpty() bool {
+func (o *MTLSOptions) IsEmpty() bool {
 	return o.CertFile == "" && o.CertData == "" && o.KeyFile == "" && o.KeyData == ""
 }
 
@@ -69,7 +70,7 @@ type BasicAuthOptions struct {
 }
 
 // IsEmpty returns true if the options are empty.
-func (o BasicAuthOptions) IsEmpty() bool {
+func (o *BasicAuthOptions) IsEmpty() bool {
 	return o.Username == "" && o.Password == ""
 }
 
@@ -82,7 +83,7 @@ type LDAPAuthOptions struct {
 }
 
 // IsEmpty returns true if the options are empty.
-func (o LDAPAuthOptions) IsEmpty() bool {
+func (o *LDAPAuthOptions) IsEmpty() bool {
 	return o.Username == "" && o.Password == ""
 }
 
@@ -109,6 +110,7 @@ func (o *AuthOptions) Validate() error {
 		if o.MTLS.KeyFile == "" && o.MTLS.KeyData == "" {
 			return errors.New("auth.mtls.key-file is required")
 		}
+		return nil
 	}
 	if !o.Basic.IsEmpty() {
 		if o.Basic.Username == "" {
@@ -117,6 +119,7 @@ func (o *AuthOptions) Validate() error {
 		if o.Basic.Password == "" {
 			return errors.New("auth.basic.password is required")
 		}
+		return nil
 	}
 	if !o.LDAP.IsEmpty() {
 		if o.LDAP.Username == "" {
@@ -125,6 +128,8 @@ func (o *AuthOptions) Validate() error {
 		if o.LDAP.Password == "" {
 			return errors.New("auth.ldap.password is required")
 		}
+		return nil
 	}
-	return nil
+	// Something weird happened
+	return fmt.Errorf("auth options are invalid: %+v", o)
 }

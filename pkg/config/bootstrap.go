@@ -33,6 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // BootstrapOptions are options for bootstrapping a new mesh.
@@ -111,55 +112,66 @@ func NewBootstrapTransportOptions() BootstrapTransportOptions {
 	return BootstrapTransportOptions{
 		TCPAdvertiseAddress: net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", storage.DefaultBootstrapPort)),
 		TCPListenAddress:    storage.DefaultBootstrapListenAddress,
+		TCPServers:          map[string]string{},
+		TCPConnectionPool:   0,
 		TCPConnectTimeout:   3 * time.Second,
-		RendezvousLinger:    30 * time.Second,
+		ServerGRPCPorts:     map[string]int{},
+		Rendezvous:          "",
+		RendezvousNodes:     []string{},
+		RendezvousLinger:    time.Minute,
+		PSK:                 "",
 	}
 }
 
 // BindFlags binds the bootstrap options to a flag set.
 func (o *BootstrapOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.BoolVar(&o.Enabled, prefix+"bootstrap.enabled", false, "Attempt to bootstrap a new cluster")
-	fs.DurationVar(&o.ElectionTimeout, prefix+"bootstrap.election-timeout", time.Second*3, "Election timeout to use when bootstrapping a new cluster")
-	fs.StringVar(&o.IPv4Network, prefix+"bootstrap.ipv4-network", storage.DefaultIPv4Network, "IPv4 network of the mesh to write to the database when bootstraping a new cluster")
-	fs.StringVar(&o.MeshDomain, prefix+"bootstrap.mesh-domain", storage.DefaultMeshDomain, "Domain of the mesh to write to the database when bootstraping a new cluster")
-	fs.StringVar(&o.Admin, prefix+"bootstrap.admin", storage.DefaultMeshAdmin, "User and/or node name to assign administrator privileges to when bootstraping a new cluster")
-	fs.StringSliceVar(&o.Voters, prefix+"bootstrap.voters", nil, "Comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster")
-	fs.StringVar(&o.DefaultNetworkPolicy, prefix+"bootstrap.default-network-policy", storage.DefaultNetworkPolicy, "Default network policy to apply to the mesh when bootstraping a new cluster")
-	fs.BoolVar(&o.DisableRBAC, prefix+"bootstrap.disable-rbac", false, "Disable RBAC when bootstrapping a new cluster")
-	fs.BoolVar(&o.Force, prefix+"bootstrap.force", false, "Force new bootstrap")
+	fs.BoolVar(&o.Enabled, prefix+"bootstrap.enabled", o.Enabled, "Attempt to bootstrap a new cluster")
+	fs.DurationVar(&o.ElectionTimeout, prefix+"bootstrap.election-timeout", o.ElectionTimeout, "Election timeout to use when bootstrapping a new cluster")
+	fs.StringVar(&o.IPv4Network, prefix+"bootstrap.ipv4-network", o.IPv4Network, "IPv4 network of the mesh to write to the database when bootstraping a new cluster")
+	fs.StringVar(&o.MeshDomain, prefix+"bootstrap.mesh-domain", o.MeshDomain, "Domain of the mesh to write to the database when bootstraping a new cluster")
+	fs.StringVar(&o.Admin, prefix+"bootstrap.admin", o.Admin, "User and/or node name to assign administrator privileges to when bootstraping a new cluster")
+	fs.StringSliceVar(&o.Voters, prefix+"bootstrap.voters", o.Voters, "Comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster")
+	fs.StringVar(&o.DefaultNetworkPolicy, prefix+"bootstrap.default-network-policy", o.DefaultNetworkPolicy, "Default network policy to apply to the mesh when bootstraping a new cluster")
+	fs.BoolVar(&o.DisableRBAC, prefix+"bootstrap.disable-rbac", o.DisableRBAC, "Disable RBAC when bootstrapping a new cluster")
+	fs.BoolVar(&o.Force, prefix+"bootstrap.force", o.Force, "Force new bootstrap")
 	o.Transport.BindFlags(prefix, fs)
 }
 
 // BindFlags binds the bootstrap transport options to a flag set.
 func (o *BootstrapTransportOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringVar(&o.TCPAdvertiseAddress, prefix+"bootstrap.transport.tcp-advertise-address", "", "Address to advertise for raft consensus")
-	fs.StringVar(&o.TCPListenAddress, prefix+"bootstrap.transport.tcp-listen-address", storage.DefaultBootstrapListenAddress, "Address to use when using TCP raft consensus to bootstrap")
-	fs.IntVar(&o.TCPConnectionPool, prefix+"bootstrap.transport.tcp-connection-pool", 0, "Maximum number of TCP connections to maintain to other nodes")
-	fs.DurationVar(&o.TCPConnectTimeout, prefix+"bootstrap.transport.tcp-connect-timeout", time.Second*3, "Maximum amount of time to wait for a TCP connection to be established")
-	fs.StringToStringVar(&o.TCPServers, prefix+"bootstrap.transport.tcp-servers", nil, "Map of node IDs to raft addresses to bootstrap with")
-	fs.StringToIntVar(&o.ServerGRPCPorts, prefix+"bootstrap.transport.server-grpc-ports", nil, "Map of node IDs to gRPC ports to bootstrap with")
-	fs.StringVar(&o.Rendezvous, prefix+"bootstrap.transport.rendezvous", "", "Rendezvous string to use when using libp2p to bootstrap")
-	fs.StringSliceVar(&o.RendezvousNodes, prefix+"bootstrap.transport.rendezvous-nodes", nil, "List of node IDs to use when using libp2p to bootstrap")
-	fs.DurationVar(&o.RendezvousLinger, prefix+"bootstrap.transport.rendezvous-linger", time.Minute, "Amount of time to wait for other nodes to join when using libp2p to bootstrap")
-	fs.StringVar(&o.PSK, prefix+"bootstrap.transport.psk", "", "Pre-shared key to use when using libp2p to bootstrap")
+	fs.StringVar(&o.TCPAdvertiseAddress, prefix+"bootstrap.transport.tcp-advertise-address", o.TCPAdvertiseAddress, "Address to advertise for raft consensus")
+	fs.StringVar(&o.TCPListenAddress, prefix+"bootstrap.transport.tcp-listen-address", o.TCPListenAddress, "Address to use when using TCP raft consensus to bootstrap")
+	fs.IntVar(&o.TCPConnectionPool, prefix+"bootstrap.transport.tcp-connection-pool", o.TCPConnectionPool, "Maximum number of TCP connections to maintain to other nodes")
+	fs.DurationVar(&o.TCPConnectTimeout, prefix+"bootstrap.transport.tcp-connect-timeout", o.TCPConnectTimeout, "Maximum amount of time to wait for a TCP connection to be established")
+	fs.StringToStringVar(&o.TCPServers, prefix+"bootstrap.transport.tcp-servers", o.TCPServers, "Map of node IDs to raft addresses to bootstrap with")
+	fs.StringToIntVar(&o.ServerGRPCPorts, prefix+"bootstrap.transport.server-grpc-ports", o.ServerGRPCPorts, "Map of node IDs to gRPC ports to bootstrap with")
+	fs.StringVar(&o.Rendezvous, prefix+"bootstrap.transport.rendezvous", o.Rendezvous, "Rendezvous string to use when using libp2p to bootstrap")
+	fs.StringSliceVar(&o.RendezvousNodes, prefix+"bootstrap.transport.rendezvous-nodes", o.RendezvousNodes, "List of node IDs to use when using libp2p to bootstrap")
+	fs.DurationVar(&o.RendezvousLinger, prefix+"bootstrap.transport.rendezvous-linger", o.RendezvousLinger, "Amount of time to wait for other nodes to join when using libp2p to bootstrap")
+	fs.StringVar(&o.PSK, prefix+"bootstrap.transport.psk", o.PSK, "Pre-shared key to use when using libp2p to bootstrap")
 }
 
 // Validate validates the bootstrap options.
 func (o *BootstrapOptions) Validate() error {
-	if !o.Enabled {
+	if o == nil || !o.Enabled {
 		return nil
 	}
 	if o.IPv4Network == "" {
 		return fmt.Errorf("ipv4 network must be set when bootstrapping")
 	}
-	if _, _, err := net.ParseCIDR(o.IPv4Network); err != nil {
+	if ip, _, err := net.ParseCIDR(o.IPv4Network); err != nil {
 		return fmt.Errorf("ipv4 network must be a valid CIDR")
+	} else if ip.To4() == nil {
+		return fmt.Errorf("ipv4 network must be a valid IPv4 CIDR")
 	}
 	if o.MeshDomain == "" {
 		return fmt.Errorf("mesh domain must be set when bootstrapping")
 	}
 	if o.Admin == "" {
 		return fmt.Errorf("admin must be set when bootstrapping")
+	}
+	if !types.IsValidNodeID(o.Admin) {
+		return fmt.Errorf("admin must be a valid node or user name")
 	}
 	if o.DefaultNetworkPolicy == "" {
 		return fmt.Errorf("default network policy must be set when bootstrapping")
@@ -171,7 +183,7 @@ func (o *BootstrapOptions) Validate() error {
 }
 
 // Validate validates the bootstrap transport options.
-func (o *BootstrapTransportOptions) Validate() error {
+func (o BootstrapTransportOptions) Validate() error {
 	if o.Rendezvous != "" || o.PSK != "" {
 		// Validate libp2p options
 		if len(o.RendezvousNodes) == 0 {

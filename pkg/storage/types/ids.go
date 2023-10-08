@@ -40,7 +40,7 @@ func IsValidID(id string) bool {
 		return false
 	}
 	// Make sure all characters are valid UTF-8.
-	if validated := strings.ToValidUTF8(id, "/"); validated != id {
+	if validated := strings.ToValidUTF8(id, ""); validated != id {
 		return false
 	}
 	for _, c := range InvalidIDChars {
