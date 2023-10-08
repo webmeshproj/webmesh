@@ -37,10 +37,11 @@ func ParseStorageQuery(query *v1.QueryRequest) (StorageQuery, error) {
 	if query.GetCommand() == v1.QueryRequest_GET {
 		// The filter should always contain an ID or pub key
 		// unless its for raw network or rbac state.
-		if query.GetType() != v1.QueryRequest_NETWORK_STATE && query.GetType() != v1.QueryRequest_RBAC_STATE {
-			if len(filters) == 0 {
-				return StorageQuery{}, errors.ErrInvalidQuery
-			}
+		if query.GetType() == v1.QueryRequest_NETWORK_STATE || query.GetType() == v1.QueryRequest_RBAC_STATE {
+			return StorageQuery{QueryRequest: query, filters: filters}, nil
+		}
+		if len(filters) == 0 {
+			return StorageQuery{}, errors.ErrInvalidQuery
 		}
 		if query.GetType() == v1.QueryRequest_EDGES {
 			// The query should have a source and target id
