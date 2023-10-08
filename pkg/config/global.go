@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // GlobalOptions are options that will be re-applied to all relevant configurations after parsing.
@@ -79,18 +80,18 @@ type GlobalOptions struct {
 // NewGlobalOptions creates a new GlobalOptions.
 func NewGlobalOptions() GlobalOptions {
 	return GlobalOptions{
-		LogLevel:               "info",
-		LogFormat:              "text",
-		TLSCertFile:            "",
-		TLSKeyFile:             "",
-		TLSCAFile:              "",
-		TLSClientCAFile:        "",
-		MTLS:                   false,
-		VerifyChainOnly:        false,
-		InsecureSkipVerify:     false,
-		Insecure:               false,
-		PrimaryEndpoint:        "",
-		Endpoints:              []string{},
+		LogLevel:           "info",
+		LogFormat:          "text",
+		TLSCertFile:        "",
+		TLSKeyFile:         "",
+		TLSCAFile:          "",
+		TLSClientCAFile:    "",
+		MTLS:               false,
+		VerifyChainOnly:    false,
+		InsecureSkipVerify: false,
+		Insecure:           false,
+		PrimaryEndpoint:    "",
+		// Endpoints:              []string{},
 		DetectEndpoints:        false,
 		DetectPrivateEndpoints: false,
 		AllowRemoteDetection:   false,
@@ -138,6 +139,12 @@ func (o *GlobalOptions) Validate() error {
 		}
 		if o.TLSCAFile == "" && o.TLSClientCAFile == "" {
 			return fmt.Errorf("mtls is enabled but no tls-ca-file is set")
+		}
+	}
+	if o.PrimaryEndpoint != "" {
+		_, err := netip.ParseAddr(o.PrimaryEndpoint)
+		if err != nil {
+			return fmt.Errorf("failed to parse primary endpoint: %w", err)
 		}
 	}
 	return nil
@@ -190,13 +197,13 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 	}
 
 	// If the primary endpoint was detected, set it to the appropriate places
-	if primaryEndpoint.IsValid() {
+	if primaryEndpoint.IsValid() || len(global.Endpoints) > 0 {
 		// If the mesh primary endpoint was not set yet, set it
 		if o.Mesh.PrimaryEndpoint == "" {
 			o.Mesh.PrimaryEndpoint = primaryEndpoint.String()
 		}
 		// If the bootstrap advertise address was not set yet, set it
-		if o.Bootstrap.Enabled && o.Bootstrap.Transport.TCPAdvertiseAddress == "" {
+		if o.Bootstrap.Enabled && (o.Bootstrap.Transport.TCPAdvertiseAddress == "" || o.Bootstrap.Transport.TCPAdvertiseAddress == storage.DefaultBootstrapAdvertiseAddress) {
 			_, port, err := net.SplitHostPort(o.Bootstrap.Transport.TCPListenAddress)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse bootstrap listen address: %w", err)
@@ -211,6 +218,9 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 			for _, endpoint := range detectedEndpoints {
 				eps = append(eps, net.JoinHostPort(endpoint.Addr().String(), strconv.Itoa(wgPort)))
 			}
+			for _, endpoint := range global.Endpoints {
+				eps = append(eps, net.JoinHostPort(endpoint, strconv.Itoa(wgPort)))
+			}
 			o.WireGuard.Endpoints = eps
 		}
 		if o.Services.TURN.Enabled {
@@ -221,7 +231,7 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 			}
 			// If the TURN endpoint was not set yet, set it
 			if o.Services.TURN.Endpoint == "" {
-				o.Services.TURN.Endpoint = "turn:" + net.JoinHostPort(primaryEndpoint.String(), port)
+				o.Services.TURN.Endpoint = "stun:" + net.JoinHostPort(primaryEndpoint.String(), port)
 			}
 			// Same for the public IP
 			if o.Services.TURN.PublicIP == "" {
@@ -320,15 +330,16 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 		}
 		meshDNSPort = zport
 	}
-	for _, bridgeOpts := range o.Bridge.Meshes {
+	for id, bridgeOpts := range o.Bridge.Meshes {
 		// First set the advertise port, then recurse on ApplyGlobals
 		if bridgeOpts.Mesh.MeshDNSAdvertisePort == 0 {
 			bridgeOpts.Mesh.MeshDNSAdvertisePort = meshDNSPort
 		}
-		if _, err := global.ApplyGlobals(bridgeOpts); err != nil {
+		overlay, err := global.ApplyGlobals(bridgeOpts)
+		if err != nil {
 			return nil, err
 		}
+		o.Bridge.Meshes[id] = overlay
 	}
-
 	return o, nil
 }

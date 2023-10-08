@@ -155,7 +155,8 @@ func (o *Config) Validate() error {
 	if !o.Bootstrap.Enabled && o.Mesh.JoinAddress == "" && (!o.Discovery.Discover || o.Discovery.Rendezvous == "") && len(o.Bridge.Meshes) == 0 {
 		return ErrNoMesh
 	}
-	err := o.Global.Validate()
+	var err error
+	err = o.Global.Validate()
 	if err != nil {
 		return fmt.Errorf("invalid global options: %w", err)
 	}

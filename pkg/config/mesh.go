@@ -151,11 +151,10 @@ func (o *MeshOptions) Validate() error {
 	if o == nil {
 		return fmt.Errorf("mesh options are required")
 	}
-	if o.NodeID == "" {
-		return fmt.Errorf("node ID is required")
-	}
-	if !types.IsValidNodeID(o.NodeID) {
-		return fmt.Errorf("invalid node ID")
+	if o.NodeID != "" {
+		if !types.IsValidNodeID(o.NodeID) {
+			return fmt.Errorf("invalid node ID")
+		}
 	}
 	if o.DisableIPv4 && o.DisableIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")

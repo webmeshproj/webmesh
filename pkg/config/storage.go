@@ -101,7 +101,7 @@ func (o *StorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 }
 
 // Validate validates the storage options.
-func (o *StorageOptions) Validate(isMember bool) error {
+func (o StorageOptions) Validate(isMember bool) error {
 	provider := StorageProvider(o.Provider)
 	if !provider.IsValid() {
 		return fmt.Errorf("invalid storage provider: %s", o.Provider)
@@ -122,7 +122,7 @@ func (o *StorageOptions) Validate(isMember bool) error {
 }
 
 // ListenPort returns the port to listen on for the storage provider.
-func (o *StorageOptions) ListenPort() int {
+func (o StorageOptions) ListenPort() int {
 	if o.Provider == string(StorageProviderRaft) || o.Provider == "" {
 		return o.Raft.ListenPort()
 	}
@@ -149,7 +149,7 @@ func (o *Config) NewStorageProvider(ctx context.Context, node meshnode.Node, for
 }
 
 // NewRaftStorageProvider returns a new raftstorage provider for the current configuration.
-func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, node meshnode.Node, force bool) (storage.Provider, error) {
+func (o StorageOptions) NewRaftStorageProvider(ctx context.Context, node meshnode.Node, force bool) (storage.Provider, error) {
 	opts, err := o.NewRaftOptions(ctx, node, force)
 	if err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ func (o *StorageOptions) NewRaftStorageProvider(ctx context.Context, node meshno
 }
 
 // NewExternalStorageProvider returns a new external storage provider for the current configuration.
-func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID types.NodeID) (storage.Provider, error) {
+func (o StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID types.NodeID) (storage.Provider, error) {
 	opts, err := o.NewExternalStorageOptions(ctx, nodeID)
 	if err != nil {
 		return nil, err
@@ -167,7 +167,7 @@ func (o *StorageOptions) NewExternalStorageProvider(ctx context.Context, nodeID 
 }
 
 // NewRaftOptions returns a new raft options for the current configuration.
-func (o *StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node, force bool) (raftstorage.Options, error) {
+func (o StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node, force bool) (raftstorage.Options, error) {
 	raftTransport, err := o.Raft.NewTransport(node)
 	if err != nil {
 		return raftstorage.Options{}, fmt.Errorf("create raft transport: %w", err)
@@ -194,7 +194,7 @@ func (o *StorageOptions) NewRaftOptions(ctx context.Context, node meshnode.Node,
 }
 
 // NewPassthroughOptions returns a new passthrough options for the current configuration.
-func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, node meshnode.Node) passthroughstorage.Options {
+func (o StorageOptions) NewPassthroughOptions(ctx context.Context, node meshnode.Node) passthroughstorage.Options {
 	return passthroughstorage.Options{
 		Dialer:    node,
 		LogLevel:  o.LogLevel,
@@ -203,7 +203,7 @@ func (o *StorageOptions) NewPassthroughOptions(ctx context.Context, node meshnod
 }
 
 // NewExternalStorageOptions creates a new external storage options.
-func (o *StorageOptions) NewExternalStorageOptions(ctx context.Context, nodeID types.NodeID) (extstorage.Options, error) {
+func (o StorageOptions) NewExternalStorageOptions(ctx context.Context, nodeID types.NodeID) (extstorage.Options, error) {
 	opts := extstorage.Options{
 		NodeID:    nodeID,
 		Server:    o.External.Server,

@@ -101,7 +101,7 @@ func (o *RaftOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 }
 
 // Validate validates the options.
-func (o *RaftOptions) Validate(dataDir string, inMemory bool) error {
+func (o RaftOptions) Validate(dataDir string, inMemory bool) error {
 	if o.ListenAddress == "" {
 		return fmt.Errorf("raft.listen-address is required")
 	}
@@ -116,7 +116,7 @@ func (o *RaftOptions) Validate(dataDir string, inMemory bool) error {
 }
 
 // NewTransport creates a new raft transport for the current configuration.
-func (o *RaftOptions) NewTransport(conn meshnode.Node) (transport.RaftTransport, error) {
+func (o RaftOptions) NewTransport(conn meshnode.Node) (transport.RaftTransport, error) {
 	return tcp.NewRaftTransport(conn, tcp.RaftTransportOptions{
 		Addr:    o.ListenAddress,
 		MaxPool: o.ConnectionPoolCount,
@@ -125,7 +125,7 @@ func (o *RaftOptions) NewTransport(conn meshnode.Node) (transport.RaftTransport,
 }
 
 // ListenPort returns the listen port.
-func (o *RaftOptions) ListenPort() int {
+func (o RaftOptions) ListenPort() int {
 	addr, err := netip.ParseAddrPort(o.ListenAddress)
 	if err != nil {
 		return 0

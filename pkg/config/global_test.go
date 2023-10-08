@@ -49,6 +49,13 @@ func TestGlobalOptionsValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "InvalidPrimaryEndpoint",
+			opts: &GlobalOptions{
+				PrimaryEndpoint: "invalid",
+			},
+			wantErr: true,
+		},
+		{
 			name: "MTLSNoCertFile",
 			opts: &GlobalOptions{
 				MTLS:        true,
@@ -105,4 +112,81 @@ func TestGlobalOptionsValidate(t *testing.T) {
 
 func TestApplyGlobalOptions(t *testing.T) {
 	t.Parallel()
+
+	t.Run("ProtocolPreferences", func(t *testing.T) {
+		t.Parallel()
+		opts := NewDefaultConfig("test")
+		opts.Global.DisableIPv4 = true
+		opts, err := opts.Global.ApplyGlobals(opts)
+		if err != nil {
+			t.Errorf("ApplyGlobals() error = %v", err)
+		}
+		if opts.Mesh.DisableIPv4 != true {
+			t.Errorf("ApplyGlobals() expected DisableIPv4 to be true")
+		}
+		opts.Global.DisableIPv4 = false
+		opts.Global.DisableIPv6 = true
+		opts, err = opts.Global.ApplyGlobals(opts)
+		if err != nil {
+			t.Errorf("ApplyGlobals() error = %v", err)
+		}
+		if opts.Mesh.DisableIPv6 != true {
+			t.Errorf("ApplyGlobals() expected DisableIPv6 to be true")
+		}
+	})
+
+	t.Run("PrimaryEndpoints", func(t *testing.T) {
+		t.Parallel()
+		t.Run("InvalidPrimaryEndpoint", func(t *testing.T) {
+			t.Parallel()
+			opts := NewDefaultConfig("test")
+			opts.Global.PrimaryEndpoint = "invalid"
+			_, err := opts.Global.ApplyGlobals(opts)
+			if err == nil {
+				t.Errorf("ApplyGlobals() expected error")
+			}
+		})
+		t.Run("ValidPrimaryEndpoint", func(t *testing.T) {
+			t.Parallel()
+			opts := NewDefaultConfig("test")
+			opts.Bootstrap.Enabled = true
+			opts.Bootstrap.Transport.TCPListenAddress = "[::]:9090"
+			opts.Global.PrimaryEndpoint = "127.0.0.1"
+			opts.WireGuard.ListenPort = 1234
+			opts.Services.TURN.Enabled = true
+			opts.Services.TURN.ListenAddress = "[::]:3478"
+			opts, err := opts.Global.ApplyGlobals(opts)
+			if err != nil {
+				t.Errorf("ApplyGlobals() error = %v", err)
+			}
+			if opts.Mesh.PrimaryEndpoint != "127.0.0.1" {
+				t.Errorf("ApplyGlobals() expected Mesh.PrimaryEndpoint to be 127.0.0.1, got: %s", opts.Mesh.PrimaryEndpoint)
+			}
+			if opts.Bootstrap.Transport.TCPAdvertiseAddress != "127.0.0.1:9090" {
+				t.Errorf("ApplyGlobals() expected Bootstrap.Transport.TCPAdvertiseAddress to be 127.0.0.1:9090, got: %s", opts.Bootstrap.Transport.TCPAdvertiseAddress)
+			}
+			if len(opts.WireGuard.Endpoints) != 1 {
+				t.Fatal("ApplyGlobals() expected exactly one WireGuard endpoint")
+			}
+			if opts.WireGuard.Endpoints[0] != "127.0.0.1:1234" {
+				t.Errorf("ApplyGlobals() expected WireGuard endpoint to be 127.0.0.1:1234 got: %s", opts.WireGuard.Endpoints[0])
+			}
+			if opts.Services.TURN.Endpoint != "stun:127.0.0.1:3478" {
+				t.Errorf("ApplyGlobals() expected TURN endpoint to be stun:127.0.0.1:3478 got: %s", opts.Services.TURN.Endpoint)
+			}
+			if opts.Services.TURN.PublicIP != "127.0.0.1" {
+				t.Errorf("ApplyGlobals() expected TURN public IP to be 127.0.0.1 got: %s", opts.Services.TURN.PublicIP)
+			}
+		})
+	})
+
+	t.Run("EndpointDetection", func(t *testing.T) {})
+
+	t.Run("LogPreferences", func(t *testing.T) {})
+
+	t.Run("TLSOptions", func(t *testing.T) {})
+
+	t.Run("MTLSOptions", func(t *testing.T) {})
+
+	t.Run("AdvertisePorts", func(t *testing.T) {})
 }

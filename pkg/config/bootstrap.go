@@ -110,7 +110,7 @@ func NewBootstrapOptions() BootstrapOptions {
 // NewBootstrapTransportOptions returns a new BootstrapTransportOptions with the default values.
 func NewBootstrapTransportOptions() BootstrapTransportOptions {
 	return BootstrapTransportOptions{
-		TCPAdvertiseAddress: net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", storage.DefaultBootstrapPort)),
+		TCPAdvertiseAddress: storage.DefaultBootstrapAdvertiseAddress,
 		TCPListenAddress:    storage.DefaultBootstrapListenAddress,
 		TCPServers:          map[string]string{},
 		TCPConnectionPool:   0,

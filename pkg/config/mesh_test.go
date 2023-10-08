@@ -48,7 +48,7 @@ func TestMeshConfigValidation(t *testing.T) {
 		{
 			name:    "NoNodeID",
 			cfg:     &defaultsNoID,
-			wantErr: true,
+			wantErr: false, // We attempt to generate one
 		},
 		{
 			name:    "InvalidNodeID",
