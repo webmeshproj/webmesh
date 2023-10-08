@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/mtls"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
@@ -259,6 +260,14 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 			o.Plugins.Configs["mtls"] = PluginConfig{
 				Config: map[string]any{
 					"ca-file": func() string {
+						if global.TLSClientCAFile != "" {
+							return global.TLSClientCAFile
+						}
+						return global.TLSCAFile
+					}(),
+				},
+				builtinConfig: &mtls.Config{
+					CAFile: func() string {
 						if global.TLSClientCAFile != "" {
 							return global.TLSClientCAFile
 						}
