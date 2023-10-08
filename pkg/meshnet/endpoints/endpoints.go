@@ -50,6 +50,26 @@ func (a PrefixList) FirstPublicAddr() netip.Addr {
 	return netip.Addr{}
 }
 
+func (a PrefixList) PublicAddrs() []netip.Addr {
+	var out []netip.Addr
+	for _, prefix := range a {
+		if !prefix.Addr().IsPrivate() {
+			out = append(out, prefix.Addr())
+		}
+	}
+	return out
+}
+
+func (a PrefixList) PrivateAddrs() []netip.Addr {
+	var out []netip.Addr
+	for _, prefix := range a {
+		if prefix.Addr().IsPrivate() {
+			out = append(out, prefix.Addr())
+		}
+	}
+	return out
+}
+
 func (a PrefixList) Contains(addr netip.Addr) bool {
 	for _, prefix := range a {
 		if prefix.Addr().Compare(addr) == 0 || prefix.Contains(addr) {
@@ -107,8 +127,16 @@ func (a PrefixList) WebmeshMultiaddrs(proto string, port uint16, peerID peer.ID)
 func (a PrefixList) Len() int      { return len(a) }
 func (a PrefixList) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
-// Sort by IPv4 addresses first, then IPv6 addresses.
+// Sort by Public addresses first. Then IPv4 addresses and finally IPv6 addresses.
 func (a PrefixList) Less(i, j int) bool {
+	iispub := !a[i].Addr().IsPrivate()
+	jispub := !a[j].Addr().IsPrivate()
+	if iispub && !jispub {
+		return true
+	}
+	if !iispub && jispub {
+		return false
+	}
 	iis4 := a[i].Addr().Is4()
 	jis4 := a[j].Addr().Is4()
 	if iis4 && !jis4 {

@@ -291,7 +291,7 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 	// Service advertisements
 
 	// Set the gRPC advertise port if it is still zero.
-	if o.Mesh.GRPCAdvertisePort == 0 {
+	if o.Mesh.GRPCAdvertisePort == 0 && !o.Mesh.DisableFeatureAdvertisement {
 		_, port, err := net.SplitHostPort(o.Services.API.ListenAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse gRPC listen address: %w", err)

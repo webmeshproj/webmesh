@@ -86,12 +86,22 @@ func TestGlobalOptionsValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "MTLSValid",
+			name: "MTLSValidCAFile",
 			opts: &GlobalOptions{
 				MTLS:        true,
 				TLSCertFile: "certfile",
 				TLSKeyFile:  "keyfile",
 				TLSCAFile:   "cafile",
+			},
+			wantErr: false,
+		},
+		{
+			name: "MTLSValidClientCAFile",
+			opts: &GlobalOptions{
+				MTLS:            true,
+				TLSCertFile:     "certfile",
+				TLSKeyFile:      "keyfile",
+				TLSClientCAFile: "cafile",
 			},
 			wantErr: false,
 		},
@@ -180,13 +190,147 @@ func TestApplyGlobalOptions(t *testing.T) {
 		})
 	})
 
-	t.Run("EndpointDetection", func(t *testing.T) {})
+	t.Run("LogPreferences", func(t *testing.T) {
+		t.Parallel()
+		opts := NewDefaultConfig("test")
+		opts.Global.LogLevel = "test"
+		opts.Global.LogFormat = "test"
+		opts, err := opts.Global.ApplyGlobals(opts)
+		if err != nil {
+			t.Errorf("ApplyGlobals() error = %v", err)
+		}
+		if opts.Storage.LogLevel != "test" {
+			t.Errorf("ApplyGlobals() expected Storage.LogLevel to be test, got: %s", opts.Storage.LogLevel)
+		}
+		if opts.Storage.LogFormat != "test" {
+			t.Errorf("ApplyGlobals() expected Storage.LogFormat to be test, got: %s", opts.Storage.LogFormat)
+		}
+	})
 
-	t.Run("LogPreferences", func(t *testing.T) {})
+	t.Run("MTLSOptions", func(t *testing.T) {
+		t.Parallel()
 
-	t.Run("TLSOptions", func(t *testing.T) {})
+		t.Run("WithCAFile", func(t *testing.T) {
+			t.Parallel()
+			opts := NewDefaultConfig("test")
+			opts.Global.MTLS = true
+			opts.Global.TLSCertFile = "certfile"
+			opts.Global.TLSKeyFile = "keyfile"
+			opts.Global.TLSCAFile = "cafile"
+			opts, err := opts.Global.ApplyGlobals(opts)
+			if err != nil {
+				t.Errorf("ApplyGlobals() error = %v", err)
+			}
+			if opts.Auth.MTLS.CertFile != "certfile" {
+				t.Errorf("ApplyGlobals() expected Auth.MTLS.TLSCertFile to be certfile, got: %s", opts.Auth.MTLS.CertFile)
+			}
+			if opts.Auth.MTLS.KeyFile != "keyfile" {
+				t.Errorf("ApplyGlobals() expected Auth.MTLS.TLSKeyFile to be keyfile, got: %s", opts.Auth.MTLS.KeyFile)
+			}
+			mtlsPlug, ok := opts.Plugins.Configs["mtls"]
+			if !ok {
+				t.Fatal("ApplyGlobals() expected mtls plugin to be configured")
+			}
+			caFile, ok := mtlsPlug.Config["ca-file"]
+			if !ok {
+				t.Fatal("ApplyGlobals() expected mtls plugin to be configured with a ca-file")
+			}
+			if caFile != "cafile" {
+				t.Errorf("ApplyGlobals() expected mtls plugin ca-file to be cafile, got: %s", caFile)
+			}
+		})
 
-	t.Run("MTLSOptions", func(t *testing.T) {})
+		t.Run("WithClientCAFile", func(t *testing.T) {
+			t.Parallel()
+			opts := NewDefaultConfig("test")
+			opts.Global.MTLS = true
+			opts.Global.TLSCertFile = "certfile"
+			opts.Global.TLSKeyFile = "keyfile"
+			opts.Global.TLSClientCAFile = "clientcafile"
+			opts, err := opts.Global.ApplyGlobals(opts)
+			if err != nil {
+				t.Errorf("ApplyGlobals() error = %v", err)
+			}
+			if opts.Auth.MTLS.CertFile != "certfile" {
+				t.Errorf("ApplyGlobals() expected Auth.MTLS.TLSCertFile to be certfile, got: %s", opts.Auth.MTLS.CertFile)
+			}
+			if opts.Auth.MTLS.KeyFile != "keyfile" {
+				t.Errorf("ApplyGlobals() expected Auth.MTLS.TLSKeyFile to be keyfile, got: %s", opts.Auth.MTLS.KeyFile)
+			}
+			mtlsPlug, ok := opts.Plugins.Configs["mtls"]
+			if !ok {
+				t.Fatal("ApplyGlobals() expected mtls plugin to be configured")
+			}
+			caFile, ok := mtlsPlug.Config["ca-file"]
+			if !ok {
+				t.Fatal("ApplyGlobals() expected mtls plugin to be configured with a ca-file")
+			}
+			if caFile != "clientcafile" {
+				t.Errorf("ApplyGlobals() expected mtls plugin ca-file to be cafile, got: %s", caFile)
+			}
+		})
+	})
 
-	t.Run("AdvertisePorts", func(t *testing.T) {})
+	t.Run("TLSOptions", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("Insecure", func(t *testing.T) {
+			t.Parallel()
+			opts := NewDefaultConfig("test")
+			opts.Global.Insecure = true
+			opts, err := opts.Global.ApplyGlobals(opts)
+			if err != nil {
+				t.Errorf("ApplyGlobals() error = %v", err)
+			}
+			if opts.TLS.Insecure != true {
+				t.Errorf("ApplyGlobals() expected TLS.Insecure to be true, got: %v", opts.TLS.Insecure)
+			}
+			if opts.Services.API.Insecure != true {
+				t.Errorf("ApplyGlobals() expected Services.API.Insecure to be true, got: %v", opts.Services.API.Insecure)
+			}
+		})
+
+		t.Run("SkipVerify", func(t *testing.T) {
+			t.Parallel()
+			opts := NewDefaultConfig("test")
+			opts.Global.InsecureSkipVerify = true
+			opts, err := opts.Global.ApplyGlobals(opts)
+			if err != nil {
+				t.Errorf("ApplyGlobals() error = %v", err)
+			}
+			if opts.TLS.InsecureSkipVerify != true {
+				t.Errorf("ApplyGlobals() expected TLS.InsecureSkipVerify to be true, got: %v", opts.TLS.InsecureSkipVerify)
+			}
+		})
+
+		t.Run("VerifyChainOnly", func(t *testing.T) {
+			t.Parallel()
+			opts := NewDefaultConfig("test")
+			opts.Global.VerifyChainOnly = true
+			opts, err := opts.Global.ApplyGlobals(opts)
+			if err != nil {
+				t.Errorf("ApplyGlobals() error = %v", err)
+			}
+			if opts.TLS.VerifyChainOnly != true {
+				t.Errorf("ApplyGlobals() expected TLS.VerifyChainOnly to be true, got: %v", opts.TLS.VerifyChainOnly)
+			}
+		})
+
+		t.Run("KeyPair", func(t *testing.T) {
+			t.Parallel()
+			opts := NewDefaultConfig("test")
+			opts.Global.TLSCertFile = "certfile"
+			opts.Global.TLSKeyFile = "keyfile"
+			opts, err := opts.Global.ApplyGlobals(opts)
+			if err != nil {
+				t.Errorf("ApplyGlobals() error = %v", err)
+			}
+			if opts.Services.API.TLSCertFile != "certfile" {
+				t.Errorf("ApplyGlobals() expected Services.API.TLSCertFile to be certfile, got: %s", opts.Services.API.TLSCertFile)
+			}
+			if opts.Services.API.TLSKeyFile != "keyfile" {
+				t.Errorf("ApplyGlobals() expected Services.API.TLSKeyFile to be keyfile, got: %s", opts.Services.API.TLSKeyFile)
+			}
+		})
+	})
 }
