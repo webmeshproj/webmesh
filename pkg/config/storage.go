@@ -274,7 +274,7 @@ func (o *ExternalStorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 }
 
 // Validate validates the external storage options.
-func (o *ExternalStorageOptions) Validate() error {
+func (o ExternalStorageOptions) Validate() error {
 	if o.Server == "" {
 		return fmt.Errorf("external storage server is required")
 	}
@@ -282,7 +282,7 @@ func (o *ExternalStorageOptions) Validate() error {
 }
 
 // NewTLSConfig creates a new TLS config from the options.
-func (o *ExternalStorageOptions) NewTLSConfig(ctx context.Context) (*tls.Config, error) {
+func (o ExternalStorageOptions) NewTLSConfig(ctx context.Context) (*tls.Config, error) {
 	var conf tls.Config
 	var roots *x509.CertPool
 	var err error
