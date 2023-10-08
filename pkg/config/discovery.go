@@ -66,13 +66,13 @@ func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 
 // BindFlags binds the flags for the discovery options.
 func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.BoolVar(&o.Announce, prefix+"discovery.announce", false, "announce this peer to the discovery service")
-	fs.StringVar(&o.Rendezvous, prefix+"discovery.rendezvous", "", "pre-shared key to use as a rendezvous point for peer discovery")
-	fs.BoolVar(&o.Discover, prefix+"discovery.discover", false, "use the libp2p kademlia DHT for discovery")
-	fs.StringSliceVar(&o.BootstrapServers, prefix+"discovery.bootstrap-servers", nil, "list of bootstrap servers to use for the DHT")
-	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", time.Minute, "TTL for the announcement")
-	fs.StringSliceVar(&o.LocalAddrs, prefix+"discovery.local-addrs", nil, "list of local addresses to announce to the discovery service")
-	fs.DurationVar(&o.ConnectTimeout, prefix+"discovery.connect-timeout", 5*time.Second, "timeout for connecting to a peer")
+	fs.BoolVar(&o.Announce, prefix+"discovery.announce", o.Announce, "announce this peer to the discovery service")
+	fs.StringVar(&o.Rendezvous, prefix+"discovery.rendezvous", o.Rendezvous, "pre-shared key to use as a rendezvous point for peer discovery")
+	fs.BoolVar(&o.Discover, prefix+"discovery.discover", o.Discover, "use the libp2p kademlia DHT for discovery")
+	fs.StringSliceVar(&o.BootstrapServers, prefix+"discovery.bootstrap-servers", o.BootstrapServers, "list of bootstrap servers to use for the DHT")
+	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", o.AnnounceTTL, "TTL for the announcement")
+	fs.StringSliceVar(&o.LocalAddrs, prefix+"discovery.local-addrs", o.LocalAddrs, "list of local addresses to announce to the discovery service")
+	fs.DurationVar(&o.ConnectTimeout, prefix+"discovery.connect-timeout", o.ConnectTimeout, "timeout for connecting to a peer")
 }
 
 // NewHostConfig returns a new HostOptions for the discovery config.
@@ -109,22 +109,20 @@ func (o *DiscoveryOptions) HostOptions(ctx context.Context, key crypto.PrivateKe
 
 // Validate validates the discovery options.
 func (o *DiscoveryOptions) Validate() error {
-	if len(o.BootstrapServers) > 0 {
-		// Make sure all the addresses are valid
-		for _, addr := range o.BootstrapServers {
-			_, err := multiaddr.NewMultiaddr(addr)
-			if err != nil {
-				return fmt.Errorf("invalid bootstrap server address: %w", err)
-			}
-		}
+	if o == nil {
+		return nil
 	}
-	if o.Discover || o.Announce {
-		if o.Rendezvous == "" {
-			return fmt.Errorf("rendezvous must be set when using the kademlia DHT")
-		}
-		if o.Announce && o.AnnounceTTL <= 0 {
-			return fmt.Errorf("announce TTL must be greater than zero")
-		}
+	if !o.Discover && !o.Announce {
+		return nil
+	}
+	if o.Rendezvous == "" {
+		return fmt.Errorf("rendezvous must be set when using the kademlia DHT")
+	}
+	if o.Announce && o.AnnounceTTL <= 0 {
+		return fmt.Errorf("announce TTL must be greater than zero")
+	}
+	if o.ConnectTimeout <= 0 {
+		return fmt.Errorf("connect timeout must be greater than zero")
 	}
 	if len(o.LocalAddrs) > 0 {
 		// Make sure all the addresses are valid
