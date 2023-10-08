@@ -301,9 +301,23 @@ func (s *meshStore) Credentials() []grpc.DialOption {
 }
 
 func (s *meshStore) dialWithLocalStorage(ctx context.Context, nodeID types.NodeID) (*grpc.ClientConn, error) {
-	node, err := s.Storage().MeshDB().Peers().Get(ctx, nodeID)
-	if err != nil {
-		return nil, fmt.Errorf("get node private rpc address: %w", err)
+	var node types.MeshNode
+	var err error
+	if nodeID == "" {
+		// This is a request for any storage providing node.
+		nodes, err := s.Storage().MeshDB().Peers().List(ctx, storage.FilterByFeature(v1.Feature_STORAGE_PROVIDER))
+		if err != nil {
+			return nil, fmt.Errorf("list storage providers: %w", err)
+		}
+		if len(nodes) == 0 {
+			return nil, fmt.Errorf("no storage providers found")
+		}
+		node = nodes[0]
+	} else {
+		node, err = s.Storage().MeshDB().Peers().Get(ctx, nodeID)
+		if err != nil {
+			return nil, fmt.Errorf("get node private rpc address: %w", err)
+		}
 	}
 	if s.opts.DisableIPv4 {
 		addr := node.PrivateRPCAddrV6()
@@ -338,7 +352,7 @@ func (s *meshStore) dialWithWireguardPeers(ctx context.Context, nodeID types.Nod
 			// This may change in the future.
 			continue
 		}
-		// An empty node ID means any peer is acceptable, but this should be more controlled
+		// An empty node ID means any storage peer is acceptable, but this should be more controlled
 		// so retries can ensure a connection to a different peer.
 		if nodeID == "" || id == nodeID.String() {
 			toDial = &peer
