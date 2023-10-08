@@ -26,7 +26,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
-func (s *Server) GetStorageConfiguration(ctx context.Context, _ *v1.StorageConfigurationRequest) (*v1.StorageConfigurationResponse, error) {
+func (s *Server) GetCurrentConsensus(ctx context.Context, _ *v1.StorageConsensusRequest) (*v1.StorageConsensusResponse, error) {
 	if !context.IsInNetwork(ctx, s.meshnet) {
 		addr, _ := context.PeerAddrFrom(ctx)
 		s.log.Warn("Received GetStorageConfiguration request from out of network", slog.String("peer", addr.String()))
@@ -34,14 +34,15 @@ func (s *Server) GetStorageConfiguration(ctx context.Context, _ *v1.StorageConfi
 	}
 	storageStatus := s.storage.Status()
 	s.log.Debug("Handling GetStorageConfiguration request", slog.Any("current-status", storageStatus))
-	resp := &v1.StorageConfigurationResponse{
+	resp := &v1.StorageConsensusResponse{
 		Servers: make([]*v1.StorageServer, 0),
 	}
 	for _, srv := range storageStatus.GetPeers() {
 		resp.Servers = append(resp.Servers, &v1.StorageServer{
-			Id:       srv.GetId(),
-			Address:  srv.GetAddress(),
-			Suffrage: srv.GetClusterStatus(),
+			Id:        srv.GetId(),
+			PublicKey: srv.GetPublicKey(),
+			Address:   srv.GetAddress(),
+			Suffrage:  srv.GetClusterStatus(),
 		})
 	}
 	return resp, nil

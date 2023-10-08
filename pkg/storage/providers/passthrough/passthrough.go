@@ -147,7 +147,7 @@ func (p *Provider) Status() *v1.StorageStatus {
 	return &status
 }
 
-func (p *Provider) getConfiguration() (*v1.StorageConfigurationResponse, error) {
+func (p *Provider) getConfiguration() (*v1.StorageConsensusResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, err := p.Options.Dialer.DialNode(ctx, "")
@@ -155,7 +155,7 @@ func (p *Provider) getConfiguration() (*v1.StorageConfigurationResponse, error) 
 		return nil, err
 	}
 	cli := v1.NewMembershipClient(c)
-	config, err := cli.GetStorageConfiguration(ctx, &v1.StorageConfigurationRequest{})
+	config, err := cli.GetCurrentConsensus(ctx, &v1.StorageConsensusRequest{})
 	if err != nil {
 		return nil, err
 	}

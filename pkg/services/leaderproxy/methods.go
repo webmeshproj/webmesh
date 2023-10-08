@@ -39,7 +39,7 @@ func RouteRequiresInNetworkSource(route string) bool {
 		route == v1.Membership_Leave_FullMethodName ||
 		route == v1.Membership_Apply_FullMethodName ||
 		route == v1.Membership_SubscribePeers_FullMethodName ||
-		route == v1.Membership_GetStorageConfiguration_FullMethodName ||
+		route == v1.Membership_GetCurrentConsensus_FullMethodName ||
 		route == v1.Node_NegotiateDataChannel_FullMethodName ||
 		route == v1.StorageQueryService_Query_FullMethodName ||
 		route == v1.StorageQueryService_Publish_FullMethodName ||
@@ -49,12 +49,12 @@ func RouteRequiresInNetworkSource(route string) bool {
 // MethodPolicyMap is a map of method names to their MethodPolicy.
 var MethodPolicyMap = map[string]MethodPolicy{
 	// Membership API
-	v1.Membership_Join_FullMethodName:                    RequireLeader,
-	v1.Membership_Update_FullMethodName:                  RequireLeader,
-	v1.Membership_Leave_FullMethodName:                   RequireLeader,
-	v1.Membership_Apply_FullMethodName:                   RequireLeader,
-	v1.Membership_SubscribePeers_FullMethodName:          AllowNonLeader,
-	v1.Membership_GetStorageConfiguration_FullMethodName: AllowNonLeader,
+	v1.Membership_Join_FullMethodName:                RequireLeader,
+	v1.Membership_Update_FullMethodName:              RequireLeader,
+	v1.Membership_Leave_FullMethodName:               RequireLeader,
+	v1.Membership_Apply_FullMethodName:               RequireLeader,
+	v1.Membership_SubscribePeers_FullMethodName:      AllowNonLeader,
+	v1.Membership_GetCurrentConsensus_FullMethodName: AllowNonLeader,
 
 	// Node API
 	v1.Node_GetStatus_FullMethodName:            RequireLocal,

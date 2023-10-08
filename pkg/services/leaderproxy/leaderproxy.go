@@ -148,8 +148,8 @@ func (i *Interceptor) proxyUnaryToLeader(ctx context.Context, req any, info *grp
 		return v1.NewMembershipClient(conn).Leave(ctx, req.(*v1.LeaveRequest))
 	case v1.Membership_Apply_FullMethodName:
 		return v1.NewMembershipClient(conn).Apply(ctx, req.(*v1.RaftLogEntry))
-	case v1.Membership_GetStorageConfiguration_FullMethodName:
-		return v1.NewMembershipClient(conn).GetStorageConfiguration(ctx, req.(*v1.StorageConfigurationRequest))
+	case v1.Membership_GetCurrentConsensus_FullMethodName:
+		return v1.NewMembershipClient(conn).GetCurrentConsensus(ctx, req.(*v1.StorageConsensusRequest))
 
 	// Node API
 	case v1.Node_GetStatus_FullMethodName:
