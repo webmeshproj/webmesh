@@ -244,6 +244,20 @@ func (ext *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 	return resp.GetPeers(), nil
 }
 
+// GetPeer returns the peer with the given ID.
+func (ext *Consensus) GetPeer(ctx context.Context, id string) (*v1.StoragePeer, error) {
+	peers, err := ext.GetPeers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, peer := range peers {
+		if peer.GetId() == id {
+			return peer, nil
+		}
+	}
+	return nil, errors.ErrNodeNotFound
+}
+
 // GetLeader returns the leader of the storage group.
 func (ext *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 	ext.mu.RLock()

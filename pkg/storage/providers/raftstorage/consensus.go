@@ -81,6 +81,20 @@ func (r *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 	return peers, nil
 }
 
+// GetPeer returns the peer with the given ID.
+func (r *Consensus) GetPeer(ctx context.Context, id string) (*v1.StoragePeer, error) {
+	peers, err := r.GetPeers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, peer := range peers {
+		if peer.GetId() == id {
+			return peer, nil
+		}
+	}
+	return nil, errors.ErrNodeNotFound
+}
+
 // GetLeader returns the leader of the cluster.
 func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
 	r.mu.RLock()

@@ -108,7 +108,7 @@ func (o *GlobalOptions) Validate() error {
 	if o.MTLS && o.TLSKeyFile == "" {
 		return fmt.Errorf("mtls is enabled but no tls-key-file is set")
 	}
-	if o.MTLS && (o.TLSCAFile == "" || o.TLSClientCAFile == "") {
+	if o.MTLS && (o.TLSCAFile == "" && o.TLSClientCAFile == "") {
 		return fmt.Errorf("mtls is enabled but no tls-ca-file is set")
 	}
 	return nil

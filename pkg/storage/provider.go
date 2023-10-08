@@ -78,12 +78,14 @@ type MeshDataStore interface {
 	Networking() Networking
 }
 
-// Consensus is the interface for configuring storage consensus.
+// Consensus is the interface for managing storage consensus.
 type Consensus interface {
 	// IsLeader returns true if the node is the leader of the storage group.
 	IsLeader() bool
 	// IsMember returns true if the node is a member of the storage group.
 	IsMember() bool
+	// GetPeer returns the peer with the given ID.
+	GetPeer(context.Context, string) (*v1.StoragePeer, error)
 	// GetPeers returns the peers of the storage group.
 	GetPeers(context.Context) ([]*v1.StoragePeer, error)
 	// GetLeader returns the leader of the storage group.
