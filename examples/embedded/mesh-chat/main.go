@@ -90,7 +90,7 @@ func runServer(loglevel string) error {
 	conf.TLS.Insecure = true
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
 
-	conn, err := embed.NewNode(context.Background(), embed.Options{Config: &conf})
+	conn, err := embed.NewNode(context.Background(), embed.Options{Config: conf})
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func runClient(loglevel string, join string) error {
 	conf.Mesh.JoinAddress = join
 	conf.TLS.Insecure = true
 
-	conn, err := embed.NewNode(context.Background(), embed.Options{Config: &conf})
+	conn, err := embed.NewNode(context.Background(), embed.Options{Config: conf})
 	if err != nil {
 		return err
 	}

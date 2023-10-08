@@ -66,6 +66,7 @@ type WireGuardOptions struct {
 func NewWireGuardOptions() WireGuardOptions {
 	return WireGuardOptions{
 		ListenPort:            wireguard.DefaultListenPort,
+		Modprobe:              false,
 		InterfaceName:         wireguard.DefaultInterfaceName,
 		ForceInterfaceName:    false,
 		ForceTUN:              false,
@@ -82,19 +83,19 @@ func NewWireGuardOptions() WireGuardOptions {
 
 // BindFlags binds the flags.
 func (o *WireGuardOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.IntVar(&o.ListenPort, prefix+"wireguard.listen-port", wireguard.DefaultListenPort, "The port to listen on.")
-	fs.BoolVar(&o.Modprobe, prefix+"wireguard.modprobe", false, "Attempt to load the wireguard kernel module on linux systems.")
-	fs.StringVar(&o.InterfaceName, prefix+"wireguard.interface-name", wireguard.DefaultInterfaceName, "The name of the interface.")
-	fs.BoolVar(&o.ForceInterfaceName, prefix+"wireguard.force-interface-name", false, "Force the use of the given name by deleting any pre-existing interface with the same name.")
-	fs.BoolVar(&o.ForceTUN, prefix+"wireguard.force-tun", false, "Force the use of a TUN interface.")
-	fs.BoolVar(&o.Masquerade, prefix+"wireguard.masquerade", false, "Enable masquerading of traffic from the wireguard interface.")
-	fs.DurationVar(&o.PersistentKeepAlive, prefix+"wireguard.persistent-keepalive", 0, "The interval at which to send keepalive packets to peers.")
-	fs.IntVar(&o.MTU, prefix+"wireguard.mtu", system.DefaultMTU, "The MTU to use for the interface.")
-	fs.StringSliceVar(&o.Endpoints, prefix+"wireguard.endpoints", nil, "Additional WireGuard endpoints to broadcast when joining.")
-	fs.StringVar(&o.KeyFile, prefix+"wireguard.key-file", "", "The path to the WireGuard private key. If it does not exist it will be created.")
-	fs.DurationVar(&o.KeyRotationInterval, prefix+"wireguard.key-rotation-interval", time.Hour*24*7, "The interval to rotate wireguard keys. Set this to 0 to disable key rotation.")
-	fs.BoolVar(&o.RecordMetrics, prefix+"wireguard.record-metrics", false, "Record WireGuard metrics. These are only exposed if the metrics server is enabled.")
-	fs.DurationVar(&o.RecordMetricsInterval, prefix+"wireguard.record-metrics-interval", time.Second*10, "The interval at which to update WireGuard metrics.")
+	fs.IntVar(&o.ListenPort, prefix+"wireguard.listen-port", o.ListenPort, "The port to listen on.")
+	fs.BoolVar(&o.Modprobe, prefix+"wireguard.modprobe", o.Modprobe, "Attempt to load the wireguard kernel module on linux systems.")
+	fs.StringVar(&o.InterfaceName, prefix+"wireguard.interface-name", o.InterfaceName, "The name of the interface.")
+	fs.BoolVar(&o.ForceInterfaceName, prefix+"wireguard.force-interface-name", o.ForceInterfaceName, "Force the use of the given name by deleting any pre-existing interface with the same name.")
+	fs.BoolVar(&o.ForceTUN, prefix+"wireguard.force-tun", o.ForceTUN, "Force the use of a TUN interface.")
+	fs.BoolVar(&o.Masquerade, prefix+"wireguard.masquerade", o.Masquerade, "Enable masquerading of traffic from the wireguard interface.")
+	fs.DurationVar(&o.PersistentKeepAlive, prefix+"wireguard.persistent-keepalive", o.PersistentKeepAlive, "The interval at which to send keepalive packets to peers.")
+	fs.IntVar(&o.MTU, prefix+"wireguard.mtu", o.MTU, "The MTU to use for the interface.")
+	fs.StringSliceVar(&o.Endpoints, prefix+"wireguard.endpoints", o.Endpoints, "Additional WireGuard endpoints to broadcast when joining.")
+	fs.StringVar(&o.KeyFile, prefix+"wireguard.key-file", o.KeyFile, "The path to the WireGuard private key. If it does not exist it will be created.")
+	fs.DurationVar(&o.KeyRotationInterval, prefix+"wireguard.key-rotation-interval", o.KeyRotationInterval, "The interval to rotate wireguard keys. Set this to 0 to disable key rotation.")
+	fs.BoolVar(&o.RecordMetrics, prefix+"wireguard.record-metrics", o.RecordMetrics, "Record WireGuard metrics. These are only exposed if the metrics server is enabled.")
+	fs.DurationVar(&o.RecordMetricsInterval, prefix+"wireguard.record-metrics-interval", o.RecordMetricsInterval, "The interval at which to update WireGuard metrics.")
 }
 
 // Validate validates the options.

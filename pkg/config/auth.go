@@ -34,6 +34,11 @@ type AuthOptions struct {
 	LDAP LDAPAuthOptions `koanf:"ldap,omitempty"`
 }
 
+// NewAuthOptions returns a new empty AuthOptions.
+func NewAuthOptions() AuthOptions {
+	return AuthOptions{}
+}
+
 // IsEmpty returns true if the options are empty.
 func (o *AuthOptions) IsEmpty() bool {
 	if o == nil {

@@ -37,6 +37,11 @@ type PluginOptions struct {
 	Configs map[string]PluginConfig `koanf:"configs"`
 }
 
+// NewPluginOptions returns a new empty PluginOptions.
+func NewPluginOptions() PluginOptions {
+	return PluginOptions{}
+}
+
 // BindFlags binds the flags for the plugin options.
 func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	seen := map[string]struct{}{}
@@ -106,7 +111,7 @@ type ExecutablePluginConfig struct {
 
 // BindFlags binds the flags for the executable plugin configuration.
 func (o *ExecutablePluginConfig) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringVar(&o.Path, prefix+"exec.path", "", "Path to the executable for the plugin.")
+	fs.StringVar(&o.Path, prefix+"exec.path", o.Path, "Path to the executable for the plugin.")
 }
 
 // RemotePluginConfig is the configuration for a plugin that connects to an external server.
@@ -127,12 +132,12 @@ type RemotePluginConfig struct {
 
 // BindFlags binds the flags for the remote plugin configuration.
 func (o *RemotePluginConfig) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringVar(&o.Server, prefix+"remote.server", "", "Address of the server for the plugin.")
-	fs.BoolVar(&o.Insecure, prefix+"remote.insecure", false, "Whether to use an insecure connection to the plugin server.")
-	fs.StringVar(&o.TLSCAFile, prefix+"remote.tls-ca-file", "", "Path to a CA for verifying certificates.")
-	fs.StringVar(&o.TLSCertFile, prefix+"remote.tls-cert-file", "", "Path to a certificate for authenticating to the plugin server.")
-	fs.StringVar(&o.TLSKeyFile, prefix+"remote.tls-key-file", "", "Path to a key for authenticating to the plugin server.")
-	fs.BoolVar(&o.TLSSkipVerify, prefix+"remote.tls-skip-verify", false, "Whether to skip verifying the plugin server's certificate.")
+	fs.StringVar(&o.Server, prefix+"remote.server", o.Server, "Address of the server for the plugin.")
+	fs.BoolVar(&o.Insecure, prefix+"remote.insecure", o.Insecure, "Whether to use an insecure connection to the plugin server.")
+	fs.StringVar(&o.TLSCAFile, prefix+"remote.tls-ca-file", o.TLSCAFile, "Path to a CA for verifying certificates.")
+	fs.StringVar(&o.TLSCertFile, prefix+"remote.tls-cert-file", o.TLSCertFile, "Path to a certificate for authenticating to the plugin server.")
+	fs.StringVar(&o.TLSKeyFile, prefix+"remote.tls-key-file", o.TLSKeyFile, "Path to a key for authenticating to the plugin server.")
+	fs.BoolVar(&o.TLSSkipVerify, prefix+"remote.tls-skip-verify", o.TLSSkipVerify, "Whether to skip verifying the plugin server's certificate.")
 }
 
 // NewPluginSet returns a new plugin set for the node configuration.

@@ -84,20 +84,20 @@ func NewRaftOptions() RaftOptions {
 
 // BindFlags binds the flags.
 func (o *RaftOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringVar(&o.ListenAddress, prefix+"listen-address", raftstorage.DefaultListenAddress, "Raft listen address.")
-	fs.IntVar(&o.ConnectionPoolCount, prefix+"connection-pool-count", 0, "Raft connection pool count.")
-	fs.DurationVar(&o.ConnectionTimeout, prefix+"connection-timeout", time.Second*3, "Raft connection timeout.")
-	fs.DurationVar(&o.HeartbeatTimeout, prefix+"heartbeat-timeout", time.Second*2, "Raft heartbeat timeout.")
-	fs.DurationVar(&o.ElectionTimeout, prefix+"election-timeout", time.Second*2, "Raft election timeout.")
-	fs.DurationVar(&o.ApplyTimeout, prefix+"apply-timeout", 10*time.Second, "Raft apply timeout.")
-	fs.DurationVar(&o.CommitTimeout, prefix+"commit-timeout", 10*time.Second, "Raft commit timeout.")
-	fs.IntVar(&o.MaxAppendEntries, prefix+"max-append-entries", 64, "Raft max append entries.")
-	fs.DurationVar(&o.LeaderLeaseTimeout, prefix+"leader-lease-timeout", time.Second*2, "Raft leader lease timeout.")
-	fs.DurationVar(&o.SnapshotInterval, prefix+"snapshot-interval", 30*time.Second, "Raft snapshot interval.")
-	fs.Uint64Var(&o.SnapshotThreshold, prefix+"snapshot-threshold", 8192, "Raft snapshot threshold.")
-	fs.Uint64Var(&o.SnapshotRetention, prefix+"snapshot-retention", 2, "Raft snapshot retention.")
-	fs.IntVar(&o.ObserverChanBuffer, prefix+"observer-chan-buffer", 100, "Raft observer channel buffer.")
-	fs.IntVar(&o.HeartbeatPurgeThreshold, prefix+"heartbeat-purge-threshold", 25, "Raft heartbeat purge threshold.")
+	fs.StringVar(&o.ListenAddress, prefix+"listen-address", o.ListenAddress, "Raft listen address.")
+	fs.IntVar(&o.ConnectionPoolCount, prefix+"connection-pool-count", o.ConnectionPoolCount, "Raft connection pool count.")
+	fs.DurationVar(&o.ConnectionTimeout, prefix+"connection-timeout", o.ConnectionTimeout, "Raft connection timeout.")
+	fs.DurationVar(&o.HeartbeatTimeout, prefix+"heartbeat-timeout", o.HeartbeatTimeout, "Raft heartbeat timeout.")
+	fs.DurationVar(&o.ElectionTimeout, prefix+"election-timeout", o.ElectionTimeout, "Raft election timeout.")
+	fs.DurationVar(&o.ApplyTimeout, prefix+"apply-timeout", o.ApplyTimeout, "Raft apply timeout.")
+	fs.DurationVar(&o.CommitTimeout, prefix+"commit-timeout", o.CommitTimeout, "Raft commit timeout.")
+	fs.IntVar(&o.MaxAppendEntries, prefix+"max-append-entries", o.MaxAppendEntries, "Raft max append entries.")
+	fs.DurationVar(&o.LeaderLeaseTimeout, prefix+"leader-lease-timeout", o.LeaderLeaseTimeout, "Raft leader lease timeout.")
+	fs.DurationVar(&o.SnapshotInterval, prefix+"snapshot-interval", o.SnapshotInterval, "Raft snapshot interval.")
+	fs.Uint64Var(&o.SnapshotThreshold, prefix+"snapshot-threshold", o.SnapshotThreshold, "Raft snapshot threshold.")
+	fs.Uint64Var(&o.SnapshotRetention, prefix+"snapshot-retention", o.SnapshotRetention, "Raft snapshot retention.")
+	fs.IntVar(&o.ObserverChanBuffer, prefix+"observer-chan-buffer", o.ObserverChanBuffer, "Raft observer channel buffer.")
+	fs.IntVar(&o.HeartbeatPurgeThreshold, prefix+"heartbeat-purge-threshold", o.HeartbeatPurgeThreshold, "Raft heartbeat purge threshold.")
 }
 
 // Validate validates the options.

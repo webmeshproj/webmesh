@@ -38,7 +38,8 @@ import (
 )
 
 var (
-	flagset                 = pflag.NewFlagSet("webmesh-node", pflag.ContinueOnError)
+	flagset = pflag.NewFlagSet("webmesh-node", pflag.ContinueOnError)
+
 	helpFlag                = flagset.Bool("help", false, "Print usage information and exit")
 	versionFlag             = flagset.Bool("version", false, "Print version information and exit")
 	configFlag              = flagset.String("config", "", "Path to a configuration file")
@@ -50,7 +51,7 @@ var (
 	appDaemonGrpcWeb        = flagset.Bool("app-daemon-grpc-web", false, "Use gRPC-Web for the application daemon (default: false)")
 	appDaemonInsecureSocket = flagset.Bool("app-daemon-insecure-socket", false, "Leave default ownership on the Unix socket (default: false)")
 
-	conf = (&config.Config{}).BindFlags("", flagset)
+	conf = config.NewDefaultConfig("").BindFlags("", flagset)
 )
 
 func Execute() error {

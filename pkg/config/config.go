@@ -66,19 +66,19 @@ type Config struct {
 
 // NewDefaultConfig returns a new config with the default options. If nodeID is empty,
 // the hostname or a randomly generated one will be used.
-func NewDefaultConfig(nodeID string) Config {
-	return Config{
-		Global:    GlobalOptions{},
+func NewDefaultConfig(nodeID string) *Config {
+	return &Config{
+		Global:    NewGlobalOptions(),
 		Bootstrap: NewBootstrapOptions(),
-		Auth:      AuthOptions{},
+		Auth:      NewAuthOptions(),
 		Mesh:      NewMeshOptions(nodeID),
 		Storage:   NewStorageOptions(),
 		Services:  NewServiceOptions(),
-		TLS:       TLSOptions{},
+		TLS:       NewTLSOptions(),
 		WireGuard: NewWireGuardOptions(),
 		Discovery: NewDiscoveryOptions("", false),
-		Plugins:   PluginOptions{},
-		Bridge:    BridgeOptions{},
+		Plugins:   NewPluginOptions(),
+		Bridge:    NewBridgeOptions(),
 	}
 }
 
@@ -87,17 +87,17 @@ func NewDefaultConfig(nodeID string) Config {
 // If nodeID is empty, the hostname or a randomly generated one will be used.
 func NewInsecureConfig(nodeID string) *Config {
 	conf := &Config{
-		Global:    GlobalOptions{},
+		Global:    NewGlobalOptions(),
 		Bootstrap: NewBootstrapOptions(),
-		Auth:      AuthOptions{},
+		Auth:      NewAuthOptions(),
 		Mesh:      NewMeshOptions(nodeID),
 		Storage:   NewStorageOptions(),
 		Services:  NewServiceOptions(),
-		TLS:       TLSOptions{},
+		TLS:       NewTLSOptions(),
 		WireGuard: NewWireGuardOptions(),
 		Discovery: NewDiscoveryOptions("", false),
-		Plugins:   PluginOptions{},
-		Bridge:    BridgeOptions{},
+		Plugins:   NewPluginOptions(),
+		Bridge:    NewBridgeOptions(),
 	}
 	conf.Storage.InMemory = true
 	// Lower the raft timeouts
