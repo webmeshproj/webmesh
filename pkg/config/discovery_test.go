@@ -21,6 +21,9 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 func TestDiscoveryConfigValidate(t *testing.T) {
@@ -155,4 +158,137 @@ func TestDiscoveryConfigValidate(t *testing.T) {
 	}
 }
 
-func TestDiscoveryConfigHostOptions(t *testing.T) {}
+func TestDiscoveryConfigHostOptions(t *testing.T) {
+	ctx := context.Background()
+	key := crypto.MustGenerateKey()
+	t.Parallel()
+
+	t.Run("Defaults", func(t *testing.T) {
+		opts := NewDiscoveryOptions("", false)
+		hostopts := opts.HostOptions(ctx, key)
+		if len(hostopts.Options) != 1 {
+			t.Errorf("expected 1 option, got %d", len(hostopts.Options))
+		}
+		if len(hostopts.BootstrapPeers) != 0 {
+			t.Errorf("expected 0 bootstrap peers, got %d", len(hostopts.BootstrapPeers))
+		}
+		if len(hostopts.LocalAddrs) != 0 {
+			t.Errorf("expected 0 local addresses, got %d", len(hostopts.LocalAddrs))
+		}
+		if hostopts.ConnectTimeout != opts.ConnectTimeout {
+			t.Errorf("expected connect timeout %v, got %v", opts.ConnectTimeout, hostopts.ConnectTimeout)
+		}
+	})
+
+	t.Run("CustomBootstrapPeers", func(t *testing.T) {
+		t.Run("ValidBootstrapPeers", func(t *testing.T) {
+			opts := NewDiscoveryOptions("", false)
+			opts.BootstrapServers = []string{
+				"/ip4/127.0.0.1/tcp/8080",
+				"/ip6/::1/tcp/8080",
+			}
+			hostopts := opts.HostOptions(ctx, key)
+			if len(hostopts.Options) != 1 {
+				t.Errorf("expected 1 option, got %d", len(hostopts.Options))
+			}
+			if len(hostopts.LocalAddrs) != 0 {
+				t.Errorf("expected 0 local addresses, got %d", len(hostopts.LocalAddrs))
+			}
+			if hostopts.ConnectTimeout != opts.ConnectTimeout {
+				t.Errorf("expected connect timeout %v, got %v", opts.ConnectTimeout, hostopts.ConnectTimeout)
+			}
+			if len(hostopts.BootstrapPeers) != 2 {
+				t.Fatalf("expected 2 bootstrap peers, got %d", len(hostopts.BootstrapPeers))
+			}
+			for i, addr := range hostopts.BootstrapPeers {
+				if addr.String() != opts.BootstrapServers[i] {
+					t.Errorf("expected bootstrap peer %s, got %s", opts.BootstrapServers[i], addr.String())
+				}
+			}
+		})
+
+		t.Run("InvalidBootstrapPeers", func(t *testing.T) {
+			opts := NewDiscoveryOptions("", false)
+			opts.BootstrapServers = []string{
+				"/ip4/127.0.0.1/tcp/8080",
+				"/ip6/::1/tcp/8080",
+				"invalid",
+			}
+			hostopts := opts.HostOptions(ctx, key)
+			if len(hostopts.Options) != 1 {
+				t.Errorf("expected 1 option, got %d", len(hostopts.Options))
+			}
+			if len(hostopts.LocalAddrs) != 0 {
+				t.Errorf("expected 0 local addresses, got %d", len(hostopts.LocalAddrs))
+			}
+			if hostopts.ConnectTimeout != opts.ConnectTimeout {
+				t.Errorf("expected connect timeout %v, got %v", opts.ConnectTimeout, hostopts.ConnectTimeout)
+			}
+			// The invalid address should be ignored
+			if len(hostopts.BootstrapPeers) != 2 {
+				t.Fatalf("expected 2 bootstrap peers, got %d", len(hostopts.BootstrapPeers))
+			}
+			for i, addr := range hostopts.BootstrapPeers {
+				if addr.String() != opts.BootstrapServers[i] {
+					t.Errorf("expected bootstrap peer %s, got %s", opts.BootstrapServers[i], addr.String())
+				}
+			}
+		})
+	})
+
+	t.Run("CustomLocalAddrs", func(t *testing.T) {
+		t.Run("ValidLocalAddrs", func(t *testing.T) {
+			opts := NewDiscoveryOptions("", false)
+			opts.LocalAddrs = []string{
+				"/ip4/127.0.0.1/tcp/8080",
+				"/ip6/::1/tcp/8080",
+			}
+			hostopts := opts.HostOptions(ctx, key)
+			if len(hostopts.Options) != 1 {
+				t.Errorf("expected 1 option, got %d", len(hostopts.Options))
+			}
+			if len(hostopts.BootstrapPeers) != 0 {
+				t.Errorf("expected 0 bootstrap peers, got %d", len(hostopts.LocalAddrs))
+			}
+			if hostopts.ConnectTimeout != opts.ConnectTimeout {
+				t.Errorf("expected connect timeout %v, got %v", opts.ConnectTimeout, hostopts.ConnectTimeout)
+			}
+			if len(hostopts.LocalAddrs) != 2 {
+				t.Fatalf("expected 2 local addrs, got %d", len(hostopts.LocalAddrs))
+			}
+			for i, addr := range hostopts.LocalAddrs {
+				if addr.String() != opts.LocalAddrs[i] {
+					t.Errorf("expected local addrr %s, got %s", opts.LocalAddrs[i], addr.String())
+				}
+			}
+		})
+
+		t.Run("InvalidLocalAddrs", func(t *testing.T) {
+			opts := NewDiscoveryOptions("", false)
+			opts.LocalAddrs = []string{
+				"/ip4/127.0.0.1/tcp/8080",
+				"/ip6/::1/tcp/8080",
+				"invalid",
+			}
+			hostopts := opts.HostOptions(ctx, key)
+			if len(hostopts.Options) != 1 {
+				t.Errorf("expected 1 option, got %d", len(hostopts.Options))
+			}
+			if len(hostopts.BootstrapPeers) != 0 {
+				t.Errorf("expected 0 bootstrap peers, got %d", len(hostopts.LocalAddrs))
+			}
+			if hostopts.ConnectTimeout != opts.ConnectTimeout {
+				t.Errorf("expected connect timeout %v, got %v", opts.ConnectTimeout, hostopts.ConnectTimeout)
+			}
+			if len(hostopts.LocalAddrs) != 2 {
+				t.Fatalf("expected 2 local addrs, got %d", len(hostopts.LocalAddrs))
+			}
+			for i, addr := range hostopts.LocalAddrs {
+				if addr.String() != opts.LocalAddrs[i] {
+					t.Errorf("expected local addrr %s, got %s", opts.LocalAddrs[i], addr.String())
+				}
+			}
+		})
+	})
+
+}

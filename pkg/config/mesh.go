@@ -107,56 +107,120 @@ func NewMeshOptions(nodeID string) MeshOptions {
 		JoinAddress:                 "",
 		MaxJoinRetries:              15,
 		Routes:                      nil,
+		ICEPeers:                    []string{},
+		LibP2PPeers:                 []string{},
 		GRPCAdvertisePort:           services.DefaultGRPCPort,
 		MeshDNSAdvertisePort:        meshdns.DefaultAdvertisePort,
 		UseMeshDNS:                  false,
+		RequestVote:                 false,
+		RequestObserver:             false,
+		StoragePreferIPv6:           false,
 		DisableIPv4:                 false,
 		DisableIPv6:                 false,
 		DisableFeatureAdvertisement: false,
+		DisableDefaultIPAM:          false,
+		DefaultIPAMStaticIPv4:       map[string]string{},
 	}
 }
 
 // BindFlags binds the flags to the options.
 func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringVar(&o.NodeID, prefix+"mesh.node-id", "", "Node ID. One will be chosen automatically if left unset.")
-	fs.StringVar(&o.PrimaryEndpoint, prefix+"mesh.primary-endpoint", "", "Primary endpoint to advertise when joining.")
-	fs.StringVar(&o.ZoneAwarenessID, prefix+"mesh.zone-awareness-id", "", "Zone awareness ID.")
-	fs.StringVar(&o.JoinAddress, prefix+"mesh.join-address", "", "Address of a node to join.")
-	fs.IntVar(&o.MaxJoinRetries, prefix+"mesh.max-join-retries", 15, "Maximum number of join retries.")
-	fs.StringSliceVar(&o.Routes, prefix+"mesh.routes", nil, "Additional routes to advertise to the mesh.")
-	fs.StringSliceVar(&o.ICEPeers, prefix+"mesh.ice-peers", nil, "Peers to request direct edges to over ICE.")
-	fs.StringSliceVar(&o.LibP2PPeers, prefix+"mesh.libp2p-peers", nil, "Map of peer IDs to rendezvous strings for edges over libp2p.")
-	fs.IntVar(&o.GRPCAdvertisePort, prefix+"mesh.grpc-advertise-port", services.DefaultGRPCPort, "Port to advertise for gRPC.")
-	fs.IntVar(&o.MeshDNSAdvertisePort, prefix+"mesh.meshdns-advertise-port", meshdns.DefaultAdvertisePort, "Port to advertise for DNS.")
-	fs.BoolVar(&o.UseMeshDNS, prefix+"mesh.use-meshdns", false, "Set mesh DNS servers to the system configuration.")
-	fs.BoolVar(&o.RequestVote, prefix+"mesh.request-vote", false, "Request a vote in elections for the storage backend.")
-	fs.BoolVar(&o.RequestObserver, prefix+"mesh.request-observer", false, "Request to be an observer in the storage backend.")
-	fs.BoolVar(&o.StoragePreferIPv6, prefix+"mesh.storage-prefer-ipv6", false, "Prefer IPv6 connections for the storage backend transport.")
-	fs.BoolVar(&o.DisableIPv4, prefix+"mesh.disable-ipv4", false, "Disable IPv4 usage.")
-	fs.BoolVar(&o.DisableIPv6, prefix+"mesh.disable-ipv6", false, "Disable IPv6 usage.")
-	fs.BoolVar(&o.DisableFeatureAdvertisement, prefix+"mesh.disable-feature-advertisement", false, "Disable feature advertisement.")
-	fs.BoolVar(&o.DisableDefaultIPAM, prefix+"services.api.disable-default-ipam", false, "Disable the default IPAM.")
-	fs.StringToStringVar(&o.DefaultIPAMStaticIPv4, prefix+"services.api.default-ipam-static-ipv4", nil, "Static IPv4 assignments to use for the default IPAM.")
+	fs.StringVar(&o.NodeID, prefix+"mesh.node-id", o.NodeID, "Node ID. One will be chosen automatically if left unset.")
+	fs.StringVar(&o.PrimaryEndpoint, prefix+"mesh.primary-endpoint", o.PrimaryEndpoint, "Primary endpoint to advertise when joining.")
+	fs.StringVar(&o.ZoneAwarenessID, prefix+"mesh.zone-awareness-id", o.ZoneAwarenessID, "Zone awareness ID.")
+	fs.StringVar(&o.JoinAddress, prefix+"mesh.join-address", o.JoinAddress, "Address of a node to join.")
+	fs.IntVar(&o.MaxJoinRetries, prefix+"mesh.max-join-retries", o.MaxJoinRetries, "Maximum number of join retries.")
+	fs.StringSliceVar(&o.Routes, prefix+"mesh.routes", o.Routes, "Additional routes to advertise to the mesh.")
+	fs.StringSliceVar(&o.ICEPeers, prefix+"mesh.ice-peers", o.ICEPeers, "Peers to request direct edges to over ICE.")
+	fs.StringSliceVar(&o.LibP2PPeers, prefix+"mesh.libp2p-peers", o.LibP2PPeers, "Map of peer IDs to rendezvous strings for edges over libp2p.")
+	fs.IntVar(&o.GRPCAdvertisePort, prefix+"mesh.grpc-advertise-port", o.GRPCAdvertisePort, "Port to advertise for gRPC.")
+	fs.IntVar(&o.MeshDNSAdvertisePort, prefix+"mesh.meshdns-advertise-port", o.MeshDNSAdvertisePort, "Port to advertise for DNS.")
+	fs.BoolVar(&o.UseMeshDNS, prefix+"mesh.use-meshdns", o.UseMeshDNS, "Set mesh DNS servers to the system configuration.")
+	fs.BoolVar(&o.RequestVote, prefix+"mesh.request-vote", o.RequestVote, "Request a vote in elections for the storage backend.")
+	fs.BoolVar(&o.RequestObserver, prefix+"mesh.request-observer", o.RequestObserver, "Request to be an observer in the storage backend.")
+	fs.BoolVar(&o.StoragePreferIPv6, prefix+"mesh.storage-prefer-ipv6", o.StoragePreferIPv6, "Prefer IPv6 connections for the storage backend transport.")
+	fs.BoolVar(&o.DisableIPv4, prefix+"mesh.disable-ipv4", o.DisableIPv4, "Disable IPv4 usage.")
+	fs.BoolVar(&o.DisableIPv6, prefix+"mesh.disable-ipv6", o.DisableIPv6, "Disable IPv6 usage.")
+	fs.BoolVar(&o.DisableFeatureAdvertisement, prefix+"mesh.disable-feature-advertisement", o.DisableFeatureAdvertisement, "Disable feature advertisement.")
+	fs.BoolVar(&o.DisableDefaultIPAM, prefix+"services.api.disable-default-ipam", o.DisableDefaultIPAM, "Disable the default IPAM.")
+	fs.StringToStringVar(&o.DefaultIPAMStaticIPv4, prefix+"services.api.default-ipam-static-ipv4", o.DefaultIPAMStaticIPv4, "Static IPv4 assignments to use for the default IPAM.")
 }
 
 // Validate validates the options.
 func (o *MeshOptions) Validate() error {
+	if o == nil {
+		return fmt.Errorf("mesh options are required")
+	}
+	if o.NodeID == "" {
+		return fmt.Errorf("node ID is required")
+	}
+	if !types.IsValidNodeID(o.NodeID) {
+		return fmt.Errorf("invalid node ID")
+	}
 	if o.DisableIPv4 && o.DisableIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
-	if o.JoinAddress != "" && o.MaxJoinRetries < 0 {
+	if o.JoinAddress != "" && o.MaxJoinRetries <= 0 {
 		return fmt.Errorf("max join retries must be >= 0")
+	}
+	if o.JoinAddress != "" {
+		if _, _, err := net.SplitHostPort(o.JoinAddress); err != nil {
+			return fmt.Errorf("invalid join address: %w", err)
+		}
+	}
+	if o.RequestVote && o.RequestObserver {
+		return fmt.Errorf("cannot request vote and observer")
+	}
+	if o.DisableIPv6 && o.StoragePreferIPv6 {
+		return fmt.Errorf("cannot prefer IPv6 for storage when IPv6 is disabled")
 	}
 	if o.PrimaryEndpoint != "" {
 		// Add a dummy port to the primary endpoint
-		ep := net.JoinHostPort(o.PrimaryEndpoint, "0")
-		_, _, err := net.SplitHostPort(ep)
+		var epstr string
+		ip, err := netip.ParseAddr(o.PrimaryEndpoint)
+		if err == nil {
+			if ip.Is4() {
+				epstr = fmt.Sprintf("%s:0", ip.String())
+			} else {
+				epstr = fmt.Sprintf("[%s]:0", ip.String())
+			}
+		} else {
+			// Assume it's a hostname
+			epstr = fmt.Sprintf("%s:0", o.PrimaryEndpoint)
+		}
+		_, _, err = net.SplitHostPort(epstr)
 		if err != nil {
 			return fmt.Errorf("invalid primary endpoint: %w", err)
 		}
 	}
-	if o.GRPCAdvertisePort <= 1024 {
-		return fmt.Errorf("invalid gRPC advertise port")
+	for _, peer := range o.ICEPeers {
+		if !types.IsValidNodeID(peer) {
+			return fmt.Errorf("invalid ICE peer ID %s", peer)
+		}
+	}
+	for _, peer := range o.LibP2PPeers {
+		if !types.IsValidNodeID(peer) {
+			return fmt.Errorf("invalid libp2p peer ID %s", peer)
+		}
+	}
+	if !o.DisableFeatureAdvertisement {
+		if o.GRPCAdvertisePort <= 0 || o.GRPCAdvertisePort > 65535 {
+			return fmt.Errorf("invalid gRPC advertise port")
+		}
+		if o.MeshDNSAdvertisePort <= 0 || o.MeshDNSAdvertisePort > 65535 {
+			return fmt.Errorf("invalid mesh DNS advertise port")
+		}
+	}
+	if !o.DisableDefaultIPAM {
+		for id, addr := range o.DefaultIPAMStaticIPv4 {
+			if !types.IsValidNodeID(id) {
+				return fmt.Errorf("invalid node ID %s", id)
+			}
+			_, err := netip.ParsePrefix(addr)
+			if err != nil {
+				return fmt.Errorf("invalid IPv4 address %s for node %s", addr, id)
+			}
+		}
 	}
 	return nil
 }
