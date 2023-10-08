@@ -268,6 +268,15 @@ func doGetQuery(ctx context.Context, db storage.Provider, req types.StorageQuery
 		}
 		res.Items = append(res.Items, out)
 
+	case v1.QueryRequest_RBAC_STATE:
+		var enabled bool
+		enabled, err = db.MeshDB().RBAC().GetEnabled(ctx)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		res.Items = append(res.Items, []byte(fmt.Sprintf("%t", enabled)))
+
 	default:
 		err = fmt.Errorf("%w: unsupported GET query type %s", ErrInvalidQuery, req.GetType().String())
 		res.Error = err.Error()
