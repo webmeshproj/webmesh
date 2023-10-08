@@ -19,6 +19,7 @@ package passthrough
 import (
 	"context"
 	"net/netip"
+	"strconv"
 	"sync"
 	"time"
 
@@ -258,7 +259,19 @@ func (r *RBACStore) SetEnabled(ctx context.Context, enabled bool) error {
 }
 
 func (r *RBACStore) GetEnabled(ctx context.Context) (bool, error) {
-	return false, errors.ErrNotStorageNode
+	req := &v1.QueryRequest{
+		Command: v1.QueryRequest_GET,
+		Type:    v1.QueryRequest_RBAC_STATE,
+	}
+	resp, err := r.cli.Query(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	if len(resp.GetItems()) == 0 {
+		return false, errors.ErrNotFound
+	}
+	val := string(resp.GetItems()[0])
+	return strconv.ParseBool(val)
 }
 
 func (r *RBACStore) PutRole(ctx context.Context, role types.Role) error {

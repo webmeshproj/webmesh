@@ -21,6 +21,7 @@ package plugindb
 import (
 	"fmt"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -337,7 +338,24 @@ func (r *RBACStore) SetEnabled(ctx context.Context, enabled bool) error {
 }
 
 func (r *RBACStore) GetEnabled(ctx context.Context) (bool, error) {
-	return false, errors.ErrNotStorageNode
+	req := &v1.QueryRequest{
+		Command: v1.QueryRequest_GET,
+		Type:    v1.QueryRequest_RBAC_STATE,
+	}
+	err := r.Send(req)
+	if err != nil {
+		return false, err
+	}
+	var resp *v1.QueryResponse
+	resp, err = r.Recv()
+	if err != nil {
+		return false, err
+	}
+	if len(resp.GetItems()) == 0 {
+		return false, errors.ErrNotFound
+	}
+	val := string(resp.GetItems()[0])
+	return strconv.ParseBool(val)
 }
 
 func (r *RBACStore) PutRole(ctx context.Context, role types.Role) error {

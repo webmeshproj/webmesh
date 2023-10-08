@@ -819,12 +819,10 @@ github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1Y
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSDJfjId/PEGEShv6ugrt4kYsC5UIDaQ=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
-github.com/webmeshproj/api v0.7.1-0.20231008130006-022ae146ca3a h1:HFA+mSKyxRXtpz0LMGyAv4P/fvkJAzCSmVnucruOvXM=
-github.com/webmeshproj/api v0.7.1-0.20231008130006-022ae146ca3a/go.mod h1:Ia4HoAMgOsclInabO+p7SvaRnMmE00DTLz9SS14zcwU=
-github.com/webmeshproj/api v0.7.1-0.20231008134019-498c1edbb196 h1:wIn1EE9WFURUmfkN3FxBYBVVey1ONEe6TRvb2ZqUOUI=
-github.com/webmeshproj/api v0.7.1-0.20231008134019-498c1edbb196/go.mod h1:Ia4HoAMgOsclInabO+p7SvaRnMmE00DTLz9SS14zcwU=
 github.com/webmeshproj/api v0.7.1-0.20231008134159-3b68cbb55a7a h1:OdHjWxcyWl/w4b/PlXw6EHASEG1Umxcw3Nf/gWcOBwU=
 github.com/webmeshproj/api v0.7.1-0.20231008134159-3b68cbb55a7a/go.mod h1:Ia4HoAMgOsclInabO+p7SvaRnMmE00DTLz9SS14zcwU=
+github.com/webmeshproj/api v0.7.1-0.20231008134830-9650c1915abb h1:01SSVEwn7cYnWRQNWIHOurXLIDXBsWet7OfhyT1k50w=
+github.com/webmeshproj/api v0.7.1-0.20231008134830-9650c1915abb/go.mod h1:Ia4HoAMgOsclInabO+p7SvaRnMmE00DTLz9SS14zcwU=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1/go.mod h1:8UvriyWtv5Q5EOgjHaSseUEdkQfvwFv1I/In/O2M9gc=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
