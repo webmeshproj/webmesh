@@ -101,7 +101,7 @@ func (c *Config) LoadFrom(fs *pflag.FlagSet, confFiles []string) error {
 			return fmt.Errorf("error setting %s: %w", mapKey, err)
 		}
 	}
-	// Finally unmarsal the configuration'
+	// Finally unmarsal the configuration
 	err = k.Unmarshal("", c)
 	if err != nil {
 		return fmt.Errorf("error unmarshaling configuration: %w", err)

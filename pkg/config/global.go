@@ -123,17 +123,22 @@ func (o *GlobalOptions) BindFlags(fs *pflag.FlagSet) {
 
 // Validate validates the global options.
 func (o *GlobalOptions) Validate() error {
+	if o == nil {
+		return nil
+	}
 	if o.DisableIPv4 && o.DisableIPv6 {
 		return fmt.Errorf("both IPv4 and IPv6 are disabled")
 	}
-	if o.MTLS && o.TLSCertFile == "" {
-		return fmt.Errorf("mtls is enabled but no tls-cert-file is set")
-	}
-	if o.MTLS && o.TLSKeyFile == "" {
-		return fmt.Errorf("mtls is enabled but no tls-key-file is set")
-	}
-	if o.MTLS && (o.TLSCAFile == "" && o.TLSClientCAFile == "") {
-		return fmt.Errorf("mtls is enabled but no tls-ca-file is set")
+	if o.MTLS {
+		if o.TLSCertFile == "" {
+			return fmt.Errorf("mtls is enabled but no tls-cert-file is set")
+		}
+		if o.TLSKeyFile == "" {
+			return fmt.Errorf("mtls is enabled but no tls-key-file is set")
+		}
+		if o.TLSCAFile == "" && o.TLSClientCAFile == "" {
+			return fmt.Errorf("mtls is enabled but no tls-ca-file is set")
+		}
 	}
 	return nil
 }
