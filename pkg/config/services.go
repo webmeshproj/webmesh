@@ -23,7 +23,9 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -74,6 +76,18 @@ func NewServiceOptions() ServiceOptions {
 	}
 }
 
+// NewInsecureServiceOptions returns a new ServiceOptions with the default values
+// and insecure set to true.
+func NewInsecureServiceOptions() ServiceOptions {
+	return ServiceOptions{
+		API:     NewInsecureAPIOptions(),
+		WebRTC:  NewWebRTCOptions(),
+		MeshDNS: NewMeshDNSOptions(),
+		TURN:    NewTURNOptions(),
+		Metrics: NewMetricsOptions(),
+	}
+}
+
 // BindFlags binds the flags.
 func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	s.API.BindFlags(prefix, fl)
@@ -88,27 +102,28 @@ func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 
 // Validate validates the options.
 func (s *ServiceOptions) Validate() error {
+	if s == nil {
+		return nil
+	}
 	err := s.API.Validate()
 	if err != nil {
 		return err
 	}
-	if s.TURN.Enabled {
-		err := s.TURN.Validate()
-		if err != nil {
-			return err
-		}
+	err = s.TURN.Validate()
+	if err != nil {
+		return err
 	}
-	if s.Metrics.Enabled {
-		err := s.Metrics.Validate()
-		if err != nil {
-			return err
-		}
+	err = s.MeshDNS.Validate()
+	if err != nil {
+		return err
 	}
-	if s.WebRTC.Enabled {
-		err := s.WebRTC.Validate()
-		if err != nil {
-			return err
-		}
+	err = s.Metrics.Validate()
+	if err != nil {
+		return err
+	}
+	err = s.WebRTC.Validate()
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -148,6 +163,15 @@ func NewAPIOptions() APIOptions {
 	}
 }
 
+// NewInsecureAPIOptions returns a new APIOptions with the default values
+// and insecure set to true.
+func NewInsecureAPIOptions() APIOptions {
+	return APIOptions{
+		ListenAddress: services.DefaultGRPCListenAddress,
+		Insecure:      true,
+	}
+}
+
 // BindFlags binds the flags.
 func (a *APIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&a.Disabled, prefix+"services.api.disabled", a.Disabled, "Disable the API. This is ignored when joining as a Raft member.")
@@ -164,19 +188,19 @@ func (a *APIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 }
 
 // Validate validates the options.
-func (a *APIOptions) Validate() error {
+func (a APIOptions) Validate() error {
 	if a.Disabled {
 		return nil
 	}
 	if a.ListenAddress == "" {
 		return fmt.Errorf("services.api.listen-address must be set")
 	}
-	_, _, err := net.SplitHostPort(a.ListenAddress)
+	_, err := netip.ParseAddrPort(a.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("listen-address is invalid: %w", err)
 	}
 	if !a.Insecure {
-		if (a.TLSCertFile == "" || a.TLSKeyFile == "") || (a.TLSCertData == "" || a.TLSKeyData == "") {
+		if (a.TLSCertFile == "" || a.TLSKeyFile == "") && (a.TLSCertData == "" || a.TLSKeyData == "") {
 			return fmt.Errorf("tls-cert-file and tls-key-file or tls-cert-data and tls-key-data must be set")
 		}
 	}
@@ -206,7 +230,18 @@ func (w *WebRTCOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 }
 
 // Validate validates the options.
-func (w *WebRTCOptions) Validate() error {
+func (w WebRTCOptions) Validate() error {
+	if !w.Enabled {
+		return nil
+	}
+	for _, srv := range w.STUNServers {
+		srv = strings.TrimPrefix(srv, "turn:")
+		srv = strings.TrimPrefix(srv, "stun:")
+		_, _, err := net.SplitHostPort(srv)
+		if err != nil {
+			return fmt.Errorf("services.webrtc.stun-servers is invalid: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -249,7 +284,7 @@ func (t *TURNOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 }
 
 // Validate values the TURN options.
-func (t *TURNOptions) Validate() error {
+func (t TURNOptions) Validate() error {
 	if !t.Enabled {
 		return nil
 	}
@@ -261,7 +296,7 @@ func (t *TURNOptions) Validate() error {
 			return fmt.Errorf("services.turn.listen-address is invalid: %w", err)
 		}
 	}
-	if t.PublicIP == "" || t.Endpoint == "" {
+	if t.PublicIP == "" && t.Endpoint == "" {
 		return fmt.Errorf("services.turn.public-ip or services.turn.endpoint must be set")
 	}
 	if t.PublicIP != "" {
@@ -279,7 +314,7 @@ func (t *TURNOptions) Validate() error {
 
 // ListenPort returns the listen port for this TURN configuration. or 0
 // if not enabled or invalid.
-func (t *TURNOptions) ListenPort() uint16 {
+func (t TURNOptions) ListenPort() uint16 {
 	if !t.Enabled {
 		return 0
 	}
@@ -355,7 +390,7 @@ func (m *MeshDNSOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 }
 
 // ListenPort returns the listen port for the MeshDNS server is enabled.
-func (m *MeshDNSOptions) ListenPort() uint16 {
+func (m MeshDNSOptions) ListenPort() uint16 {
 	if !m.Enabled {
 		return 0
 	}
@@ -368,6 +403,36 @@ func (m *MeshDNSOptions) ListenPort() uint16 {
 		return 0
 	}
 	return uint16(out)
+}
+
+// Validate validates the options.
+func (m MeshDNSOptions) Validate() error {
+	if !m.Enabled {
+		return nil
+	}
+	if m.ListenTCP == "" && m.ListenUDP == "" {
+		return fmt.Errorf("services.meshdns.listen-tcp or services.meshdns.listen-udp must be set")
+	}
+	if m.ListenTCP != "" {
+		_, _, err := net.SplitHostPort(m.ListenTCP)
+		if err != nil {
+			return fmt.Errorf("services.meshdns.listen-tcp is invalid: %w", err)
+		}
+	}
+	if m.ListenUDP != "" {
+		_, _, err := net.SplitHostPort(m.ListenUDP)
+		if err != nil {
+			return fmt.Errorf("services.meshdns.listen-udp is invalid: %w", err)
+		}
+	}
+	if runtime.GOOS == "linux" {
+		if m.ReusePort < 0 {
+			return fmt.Errorf("services.meshdns.reuse-port must be >= 0")
+		}
+	} else if m.ReusePort != 0 && runtime.GOOS != "linux" {
+		return fmt.Errorf("services.meshdns.reuse-port is only supported on Linux")
+	}
+	return nil
 }
 
 // Metrics are options for exposing metrics.
@@ -397,7 +462,7 @@ func (m *MetricsOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 }
 
 // ListenPort returns the listen port for the Metrics server is enabled.
-func (m *MetricsOptions) ListenPort() uint16 {
+func (m MetricsOptions) ListenPort() uint16 {
 	if !m.Enabled {
 		return 0
 	}
@@ -413,7 +478,7 @@ func (m *MetricsOptions) ListenPort() uint16 {
 }
 
 // Validate validates the options.
-func (m *MetricsOptions) Validate() error {
+func (m MetricsOptions) Validate() error {
 	if !m.Enabled {
 		return nil
 	}
