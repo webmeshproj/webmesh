@@ -33,6 +33,14 @@ type AuthOptions struct {
 	LDAP LDAPAuthOptions `koanf:"ldap,omitempty"`
 }
 
+// IsEmpty returns true if the options are empty.
+func (o *AuthOptions) IsEmpty() bool {
+	if o == nil {
+		return true
+	}
+	return o.MTLS.IsEmpty() && o.Basic.IsEmpty() && o.LDAP.IsEmpty()
+}
+
 // MTLSOptions are options for mutual TLS.
 type MTLSOptions struct {
 	// CertFile is the path to a TLS certificate file to present when joining. Either this
@@ -47,12 +55,22 @@ type MTLSOptions struct {
 	KeyData string `koanf:"key-data,omitempty"`
 }
 
+// IsEmpty returns true if the options are empty.
+func (o MTLSOptions) IsEmpty() bool {
+	return o.CertFile == "" && o.CertData == "" && o.KeyFile == "" && o.KeyData == ""
+}
+
 // BasicAuthOptions are options for basic authentication.
 type BasicAuthOptions struct {
 	// Username is the username.
 	Username string `koanf:"username,omitempty"`
 	// Password is the password.
 	Password string `koanf:"password,omitempty"`
+}
+
+// IsEmpty returns true if the options are empty.
+func (o BasicAuthOptions) IsEmpty() bool {
+	return o.Username == "" && o.Password == ""
 }
 
 // LDAPAuthOptions are options for LDAP authentication.
@@ -63,23 +81,28 @@ type LDAPAuthOptions struct {
 	Password string `koanf:"password,omitempty"`
 }
 
+// IsEmpty returns true if the options are empty.
+func (o LDAPAuthOptions) IsEmpty() bool {
+	return o.Username == "" && o.Password == ""
+}
+
 // BindFlags binds the flags to the options.
 func (o *AuthOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.StringVar(&o.Basic.Username, prefix+"auth.basic.username", "", "Basic auth username.")
-	fl.StringVar(&o.Basic.Password, prefix+"auth.basic.password", "", "Basic auth password.")
-	fl.StringVar(&o.MTLS.CertFile, prefix+"auth.mtls.cert-file", "", "Path to a TLS certificate file to present when joining.")
-	fl.StringVar(&o.MTLS.CertData, prefix+"auth.mtls.cert-data", "", "Base64 encoded TLS certificate data to present when joining.")
-	fl.StringVar(&o.MTLS.KeyFile, prefix+"auth.mtls.key-file", "", "Path to a TLS key file for the certificate.")
-	fl.StringVar(&o.MTLS.KeyData, prefix+"auth.mtls.key-data", "", "Base64 encoded TLS key data for the certificate.")
-	fl.StringVar(&o.LDAP.Username, prefix+"auth.ldap.username", "", "LDAP auth username.")
-	fl.StringVar(&o.LDAP.Password, prefix+"auth.ldap.password", "", "LDAP auth password.")
+	fl.StringVar(&o.Basic.Username, prefix+"auth.basic.username", o.Basic.Username, "Basic auth username.")
+	fl.StringVar(&o.Basic.Password, prefix+"auth.basic.password", o.Basic.Password, "Basic auth password.")
+	fl.StringVar(&o.MTLS.CertFile, prefix+"auth.mtls.cert-file", o.MTLS.CertFile, "Path to a TLS certificate file to present when joining.")
+	fl.StringVar(&o.MTLS.CertData, prefix+"auth.mtls.cert-data", o.MTLS.CertData, "Base64 encoded TLS certificate data to present when joining.")
+	fl.StringVar(&o.MTLS.KeyFile, prefix+"auth.mtls.key-file", o.MTLS.KeyFile, "Path to a TLS key file for the certificate.")
+	fl.StringVar(&o.MTLS.KeyData, prefix+"auth.mtls.key-data", o.MTLS.KeyData, "Base64 encoded TLS key data for the certificate.")
+	fl.StringVar(&o.LDAP.Username, prefix+"auth.ldap.username", o.LDAP.Username, "LDAP auth username.")
+	fl.StringVar(&o.LDAP.Password, prefix+"auth.ldap.password", o.LDAP.Password, "LDAP auth password.")
 }
 
 func (o *AuthOptions) Validate() error {
-	if o == nil {
+	if o.IsEmpty() {
 		return nil
 	}
-	if o.MTLS != (MTLSOptions{}) {
+	if !o.MTLS.IsEmpty() {
 		if o.MTLS.CertFile == "" && o.MTLS.CertData == "" {
 			return errors.New("auth.mtls.cert-file is required")
 		}
@@ -87,7 +110,7 @@ func (o *AuthOptions) Validate() error {
 			return errors.New("auth.mtls.key-file is required")
 		}
 	}
-	if o.Basic != (BasicAuthOptions{}) {
+	if !o.Basic.IsEmpty() {
 		if o.Basic.Username == "" {
 			return errors.New("auth.basic.username is required")
 		}
@@ -95,7 +118,7 @@ func (o *AuthOptions) Validate() error {
 			return errors.New("auth.basic.password is required")
 		}
 	}
-	if o.LDAP != (LDAPAuthOptions{}) {
+	if !o.LDAP.IsEmpty() {
 		if o.LDAP.Username == "" {
 			return errors.New("auth.ldap.username is required")
 		}
