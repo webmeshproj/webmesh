@@ -38,6 +38,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -214,8 +215,20 @@ func (a APIOptions) Validate() error {
 		return fmt.Errorf("listen-address is invalid: %w", err)
 	}
 	if !a.Insecure {
-		if (a.TLSCertFile == "" || a.TLSKeyFile == "") && (a.TLSCertData == "" || a.TLSKeyData == "") {
-			return fmt.Errorf("tls-cert-file and tls-key-file or tls-cert-data and tls-key-data must be set")
+		// If key file is supplied, make sure we have a cert-file with it.
+		if a.TLSKeyFile != "" && a.TLSCertFile == "" {
+			return fmt.Errorf("services.api.tls-cert-file must be set when services.api.tls-key-file is set")
+		}
+		// If key data is supplied, make sure we have a cert-data with it.
+		if a.TLSKeyData != "" && a.TLSCertData == "" {
+			return fmt.Errorf("services.api.tls-cert-data must be set when services.api.tls-key-data is set")
+		}
+		// Same in reverse
+		if a.TLSCertFile != "" && a.TLSKeyFile == "" {
+			return fmt.Errorf("services.api.tls-key-file must be set when services.api.tls-cert-file is set")
+		}
+		if a.TLSCertData != "" && a.TLSKeyData == "" {
+			return fmt.Errorf("services.api.tls-key-data must be set when services.api.tls-cert-data is set")
 		}
 	}
 	return nil
@@ -673,7 +686,7 @@ func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.No
 		// Build out the server options
 		if !o.API.Insecure {
 			// Setup TLS
-			tlsOpts, err := o.NewServerTLSOptions()
+			tlsOpts, err := o.NewServerTLSOptions(ctx)
 			if err != nil {
 				return conf, err
 			}
@@ -762,7 +775,11 @@ func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.No
 }
 
 // NewServerTLSOptions returns new TLS options for the gRPC server.
-func (o *ServiceOptions) NewServerTLSOptions() (grpc.ServerOption, error) {
+func (o *ServiceOptions) NewServerTLSOptions(ctx context.Context) (grpc.ServerOption, error) {
+	if o.API.Insecure {
+		// We shouldn't have gotten here. But as a fail safe, we return an insecure server.
+		return grpc.Creds(insecure.NewCredentials()), nil
+	}
 	tlsConfig := &tls.Config{}
 	if o.API.TLSCertFile != "" && o.API.TLSKeyFile != "" {
 		cert, err := tls.LoadX509KeyPair(o.API.TLSCertFile, o.API.TLSKeyFile)
@@ -785,6 +802,18 @@ func (o *ServiceOptions) NewServerTLSOptions() (grpc.ServerOption, error) {
 			return nil, err
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+	// If we got here with no certificates yet, generate a self-signed one.
+	if len(tlsConfig.Certificates) == 0 {
+		context.LoggerFrom(ctx).Info("Generating self-signed certificate for gRPC server")
+		key, cert, err := crypto.GenerateSelfSignedServerCert()
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{{
+			Certificate: [][]byte{cert.Raw},
+			PrivateKey:  key,
+		}}
 	}
 	// If we are using mTLS we need to request a client certificate
 	if o.API.MTLS {

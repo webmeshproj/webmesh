@@ -45,10 +45,9 @@ func TestServiceOptionsValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Defaults",
-			opts: &defaults,
-			// Defaults are invalid without explicitly setting insecure.
-			wantErr: true,
+			name:    "Defaults",
+			opts:    &defaults,
+			wantErr: false,
 		},
 		{
 			name:    "InsecureDefaults",
