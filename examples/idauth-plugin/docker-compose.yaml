@@ -16,7 +16,6 @@ services:
     networks:
       bootstrap:
         ipv4_address: 10.1.0.5
-    hostname: bootstrap-node
     entrypoint:
       - /webmesh-node
       - --global.insecure
@@ -25,23 +24,26 @@ services:
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --plugins.id-auth.allowed-ids=bootstrap-node
+      - --plugins.id-auth.id-files=/allowed-ids.txt
+    volumes:
+      - ./allowed-ids.txt:/allowed-ids.txt
     ports:
       - 8443:8443
-    volumes:
-      - ./htpasswd:/etc/htpasswd
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
   join-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
       bootstrap:
-    hostname: join-node
     entrypoint:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
       - --mesh.join-address=10.1.0.5:8443
+      - --wireguard.key-file=/wireguard.key
+      - --wireguard.key-rotation-interval=0
       - --auth.id-auth=true
+    volumes:
+      - ./example.key:/wireguard.key
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
