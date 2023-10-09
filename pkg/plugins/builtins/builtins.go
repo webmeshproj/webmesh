@@ -22,6 +22,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/debug"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/mtls"
 	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
@@ -31,6 +32,7 @@ import (
 func NewPluginMap() map[string]clients.PluginClient {
 	return map[string]clients.PluginClient{
 		"mtls":       clients.NewInProcessClient(&mtls.Plugin{}),
+		"idauth":     clients.NewInProcessClient(&idauth.Plugin{}),
 		"basic-auth": clients.NewInProcessClient(&basicauth.Plugin{}),
 		"ldap":       clients.NewInProcessClient(&ldap.Plugin{}),
 		"debug":      clients.NewInProcessClient(&debug.Plugin{}),
@@ -67,6 +69,7 @@ type FlagBinder interface {
 func NewPluginConfigs() map[string]FlagBinder {
 	return map[string]FlagBinder{
 		"mtls":       &mtls.Config{},
+		"idauth":     &idauth.Config{},
 		"basic-auth": &basicauth.Config{},
 		"ldap":       &ldap.Config{},
 		"debug":      &debug.Config{},
