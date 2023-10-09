@@ -49,20 +49,20 @@ type Plugin struct {
 type Config struct {
 	// AllowedIDs is a list of allowed peer IDs.
 	AllowedIDs []string `mapstructure:"allowed-ids,omitempty" koanf:"allowed-ids,omitempty"`
-	// IDFile is the path to a file containing a list of allowed peer IDs.
-	// This can be a local file or a file in a remote HTTP(S) location.
-	IDFile string `mapstructure:"id-file,omitempty" koanf:"id-file,omitempty"`
+	// IDFiles are paths to files containing lists of allowed peer IDs.
+	// These can be local files or files in a remote HTTP(S) location.
+	IDFiles []string `mapstructure:"id-files,omitempty" koanf:"id-files,omitempty"`
 }
 
 func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringSliceVar(&c.AllowedIDs, prefix+"allowed-ids", nil, "List of allowed peer IDs")
-	fs.StringVar(&c.IDFile, prefix+"id-file", "", "Path to a file containing a list of allowed peer IDs")
+	fs.StringSliceVar(&c.AllowedIDs, prefix+"allowed-ids", c.AllowedIDs, "List of allowed peer IDs")
+	fs.StringSliceVar(&c.IDFiles, prefix+"id-files", c.IDFiles, "Path to a file containing a list of allowed peer IDs")
 }
 
 func (c *Config) AsMapStructure() map[string]any {
 	return map[string]any{
 		"allowed-ids": c.AllowedIDs,
-		"id-file":     c.IDFile,
+		"id-files":    c.IDFiles,
 	}
 }
 
@@ -93,32 +93,35 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 		return nil, err
 	}
 	p.allowedIDs = config.AllowedIDs
-	if config.IDFile != "" {
-		var idData []byte
-		switch {
-		case strings.HasPrefix(config.IDFile, "http://"), strings.HasPrefix(config.IDFile, "https://"):
-			resp, err := http.Get(config.IDFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch ID file: %w", err)
+	if len(config.IDFiles) > 0 {
+		for _, file := range config.IDFiles {
+			var idData []byte
+			switch {
+			case strings.HasPrefix(file, "http://"), strings.HasPrefix(file, "https://"):
+				resp, err := http.Get(file)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch ID file: %w", err)
+				}
+				defer resp.Body.Close()
+				idData, err = io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read ID file: %w", err)
+				}
+			default:
+				fname := strings.TrimPrefix(file, "file://")
+				idData, err = os.ReadFile(fname)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read ID file: %w", err)
+				}
 			}
-			defer resp.Body.Close()
-			idData, err = io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read ID file: %w", err)
+			ids := strings.Split(string(idData), "\n")
+			for _, id := range ids {
+				id = strings.TrimSpace(id)
+				if id == "" {
+					continue
+				}
+				p.allowedIDs = append(p.allowedIDs, id)
 			}
-		default:
-			fname := strings.TrimPrefix(config.IDFile, "file://")
-			idData, err = os.ReadFile(fname)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read ID file: %w", err)
-			}
-		}
-		ids := strings.Split(string(idData), "\n")
-		for _, id := range ids {
-			if id == "" {
-				continue
-			}
-			p.allowedIDs = append(p.allowedIDs, id)
 		}
 	}
 	return &emptypb.Empty{}, nil
