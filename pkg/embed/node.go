@@ -192,7 +192,7 @@ func (n *node) Start(ctx context.Context) error {
 	}
 	n.services, err = services.NewServer(ctx, srvOpts)
 	if err != nil {
-		return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
+		return handleErr(fmt.Errorf("failed to create webmesh server: %w", err))
 	}
 	isStorageMember := n.conf.IsStorageMember()
 	features := n.conf.Services.NewFeatureSet(n.conf.Mesh.GRPCAdvertisePort, n.conf.Storage.ListenPort(), isStorageMember)
@@ -205,13 +205,13 @@ func (n *node) Start(ctx context.Context) error {
 	select {
 	case <-n.Mesh().Ready():
 	case <-ctx.Done():
-		return handleErr(fmt.Errorf("failed to start mesh node: %w", ctx.Err()))
+		return handleErr(fmt.Errorf("failed to start webmesh node: %w", ctx.Err()))
 	}
 
 	log.Info("Webmesh is ready")
 	go func() {
 		if err := n.services.ListenAndServe(); err != nil {
-			n.errs <- fmt.Errorf("failed to start gRPC server: %w", err)
+			n.errs <- fmt.Errorf("failed to start webmesh services: %w", err)
 		}
 	}()
 	return nil
