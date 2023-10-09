@@ -73,7 +73,7 @@ type Key interface {
 	Rendezvous(keys ...PublicKey) string
 }
 
-// PrivateKey is a private key used for encryption and identity over libp2p
+// PrivateKey is a private key used for encryption and identity over webmesh.
 type PrivateKey interface {
 	Key
 	p2pcrypto.PrivKey
@@ -86,7 +86,7 @@ type PrivateKey interface {
 	PublicKey() PublicKey
 }
 
-// PublicKey is a public key used for encryption and identity over libp2p
+// PublicKey is a public key used for encryption and identity over webmesh.
 type PublicKey interface {
 	Key
 	p2pcrypto.PubKey
