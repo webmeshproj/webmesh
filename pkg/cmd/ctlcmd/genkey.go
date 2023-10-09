@@ -17,6 +17,7 @@ limitations under the License.
 package ctlcmd
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -29,6 +30,7 @@ import (
 func init() {
 	rootCmd.AddCommand(genKeyCmd)
 	rootCmd.AddCommand(pubKeyCmd)
+	rootCmd.AddCommand(keyIDCmd)
 }
 
 var genKeyCmd = &cobra.Command{
@@ -67,6 +69,40 @@ var pubKeyCmd = &cobra.Command{
 			return err
 		}
 		fmt.Println(encodedPub)
+		return nil
+	},
+}
+
+var keyIDCmd = &cobra.Command{
+	Use:   "keyid",
+	Short: "Extract the key ID from a private or public key on stdin",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		data, err := io.ReadAll(cmd.InOrStdin())
+		if err != nil {
+			return err
+		}
+		data = bytes.TrimSpace(data)
+		switch len(data) {
+		case 0:
+			return fmt.Errorf("no data on stdin")
+		case 92:
+			// Private key
+			key, err := crypto.DecodePrivateKey(string(data))
+			if err != nil {
+				return err
+			}
+			fmt.Println(key.ID())
+		case 48:
+			// Public key
+			key, err := crypto.DecodePublicKey(string(data))
+			if err != nil {
+				return err
+			}
+			fmt.Println(key.ID())
+		default:
+			return fmt.Errorf("invalid key data")
+		}
 		return nil
 	},
 }

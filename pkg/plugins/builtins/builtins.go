@@ -32,7 +32,7 @@ import (
 func NewPluginMap() map[string]clients.PluginClient {
 	return map[string]clients.PluginClient{
 		"mtls":       clients.NewInProcessClient(&mtls.Plugin{}),
-		"idauth":     clients.NewInProcessClient(&idauth.Plugin{}),
+		"id-auth":    clients.NewInProcessClient(&idauth.Plugin{}),
 		"basic-auth": clients.NewInProcessClient(&basicauth.Plugin{}),
 		"ldap":       clients.NewInProcessClient(&ldap.Plugin{}),
 		"debug":      clients.NewInProcessClient(&debug.Plugin{}),
@@ -43,7 +43,7 @@ func NewPluginMap() map[string]clients.PluginClient {
 func NewPluginConfigs() map[string]FlagBinder {
 	return map[string]FlagBinder{
 		"mtls":       &mtls.Config{},
-		"idauth":     &idauth.Config{},
+		"id-auth":    &idauth.Config{},
 		"basic-auth": &basicauth.Config{},
 		"ldap":       &ldap.Config{},
 		"debug":      &debug.Config{},
