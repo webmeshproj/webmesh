@@ -39,6 +39,17 @@ func NewPluginMap() map[string]clients.PluginClient {
 	}
 }
 
+// NewPluginConfigs returns a map of the built-in plugin configurations.
+func NewPluginConfigs() map[string]FlagBinder {
+	return map[string]FlagBinder{
+		"mtls":       &mtls.Config{},
+		"idauth":     &idauth.Config{},
+		"basic-auth": &basicauth.Config{},
+		"ldap":       &ldap.Config{},
+		"debug":      &debug.Config{},
+	}
+}
+
 // NewClient returns a new built-in plugin client for the given plugin name.
 func NewClient(pluginName string) (clients.PluginClient, bool) {
 	client, ok := NewPluginMap()[pluginName]
@@ -47,7 +58,7 @@ func NewClient(pluginName string) (clients.PluginClient, bool) {
 
 // IsBuiltIn returns true if the plugin is a built-in plugin.
 func IsBuiltIn(pluginName string) bool {
-	_, ok := NewPluginMap()[pluginName]
+	_, ok := NewPluginConfigs()[pluginName]
 	return ok
 }
 
@@ -63,15 +74,4 @@ type FlagBinder interface {
 	// SetMapStructure is called to set the options from a map
 	// of string keys and values.
 	SetMapStructure(map[string]any)
-}
-
-// NewPluginConfigs returns a map of the built-in plugin configurations.
-func NewPluginConfigs() map[string]FlagBinder {
-	return map[string]FlagBinder{
-		"mtls":       &mtls.Config{},
-		"idauth":     &idauth.Config{},
-		"basic-auth": &basicauth.Config{},
-		"ldap":       &ldap.Config{},
-		"debug":      &debug.Config{},
-	}
 }
