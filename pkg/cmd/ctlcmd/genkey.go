@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -53,22 +52,40 @@ var genKeyCmd = &cobra.Command{
 
 var pubKeyCmd = &cobra.Command{
 	Use:   "pubkey",
-	Short: "Extract the public key from a private key on stdin",
+	Short: "Extract the public key from a private key or ID on stdin",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		data, err := io.ReadAll(cmd.InOrStdin())
 		if err != nil {
 			return err
 		}
-		key, err := crypto.DecodePrivateKey(strings.TrimSpace(string(data)))
-		if err != nil {
-			return err
+		data = bytes.TrimSpace(data)
+		switch len(data) {
+		case 92:
+			// This is a private key.
+			key, err := crypto.DecodePrivateKey(string(data))
+			if err != nil {
+				return err
+			}
+			encodedPub, err := key.PublicKey().Encode()
+			if err != nil {
+				return err
+			}
+			fmt.Println(encodedPub)
+		case 52:
+			// This is an ID with an embedded public key
+			key, err := crypto.PubKeyFromID(string(data))
+			if err != nil {
+				return err
+			}
+			encodedPub, err := key.Encode()
+			if err != nil {
+				return err
+			}
+			fmt.Println(encodedPub)
+		default:
+			return fmt.Errorf("invalid key data")
 		}
-		encodedPub, err := key.PublicKey().Encode()
-		if err != nil {
-			return err
-		}
-		fmt.Println(encodedPub)
 		return nil
 	},
 }
