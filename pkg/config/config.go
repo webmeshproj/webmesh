@@ -199,11 +199,12 @@ func (o *Config) Validate() error {
 
 // NodeID returns the node ID for this configuration, or any error attempting to determine it.
 func (o *Config) NodeID() (string, error) {
+	// Return an already set node ID
 	if o.Mesh.NodeID != "" {
 		return o.Mesh.NodeID, nil
 	}
 	// Check if we are using authentication
-	if o.Auth.MTLS != (MTLSOptions{}) {
+	if !o.Auth.MTLS.IsEmpty() {
 		// Parse the client certificate for the node ID
 		var certDataPEM []byte
 		var err error
@@ -234,18 +235,16 @@ func (o *Config) NodeID() (string, error) {
 		o.Mesh.NodeID = cert.Subject.CommonName
 		return cert.Subject.CommonName, nil
 	}
-	if o.Auth.Basic != (BasicAuthOptions{}) {
+	if !o.Auth.Basic.IsEmpty() {
 		// Parse the username for the node ID
 		o.Mesh.NodeID = o.Auth.Basic.Username
 		return o.Auth.Basic.Username, nil
 	}
-	if o.Auth.LDAP != (LDAPAuthOptions{}) {
+	if !o.Auth.LDAP.IsEmpty() {
 		// Parse the username for the node ID
 		o.Mesh.NodeID = o.Auth.LDAP.Username
 		return o.Auth.LDAP.Username, nil
 	}
-	// If we got this far, set our nodeID so we don't accidentally
-	// generate a new one every time.
-	o.Mesh.NodeID = DefaultNodeID
+	// Fall back to the hostname or generated one.
 	return DefaultNodeID, nil
 }

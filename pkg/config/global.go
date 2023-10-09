@@ -154,6 +154,14 @@ func (o *GlobalOptions) Validate() error {
 // ApplyGlobals applies the global options to the given options. It returns the
 // options for convenience.
 func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
+	// Generate a NodeID if not set.
+	if o.Mesh.NodeID == "" {
+		var err error
+		o.Mesh.NodeID, err = o.NodeID()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate node ID: %w", err)
+		}
+	}
 	// Protocol preferences
 	o.Mesh.DisableIPv4 = global.DisableIPv4
 	o.Mesh.DisableIPv6 = global.DisableIPv6
