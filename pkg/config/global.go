@@ -153,11 +153,11 @@ func (o *GlobalOptions) Validate() error {
 
 // ApplyGlobals applies the global options to the given options. It returns the
 // options for convenience.
-func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
+func (global *GlobalOptions) ApplyGlobals(ctx context.Context, o *Config) (*Config, error) {
 	// Generate a NodeID if not set.
 	if o.Mesh.NodeID == "" {
 		var err error
-		o.Mesh.NodeID, err = o.NodeID()
+		o.Mesh.NodeID, err = o.NodeID(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate node ID: %w", err)
 		}
@@ -176,7 +176,7 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 		}
 	}
 	if global.DetectEndpoints || global.DetectPrivateEndpoints {
-		detectedEndpoints, err = endpoints.Detect(context.Background(), endpoints.DetectOpts{
+		detectedEndpoints, err = endpoints.Detect(ctx, endpoints.DetectOpts{
 			DetectIPv6:           global.DetectIPv6,
 			DetectPrivate:        global.DetectPrivateEndpoints,
 			AllowRemoteDetection: global.AllowRemoteDetection,
@@ -353,7 +353,7 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 		if bridgeOpts.Mesh.MeshDNSAdvertisePort == 0 {
 			bridgeOpts.Mesh.MeshDNSAdvertisePort = meshDNSPort
 		}
-		overlay, err := global.ApplyGlobals(bridgeOpts)
+		overlay, err := global.ApplyGlobals(ctx, bridgeOpts)
 		if err != nil {
 			return nil, err
 		}

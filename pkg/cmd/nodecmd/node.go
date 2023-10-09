@@ -98,8 +98,12 @@ func Execute() error {
 		return nil
 	}
 
+	// Setup logging and a base context
+	log := logging.SetupLogging(conf.Global.LogLevel, conf.Global.LogFormat)
+	ctx := context.WithLogger(context.Background(), log)
+
 	// Apply globals
-	conf, err = conf.Global.ApplyGlobals(conf)
+	conf, err = conf.Global.ApplyGlobals(ctx, conf)
 	if err != nil {
 		return err
 	}
@@ -119,9 +123,6 @@ func Execute() error {
 	}
 
 	// Time to get going
-
-	log := logging.SetupLogging(conf.Global.LogLevel, conf.Global.LogFormat)
-	ctx := context.WithLogger(context.Background(), log)
 
 	log.Info("Starting webmesh node",
 		slog.String("version", version.Version),

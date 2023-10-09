@@ -65,6 +65,9 @@ type WireGuardOptions struct {
 	RecordMetrics bool `koanf:"record-metrics,omitempty"`
 	// RecordMetricsInterval is the interval at which to update WireGuard metrics.
 	RecordMetricsInterval time.Duration `koanf:"record-metrics-interval,omitempty"`
+
+	// loaded is an already loaded key from the configuration.
+	loaded crypto.PrivateKey `koanf:"-"`
 }
 
 // NewWireGuardOptions returns a new WireGuardOptions with sensible defaults.
@@ -128,10 +131,18 @@ func (o *WireGuardOptions) Validate() error {
 // LoadKey loads the key from the given configuration.
 func (o *WireGuardOptions) LoadKey(ctx context.Context) (crypto.PrivateKey, error) {
 	log := context.LoggerFrom(ctx)
+	if o.loaded != nil {
+		return o.loaded, nil
+	}
 	if o.KeyFile == "" {
 		// Generate an ephemeral key
 		log.Debug("Generating ephemeral WireGuard key")
-		return crypto.GenerateKey()
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			return nil, fmt.Errorf("generate ephemeral key: %w", err)
+		}
+		o.loaded = key
+		return key, nil
 	}
 	// Check that the file exists and hasn't expired.
 	stat, err := os.Stat(o.KeyFile)
@@ -139,7 +150,7 @@ func (o *WireGuardOptions) LoadKey(ctx context.Context) (crypto.PrivateKey, erro
 		return nil, fmt.Errorf("stat wireguard key file: %w", err)
 	} else if os.IsNotExist(err) {
 		// Generate a new key
-		log.Info("Generating new WireGuard key and saving to file", slog.String("file", o.KeyFile))
+		log.Debug("Generating new WireGuard key and saving to file", slog.String("file", o.KeyFile))
 		key, err := crypto.GenerateKey()
 		if err != nil {
 			return nil, fmt.Errorf("generate new key: %w", err)
@@ -151,6 +162,7 @@ func (o *WireGuardOptions) LoadKey(ctx context.Context) (crypto.PrivateKey, erro
 		if err := os.WriteFile(o.KeyFile, []byte(encoded), 0600); err != nil {
 			return nil, fmt.Errorf("write key file: %w", err)
 		}
+		o.loaded = key
 		return key, nil
 	}
 	if stat.IsDir() {
@@ -160,12 +172,12 @@ func (o *WireGuardOptions) LoadKey(ctx context.Context) (crypto.PrivateKey, erro
 	if o.KeyRotationInterval > 0 {
 		if stat.ModTime().Add(o.KeyRotationInterval).Before(time.Now()) {
 			// Delete the key file if it's older than the key rotation interval.
-			log.Info("Removing expired WireGuard key file", slog.String("file", o.KeyFile))
+			log.Debug("Removing expired WireGuard key file", slog.String("file", o.KeyFile))
 			if err := os.Remove(o.KeyFile); err != nil {
 				return nil, fmt.Errorf("remove expired wireguard key file: %w", err)
 			}
 			// Generate a new key and save it to the file
-			log.Info("Generating new WireGuard key and saving to file", slog.String("file", o.KeyFile))
+			log.Debug("Generating new WireGuard key and saving to file", slog.String("file", o.KeyFile))
 			key, err := crypto.GenerateKey()
 			if err != nil {
 				return nil, fmt.Errorf("generate new key: %w", err)
@@ -177,14 +189,20 @@ func (o *WireGuardOptions) LoadKey(ctx context.Context) (crypto.PrivateKey, erro
 			if err := os.WriteFile(o.KeyFile, []byte(encoded), 0600); err != nil {
 				return nil, fmt.Errorf("write key file: %w", err)
 			}
+			o.loaded = key
 			return key, nil
 		}
 	}
 	// Load the key from the file
-	log.Info("Loading WireGuard key from file", slog.String("file", o.KeyFile))
+	log.Debug("Loading WireGuard key from file", slog.String("file", o.KeyFile))
 	keyData, err := os.ReadFile(o.KeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("read key file: %w", err)
 	}
-	return crypto.DecodePrivateKey(strings.TrimSpace(string(keyData)))
+	key, err := crypto.DecodePrivateKey(strings.TrimSpace(string(keyData)))
+	if err != nil {
+		return nil, fmt.Errorf("decode key: %w", err)
+	}
+	o.loaded = key
+	return key, nil
 }

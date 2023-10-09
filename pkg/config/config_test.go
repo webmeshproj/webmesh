@@ -20,14 +20,19 @@ import (
 	"encoding/base64"
 	"os"
 	"testing"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
 
 func TestNodeID(t *testing.T) {
 	t.Parallel()
+	log := logging.NewLogger("", "")
+	ctx := context.WithLogger(context.Background(), log)
 
 	t.Run("Default", func(t *testing.T) {
 		conf := NewDefaultConfig("")
-		id, err := conf.NodeID()
+		id, err := conf.NodeID(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -35,7 +40,7 @@ func TestNodeID(t *testing.T) {
 			t.Fatalf("expected %s, got %s", DefaultNodeID, id)
 		}
 		// Subsequent calls should return the same value
-		id, err = conf.NodeID()
+		id, err = conf.NodeID(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -46,7 +51,7 @@ func TestNodeID(t *testing.T) {
 
 	t.Run("Preset", func(t *testing.T) {
 		conf := NewDefaultConfig("test")
-		id, err := conf.NodeID()
+		id, err := conf.NodeID(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +66,7 @@ func TestNodeID(t *testing.T) {
 			Username: "test-basic-user",
 			Password: "test-password",
 		}
-		id, err := conf.NodeID()
+		id, err := conf.NodeID(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +81,7 @@ func TestNodeID(t *testing.T) {
 			Username: "test-ldap-user",
 			Password: "test-password",
 		}
-		id, err := conf.NodeID()
+		id, err := conf.NodeID(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,7 +96,7 @@ func TestNodeID(t *testing.T) {
 			conf.Auth.MTLS = MTLSOptions{
 				CertData: base64.StdEncoding.EncodeToString([]byte(testCert)),
 			}
-			id, err := conf.NodeID()
+			id, err := conf.NodeID(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -118,7 +123,7 @@ func TestNodeID(t *testing.T) {
 			conf.Auth.MTLS = MTLSOptions{
 				CertFile: f.Name(),
 			}
-			id, err := conf.NodeID()
+			id, err := conf.NodeID(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}

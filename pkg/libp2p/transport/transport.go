@@ -466,7 +466,9 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 		ctx, cancel = context.WithTimeout(ctx, t.opts.StartTimeout)
 		defer cancel()
 	}
-	conf, err := t.opts.Config.Global.ApplyGlobals(t.opts.Config)
+	log := logging.NewLogger(t.opts.Config.Global.LogLevel, t.opts.Config.Global.LogFormat).With("component", "webmesh-node")
+	ctx = context.WithLogger(ctx, log)
+	conf, err := t.opts.Config.Global.ApplyGlobals(ctx, t.opts.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply global config: %w", err)
 	}
@@ -500,7 +502,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 		return nil, fmt.Errorf("failed to create mesh config: %w", err)
 	}
 	meshConfig.Key = t.key
-	node := meshnode.NewWithLogger(logging.NewLogger(conf.Global.LogLevel, conf.Global.LogFormat).With("component", "webmesh-node"), meshConfig)
+	node := meshnode.NewWithLogger(log, meshConfig)
 	storageProvider, err := conf.NewStorageProvider(ctx, node, conf.Bootstrap.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage provider: %w", err)

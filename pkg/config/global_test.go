@@ -20,11 +20,15 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
 
 func TestGlobalOptionsValidate(t *testing.T) {
 	t.Parallel()
 	defaults := NewGlobalOptions()
+
 	tc := []struct {
 		name    string
 		opts    *GlobalOptions
@@ -122,12 +126,14 @@ func TestGlobalOptionsValidate(t *testing.T) {
 
 func TestApplyGlobalOptions(t *testing.T) {
 	t.Parallel()
+	log := logging.NewLogger("", "")
+	ctx := context.WithLogger(context.Background(), log)
 
 	t.Run("ProtocolPreferences", func(t *testing.T) {
 		t.Parallel()
 		opts := NewDefaultConfig("test")
 		opts.Global.DisableIPv4 = true
-		opts, err := opts.Global.ApplyGlobals(opts)
+		opts, err := opts.Global.ApplyGlobals(ctx, opts)
 		if err != nil {
 			t.Errorf("ApplyGlobals() error = %v", err)
 		}
@@ -136,7 +142,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 		}
 		opts.Global.DisableIPv4 = false
 		opts.Global.DisableIPv6 = true
-		opts, err = opts.Global.ApplyGlobals(opts)
+		opts, err = opts.Global.ApplyGlobals(ctx, opts)
 		if err != nil {
 			t.Errorf("ApplyGlobals() error = %v", err)
 		}
@@ -151,7 +157,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 			t.Parallel()
 			opts := NewDefaultConfig("test")
 			opts.Global.PrimaryEndpoint = "invalid"
-			_, err := opts.Global.ApplyGlobals(opts)
+			_, err := opts.Global.ApplyGlobals(ctx, opts)
 			if err == nil {
 				t.Errorf("ApplyGlobals() expected error")
 			}
@@ -165,7 +171,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 			opts.WireGuard.ListenPort = 1234
 			opts.Services.TURN.Enabled = true
 			opts.Services.TURN.ListenAddress = "[::]:3478"
-			opts, err := opts.Global.ApplyGlobals(opts)
+			opts, err := opts.Global.ApplyGlobals(ctx, opts)
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
 			}
@@ -195,7 +201,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 		opts := NewDefaultConfig("test")
 		opts.Global.LogLevel = "test"
 		opts.Global.LogFormat = "test"
-		opts, err := opts.Global.ApplyGlobals(opts)
+		opts, err := opts.Global.ApplyGlobals(ctx, opts)
 		if err != nil {
 			t.Errorf("ApplyGlobals() error = %v", err)
 		}
@@ -217,7 +223,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 			opts.Global.TLSCertFile = "certfile"
 			opts.Global.TLSKeyFile = "keyfile"
 			opts.Global.TLSCAFile = "cafile"
-			opts, err := opts.Global.ApplyGlobals(opts)
+			opts, err := opts.Global.ApplyGlobals(ctx, opts)
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
 			}
@@ -250,7 +256,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 			opts.Global.TLSCertFile = "certfile"
 			opts.Global.TLSKeyFile = "keyfile"
 			opts.Global.TLSClientCAFile = "clientcafile"
-			opts, err := opts.Global.ApplyGlobals(opts)
+			opts, err := opts.Global.ApplyGlobals(ctx, opts)
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
 			}
@@ -284,7 +290,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 			t.Parallel()
 			opts := NewDefaultConfig("test")
 			opts.Global.Insecure = true
-			opts, err := opts.Global.ApplyGlobals(opts)
+			opts, err := opts.Global.ApplyGlobals(ctx, opts)
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
 			}
@@ -300,7 +306,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 			t.Parallel()
 			opts := NewDefaultConfig("test")
 			opts.Global.InsecureSkipVerify = true
-			opts, err := opts.Global.ApplyGlobals(opts)
+			opts, err := opts.Global.ApplyGlobals(ctx, opts)
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
 			}
@@ -313,7 +319,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 			t.Parallel()
 			opts := NewDefaultConfig("test")
 			opts.Global.VerifyChainOnly = true
-			opts, err := opts.Global.ApplyGlobals(opts)
+			opts, err := opts.Global.ApplyGlobals(ctx, opts)
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
 			}
@@ -327,7 +333,7 @@ func TestApplyGlobalOptions(t *testing.T) {
 			opts := NewDefaultConfig("test")
 			opts.Global.TLSCertFile = "certfile"
 			opts.Global.TLSKeyFile = "keyfile"
-			opts, err := opts.Global.ApplyGlobals(opts)
+			opts, err := opts.Global.ApplyGlobals(ctx, opts)
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
 			}

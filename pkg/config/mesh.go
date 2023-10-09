@@ -44,6 +44,7 @@ import (
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -233,7 +234,7 @@ func (o *Config) IsStorageMember() bool {
 // The key is optional and will be taken from the configuration if not provided.
 func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf meshnode.Config, err error) {
 	log := context.LoggerFrom(ctx)
-	nodeid, err := o.NodeID()
+	nodeid, err := o.NodeID(ctx)
 	if err != nil {
 		return
 	}
@@ -306,7 +307,7 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 			tlsconf.VerifyPeerCertificate = netutil.VerifyChainOnly
 		}
 		// Check if we are using mutual TLS
-		if o.Auth.MTLS != (MTLSOptions{}) {
+		if !o.Auth.MTLS.IsEmpty() {
 			log.Debug("Configuring mutual TLS")
 			var cert tls.Certificate
 			if o.Auth.MTLS.CertFile != "" && o.Auth.MTLS.KeyFile != "" {
@@ -340,13 +341,17 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 		conf.Credentials = append(conf.Credentials, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 	// Check for per-rpc credentials
-	if o.Auth.Basic != (BasicAuthOptions{}) {
+	if !o.Auth.Basic.IsEmpty() {
 		log.Debug("Configuring basic authentication")
 		conf.Credentials = append(conf.Credentials, basicauth.NewCreds(o.Auth.Basic.Username, o.Auth.Basic.Password))
 	}
-	if o.Auth.LDAP != (LDAPAuthOptions{}) {
+	if !o.Auth.LDAP.IsEmpty() {
 		log.Debug("Configuring LDAP authentication")
 		conf.Credentials = append(conf.Credentials, ldap.NewCreds(o.Auth.LDAP.Username, o.Auth.LDAP.Password))
+	}
+	if o.Auth.IDAuth {
+		log.Debug("Configuring ID authentication")
+		conf.Credentials = append(conf.Credentials, idauth.NewCreds(key))
 	}
 	return
 }
@@ -355,7 +360,7 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 // be started before it can be used. Host can be nil and if one is needed it will be created.
 func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, provider storage.Provider, host host.Host) (opts meshnode.ConnectOptions, err error) {
 	// Determine our node ID
-	nodeid, err := o.NodeID()
+	nodeid, err := o.NodeID(ctx)
 	if err != nil {
 		return
 	}

@@ -27,6 +27,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/spf13/pflag"
+
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 // DefaultNodeID is the default node ID used if no other is configured
@@ -106,8 +108,7 @@ func NewInsecureConfig(nodeID string) *Config {
 	conf.Storage.Raft.LeaderLeaseTimeout = time.Millisecond * 500
 	conf.Global.Insecure = true
 	conf.Services.API.Insecure = true
-	c, _ := conf.Global.ApplyGlobals(conf)
-	return c
+	return conf
 }
 
 // BindFlags binds the flags. The options are returned for convenience.
@@ -198,10 +199,19 @@ func (o *Config) Validate() error {
 }
 
 // NodeID returns the node ID for this configuration, or any error attempting to determine it.
-func (o *Config) NodeID() (string, error) {
+func (o *Config) NodeID(ctx context.Context) (string, error) {
 	// Return an already set node ID
 	if o.Mesh.NodeID != "" {
 		return o.Mesh.NodeID, nil
+	}
+	// Check if we are using ID authentication.
+	if o.Auth.IDAuth {
+		key, err := o.WireGuard.LoadKey(ctx)
+		if err != nil {
+			return "", fmt.Errorf("load wireguard key: %w", err)
+		}
+		o.Mesh.NodeID = key.ID()
+		return key.ID(), nil
 	}
 	// Check if we are using authentication
 	if !o.Auth.MTLS.IsEmpty() {
