@@ -238,7 +238,7 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 		return
 	}
 	if key == nil {
-		key, err = o.LoadKey(ctx)
+		key, err = o.WireGuard.LoadKey(ctx)
 		if err != nil {
 			return
 		}
@@ -349,68 +349,6 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 		conf.Credentials = append(conf.Credentials, ldap.NewCreds(o.Auth.LDAP.Username, o.Auth.LDAP.Password))
 	}
 	return
-}
-
-// LoadKey loads the key from the given configuration.
-func (o *Config) LoadKey(ctx context.Context) (crypto.PrivateKey, error) {
-	log := context.LoggerFrom(ctx)
-	if o.WireGuard.KeyFile == "" {
-		// Generate an ephemeral key
-		log.Debug("Generating ephemeral WireGuard key")
-		return crypto.GenerateKey()
-	}
-	// Check that the file exists and hasn't expired.
-	stat, err := os.Stat(o.WireGuard.KeyFile)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("stat wireguard key file: %w", err)
-	} else if os.IsNotExist(err) {
-		// Generate a new key
-		log.Info("Generating new WireGuard key and saving to file", slog.String("file", o.WireGuard.KeyFile))
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			return nil, fmt.Errorf("generate new key: %w", err)
-		}
-		encoded, err := key.Encode()
-		if err != nil {
-			return nil, fmt.Errorf("encode key: %w", err)
-		}
-		if err := os.WriteFile(o.WireGuard.KeyFile, []byte(encoded), 0600); err != nil {
-			return nil, fmt.Errorf("write key file: %w", err)
-		}
-		return key, nil
-	}
-	if stat.IsDir() {
-		return nil, fmt.Errorf("wireguard key file is a directory")
-	}
-	// Check if the key is expired
-	if stat.ModTime().Add(o.WireGuard.KeyRotationInterval).Before(time.Now()) {
-		// Delete the key file if it's older than the key rotation interval.
-		log.Info("Removing expired WireGuard key file", slog.String("file", o.WireGuard.KeyFile))
-		if err := os.Remove(o.WireGuard.KeyFile); err != nil {
-			return nil, fmt.Errorf("remove expired wireguard key file: %w", err)
-		}
-		// Generate a new key and save it to the file
-		log.Info("Generating new WireGuard key and saving to file", slog.String("file", o.WireGuard.KeyFile))
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			return nil, fmt.Errorf("generate new key: %w", err)
-		}
-		encoded, err := key.Encode()
-		if err != nil {
-			return nil, fmt.Errorf("encode key: %w", err)
-		}
-		if err := os.WriteFile(o.WireGuard.KeyFile, []byte(encoded), 0600); err != nil {
-			return nil, fmt.Errorf("write key file: %w", err)
-		}
-		return key, nil
-	}
-	// Load the key from the file
-	log.Info("Loading WireGuard key from file", slog.String("file", o.WireGuard.KeyFile))
-	keyData, err := os.ReadFile(o.WireGuard.KeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("read key file: %w", err)
-	}
-	return crypto.DecodePrivateKey(strings.TrimSpace(string(keyData)))
 }
 
 // NewConnectOptions returns new connection options for the configuration. The given raft node must

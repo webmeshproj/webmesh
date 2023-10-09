@@ -45,7 +45,7 @@ type TransportOptions struct {
 // embedded webmesh node.
 func WithWebmeshTransport(topts TransportOptions) config.Option {
 	ctx := context.Background()
-	key, err := topts.Config.LoadKey(ctx)
+	key, err := topts.Config.WireGuard.LoadKey(ctx)
 	if err != nil {
 		panic(err)
 	}
