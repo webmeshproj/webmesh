@@ -66,9 +66,10 @@ type ServiceOptions struct {
 }
 
 // NewServiceOptions returns a new ServiceOptions with the default values.
-func NewServiceOptions() ServiceOptions {
+// Disabled sets the initial state of whether the gRPC API is enabled.
+func NewServiceOptions(disabled bool) ServiceOptions {
 	return ServiceOptions{
-		API:     NewAPIOptions(),
+		API:     NewAPIOptions(disabled),
 		WebRTC:  NewWebRTCOptions(),
 		MeshDNS: NewMeshDNSOptions(),
 		TURN:    NewTURNOptions(),
@@ -77,10 +78,11 @@ func NewServiceOptions() ServiceOptions {
 }
 
 // NewInsecureServiceOptions returns a new ServiceOptions with the default values
-// and insecure set to true.
-func NewInsecureServiceOptions() ServiceOptions {
+// and insecure set to true. Disabled sets the initial state of whether the gRPC API
+// is enabled.
+func NewInsecureServiceOptions(disabled bool) ServiceOptions {
 	return ServiceOptions{
-		API:     NewInsecureAPIOptions(),
+		API:     NewInsecureAPIOptions(disabled),
 		WebRTC:  NewWebRTCOptions(),
 		MeshDNS: NewMeshDNSOptions(),
 		TURN:    NewTURNOptions(),
@@ -157,16 +159,18 @@ type APIOptions struct {
 }
 
 // NewAPIOptions returns a new APIOptions with the default values.
-func NewAPIOptions() APIOptions {
+func NewAPIOptions(disabled bool) APIOptions {
 	return APIOptions{
+		Disabled:      disabled,
 		ListenAddress: services.DefaultGRPCListenAddress,
 	}
 }
 
 // NewInsecureAPIOptions returns a new APIOptions with the default values
 // and insecure set to true.
-func NewInsecureAPIOptions() APIOptions {
+func NewInsecureAPIOptions(disabled bool) APIOptions {
 	return APIOptions{
+		Disabled:      disabled,
 		ListenAddress: services.DefaultGRPCListenAddress,
 		Insecure:      true,
 	}

@@ -30,8 +30,8 @@ import (
 
 func TestServiceOptionsValidate(t *testing.T) {
 	t.Parallel()
-	defaults := NewServiceOptions()
-	insecureDefaults := NewInsecureServiceOptions()
+	defaults := NewServiceOptions(false)
+	insecureDefaults := NewInsecureServiceOptions(false)
 	tc := []struct {
 		name    string
 		opts    *ServiceOptions
@@ -207,7 +207,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "DisabledWebRTCAPI",
 			opts: &ServiceOptions{
-				API: NewInsecureAPIOptions(),
+				API: NewInsecureAPIOptions(false),
 				WebRTC: WebRTCOptions{
 					Enabled: false,
 				},
@@ -220,7 +220,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "InvalidSTUNServers",
 			opts: &ServiceOptions{
-				API: NewInsecureAPIOptions(),
+				API: NewInsecureAPIOptions(false),
 				WebRTC: WebRTCOptions{
 					Enabled: true,
 					STUNServers: []string{
@@ -236,7 +236,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "ValidSTUNServers",
 			opts: &ServiceOptions{
-				API: NewInsecureAPIOptions(),
+				API: NewInsecureAPIOptions(false),
 				WebRTC: WebRTCOptions{
 					Enabled:     true,
 					STUNServers: webrtc.DefaultSTUNServers,
@@ -250,7 +250,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "DisabledTURNServer",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN: TURNOptions{
@@ -263,7 +263,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "NoTURNListenAddress",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN: TURNOptions{
@@ -281,7 +281,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "InvalidTURNListenAddress",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN: TURNOptions{
@@ -299,7 +299,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "ValidTURNListenAddress",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN: TURNOptions{
@@ -317,7 +317,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "NoTURNPublicIPOrEndpoint",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN: TURNOptions{
@@ -335,7 +335,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "InvalidTURNPublicIP",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN: TURNOptions{
@@ -352,7 +352,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "InvalidTURNPortRange",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN: TURNOptions{
@@ -369,7 +369,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "DisabledDNSOptions",
 			opts: &ServiceOptions{
-				API:    NewInsecureAPIOptions(),
+				API:    NewInsecureAPIOptions(false),
 				WebRTC: NewWebRTCOptions(),
 				MeshDNS: MeshDNSOptions{
 					Enabled: false,
@@ -382,7 +382,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "NoDNSListenAddrs",
 			opts: &ServiceOptions{
-				API:    NewInsecureAPIOptions(),
+				API:    NewInsecureAPIOptions(false),
 				WebRTC: NewWebRTCOptions(),
 				MeshDNS: MeshDNSOptions{
 					Enabled: true,
@@ -395,7 +395,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "InvalidDNSTCPAddr",
 			opts: &ServiceOptions{
-				API:    NewInsecureAPIOptions(),
+				API:    NewInsecureAPIOptions(false),
 				WebRTC: NewWebRTCOptions(),
 				MeshDNS: MeshDNSOptions{
 					Enabled:   true,
@@ -409,7 +409,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "InvalidDNSUDPAddr",
 			opts: &ServiceOptions{
-				API:    NewInsecureAPIOptions(),
+				API:    NewInsecureAPIOptions(false),
 				WebRTC: NewWebRTCOptions(),
 				MeshDNS: MeshDNSOptions{
 					Enabled:   true,
@@ -423,7 +423,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "ValidDNSUDPAddr",
 			opts: &ServiceOptions{
-				API:    NewInsecureAPIOptions(),
+				API:    NewInsecureAPIOptions(false),
 				WebRTC: NewWebRTCOptions(),
 				MeshDNS: MeshDNSOptions{
 					Enabled:   true,
@@ -437,7 +437,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "ValidDNSTCPAddr",
 			opts: &ServiceOptions{
-				API:    NewInsecureAPIOptions(),
+				API:    NewInsecureAPIOptions(false),
 				WebRTC: NewWebRTCOptions(),
 				MeshDNS: MeshDNSOptions{
 					Enabled:   true,
@@ -451,7 +451,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "ValidDNSTCPAndUDPAddr",
 			opts: &ServiceOptions{
-				API:    NewInsecureAPIOptions(),
+				API:    NewInsecureAPIOptions(false),
 				WebRTC: NewWebRTCOptions(),
 				MeshDNS: MeshDNSOptions{
 					Enabled:   true,
@@ -466,7 +466,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "DisabledMetrics",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN:    NewTURNOptions(),
@@ -479,7 +479,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "NoMetricsAddress",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN:    NewTURNOptions(),
@@ -493,7 +493,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "InvalidMetricsAddress",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN:    NewTURNOptions(),
@@ -507,7 +507,7 @@ func TestServiceOptionsValidate(t *testing.T) {
 		{
 			name: "ValidMetricsAddress",
 			opts: &ServiceOptions{
-				API:     NewInsecureAPIOptions(),
+				API:     NewInsecureAPIOptions(false),
 				WebRTC:  NewWebRTCOptions(),
 				MeshDNS: NewMeshDNSOptions(),
 				TURN:    NewTURNOptions(),
