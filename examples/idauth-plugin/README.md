@@ -1,4 +1,4 @@
-# ID based Authentication Plugin
+# ID Based Authentication Plugin
 
 This plugin allows you to authenticate users based on an ID derived from their public key.
 To get any use out of this plugin, you generally want to use persistent identities, such as those saved to this directory.
