@@ -25,6 +25,10 @@ import (
 
 // AuthOptions are options for authentication into the mesh.
 type AuthOptions struct {
+	// IDAuth indicates to use ID authentication. An ID is derived
+	// from the public wireguard key and presented with a signature
+	// that can be verified by the private wireguard key.
+	IDAuth bool `koanf:"id-auth,omitempty"`
 	// MTLS are options for mutual TLS. This is the recommended
 	// authentication method.
 	MTLS MTLSOptions `koanf:"mtls,omitempty"`
@@ -44,7 +48,7 @@ func (o *AuthOptions) IsEmpty() bool {
 	if o == nil {
 		return true
 	}
-	return o.MTLS.IsEmpty() && o.Basic.IsEmpty() && o.LDAP.IsEmpty()
+	return !o.IDAuth && o.MTLS.IsEmpty() && o.Basic.IsEmpty() && o.LDAP.IsEmpty()
 }
 
 // MTLSEnabled is true if any mtls fields are set.
@@ -107,6 +111,7 @@ func (o *LDAPAuthOptions) IsEmpty() bool {
 
 // BindFlags binds the flags to the options.
 func (o *AuthOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
+	fl.BoolVar(&o.IDAuth, prefix+"id-auth", o.IDAuth, "Use ID authentication.")
 	fl.StringVar(&o.Basic.Username, prefix+"basic.username", o.Basic.Username, "Basic auth username.")
 	fl.StringVar(&o.Basic.Password, prefix+"basic.password", o.Basic.Password, "Basic auth password.")
 	fl.StringVar(&o.MTLS.CertFile, prefix+"mtls.cert-file", o.MTLS.CertFile, "Path to a TLS certificate file to present when joining.")

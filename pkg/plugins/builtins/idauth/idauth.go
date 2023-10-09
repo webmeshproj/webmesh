@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
@@ -93,7 +92,7 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 	if !ok {
 		return nil, fmt.Errorf("missing %s header", signatureHeader)
 	}
-	pubKey, err := crypto.PubKeyFromID(peer.ID(id))
+	pubKey, err := crypto.PubKeyFromID(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract public key from ID: %w", err)
 	}

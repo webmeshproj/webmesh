@@ -28,6 +28,7 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	cryptopb "github.com/libp2p/go-libp2p/core/crypto/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	b58 "github.com/mr-tron/base58/base58"
 	oed25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 	"github.com/oasisprotocol/curve25519-voi/primitives/x25519"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -56,7 +57,7 @@ type Key interface {
 	p2pcrypto.Key
 
 	// ID returns the peer ID of the key.
-	ID() peer.ID
+	ID() string
 
 	// Bytes returns the raw bytes of the key. This is the same as Key.Raw
 	// without needing to do an error check.
@@ -194,8 +195,12 @@ func ParsePublicKey(data []byte) (PublicKey, error) {
 }
 
 // PubKeyFromID returns the public key from the given peer ID.
-func PubKeyFromID(id peer.ID) (PublicKey, error) {
-	key, err := id.ExtractPublicKey()
+func PubKeyFromID(id string) (PublicKey, error) {
+	idBytes, err := b58.Decode(id)
+	if err != nil {
+		return nil, fmt.Errorf("decode peer ID: %w", err)
+	}
+	key, err := peer.ID(idBytes).ExtractPublicKey()
 	if err != nil {
 		return nil, fmt.Errorf("extract public key from peer ID: %w", err)
 	}
@@ -228,7 +233,7 @@ func (w *WebmeshPrivateKey) Type() cryptopb.KeyType {
 }
 
 // ID returns the peer ID of the key.
-func (w *WebmeshPrivateKey) ID() peer.ID {
+func (w *WebmeshPrivateKey) ID() string {
 	return w.PublicKey().ID()
 }
 
@@ -320,9 +325,9 @@ func (w *WebmeshPublicKey) Type() cryptopb.KeyType {
 }
 
 // ID returns the peer ID of the key.
-func (w *WebmeshPublicKey) ID() peer.ID {
+func (w *WebmeshPublicKey) ID() string {
 	id, _ := peer.IDFromPublicKey(w)
-	return id
+	return id.String()
 }
 
 // Bytes returns the raw bytes of the key. This is the same as Key.Raw
