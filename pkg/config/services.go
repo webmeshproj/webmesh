@@ -97,7 +97,7 @@ func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	s.TURN.BindFlags(prefix+"turn.", fl)
 	s.Metrics.BindFlags(prefix+"metrics.", fl)
 	// Don't recurse on meshdns flags in bridge configurations
-	if strings.Contains(prefix, "bridge.") {
+	if !strings.Contains(prefix, "bridge.") {
 		s.MeshDNS.BindFlags(prefix+"meshdns.", fl)
 	}
 }
