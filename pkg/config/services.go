@@ -211,6 +211,19 @@ func (a APIOptions) Validate() error {
 	return nil
 }
 
+// ListenPort returns the listen port configured by these API options.
+func (a APIOptions) ListenPort() uint16 {
+	_, port, err := net.SplitHostPort(a.ListenAddress)
+	if err != nil {
+		return 0
+	}
+	out, err := strconv.Atoi(port)
+	if err != nil {
+		return 0
+	}
+	return uint16(out)
+}
+
 // WebRTCOptions are the options for the WebRTC API.
 type WebRTCOptions struct {
 	// Enabled enables the WebRTC API.
