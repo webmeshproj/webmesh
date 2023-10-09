@@ -248,3 +248,8 @@ func (o *Config) NodeID() (string, error) {
 	// Fall back to the hostname or generated one.
 	return DefaultNodeID, nil
 }
+
+// MTLSEnabled reports whether mtls is enabled.
+func (o *Config) MTLSEnabled() bool {
+	return o.Plugins.MTLSEnabled() && o.Auth.MTLSEnabled()
+}

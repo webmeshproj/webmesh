@@ -158,7 +158,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	log.Info("Mesh connection is ready, starting services")
 
 	// Start the mesh services
-	srvOpts, err := conf.NewServiceOptions(ctx, meshConn)
+	srvOpts, err := conf.Services.NewServiceOptions(ctx, meshConn, conf.MTLSEnabled())
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to create service options: %v", err))
 	}
@@ -166,9 +166,13 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to create gRPC server: %v", err))
 	}
-	err = conf.RegisterAPIs(ctx, meshConn, srv)
-	if err != nil {
-		return nil, handleErr(status.Errorf(codes.Internal, "failed to register APIs: %v", err))
+	if !conf.Services.API.Disabled {
+		isStorageMember := conf.IsStorageMember()
+		features := conf.Services.NewFeatureSet(conf.Mesh.GRPCAdvertisePort, conf.Storage.ListenPort(), isStorageMember)
+		err = conf.Services.RegisterAPIs(ctx, meshConn, srv, features, isStorageMember)
+		if err != nil {
+			return nil, handleErr(status.Errorf(codes.Internal, "failed to register APIs: %v", err))
+		}
 	}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {

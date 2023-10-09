@@ -47,6 +47,14 @@ func (o *AuthOptions) IsEmpty() bool {
 	return o.MTLS.IsEmpty() && o.Basic.IsEmpty() && o.LDAP.IsEmpty()
 }
 
+// MTLSEnabled is true if any mtls fields are set.
+func (o *AuthOptions) MTLSEnabled() bool {
+	if o == nil {
+		return false
+	}
+	return o.MTLS.Enabled()
+}
+
 // MTLSOptions are options for mutual TLS.
 type MTLSOptions struct {
 	// CertFile is the path to a TLS certificate file to present when joining. Either this
@@ -64,6 +72,11 @@ type MTLSOptions struct {
 // IsEmpty returns true if the options are empty.
 func (o *MTLSOptions) IsEmpty() bool {
 	return o.CertFile == "" && o.CertData == "" && o.KeyFile == "" && o.KeyData == ""
+}
+
+// Enabled is true if any fields are set.
+func (o *MTLSOptions) Enabled() bool {
+	return !o.IsEmpty()
 }
 
 // BasicAuthOptions are options for basic authentication.

@@ -521,7 +521,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 		StorageProvider:      provider,
 		JoinRoundTripper:     joinRT,
 		LeaveRoundTripper:    o.NewLeaveTransport(ctx, conn),
-		Features:             o.NewFeatureSet(),
+		Features:             o.Services.NewFeatureSet(o.Mesh.GRPCAdvertisePort, o.Storage.ListenPort(), o.IsStorageMember()),
 		Bootstrap:            bootstrap,
 		MaxJoinRetries:       o.Mesh.MaxJoinRetries,
 		GRPCAdvertisePort:    o.Mesh.GRPCAdvertisePort,

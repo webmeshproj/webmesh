@@ -493,7 +493,7 @@ func (m MetricsOptions) Validate() error {
 }
 
 // RegisterAPIs registers the configured APIs to the given server.
-func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *services.Server) error {
+func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *services.Server, features []*v1.FeaturePort, storageMember bool) error {
 	log := context.LoggerFrom(ctx)
 	var rbacDisabled bool
 	var err error
@@ -526,10 +526,10 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 		Storage:    conn.Storage(),
 		Meshnet:    conn.Network(),
 		Plugins:    conn.Plugins(),
-		Features:   o.NewFeatureSet(),
+		Features:   features,
 	}))
 	// Register membership and storage if we are a storage provider
-	if o.IsStorageMember() {
+	if storageMember {
 		log.Debug("Registering membership service")
 		v1.RegisterMembershipServer(srv, membership.NewServer(ctx, membership.Options{
 			NodeID:  conn.ID(),
@@ -543,113 +543,110 @@ func (o *Config) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *serv
 		v1.RegisterStorageQueryServiceServer(srv, storageSrv)
 	}
 	// Register any other enabled APIs
-	if o.Services.API.MeshEnabled {
+	if o.API.MeshEnabled {
 		log.Debug("Registering mesh api")
 		v1.RegisterMeshServer(srv, meshapi.NewServer(conn.Storage().MeshDB()))
 	}
-	if o.Services.WebRTC.Enabled {
+	if o.WebRTC.Enabled {
 		log.Debug("Registering WebRTC api")
 		// Check if we are a TURN server, and if so - register the TURN server
-		if o.Services.TURN.Enabled {
+		if o.TURN.Enabled {
 			log.Debug("Registering local TURN server with WebRTC API")
-			turnAddr := net.JoinHostPort(o.Services.TURN.PublicIP, strconv.Itoa(int(o.Services.TURN.ListenPort())))
+			turnAddr := net.JoinHostPort(o.TURN.PublicIP, strconv.Itoa(int(o.TURN.ListenPort())))
 			turnAddr = fmt.Sprintf("turn:%s", turnAddr)
-			o.Services.WebRTC.STUNServers = append([]string{turnAddr}, o.Services.WebRTC.STUNServers...)
+			o.WebRTC.STUNServers = append([]string{turnAddr}, o.WebRTC.STUNServers...)
 		}
 		v1.RegisterWebRTCServer(srv, webrtc.NewServer(webrtc.Options{
 			ID:          conn.ID(),
 			Wireguard:   conn.Network().WireGuard(),
 			NodeDialer:  conn,
 			RBAC:        rbacEvaluator,
-			STUNServers: o.Services.WebRTC.STUNServers,
+			STUNServers: o.WebRTC.STUNServers,
 		}))
 	}
 	return nil
 }
 
 // NewFeatureSet returns a new FeatureSet for the given node options.
-func (o *Config) NewFeatureSet() []*v1.FeaturePort {
-	if o.Mesh.DisableFeatureAdvertisement {
-		return []*v1.FeaturePort{}
-	}
+func (o *ServiceOptions) NewFeatureSet(grpcPort int, storagePort int, storageMember bool) []*v1.FeaturePort {
 	// We always expose the node API
 	var features []*v1.FeaturePort
-	if !o.Services.API.Disabled {
+	if !o.API.Disabled {
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_NODES,
-			Port:    int32(o.Mesh.GRPCAdvertisePort),
+			Port:    int32(grpcPort),
 		})
 	}
 	// If we are a raft member, we automatically serve storage and membership
-	if o.IsStorageMember() {
+	if storageMember {
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_STORAGE_QUERIER,
-			Port:    int32(o.Mesh.GRPCAdvertisePort),
+			Port:    int32(grpcPort),
 		})
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_MEMBERSHIP,
-			Port:    int32(o.Mesh.GRPCAdvertisePort),
+			Port:    int32(grpcPort),
 		})
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_STORAGE_PROVIDER,
-			Port:    int32(o.Storage.ListenPort()),
+			Port:    int32(storagePort),
 		})
 	}
-	if !o.Services.API.Disabled {
-		if !o.Services.API.DisableLeaderProxy {
+	if !o.API.Disabled {
+		if !o.API.DisableLeaderProxy {
 			features = append(features, &v1.FeaturePort{
 				Feature: v1.Feature_LEADER_PROXY,
-				Port:    int32(o.Mesh.GRPCAdvertisePort),
+				Port:    int32(grpcPort),
 			})
 		}
-		if o.Services.API.MeshEnabled {
+		if o.API.MeshEnabled {
 			features = append(features, &v1.FeaturePort{
 				Feature: v1.Feature_MESH_API,
-				Port:    int32(o.Mesh.GRPCAdvertisePort),
+				Port:    int32(grpcPort),
 			})
 		}
-		if o.Services.API.AdminEnabled {
+		if o.API.AdminEnabled {
 			features = append(features, &v1.FeaturePort{
 				Feature: v1.Feature_ADMIN_API,
-				Port:    int32(o.Mesh.GRPCAdvertisePort),
+				Port:    int32(grpcPort),
 			})
 		}
-		if o.Services.WebRTC.Enabled {
+		if o.WebRTC.Enabled {
 			features = append(features, &v1.FeaturePort{
 				Feature: v1.Feature_ICE_NEGOTIATION,
-				Port:    int32(o.Mesh.GRPCAdvertisePort),
+				Port:    int32(grpcPort),
 			})
 		}
 	}
-	if o.Services.TURN.Enabled {
+	if o.TURN.Enabled {
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_TURN_SERVER,
-			Port:    int32(o.Services.TURN.ListenPort()),
+			Port:    int32(o.TURN.ListenPort()),
 		})
 	}
-	if o.Services.MeshDNS.Enabled {
+	if o.MeshDNS.Enabled {
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_MESH_DNS,
-			Port:    int32(o.Services.MeshDNS.ListenPort()),
+			Port:    int32(o.MeshDNS.ListenPort()),
 		})
 	}
-	if o.Services.Metrics.Enabled {
+	if o.Metrics.Enabled {
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_METRICS,
-			Port:    int32(o.Services.Metrics.ListenPort()),
+			Port:    int32(o.Metrics.ListenPort()),
 		})
 	}
 	return features
 }
 
 // NewServiceOptions returns new options for the webmesh services.
-func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (conf services.Options, err error) {
-	if !o.Services.API.Disabled {
-		conf.ListenAddress = o.Services.API.ListenAddress
+func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.Node, mtls bool) (conf services.Options, err error) {
+	if !o.API.Disabled {
+		conf.ListenAddress = o.API.ListenAddress
 		// Build out the server options
-		if !o.Services.API.Insecure {
+		if !o.API.Insecure {
 			// Setup TLS
-			tlsOpts, err := o.NewServerTLSOptions()
+			tlsOpts, err := o.NewServerTLSOptions(mtls)
 			if err != nil {
 				return conf, err
 			}
@@ -669,7 +666,7 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (con
 		}
 
 		// If metrics are enabled, register the metrics interceptor
-		if o.Services.Metrics.Enabled {
+		if o.Metrics.Enabled {
 			unarymiddlewares, streammiddlewares, err = metrics.AppendMetricsMiddlewares(context.LoggerFrom(ctx), unarymiddlewares, streammiddlewares)
 			if err != nil {
 				return conf, err
@@ -682,7 +679,7 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (con
 			streammiddlewares = append(streammiddlewares, conn.Plugins().AuthStreamInterceptor())
 		}
 
-		if !o.Services.API.DisableLeaderProxy {
+		if !o.API.DisableLeaderProxy {
 			leaderProxy := leaderproxy.New(conn.ID(), conn.Storage().Consensus(), conn, conn.Network())
 			unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
 			streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
@@ -694,43 +691,43 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (con
 		conf.DisableGRPC = true
 	}
 	// Append the enabled mesh services
-	if o.Services.MeshDNS.Enabled {
+	if o.MeshDNS.Enabled {
 		dnsServer := meshdns.NewServer(ctx, &meshdns.Options{
-			UDPListenAddr:     o.Services.MeshDNS.ListenUDP,
-			TCPListenAddr:     o.Services.MeshDNS.ListenTCP,
-			ReusePort:         o.Services.MeshDNS.ReusePort,
-			Compression:       o.Services.MeshDNS.EnableCompression,
-			RequestTimeout:    o.Services.MeshDNS.RequestTimeout,
-			Forwarders:        o.Services.MeshDNS.Forwarders,
-			DisableForwarding: o.Services.MeshDNS.DisableForwarding,
-			CacheSize:         o.Services.MeshDNS.CacheSize,
+			UDPListenAddr:     o.MeshDNS.ListenUDP,
+			TCPListenAddr:     o.MeshDNS.ListenTCP,
+			ReusePort:         o.MeshDNS.ReusePort,
+			Compression:       o.MeshDNS.EnableCompression,
+			RequestTimeout:    o.MeshDNS.RequestTimeout,
+			Forwarders:        o.MeshDNS.Forwarders,
+			DisableForwarding: o.MeshDNS.DisableForwarding,
+			CacheSize:         o.MeshDNS.CacheSize,
 		})
 		// Automatically register the local domain
 		err := dnsServer.RegisterDomain(meshdns.DomainOptions{
 			NodeID:              conn.ID(),
 			MeshDomain:          conn.Domain(),
 			MeshStorage:         conn.Storage(),
-			IPv6Only:            o.Services.MeshDNS.IPv6Only,
-			SubscribeForwarders: o.Services.MeshDNS.SubscribeForwarders,
+			IPv6Only:            o.MeshDNS.IPv6Only,
+			SubscribeForwarders: o.MeshDNS.SubscribeForwarders,
 		})
 		if err != nil {
 			return conf, err
 		}
 		conf.Servers = append(conf.Servers, dnsServer)
 	}
-	if o.Services.TURN.Enabled {
+	if o.TURN.Enabled {
 		turnServer := turn.NewServer(ctx, turn.Options{
-			PublicIP:  o.Services.TURN.PublicIP,
-			ListenUDP: o.Services.TURN.ListenAddress,
-			Realm:     o.Services.TURN.Realm,
-			PortRange: o.Services.TURN.TURNPortRange,
+			PublicIP:  o.TURN.PublicIP,
+			ListenUDP: o.TURN.ListenAddress,
+			Realm:     o.TURN.Realm,
+			PortRange: o.TURN.TURNPortRange,
 		})
 		conf.Servers = append(conf.Servers, turnServer)
 	}
-	if o.Services.Metrics.Enabled {
+	if o.Metrics.Enabled {
 		metricsServer := metrics.New(ctx, metrics.Options{
-			ListenAddress: o.Services.Metrics.ListenAddress,
-			Path:          o.Services.Metrics.Path,
+			ListenAddress: o.Metrics.ListenAddress,
+			Path:          o.Metrics.Path,
 		})
 		conf.Servers = append(conf.Servers, metricsServer)
 	}
@@ -738,21 +735,21 @@ func (o *Config) NewServiceOptions(ctx context.Context, conn meshnode.Node) (con
 }
 
 // NewServerTLSOptions returns new TLS options for the gRPC server.
-func (o *Config) NewServerTLSOptions() (grpc.ServerOption, error) {
+func (o *ServiceOptions) NewServerTLSOptions(mtls bool) (grpc.ServerOption, error) {
 	tlsConfig := &tls.Config{}
-	if o.Services.API.TLSCertFile != "" && o.Services.API.TLSKeyFile != "" {
-		cert, err := tls.LoadX509KeyPair(o.Services.API.TLSCertFile, o.Services.API.TLSKeyFile)
+	if o.API.TLSCertFile != "" && o.API.TLSKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(o.API.TLSCertFile, o.API.TLSKeyFile)
 		if err != nil {
 			return nil, err
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
-	if o.Services.API.TLSCertData != "" && o.Services.API.TLSKeyData != "" {
-		certData, err := base64.StdEncoding.DecodeString(o.Services.API.TLSCertData)
+	if o.API.TLSCertData != "" && o.API.TLSKeyData != "" {
+		certData, err := base64.StdEncoding.DecodeString(o.API.TLSCertData)
 		if err != nil {
 			return nil, err
 		}
-		keyData, err := base64.StdEncoding.DecodeString(o.Services.API.TLSKeyData)
+		keyData, err := base64.StdEncoding.DecodeString(o.API.TLSKeyData)
 		if err != nil {
 			return nil, err
 		}
@@ -763,7 +760,7 @@ func (o *Config) NewServerTLSOptions() (grpc.ServerOption, error) {
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
 	// If we are using mTLS we need to request a client certificate
-	if o.Auth.MTLS != (MTLSOptions{}) {
+	if mtls {
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	}
 	return grpc.Creds(credentials.NewTLS(tlsConfig)), nil

@@ -186,7 +186,7 @@ func (n *node) Start(ctx context.Context) error {
 	log.Info("Connected to mesh, starting services")
 
 	// Start the mesh services
-	srvOpts, err := n.conf.NewServiceOptions(ctx, n.Mesh())
+	srvOpts, err := n.conf.Services.NewServiceOptions(ctx, n.Mesh(), n.conf.MTLSEnabled())
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create service options: %w", err))
 	}
@@ -194,8 +194,10 @@ func (n *node) Start(ctx context.Context) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 	}
+	isStorageMember := n.conf.IsStorageMember()
+	features := n.conf.Services.NewFeatureSet(n.conf.Mesh.GRPCAdvertisePort, n.conf.Storage.ListenPort(), isStorageMember)
 	if !n.conf.Services.API.Disabled {
-		err = n.conf.RegisterAPIs(ctx, n.Mesh(), n.services)
+		err = n.conf.Services.RegisterAPIs(ctx, n.Mesh(), n.services, features, isStorageMember)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to register APIs: %w", err))
 		}

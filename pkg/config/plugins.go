@@ -42,6 +42,15 @@ func NewPluginOptions() PluginOptions {
 	return PluginOptions{}
 }
 
+// MTLSEnabled reports whether the mtls plugin is configured.
+func (o *PluginOptions) MTLSEnabled() bool {
+	if o == nil {
+		return false
+	}
+	_, ok := o.Configs["mtls"]
+	return ok
+}
+
 // BindFlags binds the flags for the plugin options.
 func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	seen := map[string]struct{}{}

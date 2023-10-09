@@ -538,7 +538,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	})
 
 	// Start any mesh services
-	srvOpts, err := conf.NewServiceOptions(ctx, node)
+	srvOpts, err := conf.Services.NewServiceOptions(ctx, node, conf.MTLSEnabled())
 	if err != nil {
 		return nil, handleErr(fmt.Errorf("failed to create service options: %w", err))
 	}
@@ -546,8 +546,10 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	if err != nil {
 		return nil, handleErr(fmt.Errorf("failed to create mesh services: %w", err))
 	}
+	isStorageMember := conf.IsStorageMember()
+	features := conf.Services.NewFeatureSet(conf.Mesh.GRPCAdvertisePort, conf.Storage.ListenPort(), isStorageMember)
 	if !conf.Services.API.Disabled {
-		err = conf.RegisterAPIs(ctx, node, t.svcs)
+		err = conf.Services.RegisterAPIs(ctx, node, t.svcs, features, isStorageMember)
 		if err != nil {
 			return nil, handleErr(fmt.Errorf("failed to register APIs: %w", err))
 		}

@@ -117,7 +117,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	for meshID, meshConn := range meshes {
 		id := meshID
 		meshConfig := config.Meshes[id]
-		srvOpts, err := meshConfig.NewServiceOptions(ctx, meshConn)
+		srvOpts, err := meshConfig.Services.NewServiceOptions(ctx, meshConn, meshConfig.MTLSEnabled())
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create service options: %w", err))
 		}
@@ -126,7 +126,9 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 		}
 		if !meshConfig.Services.API.Disabled {
-			err = meshConfig.RegisterAPIs(ctx, meshConn, srv)
+			isStorageMember := meshConfig.IsStorageMember()
+			features := meshConfig.Services.NewFeatureSet(meshConfig.Mesh.GRPCAdvertisePort, meshConfig.Storage.ListenPort(), isStorageMember)
+			err = meshConfig.Services.RegisterAPIs(ctx, meshConn, srv, features, isStorageMember)
 			if err != nil {
 				return handleErr(fmt.Errorf("failed to register APIs: %w", err))
 			}
@@ -229,9 +231,13 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			// Will need to subscribe to route updates from the other meshes.
 			meshConfig := config.Meshes[otherID]
 			req := &v1.UpdateRequest{
-				Id:       meshConn.ID().String(),
-				Routes:   toBroadcast,
-				Features: meshConfig.NewFeatureSet(),
+				Id:     meshConn.ID().String(),
+				Routes: toBroadcast,
+				Features: meshConfig.Services.NewFeatureSet(
+					meshConfig.Mesh.GRPCAdvertisePort,
+					meshConfig.Storage.ListenPort(),
+					meshConfig.IsStorageMember(),
+				),
 			}
 			// If we are bridging DNS, add it to our feature set
 			if config.MeshDNS.Enabled {
