@@ -42,7 +42,7 @@ type Plugin struct {
 	v1.UnimplementedPluginServer
 	v1.UnimplementedAuthPluginServer
 
-	allowedIDs []string
+	allowedIDs map[string]struct{}
 }
 
 // Config is the configuration for the ID auth plugin.
@@ -92,7 +92,10 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		return nil, err
 	}
-	p.allowedIDs = config.AllowedIDs
+	allowedIDs := make(map[string]struct{})
+	for _, id := range config.AllowedIDs {
+		allowedIDs[id] = struct{}{}
+	}
 	if len(config.IDFiles) > 0 {
 		for _, file := range config.IDFiles {
 			var idData []byte
@@ -120,10 +123,11 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 				if id == "" {
 					continue
 				}
-				p.allowedIDs = append(p.allowedIDs, id)
+				allowedIDs[id] = struct{}{}
 			}
 		}
 	}
+	p.allowedIDs = allowedIDs
 	return &emptypb.Empty{}, nil
 }
 
@@ -135,7 +139,7 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 		return nil, fmt.Errorf("missing %s header", peerIDHeader)
 	}
 	// Fast path, make sure it's in the list of allowed IDs.
-	if !p.isAllowedID(id) {
+	if _, ok := p.allowedIDs[id]; !ok {
 		return nil, fmt.Errorf("peer ID %s is not in the allow list", id)
 	}
 	encodedSig, ok := req.GetHeaders()[signatureHeader]
@@ -164,13 +168,4 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 
 func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, nil
-}
-
-func (p *Plugin) isAllowedID(id string) bool {
-	for _, allowedID := range p.allowedIDs {
-		if allowedID == id {
-			return true
-		}
-	}
-	return false
 }
