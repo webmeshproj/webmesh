@@ -94,7 +94,7 @@ func (s *Server) ListenAndServe() error {
 		sr := srv
 		g.Go(func() error {
 			if err := sr.ListenAndServe(); err != nil {
-				s.log.Error("mesh server failed", slog.String("error", err.Error()))
+				s.log.Error("Mesh server failed", slog.String("error", err.Error()))
 				return err
 			}
 			return nil
@@ -144,7 +144,7 @@ func (s *Server) Shutdown(ctx context.Context) {
 		s.log.Debug("Shutting down mesh server")
 		err := srv.Shutdown(ctx)
 		if err != nil {
-			s.log.Error("mesh server shutdown failed", slog.String("error", err.Error()))
+			s.log.Error("Mesh server shutdown failed", slog.String("error", err.Error()))
 		}
 	}
 	if s.srv != nil {

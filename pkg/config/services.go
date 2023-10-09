@@ -553,7 +553,11 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, s
 	var rbacEvaluator rbac.Evaluator
 	insecureServices := !conn.Plugins().HasAuth() || rbacDisabled
 	if insecureServices {
-		log.Warn("Running services without authorization")
+		if conn.Plugins().HasAuth() {
+			log.Warn("Running services with authentication but without authorization")
+		} else {
+			log.Warn("Running services without authentication or authorization")
+		}
 		rbacEvaluator = rbac.NewNoopEvaluator()
 	} else {
 		rbacEvaluator = rbac.NewStoreEvaluator(conn.Storage().MeshDB())
