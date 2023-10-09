@@ -134,13 +134,21 @@ func (c *Config) CurrentSigData(id string) [][]byte {
 
 func (c *Config) AsMapStructure() map[string]any {
 	return map[string]any{
-		"allowed-ids":                 c.AllowedIDs,
-		"id-files":                    c.IDFiles,
+		"allowed-ids":                 toAnySlice(c.AllowedIDs),
+		"id-files":                    toAnySlice(c.IDFiles),
 		"watch-id-files":              c.WatchIDFiles,
-		"watch-interval":              c.WatchInterval,
+		"watch-interval":              int(c.WatchInterval),
 		"remote-fetch-retries":        c.RemoteFetchRetries,
-		"remote-fetch-retry-interval": c.RemoteFetchRetryInterval,
+		"remote-fetch-retry-interval": int(c.RemoteFetchRetryInterval),
 	}
+}
+
+func toAnySlice(in []string) []any {
+	out := make([]any, len(in))
+	for i, v := range in {
+		out[i] = any(v)
+	}
+	return out
 }
 
 func (c *Config) SetMapStructure(in map[string]any) {
@@ -228,6 +236,7 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 	}
 	// Fast path, make sure it's in the list of allowed IDs.
 	if !p.allowedIDs.HasID(id) {
+		log.Warn("Peer ID is not in the allow list", "id", id)
 		return nil, fmt.Errorf("peer ID %s is not in the allow list", id)
 	}
 	encodedSig, ok := req.GetHeaders()[signatureHeader]
@@ -334,6 +343,7 @@ func (p *Plugin) watchRemoteFile(ctx context.Context, url string) {
 			return
 		case <-t.C:
 			p.mu.Lock()
+			log.Debug("Fetching remote ID list", "url", url)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			data, err := getWithRetry(ctx, url, p.config.RemoteFetchRetries, p.config.RemoteFetchRetryInterval)
 			cancel()
@@ -369,6 +379,11 @@ func getWithRetry(ctx context.Context, url string, retries int, interval time.Du
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			context.LoggerFrom(ctx).Warn("Failed to fetch remote ID list", "url", url, "error", err.Error())
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(interval):
+			}
 			continue
 		}
 		defer resp.Body.Close()

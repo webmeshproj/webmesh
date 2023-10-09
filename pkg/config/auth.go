@@ -126,6 +126,9 @@ func (o *AuthOptions) Validate() error {
 	if o.IsEmpty() {
 		return nil
 	}
+	if o.IDAuth {
+		return nil
+	}
 	if !o.MTLS.IsEmpty() {
 		if o.MTLS.CertFile == "" && o.MTLS.CertData == "" {
 			return errors.New("auth.mtls.cert-file is required")

@@ -1,18 +1,25 @@
 version: "3"
 
 networks:
-  bootstrap:
+  idauth:
+    enable_ipv6: true
+    driver: bridge
     ipam:
       driver: default
       config:
         - subnet: 10.1.0.0/24
+          gateway: 10.1.0.1
+        - subnet: 2001:db8:3200::/64
+          gateway: 2001:db8:3200::1
 
 services:
   # Some random server that will serve the allowed-ids.txt file
+  # This should be replaced with a KMS or other service that can
+  # provide IDs to the nodes.
   id-server:
     image: python:3.9
     networks:
-      bootstrap:
+      idauth:
         ipv4_address: 10.1.0.6
     entrypoint:
       - python
@@ -26,63 +33,98 @@ services:
       - ./allowed-ids-http.txt:/data/allowed-ids.txt
 
   # A network leader that is trusting IDs in a local file and from the id-server
+
   bootstrap-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     build:
       context: ../..
       dockerfile: Dockerfile
     networks:
-      bootstrap:
+      idauth:
         ipv4_address: 10.1.0.5
     entrypoint:
       - /webmesh-node
-      - --global.insecure
-      - --global.disable-ipv6
+      # Don't verify TLS certificates
+      - --global.insecure-skip-verify
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       - --bootstrap.enabled
       - --bootstrap.ipv4-network=10.10.10.0/24
-      - --plugins.id-auth.id-files=/allowed-ids.txt,http://10.1.0.6/allowed-ids.txt
+      # Configure the ID auth plugin to load IDs from a local file
+      - --plugins.id-auth.id-files=/allowed-ids.txt
+      # Configure the ID auth plugin to load IDs from the id-server
+      - --plugins.id-auth.id-files=http://10.1.0.6:8000/allowed-ids.txt
+      # Poll the files for changes.
+      - --plugins.id-auth.watch-id-files=true
+      # Poll the remote file every 15 seconds. Local files use fsnotify.
+      - --plugins.id-auth.watch-interval=15s
+      #
+      # You can also inline additional IDs here with:
+      # -- plugins.id-auth.allowed-ids=foo
+      # -- plugins.id-auth.allowed-ids=bar
+      #
+      # We can configure webmesh to automatically attempt to load
+      # the wireguard module, and fall back to TUN only if not present.
+      # The kernel module will still be tried automatically regardless
+      # of this setting.
+      - --wireguard.modprobe
     volumes:
       - ./allowed-ids.txt:/allowed-ids.txt
+      - /dev/net/tun:/dev/net/tun
+      - /lib/modules:/lib/modules
     ports:
       - 8443:8443
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     depends_on:
       - id-server
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
 
   # Nodes that are connecting to the network leader
 
   node-1:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
-      bootstrap:
+      idauth:
     entrypoint:
       - /webmesh-node
-      - --global.insecure
-      - --global.disable-ipv6
+      - --global.insecure-skip-verify
       - --mesh.join-address=10.1.0.5:8443
       - --wireguard.key-file=/wireguard.key
       - --wireguard.key-rotation-interval=0
+      - --wireguard.modprobe
+      # Authenticate with the ID generated from our key
       - --auth.id-auth=true
     volumes:
       - ./node-1.key:/wireguard.key
+      - /dev/net/tun:/dev/net/tun
+      - /lib/modules:/lib/modules
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    depends_on:
+      - bootstrap-node
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
 
   node-2:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
     networks:
-      bootstrap:
+      idauth:
     entrypoint:
       - /webmesh-node
-      - --global.insecure
-      - --global.disable-ipv6
+      - --global.insecure-skip-verify
       - --mesh.join-address=10.1.0.5:8443
       - --wireguard.key-file=/wireguard.key
       - --wireguard.key-rotation-interval=0
+      - --wireguard.modprobe
       - --auth.id-auth=true
     volumes:
       - ./node-2.key:/wireguard.key
+      - /dev/net/tun:/dev/net/tun
+      - /lib/modules:/lib/modules
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    depends_on:
+      - bootstrap-node
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
