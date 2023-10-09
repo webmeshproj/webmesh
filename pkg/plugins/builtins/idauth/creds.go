@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -39,7 +40,8 @@ type idauthCreds struct {
 
 func (c *idauthCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
 	id := c.key.ID()
-	sig, err := c.key.Sign([]byte(id))
+	t := Now().Truncate(time.Second * 30).Unix()
+	sig, err := c.key.Sign([]byte(fmt.Sprintf("%s:%d", id, t)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign ID: %w", err)
 	}

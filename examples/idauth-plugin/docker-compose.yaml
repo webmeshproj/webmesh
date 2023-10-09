@@ -18,9 +18,12 @@ services:
       - python
       - -m
       - http.server
-      - :8000
+      - --directory=/data
+      - "8000"
+    ports:
+      - 8000:8000
     volumes:
-      - ./allowed-ids-http.txt:/allowed-ids.txt
+      - ./allowed-ids-http.txt:/data/allowed-ids.txt
 
   # A network leader that is trusting IDs in a local file and from the id-server
   bootstrap-node:
@@ -45,6 +48,8 @@ services:
     ports:
       - 8443:8443
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
+    depends_on:
+      - id-server
 
   # Nodes that are connecting to the network leader
 
