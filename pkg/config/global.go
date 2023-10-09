@@ -253,6 +253,7 @@ func (global *GlobalOptions) ApplyGlobals(o *Config) (*Config, error) {
 
 	if global.MTLS {
 		// Configure both client and server mTLS
+		o.Services.API.MTLS = global.MTLS
 		o.Auth.MTLS = MTLSOptions{
 			CertFile: global.TLSCertFile,
 			KeyFile:  global.TLSKeyFile,

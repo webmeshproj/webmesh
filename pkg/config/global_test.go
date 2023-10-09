@@ -221,6 +221,9 @@ func TestApplyGlobalOptions(t *testing.T) {
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
 			}
+			if !opts.Services.API.MTLS {
+				t.Errorf("ApplyGlobals() expected Services.API.MTLS to be true")
+			}
 			if opts.Auth.MTLS.CertFile != "certfile" {
 				t.Errorf("ApplyGlobals() expected Auth.MTLS.TLSCertFile to be certfile, got: %s", opts.Auth.MTLS.CertFile)
 			}
@@ -250,6 +253,9 @@ func TestApplyGlobalOptions(t *testing.T) {
 			opts, err := opts.Global.ApplyGlobals(opts)
 			if err != nil {
 				t.Errorf("ApplyGlobals() error = %v", err)
+			}
+			if !opts.Services.API.MTLS {
+				t.Errorf("ApplyGlobals() expected Services.API.MTLS to be true")
 			}
 			if opts.Auth.MTLS.CertFile != "certfile" {
 				t.Errorf("ApplyGlobals() expected Auth.MTLS.TLSCertFile to be certfile, got: %s", opts.Auth.MTLS.CertFile)

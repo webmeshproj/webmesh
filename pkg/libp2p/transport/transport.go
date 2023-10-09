@@ -538,7 +538,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	})
 
 	// Start any mesh services
-	srvOpts, err := conf.Services.NewServiceOptions(ctx, node, conf.MTLSEnabled())
+	srvOpts, err := conf.Services.NewServiceOptions(ctx, node)
 	if err != nil {
 		return nil, handleErr(fmt.Errorf("failed to create service options: %w", err))
 	}

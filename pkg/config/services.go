@@ -18,11 +18,13 @@ package config
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/netip"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -148,6 +150,11 @@ type APIOptions struct {
 	TLSKeyFile string `koanf:"tls-key-file,omitempty"`
 	// TLSKeyData is the TLS key data.
 	TLSKeyData string `koanf:"tls-key-data,omitempty"`
+	// MTLS is true if mutual TLS should be enabled.
+	MTLS bool `koanf:"mtls,omitempty"`
+	// MTLSClientCAFile is the path to the client CA file. This is not usually
+	// required and handled by the mtls auth plugin.
+	MTLSClientCAFile string `koanf:"mtls-client-ca-file,omitempty"`
 	// Insecure is true if the transport is insecure.
 	Insecure bool `koanf:"insecure,omitempty"`
 	// DisableLeaderProxy is true if the leader proxy should be disabled.
@@ -186,6 +193,8 @@ func (a *APIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.StringVar(&a.TLSCertData, prefix+"tls-cert-data", a.TLSCertData, "TLS certificate data.")
 	fl.StringVar(&a.TLSKeyFile, prefix+"tls-key-file", a.TLSKeyFile, "TLS key file.")
 	fl.StringVar(&a.TLSKeyData, prefix+"tls-key-data", a.TLSKeyData, "TLS key data.")
+	fl.BoolVar(&a.MTLS, prefix+"mtls", a.MTLS, "Require clients to provide a client certificate.")
+	fl.StringVar(&a.MTLSClientCAFile, prefix+"mtls-client-ca-file", a.MTLSClientCAFile, "Client CA file if not provided by the mtls auth plugin")
 	fl.BoolVar(&a.Insecure, prefix+"insecure", a.Insecure, "Disable TLS.")
 	fl.BoolVar(&a.MeshEnabled, prefix+"mesh-enabled", a.MeshEnabled, "Enable and register the MeshAPI.")
 	fl.BoolVar(&a.AdminEnabled, prefix+"admin-enabled", a.AdminEnabled, "Enable and register the AdminAPI.")
@@ -657,13 +666,13 @@ func (o *ServiceOptions) NewFeatureSet(grpcPort int, storagePort int, storageMem
 }
 
 // NewServiceOptions returns new options for the webmesh services.
-func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.Node, mtls bool) (conf services.Options, err error) {
+func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.Node) (conf services.Options, err error) {
 	if !o.API.Disabled {
 		conf.ListenAddress = o.API.ListenAddress
 		// Build out the server options
 		if !o.API.Insecure {
 			// Setup TLS
-			tlsOpts, err := o.NewServerTLSOptions(mtls)
+			tlsOpts, err := o.NewServerTLSOptions()
 			if err != nil {
 				return conf, err
 			}
@@ -752,7 +761,7 @@ func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.No
 }
 
 // NewServerTLSOptions returns new TLS options for the gRPC server.
-func (o *ServiceOptions) NewServerTLSOptions(mtls bool) (grpc.ServerOption, error) {
+func (o *ServiceOptions) NewServerTLSOptions() (grpc.ServerOption, error) {
 	tlsConfig := &tls.Config{}
 	if o.API.TLSCertFile != "" && o.API.TLSKeyFile != "" {
 		cert, err := tls.LoadX509KeyPair(o.API.TLSCertFile, o.API.TLSKeyFile)
@@ -777,8 +786,20 @@ func (o *ServiceOptions) NewServerTLSOptions(mtls bool) (grpc.ServerOption, erro
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
 	// If we are using mTLS we need to request a client certificate
-	if mtls {
+	if o.API.MTLS {
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		if o.API.MTLSClientCAFile != "" {
+			// This happens in external cases where the mtls plugin is not being used.
+			pool := x509.NewCertPool()
+			caCert, err := os.ReadFile(o.API.MTLSClientCAFile)
+			if err != nil {
+				return nil, err
+			}
+			if !pool.AppendCertsFromPEM(caCert) {
+				return nil, fmt.Errorf("failed to parse client CA certificate")
+			}
+			tlsConfig.ClientCAs = pool
+		}
 	}
 	return grpc.Creds(credentials.NewTLS(tlsConfig)), nil
 }

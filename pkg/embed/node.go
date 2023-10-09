@@ -186,7 +186,7 @@ func (n *node) Start(ctx context.Context) error {
 	log.Info("Connected to mesh, starting services")
 
 	// Start the mesh services
-	srvOpts, err := n.conf.Services.NewServiceOptions(ctx, n.Mesh(), n.conf.MTLSEnabled())
+	srvOpts, err := n.conf.Services.NewServiceOptions(ctx, n.Mesh())
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create service options: %w", err))
 	}

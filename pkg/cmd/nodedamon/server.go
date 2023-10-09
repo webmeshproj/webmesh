@@ -158,7 +158,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	log.Info("Mesh connection is ready, starting services")
 
 	// Start the mesh services
-	srvOpts, err := conf.Services.NewServiceOptions(ctx, meshConn, conf.MTLSEnabled())
+	srvOpts, err := conf.Services.NewServiceOptions(ctx, meshConn)
 	if err != nil {
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to create service options: %v", err))
 	}

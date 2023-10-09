@@ -117,7 +117,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	for meshID, meshConn := range meshes {
 		id := meshID
 		meshConfig := config.Meshes[id]
-		srvOpts, err := meshConfig.Services.NewServiceOptions(ctx, meshConn, meshConfig.MTLSEnabled())
+		srvOpts, err := meshConfig.Services.NewServiceOptions(ctx, meshConn)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create service options: %w", err))
 		}
