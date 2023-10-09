@@ -168,7 +168,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	}
 	if !conf.Services.API.Disabled {
 		isStorageMember := conf.IsStorageMember()
-		features := conf.Services.NewFeatureSet(conf.Mesh.GRPCAdvertisePort, conf.Storage.ListenPort(), isStorageMember)
+		features := conf.Services.NewFeatureSet(conf.Services.API.ListenPort(), conf.Storage.ListenPort(), isStorageMember)
 		err = conf.Services.RegisterAPIs(ctx, meshConn, srv, features, isStorageMember)
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to register APIs: %v", err))

@@ -56,7 +56,7 @@ func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	seen := map[string]struct{}{}
 	if len(os.Args[1:]) > 0 {
 		for _, arg := range os.Args[1:] {
-			flagPrefix := fmt.Sprintf("--%splugins.", prefix)
+			flagPrefix := fmt.Sprintf("--%s", prefix)
 			if strings.HasPrefix(arg, flagPrefix) {
 				arg = strings.TrimPrefix(arg, flagPrefix)
 				split := strings.Split(arg, ".")
