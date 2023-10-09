@@ -190,6 +190,19 @@ func ParsePublicKey(data []byte) (PublicKey, error) {
 	}, nil
 }
 
+// PubKeyFromID returns the public key from the given peer ID.
+func PubKeyFromID(id peer.ID) (PublicKey, error) {
+	key, err := id.ExtractPublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("extract public key from peer ID: %w", err)
+	}
+	pubkey, ok := key.(PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid public key type")
+	}
+	return pubkey, nil
+}
+
 // WebmeshPrivateKey is a private key used for webmesh transport.
 type WebmeshPrivateKey struct {
 	raw [64]byte
@@ -291,12 +304,6 @@ func (w *WebmeshPrivateKey) Marshal() ([]byte, error) {
 type WebmeshPublicKey struct {
 	raw [32]byte
 	typ cryptopb.KeyType
-}
-
-// ID returns the peer ID computed from the public key.
-func (w *WebmeshPublicKey) ID() peer.ID {
-	id, _ := peer.IDFromPublicKey(w)
-	return id
 }
 
 // Type returns the protobuf key type.
