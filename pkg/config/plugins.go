@@ -66,10 +66,7 @@ func (o *PluginOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	builtInConfigs := builtins.NewPluginConfigs()
 	for pluginName := range seen {
 		conf := PluginConfig{}
-		flagPrefix := "plugins." + pluginName + "."
-		if prefix != "" {
-			flagPrefix = prefix + flagPrefix
-		}
+		flagPrefix := prefix + pluginName + "."
 		if pluginConfig, ok := builtInConfigs[pluginName]; ok {
 			pconf := pluginConfig
 			pconf.BindFlags(flagPrefix, fs)

@@ -111,7 +111,7 @@ func TestGlobalOptionsValidate(t *testing.T) {
 			if tt.opts != nil {
 				// Make sure they bind to a flagset without error
 				fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-				tt.opts.BindFlags(fs)
+				tt.opts.BindFlags("global.", fs)
 			}
 			if err := tt.opts.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("GlobalOptions.Validate() error = %v, wantErr %v", err, tt.wantErr)

@@ -46,17 +46,17 @@ func NewBridgeOptions() BridgeOptions {
 }
 
 // BindFlags binds the flags.
-func (b *BridgeOptions) BindFlags(fs *pflag.FlagSet) {
-	fs.BoolVar(&b.UseMeshDNS, "bridge.use-meshdns", b.UseMeshDNS, "Use the meshdns server for local name resolution.")
+func (b *BridgeOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
+	fs.BoolVar(&b.UseMeshDNS, prefix+"use-meshdns", b.UseMeshDNS, "Use the meshdns server for local name resolution.")
 	b.MeshDNS.BindFlags(fs)
 	b.Meshes = map[string]*Config{}
 	// Determine any bridge IDs on the command line.
 	seen := map[string]struct{}{}
 	if len(os.Args[1:]) > 0 {
-		prefix := "--bridge."
+		search := fmt.Sprintf("--%s", prefix)
 		for _, arg := range os.Args[1:] {
-			if strings.HasPrefix(arg, prefix) {
-				arg = strings.TrimPrefix(arg, prefix)
+			if strings.HasPrefix(arg, search) {
+				arg = strings.TrimPrefix(arg, search)
 				split := strings.Split(arg, ".")
 				if len(split) < 2 {
 					continue
@@ -75,7 +75,7 @@ func (b *BridgeOptions) BindFlags(fs *pflag.FlagSet) {
 	}
 	for meshName := range seen {
 		conf := NewDefaultConfig("")
-		flagPrefix := "bridge." + meshName + "."
+		flagPrefix := prefix + meshName + "."
 		conf.BindFlags(flagPrefix, fs)
 		b.Meshes[meshName] = conf
 	}

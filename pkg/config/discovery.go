@@ -66,13 +66,13 @@ func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 
 // BindFlags binds the flags for the discovery options.
 func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.BoolVar(&o.Announce, prefix+"discovery.announce", o.Announce, "announce this peer to the discovery service")
-	fs.StringVar(&o.Rendezvous, prefix+"discovery.rendezvous", o.Rendezvous, "pre-shared key to use as a rendezvous point for peer discovery")
-	fs.BoolVar(&o.Discover, prefix+"discovery.discover", o.Discover, "use the libp2p kademlia DHT for discovery")
-	fs.StringSliceVar(&o.BootstrapServers, prefix+"discovery.bootstrap-servers", o.BootstrapServers, "list of bootstrap servers to use for the DHT")
-	fs.DurationVar(&o.AnnounceTTL, prefix+"discovery.announce-ttl", o.AnnounceTTL, "TTL for the announcement")
-	fs.StringSliceVar(&o.LocalAddrs, prefix+"discovery.local-addrs", o.LocalAddrs, "list of local addresses to announce to the discovery service")
-	fs.DurationVar(&o.ConnectTimeout, prefix+"discovery.connect-timeout", o.ConnectTimeout, "timeout for connecting to a peer")
+	fs.BoolVar(&o.Announce, prefix+"announce", o.Announce, "announce this peer to the discovery service")
+	fs.StringVar(&o.Rendezvous, prefix+"rendezvous", o.Rendezvous, "pre-shared key to use as a rendezvous point for peer discovery")
+	fs.BoolVar(&o.Discover, prefix+"discover", o.Discover, "use the libp2p kademlia DHT for discovery")
+	fs.StringSliceVar(&o.BootstrapServers, prefix+"bootstrap-servers", o.BootstrapServers, "list of bootstrap servers to use for the DHT")
+	fs.DurationVar(&o.AnnounceTTL, prefix+"announce-ttl", o.AnnounceTTL, "TTL for the announcement")
+	fs.StringSliceVar(&o.LocalAddrs, prefix+"local-addrs", o.LocalAddrs, "list of local addresses to announce to the discovery service")
+	fs.DurationVar(&o.ConnectTimeout, prefix+"connect-timeout", o.ConnectTimeout, "timeout for connecting to a peer")
 }
 
 // NewHostConfig returns a new HostOptions for the discovery config.

@@ -45,9 +45,9 @@ func NewTLSOptions() TLSOptions {
 
 // BindFlags binds the TLS options to the flag set.
 func (o *TLSOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.StringVar(&o.CAFile, prefix+"tls.ca-file", o.CAFile, "Path to a TLS CA certificate for verifying peer certificates.")
-	fl.StringVar(&o.CAData, prefix+"tls.ca-data", o.CAData, "Base64 encoded TLS CA certificate for verifying peer certificates.")
-	fl.BoolVar(&o.VerifyChainOnly, prefix+"tls.verify-chain-only", o.VerifyChainOnly, "Verify only the certificate chain.")
-	fl.BoolVar(&o.InsecureSkipVerify, prefix+"tls.insecure-skip-verify", o.InsecureSkipVerify, "Skip verification of the server TLS cert.")
-	fl.BoolVar(&o.Insecure, prefix+"tls.insecure", o.Insecure, "Disable TLS.")
+	fl.StringVar(&o.CAFile, prefix+"ca-file", o.CAFile, "Path to a TLS CA certificate for verifying peer certificates.")
+	fl.StringVar(&o.CAData, prefix+"ca-data", o.CAData, "Base64 encoded TLS CA certificate for verifying peer certificates.")
+	fl.BoolVar(&o.VerifyChainOnly, prefix+"verify-chain-only", o.VerifyChainOnly, "Verify only the certificate chain.")
+	fl.BoolVar(&o.InsecureSkipVerify, prefix+"insecure-skip-verify", o.InsecureSkipVerify, "Skip verification of the server TLS cert.")
+	fl.BoolVar(&o.Insecure, prefix+"insecure", o.Insecure, "Disable TLS.")
 }

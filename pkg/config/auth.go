@@ -94,14 +94,14 @@ func (o *LDAPAuthOptions) IsEmpty() bool {
 
 // BindFlags binds the flags to the options.
 func (o *AuthOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.StringVar(&o.Basic.Username, prefix+"auth.basic.username", o.Basic.Username, "Basic auth username.")
-	fl.StringVar(&o.Basic.Password, prefix+"auth.basic.password", o.Basic.Password, "Basic auth password.")
-	fl.StringVar(&o.MTLS.CertFile, prefix+"auth.mtls.cert-file", o.MTLS.CertFile, "Path to a TLS certificate file to present when joining.")
-	fl.StringVar(&o.MTLS.CertData, prefix+"auth.mtls.cert-data", o.MTLS.CertData, "Base64 encoded TLS certificate data to present when joining.")
-	fl.StringVar(&o.MTLS.KeyFile, prefix+"auth.mtls.key-file", o.MTLS.KeyFile, "Path to a TLS key file for the certificate.")
-	fl.StringVar(&o.MTLS.KeyData, prefix+"auth.mtls.key-data", o.MTLS.KeyData, "Base64 encoded TLS key data for the certificate.")
-	fl.StringVar(&o.LDAP.Username, prefix+"auth.ldap.username", o.LDAP.Username, "LDAP auth username.")
-	fl.StringVar(&o.LDAP.Password, prefix+"auth.ldap.password", o.LDAP.Password, "LDAP auth password.")
+	fl.StringVar(&o.Basic.Username, prefix+"basic.username", o.Basic.Username, "Basic auth username.")
+	fl.StringVar(&o.Basic.Password, prefix+"basic.password", o.Basic.Password, "Basic auth password.")
+	fl.StringVar(&o.MTLS.CertFile, prefix+"mtls.cert-file", o.MTLS.CertFile, "Path to a TLS certificate file to present when joining.")
+	fl.StringVar(&o.MTLS.CertData, prefix+"mtls.cert-data", o.MTLS.CertData, "Base64 encoded TLS certificate data to present when joining.")
+	fl.StringVar(&o.MTLS.KeyFile, prefix+"mtls.key-file", o.MTLS.KeyFile, "Path to a TLS key file for the certificate.")
+	fl.StringVar(&o.MTLS.KeyData, prefix+"mtls.key-data", o.MTLS.KeyData, "Base64 encoded TLS key data for the certificate.")
+	fl.StringVar(&o.LDAP.Username, prefix+"ldap.username", o.LDAP.Username, "LDAP auth username.")
+	fl.StringVar(&o.LDAP.Password, prefix+"ldap.password", o.LDAP.Password, "LDAP auth password.")
 }
 
 func (o *AuthOptions) Validate() error {

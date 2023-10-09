@@ -81,18 +81,18 @@ type GlobalOptions struct {
 // NewGlobalOptions creates a new GlobalOptions.
 func NewGlobalOptions() GlobalOptions {
 	return GlobalOptions{
-		LogLevel:           "info",
-		LogFormat:          "text",
-		TLSCertFile:        "",
-		TLSKeyFile:         "",
-		TLSCAFile:          "",
-		TLSClientCAFile:    "",
-		MTLS:               false,
-		VerifyChainOnly:    false,
-		InsecureSkipVerify: false,
-		Insecure:           false,
-		PrimaryEndpoint:    "",
-		// Endpoints:              []string{},
+		LogLevel:               "info",
+		LogFormat:              "text",
+		TLSCertFile:            "",
+		TLSKeyFile:             "",
+		TLSCAFile:              "",
+		TLSClientCAFile:        "",
+		MTLS:                   false,
+		VerifyChainOnly:        false,
+		InsecureSkipVerify:     false,
+		Insecure:               false,
+		PrimaryEndpoint:        "",
+		Endpoints:              []string{},
 		DetectEndpoints:        false,
 		DetectPrivateEndpoints: false,
 		AllowRemoteDetection:   false,
@@ -102,25 +102,25 @@ func NewGlobalOptions() GlobalOptions {
 	}
 }
 
-func (o *GlobalOptions) BindFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&o.LogLevel, "global.log-level", o.LogLevel, "Log level.")
-	fs.StringVar(&o.LogFormat, "global.log-format", o.LogFormat, "Log format. One of 'text' or 'json'.")
-	fs.StringVar(&o.TLSCertFile, "global.tls-cert-file", o.TLSCertFile, "TLS certificate file.")
-	fs.StringVar(&o.TLSKeyFile, "global.tls-key-file", o.TLSKeyFile, "TLS key file.")
-	fs.StringVar(&o.TLSCAFile, "global.tls-ca-file", o.TLSCAFile, "TLS CA file.")
-	fs.StringVar(&o.TLSClientCAFile, "global.tls-client-ca-file", o.TLSClientCAFile, "TLS client CA file.")
-	fs.BoolVar(&o.MTLS, "global.mtls", o.MTLS, "Enable mutual TLS.")
-	fs.BoolVar(&o.VerifyChainOnly, "global.verify-chain-only", o.VerifyChainOnly, "Verify only the certificate chain.")
-	fs.BoolVar(&o.Insecure, "global.insecure", o.Insecure, "Disable TLS.")
-	fs.BoolVar(&o.InsecureSkipVerify, "global.insecure-skip-verify", o.InsecureSkipVerify, "Skip TLS verification.")
-	fs.StringVar(&o.PrimaryEndpoint, "global.primary-endpoint", o.PrimaryEndpoint, "Primary endpoint to advertise when joining.")
-	fs.StringSliceVar(&o.Endpoints, "global.endpoints", o.Endpoints, "Additional endpoints to advertise when joining.")
-	fs.BoolVar(&o.DetectEndpoints, "global.detect-endpoints", o.DetectEndpoints, "Detect and advertise publicly routable endpoints.")
-	fs.BoolVar(&o.DetectPrivateEndpoints, "global.detect-private-endpoints", o.DetectPrivateEndpoints, "Detect and advertise private endpoints.")
-	fs.BoolVar(&o.AllowRemoteDetection, "global.allow-remote-detection", o.AllowRemoteDetection, "Allow remote endpoint detection.")
-	fs.BoolVar(&o.DetectIPv6, "global.detect-ipv6", o.DetectIPv6, "Detect and advertise IPv6 endpoints.")
-	fs.BoolVar(&o.DisableIPv4, "global.disable-ipv4", o.DisableIPv4, "Disable IPv4.")
-	fs.BoolVar(&o.DisableIPv6, "global.disable-ipv6", o.DisableIPv6, "Disable IPv6.")
+func (o *GlobalOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
+	fs.StringVar(&o.LogLevel, prefix+"log-level", o.LogLevel, "Log level.")
+	fs.StringVar(&o.LogFormat, prefix+"log-format", o.LogFormat, "Log format. One of 'text' or 'json'.")
+	fs.StringVar(&o.TLSCertFile, prefix+"tls-cert-file", o.TLSCertFile, "TLS certificate file.")
+	fs.StringVar(&o.TLSKeyFile, prefix+"tls-key-file", o.TLSKeyFile, "TLS key file.")
+	fs.StringVar(&o.TLSCAFile, prefix+"tls-ca-file", o.TLSCAFile, "TLS CA file.")
+	fs.StringVar(&o.TLSClientCAFile, prefix+"tls-client-ca-file", o.TLSClientCAFile, "TLS client CA file.")
+	fs.BoolVar(&o.MTLS, prefix+"mtls", o.MTLS, "Enable mutual TLS.")
+	fs.BoolVar(&o.VerifyChainOnly, prefix+"verify-chain-only", o.VerifyChainOnly, "Verify only the certificate chain.")
+	fs.BoolVar(&o.Insecure, prefix+"insecure", o.Insecure, "Disable TLS.")
+	fs.BoolVar(&o.InsecureSkipVerify, prefix+"insecure-skip-verify", o.InsecureSkipVerify, "Skip TLS verification.")
+	fs.StringVar(&o.PrimaryEndpoint, prefix+"primary-endpoint", o.PrimaryEndpoint, "Primary endpoint to advertise when joining.")
+	fs.StringSliceVar(&o.Endpoints, prefix+"endpoints", o.Endpoints, "Additional endpoints to advertise when joining.")
+	fs.BoolVar(&o.DetectEndpoints, prefix+"detect-endpoints", o.DetectEndpoints, "Detect and advertise publicly routable endpoints.")
+	fs.BoolVar(&o.DetectPrivateEndpoints, prefix+"detect-private-endpoints", o.DetectPrivateEndpoints, "Detect and advertise private endpoints.")
+	fs.BoolVar(&o.AllowRemoteDetection, prefix+"allow-remote-detection", o.AllowRemoteDetection, "Allow remote endpoint detection.")
+	fs.BoolVar(&o.DetectIPv6, prefix+"detect-ipv6", o.DetectIPv6, "Detect and advertise IPv6 endpoints.")
+	fs.BoolVar(&o.DisableIPv4, prefix+"disable-ipv4", o.DisableIPv4, "Disable IPv4.")
+	fs.BoolVar(&o.DisableIPv6, prefix+"disable-ipv6", o.DisableIPv6, "Disable IPv6.")
 }
 
 // Validate validates the global options.

@@ -90,13 +90,13 @@ func NewInsecureServiceOptions() ServiceOptions {
 
 // BindFlags binds the flags.
 func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	s.API.BindFlags(prefix, fl)
-	s.WebRTC.BindFlags(prefix, fl)
-	s.TURN.BindFlags(prefix, fl)
-	s.Metrics.BindFlags(prefix, fl)
+	s.API.BindFlags(prefix+"api.", fl)
+	s.WebRTC.BindFlags(prefix+"webrtc.", fl)
+	s.TURN.BindFlags(prefix+"turn.", fl)
+	s.Metrics.BindFlags(prefix+"metrics.", fl)
 	// Don't recurse on meshdns flags in bridge configurations
-	if prefix == "" {
-		s.MeshDNS.BindFlags(prefix, fl)
+	if prefix == "services." {
+		s.MeshDNS.BindFlags(prefix+"meshdns.", fl)
 	}
 }
 
@@ -174,17 +174,17 @@ func NewInsecureAPIOptions() APIOptions {
 
 // BindFlags binds the flags.
 func (a *APIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.BoolVar(&a.Disabled, prefix+"services.api.disabled", a.Disabled, "Disable the API. This is ignored when joining as a Raft member.")
-	fl.StringVar(&a.ListenAddress, prefix+"services.api.listen-address", a.ListenAddress, "gRPC listen address.")
-	fl.BoolVar(&a.WebEnabled, prefix+"services.api.web-enabled", a.WebEnabled, "Enable gRPC over HTTP/1.1.")
-	fl.BoolVar(&a.DisableLeaderProxy, prefix+"services.api.disable-leader-proxy", a.DisableLeaderProxy, "Disable the leader proxy.")
-	fl.StringVar(&a.TLSCertFile, prefix+"services.api.tls-cert-file", a.TLSCertFile, "TLS certificate file.")
-	fl.StringVar(&a.TLSCertData, prefix+"services.api.tls-cert-data", a.TLSCertData, "TLS certificate data.")
-	fl.StringVar(&a.TLSKeyFile, prefix+"services.api.tls-key-file", a.TLSKeyFile, "TLS key file.")
-	fl.StringVar(&a.TLSKeyData, prefix+"services.api.tls-key-data", a.TLSKeyData, "TLS key data.")
-	fl.BoolVar(&a.Insecure, prefix+"services.api.insecure", a.Insecure, "Disable TLS.")
-	fl.BoolVar(&a.MeshEnabled, prefix+"services.api.mesh-enabled", a.MeshEnabled, "Enable and register the MeshAPI.")
-	fl.BoolVar(&a.AdminEnabled, prefix+"services.api.admin-enabled", a.AdminEnabled, "Enable and register the AdminAPI.")
+	fl.BoolVar(&a.Disabled, prefix+"disabled", a.Disabled, "Disable the API. This is ignored when joining as a Raft member.")
+	fl.StringVar(&a.ListenAddress, prefix+"listen-address", a.ListenAddress, "gRPC listen address.")
+	fl.BoolVar(&a.WebEnabled, prefix+"web-enabled", a.WebEnabled, "Enable gRPC over HTTP/1.1.")
+	fl.BoolVar(&a.DisableLeaderProxy, prefix+"disable-leader-proxy", a.DisableLeaderProxy, "Disable the leader proxy.")
+	fl.StringVar(&a.TLSCertFile, prefix+"tls-cert-file", a.TLSCertFile, "TLS certificate file.")
+	fl.StringVar(&a.TLSCertData, prefix+"tls-cert-data", a.TLSCertData, "TLS certificate data.")
+	fl.StringVar(&a.TLSKeyFile, prefix+"tls-key-file", a.TLSKeyFile, "TLS key file.")
+	fl.StringVar(&a.TLSKeyData, prefix+"tls-key-data", a.TLSKeyData, "TLS key data.")
+	fl.BoolVar(&a.Insecure, prefix+"insecure", a.Insecure, "Disable TLS.")
+	fl.BoolVar(&a.MeshEnabled, prefix+"mesh-enabled", a.MeshEnabled, "Enable and register the MeshAPI.")
+	fl.BoolVar(&a.AdminEnabled, prefix+"admin-enabled", a.AdminEnabled, "Enable and register the AdminAPI.")
 }
 
 // Validate validates the options.
@@ -225,8 +225,8 @@ func NewWebRTCOptions() WebRTCOptions {
 
 // BindFlags binds the flags.
 func (w *WebRTCOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.BoolVar(&w.Enabled, prefix+"services.webrtc.enabled", w.Enabled, "Enable and register the WebRTC API.")
-	fl.StringSliceVar(&w.STUNServers, prefix+"services.webrtc.stun-servers", w.STUNServers, "TURN/STUN servers to use for the WebRTC API.")
+	fl.BoolVar(&w.Enabled, prefix+"enabled", w.Enabled, "Enable and register the WebRTC API.")
+	fl.StringSliceVar(&w.STUNServers, prefix+"stun-servers", w.STUNServers, "TURN/STUN servers to use for the WebRTC API.")
 }
 
 // Validate validates the options.
@@ -275,12 +275,12 @@ func NewTURNOptions() TURNOptions {
 
 // BindFlags binds the flags.
 func (t *TURNOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.BoolVar(&t.Enabled, prefix+"services.turn.enabled", t.Enabled, "Enable TURN server.")
-	fl.StringVar(&t.Endpoint, prefix+"services.turn.endpoint", t.Endpoint, "TURN endpoint to advertise.")
-	fl.StringVar(&t.PublicIP, prefix+"services.turn.public-ip", t.PublicIP, "Public IP to advertise for STUN/TURN requests.")
-	fl.StringVar(&t.ListenAddress, prefix+"services.turn.listen-address", t.ListenAddress, "Address to listen on for STUN/TURN requests.")
-	fl.StringVar(&t.Realm, prefix+"services.turn.realm", t.Realm, "Realm used for TURN server authentication.")
-	fl.StringVar(&t.TURNPortRange, prefix+"services.turn.port-range", t.TURNPortRange, "Port range to use for TURN relays.")
+	fl.BoolVar(&t.Enabled, prefix+"enabled", t.Enabled, "Enable TURN server.")
+	fl.StringVar(&t.Endpoint, prefix+"endpoint", t.Endpoint, "TURN endpoint to advertise.")
+	fl.StringVar(&t.PublicIP, prefix+"public-ip", t.PublicIP, "Public IP to advertise for STUN/TURN requests.")
+	fl.StringVar(&t.ListenAddress, prefix+"listen-address", t.ListenAddress, "Address to listen on for STUN/TURN requests.")
+	fl.StringVar(&t.Realm, prefix+"realm", t.Realm, "Realm used for TURN server authentication.")
+	fl.StringVar(&t.TURNPortRange, prefix+"port-range", t.TURNPortRange, "Port range to use for TURN relays.")
 }
 
 // Validate values the TURN options.
@@ -376,17 +376,17 @@ func NewMeshDNSOptions() MeshDNSOptions {
 
 // BindFlags binds the flags.
 func (m *MeshDNSOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.BoolVar(&m.Enabled, prefix+"services.meshdns.enabled", m.Enabled, "Enable mesh DNS.")
-	fl.StringVar(&m.ListenUDP, prefix+"services.meshdns.listen-udp", m.ListenUDP, "UDP address to listen on for DNS requests.")
-	fl.StringVar(&m.ListenTCP, prefix+"services.meshdns.listen-tcp", m.ListenTCP, "TCP address to listen on for DNS requests.")
-	fl.IntVar(&m.ReusePort, prefix+"services.meshdns.reuse-port", m.ReusePort, "Enable SO_REUSEPORT for mesh DNS. Only available on Linux systems.")
-	fl.BoolVar(&m.EnableCompression, prefix+"services.meshdns.compression", m.EnableCompression, "Enable DNS compression.")
-	fl.DurationVar(&m.RequestTimeout, prefix+"services.meshdns.request-timeout", m.RequestTimeout, "DNS request timeout.")
-	fl.StringSliceVar(&m.Forwarders, prefix+"services.meshdns.forwarders", m.Forwarders, "DNS forwarders (default = system resolvers).")
-	fl.BoolVar(&m.SubscribeForwarders, prefix+"services.meshdns.subscribe-forwarders", m.SubscribeForwarders, "Subscribe to new nodes that can forward requests.")
-	fl.BoolVar(&m.DisableForwarding, prefix+"services.meshdns.disable-forwarding", m.DisableForwarding, "Disable forwarding requests.")
-	fl.IntVar(&m.CacheSize, prefix+"services.meshdns.cache-size", m.CacheSize, "Size of the remote DNS cache (0 = disabled).")
-	fl.BoolVar(&m.IPv6Only, prefix+"services.meshdns.ipv6-only", m.IPv6Only, "Only respond to IPv6 requests.")
+	fl.BoolVar(&m.Enabled, prefix+"enabled", m.Enabled, "Enable mesh DNS.")
+	fl.StringVar(&m.ListenUDP, prefix+"listen-udp", m.ListenUDP, "UDP address to listen on for DNS requests.")
+	fl.StringVar(&m.ListenTCP, prefix+"isten-tcp", m.ListenTCP, "TCP address to listen on for DNS requests.")
+	fl.IntVar(&m.ReusePort, prefix+"reuse-port", m.ReusePort, "Enable SO_REUSEPORT for mesh DNS. Only available on Linux systems.")
+	fl.BoolVar(&m.EnableCompression, prefix+"compression", m.EnableCompression, "Enable DNS compression.")
+	fl.DurationVar(&m.RequestTimeout, prefix+"request-timeout", m.RequestTimeout, "DNS request timeout.")
+	fl.StringSliceVar(&m.Forwarders, prefix+"forwarders", m.Forwarders, "DNS forwarders (default = system resolvers).")
+	fl.BoolVar(&m.SubscribeForwarders, prefix+"subscribe-forwarders", m.SubscribeForwarders, "Subscribe to new nodes that can forward requests.")
+	fl.BoolVar(&m.DisableForwarding, prefix+"disable-forwarding", m.DisableForwarding, "Disable forwarding requests.")
+	fl.IntVar(&m.CacheSize, prefix+"cache-size", m.CacheSize, "Size of the remote DNS cache (0 = disabled).")
+	fl.BoolVar(&m.IPv6Only, prefix+"ipv6-only", m.IPv6Only, "Only respond to IPv6 requests.")
 }
 
 // ListenPort returns the listen port for the MeshDNS server is enabled.
@@ -456,9 +456,9 @@ func NewMetricsOptions() MetricsOptions {
 
 // BindFlags binds the flags.
 func (m *MetricsOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.BoolVar(&m.Enabled, prefix+"services.metrics.enabled", m.Enabled, "Enable gRPC metrics.")
-	fl.StringVar(&m.ListenAddress, prefix+"services.metrics.listen-address", m.ListenAddress, "gRPC metrics listen address.")
-	fl.StringVar(&m.Path, prefix+"services.metrics.path", m.Path, "gRPC metrics path.")
+	fl.BoolVar(&m.Enabled, prefix+"enabled", m.Enabled, "Enable gRPC metrics.")
+	fl.StringVar(&m.ListenAddress, prefix+"listen-address", m.ListenAddress, "gRPC metrics listen address.")
+	fl.StringVar(&m.Path, prefix+"path", m.Path, "gRPC metrics path.")
 }
 
 // ListenPort returns the listen port for the Metrics server is enabled.

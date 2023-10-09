@@ -112,19 +112,19 @@ func NewInsecureConfig(nodeID string) *Config {
 
 // BindFlags binds the flags. The options are returned for convenience.
 func (o *Config) BindFlags(prefix string, fs *pflag.FlagSet) *Config {
-	o.Bootstrap.BindFlags(prefix, fs)
-	o.Auth.BindFlags(prefix, fs)
-	o.Mesh.BindFlags(prefix, fs)
-	o.Storage.BindFlags(prefix, fs)
-	o.Services.BindFlags(prefix, fs)
-	o.TLS.BindFlags(prefix, fs)
-	o.WireGuard.BindFlags(prefix, fs)
-	o.Discovery.BindFlags(prefix, fs)
-	o.Plugins.BindFlags(prefix, fs)
+	o.Bootstrap.BindFlags(prefix+"bootstrap.", fs)
+	o.Auth.BindFlags(prefix+"auth.", fs)
+	o.Mesh.BindFlags(prefix+"mesh.", fs)
+	o.Storage.BindFlags(prefix+"storage.", fs)
+	o.Services.BindFlags(prefix+"services.", fs)
+	o.TLS.BindFlags(prefix+"tls.", fs)
+	o.WireGuard.BindFlags(prefix+"wireguard.", fs)
+	o.Discovery.BindFlags(prefix+"discovery.", fs)
+	o.Plugins.BindFlags(prefix+"plugins.", fs)
 	// Don't recurse on bridge or global configurations
 	if prefix == "" {
-		o.Global.BindFlags(fs)
-		o.Bridge.BindFlags(fs)
+		o.Global.BindFlags("global.", fs)
+		o.Bridge.BindFlags("bridge.", fs)
 	}
 	return o
 }

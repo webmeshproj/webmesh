@@ -125,30 +125,30 @@ func NewBootstrapTransportOptions() BootstrapTransportOptions {
 
 // BindFlags binds the bootstrap options to a flag set.
 func (o *BootstrapOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.BoolVar(&o.Enabled, prefix+"bootstrap.enabled", o.Enabled, "Attempt to bootstrap a new cluster")
-	fs.DurationVar(&o.ElectionTimeout, prefix+"bootstrap.election-timeout", o.ElectionTimeout, "Election timeout to use when bootstrapping a new cluster")
-	fs.StringVar(&o.IPv4Network, prefix+"bootstrap.ipv4-network", o.IPv4Network, "IPv4 network of the mesh to write to the database when bootstraping a new cluster")
-	fs.StringVar(&o.MeshDomain, prefix+"bootstrap.mesh-domain", o.MeshDomain, "Domain of the mesh to write to the database when bootstraping a new cluster")
-	fs.StringVar(&o.Admin, prefix+"bootstrap.admin", o.Admin, "User and/or node name to assign administrator privileges to when bootstraping a new cluster")
-	fs.StringSliceVar(&o.Voters, prefix+"bootstrap.voters", o.Voters, "Comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster")
-	fs.StringVar(&o.DefaultNetworkPolicy, prefix+"bootstrap.default-network-policy", o.DefaultNetworkPolicy, "Default network policy to apply to the mesh when bootstraping a new cluster")
-	fs.BoolVar(&o.DisableRBAC, prefix+"bootstrap.disable-rbac", o.DisableRBAC, "Disable RBAC when bootstrapping a new cluster")
-	fs.BoolVar(&o.Force, prefix+"bootstrap.force", o.Force, "Force new bootstrap")
-	o.Transport.BindFlags(prefix, fs)
+	fs.BoolVar(&o.Enabled, prefix+"enabled", o.Enabled, "Attempt to bootstrap a new cluster")
+	fs.DurationVar(&o.ElectionTimeout, prefix+"election-timeout", o.ElectionTimeout, "Election timeout to use when bootstrapping a new cluster")
+	fs.StringVar(&o.IPv4Network, prefix+"ipv4-network", o.IPv4Network, "IPv4 network of the mesh to write to the database when bootstraping a new cluster")
+	fs.StringVar(&o.MeshDomain, prefix+"mesh-domain", o.MeshDomain, "Domain of the mesh to write to the database when bootstraping a new cluster")
+	fs.StringVar(&o.Admin, prefix+"admin", o.Admin, "User and/or node name to assign administrator privileges to when bootstraping a new cluster")
+	fs.StringSliceVar(&o.Voters, prefix+"voters", o.Voters, "Comma separated list of node IDs to assign voting privileges to when bootstraping a new cluster")
+	fs.StringVar(&o.DefaultNetworkPolicy, prefix+"default-network-policy", o.DefaultNetworkPolicy, "Default network policy to apply to the mesh when bootstraping a new cluster")
+	fs.BoolVar(&o.DisableRBAC, prefix+"disable-rbac", o.DisableRBAC, "Disable RBAC when bootstrapping a new cluster")
+	fs.BoolVar(&o.Force, prefix+"force", o.Force, "Force new bootstrap")
+	o.Transport.BindFlags(prefix+"transport.", fs)
 }
 
 // BindFlags binds the bootstrap transport options to a flag set.
 func (o *BootstrapTransportOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.StringVar(&o.TCPAdvertiseAddress, prefix+"bootstrap.transport.tcp-advertise-address", o.TCPAdvertiseAddress, "Address to advertise for raft consensus")
-	fs.StringVar(&o.TCPListenAddress, prefix+"bootstrap.transport.tcp-listen-address", o.TCPListenAddress, "Address to use when using TCP raft consensus to bootstrap")
-	fs.IntVar(&o.TCPConnectionPool, prefix+"bootstrap.transport.tcp-connection-pool", o.TCPConnectionPool, "Maximum number of TCP connections to maintain to other nodes")
-	fs.DurationVar(&o.TCPConnectTimeout, prefix+"bootstrap.transport.tcp-connect-timeout", o.TCPConnectTimeout, "Maximum amount of time to wait for a TCP connection to be established")
-	fs.StringToStringVar(&o.TCPServers, prefix+"bootstrap.transport.tcp-servers", o.TCPServers, "Map of node IDs to raft addresses to bootstrap with")
-	fs.StringToIntVar(&o.ServerGRPCPorts, prefix+"bootstrap.transport.server-grpc-ports", o.ServerGRPCPorts, "Map of node IDs to gRPC ports to bootstrap with")
-	fs.StringVar(&o.Rendezvous, prefix+"bootstrap.transport.rendezvous", o.Rendezvous, "Rendezvous string to use when using libp2p to bootstrap")
-	fs.StringSliceVar(&o.RendezvousNodes, prefix+"bootstrap.transport.rendezvous-nodes", o.RendezvousNodes, "List of node IDs to use when using libp2p to bootstrap")
-	fs.DurationVar(&o.RendezvousLinger, prefix+"bootstrap.transport.rendezvous-linger", o.RendezvousLinger, "Amount of time to wait for other nodes to join when using libp2p to bootstrap")
-	fs.StringVar(&o.PSK, prefix+"bootstrap.transport.psk", o.PSK, "Pre-shared key to use when using libp2p to bootstrap")
+	fs.StringVar(&o.TCPAdvertiseAddress, prefix+"tcp-advertise-address", o.TCPAdvertiseAddress, "Address to advertise for raft consensus")
+	fs.StringVar(&o.TCPListenAddress, prefix+"tcp-listen-address", o.TCPListenAddress, "Address to use when using TCP raft consensus to bootstrap")
+	fs.IntVar(&o.TCPConnectionPool, prefix+"tcp-connection-pool", o.TCPConnectionPool, "Maximum number of TCP connections to maintain to other nodes")
+	fs.DurationVar(&o.TCPConnectTimeout, prefix+"tcp-connect-timeout", o.TCPConnectTimeout, "Maximum amount of time to wait for a TCP connection to be established")
+	fs.StringToStringVar(&o.TCPServers, prefix+"tcp-servers", o.TCPServers, "Map of node IDs to raft addresses to bootstrap with")
+	fs.StringToIntVar(&o.ServerGRPCPorts, prefix+"server-grpc-ports", o.ServerGRPCPorts, "Map of node IDs to gRPC ports to bootstrap with")
+	fs.StringVar(&o.Rendezvous, prefix+"rendezvous", o.Rendezvous, "Rendezvous string to use when using libp2p to bootstrap")
+	fs.StringSliceVar(&o.RendezvousNodes, prefix+"rendezvous-nodes", o.RendezvousNodes, "List of node IDs to use when using libp2p to bootstrap")
+	fs.DurationVar(&o.RendezvousLinger, prefix+"rendezvous-linger", o.RendezvousLinger, "Amount of time to wait for other nodes to join when using libp2p to bootstrap")
+	fs.StringVar(&o.PSK, prefix+"psk", o.PSK, "Pre-shared key to use when using libp2p to bootstrap")
 }
 
 // Validate validates the bootstrap options.

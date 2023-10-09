@@ -90,7 +90,6 @@ func NewStorageOptions() StorageOptions {
 
 // BindFlags binds the storage options to the flag set.
 func (o *StorageOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	prefix = prefix + "storage."
 	fs.BoolVar(&o.InMemory, prefix+"in-memory", o.InMemory, "Use in-memory storage")
 	fs.StringVar(&o.Path, prefix+"path", o.Path, "Path to the storage directory")
 	fs.StringVar(&o.Provider, prefix+"provider", o.Provider, "Storage provider (defaults to raftstorage or passthrough depending on other options)")
