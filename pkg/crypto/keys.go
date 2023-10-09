@@ -55,6 +55,9 @@ func init() {
 type Key interface {
 	p2pcrypto.Key
 
+	// ID returns the peer ID of the key.
+	ID() peer.ID
+
 	// Bytes returns the raw bytes of the key. This is the same as Key.Raw
 	// without needing to do an error check.
 	Bytes() []byte
@@ -224,6 +227,11 @@ func (w *WebmeshPrivateKey) Type() cryptopb.KeyType {
 	return w.typ
 }
 
+// ID returns the peer ID of the key.
+func (w *WebmeshPrivateKey) ID() peer.ID {
+	return w.PublicKey().ID()
+}
+
 // Bytes returns the raw bytes of the key. This is the same as Key.Raw
 // without needing to do an error check.
 func (w *WebmeshPrivateKey) Bytes() []byte {
@@ -309,6 +317,12 @@ type WebmeshPublicKey struct {
 // Type returns the protobuf key type.
 func (w *WebmeshPublicKey) Type() cryptopb.KeyType {
 	return w.typ
+}
+
+// ID returns the peer ID of the key.
+func (w *WebmeshPublicKey) ID() peer.ID {
+	id, _ := peer.IDFromPublicKey(w)
+	return id
 }
 
 // Bytes returns the raw bytes of the key. This is the same as Key.Raw

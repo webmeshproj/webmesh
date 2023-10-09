@@ -142,4 +142,14 @@ func TestWireGuardKeyIDs(t *testing.T) {
 	if !extracted.Equals(key.PublicKey()) {
 		t.Fatal("extracted public key does not match original public key")
 	}
+
+	// Check that the builtin methods work the same.
+	id = key.ID()
+	extracted, err = PubKeyFromID(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !extracted.Equals(key.PublicKey()) {
+		t.Fatal("extracted public key does not match original public key")
+	}
 }
