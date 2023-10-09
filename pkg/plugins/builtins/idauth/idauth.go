@@ -46,7 +46,6 @@ type Plugin struct {
 }
 
 // Config is the configuration for the ID auth plugin.
-// There are currently no configuration options.
 type Config struct {
 	// AllowedIDs is a list of allowed peer IDs.
 	AllowedIDs []string `mapstructure:"allowed-ids,omitempty" koanf:"allowed-ids,omitempty"`
