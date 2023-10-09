@@ -37,6 +37,12 @@ func NewPluginMap() map[string]clients.PluginClient {
 	}
 }
 
+// NewClient returns a new built-in plugin client for the given plugin name.
+func NewClient(pluginName string) (clients.PluginClient, bool) {
+	client, ok := NewPluginMap()[pluginName]
+	return client, ok
+}
+
 // IsBuiltIn returns true if the plugin is a built-in plugin.
 func IsBuiltIn(pluginName string) bool {
 	_, ok := NewPluginMap()[pluginName]
