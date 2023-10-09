@@ -146,13 +146,14 @@ func (o *RemotePluginConfig) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.BoolVar(&o.TLSSkipVerify, prefix+"remote.tls-skip-verify", o.TLSSkipVerify, "Whether to skip verifying the plugin server's certificate.")
 }
 
-// NewPluginSet returns a new plugin set for the node configuration.
-func (o *Config) NewPluginSet(ctx context.Context) (map[string]plugins.Plugin, error) {
-	if len(o.Plugins.Configs) == 0 {
+// NewPluginSet returns a new plugin set for the node configuration. This
+// will only work if the PluginOptions have been bound to a parsed flagset.
+func (o *PluginOptions) NewPluginSet(ctx context.Context) (map[string]plugins.Plugin, error) {
+	if len(o.Configs) == 0 {
 		return nil, nil
 	}
 	pluginSet := map[string]plugins.Plugin{}
-	for pluginName, pluginConfig := range o.Plugins.Configs {
+	for pluginName, pluginConfig := range o.Configs {
 		name := pluginName
 		// Create a client for the plugin
 		builtinClients := builtins.NewPluginMap()

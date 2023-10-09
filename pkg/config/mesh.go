@@ -446,7 +446,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 	}
 
 	// Create our plugins
-	plugins, err := o.NewPluginSet(ctx)
+	plugins, err := o.Plugins.NewPluginSet(ctx)
 	if err != nil {
 		return
 	}
