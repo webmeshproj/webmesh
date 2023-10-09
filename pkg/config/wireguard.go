@@ -115,7 +115,7 @@ func (o *WireGuardOptions) Validate() error {
 		return fmt.Errorf("wireguard.mtu must be greater than 1280")
 	}
 	if o.KeyRotationInterval < 0 {
-		return fmt.Errorf("wireguard.key-rotation-interval must be greater than 0")
+		return fmt.Errorf("wireguard.key-rotation-interval must be greater than or equal to 0")
 	}
 	if o.RecordMetrics {
 		if o.RecordMetricsInterval < 0 {
@@ -157,26 +157,28 @@ func (o *WireGuardOptions) LoadKey(ctx context.Context) (crypto.PrivateKey, erro
 		return nil, fmt.Errorf("wireguard key file is a directory")
 	}
 	// Check if the key is expired
-	if stat.ModTime().Add(o.KeyRotationInterval).Before(time.Now()) {
-		// Delete the key file if it's older than the key rotation interval.
-		log.Info("Removing expired WireGuard key file", slog.String("file", o.KeyFile))
-		if err := os.Remove(o.KeyFile); err != nil {
-			return nil, fmt.Errorf("remove expired wireguard key file: %w", err)
+	if o.KeyRotationInterval > 0 {
+		if stat.ModTime().Add(o.KeyRotationInterval).Before(time.Now()) {
+			// Delete the key file if it's older than the key rotation interval.
+			log.Info("Removing expired WireGuard key file", slog.String("file", o.KeyFile))
+			if err := os.Remove(o.KeyFile); err != nil {
+				return nil, fmt.Errorf("remove expired wireguard key file: %w", err)
+			}
+			// Generate a new key and save it to the file
+			log.Info("Generating new WireGuard key and saving to file", slog.String("file", o.KeyFile))
+			key, err := crypto.GenerateKey()
+			if err != nil {
+				return nil, fmt.Errorf("generate new key: %w", err)
+			}
+			encoded, err := key.Encode()
+			if err != nil {
+				return nil, fmt.Errorf("encode key: %w", err)
+			}
+			if err := os.WriteFile(o.KeyFile, []byte(encoded), 0600); err != nil {
+				return nil, fmt.Errorf("write key file: %w", err)
+			}
+			return key, nil
 		}
-		// Generate a new key and save it to the file
-		log.Info("Generating new WireGuard key and saving to file", slog.String("file", o.KeyFile))
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			return nil, fmt.Errorf("generate new key: %w", err)
-		}
-		encoded, err := key.Encode()
-		if err != nil {
-			return nil, fmt.Errorf("encode key: %w", err)
-		}
-		if err := os.WriteFile(o.KeyFile, []byte(encoded), 0600); err != nil {
-			return nil, fmt.Errorf("write key file: %w", err)
-		}
-		return key, nil
 	}
 	// Load the key from the file
 	log.Info("Loading WireGuard key from file", slog.String("file", o.KeyFile))
