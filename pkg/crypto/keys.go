@@ -196,11 +196,11 @@ func PubKeyFromID(id peer.ID) (PublicKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("extract public key from peer ID: %w", err)
 	}
-	pubkey, ok := key.(PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("invalid public key type")
+	raw, err := key.Raw()
+	if err != nil {
+		return nil, fmt.Errorf("get raw public key: %w", err)
 	}
-	return pubkey, nil
+	return ParsePublicKey(raw)
 }
 
 // WebmeshPrivateKey is a private key used for webmesh transport.
