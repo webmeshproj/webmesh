@@ -194,9 +194,9 @@ func (n *node) Start(ctx context.Context) error {
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create webmesh server: %w", err))
 	}
-	isStorageMember := n.conf.IsStorageMember()
-	features := n.conf.Services.NewFeatureSet(n.conf.Services.API.ListenPort(), n.conf.Storage.ListenPort(), isStorageMember)
 	if !n.conf.Services.API.Disabled {
+		isStorageMember := n.conf.IsStorageMember()
+		features := n.conf.Services.NewFeatureSet(n.conf.Services.API.ListenPort(), n.conf.Storage.ListenPort(), isStorageMember)
 		err = n.conf.Services.RegisterAPIs(ctx, n.Mesh(), n.services, features, isStorageMember)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to register APIs: %w", err))
