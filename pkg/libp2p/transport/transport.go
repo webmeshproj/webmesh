@@ -546,10 +546,9 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	if err != nil {
 		return nil, handleErr(fmt.Errorf("failed to create mesh services: %w", err))
 	}
-	isStorageMember := conf.IsStorageMember()
-	features := conf.Services.NewFeatureSet(conf.Mesh.GRPCAdvertisePort, conf.Storage.ListenPort(), isStorageMember)
+	features := conf.Services.NewFeatureSet(storageProvider, conf.Services.API.ListenPort())
 	if !conf.Services.API.Disabled {
-		err = conf.Services.RegisterAPIs(ctx, node, t.svcs, features, isStorageMember)
+		err = conf.Services.RegisterAPIs(ctx, node, t.svcs, features)
 		if err != nil {
 			return nil, handleErr(fmt.Errorf("failed to register APIs: %w", err))
 		}

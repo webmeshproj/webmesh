@@ -167,9 +167,8 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		return nil, handleErr(status.Errorf(codes.Internal, "failed to create gRPC server: %v", err))
 	}
 	if !conf.Services.API.Disabled {
-		isStorageMember := conf.IsStorageMember()
-		features := conf.Services.NewFeatureSet(conf.Services.API.ListenPort(), conf.Storage.ListenPort(), isStorageMember)
-		err = conf.Services.RegisterAPIs(ctx, meshConn, srv, features, isStorageMember)
+		features := conf.Services.NewFeatureSet(storageProvider, conf.Services.API.ListenPort())
+		err = conf.Services.RegisterAPIs(ctx, meshConn, srv, features)
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to register APIs: %v", err))
 		}

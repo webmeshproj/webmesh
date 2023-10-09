@@ -51,6 +51,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/storage"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
+	meshstorage "github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 // ServiceOptions contains the configuration for the mesh services.
@@ -519,7 +520,7 @@ func (m MetricsOptions) Validate() error {
 }
 
 // RegisterAPIs registers the configured APIs to the given server.
-func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *services.Server, features []*v1.FeaturePort, storageMember bool) error {
+func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *services.Server, features []*v1.FeaturePort) error {
 	log := context.LoggerFrom(ctx)
 	var rbacDisabled bool
 	var err error
@@ -555,7 +556,7 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, s
 		Features:   features,
 	}))
 	// Register membership and storage if we are a storage provider
-	if storageMember {
+	if conn.Storage().Consensus().IsMember() {
 		log.Debug("Registering membership service")
 		v1.RegisterMembershipServer(srv, membership.NewServer(ctx, membership.Options{
 			NodeID:  conn.ID(),
@@ -594,7 +595,7 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, s
 }
 
 // NewFeatureSet returns a new FeatureSet for the given node options.
-func (o *ServiceOptions) NewFeatureSet(grpcPort int, storagePort int, storageMember bool) []*v1.FeaturePort {
+func (o *ServiceOptions) NewFeatureSet(storage meshstorage.Provider, grpcPort int) []*v1.FeaturePort {
 	// We always expose the node API
 	var features []*v1.FeaturePort
 	if !o.API.Disabled {
@@ -604,7 +605,7 @@ func (o *ServiceOptions) NewFeatureSet(grpcPort int, storagePort int, storageMem
 		})
 	}
 	// If we are a raft member, we automatically serve storage and membership
-	if storageMember {
+	if storage.Consensus().IsMember() {
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_STORAGE_QUERIER,
 			Port:    int32(grpcPort),
@@ -615,7 +616,7 @@ func (o *ServiceOptions) NewFeatureSet(grpcPort int, storagePort int, storageMem
 		})
 		features = append(features, &v1.FeaturePort{
 			Feature: v1.Feature_STORAGE_PROVIDER,
-			Port:    int32(storagePort),
+			Port:    int32(storage.ListenPort()),
 		})
 	}
 	if !o.API.Disabled {

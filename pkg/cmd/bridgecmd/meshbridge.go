@@ -126,9 +126,8 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			return handleErr(fmt.Errorf("failed to create gRPC server: %w", err))
 		}
 		if !meshConfig.Services.API.Disabled {
-			isStorageMember := meshConfig.IsStorageMember()
-			features := meshConfig.Services.NewFeatureSet(meshConfig.Services.API.ListenPort(), meshConfig.Storage.ListenPort(), isStorageMember)
-			err = meshConfig.Services.RegisterAPIs(ctx, meshConn, srv, features, isStorageMember)
+			features := meshConfig.Services.NewFeatureSet(meshConn.Storage(), meshConfig.Services.API.ListenPort())
+			err = meshConfig.Services.RegisterAPIs(ctx, meshConn, srv, features)
 			if err != nil {
 				return handleErr(fmt.Errorf("failed to register APIs: %w", err))
 			}
@@ -234,9 +233,8 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 				Id:     meshConn.ID().String(),
 				Routes: toBroadcast,
 				Features: meshConfig.Services.NewFeatureSet(
-					meshConfig.Mesh.GRPCAdvertisePort,
-					meshConfig.Storage.ListenPort(),
-					meshConfig.IsStorageMember(),
+					meshConn.Storage(),
+					meshConfig.Services.API.ListenPort(),
 				),
 			}
 			// If we are bridging DNS, add it to our feature set
