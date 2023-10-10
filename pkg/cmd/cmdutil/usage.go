@@ -65,6 +65,15 @@ func NewUsageFunc(cfg UsageConfig) func() string {
 				if !strings.HasPrefix(f.Name, prefix) {
 					return
 				}
+				// Make sure it doesn't match any other prefixes.
+				for _, p := range cfg.Prefixes {
+					if p == prefix {
+						continue
+					}
+					if strings.HasPrefix(f.Name, p) {
+						return
+					}
+				}
 				line := fmt.Sprintf("\t--%s=%s\t\t%s", f.Name, f.DefValue, f.Usage)
 				_, _ = t.Write([]byte(line))
 				_, _ = t.Write([]byte("\n"))
