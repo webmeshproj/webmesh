@@ -130,8 +130,9 @@ clean: ## Clean up build and development artifacts.
 build-ctl:
 	$(GORELEASER) build --single-target $(BUILD_ARGS) --id $(CTL) -o dist/$(CTL)
 
+CTL_INSTALL_DIR ?= /usr/bin/wmctl
 install-ctl: build-ctl
-	install -m 755 dist/$(CTL) $(GOBIN)/$(CTL)
+	sudo install -m 755 dist/$(CTL) $(CTL_INSTALL_DIR)
 
 latest-api: ## Used for development and forces a pull of the API off the main branch.
 	GOPRIVATE=github.com/webmeshproj $(GO) get -u github.com/webmeshproj/api@main
