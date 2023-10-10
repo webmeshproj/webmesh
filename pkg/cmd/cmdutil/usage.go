@@ -48,7 +48,7 @@ func NewUsageFunc(cfg UsageConfig) func() string {
 	return func() string {
 		var sb strings.Builder
 		sb.WriteString(fmt.Sprintf("Usage: %s [options]\n\n", cfg.Name))
-		sb.WriteString(strings.TrimSpace(cfg.Description) + "\n\n")
+		sb.WriteString(strings.TrimSpace(cfg.Description) + "\n")
 		t := tabwriter.NewWriter(&sb, 2, 2, 2, '\t', 0)
 		for _, prefix := range cfg.Prefixes {
 			// Capitalize the prefix and write a description of the section.
