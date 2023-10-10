@@ -348,7 +348,6 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 	config.RootCAs = certpool
 	config.InsecureSkipVerify = cluster.TLSSkipVerify
 	if cluster.TLSVerifyChainOnly {
-		config.InsecureSkipVerify = true
 		config.VerifyPeerCertificate = crypto.VerifyChainOnly
 	}
 	currentUser := c.GetCurrentUser()

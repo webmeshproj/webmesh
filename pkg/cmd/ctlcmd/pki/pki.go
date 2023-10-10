@@ -278,10 +278,14 @@ func (p *pki) Generate(opts *GenerateOptions) error {
 		NotAfter:              time.Now().UTC().Add(opts.CAExpiry),
 		IsCA:                  true,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 	}
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, caPubKey, caPrivKey)
+	if err != nil {
+		return err
+	}
+	ca, err = x509.ParseCertificate(caBytes)
 	if err != nil {
 		return err
 	}
@@ -294,7 +298,7 @@ func (p *pki) Generate(opts *GenerateOptions) error {
 		NotBefore:   time.Now().UTC(),
 		NotAfter:    time.Now().UTC().Add(opts.AdminExpiry),
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 	}
 	adminBytes, err := x509.CreateCertificate(rand.Reader, admin, ca, adminPubKey, caPrivKey)
 	if err != nil {
@@ -366,7 +370,7 @@ func (p *pki) Issue(opts *IssueOptions) error {
 		NotBefore:   time.Now().UTC(),
 		NotAfter:    time.Now().UTC().Add(opts.Expiry),
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 	}
 	certBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, pubKey, caPrivKey)
 	if err != nil {

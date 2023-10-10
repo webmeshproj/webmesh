@@ -260,7 +260,7 @@ func (global *GlobalOptions) ApplyGlobals(ctx context.Context, o *Config) (*Conf
 		}()
 		// Configure both client and server mTLS
 		o.Services.API.MTLS = global.MTLS
-		o.Services.API.MTLSClientCAFile = global.TLSClientCAFile
+		o.Services.API.MTLSClientCAFile = caFile
 		o.Auth.MTLS = MTLSOptions{
 			CertFile: global.TLSCertFile,
 			KeyFile:  global.TLSKeyFile,

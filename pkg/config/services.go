@@ -822,6 +822,7 @@ func (o *ServiceOptions) NewServerTLSOptions(ctx context.Context) (grpc.ServerOp
 	// If we are using mTLS we need to request a client certificate
 	if o.API.MTLS {
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		tlsConfig.VerifyPeerCertificate = crypto.VerifyChainOnly
 		if o.API.MTLSClientCAFile != "" {
 			// This happens in external cases where the mtls plugin is not being used.
 			pool := x509.NewCertPool()
