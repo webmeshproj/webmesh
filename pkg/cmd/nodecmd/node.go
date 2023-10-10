@@ -65,7 +65,7 @@ func Execute() error {
 	}
 
 	if *helpFlag {
-		fmt.Fprint(os.Stderr, Usage())
+		Usage()
 		return nil
 	}
 
@@ -114,7 +114,7 @@ func Execute() error {
 		if err != nil {
 			if errors.Is(err, config.ErrNoMesh) {
 				// Display usage if no mesh is configured
-				fmt.Fprint(os.Stderr, Usage())
+				Usage()
 				fmt.Fprintln(os.Stderr, "No mesh configured")
 				os.Exit(1)
 			}

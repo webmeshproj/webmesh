@@ -19,6 +19,7 @@ package cmdutil
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"text/tabwriter"
 
@@ -44,8 +45,8 @@ type UsageConfig struct {
 }
 
 // NewUsageFunc returns a function that returns a usage string.
-func NewUsageFunc(cfg UsageConfig) func() string {
-	return func() string {
+func NewUsageFunc(cfg UsageConfig) func() {
+	return func() {
 		var sb strings.Builder
 		sb.WriteString(fmt.Sprintf("Usage: %s [options]\n\n", cfg.Name))
 		sb.WriteString(strings.TrimSpace(cfg.Description) + "\n")
@@ -99,6 +100,6 @@ func NewUsageFunc(cfg UsageConfig) func() string {
 		})
 		sb.WriteString("\n")
 		t.Flush()
-		return sb.String()
+		fmt.Fprintln(os.Stderr, sb.String())
 	}
 }

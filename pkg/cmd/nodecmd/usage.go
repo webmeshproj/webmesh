@@ -41,14 +41,14 @@ var configPrefixes = []string{
 	"plugin",
 }
 
-// Usage returns a string describing the nodecmd's usage.
-func Usage() string {
+// Usage prints the usage string for the nodecmd.
+func Usage() {
 	// Register the builtin plugins for their usage docs.
 	pluginConfigs := builtins.NewPluginConfigs()
 	for pluginName, pluginConfig := range pluginConfigs {
 		pluginConfig.BindFlags(fmt.Sprintf("plugins.%s.", pluginName), flagset)
 	}
-	return cmdutil.NewUsageFunc(cmdutil.UsageConfig{
+	cmdutil.NewUsageFunc(cmdutil.UsageConfig{
 		Name: "webmesh-node",
 		Description: `webmesh-node is a node in a webmesh cluster. It can be used to run services and join a network.
 
