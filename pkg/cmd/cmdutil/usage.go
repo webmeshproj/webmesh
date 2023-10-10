@@ -53,7 +53,8 @@ func NewUsageFunc(cfg UsageConfig) func() string {
 		for _, prefix := range cfg.Prefixes {
 			// Capitalize the prefix and write a description of the section.
 			titleBytes := make([]byte, len(prefix))
-			_, _, _ = cases.Title(language.English).Transform(titleBytes, []byte(prefix), true)
+			toReplace := strings.Replace(prefix, ".", " ", -1)
+			_, _, _ = cases.Title(language.English).Transform(titleBytes, []byte(toReplace), true)
 			_, _ = t.Write([]byte(fmt.Sprintf("\n%s Options:\n\n", string(titleBytes))))
 			cfg.Flagset.VisitAll(func(f *pflag.Flag) {
 				for _, sp := range cfg.SkipPrefixes {
