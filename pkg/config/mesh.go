@@ -41,7 +41,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
-	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
@@ -267,10 +266,18 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 		conf.LocalMeshDNSAddr = net.JoinHostPort("127.0.0.1", port)
 	}
 	// Check what dial options we need
+	conf.Credentials, err = o.NewClientCredentials(ctx, key)
+	return
+}
+
+// NewClientCredentials build new client credentials from the given configuration.
+func (o *Config) NewClientCredentials(ctx context.Context, key crypto.PrivateKey) ([]grpc.DialOption, error) {
+	var creds []grpc.DialOption
+	log := context.LoggerFrom(ctx)
 	if !o.TLS.Insecure {
 		// We need a TLS configuration
 		log.Debug("Configuring secure gRPC transport")
-		var tlsconf tls.Config
+		tlsconf := &tls.Config{}
 		var roots *x509.CertPool
 		roots, err := x509.SystemCertPool()
 		if err != nil {
@@ -281,21 +288,21 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 			log.Debug("Loading CA file", slog.String("file", o.TLS.CAFile))
 			ca, err := os.ReadFile(o.TLS.CAFile)
 			if err != nil {
-				return conf, fmt.Errorf("read CA file: %w", err)
+				return nil, fmt.Errorf("read CA file: %w", err)
 			}
 			// Add the CA to the roots
 			if !roots.AppendCertsFromPEM(ca) {
-				return conf, fmt.Errorf("add CA to roots")
+				return nil, fmt.Errorf("add CA to roots")
 			}
 		}
 		if o.TLS.CAData != "" {
 			ca, err := base64.StdEncoding.DecodeString(o.TLS.CAData)
 			if err != nil {
-				return conf, fmt.Errorf("decode CA data: %w", err)
+				return nil, fmt.Errorf("decode CA data: %w", err)
 			}
 			// Add the CA to the roots
 			if !roots.AppendCertsFromPEM(ca) {
-				return conf, fmt.Errorf("add CA to roots")
+				return nil, fmt.Errorf("add CA to roots")
 			}
 		}
 		tlsconf.RootCAs = roots
@@ -304,7 +311,8 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 			tlsconf.InsecureSkipVerify = true
 		}
 		if o.TLS.VerifyChainOnly {
-			tlsconf.VerifyPeerCertificate = netutil.VerifyChainOnly
+			log.Warn("VerifyChainOnly is enabled, only verifying the certificate chain")
+			tlsconf.VerifyPeerCertificate = crypto.VerifyChainOnly
 		}
 		// Check if we are using mutual TLS
 		if !o.Auth.MTLS.IsEmpty() {
@@ -314,46 +322,46 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 				log.Debug("Loading client certificate", slog.String("file", o.Auth.MTLS.CertFile), slog.String("key", o.Auth.MTLS.KeyFile))
 				cert, err = tls.LoadX509KeyPair(o.Auth.MTLS.CertFile, o.Auth.MTLS.KeyFile)
 				if err != nil {
-					return conf, fmt.Errorf("load client certificate: %w", err)
+					return nil, fmt.Errorf("load client certificate: %w", err)
 				}
 			}
 			if o.Auth.MTLS.CertData != "" && o.Auth.MTLS.KeyData != "" {
 				certData, err := base64.StdEncoding.DecodeString(o.Auth.MTLS.CertData)
 				if err != nil {
-					return conf, fmt.Errorf("decode client certificate: %w", err)
+					return nil, fmt.Errorf("decode client certificate: %w", err)
 				}
 				keyData, err := base64.StdEncoding.DecodeString(o.Auth.MTLS.KeyData)
 				if err != nil {
-					return conf, fmt.Errorf("decode client key: %w", err)
+					return nil, fmt.Errorf("decode client key: %w", err)
 				}
 				cert, err = tls.X509KeyPair(certData, keyData)
 				if err != nil {
-					return conf, fmt.Errorf("load client certificate: %w", err)
+					return nil, fmt.Errorf("load client certificate: %w", err)
 				}
 			}
 			tlsconf.Certificates = []tls.Certificate{cert}
 		}
 		// Append the configuration to the dial options
-		conf.Credentials = append(conf.Credentials, grpc.WithTransportCredentials(credentials.NewTLS(&tlsconf)))
+		creds = append(creds, grpc.WithTransportCredentials(credentials.NewTLS(tlsconf)))
 	} else {
 		log.Warn("Insecure is enabled, not using a TLS transport")
 		// Make sure we are using insecure credentials
-		conf.Credentials = append(conf.Credentials, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		creds = append(creds, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 	// Check for per-rpc credentials
 	if !o.Auth.Basic.IsEmpty() {
 		log.Debug("Configuring basic authentication")
-		conf.Credentials = append(conf.Credentials, basicauth.NewCreds(o.Auth.Basic.Username, o.Auth.Basic.Password))
+		creds = append(creds, basicauth.NewCreds(o.Auth.Basic.Username, o.Auth.Basic.Password))
 	}
 	if !o.Auth.LDAP.IsEmpty() {
 		log.Debug("Configuring LDAP authentication")
-		conf.Credentials = append(conf.Credentials, ldap.NewCreds(o.Auth.LDAP.Username, o.Auth.LDAP.Password))
+		creds = append(creds, ldap.NewCreds(o.Auth.LDAP.Username, o.Auth.LDAP.Password))
 	}
 	if o.Auth.IDAuth {
 		log.Debug("Configuring ID authentication")
-		conf.Credentials = append(conf.Credentials, idauth.NewCreds(key))
+		creds = append(creds, idauth.NewCreds(key))
 	}
-	return
+	return creds, nil
 }
 
 // NewConnectOptions returns new connection options for the configuration. The given raft node must

@@ -273,6 +273,7 @@ func (p *pki) Generate(opts *GenerateOptions) error {
 		Subject: pkix.Name{
 			CommonName: opts.CAName,
 		},
+		DNSNames:              []string{opts.CAName},
 		NotBefore:             time.Now().UTC(),
 		NotAfter:              time.Now().UTC().Add(opts.CAExpiry),
 		IsCA:                  true,
@@ -289,12 +290,11 @@ func (p *pki) Generate(opts *GenerateOptions) error {
 		Subject: pkix.Name{
 			CommonName: opts.AdminName,
 		},
-		NotBefore:             time.Now().UTC(),
-		NotAfter:              time.Now().UTC().Add(opts.AdminExpiry),
-		IsCA:                  false,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
+		DNSNames:    []string{opts.AdminName},
+		NotBefore:   time.Now().UTC(),
+		NotAfter:    time.Now().UTC().Add(opts.AdminExpiry),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
 	}
 	adminBytes, err := x509.CreateCertificate(rand.Reader, admin, ca, adminPubKey, caPrivKey)
 	if err != nil {
@@ -362,12 +362,11 @@ func (p *pki) Issue(opts *IssueOptions) error {
 		Subject: pkix.Name{
 			CommonName: opts.Name,
 		},
-		NotBefore:             time.Now().UTC(),
-		NotAfter:              time.Now().UTC().Add(opts.Expiry),
-		IsCA:                  false,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
+		DNSNames:    []string{opts.Name},
+		NotBefore:   time.Now().UTC(),
+		NotAfter:    time.Now().UTC().Add(opts.Expiry),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
 	}
 	certBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, pubKey, caPrivKey)
 	if err != nil {

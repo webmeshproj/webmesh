@@ -14,28 +14,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package crypto
 
-import "crypto/x509"
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+)
 
 // VerifyChainOnly is a function that can be used in a TLS configuration
 // to only verify that the certificate chain is valid.
 func VerifyChainOnly(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	roots := x509.NewCertPool()
-	if systemPool, err := x509.SystemCertPool(); err == nil {
-		roots = systemPool
-	}
 	var cert *x509.Certificate
 	for _, rawCert := range rawCerts {
 		var err error
 		cert, err = x509.ParseCertificate(rawCert)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to parse certificate: %w", err)
 		}
 		roots.AddCert(cert)
 	}
 	_, err := cert.Verify(x509.VerifyOptions{
 		Roots: roots,
 	})
+	return err
+}
+
+// VerifyConnectionChainOnly is a function that can be used in a TLS configuration
+// to only verify that the certificate chain is valid.
+func VerifyConnectionChainOnly(cs tls.ConnectionState) error {
+	opts := x509.VerifyOptions{
+		Intermediates: x509.NewCertPool(),
+	}
+	for _, cert := range cs.PeerCertificates[1:] {
+		opts.Intermediates.AddCert(cert)
+	}
+	_, err := cs.PeerCertificates[0].Verify(opts)
 	return err
 }

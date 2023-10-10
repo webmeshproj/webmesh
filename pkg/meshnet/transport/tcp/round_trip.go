@@ -89,7 +89,17 @@ func (rt *grpcRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) 
 		defer conn.Close()
 		log.Debug("Dial successful, invoking request")
 		var resp RESP
-		err = conn.Invoke(ctx, rt.method, req, &resp)
+		if len(rt.Credentials) > 0 {
+			log.Debug("Using credentials")
+		}
+		var callOpts []grpc.CallOption
+		for _, cred := range rt.Credentials {
+			if callCred, ok := cred.(grpc.CallOption); ok {
+				log.Debug("Adding call option", "option", callCred)
+				callOpts = append(callOpts, callCred)
+			}
+		}
+		err = conn.Invoke(ctx, rt.method, req, &resp, callOpts...)
 		if err != nil {
 			log.Debug("Invoke request failed", "error", err)
 			continue

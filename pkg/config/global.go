@@ -252,14 +252,18 @@ func (global *GlobalOptions) ApplyGlobals(ctx context.Context, o *Config) (*Conf
 	// Auth Configurations
 
 	if global.MTLS {
+		caFile := func() string {
+			if global.TLSClientCAFile != "" {
+				return global.TLSClientCAFile
+			}
+			return global.TLSCAFile
+		}()
 		// Configure both client and server mTLS
 		o.Services.API.MTLS = global.MTLS
+		o.Services.API.MTLSClientCAFile = global.TLSClientCAFile
 		o.Auth.MTLS = MTLSOptions{
 			CertFile: global.TLSCertFile,
 			KeyFile:  global.TLSKeyFile,
-		}
-		o.TLS = TLSOptions{
-			CAFile: global.TLSCAFile,
 		}
 		// Make sure the mTLS plugin is configured
 		if o.Plugins.Configs == nil {
@@ -268,20 +272,10 @@ func (global *GlobalOptions) ApplyGlobals(ctx context.Context, o *Config) (*Conf
 		if _, ok := o.Plugins.Configs["mtls"]; !ok {
 			o.Plugins.Configs["mtls"] = PluginConfig{
 				Config: map[string]any{
-					"ca-file": func() string {
-						if global.TLSClientCAFile != "" {
-							return global.TLSClientCAFile
-						}
-						return global.TLSCAFile
-					}(),
+					"ca-file": caFile,
 				},
 				builtinConfig: &mtls.Config{
-					CAFile: func() string {
-						if global.TLSClientCAFile != "" {
-							return global.TLSClientCAFile
-						}
-						return global.TLSCAFile
-					}(),
+					CAFile: caFile,
 				},
 			}
 		}
@@ -292,6 +286,16 @@ func (global *GlobalOptions) ApplyGlobals(ctx context.Context, o *Config) (*Conf
 	if global.Insecure {
 		o.TLS.Insecure = true
 		o.Services.API.Insecure = true
+	} else {
+		if global.TLSCertFile != "" && o.Services.API.TLSCertFile == "" {
+			o.Services.API.TLSCertFile = global.TLSCertFile
+		}
+		if global.TLSKeyFile != "" && o.Services.API.TLSCertFile == "" {
+			o.Services.API.TLSCertFile = global.TLSCertFile
+		}
+		if global.TLSCAFile != "" && o.TLS.CAFile == "" {
+			o.TLS.CAFile = global.TLSCAFile
+		}
 	}
 	if global.InsecureSkipVerify {
 		o.TLS.InsecureSkipVerify = true

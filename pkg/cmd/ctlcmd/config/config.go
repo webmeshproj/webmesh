@@ -36,7 +36,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
-	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 )
@@ -349,7 +349,7 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 	config.InsecureSkipVerify = cluster.TLSSkipVerify
 	if cluster.TLSVerifyChainOnly {
 		config.InsecureSkipVerify = true
-		config.VerifyPeerCertificate = netutil.VerifyChainOnly
+		config.VerifyPeerCertificate = crypto.VerifyChainOnly
 	}
 	currentUser := c.GetCurrentUser()
 	var certs []tls.Certificate

@@ -18,7 +18,6 @@ limitations under the License.
 package mtls
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -29,6 +28,7 @@ import (
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -126,14 +126,15 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 		for _, cert := range req.Certificates[1:] {
 			intermediate, err := x509.ParseCertificate(cert)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse intermediate certificate: %w", err)
 			}
 			opts.Intermediates.AddCert(intermediate)
 		}
 	}
 	_, err = cert.Verify(opts)
 	if err != nil {
-		return nil, err
+		context.LoggerFrom(ctx).Warn("mtls-auth failed to verify certificate", "error", err.Error())
+		return nil, fmt.Errorf("mtls-auth failed to verify certificate: %w", err)
 	}
 	commonName := cert.Subject.CommonName
 	if commonName == "" {
