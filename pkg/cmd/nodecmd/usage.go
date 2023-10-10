@@ -21,10 +21,10 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/pflag"
 
+	"github.com/webmeshproj/webmesh/pkg/cmd/cmdutil"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins"
 )
 
@@ -38,7 +38,7 @@ var configPrefixes = []string{
 	"tls",
 	"wireguard",
 	"discovery",
-	"plugins",
+	"plugin",
 }
 
 // Usage returns a string describing the nodecmd's usage.
@@ -48,52 +48,21 @@ func Usage() string {
 	for pluginName, pluginConfig := range pluginConfigs {
 		pluginConfig.BindFlags(fmt.Sprintf("plugins.%s.", pluginName), flagset)
 	}
-
-	var sb strings.Builder
-	sb.WriteString("Usage: webmesh-node [options]\n\n")
-
-	// Write a short description of the nodecmd.
-	sb.WriteString(`webmesh-node is a node in a webmesh cluster. It can be used to run services and join a mesh.
+	return cmdutil.NewUsageFunc(cmdutil.UsageConfig{
+		Name: "webmesh-node",
+		Description: `webmesh-node is a node in a webmesh cluster. It can be used to run services and join a network.
 
 Configurations are passed via configuration files, environment variables, and command line flags.
 The order of precedence for parsing is:
-
-1. Files
-2. Environment variables
-3. Command line flags
-`)
-
-	t := tabwriter.NewWriter(&sb, 1, 4, 4, ' ', 0)
-	for _, prefix := range configPrefixes {
-		// Capitalize the prefix and write a description of the section.
-		_, _ = t.Write([]byte(fmt.Sprintf("\n%s Options:\n\n", strings.ToTitle(prefix))))
-		flagset.VisitAll(func(f *pflag.Flag) {
-			if strings.HasPrefix(f.Name, prefix) {
-				line := fmt.Sprintf("\t--%s=%s\t\t%s", f.Name, f.DefValue, f.Usage)
-				_, _ = t.Write([]byte(line))
-				_, _ = t.Write([]byte("\n"))
-			}
-		})
-	}
-
-	t.Flush()
-
-	// Write out the footer.
-
-	sb.WriteString("\nMiscellaneous Options:\n\n")
-	flagset.VisitAll(func(f *pflag.Flag) {
-		for _, p := range configPrefixes {
-			if strings.HasPrefix(f.Name, p) || strings.HasPrefix(f.Name, "bridge") {
-				return
-			}
-		}
-		line := fmt.Sprintf("\t--%s\t\t%s", f.Name, f.Usage)
-		_, _ = t.Write([]byte(line))
-		_, _ = t.Write([]byte("\n"))
-	})
-	t.Flush()
-
-	return sb.String()
+		
+	1. Files
+	2. Environment variables
+	3. Command line flags
+`,
+		Prefixes:     configPrefixes,
+		Flagset:      flagset,
+		SkipPrefixes: []string{"bridge"},
+	})()
 }
 
 // GenMarkdownDoc returns a string describing the nodecmd's usage in markdown format.
