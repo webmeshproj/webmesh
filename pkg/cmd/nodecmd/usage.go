@@ -57,8 +57,7 @@ The order of precedence for parsing is:
 		
 	1. Files
 	2. Environment variables
-	3. Command line flags
-`,
+	3. Command line flags`,
 		Prefixes:     configPrefixes,
 		Flagset:      flagset,
 		SkipPrefixes: []string{"bridge"},
