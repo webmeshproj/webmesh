@@ -65,12 +65,12 @@ func NewUsageFunc(cfg UsageConfig) func() string {
 				if !strings.HasPrefix(f.Name, prefix) {
 					return
 				}
-				// Make sure it doesn't match any other prefixes.
+				// Make sure it doesn't match any other longer prefixes.
 				for _, p := range cfg.Prefixes {
 					if p == prefix {
 						continue
 					}
-					if strings.HasPrefix(f.Name, p) {
+					if strings.HasPrefix(f.Name, p) && len(p) > len(prefix) {
 						return
 					}
 				}
