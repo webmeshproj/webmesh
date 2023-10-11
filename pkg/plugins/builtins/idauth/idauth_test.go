@@ -249,17 +249,17 @@ func TestConfigurePlugin(t *testing.T) {
 				p.mu.Lock()
 				defer p.mu.Unlock()
 				return p.allowedIDs.HasID("foo")
-			}).ShouldEqual(time.Second*30, time.Second, false)
+			}).ShouldEqual(time.Second*15, time.Second, false)
 			if !ok {
-				t.Errorf("Expected foo to not be allowed")
+				t.Fatal("Expected foo to not be allowed")
 			}
 			ok = testutil.Eventually[bool](func() bool {
 				p.mu.Lock()
 				defer p.mu.Unlock()
 				return p.allowedIDs.HasID("bar")
-			}).ShouldEqual(time.Second*30, time.Second, false)
+			}).ShouldEqual(time.Second*15, time.Second, false)
 			if !ok {
-				t.Errorf("Expected bar to not be allowed")
+				t.Fatal("Expected bar to not be allowed")
 			}
 			// Recreate the file and we should have new ids we trust
 			idSrc, err = os.Create(idfile)
@@ -278,9 +278,9 @@ func TestConfigurePlugin(t *testing.T) {
 				p.mu.Lock()
 				defer p.mu.Unlock()
 				return p.allowedIDs.HasID("qux")
-			}).ShouldEqual(time.Second*30, time.Second, true)
+			}).ShouldEqual(time.Second*15, time.Second, true)
 			if !ok {
-				t.Errorf("Expected qux to be allowed")
+				t.Fatal("Expected qux to be allowed")
 			}
 		})
 
@@ -333,33 +333,33 @@ func TestConfigurePlugin(t *testing.T) {
 				p.mu.Lock()
 				defer p.mu.Unlock()
 				return p.allowedIDs.HasID("qux")
-			}).ShouldEqual(time.Second*30, time.Second, true)
+			}).ShouldEqual(time.Second*15, time.Second, true)
 			if !ok {
-				t.Errorf("Expected qux to be allowed")
+				t.Fatal("Expected qux to be allowed")
 			}
 			ok = testutil.Eventually[bool](func() bool {
 				p.mu.Lock()
 				defer p.mu.Unlock()
 				return p.allowedIDs.HasID("foo")
-			}).ShouldEqual(time.Second*30, time.Second, false)
+			}).ShouldEqual(time.Second*15, time.Second, false)
 			if !ok {
-				t.Errorf("Expected foo to not be allowed")
+				t.Fatal("Expected foo to not be allowed")
 			}
 			ok = testutil.Eventually[bool](func() bool {
 				p.mu.Lock()
 				defer p.mu.Unlock()
 				return p.allowedIDs.HasID("bar")
-			}).ShouldEqual(time.Second*30, time.Second, false)
+			}).ShouldEqual(time.Second*15, time.Second, false)
 			if !ok {
-				t.Errorf("Expected bar to not be allowed")
+				t.Fatal("Expected bar to not be allowed")
 			}
 			ok = testutil.Eventually[bool](func() bool {
 				p.mu.Lock()
 				defer p.mu.Unlock()
 				return p.allowedIDs.HasID("baz")
-			}).ShouldEqual(time.Second*30, time.Second, false)
+			}).ShouldEqual(time.Second*15, time.Second, false)
 			if !ok {
-				t.Errorf("Expected baz to not be allowed")
+				t.Fatal("Expected baz to not be allowed")
 			}
 		})
 	})

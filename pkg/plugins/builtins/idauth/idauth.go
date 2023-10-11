@@ -370,7 +370,7 @@ func (p *Plugin) watchLocalFile(ctx context.Context, fpath string) {
 		}
 	}()
 	log.Info("Watching directory for changes to file", "directory", watchDir, "file", filename)
-	err = watcher.Add(watchDir + "/")
+	err = watcher.Add(watchDir + string(os.PathSeparator))
 	if err != nil {
 		log.Error("Failed to watch file", "file", fpath, "error", err.Error())
 		return
