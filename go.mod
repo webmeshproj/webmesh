@@ -6,6 +6,7 @@ require (
 	github.com/containernetworking/plugins v1.3.0
 	github.com/dgraph-io/badger/v4 v4.2.0
 	github.com/dominikbraun/graph v0.23.0
+	github.com/fsnotify/fsnotify v1.6.1-0.20230713180834-9342b6df5779
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-ping/ping v1.1.0
 	github.com/golang/snappy v0.0.4
@@ -57,7 +58,6 @@ require (
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/grpc v1.58.2
 	google.golang.org/protobuf v1.31.0
-	gopkg.in/fsnotify.v1 v1.4.7
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -83,7 +83,6 @@ require (
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

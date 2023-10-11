@@ -88,8 +88,7 @@ CI_TARGETS :=  mod-download fmt vet lint test
 endif
 endif
 
-ci-test: ## Run all CI tests.
-	set -eo pipefail ; $(MAKE) $(CI_TARGETS) | xargs -IL date +"[%Y-%m-%d %H:%M:%S]: L"
+ci-test: $(CI_TARGETS) ## Run all CI tests.
 
 TEST_PARALLELISM     ?= $(shell nproc 2>/dev/null || echo 8)
 WIN_TEST_PARALLELISM ?= 4

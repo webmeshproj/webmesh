@@ -25,19 +25,33 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"gopkg.in/fsnotify.v1"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/version"
+)
+
+const (
+	// DefaultTimeSkew is the default time skew.
+	DefaultTimeSkew = 1
+	// DefaultRemoteFetchRetryInterval is the default remote fetch retry interval.
+	DefaultRemoteFetchRetryInterval = 3 * time.Second
+	// DefaultRemoteFetchRetries is the default number of remote fetch retries.
+	DefaultRemoteFetchRetries = 5
+	// DefaultWatchInterval is the default watch interval.
+	DefaultWatchInterval = time.Minute
+	// InlineSource is the source key for inline IDs.
+	InlineSource = "inline"
 )
 
 // Plugin is the ID auth plugin.
@@ -99,16 +113,16 @@ func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
 // Default sets the default values for the config.
 func (c *Config) Default() {
 	if c.TimeSkew == 0 {
-		c.TimeSkew = 1
+		c.TimeSkew = DefaultTimeSkew
 	}
 	if c.RemoteFetchRetryInterval == 0 {
-		c.RemoteFetchRetryInterval = 3 * time.Second
+		c.RemoteFetchRetryInterval = DefaultRemoteFetchRetryInterval
 	}
 	if c.RemoteFetchRetries == 0 {
-		c.RemoteFetchRetries = 5
+		c.RemoteFetchRetries = DefaultRemoteFetchRetries
 	}
 	if c.WatchInterval <= 0 {
-		c.WatchInterval = time.Minute
+		c.WatchInterval = DefaultWatchInterval
 	}
 }
 
@@ -134,6 +148,7 @@ func (c *Config) CurrentSigData(id string) [][]byte {
 
 func (c *Config) AsMapStructure() map[string]any {
 	return map[string]any{
+		"time-skew":                   c.TimeSkew,
 		"allowed-ids":                 toAnySlice(c.AllowedIDs),
 		"id-files":                    toAnySlice(c.IDFiles),
 		"watch-id-files":              c.WatchIDFiles,
@@ -174,6 +189,9 @@ func (p *Plugin) GetInfo(context.Context, *emptypb.Empty) (*v1.PluginInfo, error
 func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*emptypb.Empty, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.closec != nil {
+		close(p.closec)
+	}
 	p.closec = make(chan struct{})
 	var config Config
 	err := mapstructure.Decode(req.Config.AsMap(), &config)
@@ -183,9 +201,9 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	config.Default()
 	p.config = config
 	allowedIDs := make(AllowedIDs)
-	allowedIDs["inline"] = make(map[string]struct{})
+	allowedIDs[InlineSource] = make(map[string]struct{})
 	for _, id := range config.AllowedIDs {
-		allowedIDs["inline"][id] = struct{}{}
+		allowedIDs[InlineSource][id] = struct{}{}
 	}
 	if len(config.IDFiles) > 0 {
 		for _, src := range config.IDFiles {
@@ -201,13 +219,13 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 					go p.watchRemoteFile(ctx, src)
 				}
 			default:
-				src = strings.TrimPrefix(src, "file://")
-				idData, err = os.ReadFile(src)
+				path := strings.TrimPrefix(src, "file://")
+				idData, err = os.ReadFile(path)
 				if err != nil {
 					return nil, fmt.Errorf("failed to read ID file: %w", err)
 				}
 				if config.WatchIDFiles {
-					go p.watchLocalFile(ctx, src)
+					go p.watchLocalFile(ctx, path)
 				}
 			}
 			ids := strings.Split(string(idData), "\n")
@@ -219,6 +237,16 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 				allowedIDs[src][id] = struct{}{}
 			}
 		}
+	}
+	var haveIDs bool
+	for ms := range allowedIDs {
+		if len(allowedIDs[ms]) > 0 {
+			haveIDs = true
+			break
+		}
+	}
+	if !haveIDs {
+		return nil, fmt.Errorf("no allowed IDs configured")
 	}
 	p.allowedIDs = allowedIDs
 	return &emptypb.Empty{}, nil
@@ -282,55 +310,72 @@ func (p *Plugin) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty,
 	return &emptypb.Empty{}, nil
 }
 
-func (p *Plugin) watchLocalFile(ctx context.Context, fname string) {
-	log := context.LoggerFrom(ctx).With("component", "id-auth")
+func (p *Plugin) watchLocalFile(ctx context.Context, fpath string) {
+	log := context.LoggerFrom(ctx).With("component", "id-auth").With("watched-file", fpath)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Error("Failed to create file watcher", "error", err.Error())
 		return
 	}
 	defer watcher.Close()
-	err = watcher.Add(fname)
-	if err != nil {
-		log.Error("Failed to watch file", "file", fname, "error", err.Error())
-		return
+	filename := filepath.Base(fpath)
+	watchDir := filepath.Dir(fpath)
+	matchEvent := func(event fsnotify.Event) bool {
+		eventBase := filepath.Base(event.Name)
+		return (event.Has(fsnotify.Write) || event.Has(fsnotify.Create) || event.Has(fsnotify.Remove)) &&
+			eventBase == filename
 	}
-	for {
-		select {
-		case <-p.closec:
-			return
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				p.mu.Lock()
-				log.Debug("File changed", "file", fname, "event", event.String())
-				data, err := os.ReadFile(fname)
-				if err != nil {
-					log.Error("Failed to read file", "file", fname, "error", err.Error())
-					p.mu.Unlock()
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				evlog := log.With("event", event.String())
+				if !matchEvent(event) {
+					evlog.Debug("Ignoring event")
 					continue
 				}
-				ids := strings.Split(string(data), "\n")
-				seen := make(map[string]struct{})
-				for _, id := range ids {
-					id = strings.TrimSpace(id)
-					if id == "" {
+				p.mu.Lock()
+				newIDs := make(map[string]struct{})
+				if !event.Has(fsnotify.Remove) {
+					evlog.Debug("ID file updated, reloading")
+					data, err := os.ReadFile(fpath)
+					if err != nil {
+						log.Error("Failed to read ID file", "error", err.Error())
+						p.mu.Unlock()
 						continue
 					}
-					seen[id] = struct{}{}
+					ids := strings.Split(string(data), "\n")
+				IDs:
+					for _, id := range ids {
+						id = strings.TrimSpace(id)
+						if id == "" {
+							continue IDs
+						}
+						newIDs[id] = struct{}{}
+					}
+				} else {
+					evlog.Debug("ID file removed, removing from allowed IDs")
 				}
-				p.allowedIDs[fname] = seen
+				p.allowedIDs[fpath] = newIDs
 				p.mu.Unlock()
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Error("File watcher error", "error", err.Error())
 			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			log.Error("File watcher error", "error", err.Error())
 		}
+	}()
+	log.Info("Watching directory for changes to file", "directory", watchDir, "file", filename)
+	err = watcher.Add(watchDir + "/")
+	if err != nil {
+		log.Error("Failed to watch file", "file", fpath, "error", err.Error())
+		return
 	}
+	<-p.closec
 }
 
 func (p *Plugin) watchRemoteFile(ctx context.Context, url string) {
