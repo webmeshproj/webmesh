@@ -25,8 +25,10 @@ import (
 
 	cmdconfig "github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd/config"
 	"github.com/webmeshproj/webmesh/pkg/config"
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
 
 var (
@@ -35,6 +37,8 @@ var (
 	connectUseDNS        bool
 	connectDisableIPv4   bool
 	connectDisableIPv6   bool
+	connectLogLevel      string
+	connectLogFormat     string
 )
 
 func init() {
@@ -44,6 +48,8 @@ func init() {
 	connectFlags.BoolVar(&connectUseDNS, "use-mesh-dns", false, "Configure the system to use MeshDNS")
 	connectFlags.BoolVar(&connectDisableIPv4, "disable-ipv4", false, "Disable IPv4")
 	connectFlags.BoolVar(&connectDisableIPv6, "disable-ipv6", false, "Disable IPv6")
+	connectFlags.StringVar(&connectLogLevel, "log-level", "info", "Log level for the connection")
+	connectFlags.StringVar(&connectLogFormat, "log-format", "text", "Log format for the connection, text or json")
 	rootCmd.AddCommand(connectCmd)
 }
 
@@ -69,8 +75,14 @@ var connectCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		node, err := embed.NewNode(cmd.Context(), embed.Options{
+		log := logging.NewLogger(connectLogLevel, connectLogFormat)
+		ctx := context.WithLogger(cmd.Context(), log)
+		node, err := embed.NewNode(ctx, embed.Options{
 			Config: &config.Config{
+				Global: config.GlobalOptions{
+					LogLevel:  connectLogLevel,
+					LogFormat: connectLogFormat,
+				},
 				WireGuard: connectWireGuardOpts,
 				Discovery: connectDiscoveryOpts,
 				Auth: config.AuthOptions{
@@ -106,8 +118,10 @@ var connectCmd = &cobra.Command{
 					Insecure:           cluster.Insecure,
 				},
 				Storage: config.StorageOptions{
-					InMemory: true,
-					Provider: string(config.StorageProviderPassThrough),
+					InMemory:  true,
+					Provider:  string(config.StorageProviderPassThrough),
+					LogLevel:  connectLogLevel,
+					LogFormat: connectLogFormat,
 				},
 				Services: config.ServiceOptions{
 					API: config.APIOptions{Disabled: true},
