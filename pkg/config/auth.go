@@ -28,7 +28,7 @@ type AuthOptions struct {
 	// IDAuth indicates to use ID authentication. An ID is derived
 	// from the public wireguard key and presented with a signature
 	// that can be verified by the private wireguard key.
-	IDAuth bool `koanf:"id-auth,omitempty"`
+	IDAuth IDAuthOptions `koanf:"id-auth,omitempty"`
 	// MTLS are options for mutual TLS. This is the recommended
 	// authentication method.
 	MTLS MTLSOptions `koanf:"mtls,omitempty"`
@@ -48,7 +48,7 @@ func (o *AuthOptions) IsEmpty() bool {
 	if o == nil {
 		return true
 	}
-	return !o.IDAuth && o.MTLS.IsEmpty() && o.Basic.IsEmpty() && o.LDAP.IsEmpty()
+	return o.IDAuth.IsEmpty() && o.MTLS.IsEmpty() && o.Basic.IsEmpty() && o.LDAP.IsEmpty()
 }
 
 // MTLSEnabled is true if any mtls fields are set.
@@ -57,6 +57,26 @@ func (o *AuthOptions) MTLSEnabled() bool {
 		return false
 	}
 	return o.MTLS.Enabled()
+}
+
+// IDAuthOptions are options for ID authentication.
+type IDAuthOptions struct {
+	// Enabled is true if ID authentication is enabled.
+	Enabled bool `koanf:"enabled,omitempty"`
+	// Alias is an optional alias to attempt to register with our ID.
+	Alias string `koanf:"alias,omitempty"`
+	// Registrar is the registrar to attempt to use to register with our ID.
+	// If left unset, the node will attempt to discover one via the mesh.
+	// TODO: Credentials.
+	Registrar string `koanf:"registrar,omitempty"`
+}
+
+// IsEmpty returns true if the options are empty.
+func (o *IDAuthOptions) IsEmpty() bool {
+	if !o.Enabled {
+		return true
+	}
+	return o.Alias == ""
 }
 
 // MTLSOptions are options for mutual TLS.
@@ -111,7 +131,8 @@ func (o *LDAPAuthOptions) IsEmpty() bool {
 
 // BindFlags binds the flags to the options.
 func (o *AuthOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
-	fl.BoolVar(&o.IDAuth, prefix+"id-auth", o.IDAuth, "Use ID authentication.")
+	fl.BoolVar(&o.IDAuth.Enabled, prefix+"id-auth.enabled", o.IDAuth.Enabled, "Enable ID authentication.")
+	fl.StringVar(&o.IDAuth.Alias, prefix+"id-auth.alias", o.IDAuth.Alias, "Alias to attempt to register with our ID.")
 	fl.StringVar(&o.Basic.Username, prefix+"basic.username", o.Basic.Username, "Basic auth username.")
 	fl.StringVar(&o.Basic.Password, prefix+"basic.password", o.Basic.Password, "Basic auth password.")
 	fl.StringVar(&o.MTLS.CertFile, prefix+"mtls.cert-file", o.MTLS.CertFile, "Path to a TLS certificate file to present when joining.")
@@ -126,7 +147,7 @@ func (o *AuthOptions) Validate() error {
 	if o.IsEmpty() {
 		return nil
 	}
-	if o.IDAuth {
+	if !o.IDAuth.IsEmpty() {
 		return nil
 	}
 	if !o.MTLS.IsEmpty() {

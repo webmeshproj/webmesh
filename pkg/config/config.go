@@ -205,7 +205,7 @@ func (o *Config) NodeID(ctx context.Context) (string, error) {
 		return o.Mesh.NodeID, nil
 	}
 	// Check if we are using ID authentication.
-	if o.Auth.IDAuth {
+	if o.Auth.IDAuth.Enabled {
 		key, err := o.WireGuard.LoadKey(ctx)
 		if err != nil {
 			return "", fmt.Errorf("load wireguard key: %w", err)
@@ -215,7 +215,7 @@ func (o *Config) NodeID(ctx context.Context) (string, error) {
 	}
 	// Check if we are using authentication
 	if !o.Auth.MTLS.IsEmpty() {
-		// Parse the client certificate for the node ID
+		// Parse the client certificate fors the node ID
 		var certDataPEM []byte
 		var err error
 		if o.Auth.MTLS.CertFile != "" {

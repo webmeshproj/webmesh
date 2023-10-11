@@ -85,8 +85,8 @@ func (srv *Server) Register(ctx context.Context, req *v1.RegisterRequest) (*v1.R
 	}
 	expiry := req.GetExpiry().AsTime()
 	if expiry.IsZero() {
-		// Set to the default one year
-		expiry = time.Now().UTC().Add(time.Hour * 24 * 365)
+		// Set to the default one day
+		expiry = time.Now().UTC().Add(time.Hour * 24)
 	}
 	return srv.driver.Register(ctx, key, req.GetAlias(), expiry)
 }

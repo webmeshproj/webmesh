@@ -94,7 +94,7 @@ services:
       - --wireguard.key-rotation-interval=0
       - --wireguard.modprobe
       # Authenticate with the ID generated from our key
-      - --auth.id-auth=true
+      - --auth.id-auth.enabled
     volumes:
       - ./node-1.key:/wireguard.key
       - /dev/net/tun:/dev/net/tun
@@ -117,7 +117,7 @@ services:
       - --wireguard.key-file=/wireguard.key
       - --wireguard.key-rotation-interval=0
       - --wireguard.modprobe
-      - --auth.id-auth=true
+      - --auth.id-auth.enabled
     volumes:
       - ./node-2.key:/wireguard.key
       - /dev/net/tun:/dev/net/tun

@@ -358,7 +358,7 @@ func (o *Config) NewClientCredentials(ctx context.Context, key crypto.PrivateKey
 		log.Debug("Configuring LDAP authentication")
 		creds = append(creds, ldap.NewCreds(o.Auth.LDAP.Username, o.Auth.LDAP.Password))
 	}
-	if o.Auth.IDAuth {
+	if o.Auth.IDAuth.Enabled {
 		log.Debug("Configuring ID authentication")
 		creds = append(creds, idauth.NewCreds(key))
 	}
