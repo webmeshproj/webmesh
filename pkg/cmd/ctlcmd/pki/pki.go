@@ -472,9 +472,18 @@ func writeCertChain(path string, ca, cert []byte, key any) error {
 		return fmt.Errorf("error creating file %s: %w", certPath, err)
 	}
 	defer certFile.Close()
+	// Encode the certificate.
 	err = pem.Encode(certFile, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert,
+	})
+	if err != nil {
+		return fmt.Errorf("error encoding certificate to %s: %w", certFile.Name(), err)
+	}
+	// Encode the CA again as the issuer.
+	err = pem.Encode(certFile, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: ca,
 	})
 	if err != nil {
 		return fmt.Errorf("error encoding certificate to %s: %w", certFile.Name(), err)

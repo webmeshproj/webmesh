@@ -22,34 +22,26 @@ import (
 	"fmt"
 )
 
-// VerifyChainOnly is a function that can be used in a TLS configuration
-// to only verify that the certificate chain is valid.
-func VerifyChainOnly(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-	roots := x509.NewCertPool()
-	var cert *x509.Certificate
-	for _, rawCert := range rawCerts {
-		var err error
-		cert, err = x509.ParseCertificate(rawCert)
-		if err != nil {
-			return fmt.Errorf("failed to parse certificate: %w", err)
-		}
-		roots.AddCert(cert)
-	}
-	_, err := cert.Verify(x509.VerifyOptions{
-		Roots: roots,
-	})
-	return err
-}
-
 // VerifyConnectionChainOnly is a function that can be used in a TLS configuration
 // to only verify that the certificate chain is valid.
 func VerifyConnectionChainOnly(cs tls.ConnectionState) error {
 	opts := x509.VerifyOptions{
+		Roots:         x509.NewCertPool(),
 		Intermediates: x509.NewCertPool(),
 	}
-	for _, cert := range cs.PeerCertificates[1:] {
-		opts.Intermediates.AddCert(cert)
+	var leaf *x509.Certificate
+	for _, cert := range cs.PeerCertificates {
+		c := cert
+		if c.IsCA {
+			opts.Roots.AddCert(c)
+			continue
+		}
+		opts.Intermediates.AddCert(c)
+		leaf = c
 	}
-	_, err := cs.PeerCertificates[0].Verify(opts)
+	_, err := leaf.Verify(opts)
+	if err != nil {
+		return fmt.Errorf("failed to verify certificate: %w", err)
+	}
 	return err
 }

@@ -37,32 +37,33 @@ func (s *meshStore) Close(ctx context.Context) error {
 	defer close(s.closec)
 	s.kvSubCancel()
 	if err := s.discovery.Close(); err != nil {
-		s.log.Error("error stopping discovery service", slog.String("error", err.Error()))
+		s.log.Error("Error stopping discovery service", slog.String("error", err.Error()))
 	}
 	if s.nw != nil {
 		// Do this last so that we don't lose connectivity to the network
 		defer func() {
-			s.log.Debug("closing network manager")
+			s.log.Debug("Closing network manager")
 			if err := s.nw.Close(ctx); err != nil {
-				s.log.Error("error clearing firewall rules", slog.String("error", err.Error()))
+				s.log.Error("Error clearing firewall rules", slog.String("error", err.Error()))
 			}
 		}()
 	}
 	if s.plugins != nil {
 		// Close the plugins
-		s.log.Debug("closing plugin manager")
+		s.log.Debug("Closing plugin manager")
 		err := s.plugins.Close()
 		if err != nil {
-			s.log.Error("error closing plugins", slog.String("error", err.Error()))
+			s.log.Error("Error closing plugins", slog.String("error", err.Error()))
 		}
 	}
 	if s.storage != nil {
+		s.log.Debug("Closing storage provider")
 		err := s.storage.Close()
 		if err != nil {
-			s.log.Error("error stopping storage provider", slog.String("error", err.Error()))
+			s.log.Error("Error stopping storage provider", slog.String("error", err.Error()))
 		}
 	}
-	s.log.Debug("all services shut down, leaving cluster")
+	s.log.Info("All services shut down, leaving cluster")
 	return s.leaveCluster(ctx)
 }
 

@@ -312,7 +312,8 @@ func (o *Config) NewClientCredentials(ctx context.Context, key crypto.PrivateKey
 		}
 		if o.TLS.VerifyChainOnly {
 			log.Warn("VerifyChainOnly is enabled, only verifying the certificate chain")
-			tlsconf.VerifyPeerCertificate = crypto.VerifyChainOnly
+			tlsconf.InsecureSkipVerify = true
+			tlsconf.VerifyConnection = crypto.VerifyConnectionChainOnly
 		}
 		// Check if we are using mutual TLS
 		if !o.Auth.MTLS.IsEmpty() {
