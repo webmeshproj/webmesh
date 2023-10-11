@@ -31,11 +31,291 @@ import (
 	"golang.org/x/exp/slices"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage/testutil"
 )
 
 func TestAuthenticate(t *testing.T) {
-	t.Parallel()
+	ctx := context.Background()
+	var curTime time.Time
+	Now = func() time.Time {
+		return curTime
+	}
+	t.Cleanup(func() { Now = time.Now })
+
+	t.Run("WithoutSkew", func(t *testing.T) {
+		peer1 := crypto.MustGenerateKey()
+		peer2 := crypto.MustGenerateKey()
+		peer3 := crypto.MustGenerateKey()
+
+		var c Config
+		c.Default()
+		c.TimeSkew = -1
+		c.AllowedIDs = []string{peer1.ID(), peer2.ID()}
+		var p Plugin
+		st, err := structpb.NewStruct(c.AsMapStructure())
+		if err != nil {
+			t.Fatalf("failed to create structpb: %v", err)
+		}
+		_, err = p.Configure(ctx, &v1.PluginConfiguration{Config: st})
+		if err != nil {
+			t.Fatalf("failed to configure plugin: %v", err)
+		}
+
+		tc := []struct {
+			name    string
+			id      string
+			headers map[string]string
+			wantErr bool
+		}{
+			{
+				name: "Peer1ValidSignature",
+				id:   peer1.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer1.ID(),
+					signatureHeader: MustNewAuthSignature(peer1),
+				},
+				wantErr: false,
+			},
+			{
+				name: "Peer2ValidSignature",
+				id:   peer2.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer2.ID(),
+					signatureHeader: MustNewAuthSignature(peer2),
+				},
+				wantErr: false,
+			},
+			{
+				name: "Peer3ValidSignature",
+				id:   peer3.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer3.ID(),
+					signatureHeader: MustNewAuthSignature(peer3),
+				},
+				// We didn't allow peer3
+				wantErr: true,
+			},
+			{
+				name: "Peer1SkewedSignature",
+				id:   peer1.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer1.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer1, time.Unix(30, 0)),
+				},
+				wantErr: true,
+			},
+			{
+				name: "Peer2SkewedSignature",
+				id:   peer2.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer2.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer2, time.Unix(30, 0)),
+				},
+				wantErr: true,
+			},
+			{
+				name: "Peer3SkewedSignature",
+				id:   peer3.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer3.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer3, time.Unix(30, 0)),
+				},
+				wantErr: true,
+			},
+		}
+		for _, tt := range tc {
+			t.Run(tt.name, func(t *testing.T) {
+				resp, err := p.Authenticate(ctx, &v1.AuthenticationRequest{
+					Headers: tt.headers,
+				})
+				if tt.wantErr {
+					if err == nil {
+						t.Errorf("expected error, got nil")
+					}
+					return
+				}
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if resp == nil {
+					t.Fatal("expected response, got nil")
+				}
+				if resp.GetId() != tt.id {
+					t.Errorf("expected id to be %s, got %s", tt.id, resp.GetId())
+				}
+			})
+		}
+	})
+
+	t.Run("WithSkew", func(t *testing.T) {
+		curTime = time.Unix(60, 0)
+		peer1 := crypto.MustGenerateKey()
+		peer2 := crypto.MustGenerateKey()
+		peer3 := crypto.MustGenerateKey()
+
+		var c Config
+		c.Default()
+		c.TimeSkew = 1
+		c.AllowedIDs = []string{peer1.ID(), peer2.ID()}
+		var p Plugin
+		st, err := structpb.NewStruct(c.AsMapStructure())
+		if err != nil {
+			t.Fatalf("failed to create structpb: %v", err)
+		}
+		_, err = p.Configure(ctx, &v1.PluginConfiguration{Config: st})
+		if err != nil {
+			t.Fatalf("failed to configure plugin: %v", err)
+		}
+
+		tc := []struct {
+			name    string
+			id      string
+			headers map[string]string
+			wantErr bool
+		}{
+			{
+				name: "Peer1ValidSignature",
+				id:   peer1.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer1.ID(),
+					signatureHeader: MustNewAuthSignature(peer1),
+				},
+				wantErr: false,
+			},
+			{
+				name: "Peer2ValidSignature",
+				id:   peer2.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer2.ID(),
+					signatureHeader: MustNewAuthSignature(peer2),
+				},
+				wantErr: false,
+			},
+			{
+				name: "Peer3ValidSignature",
+				id:   peer3.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer3.ID(),
+					signatureHeader: MustNewAuthSignature(peer3),
+				},
+				// We didn't allow peer3
+				wantErr: true,
+			},
+			{
+				name: "Peer1NegativeSkewedSignature",
+				id:   peer1.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer1.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer1, time.Unix(30, 0)),
+				},
+				wantErr: false,
+			},
+			{
+				name: "Peer2NegativeSkewedSignature",
+				id:   peer2.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer2.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer2, time.Unix(30, 0)),
+				},
+				wantErr: false,
+			},
+			{
+				name: "Peer3NegativeSkewedSignature",
+				id:   peer3.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer3.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer3, time.Unix(30, 0)),
+				},
+				wantErr: true,
+			},
+			{
+				name: "Peer1PositiveSkewedSignature",
+				id:   peer1.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer1.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer1, time.Unix(90, 0)),
+				},
+				wantErr: false,
+			},
+			{
+				name: "Peer2PositiveSkewedSignature",
+				id:   peer2.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer2.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer2, time.Unix(90, 0)),
+				},
+				wantErr: false,
+			},
+			{
+				name: "Peer3PositiveSkewedSignature",
+				id:   peer3.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer3.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer3, time.Unix(90, 0)),
+				},
+				wantErr: true,
+			},
+			{
+				name: "Peer1OverSkewedSignature",
+				id:   peer1.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer1.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer1, time.Unix(120, 0)),
+				},
+				wantErr: true,
+			},
+			{
+				name: "Peer2OverSkewedSignature",
+				id:   peer2.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer2.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer2, time.Unix(120, 0)),
+				},
+				wantErr: true,
+			},
+			{
+				name: "Peer1UnderSkewedSignature",
+				id:   peer1.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer1.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer1, time.Unix(0, 0)),
+				},
+				wantErr: true,
+			},
+			{
+				name: "Peer2UnderSkewedSignature",
+				id:   peer2.ID(),
+				headers: map[string]string{
+					peerIDHeader:    peer2.ID(),
+					signatureHeader: mustNewAuthSignatureWithTime(peer2, time.Unix(0, 0)),
+				},
+				wantErr: true,
+			},
+		}
+		for _, tt := range tc {
+			t.Run(tt.name, func(t *testing.T) {
+				resp, err := p.Authenticate(ctx, &v1.AuthenticationRequest{
+					Headers: tt.headers,
+				})
+				if tt.wantErr {
+					if err == nil {
+						t.Errorf("expected error, got nil")
+					}
+					return
+				}
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if resp == nil {
+					t.Fatal("expected response, got nil")
+				}
+				if resp.GetId() != tt.id {
+					t.Errorf("expected id to be %s, got %s", tt.id, resp.GetId())
+				}
+			})
+		}
+	})
 }
 
 func TestConfigurePlugin(t *testing.T) {
@@ -520,11 +800,10 @@ func TestAllowedIDs(t *testing.T) {
 }
 
 func TestCurrentSigData(t *testing.T) {
-	t.Parallel()
-
 	Now = func() time.Time {
 		return time.Unix(0, 0)
 	}
+	t.Cleanup(func() { Now = time.Now })
 	c := Config{TimeSkew: 0}
 	sigData := c.CurrentSigData("test")
 	if len(sigData) != 1 {

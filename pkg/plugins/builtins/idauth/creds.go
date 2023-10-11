@@ -27,31 +27,64 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
-// NewCreds returns a DialOption that sets the basic auth credentials.
+// NewCreds returns a DialOption that sets the ID auth credentials.
 func NewCreds(key crypto.PrivateKey) grpc.DialOption {
 	return grpc.WithPerRPCCredentials(&idauthCreds{
 		key: key,
 	})
 }
 
+// NewAuthSignature returns a signature for the given key and the current
+// time. The returned signature is base64 encoded.
+func NewAuthSignature(key crypto.PrivateKey) (string, error) {
+	return newAuthSignatureWithTime(key, Now())
+}
+
+// MustNewAuthSignature is like NewAuthSignature but panics on error.
+func MustNewAuthSignature(key crypto.PrivateKey) string {
+	sig, err := NewAuthSignature(key)
+	if err != nil {
+		panic(err)
+	}
+	return sig
+}
+
+func mustNewAuthSignatureWithTime(key crypto.PrivateKey, t time.Time) string {
+	sig, err := newAuthSignatureWithTime(key, t)
+	if err != nil {
+		panic(err)
+	}
+	return sig
+}
+
+func newAuthSignatureWithTime(key crypto.PrivateKey, t time.Time) (string, error) {
+	ts := t.Truncate(time.Second * 30).Unix()
+	sig, err := key.Sign([]byte(fmt.Sprintf("%s:%d", key.ID(), ts)))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign ID: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(sig), nil
+}
+
 type idauthCreds struct {
 	key crypto.PrivateKey
 }
 
+func (c *idauthCreds) RequireTransportSecurity() bool {
+	return false
+}
+
 func (c *idauthCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
-	id := c.key.ID()
-	t := Now().Truncate(time.Second * 30).Unix()
-	sig, err := c.key.Sign([]byte(fmt.Sprintf("%s:%d", id, t)))
+	return c.newMetadata()
+}
+
+func (c *idauthCreds) newMetadata() (map[string]string, error) {
+	sig, err := NewAuthSignature(c.key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign ID: %w", err)
 	}
-	encodedSig := base64.StdEncoding.EncodeToString(sig)
 	return map[string]string{
-		peerIDHeader:    id,
-		signatureHeader: encodedSig,
+		peerIDHeader:    c.key.ID(),
+		signatureHeader: sig,
 	}, nil
-}
-
-func (c *idauthCreds) RequireTransportSecurity() bool {
-	return false
 }
