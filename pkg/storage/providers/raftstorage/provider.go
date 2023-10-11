@@ -315,12 +315,6 @@ func (r *Provider) Close() error {
 	if !r.started.Load() {
 		return nil
 	}
-	defer func() {
-		err := r.raftStorage.Close()
-		if err != nil {
-			r.log.Error("Error closing storage", "error", err.Error())
-		}
-	}()
 	r.log.Debug("Stopping raft storage provider")
 	defer r.log.Debug("Raft storage provider stopped")
 	defer r.started.Store(false)
