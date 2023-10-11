@@ -513,12 +513,14 @@ func TestConfigureIDAuthPlugin(t *testing.T) {
 			if err != nil {
 				t.Errorf("Expected no error for allowed IDs")
 			}
+			p.mu.Lock()
 			if ok := p.allowedIDs.HasID("foo"); !ok {
 				t.Errorf("Expected foo to be allowed")
 			}
 			if ok := p.allowedIDs.HasID("bar"); !ok {
 				t.Errorf("Expected bar to be allowed")
 			}
+			p.mu.Unlock()
 			// Delete the file and the IDs should no longer be allowed
 			time.Sleep(time.Second)
 			err = os.Remove(idfile)
@@ -598,6 +600,7 @@ func TestConfigureIDAuthPlugin(t *testing.T) {
 			if err != nil {
 				t.Errorf("Expected no error for allowed IDs")
 			}
+			p.mu.Lock()
 			if ok := p.allowedIDs.HasID("foo"); !ok {
 				t.Errorf("Expected foo to be allowed")
 			}
@@ -607,6 +610,7 @@ func TestConfigureIDAuthPlugin(t *testing.T) {
 			if ok := p.allowedIDs.HasID("baz"); !ok {
 				t.Errorf("Expected baz to be allowed")
 			}
+			p.mu.Unlock()
 			// Change the ID response and the IDs should change
 			idResp = []byte("qux\n")
 			ok := testutil.Eventually[bool](func() bool {
