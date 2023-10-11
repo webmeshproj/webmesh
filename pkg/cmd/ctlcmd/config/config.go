@@ -38,6 +38,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/basicauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/ldap"
 )
 
@@ -178,6 +179,8 @@ type UserConfig struct {
 	LDAPUsername string `yaml:"ldap-username,omitempty" json:"ldap-username,omitempty"`
 	// LDAPPassword is the password for LDAP authentication.
 	LDAPPassword string `yaml:"ldap-password,omitempty" json:"ldap-password,omitempty"`
+	// IDAuthPrivateKey is the private key for ID authentication.
+	IDAuthPrivateKey string `yaml:"id-auth-public-key,omitempty" json:"id-auth-public-key,omitempty"`
 }
 
 // Context is the named configuration for a context.
@@ -262,9 +265,17 @@ func (c *Config) GetDialOptions() ([]grpc.DialOption, error) {
 		}
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(creds)))
 	}
+	if user.IDAuthPrivateKey != "" {
+		key, err := crypto.DecodePrivateKey(user.IDAuthPrivateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode ID authentication key: %w", err)
+		}
+		opts = append(opts, idauth.NewCreds(key))
+	}
 	if user.BasicAuthUsername != "" && user.BasicAuthPassword != "" {
 		opts = append(opts, basicauth.NewCreds(user.BasicAuthUsername, user.BasicAuthPassword))
-	} else if user.LDAPUsername != "" && user.LDAPPassword != "" {
+	}
+	if user.LDAPUsername != "" && user.LDAPPassword != "" {
 		opts = append(opts, ldap.NewCreds(user.LDAPUsername, user.LDAPPassword))
 	}
 	if cluster.PreferLeader {
@@ -449,6 +460,14 @@ func bindFlags(c *Config, flset *pflag.FlagSet, usrIdx, clusterIdx int) {
 			return err
 		}
 		c.Users[usrIdx].User.ClientKeyData = base64.StdEncoding.EncodeToString(data)
+		return nil
+	})
+	fs.Func("id-auth-key", "The path to the ID authentication key for the user", func(s string) error {
+		data, err := os.ReadFile(s)
+		if err != nil {
+			return err
+		}
+		c.Users[usrIdx].User.IDAuthPrivateKey = string(data)
 		return nil
 	})
 	fs.Func("basic-auth-username", "The username for basic authentication", func(s string) error {
