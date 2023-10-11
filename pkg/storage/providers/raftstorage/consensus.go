@@ -46,6 +46,17 @@ func (r *Consensus) IsMember() bool {
 	return true
 }
 
+// StepDown steps down from leadership.
+func (r *Consensus) StepDown(ctx context.Context) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.raft.State() != raft.Leader {
+		return errors.ErrNotLeader
+	}
+	r.log.Debug("Raft node is current leader, stepping down")
+	return r.raft.LeadershipTransfer().Error()
+}
+
 // GetPeers returns the peers of the cluster.
 func (r *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 	r.mu.RLock()

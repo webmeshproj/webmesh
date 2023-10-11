@@ -168,6 +168,9 @@ type Consensus struct {
 	*Provider
 }
 
+// StepDown is a no-op.
+func (p *Consensus) StepDown(context.Context) error { return nil }
+
 // IsLeader returns true if the node is the leader of the storage group.
 func (p *Consensus) IsLeader() bool { return false }
 

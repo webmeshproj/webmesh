@@ -84,6 +84,8 @@ type Consensus interface {
 	IsLeader() bool
 	// IsMember returns true if the node is a member of the storage group.
 	IsMember() bool
+	// StepDown should be called to relinquish leadership of the storage group.
+	StepDown(context.Context) error
 	// GetPeer returns the peer with the given ID.
 	GetPeer(context.Context, string) (*v1.StoragePeer, error)
 	// GetPeers returns the peers of the storage group.

@@ -229,6 +229,18 @@ func (ext *Consensus) IsMember() bool {
 	return true
 }
 
+// StepDown should be called to relinquish leadership of the storage group.
+func (ext *Consensus) StepDown(ctx context.Context) error {
+	if !ext.IsLeader() {
+		return errors.ErrNotLeader
+	}
+	leader, err := ext.GetLeader(ctx)
+	if err != nil {
+		return err
+	}
+	return ext.RemovePeer(ctx, leader, true)
+}
+
 // GetPeers returns the peers of the storage group.
 func (ext *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 	ext.mu.RLock()

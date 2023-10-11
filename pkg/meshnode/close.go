@@ -56,6 +56,19 @@ func (s *meshStore) Close(ctx context.Context) error {
 			s.log.Error("Error closing plugins", slog.String("error", err.Error()))
 		}
 	}
+	if s.storage.Consensus().IsLeader() {
+		// We need to relinquish leadership before closing the storage provider
+		s.log.Debug("Relinquishing storage leadership")
+		err := s.storage.Consensus().StepDown(ctx)
+		if err != nil {
+			s.log.Error("Error relinquishing storage leadership", slog.String("error", err.Error()))
+		}
+	}
+	// Try to leave the cluster.
+	err := s.leaveCluster(ctx)
+	if err != nil {
+		s.log.Error("Error leaving cluster", slog.String("error", err.Error()))
+	}
 	if s.storage != nil {
 		s.log.Debug("Closing storage provider")
 		err := s.storage.Close()
@@ -63,8 +76,8 @@ func (s *meshStore) Close(ctx context.Context) error {
 			s.log.Error("Error stopping storage provider", slog.String("error", err.Error()))
 		}
 	}
-	s.log.Info("All services shut down, leaving cluster")
-	return s.leaveCluster(ctx)
+	s.log.Info("Webmesh node shut down")
+	return nil
 }
 
 // leaveCluster attempts to remove this node from the cluster. The node must

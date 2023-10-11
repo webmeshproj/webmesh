@@ -335,13 +335,6 @@ func (r *Provider) Close() error {
 			r.log.Error("Failed to take snapshot", slog.String("error", err.Error()))
 		}
 	}
-	// If we were the leader, step down.
-	if r.raft.State() == raft.Leader {
-		r.log.Debug("Raft node is current leader, stepping down")
-		if err := r.raft.LeadershipTransfer().Error(); err != nil && !errors.Is(err, raft.ErrNotLeader) {
-			r.log.Warn("Failed to transfer leadership", slog.String("error", err.Error()))
-		}
-	}
 	r.log.Debug("Shutting down raft node")
 	err := r.raft.Shutdown().Error()
 	if err != nil {
