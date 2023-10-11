@@ -35,7 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/storage/testutil"
 )
 
-func TestAuthenticate(t *testing.T) {
+func TestIDAuthenticate(t *testing.T) {
 	ctx := context.Background()
 	var curTime time.Time
 	Now = func() time.Time {
@@ -318,7 +318,7 @@ func TestAuthenticate(t *testing.T) {
 	})
 }
 
-func TestConfigurePlugin(t *testing.T) {
+func TestConfigureIDAuthPlugin(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -645,7 +645,7 @@ func TestConfigurePlugin(t *testing.T) {
 	})
 }
 
-func TestConfiguration(t *testing.T) {
+func TestIDAuthConfiguration(t *testing.T) {
 	t.Parallel()
 
 	t.Run("FlagBinder", func(t *testing.T) {
@@ -743,7 +743,7 @@ func TestConfiguration(t *testing.T) {
 	})
 }
 
-func TestAllowedIDs(t *testing.T) {
+func TestIDAuthAllowedIDs(t *testing.T) {
 	t.Parallel()
 
 	tc := []struct {
@@ -799,7 +799,7 @@ func TestAllowedIDs(t *testing.T) {
 	}
 }
 
-func TestCurrentSigData(t *testing.T) {
+func TestIDAuthCurrentSigData(t *testing.T) {
 	Now = func() time.Time {
 		return time.Unix(0, 0)
 	}
