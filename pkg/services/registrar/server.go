@@ -17,15 +17,17 @@ limitations under the License.
 package registrar
 
 import (
-	"context"
 	"sync"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 )
@@ -56,19 +58,37 @@ var (
 type Options struct {
 	// StorageDriver is the storage driver to use.
 	StorageDriver StorageDriver
+	// IDAuth is the configuration for ID authentication if
+	// not already configured on the gRPC server.
+	IDAuth *idauth.Config
+	// PublicLookup is true if the registrar should be publicly
+	// available for lookups.
+	PublicLookup bool
 }
 
 // Server is the registrar service.
 type Server struct {
 	v1.UnimplementedRegistrarServer
-	driver StorageDriver
+	auth         *idauth.Plugin
+	driver       StorageDriver
+	publicLookup bool
 }
 
 // NewServer returns a new registrar server.
-func NewServer(opts Options) *Server {
-	return &Server{
-		driver: opts.StorageDriver,
+func NewServer(ctx context.Context, opts Options) (*Server, error) {
+	var auth *idauth.Plugin
+	if opts.IDAuth != nil {
+		var err error
+		auth, err = idauth.NewWithConfig(ctx, *opts.IDAuth)
+		if err != nil {
+			return nil, err
+		}
 	}
+	return &Server{
+		auth:         auth,
+		driver:       opts.StorageDriver,
+		publicLookup: opts.PublicLookup,
+	}, nil
 }
 
 // Register is the registrar Register RPC.
@@ -79,6 +99,28 @@ func (srv *Server) Register(ctx context.Context, req *v1.RegisterRequest) (*v1.R
 	key, err := crypto.DecodePublicKey(req.GetPublicKey())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid public key: %v", err)
+	}
+	if srv.auth != nil {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "no metadata in request")
+		}
+		headers := make(map[string]string)
+		for k, v := range md {
+			headers[k] = v[0]
+		}
+		authReq := &v1.AuthenticationRequest{
+			Headers: headers,
+		}
+		resp, err := srv.auth.Authenticate(ctx, authReq)
+		if err != nil {
+			context.LoggerFrom(ctx).Warn("Authentication failed", "error", err.Error())
+			return nil, status.Error(codes.PermissionDenied, "invalid public key")
+		}
+		if resp.GetId() != key.ID() {
+			context.LoggerFrom(ctx).Warn("Authentication failed", "error", "ID mismatch")
+			return nil, status.Error(codes.PermissionDenied, "invalid public key")
+		}
 	}
 	if !req.GetExpiry().IsValid() {
 		return nil, status.Error(codes.InvalidArgument, "invalid expiry")
@@ -93,6 +135,24 @@ func (srv *Server) Register(ctx context.Context, req *v1.RegisterRequest) (*v1.R
 
 // Lookup is the registrar Lookup RPC.
 func (srv *Server) Lookup(ctx context.Context, req *v1.LookupRequest) (*v1.LookupResponse, error) {
+	if srv.auth != nil && !srv.publicLookup {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "no metadata in request")
+		}
+		headers := make(map[string]string)
+		for k, v := range md {
+			headers[k] = v[0]
+		}
+		authReq := &v1.AuthenticationRequest{
+			Headers: headers,
+		}
+		_, err := srv.auth.Authenticate(ctx, authReq)
+		if err != nil {
+			context.LoggerFrom(ctx).Warn("Authentication failed", "error", err.Error())
+			return nil, status.Error(codes.PermissionDenied, "invalid public key")
+		}
+	}
 	var opts LookupRequest
 	switch {
 	case req.GetAlias() != "":

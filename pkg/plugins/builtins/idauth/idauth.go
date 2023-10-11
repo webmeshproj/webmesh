@@ -35,6 +35,7 @@ import (
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -63,6 +64,22 @@ type Plugin struct {
 	allowedIDs AllowedIDs
 	closec     chan struct{}
 	mu         sync.RWMutex
+}
+
+// NewWithConfig returns a preconfigured plugin. Close should
+// be called on the plugin when it is no longer needed.
+func NewWithConfig(ctx context.Context, config Config) (*Plugin, error) {
+	var p Plugin
+	ms := config.AsMapStructure()
+	spb, err := structpb.NewStruct(ms)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert config to struct: %w", err)
+	}
+	_, err = p.Configure(ctx, &v1.PluginConfiguration{Config: spb})
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure plugin: %w", err)
+	}
+	return &p, nil
 }
 
 // AllowedIDs is a map of source files to a set of the allowed IDs in that file.
@@ -97,6 +114,14 @@ type Config struct {
 	RemoteFetchRetries int `mapstructure:"remote-fetch-retries,omitempty" koanf:"remote-fetch-retries,omitempty"`
 	// RemoteFetchRetryInterval is the interval to wait between retries to fetch a remote ID file.
 	RemoteFetchRetryInterval time.Duration `mapstructure:"remote-fetch-retry-interval,omitempty" koanf:"remote-fetch-retry-interval,omitempty"`
+	// InsecureAllowAll allows all peer IDs. This is insecure and should only be used for testing.
+	InsecureAllowAll bool `mapstructure:"insecure-allow-all,omitempty" koanf:"insecure-allow-all,omitempty"`
+}
+
+// NewDefaultConfig returns a new default config.
+func NewDefaultConfig() Config {
+	var c Config
+	return c.Default()
 }
 
 // BindFlags binds the config flags to the given flag set.
@@ -108,10 +133,14 @@ func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.DurationVar(&c.WatchInterval, prefix+"watch-interval", c.WatchInterval, "Interval to poll for changes to remote ID files. When unset or less than zero, defaults to 1 minute.")
 	fs.IntVar(&c.RemoteFetchRetries, prefix+"remote-fetch-retries", c.RemoteFetchRetries, "Number of times to retry fetching a remote ID file. Defaults to 5. Set to -1 to disable retries.")
 	fs.DurationVar(&c.RemoteFetchRetryInterval, prefix+"remote-fetch-retry-interval", c.RemoteFetchRetryInterval, "Interval to wait between retries to fetch a remote ID file. Defaults to 3 seconds.")
+	fs.BoolVar(&c.InsecureAllowAll, prefix+"insecure-allow-all", c.InsecureAllowAll, "Allow all peer IDs. This is insecure and should only be used for testing.")
 }
 
 // Default sets the default values for the config.
-func (c *Config) Default() {
+func (c *Config) Default() Config {
+	if c == nil {
+		c = &Config{}
+	}
 	if c.TimeSkew == 0 {
 		c.TimeSkew = DefaultTimeSkew
 	}
@@ -124,6 +153,7 @@ func (c *Config) Default() {
 	if c.WatchInterval <= 0 {
 		c.WatchInterval = DefaultWatchInterval
 	}
+	return *c
 }
 
 // Now returns the current time.
@@ -155,6 +185,7 @@ func (c *Config) AsMapStructure() map[string]any {
 		"watch-interval":              int(c.WatchInterval),
 		"remote-fetch-retries":        c.RemoteFetchRetries,
 		"remote-fetch-retry-interval": int(c.RemoteFetchRetryInterval),
+		"insecure-allow-all":          c.InsecureAllowAll,
 	}
 }
 
@@ -198,24 +229,23 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		return nil, err
 	}
-	config.Default()
-	p.config = config
+	p.config = config.Default()
 	allowedIDs := make(AllowedIDs)
 	allowedIDs[InlineSource] = make(map[string]struct{})
-	for _, id := range config.AllowedIDs {
+	for _, id := range p.config.AllowedIDs {
 		allowedIDs[InlineSource][id] = struct{}{}
 	}
-	if len(config.IDFiles) > 0 {
-		for _, src := range config.IDFiles {
+	if len(p.config.IDFiles) > 0 {
+		for _, src := range p.config.IDFiles {
 			allowedIDs[src] = make(map[string]struct{})
 			var idData []byte
 			switch {
 			case strings.HasPrefix(src, "http://"), strings.HasPrefix(src, "https://"):
-				idData, err = getWithRetry(ctx, src, config.RemoteFetchRetries, config.RemoteFetchRetryInterval)
+				idData, err = getWithRetry(ctx, src, p.config.RemoteFetchRetries, p.config.RemoteFetchRetryInterval)
 				if err != nil {
 					return nil, fmt.Errorf("failed to read ID file: %w", err)
 				}
-				if config.WatchIDFiles {
+				if p.config.WatchIDFiles {
 					go p.watchRemoteFile(ctx, src)
 				}
 			default:
@@ -224,7 +254,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 				if err != nil {
 					return nil, fmt.Errorf("failed to read ID file: %w", err)
 				}
-				if config.WatchIDFiles {
+				if p.config.WatchIDFiles {
 					go p.watchLocalFile(ctx, path)
 				}
 			}
@@ -263,7 +293,7 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 		return nil, fmt.Errorf("missing %s header", peerIDHeader)
 	}
 	// Fast path, make sure it's in the list of allowed IDs.
-	if !p.allowedIDs.HasID(id) {
+	if !p.config.InsecureAllowAll && !p.allowedIDs.HasID(id) {
 		log.Warn("Peer ID is not in the allow list", "id", id)
 		return nil, fmt.Errorf("peer ID %s is not in the allow list", id)
 	}

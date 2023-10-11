@@ -41,6 +41,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/membership"
@@ -49,6 +50,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/metrics"
 	"github.com/webmeshproj/webmesh/pkg/services/node"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
+	"github.com/webmeshproj/webmesh/pkg/services/registrar"
 	"github.com/webmeshproj/webmesh/pkg/services/storage"
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
@@ -65,6 +67,8 @@ type ServiceOptions struct {
 	MeshDNS MeshDNSOptions `koanf:"meshdns,omitempty"`
 	// TURN options
 	TURN TURNOptions `koanf:"turn,omitempty"`
+	// Registrar options
+	Registrar RegistrarOptions `koanf:"registrar,omitempty"`
 	// Metrics options
 	Metrics MetricsOptions `koanf:"metrics,omitempty"`
 }
@@ -73,11 +77,12 @@ type ServiceOptions struct {
 // Disabled sets the initial state of whether the gRPC API is enabled.
 func NewServiceOptions(disabled bool) ServiceOptions {
 	return ServiceOptions{
-		API:     NewAPIOptions(disabled),
-		WebRTC:  NewWebRTCOptions(),
-		MeshDNS: NewMeshDNSOptions(),
-		TURN:    NewTURNOptions(),
-		Metrics: NewMetricsOptions(),
+		API:       NewAPIOptions(disabled),
+		WebRTC:    NewWebRTCOptions(),
+		MeshDNS:   NewMeshDNSOptions(),
+		TURN:      NewTURNOptions(),
+		Registrar: NewRegistrarOptions(),
+		Metrics:   NewMetricsOptions(),
 	}
 }
 
@@ -86,11 +91,12 @@ func NewServiceOptions(disabled bool) ServiceOptions {
 // is enabled.
 func NewInsecureServiceOptions(disabled bool) ServiceOptions {
 	return ServiceOptions{
-		API:     NewInsecureAPIOptions(disabled),
-		WebRTC:  NewWebRTCOptions(),
-		MeshDNS: NewMeshDNSOptions(),
-		TURN:    NewTURNOptions(),
-		Metrics: NewMetricsOptions(),
+		API:       NewInsecureAPIOptions(disabled),
+		WebRTC:    NewWebRTCOptions(),
+		MeshDNS:   NewMeshDNSOptions(),
+		TURN:      NewTURNOptions(),
+		Registrar: NewRegistrarOptions(),
+		Metrics:   NewMetricsOptions(),
 	}
 }
 
@@ -99,6 +105,7 @@ func (s *ServiceOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	s.API.BindFlags(prefix+"api.", fl)
 	s.WebRTC.BindFlags(prefix+"webrtc.", fl)
 	s.TURN.BindFlags(prefix+"turn.", fl)
+	s.Registrar.BindFlags(prefix+"registrar.", fl)
 	s.Metrics.BindFlags(prefix+"metrics.", fl)
 	// Don't recurse on meshdns flags in bridge configurations
 	if !strings.Contains(prefix, "bridge.") {
@@ -245,6 +252,34 @@ func (a APIOptions) ListenPort() int {
 		return 0
 	}
 	return out
+}
+
+// RegistrarOptions are options for running a registrar service.
+type RegistrarOptions struct {
+	// Enabled is true if the registrar should be enabled.
+	Enabled bool `koanf:"enabled,omitempty"`
+	// Private means the registrar should only respond to lookup
+	// requests from authenticated nodes.
+	Private bool `koanf:"private,omitempty"`
+	// IDAuth are configurations for id-auth. These are only
+	// applicable of the id-auth plugin is not already configured.
+	IDAuth idauth.Config `koanf:"id-auth,omitempty"`
+}
+
+// NewRegistrarOptions returns a new RegistrarOptions with the default values.
+func NewRegistrarOptions() RegistrarOptions {
+	return RegistrarOptions{
+		Enabled: false,
+		Private: false,
+		IDAuth:  idauth.NewDefaultConfig(),
+	}
+}
+
+// BindFlags binds the flags.
+func (r *RegistrarOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
+	fl.BoolVar(&r.Enabled, prefix+"enabled", r.Enabled, "Enable the registrar service.")
+	fl.BoolVar(&r.Private, prefix+"private", r.Private, "Enable private lookups.")
+	r.IDAuth.BindFlags(prefix+"id-auth.", fl)
 }
 
 // WebRTCOptions are the options for the WebRTC API.
@@ -608,6 +643,22 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, s
 			STUNServers: o.WebRTC.STUNServers,
 		}))
 	}
+	if o.Registrar.Enabled {
+		log.Debug("Registering registrar api")
+		var authcfg *idauth.Config
+		if _, ok := conn.Plugins().Get("id-auth"); !ok {
+			authcfg = &o.Registrar.IDAuth
+		}
+		rs, err := registrar.NewServer(ctx, registrar.Options{
+			StorageDriver: registrar.NewMeshStorageDriver(conn.Storage().MeshStorage()),
+			IDAuth:        authcfg,
+			PublicLookup:  !o.Registrar.Private,
+		})
+		if err != nil {
+			return err
+		}
+		v1.RegisterRegistrarServer(srv, rs)
+	}
 	return nil
 }
 
@@ -635,6 +686,13 @@ func (o *ServiceOptions) NewFeatureSet(storage meshstorage.Provider, grpcPort in
 			Feature: v1.Feature_STORAGE_PROVIDER,
 			Port:    int32(storage.ListenPort()),
 		})
+		// We can also be a registrar if enabled.
+		if o.Registrar.Enabled {
+			features = append(features, &v1.FeaturePort{
+				Feature: v1.Feature_REGISTRAR,
+				Port:    int32(grpcPort),
+			})
+		}
 	}
 	if !o.API.Disabled {
 		if !o.API.DisableLeaderProxy {

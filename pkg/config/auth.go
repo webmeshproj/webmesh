@@ -64,10 +64,13 @@ type IDAuthOptions struct {
 	// Enabled is true if ID authentication is enabled.
 	Enabled bool `koanf:"enabled,omitempty"`
 	// Alias is an optional alias to attempt to register with our ID.
+	// If empty, no registration will be attempted. If alias registration
+	// fails it will be logged and the node will continue to run.
 	Alias string `koanf:"alias,omitempty"`
 	// Registrar is the registrar to attempt to use to register with our ID.
-	// If left unset, the node will attempt to discover one via the mesh.
-	// TODO: Credentials.
+	// If left unset and an alias is provided, the node will attempt to discover
+	// one via the mesh.
+	// TODO: Credentials for non-mesh registrars.
 	Registrar string `koanf:"registrar,omitempty"`
 }
 

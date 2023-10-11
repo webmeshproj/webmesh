@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"sync"
 
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -49,6 +51,8 @@ type MeshServer interface {
 type Options struct {
 	// DisableGRPC disables the gRPC server and only runs the MeshServers.
 	DisableGRPC bool
+	// WebEnabled is true if the grpc-web server should be enabled.
+	WebEnabled bool
 	// ListenAddress is the address to start the gRPC server on.
 	ListenAddress string
 	// ServerOptions are options for the server. This should include
@@ -60,11 +64,12 @@ type Options struct {
 
 // Server is the gRPC server.
 type Server struct {
-	opts Options
-	srv  *grpc.Server
-	srvs []MeshServer
-	log  *slog.Logger
-	mu   sync.Mutex
+	opts   Options
+	srv    *grpc.Server
+	websrv *http.Server
+	srvs   []MeshServer
+	log    *slog.Logger
+	mu     sync.Mutex
 }
 
 // NewServer returns a new Server.
@@ -102,13 +107,21 @@ func (s *Server) ListenAndServe() error {
 	}
 	if !s.opts.DisableGRPC {
 		g.Go(func() error {
-			s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.opts.ListenAddress))
 			lis, err := net.Listen("tcp", s.opts.ListenAddress)
 			if err != nil {
 				s.mu.Unlock()
 				return fmt.Errorf("start TCP listener: %w", err)
 			}
 			defer lis.Close()
+			if s.opts.WebEnabled {
+				s.log.Info(fmt.Sprintf("Starting gRPC-web server on %s", lis.Addr().String()))
+				s.websrv = &http.Server{Handler: grpcweb.WrapServer(s.srv)}
+				if err := s.websrv.Serve(lis); err != nil && err != http.ErrServerClosed {
+					return fmt.Errorf("grpc-web serve: %w", err)
+				}
+				return nil
+			}
+			s.log.Info(fmt.Sprintf("Starting gRPC server on %s", lis.Addr().String()))
 			if err := s.srv.Serve(lis); err != nil {
 				return fmt.Errorf("grpc serve: %w", err)
 			}
@@ -147,7 +160,12 @@ func (s *Server) Shutdown(ctx context.Context) {
 			s.log.Error("Mesh server shutdown failed", slog.String("error", err.Error()))
 		}
 	}
-	if s.srv != nil {
+	if s.websrv != nil {
+		s.log.Info("Shutting down gRPC-web server")
+		if err := s.websrv.Shutdown(ctx); err != nil {
+			s.log.Error("gRPC-web server shutdown failed", slog.String("error", err.Error()))
+		}
+	} else if s.srv != nil {
 		s.log.Info("Shutting down gRPC server")
 		s.srv.GracefulStop()
 	}
