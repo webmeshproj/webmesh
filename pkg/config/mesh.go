@@ -233,10 +233,6 @@ func (o *Config) IsStorageMember() bool {
 // The key is optional and will be taken from the configuration if not provided.
 func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf meshnode.Config, err error) {
 	log := context.LoggerFrom(ctx)
-	nodeid, err := o.NodeID(ctx)
-	if err != nil {
-		return
-	}
 	if key == nil {
 		key, err = o.WireGuard.LoadKey(ctx)
 		if err != nil {
@@ -244,7 +240,6 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 		}
 	}
 	conf = meshnode.Config{
-		NodeID:                  nodeid,
 		Credentials:             []grpc.DialOption{},
 		Key:                     key,
 		HeartbeatPurgeThreshold: o.Storage.Raft.HeartbeatPurgeThreshold,
@@ -267,6 +262,13 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 	}
 	// Check what dial options we need
 	conf.Credentials, err = o.NewClientCredentials(ctx, key)
+	if err != nil {
+		return
+	}
+	conf.NodeID, err = o.NodeID(ctx)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -361,6 +363,8 @@ func (o *Config) NewClientCredentials(ctx context.Context, key crypto.PrivateKey
 	if o.Auth.IDAuth.Enabled {
 		log.Debug("Configuring ID authentication")
 		creds = append(creds, idauth.NewCreds(key))
+		// Make sure our ID is set if it hasn't been
+		o.Mesh.NodeID = key.ID()
 	}
 	return creds, nil
 }
