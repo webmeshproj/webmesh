@@ -25,3 +25,19 @@ var (
 	// BuildDate is the date the binary was built.
 	BuildDate = "unknown"
 )
+
+// BuildInfo is the current build information.
+type BuildInfo struct {
+	Version   string `json:"version"`
+	Commit    string `json:"commit"`
+	BuildDate string `json:"buildDate"`
+}
+
+// GetBuildInfo returns the current build information.
+func GetBuildInfo() BuildInfo {
+	return BuildInfo{
+		Version:   Version,
+		Commit:    Commit,
+		BuildDate: BuildDate,
+	}
+}

@@ -55,6 +55,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/turn"
 	"github.com/webmeshproj/webmesh/pkg/services/webrtc"
 	meshstorage "github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // ServiceOptions contains the configuration for the mesh services.
@@ -567,14 +568,28 @@ func (m MetricsOptions) Validate() error {
 	return nil
 }
 
+// APIRegistrationOptions are options for registering the APIs to a given server.
+type APIRegistrationOptions struct {
+	// Node is the node to register the APIs against.
+	Node meshnode.Node
+	// Server is the server to register the APIs to.
+	Server *services.Server
+	// Features are the features to broadcast to other nodes.
+	Features []*v1.FeaturePort
+	// BuildInfo is the build info to display in the node API.
+	BuildInfo version.BuildInfo
+	// Description is an optional description to display in the node API.
+	Description string
+}
+
 // RegisterAPIs registers the configured APIs to the given server.
-func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, srv *services.Server, features []*v1.FeaturePort) error {
+func (o *ServiceOptions) RegisterAPIs(ctx context.Context, opts APIRegistrationOptions) error {
 	log := context.LoggerFrom(ctx)
 	var rbacDisabled bool
 	var err error
 	maxTries := 5
 	for i := 0; i < maxTries; i++ {
-		rbacDisabled, err = conn.Storage().MeshDB().RBAC().GetEnabled(context.Background())
+		rbacDisabled, err = opts.Node.Storage().MeshDB().RBAC().GetEnabled(context.Background())
 		if err != nil {
 			log.Error("Failed to check rbac status", "error", err.Error())
 			if i == maxTries-1 {
@@ -586,45 +601,47 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, s
 		break
 	}
 	var rbacEvaluator rbac.Evaluator
-	insecureServices := !conn.Plugins().HasAuth() || rbacDisabled
+	insecureServices := !opts.Node.Plugins().HasAuth() || rbacDisabled
 	if insecureServices {
-		if conn.Plugins().HasAuth() {
+		if opts.Node.Plugins().HasAuth() {
 			log.Warn("Running services with authentication but without authorization")
 		} else {
 			log.Warn("Running services without authentication or authorization")
 		}
 		rbacEvaluator = rbac.NewNoopEvaluator()
 	} else {
-		rbacEvaluator = rbac.NewStoreEvaluator(conn.Storage().MeshDB())
+		rbacEvaluator = rbac.NewStoreEvaluator(opts.Node.Storage().MeshDB())
 	}
 	// Always register the node API
 	log.Debug("Registering node service")
-	v1.RegisterNodeServer(srv, node.NewServer(ctx, node.Options{
-		NodeID:     conn.ID(),
-		NodeDialer: conn,
-		Storage:    conn.Storage(),
-		Meshnet:    conn.Network(),
-		Plugins:    conn.Plugins(),
-		Features:   features,
+	v1.RegisterNodeServer(opts.Server, node.NewServer(ctx, node.Options{
+		NodeID:      opts.Node.ID(),
+		Description: opts.Description,
+		Version:     opts.BuildInfo,
+		NodeDialer:  opts.Node,
+		Storage:     opts.Node.Storage(),
+		Meshnet:     opts.Node.Network(),
+		Plugins:     opts.Node.Plugins(),
+		Features:    opts.Features,
 	}))
 	// Register membership and storage if we are a storage provider
-	if conn.Storage().Consensus().IsMember() {
+	if opts.Node.Storage().Consensus().IsMember() {
 		log.Debug("Registering membership service")
-		v1.RegisterMembershipServer(srv, membership.NewServer(ctx, membership.Options{
-			NodeID:  conn.ID(),
-			Storage: conn.Storage(),
-			Plugins: conn.Plugins(),
+		v1.RegisterMembershipServer(opts.Server, membership.NewServer(ctx, membership.Options{
+			NodeID:  opts.Node.ID(),
+			Storage: opts.Node.Storage(),
+			Plugins: opts.Node.Plugins(),
 			RBAC:    rbacEvaluator,
-			Meshnet: conn.Network(),
+			Meshnet: opts.Node.Network(),
 		}))
 		log.Debug("Registering storage service")
-		storageSrv := storage.NewServer(ctx, conn.Storage(), rbacEvaluator, conn.Network())
-		v1.RegisterStorageQueryServiceServer(srv, storageSrv)
+		storageSrv := storage.NewServer(ctx, opts.Node.Storage(), rbacEvaluator, opts.Node.Network())
+		v1.RegisterStorageQueryServiceServer(opts.Server, storageSrv)
 	}
 	// Register any other enabled APIs
 	if o.API.MeshEnabled {
 		log.Debug("Registering mesh api")
-		v1.RegisterMeshServer(srv, meshapi.NewServer(conn.Storage().MeshDB()))
+		v1.RegisterMeshServer(opts.Server, meshapi.NewServer(opts.Node.Storage().MeshDB()))
 	}
 	if o.WebRTC.Enabled {
 		log.Debug("Registering WebRTC api")
@@ -635,10 +652,10 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, s
 			turnAddr = fmt.Sprintf("turn:%s", turnAddr)
 			o.WebRTC.STUNServers = append([]string{turnAddr}, o.WebRTC.STUNServers...)
 		}
-		v1.RegisterWebRTCServer(srv, webrtc.NewServer(webrtc.Options{
-			ID:          conn.ID(),
-			Wireguard:   conn.Network().WireGuard(),
-			NodeDialer:  conn,
+		v1.RegisterWebRTCServer(opts.Server, webrtc.NewServer(webrtc.Options{
+			ID:          opts.Node.ID(),
+			Wireguard:   opts.Node.Network().WireGuard(),
+			NodeDialer:  opts.Node,
 			RBAC:        rbacEvaluator,
 			STUNServers: o.WebRTC.STUNServers,
 		}))
@@ -646,18 +663,18 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, conn meshnode.Node, s
 	if o.Registrar.Enabled {
 		log.Debug("Registering registrar api")
 		var authcfg *idauth.Config
-		if _, ok := conn.Plugins().Get("id-auth"); !ok {
+		if _, ok := opts.Node.Plugins().Get("id-auth"); !ok {
 			authcfg = &o.Registrar.IDAuth
 		}
 		rs, err := registrar.NewServer(ctx, registrar.Options{
-			StorageDriver: registrar.NewMeshStorageDriver(conn.Storage().MeshStorage()),
+			StorageDriver: registrar.NewMeshStorageDriver(opts.Node.Storage().MeshStorage()),
 			IDAuth:        authcfg,
 			PublicLookup:  !o.Registrar.Private,
 		})
 		if err != nil {
 			return err
 		}
-		v1.RegisterRegistrarServer(srv, rs)
+		v1.RegisterRegistrarServer(opts.Server, rs)
 	}
 	return nil
 }

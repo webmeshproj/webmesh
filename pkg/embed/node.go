@@ -38,6 +38,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // Node is an embedded webmesh node.
@@ -196,7 +197,13 @@ func (n *node) Start(ctx context.Context) error {
 	}
 	if !n.conf.Services.API.Disabled {
 		features := n.conf.Services.NewFeatureSet(n.Storage(), n.conf.Services.API.ListenPort())
-		err = n.conf.Services.RegisterAPIs(ctx, n.Mesh(), n.services, features)
+		err = n.conf.Services.RegisterAPIs(ctx, config.APIRegistrationOptions{
+			Node:        n.Mesh(),
+			Server:      n.services,
+			Features:    features,
+			BuildInfo:   version.GetBuildInfo(),
+			Description: "webmesh-node",
+		})
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to register APIs: %w", err))
 		}

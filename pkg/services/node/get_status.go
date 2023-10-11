@@ -24,7 +24,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
-	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.Status, error) {
@@ -48,9 +47,10 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 	}
 	return &v1.Status{
 		Id:               s.NodeID.String(),
-		Version:          version.Version,
-		Commit:           version.Commit,
-		BuildDate:        version.BuildDate,
+		Description:      s.Description,
+		Version:          s.Version.Version,
+		Commit:           s.Version.Commit,
+		BuildDate:        s.Version.BuildDate,
 		Uptime:           time.Since(s.startedAt).String(),
 		StartedAt:        timestamppb.New(s.startedAt),
 		Features:         s.Features,

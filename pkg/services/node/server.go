@@ -29,6 +29,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // Server is the webmesh node service.
@@ -41,12 +42,14 @@ type Server struct {
 
 // Options are options for the Node service.
 type Options struct {
-	NodeID     types.NodeID
-	Storage    storage.Provider
-	Meshnet    meshnet.Manager
-	NodeDialer transport.NodeDialer
-	Plugins    plugins.Manager
-	Features   []*v1.FeaturePort
+	NodeID      types.NodeID
+	Description string
+	Version     version.BuildInfo
+	Storage     storage.Provider
+	Meshnet     meshnet.Manager
+	NodeDialer  transport.NodeDialer
+	Plugins     plugins.Manager
+	Features    []*v1.FeaturePort
 }
 
 // NewServer returns a new Server. Features are used for returning what features are enabled.

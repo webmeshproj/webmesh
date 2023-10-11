@@ -40,9 +40,10 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
-func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error {
+func RunBridgeConnection(ctx context.Context, conf config.BridgeOptions) error {
 	if runtime.GOOS == "windows" {
 		return fmt.Errorf("bridge mode is not supported on windows")
 	}
@@ -50,7 +51,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 
 	// Build all the mesh objects.
 	meshes := make(map[string]meshnode.Node)
-	for meshID, meshConfig := range config.Meshes {
+	for meshID, meshConfig := range conf.Meshes {
 		id := meshID
 		// For now we only allow IPv6 on bridged meshes.
 		meshConfig.Mesh.DisableIPv4 = true
@@ -78,7 +79,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	// Start all the mesh connections.
 	for meshID, meshConn := range meshes {
 		// Create a new raft node and build connection options
-		meshConfig := config.Meshes[meshID]
+		meshConfig := conf.Meshes[meshID]
 		storageProvider, err := meshConfig.NewStorageProvider(ctx, meshConn, meshConfig.Bootstrap.Force)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create storage provider: %w", err))
@@ -116,7 +117,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 	meshSvcs := make(map[string]*services.Server)
 	for meshID, meshConn := range meshes {
 		id := meshID
-		meshConfig := config.Meshes[id]
+		meshConfig := conf.Meshes[id]
 		srvOpts, err := meshConfig.Services.NewServiceOptions(ctx, meshConn)
 		if err != nil {
 			return handleErr(fmt.Errorf("failed to create service options: %w", err))
@@ -127,7 +128,13 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 		}
 		if !meshConfig.Services.API.Disabled {
 			features := meshConfig.Services.NewFeatureSet(meshConn.Storage(), meshConfig.Services.API.ListenPort())
-			err = meshConfig.Services.RegisterAPIs(ctx, meshConn, srv, features)
+			err = meshConfig.Services.RegisterAPIs(ctx, config.APIRegistrationOptions{
+				Node:        meshConn,
+				Server:      srv,
+				Features:    features,
+				BuildInfo:   version.GetBuildInfo(),
+				Description: "webmesh-bridge-node",
+			})
 			if err != nil {
 				return handleErr(fmt.Errorf("failed to register APIs: %w", err))
 			}
@@ -152,10 +159,10 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 
 	// Set up bridge DNS if enabled
 	var dnsPort int
-	if config.MeshDNS.Enabled {
+	if conf.MeshDNS.Enabled {
 		// Determine the DNS port
-		if config.MeshDNS.ListenUDP != "" {
-			_, port, err := net.SplitHostPort(config.MeshDNS.ListenUDP)
+		if conf.MeshDNS.ListenUDP != "" {
+			_, port, err := net.SplitHostPort(conf.MeshDNS.ListenUDP)
 			if err != nil {
 				return handleErr(fmt.Errorf("failed to parse meshdns listen UDP address: %w", err))
 			}
@@ -165,13 +172,13 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			}
 		}
 		dnsSrv := meshdns.NewServer(ctx, &meshdns.Options{
-			UDPListenAddr:     config.MeshDNS.ListenUDP,
-			TCPListenAddr:     config.MeshDNS.ListenTCP,
-			ReusePort:         config.MeshDNS.ReusePort,
-			Compression:       config.MeshDNS.EnableCompression,
-			RequestTimeout:    config.MeshDNS.RequestTimeout,
-			Forwarders:        config.MeshDNS.Forwarders,
-			CacheSize:         config.MeshDNS.CacheSize,
+			UDPListenAddr:     conf.MeshDNS.ListenUDP,
+			TCPListenAddr:     conf.MeshDNS.ListenTCP,
+			ReusePort:         conf.MeshDNS.ReusePort,
+			Compression:       conf.MeshDNS.EnableCompression,
+			RequestTimeout:    conf.MeshDNS.RequestTimeout,
+			Forwarders:        conf.MeshDNS.Forwarders,
+			CacheSize:         conf.MeshDNS.CacheSize,
 			DisableForwarding: false,
 		})
 		// Register each mesh to the server
@@ -200,7 +207,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			}
 		}()
 		// If we are enabling MeshDNS locally, set the system resolvers
-		if config.UseMeshDNS {
+		if conf.UseMeshDNS {
 			addrport := netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), uint16(dnsPort))
 			err := dns.AddServers("", []netip.AddrPort{addrport})
 			if err != nil {
@@ -228,7 +235,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 			// TODO: Check if any unique non-internal routes are broadcasted
 			// by the other meshes and add them to this list (per a configuration flag).
 			// Will need to subscribe to route updates from the other meshes.
-			meshConfig := config.Meshes[otherID]
+			meshConfig := conf.Meshes[otherID]
 			req := &v1.UpdateRequest{
 				Id:     meshConn.ID().String(),
 				Routes: toBroadcast,
@@ -238,7 +245,7 @@ func RunBridgeConnection(ctx context.Context, config config.BridgeOptions) error
 				),
 			}
 			// If we are bridging DNS, add it to our feature set
-			if config.MeshDNS.Enabled {
+			if conf.MeshDNS.Enabled {
 				req.Features = append(req.Features, &v1.FeaturePort{
 					Feature: v1.Feature_MESH_DNS,
 					Port:    int32(dnsPort),

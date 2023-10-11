@@ -48,6 +48,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // TransportBuilder is the signature of a function that builds a webmesh transport.
@@ -550,7 +551,13 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	}
 	features := conf.Services.NewFeatureSet(storageProvider, conf.Services.API.ListenPort())
 	if !conf.Services.API.Disabled {
-		err = conf.Services.RegisterAPIs(ctx, node, t.svcs, features)
+		err = conf.Services.RegisterAPIs(ctx, config.APIRegistrationOptions{
+			Node:        node,
+			Server:      t.svcs,
+			Features:    features,
+			BuildInfo:   version.GetBuildInfo(),
+			Description: "libp2p-transport-webmesh",
+		})
 		if err != nil {
 			return nil, handleErr(fmt.Errorf("failed to register APIs: %w", err))
 		}

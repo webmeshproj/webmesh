@@ -38,6 +38,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // AppDaemon is the app daemon RPC server.
@@ -168,7 +169,13 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	}
 	if !conf.Services.API.Disabled {
 		features := conf.Services.NewFeatureSet(storageProvider, conf.Services.API.ListenPort())
-		err = conf.Services.RegisterAPIs(ctx, meshConn, srv, features)
+		err = conf.Services.RegisterAPIs(ctx, config.APIRegistrationOptions{
+			Node:        meshConn,
+			Server:      srv,
+			Features:    features,
+			BuildInfo:   version.GetBuildInfo(),
+			Description: "webmesh-app-daemon",
+		})
 		if err != nil {
 			return nil, handleErr(status.Errorf(codes.Internal, "failed to register APIs: %v", err))
 		}
