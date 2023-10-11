@@ -44,7 +44,7 @@ func (s *Server) SubscribePeers(req *v1.SubscribePeersRequest, stream v1.Members
 	} else if !types.IsValidNodeID(req.GetId()) {
 		return status.Error(codes.InvalidArgument, "node id is invalid")
 	}
-	if s.rbac.IsSecure() {
+	if s.plugins.HasAuth() {
 		// If we are running with authorization, ensure the node id matches the authenticated caller.
 		if !nodeIDMatchesContext(stream.Context(), req.GetId()) {
 			return status.Errorf(codes.PermissionDenied, "node id %s does not match authenticated caller", req.GetId())

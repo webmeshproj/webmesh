@@ -60,6 +60,11 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 	} else if !types.IsValidNodeID(req.GetId()) {
 		return nil, status.Error(codes.InvalidArgument, "node id is invalid")
 	}
+	if s.plugins.HasAuth() {
+		if !nodeIDMatchesContext(ctx, req.GetId()) {
+			return nil, status.Errorf(codes.PermissionDenied, "node id %s does not match authenticated caller", req.GetId())
+		}
+	}
 	if len(req.GetRoutes()) > 0 {
 		for _, route := range req.GetRoutes() {
 			route, err := netip.ParsePrefix(route)
@@ -83,9 +88,6 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 
 	// Check that the node is indeed who they say they are
 	if s.rbac.IsSecure() {
-		if !nodeIDMatchesContext(ctx, req.GetId()) {
-			return nil, status.Errorf(codes.PermissionDenied, "node id %s does not match authenticated caller", req.GetId())
-		}
 		// We can go ahead and check here if the node is allowed to do what they want.
 		var actions rbac.Actions
 		if req.GetAsVoter() {

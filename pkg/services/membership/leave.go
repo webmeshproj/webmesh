@@ -46,9 +46,10 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	s.log.Info("Leave request received", slog.Any("request", req))
 	// Check that the node is indeed who they say they are
-	if s.rbac.IsSecure() {
+	if s.plugins.HasAuth() {
 		if proxiedFor, ok := leaderproxy.ProxiedFor(ctx); ok {
 			if proxiedFor != req.GetId() {
 				return nil, status.Errorf(codes.PermissionDenied, "proxied for %s, not %s", proxiedFor, req.GetId())
@@ -56,7 +57,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 		} else {
 			if peer, ok := context.AuthenticatedCallerFrom(ctx); ok {
 				if peer != req.GetId() {
-					return nil, status.Errorf(codes.PermissionDenied, "peer id %s, not %s", peer, req.GetId())
+					return nil, status.Errorf(codes.PermissionDenied, "peer id is %s, not %s", peer, req.GetId())
 				}
 			} else {
 				return nil, status.Error(codes.PermissionDenied, "no peer authentication info in context")
