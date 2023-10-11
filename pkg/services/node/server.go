@@ -18,7 +18,9 @@ limitations under the License.
 package node
 
 import (
+	"fmt"
 	"log/slog"
+	"runtime"
 	"time"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -56,6 +58,7 @@ type Options struct {
 // It is the callers responsibility to ensure those servers are registered on the node.
 // Insecure is used to disable authorization.
 func NewServer(ctx context.Context, opts Options) *Server {
+	opts.Description += fmt.Sprintf(" (%s)", runtime.Version())
 	return &Server{
 		Options:   opts,
 		startedAt: time.Now(),
