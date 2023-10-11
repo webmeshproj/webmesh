@@ -65,6 +65,7 @@ type Options struct {
 // Server is the gRPC server.
 type Server struct {
 	opts   Options
+	lis    *net.TCPListener
 	srv    *grpc.Server
 	websrv *http.Server
 	srvs   []MeshServer
@@ -86,6 +87,12 @@ func NewServer(ctx context.Context, o Options) (*Server, error) {
 		server.srv = grpc.NewServer(o.ServerOptions...)
 		log.Debug("Registering reflection service")
 		reflection.Register(server)
+		// Go ahead and start the listener.
+		lis, err := net.Listen("tcp", o.ListenAddress)
+		if err != nil {
+			return nil, fmt.Errorf("start TCP listener: %w", err)
+		}
+		server.lis = lis.(*net.TCPListener)
 	}
 	return server, nil
 }
@@ -107,22 +114,17 @@ func (s *Server) ListenAndServe() error {
 	}
 	if !s.opts.DisableGRPC {
 		g.Go(func() error {
-			lis, err := net.Listen("tcp", s.opts.ListenAddress)
-			if err != nil {
-				s.mu.Unlock()
-				return fmt.Errorf("start TCP listener: %w", err)
-			}
-			defer lis.Close()
+			defer s.lis.Close()
 			if s.opts.WebEnabled {
-				s.log.Info(fmt.Sprintf("Starting gRPC-web server on %s", lis.Addr().String()))
+				s.log.Info(fmt.Sprintf("Starting gRPC-web server on %s", s.lis.Addr().String()))
 				s.websrv = &http.Server{Handler: grpcweb.WrapServer(s.srv)}
-				if err := s.websrv.Serve(lis); err != nil && err != http.ErrServerClosed {
+				if err := s.websrv.Serve(s.lis); err != nil && err != http.ErrServerClosed {
 					return fmt.Errorf("grpc-web serve: %w", err)
 				}
 				return nil
 			}
-			s.log.Info(fmt.Sprintf("Starting gRPC server on %s", lis.Addr().String()))
-			if err := s.srv.Serve(lis); err != nil {
+			s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.lis.Addr().String()))
+			if err := s.srv.Serve(s.lis); err != nil {
 				return fmt.Errorf("grpc serve: %w", err)
 			}
 			return nil
@@ -146,6 +148,14 @@ func (s *Server) GetServiceInfo() map[string]grpc.ServiceInfo {
 		return map[string]grpc.ServiceInfo{}
 	}
 	return s.srv.GetServiceInfo()
+}
+
+// GRPCListenPort returns the port the gRPC server is listening on.
+func (s *Server) GRPCListenPort() int {
+	if s.opts.DisableGRPC {
+		return 0
+	}
+	return s.lis.Addr().(*net.TCPAddr).Port
 }
 
 // Shutdown stops the gRPC server and all mesh services gracefully.
