@@ -276,7 +276,14 @@ func (db *badgerDB) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pr
 				key, val := make([]byte, len(k)), make([]byte, len(v))
 				copy(key, k)
 				copy(val, v)
-				return fn(key, val)
+				err := fn(key, val)
+				if err != nil {
+					if errors.Is(err, storage.ErrStopIteration) {
+						return nil
+					}
+					return err
+				}
+				return nil
 			})
 			if err != nil {
 				return err

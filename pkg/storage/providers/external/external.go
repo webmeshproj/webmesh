@@ -458,6 +458,9 @@ func (ext *ExternalStorage) IterPrefix(ctx context.Context, prefix []byte, fn st
 	}
 	for _, value := range resp.GetValues() {
 		if err := fn(value.GetKey(), value.GetValue()); err != nil {
+			if errors.Is(err, storage.ErrStopIteration) {
+				return nil
+			}
 			return err
 		}
 	}

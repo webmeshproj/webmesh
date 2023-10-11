@@ -19,6 +19,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -108,6 +109,9 @@ type KVSubscribeFunc func(key, value []byte)
 
 // PrefixIterator is the function signature for iterating over all keys with a given prefix.
 type PrefixIterator func(key, value []byte) error
+
+// ErrStopIteration is a special error that can be returned by PrefixIterator to stop iteration.
+var ErrStopIteration = fmt.Errorf("stop iteration")
 
 // MeshStorage is the interface for storing and retrieving data about the state of the mesh.
 type MeshStorage interface {

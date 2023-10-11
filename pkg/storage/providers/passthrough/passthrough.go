@@ -310,6 +310,9 @@ func (p *Storage) IterPrefix(ctx context.Context, prefix []byte, fn storage.Pref
 			return err
 		}
 		if err := fn(key, value); err != nil {
+			if errors.Is(err, storage.ErrStopIteration) {
+				return nil
+			}
 			return err
 		}
 	}
