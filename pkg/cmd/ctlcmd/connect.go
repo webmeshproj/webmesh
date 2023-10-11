@@ -107,6 +107,7 @@ var connectCmd = &cobra.Command{
 				},
 				Storage: config.StorageOptions{
 					InMemory: true,
+					Provider: "passthrough",
 				},
 				Services: config.ServiceOptions{
 					API: config.APIOptions{Disabled: true},

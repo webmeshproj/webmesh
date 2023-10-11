@@ -213,13 +213,16 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		if err != nil {
 			return handleErr(fmt.Errorf("join: %w", err))
 		}
-	} else {
+	} else if opts.StorageProvider.Consensus().IsMember() {
 		// We neither had the bootstrap flag nor any join flags set.
 		// This means we are possibly a single node cluster.
 		// Recover our previous wireguard configuration and start up.
 		if err := s.recoverWireguard(ctx); err != nil {
 			return fmt.Errorf("recover wireguard: %w", err)
 		}
+	} else {
+		// We got nothing, bail out.
+		return handleErr(fmt.Errorf("no bootstrap or join options provided"))
 	}
 	// At this point we are open for business.
 	s.open.Store(true)
