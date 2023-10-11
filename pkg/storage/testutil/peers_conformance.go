@@ -60,6 +60,13 @@ func TestPeerStorageConformance(t *testing.T, builder NewPeersFunc) {
 					}},
 				},
 				{
+					name: "crypto-key-id",
+					node: types.MeshNode{MeshNode: &v1.MeshNode{
+						Id:        crypto.MustGenerateKey().ID(),
+						PublicKey: mustGeneratePublicKey(t),
+					}},
+				},
+				{
 					name: "valid-node-with-data",
 					node: types.MeshNode{MeshNode: &v1.MeshNode{
 						Id:                 "node-id",

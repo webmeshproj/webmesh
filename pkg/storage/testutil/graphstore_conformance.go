@@ -24,6 +24,7 @@ import (
 	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/v1"
 
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
@@ -97,6 +98,13 @@ func TestPeerGraphstoreConformance(t *testing.T, builder NewGraphStoreFunc) {
 						name: "valid-node-c",
 						node: types.MeshNode{MeshNode: &v1.MeshNode{
 							Id:        "valid-node-c",
+							PublicKey: mustGeneratePublicKey(t),
+						}},
+					},
+					{
+						name: "crypto-key-id",
+						node: types.MeshNode{MeshNode: &v1.MeshNode{
+							Id:        crypto.MustGenerateKey().ID(),
 							PublicKey: mustGeneratePublicKey(t),
 						}},
 					},
