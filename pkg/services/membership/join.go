@@ -207,7 +207,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		JoinedAt:           timestamppb.New(time.Now().UTC()),
 	}})
 	if err != nil {
-		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to raft log: %v", err))
+		return nil, handleErr(status.Errorf(codes.Internal, "failed to persist peer details to storage: %v", err))
 	}
 	cleanFuncs = append(cleanFuncs, func() {
 		err := p.Delete(ctx, types.NodeID(req.GetId()))
@@ -375,7 +375,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 
 	dnsServers, err := p.List(ctx, storage.FilterByFeature(v1.Feature_MESH_DNS))
 	if err != nil {
-		log.Warn("could not lookup DNS servers", slog.String("error", err.Error()))
+		log.Warn("Could not lookup DNS servers for peer", slog.String("error", err.Error()))
 	} else {
 		for _, peer := range dnsServers {
 			if peer.GetId() == req.GetId() {
