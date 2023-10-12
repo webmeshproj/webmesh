@@ -63,7 +63,7 @@ func addServers(_ string, servers []netip.AddrPort) error {
 func removeServers(_ string, servers []netip.AddrPort) error {
 	// Create a new resolvconf file, removing the servers
 	// if encountered
-	current, err := readResolvConf()
+	current, err := readResolvConfHead()
 	if err != nil {
 		return err
 	}
@@ -219,15 +219,6 @@ func openResolvConf() (*os.File, error) {
 		return nil, err
 	}
 	return f, nil
-}
-
-func readResolvConf() ([]byte, error) {
-	f, err := openResolvConf()
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return io.ReadAll(f)
 }
 
 func readResolvConfHead() ([]byte, error) {
