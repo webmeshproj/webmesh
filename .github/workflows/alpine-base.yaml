@@ -46,7 +46,7 @@ jobs:
         id: build
         with:
           context: .
-          file: Dockerfile.alpine
+          file: Dockerfile.base
           push: true
           tags: ${{ env.IMAGE_NAME }}:${{ inputs.alpine-version }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
