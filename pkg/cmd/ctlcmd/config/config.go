@@ -238,6 +238,9 @@ func (c *Config) NewAdminClient() (v1.AdminClient, io.Closer, error) {
 // DialCurrent connects to the current context.
 func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 	cluster := c.GetCurrentCluster()
+	if cluster.Server == "" {
+		return nil, fmt.Errorf("no server specified for cluster")
+	}
 	opts, err := c.GetDialOptions()
 	if err != nil {
 		return nil, err
@@ -261,7 +264,7 @@ func (c *Config) GetDialOptions() ([]grpc.DialOption, error) {
 	} else {
 		creds, err := c.TLSConfig()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("build client TLS config: %w", err)
 		}
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(creds)))
 	}
@@ -286,6 +289,10 @@ func (c *Config) GetDialOptions() ([]grpc.DialOption, error) {
 		timeout := cluster.RequestTimeout.Duration
 		opts = append(opts, grpc.WithUnaryInterceptor(RequestTimeoutUnaryClientInterceptor(timeout)))
 		opts = append(opts, grpc.WithStreamInterceptor(RequestTimeoutStreamClientInterceptor(timeout)))
+	}
+	if len(opts) == 0 {
+		// We shouldn't have gotten here
+		return nil, fmt.Errorf("no credentials specified for cluster")
 	}
 	return opts, nil
 }
