@@ -246,10 +246,10 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 				s.log.Debug("Dialing network leader for membership updates")
 				c, err := s.DialLeader(subctx)
 				if err != nil {
-					s.log.Error("Failed to dial leader for membership updates", slog.String("error", err.Error()))
 					if subctx.Err() != nil {
 						return
 					}
+					s.log.Error("Failed to dial leader for membership updates, will retry", slog.String("error", err.Error()))
 					time.Sleep(time.Second)
 					continue
 				}
@@ -259,10 +259,10 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 					Id: s.ID().String(),
 				})
 				if err != nil {
-					s.log.Error("Failed to subscribe to peers", slog.String("error", err.Error()))
 					if subctx.Err() != nil {
 						return
 					}
+					s.log.Error("Failed to subscribe to peers, will retry", slog.String("error", err.Error()))
 					time.Sleep(time.Second)
 					continue
 				}
@@ -272,20 +272,20 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 				for {
 					peers, err := stream.Recv()
 					if err != nil {
-						s.log.Error("Failed to receive peer updates", slog.String("error", err.Error()))
 						if subctx.Err() != nil {
 							return
 						}
+						s.log.Error("Failed to receive peer updates, will retry", slog.String("error", err.Error()))
 						time.Sleep(time.Second)
 						break
 					}
 					s.log.Debug("Received peer updates", slog.Any("peers", peers))
 					err = s.nw.Peers().Refresh(subctx, peers.Peers)
 					if err != nil {
-						s.log.Error("Failed to refresh peers", slog.String("error", err.Error()))
 						if subctx.Err() != nil {
 							return
 						}
+						s.log.Error("Failed to refresh peers, will retry", slog.String("error", err.Error()))
 						time.Sleep(time.Second)
 						break
 					}
