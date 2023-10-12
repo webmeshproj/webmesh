@@ -47,6 +47,8 @@ const (
 	APIVersion = "webmesh.io/v1"
 	// Kind is the kind of the configuration. It should always be "Config".
 	Kind = "Config"
+	// DefaultServer is the default server to connect to.
+	DefaultServer = "localhost:8443"
 )
 
 var (
@@ -239,7 +241,7 @@ func (c *Config) NewAdminClient() (v1.AdminClient, io.Closer, error) {
 func (c *Config) DialCurrent() (*grpc.ClientConn, error) {
 	cluster := c.GetCurrentCluster()
 	if cluster.Server == "" {
-		return nil, fmt.Errorf("no server specified for cluster")
+		cluster.Server = DefaultServer
 	}
 	opts, err := c.GetDialOptions()
 	if err != nil {
