@@ -92,6 +92,12 @@ func NewWireGuardOptions() WireGuardOptions {
 	}
 }
 
+// SetKey is a convenience method for setting a preloaded key to these wireguard options
+// so that calls to LoadKey will return the preloaded key.
+func (o *WireGuardOptions) SetKey(key crypto.PrivateKey) {
+	o.loaded = key
+}
+
 // BindFlags binds the flags.
 func (o *WireGuardOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.IntVar(&o.ListenPort, prefix+"listen-port", o.ListenPort, "The port to listen on.")

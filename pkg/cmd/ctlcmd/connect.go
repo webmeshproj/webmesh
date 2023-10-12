@@ -70,15 +70,24 @@ var connectCmd = &cobra.Command{
 			user = &cmdconfig.UserConfig{}
 		}
 		if cluster == nil {
-			cluster = &cmdconfig.ClusterConfig{}
+			cluster = &cmdconfig.ClusterConfig{
+				Server:        cmdconfig.DefaultServer,
+				TLSSkipVerify: true,
+			}
+		} else if cluster.Server == "" {
+			cluster.Server = cmdconfig.DefaultServer
 		}
 		if user.IDAuthPrivateKey != "" {
 			key, err = crypto.DecodePrivateKey(user.IDAuthPrivateKey)
+			if err != nil {
+				return err
+			}
+			connectWireGuardOpts.SetKey(key)
 		} else {
 			key, err = connectWireGuardOpts.LoadKey(cmd.Context())
-		}
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
 		log := logging.NewLogger(connectLogLevel, connectLogFormat)
 		ctx := context.WithLogger(cmd.Context(), log)
