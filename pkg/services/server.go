@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"reflect"
 	"sync"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -47,6 +48,31 @@ type MeshServer interface {
 	Shutdown(ctx context.Context) error
 }
 
+// MeshServers is a list of MeshServers.
+type MeshServers []MeshServer
+
+// GetByType iterates the list of given servers and returns
+// one of the given type.
+func (s MeshServers) GetByType(t any) (MeshServer, bool) {
+	for _, srv := range s {
+		if reflect.TypeOf(srv) == reflect.TypeOf(t) {
+			return srv, true
+		}
+	}
+	return nil, false
+}
+
+// GetByType is a generic function that can be used to search for the
+// given server and automatically convert it to the given type.
+func GetByType[T any](srvs MeshServers, t T) (T, bool) {
+	srv, ok := srvs.GetByType(t)
+	if !ok {
+		var out T
+		return out, false
+	}
+	return srv.(T), true
+}
+
 // Options contains the configuration for the gRPC server.
 type Options struct {
 	// DisableGRPC disables the gRPC server and only runs the MeshServers.
@@ -59,7 +85,12 @@ type Options struct {
 	// any registered authentication mechanisms.
 	ServerOptions []grpc.ServerOption
 	// Servers are additional servers to manage alongside the gRPC server.
-	Servers []MeshServer
+	Servers MeshServers
+}
+
+// GetServer returns the server of the given type.
+func (o *Options) GetServer(typ any) (MeshServer, bool) {
+	return o.Servers.GetByType(typ)
 }
 
 // Server is the gRPC server.

@@ -422,6 +422,8 @@ type MeshDNSOptions struct {
 	RequestTimeout time.Duration `koanf:"request-timeout,omitempty"`
 	// Forwarders are the DNS forwarders to use. If empty, the system DNS servers will be used.
 	Forwarders []string `koanf:"forwarders,omitempty"`
+	// IncludeSystemResolvers includes the system DNS servers in the forwarders list if it is non-empty.
+	IncludeSystemResolvers bool `koanf:"include-system-resolvers,omitempty"`
 	// SubscribeForwarders will subscribe to new nodes that are able to forward requests for other meshes.
 	// These forwarders will be placed at the bottom of the forwarders list.
 	SubscribeForwarders bool `koanf:"subscribe-forwarders,omitempty"`
@@ -436,17 +438,18 @@ type MeshDNSOptions struct {
 // NewMeshDNSOptions returns a new MeshDNSOptions with the default values.
 func NewMeshDNSOptions() MeshDNSOptions {
 	return MeshDNSOptions{
-		Enabled:             false,
-		ListenUDP:           meshdns.DefaultListenUDP,
-		ListenTCP:           meshdns.DefaultListenTCP,
-		ReusePort:           0,
-		EnableCompression:   true,
-		RequestTimeout:      time.Second * 5,
-		Forwarders:          nil,
-		SubscribeForwarders: false,
-		DisableForwarding:   false,
-		CacheSize:           100,
-		IPv6Only:            false,
+		Enabled:                false,
+		ListenUDP:              meshdns.DefaultListenUDP,
+		ListenTCP:              meshdns.DefaultListenTCP,
+		ReusePort:              0,
+		EnableCompression:      true,
+		RequestTimeout:         time.Second * 5,
+		Forwarders:             nil,
+		IncludeSystemResolvers: false,
+		SubscribeForwarders:    false,
+		DisableForwarding:      false,
+		CacheSize:              100,
+		IPv6Only:               false,
 	}
 }
 
@@ -459,6 +462,7 @@ func (m *MeshDNSOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&m.EnableCompression, prefix+"compression", m.EnableCompression, "Enable DNS compression.")
 	fl.DurationVar(&m.RequestTimeout, prefix+"request-timeout", m.RequestTimeout, "DNS request timeout.")
 	fl.StringSliceVar(&m.Forwarders, prefix+"forwarders", m.Forwarders, "DNS forwarders (default = system resolvers).")
+	fl.BoolVar(&m.IncludeSystemResolvers, prefix+"include-system-resolvers", m.IncludeSystemResolvers, "Include system resolvers in any provided forwarders list.")
 	fl.BoolVar(&m.SubscribeForwarders, prefix+"subscribe-forwarders", m.SubscribeForwarders, "Subscribe to new nodes that can forward requests.")
 	fl.BoolVar(&m.DisableForwarding, prefix+"disable-forwarding", m.DisableForwarding, "Disable forwarding requests.")
 	fl.IntVar(&m.CacheSize, prefix+"cache-size", m.CacheSize, "Size of the remote DNS cache (0 = disabled).")
@@ -812,14 +816,15 @@ func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.No
 	// Append the enabled mesh services
 	if o.MeshDNS.Enabled {
 		dnsServer := meshdns.NewServer(ctx, &meshdns.Options{
-			UDPListenAddr:     o.MeshDNS.ListenUDP,
-			TCPListenAddr:     o.MeshDNS.ListenTCP,
-			ReusePort:         o.MeshDNS.ReusePort,
-			Compression:       o.MeshDNS.EnableCompression,
-			RequestTimeout:    o.MeshDNS.RequestTimeout,
-			Forwarders:        o.MeshDNS.Forwarders,
-			DisableForwarding: o.MeshDNS.DisableForwarding,
-			CacheSize:         o.MeshDNS.CacheSize,
+			UDPListenAddr:          o.MeshDNS.ListenUDP,
+			TCPListenAddr:          o.MeshDNS.ListenTCP,
+			ReusePort:              o.MeshDNS.ReusePort,
+			Compression:            o.MeshDNS.EnableCompression,
+			RequestTimeout:         o.MeshDNS.RequestTimeout,
+			Forwarders:             o.MeshDNS.Forwarders,
+			IncludeSystemResolvers: o.MeshDNS.IncludeSystemResolvers,
+			DisableForwarding:      o.MeshDNS.DisableForwarding,
+			CacheSize:              o.MeshDNS.CacheSize,
 		})
 		// Automatically register the local domain
 		err := dnsServer.RegisterDomain(meshdns.DomainOptions{

@@ -60,6 +60,9 @@ type Options struct {
 	// Forwaders are the DNS forwarders to use. If empty,
 	// the system DNS servers will be used.
 	Forwarders []string
+	// IncludeSystemResolvers includes the system DNS
+	// servers in the forwarders list if it is non-empty.
+	IncludeSystemResolvers bool
 	// DisableForwarding disables forwarding requests to the
 	// configured forwarders.
 	DisableForwarding bool
@@ -87,9 +90,9 @@ func NewServer(ctx context.Context, o *Options) *Server {
 		}
 	}
 	forwarders := o.Forwarders
-	if len(forwarders) == 0 && !o.DisableForwarding {
+	if (len(forwarders) == 0 || o.IncludeSystemResolvers) && !o.DisableForwarding {
 		syscfg := dnsutil.GetSystemConfig()
-		forwarders = syscfg.Servers
+		forwarders = append(forwarders, syscfg.Servers...)
 	}
 	srv.extforwarders = append(srv.extforwarders, forwarders...)
 	return srv
@@ -108,6 +111,47 @@ type Server struct {
 	log            *slog.Logger
 	subCancels     []func()
 	mu             sync.RWMutex
+}
+
+// UpsertForwarder upserts a forwarder into the static forwarders list.
+func (s *Server) UpsertForwarder(forwarder string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, fwd := range s.extforwarders {
+		if fwd == forwarder {
+			return
+		}
+	}
+	s.extforwarders = append(s.extforwarders, forwarder)
+}
+
+// PushForwarder pushes a forwarder to the front of the static forwarders list.
+func (s *Server) PushForwarder(forwarder string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, fwd := range s.extforwarders {
+		if fwd == forwarder {
+			if i == 0 {
+				return
+			}
+			s.extforwarders = append(s.extforwarders[:i], s.extforwarders[i+1:]...)
+			s.extforwarders = append([]string{forwarder}, s.extforwarders...)
+			return
+		}
+	}
+	s.extforwarders = append([]string{forwarder}, s.extforwarders...)
+}
+
+// RemoveForwarder removes a forwarder from the static forwarders list.
+func (s *Server) RemoveForwarder(forwarder string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, fwd := range s.extforwarders {
+		if fwd == forwarder {
+			s.extforwarders = append(s.extforwarders[:i], s.extforwarders[i+1:]...)
+			return
+		}
+	}
 }
 
 type cacheKey struct {
