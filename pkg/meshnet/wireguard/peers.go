@@ -194,26 +194,33 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 		}
 		// If this is a default IPv4 gateway route set the system default route
-		if addr.Is4() && addr.IsUnspecified() && ones == 0 && !w.opts.DisableIPv4 && !w.opts.DisableFullTunnel && !w.changedGateway {
-			w.log.Debug("Setting default IPv4 gateway", slog.String("prefix", prefix.String()))
-			var err error
-			if w.opts.NetNs != "" {
-				err = system.DoInNetNS(w.opts.NetNs, func() error {
-					return routes.SetDefaultIPv4Gateway(ctx, routes.Gateway{
+		if addr.Is4() && addr.IsUnspecified() && ones == 0 {
+			if w.opts.DisableFullTunnel {
+				w.log.Debug("Skipping setting default IPv4 gateway", slog.String("prefix", prefix.String()))
+				continue
+			}
+			if !w.opts.DisableIPv4 && !w.changedGateway {
+				w.log.Debug("Setting default IPv4 gateway", slog.String("prefix", prefix.String()))
+				var err error
+				if w.opts.NetNs != "" {
+					err = system.DoInNetNS(w.opts.NetNs, func() error {
+						return routes.SetDefaultIPv4Gateway(ctx, routes.Gateway{
+							Name: w.Name(),
+							Addr: w.AddressV4().Addr(),
+						})
+					})
+				} else {
+					err = routes.SetDefaultIPv4Gateway(ctx, routes.Gateway{
 						Name: w.Name(),
 						Addr: w.AddressV4().Addr(),
 					})
-				})
-			} else {
-				err = routes.SetDefaultIPv4Gateway(ctx, routes.Gateway{
-					Name: w.Name(),
-					Addr: w.AddressV4().Addr(),
-				})
+				}
+				if err != nil {
+					return fmt.Errorf("failed to set default IPv4 gateway: %w", err)
+				}
+				w.changedGateway = true
+				continue
 			}
-			if err != nil {
-				return fmt.Errorf("failed to set default IPv4 gateway: %w", err)
-			}
-			w.changedGateway = true
 		}
 		// Add any other routes
 		if prefix.Addr().Is4() && !w.opts.DisableIPv4 {
