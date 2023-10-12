@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -39,6 +40,7 @@ var (
 	connectDisableIPv6   bool
 	connectLogLevel      string
 	connectLogFormat     string
+	connectTimeout       time.Duration
 )
 
 func init() {
@@ -52,6 +54,7 @@ func init() {
 	connectFlags.BoolVar(&connectDisableIPv6, "disable-ipv6", false, "Disable IPv6")
 	connectFlags.StringVar(&connectLogLevel, "log-level", "info", "Log level for the connection")
 	connectFlags.StringVar(&connectLogFormat, "log-format", "text", "Log format for the connection, text or json")
+	connectFlags.DurationVar(&connectTimeout, "timeout", 30*time.Second, "Timeout for connecting to the mesh")
 	rootCmd.AddCommand(connectCmd)
 }
 
@@ -79,77 +82,97 @@ var connectCmd = &cobra.Command{
 		}
 		log := logging.NewLogger(connectLogLevel, connectLogFormat)
 		ctx := context.WithLogger(cmd.Context(), log)
-		node, err := embed.NewNode(ctx, embed.Options{
-			Config: &config.Config{
-				Global: config.GlobalOptions{
-					LogLevel:  connectLogLevel,
-					LogFormat: connectLogFormat,
-				},
-				WireGuard: connectWireGuardOpts,
-				Discovery: connectDiscoveryOpts,
-				Auth: config.AuthOptions{
-					IDAuth: config.IDAuthOptions{
-						Enabled: user.IDAuthPrivateKey != "",
-					},
-					MTLS: config.MTLSOptions{
-						CertData: user.ClientCertificateData,
-						KeyData:  user.ClientKeyData,
-					},
-					Basic: config.BasicAuthOptions{
-						Username: user.BasicAuthUsername,
-						Password: user.BasicAuthPassword,
-					},
-					LDAP: config.LDAPAuthOptions{
-						Username: user.LDAPUsername,
-						Password: user.LDAPPassword,
-					},
-				},
-				Mesh: config.MeshOptions{
-					JoinAddress:                 cluster.Server,
-					MaxJoinRetries:              5,
-					UseMeshDNS:                  connectUseDNS,
-					DisableIPv4:                 connectDisableIPv4,
-					DisableIPv6:                 connectDisableIPv6,
-					DisableFeatureAdvertisement: true,
-					DisableDefaultIPAM:          true,
-				},
-				TLS: config.TLSOptions{
-					CAData:             cluster.CertificateAuthorityData,
-					VerifyChainOnly:    cluster.TLSVerifyChainOnly,
-					InsecureSkipVerify: cluster.TLSSkipVerify,
-					Insecure:           cluster.Insecure,
-				},
-				Storage: config.StorageOptions{
-					InMemory:  true,
-					Provider:  string(config.StorageProviderPassThrough),
-					LogLevel:  connectLogLevel,
-					LogFormat: connectLogFormat,
-				},
-				Services: config.ServiceOptions{
-					API: config.APIOptions{Disabled: true},
-				},
-			},
-			Key: key,
-		})
+		cancel := func() {}
+		if connectTimeout > 0 {
+			ctx, cancel = context.WithTimeout(ctx, connectTimeout)
+		} else {
+			ctx, cancel = context.WithCancel(ctx)
+		}
+		node, err := embed.NewNode(ctx, newEmbedOptions(user, cluster, key))
 		if err != nil {
 			return err
 		}
-		err = node.Start(cmd.Context())
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			defer cancel()
+			select {
+			case <-sig:
+				cmd.Println("Received interrupt, cancelling connection...")
+			case <-ctx.Done():
+			}
+		}()
+		err = node.Start(ctx)
 		if err != nil {
 			return err
 		}
+		cancel()
 		defer func() {
-			err = node.Stop(cmd.Context())
+			err = node.Stop(context.Background())
 			if err != nil {
 				cmd.PrintErr(err)
 			}
 		}()
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 		select {
 		case <-sig:
 		case <-cmd.Context().Done():
 		}
+		cmd.Println("Terminating connection...")
 		return nil
 	},
+}
+
+func newEmbedOptions(user *cmdconfig.UserConfig, cluster *cmdconfig.ClusterConfig, key crypto.PrivateKey) embed.Options {
+	return embed.Options{
+		Config: &config.Config{
+			Global: config.GlobalOptions{
+				LogLevel:  connectLogLevel,
+				LogFormat: connectLogFormat,
+			},
+			WireGuard: connectWireGuardOpts,
+			Discovery: connectDiscoveryOpts,
+			Auth: config.AuthOptions{
+				IDAuth: config.IDAuthOptions{
+					Enabled: user.IDAuthPrivateKey != "",
+				},
+				MTLS: config.MTLSOptions{
+					CertData: user.ClientCertificateData,
+					KeyData:  user.ClientKeyData,
+				},
+				Basic: config.BasicAuthOptions{
+					Username: user.BasicAuthUsername,
+					Password: user.BasicAuthPassword,
+				},
+				LDAP: config.LDAPAuthOptions{
+					Username: user.LDAPUsername,
+					Password: user.LDAPPassword,
+				},
+			},
+			Mesh: config.MeshOptions{
+				JoinAddress:                 cluster.Server,
+				MaxJoinRetries:              5,
+				UseMeshDNS:                  connectUseDNS,
+				DisableIPv4:                 connectDisableIPv4,
+				DisableIPv6:                 connectDisableIPv6,
+				DisableFeatureAdvertisement: true,
+				DisableDefaultIPAM:          true,
+			},
+			TLS: config.TLSOptions{
+				CAData:             cluster.CertificateAuthorityData,
+				VerifyChainOnly:    cluster.TLSVerifyChainOnly,
+				InsecureSkipVerify: cluster.TLSSkipVerify,
+				Insecure:           cluster.Insecure,
+			},
+			Storage: config.StorageOptions{
+				InMemory:  true,
+				Provider:  string(config.StorageProviderPassThrough),
+				LogLevel:  connectLogLevel,
+				LogFormat: connectLogFormat,
+			},
+			Services: config.ServiceOptions{
+				API: config.APIOptions{Disabled: true},
+			},
+		},
+		Key: key,
+	}
 }
