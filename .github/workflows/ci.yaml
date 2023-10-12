@@ -132,6 +132,20 @@ jobs:
           version: latest
           args: release --clean --fail-fast --parallelism=${{ env.BUILD_PARALLELISM }}
 
+      - name: Update AUR Packages
+        shell: bash
+        if: ${{ vars.BUILD_PLATFORM == 'self-hosted' && startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -ex
+          git clone ssh://aur@aur.archlinux.org/webmesh-git.git
+          git clone ssh://aur@aur.archlinux.org/webmesh-bin.git
+          cd webmesh-git
+          make all publish
+          cd ../webmesh-bin
+          make all publish
+
   build-containers:
     name: Build Containers
     runs-on: ${{ vars.BUILD_PLATFORM == '' && 'ubuntu-latest' || vars.BUILD_PLATFORM }}
