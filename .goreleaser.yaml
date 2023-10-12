@@ -198,8 +198,6 @@ brews:
 signs:
   - id: checksum
     cmd: cosign
-    env:
-      - COSIGN_EXPERIMENTAL=1
     args:
       - "sign-blob"
       - "--yes"
@@ -208,18 +206,20 @@ signs:
       - "--output-certificate=${signature}.cert"
       - "${artifact}"
     artifacts: checksum
+    env:
+      - COSIGN_EXPERIMENTAL=1
 
   - id: packages
-    artifacts: package
     cmd: gpg2
     stdin: '{{ .Env.GPG_PASSWORD }}'
-    args: [
-      "-u", "{{ .Env.GPG_KEY_ID }}", 
-      "--output", "${signature}", 
-      "--passphrase-file", "/dev/stdin",
-      "--pinentry", "loopback",
-      "--detach-sign", "${artifact}",
-    ]
+    args:
+      - "--local-user={{ .Env.GPG_KEY_ID }}"
+      - "--passphrase-file=/dev/stdin"
+      - "--pinentry=loopback"
+      - "--output=${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+    artifacts: package
     ids:
       - webmesh-arch
 
