@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"net/netip"
 
 	v1 "github.com/webmeshproj/api/v1"
 
@@ -111,6 +112,22 @@ func FilterByIsPublic() PeerFilter {
 func FilterByZoneID(zoneID string) PeerFilter {
 	return func(node types.MeshNode) bool {
 		return node.GetZoneAwarenessID() == zoneID
+	}
+}
+
+// FilterByIPv4Prefix returns a new filter that matches nodes whose private IPv4
+// address is in a given prefix.
+func FilterByIPv4Prefix(prefix netip.Prefix) PeerFilter {
+	return func(node types.MeshNode) bool {
+		return prefix.Contains(node.PrivateAddrV4().Addr())
+	}
+}
+
+// FilterByIPv6Prefix returns a new filter that matches nodes whose private IPv6
+// address is in a given prefix.
+func FilterByIPv6Prefix(prefix netip.Prefix) PeerFilter {
+	return func(node types.MeshNode) bool {
+		return prefix.Contains(node.PrivateAddrV6().Addr())
 	}
 }
 
