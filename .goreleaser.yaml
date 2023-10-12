@@ -36,24 +36,6 @@ builds:
       - mipsle
       - mips
 
-  # - id: node-wasm
-  #   main: cmd/webmesh-wasm/main.go
-  #   binary: webmesh-wasm
-  #   env:
-  #     - CGO_ENABLED=0
-  #   tags:
-  #     - osusergo
-  #     - netgo
-  #   ldflags:
-  #     - -s -w 
-  #     - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
-  #     - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
-  #     - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
-  #   goos:
-  #     - js
-  #   goarch:
-  #     - wasm
-
   - id: wmctl
     main: cmd/wmctl/main.go
     binary: wmctl
@@ -142,18 +124,33 @@ nfpms:
       - deb
       - rpm
       - apk
-      - archlinux
     recommends:
       - wireguard-tools
-    archlinux:
-      packager: Avi Zimmerman <avi.zimmerman@gmail.com>
-      pkgbase: webmesh
     overrides:
       rpm:
         dependencies:
           - elrepo-release
           - epel-release
           - kmod-wireguard
+
+  - id: webmesh-arch
+    maintainer: Avi Zimmerman <avi.zimmerman@gmail.com>
+    description: Webmesh is a service mesh for the web
+    homepage: https://webmeshproj.github.io
+    license: Apache 2.0
+    builds:
+      - node
+      - wmctl
+    formats:
+      - archlinux
+    recommends:
+      - wireguard-tools
+    conflicts:
+      - webmesh-git
+      - webmesh-bin
+    archlinux:
+      packager: Avi Zimmerman <avi.zimmerman@gmail.com>
+      pkgbase: webmesh
 
 brews:
   - ids: [webmesh]
@@ -199,7 +196,8 @@ brews:
         source #{fish_completion}/wmctl.fish
 
 signs:
-  - cmd: cosign
+  - id: checksum
+    cmd: cosign
     env:
       - COSIGN_EXPERIMENTAL=1
     args:
@@ -210,6 +208,20 @@ signs:
       - "--output-certificate=${signature}.cert"
       - "${artifact}"
     artifacts: checksum
+
+  - id: packages
+    artifacts: package
+    cmd: gpg2
+    stdin: '{{ .Env.GPG_PASSWORD }}'
+    args: [
+      "-u", "{{ .Env.GPG_KEY_ID }}", 
+      "--output", "${signature}", 
+      "--passphrase-file", "/dev/stdin",
+      "--pinentry", "loopback",
+      "--detach-sign", "${artifact}",
+    ]
+    ids:
+      - webmesh-arch
 
 changelog:
   sort: asc
@@ -223,6 +235,7 @@ release:
     name: webmesh
   ids:
     - webmesh
+    - webmesh-arch
   extra_files:
     - glob: dist/*.sig
     - glob: dist/*.sig.cert
