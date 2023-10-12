@@ -1,0 +1,56 @@
+name: Build Alpine Base Images
+on:
+  workflow_dispatch:
+    inputs:
+      alpine-version:
+        description: "Alpine version to build"
+        required: true
+        default: "3.18"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/webmeshproj/alpine
+  COSIGN_EXPERIMENTAL: 1
+  DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
+
+jobs:
+  build:
+    name: Build Alpine Base Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "write"
+      id-token: "write"
+      packages: "write"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@main
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build Images
+        uses: docker/build-push-action@v5
+        id: build
+        with:
+          context: .
+          file: Dockerfile.alpine
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ inputs.alpine-version }}
+          platforms: ${{ env.DOCKER_PLATFORMS }}
+          build-args: ALPINE_VERSION=${{ inputs.alpine-version }}
+
+      - name: Sign Images
+        run: cosign sign --yes --recursive ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}

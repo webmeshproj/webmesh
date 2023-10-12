@@ -1,0 +1,6 @@
+# This Dockerfile produces an alpine image with a small set of network
+# utilities included that are useful for debugging.
+ARG ALPINE_VERSION=3.18
+FROM alpine:${ALPINE_VERSION}
+
+RUN apk add --update --no-cache wireguard-tools net-tools nftables iproute2
