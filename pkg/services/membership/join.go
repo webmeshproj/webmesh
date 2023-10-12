@@ -117,38 +117,35 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 		}
 	}
 
-	// Check that the node is indeed who they say they are
-	if s.rbac.IsSecure() {
-		// We can go ahead and check here if the node is allowed to do what
-		// they want.
-		var actions rbac.Actions
-		if req.GetAsVoter() {
-			actions = append(actions, canVoteAction)
+	// We can go ahead and check here if the node is allowed to do what
+	// they want.
+	var actions rbac.Actions
+	if req.GetAsVoter() {
+		actions = append(actions, canVoteAction)
+	}
+	if req.GetAsObserver() {
+		// Technically, voters are also observers, but we check it for now
+		// for consistency.
+		actions = append(actions, canObserveAction)
+	}
+	if len(req.GetRoutes()) > 0 {
+		actions = append(actions, canPutRouteAction)
+	}
+	if len(req.GetDirectPeers()) > 0 {
+		for peer := range req.GetDirectPeers() {
+			actions = append(actions, canPutEdgeAction.For(peer))
 		}
-		if req.GetAsObserver() {
-			// Technically, voters are also observers, but we check it for now
-			// for consistency.
-			actions = append(actions, canObserveAction)
+	}
+	if len(actions) > 0 {
+		allowed, err := s.rbac.Evaluate(ctx, actions)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to evaluate permissions: %v", err)
 		}
-		if len(req.GetRoutes()) > 0 {
-			actions = append(actions, canPutRouteAction)
-		}
-		if len(req.GetDirectPeers()) > 0 {
-			for peer := range req.GetDirectPeers() {
-				actions = append(actions, canPutEdgeAction.For(peer))
-			}
-		}
-		if len(actions) > 0 {
-			allowed, err := s.rbac.Evaluate(ctx, actions)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to evaluate permissions: %v", err)
-			}
-			if !allowed {
-				s.log.Warn("Node not allowed to perform requested actions",
-					slog.String("id", req.GetId()),
-					slog.Any("actions", actions))
-				return nil, status.Error(codes.PermissionDenied, "not allowed")
-			}
+		if !allowed {
+			s.log.Warn("Node not allowed to perform requested actions",
+				slog.String("id", req.GetId()),
+				slog.Any("actions", actions))
+			return nil, status.Error(codes.PermissionDenied, "not allowed")
 		}
 	}
 
