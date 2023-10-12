@@ -118,6 +118,9 @@ jobs:
       - name: Run Snapshot Release
         uses: goreleaser/goreleaser-action@v5
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PASSWORD: ${{ secrets.GPG_PASSWORD }}
         with:
           version: latest
           args: release --snapshot --clean --fail-fast --parallelism=${{ env.BUILD_PARALLELISM }}
