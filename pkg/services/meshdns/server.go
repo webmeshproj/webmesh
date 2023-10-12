@@ -154,6 +154,13 @@ func (s *Server) RemoveForwarder(forwarder string) {
 	}
 }
 
+// ReplaceForwarders replaces the static forwarders list with the given list.
+func (s *Server) ReplaceForwarders(forwarders []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.extforwarders = forwarders
+}
+
 type cacheKey struct {
 	qname string
 	qtype uint16
