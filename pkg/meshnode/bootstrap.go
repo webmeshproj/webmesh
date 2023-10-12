@@ -85,21 +85,23 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	bootstrapOpts := storage.BootstrapOptions{
 		MeshDomain:           opts.Bootstrap.MeshDomain,
 		IPv4Network:          opts.Bootstrap.IPv4Network,
+		IPv6Network:          opts.Bootstrap.IPv6Network,
 		Admin:                opts.Bootstrap.Admin,
 		DefaultNetworkPolicy: opts.Bootstrap.DefaultNetworkPolicy,
 		BootstrapNodes:       append(opts.Bootstrap.Servers, s.ID().String()),
 		Voters:               opts.Bootstrap.Voters,
 		DisableRBAC:          opts.Bootstrap.DisableRBAC,
 	}
+	s.log.Debug("Bootstrapping mesh database", slog.Any("params", bootstrapOpts))
 	results, err := storage.Bootstrap(ctx, s.Storage().MeshDB(), bootstrapOpts)
 	if err != nil {
 		return fmt.Errorf("bootstrap database: %w", err)
 	}
 	s.meshDomain = results.MeshDomain
 	s.log.Info("Bootstrapped webmesh cluster database",
-		slog.String("ipv4-network", opts.Bootstrap.IPv4Network),
+		slog.String("ipv4-network", results.NetworkV4.String()),
 		slog.String("ipv6-network", results.NetworkV6.String()),
-		slog.String("mesh-domain", s.meshDomain),
+		slog.String("mesh-domain", results.MeshDomain),
 	)
 
 	// If we have routes configured, add them to the db
@@ -152,7 +154,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	if !s.opts.DisableIPv4 {
 		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
 			NodeID: s.ID().String(),
-			Subnet: opts.Bootstrap.IPv4Network,
+			Subnet: results.NetworkV4.String(),
 		})
 		if err != nil {
 			return fmt.Errorf("allocate IPv4 address: %w", err)

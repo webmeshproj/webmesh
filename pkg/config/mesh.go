@@ -240,12 +240,10 @@ func (o *Config) NewMeshConfig(ctx context.Context, key crypto.PrivateKey) (conf
 		}
 	}
 	conf = meshnode.Config{
-		Credentials:             []grpc.DialOption{},
 		Key:                     key,
 		HeartbeatPurgeThreshold: o.Storage.Raft.HeartbeatPurgeThreshold,
 		ZoneAwarenessID:         o.Mesh.ZoneAwarenessID,
 		UseMeshDNS:              o.Mesh.UseMeshDNS,
-		LocalMeshDNSAddr:        "",
 		DisableIPv4:             o.Mesh.DisableIPv4,
 		DisableIPv6:             o.Mesh.DisableIPv6,
 		DisableDefaultIPAM:      o.Mesh.DisableDefaultIPAM,
@@ -448,6 +446,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 		bootstrap = &meshnode.BootstrapOptions{
 			Transport:            rt,
 			IPv4Network:          o.Bootstrap.IPv4Network,
+			IPv6Network:          o.Bootstrap.IPv6Network,
 			MeshDomain:           o.Bootstrap.MeshDomain,
 			Admin:                o.Bootstrap.Admin,
 			Servers:              bootstrapServers,

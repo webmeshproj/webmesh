@@ -120,6 +120,9 @@ type BootstrapOptions struct {
 	// IPv4Network is the IPv4 Network to use for the mesh. Defaults to
 	// DefaultIPv4Network.
 	IPv4Network string
+	// IPv6Network is the IPv6 Network to use for the mesh. Defaults to
+	// a randomly generated /32 prefix.
+	IPv6Network string
 	// MeshDomain is the domain of the mesh network. Defaults to
 	// DefaultMeshDomain.
 	MeshDomain string
@@ -142,6 +145,7 @@ type BootstrapOptions struct {
 func (b BootstrapOptions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"ipv4Network":          b.IPv4Network,
+		"ipv6Network":          b.IPv6Network,
 		"meshDomain":           b.MeshDomain,
 		"admin":                b.Admin,
 		"servers":              b.Servers,

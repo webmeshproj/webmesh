@@ -52,6 +52,9 @@ type BootstrapOptions struct {
 	MeshDomain string
 	// IPv4Network is the IPv4 prefix.
 	IPv4Network string
+	// IPv6Network is the IPv6 prefix. If left unset,
+	// one will be generated.
+	IPv6Network string
 	// Admin is the admin node ID.
 	Admin string
 	// DefaultNetworkPolicy is the default network policy.
@@ -122,10 +125,22 @@ func Bootstrap(ctx context.Context, db MeshDB, opts BootstrapOptions) (results B
 		err = fmt.Errorf("parse IPv4 network: %w", err)
 		return
 	}
-	results.NetworkV6, err = netutil.GenerateULA()
-	if err != nil {
-		err = fmt.Errorf("generate ULA: %w", err)
-		return
+	if opts.IPv6Network != "" {
+		results.NetworkV6, err = netip.ParsePrefix(opts.IPv6Network)
+		if err != nil {
+			err = fmt.Errorf("parse IPv6 network: %w", err)
+			return
+		}
+		if results.NetworkV6.Bits() != netutil.DefaultULABits {
+			err = fmt.Errorf("IPv6 network must be /%d", netutil.DefaultULABits)
+			return
+		}
+	} else {
+		results.NetworkV6, err = netutil.GenerateULA()
+		if err != nil {
+			err = fmt.Errorf("generate ULA: %w", err)
+			return
+		}
 	}
 
 	// Initialize the network state

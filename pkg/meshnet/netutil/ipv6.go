@@ -31,6 +31,15 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
+const (
+	// DefaultULABits are the default bits used for the IPv6 address
+	// space of the network.
+	DefaultULABits = 32
+	// DefaultNodeBits are the default bits used for the IPv6 address
+	// space of each node.
+	DefaultNodeBits = 112
+)
+
 // GenerateULA generates a unique local address with a /32 prefix
 // according to RFC 4193. The network is returned as a netip.Prefix.
 func GenerateULA() (netip.Prefix, error) {
@@ -55,7 +64,7 @@ func GenerateULAWithSeed(psk []byte) netip.Prefix {
 	// for client addresses
 	ip = append(ip, make([]byte, 10)...)
 	addr, _ := netip.AddrFromSlice(ip)
-	return netip.PrefixFrom(addr, 32)
+	return netip.PrefixFrom(addr, DefaultULABits)
 }
 
 // GenerateULAWithKey generates a unique local address with a /32 prefix
@@ -81,7 +90,7 @@ func AssignToPrefix(prefix netip.Prefix, publicKey crypto.PublicKey) netip.Prefi
 	// Set the client ID to the first 8 bytes of the hash
 	copy(ip[6:], data[:8])
 	addr, _ := netip.AddrFromSlice(ip)
-	return netip.PrefixFrom(addr, 112)
+	return netip.PrefixFrom(addr, DefaultNodeBits)
 }
 
 // AssignMulticastGroup assigns a multicast group to two or more public keys.
@@ -98,7 +107,7 @@ func AssignMulticastGroup(keys ...crypto.PublicKey) netip.Prefix {
 	// Set the first 8 bytes of the hash to the multicast group ID
 	copy(group[2:], data[:8])
 	addr, _ := netip.AddrFromSlice(group)
-	return netip.PrefixFrom(addr, 112)
+	return netip.PrefixFrom(addr, DefaultNodeBits)
 }
 
 // RandomAddress returns a random /128 address within a /112 prefix.
