@@ -45,12 +45,12 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	}
 	if s.opts.DisableForwarding {
 		// We're not forwarding, so return NXDOMAIN
-		s.log.Debug("handling request with forwarding disabled")
+		s.log.Debug("Handling request with forwarding disabled")
 		m := s.newMsg(meshDomain{}, r)
 		s.writeMsg(w, r, m, dns.RcodeNameError)
 		return
 	}
-	s.log.Debug("handling forward lookup")
+	s.log.Debug("Handling forward lookup")
 	if len(s.extforwarders) == 0 && len(s.meshforwarders) == 0 {
 		// If there are no forwarders, return a NXDOMAIN
 		s.log.Debug("forward request with no forwarders configured")
@@ -82,10 +82,17 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		// If this is a CHAOS query, only use the mesh forwarders
 		forwarders = s.meshforwarders
 	} else {
-		// Otherwise, inspect the domain to see if it's a mesh domain.
-		// TODO: This is a super ugly hack assuming everyone ends in
-		// .internal. Really this should be enforced by the mesh somehow.
-		if strings.HasSuffix(strings.TrimSuffix(q.Name, "."), ".internal") {
+		var isMeshDomain bool
+		for _, mux := range s.meshmuxes {
+			if strings.HasSuffix(strings.TrimSuffix(q.Name, "."), strings.TrimSuffix(mux.domain, ".")) {
+				// We technically know the exact forwarder to try first.
+				// But we also support duplicate domains, so we'll just
+				// prioritize mesh forwarders.
+				isMeshDomain = true
+				break
+			}
+		}
+		if isMeshDomain {
 			// Prioritize mesh forwarders
 			forwarders = append(s.meshforwarders, s.extforwarders...)
 		} else {
@@ -134,7 +141,8 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		}
 		// If the forwarder returned NXDOMAIN, try the next forwarder
 	}
-	// If all forwarders returned NXDOMAIN, return NXDOMAIN
-	m := s.newMsg(meshDomain{}, r)
+	// If all forwarders returned NXDOMAIN, return NXDOMAIN with our first
+	// registered mesh as the SOA.
+	m := s.newMsg(s.meshmuxes[0].meshes[0], r)
 	s.writeMsg(w, r, m, dns.RcodeNameError)
 }

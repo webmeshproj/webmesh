@@ -86,10 +86,10 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 			return
 		}
 		s.writeMsg(w, r, m, dns.RcodeSuccess)
+		return
 	}
-	// NXDOMAIN
-	m := s.newMsg(s.meshes[0], r) // TODO: Match the NS record to our ID where the request came from
-	s.writeMsg(w, r, m, dns.RcodeNameError)
+	// Fall down to the default handler
+	s.handleDefault(ctx, w, r)
 }
 
 func (s *meshLookupMux) handleLeaderLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
