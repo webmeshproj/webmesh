@@ -43,6 +43,8 @@ var (
 
 func init() {
 	connectFlags := connectCmd.Flags()
+	// Make full-tunnel opt-in for the connect command.
+	connectWireGuardOpts.DisableFullTunnel = true
 	connectWireGuardOpts.BindFlags("wireguard.", connectFlags)
 	connectDiscoveryOpts.BindFlags("discovery.", connectFlags)
 	connectFlags.BoolVar(&connectUseDNS, "use-mesh-dns", false, "Configure the system to use MeshDNS")
