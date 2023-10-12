@@ -39,7 +39,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/services"

@@ -14,30 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
-
-import (
-	"fmt"
-	"strconv"
-	"strings"
-)
-
-// ParsePortRange parses a port range string.
-func ParsePortRange(s string) (start int, end int, err error) {
-	spl := strings.Split(s, "-")
-	if len(spl) > 2 {
-		return 0, 0, fmt.Errorf("invalid port range: %s", s)
-	}
-	start, err = strconv.Atoi(spl[0])
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid port range: %s", s)
-	}
-	end = start
-	if len(spl) == 2 {
-		end, err = strconv.Atoi(spl[1])
-		if err != nil {
-			return 0, 0, fmt.Errorf("invalid port range: %s", s)
-		}
-	}
-	return start, end, nil
-}
+// package netutil provides common utility functions for networking.
+package netutil

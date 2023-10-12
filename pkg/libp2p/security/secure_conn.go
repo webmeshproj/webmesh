@@ -35,7 +35,7 @@ import (
 	wgcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
-	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
 

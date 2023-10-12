@@ -38,8 +38,8 @@ import (
 	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
 	"github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
-	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
