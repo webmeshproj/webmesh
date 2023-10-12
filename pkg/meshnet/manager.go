@@ -79,6 +79,8 @@ type Options struct {
 	DisableIPv4 bool
 	// DisableIPv6 disables IPv6 on the interface.
 	DisableIPv6 bool
+	// DisableFullTunnel will ignore routes for a default gateway.
+	DisableFullTunnel bool
 	// Relays are options for when presented with the need to negotiate
 	// p2p data channels.
 	Relays RelayOptions
@@ -256,6 +258,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		NetworkV6:           opts.NetworkV6,
 		DisableIPv4:         m.opts.DisableIPv4,
 		DisableIPv6:         m.opts.DisableIPv6,
+		DisableFullTunnel:   m.opts.DisableFullTunnel,
 	}
 	log.Debug("Configuring wireguard", slog.Any("opts", wgopts))
 	m.wg, err = wireguard.New(ctx, wgopts)

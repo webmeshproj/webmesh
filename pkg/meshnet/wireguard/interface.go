@@ -115,6 +115,8 @@ type Options struct {
 	DisableIPv4 bool
 	// DisableIPv6 disables IPv6 on the interface.
 	DisableIPv6 bool
+	// DisableFullTunnel will ignore routes for a default gateway.
+	DisableFullTunnel bool
 }
 
 type wginterface struct {

@@ -194,7 +194,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			}
 		}
 		// If this is a default IPv4 gateway route set the system default route
-		if addr.Is4() && addr.IsUnspecified() && ones == 0 && !w.opts.DisableIPv4 && !w.changedGateway {
+		if addr.Is4() && addr.IsUnspecified() && ones == 0 && !w.opts.DisableIPv4 && !w.opts.DisableFullTunnel && !w.changedGateway {
 			w.log.Debug("Setting default IPv4 gateway", slog.String("prefix", prefix.String()))
 			var err error
 			if w.opts.NetNs != "" {

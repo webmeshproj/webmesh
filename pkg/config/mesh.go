@@ -529,6 +529,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 			LocalDNSAddr:          localDNSAddr,
 			DisableIPv4:           o.Mesh.DisableIPv4,
 			DisableIPv6:           o.Mesh.DisableIPv6,
+			DisableFullTunnel:     o.WireGuard.DisableFullTunnel,
 			Relays: meshnet.RelayOptions{
 				Host: o.Discovery.HostOptions(ctx, conn.Key()),
 			},

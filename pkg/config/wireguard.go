@@ -65,6 +65,8 @@ type WireGuardOptions struct {
 	RecordMetrics bool `koanf:"record-metrics,omitempty"`
 	// RecordMetricsInterval is the interval at which to update WireGuard metrics.
 	RecordMetricsInterval time.Duration `koanf:"record-metrics-interval,omitempty"`
+	// DisableFullTunnel will ignore routes for a default gateway.
+	DisableFullTunnel bool `koanf:"disable-full-tunnel,omitempty"`
 
 	// loaded is an already loaded key from the configuration.
 	loaded crypto.PrivateKey `koanf:"-"`
@@ -86,6 +88,7 @@ func NewWireGuardOptions() WireGuardOptions {
 		KeyRotationInterval:   time.Hour * 24 * 7,
 		RecordMetrics:         false,
 		RecordMetricsInterval: time.Second * 10,
+		DisableFullTunnel:     false,
 	}
 }
 
@@ -104,6 +107,7 @@ func (o *WireGuardOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.DurationVar(&o.KeyRotationInterval, prefix+"key-rotation-interval", o.KeyRotationInterval, "The interval to rotate wireguard keys. Set this to 0 to disable key rotation.")
 	fs.BoolVar(&o.RecordMetrics, prefix+"record-metrics", o.RecordMetrics, "Record WireGuard metrics. These are only exposed if the metrics server is enabled.")
 	fs.DurationVar(&o.RecordMetricsInterval, prefix+"record-metrics-interval", o.RecordMetricsInterval, "The interval at which to update WireGuard metrics.")
+	fs.BoolVar(&o.DisableFullTunnel, prefix+"disable-full-tunnel", o.DisableFullTunnel, "Ignore routes for a default gateway.")
 }
 
 // Validate validates the options.
