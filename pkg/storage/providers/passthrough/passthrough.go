@@ -190,9 +190,11 @@ func (p *Consensus) GetPeers(context.Context) ([]*v1.StoragePeer, error) {
 // GetLeader returns the leader of the storage group.
 func (p *Consensus) GetLeader(context.Context) (*v1.StoragePeer, error) {
 	status := p.Status()
+	p.log.Debug("Checking peers for leader", "peers", status.GetPeers())
 	var leader *v1.StoragePeer
 	for _, peer := range status.GetPeers() {
 		if peer.GetClusterStatus() == v1.ClusterStatus_CLUSTER_LEADER {
+			p.log.Debug("Found leader", "leader", peer)
 			leader = peer
 			break
 		}
