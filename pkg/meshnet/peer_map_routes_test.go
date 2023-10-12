@@ -17,6 +17,7 @@ limitations under the License.
 package meshnet
 
 import (
+	"net/netip"
 	"reflect"
 	"sort"
 	"testing"
@@ -163,6 +164,19 @@ func TestWireGuardPeersWithRoutes(t *testing.T) {
 			ctx := context.Background()
 			db := meshdb.NewTestDB()
 			defer db.Close()
+			// Set the network state
+			err := db.MeshState().SetIPv4Prefix(ctx, netip.MustParsePrefix("172.16.0.0/16"))
+			if err != nil {
+				t.Fatalf("set ipv4 prefix: %v", err)
+			}
+			err = db.MeshState().SetIPv6Prefix(ctx, netip.MustParsePrefix("2001:db8::/64"))
+			if err != nil {
+				t.Fatalf("set ipv6 prefix: %v", err)
+			}
+			err = db.MeshState().SetMeshDomain(ctx, "example.com")
+			if err != nil {
+				t.Fatalf("set mesh domain: %v", err)
+			}
 			for _, peer := range tc.peers {
 				peer.PublicKey = mustGeneratePublicKey(t)
 				if err := db.Peers().Put(ctx, peer); err != nil {
@@ -186,7 +200,7 @@ func TestWireGuardPeersWithRoutes(t *testing.T) {
 				}
 			}
 			// Create an allow-all ACL
-			err := db.Networking().PutNetworkACL(ctx, types.NetworkACL{
+			err = db.Networking().PutNetworkACL(ctx, types.NetworkACL{
 				NetworkACL: &v1.NetworkACL{
 					Name:             "allow-all",
 					Priority:         0,

@@ -85,6 +85,10 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 	log := context.LoggerFrom(ctx).With("source-peer", peerID)
 	graph := st.Peers().Graph()
 	nw := st.Networking()
+	nwState, err := st.MeshState().GetMeshState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get mesh state: %w", err)
+	}
 	adjacencyMap, err := FilterGraph(ctx, st, peerID)
 	if err != nil {
 		return nil, fmt.Errorf("filter adjacency map: %w", err)
@@ -171,6 +175,24 @@ func WireGuardPeersFor(ctx context.Context, st storage.MeshDB, peerID types.Node
 			}
 		}
 		out = append(out, peer.WireGuardPeer)
+	}
+	if len(out) == 1 {
+		// If there is only one peer, we can flatten the internal network routes
+		// to a single route.
+		// TODO: Smarter IPv4 assignments could make this possible for multiple peers.
+		peer := out[0]
+		newAllowedIPs := []string{
+			nwState.NetworkV4().String(),
+			nwState.NetworkV6().String(),
+		}
+		for _, allowedIP := range peer.AllowedIPs {
+			// The address was validated when it was added to the allowed IPs.
+			addr := netip.MustParsePrefix(allowedIP)
+			if !nwState.NetworkV4().Contains(addr.Addr()) && !nwState.NetworkV6().Contains(addr.Addr()) {
+				newAllowedIPs = append(newAllowedIPs, allowedIP)
+			}
+		}
+		peer.AllowedIPs = newAllowedIPs
 	}
 	return out, nil
 }
