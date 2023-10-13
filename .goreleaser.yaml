@@ -15,8 +15,11 @@ builds:
     tags:
       - osusergo
       - netgo
+    flags:
+      - -trimpath
     ldflags:
-      - -s -w 
+      - -s 
+      - -w 
       - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
       - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
       - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
@@ -44,8 +47,11 @@ builds:
     tags:
       - osusergo
       - netgo
+    flags:
+      - -trimpath
     ldflags:
-      - -s -w 
+      - -s 
+      - -w 
       - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
       - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
       - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
@@ -73,8 +79,11 @@ builds:
     tags:
       - osusergo
       - netgo
+    flags:
+      - -trimpath
     ldflags:
-      - -s -w 
+      - -s 
+      - -w 
       - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
       - -X github.com/webmeshproj/webmesh/pkg/version.Commit={{.Commit}}
       - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
@@ -87,6 +96,14 @@ builds:
       - '386'
       - ppc64le
       - s390x
+
+upx:
+  - ids: [node, wmctl, node-docker-linux]
+    enabled: true
+    compress: best
+    lzma: true
+    goos: [linux]
+    goarch: [amd64, arm64, arm, '386', ppc64le, mipsle, mips]
 
 checksum:
   name_template: 'checksums.txt'
