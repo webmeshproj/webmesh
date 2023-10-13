@@ -60,6 +60,31 @@ func addServers(_ string, servers []netip.AddrPort) error {
 	return nil
 }
 
+func addSearchDomains(_ string, domains []string) error {
+	current, err := readResolvConfHead()
+	if err != nil {
+		return err
+	}
+	f, err := os.Create("/etc/resolv.conf.head")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	// Write the new search domains
+	for _, domain := range domains {
+		_, err = f.WriteString("search " + domain + "\n")
+		if err != nil {
+			return err
+		}
+	}
+	// Write the rest of the file
+	_, err = f.Write(current)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func removeServers(_ string, servers []netip.AddrPort) error {
 	// Create a new resolvconf file, removing the servers
 	// if encountered
@@ -108,6 +133,63 @@ Lines:
 				for _, server := range servers {
 					if addrport == server {
 						continue Lines
+					}
+				}
+				_, err = f.WriteString(line + "\n")
+				if err != nil {
+					return err
+				}
+			}
+		default:
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return err
+	}
+	return nil
+}
+
+func removeSearchDomains(_ string, domains []string) error {
+	// Create a new resolvconf file, removing the domains
+	// if encountered
+	current, err := readResolvConfHead()
+	if err != nil {
+		return err
+	}
+	f, err := os.Create("/etc/resolv.conf.head")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(strings.NewReader(string(current)))
+
+Lines:
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
+			// comment.
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 1 {
+			continue
+		}
+		switch fields[0] {
+		case "search":
+			if len(fields) > 1 {
+				for _, domain := range domains {
+					for _, field := range fields[1:] {
+						if domain == field {
+							continue Lines
+						}
 					}
 				}
 				_, err = f.WriteString(line + "\n")

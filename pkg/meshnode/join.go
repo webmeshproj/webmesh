@@ -144,6 +144,10 @@ func (s *meshStore) handleJoinResponse(ctx context.Context, opts ConnectOptions,
 		if err != nil {
 			log.Error("Failed to add DNS servers", slog.String("error", err.Error()))
 		}
+		err = s.nw.DNS().AddSearchDomains(ctx, []string{resp.GetMeshDomain()})
+		if err != nil {
+			log.Error("Failed to add DNS search domains", slog.String("error", err.Error()))
+		}
 	}
 	return nil
 }

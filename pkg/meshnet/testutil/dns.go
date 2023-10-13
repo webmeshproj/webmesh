@@ -24,7 +24,8 @@ import (
 
 // DNSManager is a mock dns manager.
 type DNSManager struct {
-	servers []netip.AddrPort
+	servers       []netip.AddrPort
+	searchDomains []string
 }
 
 // Resolver returns a net.Resolver that can be used to resolve DNS names.
@@ -35,6 +36,12 @@ func (d *DNSManager) Resolver() *net.Resolver {
 // AddServers adds the given dns servers to the system configuration.
 func (d *DNSManager) AddServers(ctx context.Context, servers []netip.AddrPort) error {
 	d.servers = append(d.servers, servers...)
+	return nil
+}
+
+// AddServers adds the given dns servers to the system configuration.
+func (d *DNSManager) AddSearchDomains(ctx context.Context, domains []string) error {
+	d.searchDomains = append(d.searchDomains, domains...)
 	return nil
 }
 

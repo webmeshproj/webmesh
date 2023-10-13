@@ -50,6 +50,22 @@ func addServers(iface string, servers []netip.AddrPort) error {
 	return nil
 }
 
+func addSearchDomains(iface string, domains []string) error {
+	// Just use netsh
+	for i, domain := range domains {
+		args := []string{
+			"interface", "ip", "add", "dnsserver", iface,
+			fmt.Sprintf("search=%s", domain),
+			fmt.Sprintf("index=%d", i),
+		}
+		cmd := exec.Command("netsh", args...)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func removeServers(iface string, servers []netip.AddrPort) error {
 	// Just use netsh
 	for _, server := range servers {
@@ -60,6 +76,21 @@ func removeServers(iface string, servers []netip.AddrPort) error {
 		args := []string{
 			"interface", family, "delete", "dnsserver", iface,
 			fmt.Sprintf("address=%s", server.Addr().String()),
+		}
+		cmd := exec.Command("netsh", args...)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeSearchDomains(iface string, domains []string) error {
+	// Just use netsh
+	for _, domain := range domains {
+		args := []string{
+			"interface", "ip", "delete", "dnsserver", iface,
+			fmt.Sprintf("search=%s", domain),
 		}
 		cmd := exec.Command("netsh", args...)
 		if err := cmd.Run(); err != nil {

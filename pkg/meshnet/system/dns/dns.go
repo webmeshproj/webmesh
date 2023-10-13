@@ -73,3 +73,15 @@ func AddServers(iface string, servers []netip.AddrPort) error {
 func RemoveServers(iface string, servers []netip.AddrPort) error {
 	return removeServers(iface, servers)
 }
+
+// AddSearchDomains adds DNS search domains to the system configuration. On Windows
+// the interface name is required.
+func AddSearchDomains(iface string, domains []string) error {
+	return addSearchDomains(iface, domains)
+}
+
+// RemoveSearchDomains removes DNS search domains from the system configuration. On Windows
+// the interface name is required.
+func RemoveSearchDomains(iface string, domains []string) error {
+	return removeSearchDomains(iface, domains)
+}

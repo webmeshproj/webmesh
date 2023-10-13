@@ -399,7 +399,7 @@ func (m *manager) Close(ctx context.Context) error {
 	if m.fw != nil {
 		// Clear the firewall rules after wireguard is shutdown
 		defer func() {
-			log.Debug("clearing firewall rules")
+			log.Debug("Clearing firewall rules")
 			if err := m.fw.Clear(ctx); err != nil {
 				log.Error("error clearing firewall rules", slog.String("error", err.Error()))
 			}
@@ -407,15 +407,22 @@ func (m *manager) Close(ctx context.Context) error {
 	}
 	if m.dns != nil {
 		if len(m.dns.dnsservers) > 0 {
-			log.Debug("removing DNS servers", slog.Any("servers", m.dns.dnsservers))
+			log.Debug("Removing DNS servers", slog.Any("servers", m.dns.dnsservers))
 			err := dns.RemoveServers(m.wg.Name(), m.dns.dnsservers)
 			if err != nil {
 				log.Error("error removing DNS servers", slog.String("error", err.Error()))
 			}
 		}
+		if len(m.dns.searchdomains) > 0 {
+			log.Debug("Removing DNS search domains", slog.Any("domains", m.dns.searchdomains))
+			err := dns.RemoveSearchDomains(m.wg.Name(), m.dns.searchdomains)
+			if err != nil {
+				log.Error("error removing DNS search domains", slog.String("error", err.Error()))
+			}
+		}
 	}
 	if m.wg != nil {
-		log.Debug("closing wireguard interface")
+		log.Debug("Closing wireguard interface")
 		err := m.wg.Close(ctx)
 		if err != nil {
 			return fmt.Errorf("close wireguard: %w", err)

@@ -37,6 +37,8 @@ type DNSManager interface {
 	Resolver() *net.Resolver
 	// AddServers adds the given dns servers to the system configuration.
 	AddServers(ctx context.Context, servers []netip.AddrPort) error
+	// AddSearchDomains adds the given search domains to the system configuration.
+	AddSearchDomains(ctx context.Context, domains []string) error
 	// RefreshServers checks which peers in the database are offering DNS
 	// and updates the system configuration accordingly.
 	RefreshServers(ctx context.Context) error
@@ -47,6 +49,7 @@ type dnsManager struct {
 	storage        storage.MeshDB
 	localdnsaddr   netip.AddrPort
 	dnsservers     []netip.AddrPort
+	searchdomains  []string
 	noIPv4, noIPv6 bool
 	mu             sync.RWMutex
 }
@@ -84,6 +87,19 @@ func (m *dnsManager) AddServers(ctx context.Context, servers []netip.AddrPort) e
 		return fmt.Errorf("add dns servers: %w", err)
 	}
 	m.dnsservers = append(m.dnsservers, servers...)
+	return nil
+}
+
+// AddSearchDomains adds the given search domains to the system configuration.
+func (m *dnsManager) AddSearchDomains(ctx context.Context, domains []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	context.LoggerFrom(ctx).Debug("Configuring DNS search domains", slog.Any("domains", domains))
+	err := dns.AddSearchDomains(m.wg.Name(), domains)
+	if err != nil {
+		return fmt.Errorf("add dns search domains: %w", err)
+	}
+	m.searchdomains = append(m.searchdomains, domains...)
 	return nil
 }
 
