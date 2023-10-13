@@ -70,6 +70,11 @@ func addSearchDomains(_ string, domains []string) error {
 		return err
 	}
 	defer f.Close()
+	// Write the original file to the head
+	_, err = f.Write(current)
+	if err != nil {
+		return err
+	}
 	// Write the new search domains
 	for _, domain := range domains {
 		_, err = f.WriteString("search " + domain + "\n")
@@ -77,8 +82,8 @@ func addSearchDomains(_ string, domains []string) error {
 			return err
 		}
 	}
-	// Write the rest of the file
-	_, err = f.Write(current)
+	// Allow one ndots (this should be configurable)
+	_, err = f.WriteString("options ndots:1\n")
 	if err != nil {
 		return err
 	}
@@ -193,6 +198,20 @@ Lines:
 					}
 				}
 				_, err = f.WriteString(line + "\n")
+				if err != nil {
+					return err
+				}
+			}
+		case "options":
+			// Remove ndots
+			var newOptions []string
+			for _, opt := range fields[1:] {
+				if !strings.HasPrefix(opt, "ndots:") {
+					newOptions = append(newOptions, opt)
+				}
+			}
+			if len(newOptions) > 0 {
+				_, err = f.WriteString("options " + strings.Join(newOptions, " ") + "\n")
 				if err != nil {
 					return err
 				}
