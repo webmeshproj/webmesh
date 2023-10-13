@@ -25,7 +25,6 @@ import (
 	mrand "math/rand"
 	"net"
 	"net/netip"
-	"sort"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -34,13 +33,13 @@ import (
 const (
 	// DefaultULABits are the default bits used for the IPv6 address
 	// space of the network.
-	DefaultULABits = 32
+	DefaultULABits = 48
 	// DefaultNodeBits are the default bits used for the IPv6 address
 	// space of each node.
 	DefaultNodeBits = 112
 )
 
-// GenerateULA generates a unique local address with a /32 prefix
+// GenerateULA generates a unique local address with a /48 prefix
 // according to RFC 4193. The network is returned as a netip.Prefix.
 func GenerateULA() (netip.Prefix, error) {
 	secret, err := generateLocalSecret()
@@ -50,7 +49,7 @@ func GenerateULA() (netip.Prefix, error) {
 	return GenerateULAWithSeed(secret), nil
 }
 
-// GenerateULAWithSeed generates a unique local address with a /32 prefix
+// GenerateULAWithSeed generates a unique local address with a /48 prefix
 // using a seed value. The network is returned as a netip.Prefix.
 func GenerateULAWithSeed(psk []byte) netip.Prefix {
 	sha := sha256.New()
@@ -67,7 +66,7 @@ func GenerateULAWithSeed(psk []byte) netip.Prefix {
 	return netip.PrefixFrom(addr, DefaultULABits)
 }
 
-// GenerateULAWithKey generates a unique local address with a /32 prefix
+// GenerateULAWithKey generates a unique local address with a /48 prefix
 // using the key bytes as a seed. The network is returned as a netip.Prefix.
 // It then computes another /112 prefix for the given public key's wireguard key.
 // It returns the /112 prefix as the first /128 address within it.
@@ -77,8 +76,8 @@ func GenerateULAWithKey(key crypto.PublicKey) (netip.Prefix, netip.Addr) {
 	return prefix, addr.Addr()
 }
 
-// AssignToPrefix assigns a /112 prefix within a /32 prefix using a public key.
-// It does not check that the given prefix is a valid /32 prefix.
+// AssignToPrefix assigns a /112 prefix within a /48 prefix using a public key.
+// It does not check that the given prefix is a valid /48 prefix.
 func AssignToPrefix(prefix netip.Prefix, publicKey crypto.PublicKey) netip.Prefix {
 	// Convert the prefix to a slice
 	ip := prefix.Addr().AsSlice()
@@ -91,41 +90,6 @@ func AssignToPrefix(prefix netip.Prefix, publicKey crypto.PublicKey) netip.Prefi
 	copy(ip[6:], data[:8])
 	addr, _ := netip.AddrFromSlice(ip)
 	return netip.PrefixFrom(addr, DefaultNodeBits)
-}
-
-// AssignMulticastGroup assigns a multicast group to two or more public keys.
-func AssignMulticastGroup(keys ...crypto.PublicKey) netip.Prefix {
-	group := netip.MustParsePrefix("ff0e::/16").Addr().AsSlice()
-	// Take a hash of the public keys in order of their bytes
-	sorted := crypto.SortedKeys(keys)
-	sort.Sort(sorted)
-	sha := sha256.New()
-	for _, key := range sorted {
-		sha.Write(key.Bytes())
-	}
-	data := sha.Sum(nil)
-	// Set the first 8 bytes of the hash to the multicast group ID
-	copy(group[2:], data[:8])
-	addr, _ := netip.AddrFromSlice(group)
-	return netip.PrefixFrom(addr, DefaultNodeBits)
-}
-
-// RandomAddress returns a random /128 address within a /112 prefix.
-// This is typically used for picking local dialing addresses, but can
-// also be used to assign relay addresses. The function does not check
-// that the prefix is a valid /112 prefix. Addresses are not guaranteed
-// to be unique.
-func RandomAddress(prefix netip.Prefix) netip.Addr {
-	// We have the last two bytes to play with
-	ip := prefix.Addr().AsSlice()
-	// Generate a random number
-	r := mrand.New(mrand.NewSource(time.Now().UnixNano()))
-	var data [2]byte
-	binary.BigEndian.PutUint16(data[:], uint16(r.Intn(65535)))
-	// Set the last two bytes to the random number
-	copy(ip[14:], data[:])
-	addr, _ := netip.AddrFromSlice(ip)
-	return addr
 }
 
 func generateLocalSecret() ([]byte, error) {

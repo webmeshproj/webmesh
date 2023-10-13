@@ -55,7 +55,7 @@ func FuzzGenerateULA(t *testing.F) {
 		if !ula.IsValid() {
 			t.Fatalf("generated invalid ULA: %s", ula)
 		}
-		if ula.Bits() != 32 {
+		if ula.Bits() != DefaultULABits {
 			t.Fatalf("generated ULA with invalid prefix length: %s", ula)
 		}
 	})
@@ -76,7 +76,7 @@ func FuzzGenerateULAWithSeed(t *testing.F) {
 			if !prefix.IsValid() {
 				t.Fatalf("generated invalid ULA: %s", prefix)
 			}
-			if prefix.Bits() != 32 {
+			if prefix.Bits() != DefaultULABits {
 				t.Fatalf("generated ULA with invalid prefix length: %s", prefix)
 			}
 			if prefix.String() != lastPrefix.String() {
@@ -116,7 +116,7 @@ func FuzzAssignToPrefix(f *testing.F) {
 		if !prefix.IsValid() {
 			t.Fatalf("generated invalid prefix: %s", prefix)
 		}
-		if prefix.Bits() != 112 {
+		if prefix.Bits() != DefaultNodeBits {
 			t.Fatalf("generated prefix with invalid prefix length: %s", prefix)
 		}
 		if !ula.Contains(prefix.Addr()) {
@@ -141,34 +141,6 @@ func FuzzAssignToPrefix(f *testing.F) {
 		// Make sure we don't generate the same prefix for different keys
 		seen.Store(prefix, struct{}{})
 		count.Add(1)
-	})
-}
-
-func FuzzRandomAddress(t *testing.F) {
-	ula := mustGenerateULA(t)
-	seed := mustGenerateSeedKey(t)
-	key, err := crypto.ParsePublicKey(seed)
-	if err != nil {
-		t.Fatalf("failed to parse public key: %s", err)
-	}
-	prefix := AssignToPrefix(ula, key)
-	// This is a special case where we don't guarantee uniqueness,
-	// but we do guarantee that the generated address is contained
-	// within the prefix.
-	for i := 0; i <= defaultTestCount(t); i++ {
-		t.Add(string(mustGenerateSeedKey(t)))
-	}
-	t.Fuzz(func(t *testing.T, a string) {
-		// We ignore the fuzz data, but we need to consume it
-		c := io.NopCloser(strings.NewReader(a))
-		defer c.Close()
-		addr := RandomAddress(prefix)
-		if !addr.IsValid() {
-			t.Fatalf("generated invalid address: %s", addr)
-		}
-		if !prefix.Contains(addr) {
-			t.Fatalf("generated address %q not contained in prefix %q", addr.String(), prefix.String())
-		}
 	})
 }
 
