@@ -50,6 +50,10 @@ type Interface interface {
 	Down(context.Context) error
 	// Destroy destroys the interface.
 	Destroy(context.Context) error
+	// AddAddress adds the given address to the interface.
+	AddAddress(context.Context, netip.Prefix) error
+	// RemoveAddress removes the given address from the interface.
+	RemoveAddress(context.Context, netip.Prefix) error
 	// AddRoute adds a route for the given network.
 	AddRoute(context.Context, netip.Prefix) error
 	// RemoveRoute removes the route for the given network.
@@ -235,6 +239,26 @@ func (l *sysInterface) Destroy(ctx context.Context) error {
 		}
 	}
 	return l.close(ctx)
+}
+
+// AddAddress adds the given address to the interface.
+func (l *sysInterface) AddAddress(ctx context.Context, addr netip.Prefix) error {
+	if runtime.GOOS == "linux" && l.netns != "" {
+		return DoInNetNS(l.netns, func() error {
+			return link.SetInterfaceAddress(ctx, l.Name(), addr)
+		})
+	}
+	return link.SetInterfaceAddress(ctx, l.Name(), addr)
+}
+
+// RemoveAddress removes the given address from the interface.
+func (l *sysInterface) RemoveAddress(ctx context.Context, addr netip.Prefix) error {
+	if runtime.GOOS == "linux" && l.netns != "" {
+		return DoInNetNS(l.netns, func() error {
+			return link.RemoveInterfaceAddress(ctx, l.Name(), addr)
+		})
+	}
+	return link.RemoveInterfaceAddress(ctx, l.Name(), addr)
 }
 
 // AddRoute adds a route for the given network.

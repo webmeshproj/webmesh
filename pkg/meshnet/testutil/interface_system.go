@@ -36,6 +36,7 @@ type SystemInterface struct {
 	hwaddr  net.HardwareAddr
 	started bool
 	closed  bool
+	addrs   []netip.Prefix
 	routes  []netip.Prefix
 	mu      sync.Mutex
 }
@@ -104,6 +105,39 @@ func (t *SystemInterface) Destroy(context.Context) error {
 		return errors.New("interface closed")
 	}
 	t.closed = true
+	return nil
+}
+
+// AddAddress adds an address to the interface.
+func (t *SystemInterface) AddAddress(_ context.Context, addr netip.Prefix) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return errors.New("interface closed")
+	}
+	if t.Options.DisableIPv4 && addr.Addr().Is4() {
+		return nil
+	}
+	if t.Options.DisableIPv6 && addr.Addr().Is6() {
+		return nil
+	}
+	t.addrs = append(t.addrs, addr)
+	return nil
+}
+
+// RemoveAddress removes an address from the interface.
+func (t *SystemInterface) RemoveAddress(_ context.Context, addr netip.Prefix) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return errors.New("interface closed")
+	}
+	for i, a := range t.addrs {
+		if a == addr {
+			t.addrs = append(t.addrs[:i], t.addrs[i+1:]...)
+			break
+		}
+	}
 	return nil
 }
 
