@@ -312,18 +312,15 @@ func (s *meshStore) recoverWireguard(ctx context.Context) error {
 	}
 	var meshnetworkv4, meshnetworkv6 netip.Prefix
 	var err error
-	state := s.Storage().MeshDB().MeshState()
+	state, err := s.Storage().MeshDB().MeshState().GetMeshState(ctx)
+	if err != nil {
+		return fmt.Errorf("get mesh state: %w", err)
+	}
 	if !s.opts.DisableIPv6 {
-		meshnetworkv6, err = state.GetIPv6Prefix(ctx)
-		if err != nil {
-			return fmt.Errorf("get ula prefix: %w", err)
-		}
+		meshnetworkv6 = state.NetworkV6()
 	}
 	if !s.opts.DisableIPv4 {
-		meshnetworkv4, err = state.GetIPv4Prefix(ctx)
-		if err != nil {
-			return fmt.Errorf("get ipv4 prefix: %w", err)
-		}
+		meshnetworkv4 = state.NetworkV4()
 	}
 	p := s.Storage().MeshDB().Peers()
 	self, err := p.Get(ctx, s.ID())

@@ -97,6 +97,26 @@ func (s *state) SetMeshDomain(ctx context.Context, domain string) error {
 	return nil
 }
 
+func (s *state) SetMeshState(ctx context.Context, state types.NetworkState) error {
+	if state.NetworkV4().IsValid() {
+		err := s.SetIPv4Prefix(ctx, state.NetworkV4())
+		if err != nil {
+			return err
+		}
+	}
+	if state.NetworkV6().IsValid() {
+		err := s.SetIPv6Prefix(ctx, state.NetworkV6())
+		if err != nil {
+			return err
+		}
+	}
+	err := s.SetMeshDomain(ctx, state.Domain())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *state) GetMeshState(ctx context.Context) (types.NetworkState, error) {
 	state := types.NetworkState{
 		NetworkState: &v1.NetworkState{},

@@ -17,7 +17,6 @@ limitations under the License.
 package meshnet
 
 import (
-	"net/netip"
 	"reflect"
 	"sort"
 	"testing"
@@ -165,17 +164,15 @@ func TestWireGuardPeersWithRoutes(t *testing.T) {
 			db := meshdb.NewTestDB()
 			defer db.Close()
 			// Set the network state
-			err := db.MeshState().SetIPv4Prefix(ctx, netip.MustParsePrefix("172.16.0.0/16"))
+			err := db.MeshState().SetMeshState(ctx, types.NetworkState{
+				NetworkState: &v1.NetworkState{
+					NetworkV4: "172.16.0.0/12",
+					NetworkV6: "2001:db8::/64",
+					Domain:    "example.com",
+				},
+			})
 			if err != nil {
-				t.Fatalf("set ipv4 prefix: %v", err)
-			}
-			err = db.MeshState().SetIPv6Prefix(ctx, netip.MustParsePrefix("2001:db8::/64"))
-			if err != nil {
-				t.Fatalf("set ipv6 prefix: %v", err)
-			}
-			err = db.MeshState().SetMeshDomain(ctx, "example.com")
-			if err != nil {
-				t.Fatalf("set mesh domain: %v", err)
+				t.Fatalf("set network state: %v", err)
 			}
 			for _, peer := range tc.peers {
 				peer.PublicKey = mustGeneratePublicKey(t)

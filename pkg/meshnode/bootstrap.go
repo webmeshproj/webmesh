@@ -39,7 +39,7 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	// Check if the mesh network is defined
 	s.log.Debug("Checking if cluster is already bootstrapped")
 	var bootstrapped bool = true
-	_, err := s.Storage().MeshDB().MeshState().GetIPv6Prefix(ctx)
+	_, err := s.Storage().MeshDB().MeshState().GetMeshState(ctx)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("get mesh network: %w", err)

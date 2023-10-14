@@ -50,10 +50,10 @@ func TestWireGuardPeersAllowedIPs(t *testing.T) {
 			},
 			wantIPs: map[string]map[string][]string{
 				"peer1": {
-					"peer2": {"172.16.0.0/16", "2001:db8::/64"},
+					"peer2": {"172.16.0.0/12", "2001:db8::/64"},
 				},
 				"peer2": {
-					"peer1": {"172.16.0.0/16", "2001:db8::/64"},
+					"peer1": {"172.16.0.0/12", "2001:db8::/64"},
 				},
 			},
 		},
@@ -109,27 +109,27 @@ func TestWireGuardPeersAllowedIPs(t *testing.T) {
 				// Peers should have all other peers as allowed IPs via the router
 				"peer1": {
 					"router": {
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"peer2": {
 					"router": {
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"peer3": {
 					"router": {
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"peer4": {
 					"router": {
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"peer5": {
 					"router": {
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 			},
@@ -166,13 +166,13 @@ func TestWireGuardPeersAllowedIPs(t *testing.T) {
 				"site1-follower": {
 					"site1-router": {
 						// All IPs reachable via site1-router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site2-follower": {
 					"site2-router": {
 						// All IPs reachable via site2-router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 			},
@@ -259,55 +259,55 @@ func TestWireGuardPeersAllowedIPs(t *testing.T) {
 				"site1-follower-1": {
 					"site1-router": {
 						// Everyone is reachable via site 1 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site1-follower-2": {
 					"site1-router": {
 						// Everyone is reachable via site 1 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site1-follower-3": {
 					"site1-router": {
 						// Everyone is reachable via site 1 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site2-follower-1": {
 					"site2-router": {
 						// Everyone is reachable via site 2 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site2-follower-2": {
 					"site2-router": {
 						// Everyone is reachable via site 2 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site2-follower-3": {
 					"site2-router": {
 						// Everyone is reachable via site 2 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site3-follower-1": {
 					"site3-router": {
 						// Everyone is reachable via site 3 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site3-follower-2": {
 					"site3-router": {
 						// Everyone is reachable via site 3 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 				"site3-follower-3": {
 					"site3-router": {
 						// Everyone is reachable via site 3 router
-						"172.16.0.0/16", "2001:db8::/64",
+						"172.16.0.0/12", "2001:db8::/64",
 					},
 				},
 			},
@@ -321,17 +321,15 @@ func TestWireGuardPeersAllowedIPs(t *testing.T) {
 			db := meshdb.NewTestDB()
 			defer db.Close()
 			// Set the network state
-			err := db.MeshState().SetIPv4Prefix(ctx, netip.MustParsePrefix("172.16.0.0/16"))
+			err := db.MeshState().SetMeshState(ctx, types.NetworkState{
+				NetworkState: &v1.NetworkState{
+					NetworkV4: "172.16.0.0/12",
+					NetworkV6: "2001:db8::/64",
+					Domain:    "example.com",
+				},
+			})
 			if err != nil {
-				t.Fatalf("set ipv4 prefix: %v", err)
-			}
-			err = db.MeshState().SetIPv6Prefix(ctx, netip.MustParsePrefix("2001:db8::/64"))
-			if err != nil {
-				t.Fatalf("set ipv6 prefix: %v", err)
-			}
-			err = db.MeshState().SetMeshDomain(ctx, "example.com")
-			if err != nil {
-				t.Fatalf("set mesh domain: %v", err)
+				t.Fatalf("set network state: %v", err)
 			}
 			// Create an allow-all traffic policy.
 			err = db.Networking().PutNetworkACL(ctx, types.NetworkACL{NetworkACL: &v1.NetworkACL{

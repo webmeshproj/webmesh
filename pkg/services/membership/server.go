@@ -72,28 +72,19 @@ func NewServer(ctx context.Context, opts Options) *Server {
 }
 
 func (s *Server) loadMeshState(ctx context.Context) error {
-	var err error
-	state := s.storage.MeshDB().MeshState()
+	s.log.Debug("Fetching current network state")
+	state, err := s.storage.MeshDB().MeshState().GetMeshState(ctx)
+	if err != nil {
+		return fmt.Errorf("get mesh state: %w", err)
+	}
 	if !s.ipv6Prefix.IsValid() {
-		s.log.Debug("Looking up mesh IPv6 prefix")
-		s.ipv6Prefix, err = state.GetIPv6Prefix(ctx)
-		if err != nil {
-			return fmt.Errorf("lookup mesh IPv6 prefix: %w", err)
-		}
+		s.ipv6Prefix = state.NetworkV4()
 	}
 	if !s.ipv4Prefix.IsValid() {
-		s.log.Debug("Looking up mesh IPv4 prefix")
-		s.ipv4Prefix, err = state.GetIPv4Prefix(ctx)
-		if err != nil {
-			return fmt.Errorf("lookup mesh IPv4 prefix: %w", err)
-		}
+		s.ipv4Prefix = state.NetworkV6()
 	}
 	if s.meshDomain == "" {
-		s.log.Debug("Looking up mesh domain")
-		s.meshDomain, err = state.GetMeshDomain(ctx)
-		if err != nil {
-			return fmt.Errorf("lookup mesh domain: %w", err)
-		}
+		s.meshDomain = state.Domain()
 	}
 	return nil
 }

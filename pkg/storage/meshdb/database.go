@@ -143,43 +143,24 @@ type ValidatingMeshStateStore struct {
 	storage.MeshState
 }
 
-// GetIPv6Prefix returns the IPv6 prefix.
-func (v *ValidatingMeshStateStore) GetIPv6Prefix(ctx context.Context) (netip.Prefix, error) {
-	return v.MeshState.GetIPv6Prefix(ctx)
-}
-
-// SetIPv6Prefix sets the IPv6 prefix.
-func (v *ValidatingMeshStateStore) SetIPv6Prefix(ctx context.Context, prefix netip.Prefix) error {
-	if !prefix.IsValid() {
-		return fmt.Errorf("%w: %s", errors.ErrInvalidPrefix, prefix)
-	}
-	return v.MeshState.SetIPv6Prefix(ctx, prefix)
-}
-
-// GetIPv4Prefix returns the IPv4 prefix.
-func (v *ValidatingMeshStateStore) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
-	return v.MeshState.GetIPv4Prefix(ctx)
-}
-
-// SetIPv4Prefix sets the IPv4 prefix.
-func (v *ValidatingMeshStateStore) SetIPv4Prefix(ctx context.Context, prefix netip.Prefix) error {
-	if !prefix.IsValid() {
-		return fmt.Errorf("%w: %s", errors.ErrInvalidPrefix, prefix)
-	}
-	return v.MeshState.SetIPv4Prefix(ctx, prefix)
-}
-
-// GetMeshDomain returns the mesh domain.
-func (v *ValidatingMeshStateStore) GetMeshDomain(ctx context.Context) (string, error) {
-	return v.MeshState.GetMeshDomain(ctx)
-}
-
 // SetMeshDomain sets the mesh domain.
-func (v *ValidatingMeshStateStore) SetMeshDomain(ctx context.Context, domain string) error {
-	if domain == "" {
+func (v *ValidatingMeshStateStore) SetMeshState(ctx context.Context, state types.NetworkState) error {
+	if state.GetDomain() == "" {
 		return fmt.Errorf("domain can not be empty")
 	}
-	return v.MeshState.SetMeshDomain(ctx, domain)
+	if state.GetNetworkV4() != "" {
+		_, err := netip.ParsePrefix(state.GetNetworkV4())
+		if err != nil {
+			return fmt.Errorf("parse IPv4 prefix: %w", err)
+		}
+	}
+	if state.GetNetworkV6() != "" {
+		_, err := netip.ParsePrefix(state.GetNetworkV6())
+		if err != nil {
+			return fmt.Errorf("parse IPv6 prefix: %w", err)
+		}
+	}
+	return v.MeshState.SetMeshState(ctx, state)
 }
 
 // GetMeshState returns the mesh state.

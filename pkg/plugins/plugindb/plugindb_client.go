@@ -596,39 +596,7 @@ type MeshStateStore struct {
 	*PluginDataStore
 }
 
-func (st *MeshStateStore) GetIPv6Prefix(ctx context.Context) (netip.Prefix, error) {
-	state, err := st.GetMeshState(ctx)
-	if err != nil {
-		return netip.Prefix{}, err
-	}
-	return state.NetworkV6(), nil
-}
-
-func (st *MeshStateStore) SetIPv6Prefix(ctx context.Context, prefix netip.Prefix) error {
-	return errors.ErrNotStorageNode
-}
-
-func (st *MeshStateStore) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
-	state, err := st.GetMeshState(ctx)
-	if err != nil {
-		return netip.Prefix{}, err
-	}
-	return state.NetworkV4(), nil
-}
-
-func (st *MeshStateStore) SetIPv4Prefix(ctx context.Context, prefix netip.Prefix) error {
-	return errors.ErrNotStorageNode
-}
-
-func (st *MeshStateStore) GetMeshDomain(ctx context.Context) (string, error) {
-	state, err := st.GetMeshState(ctx)
-	if err != nil {
-		return "", err
-	}
-	return state.Domain(), nil
-}
-
-func (st *MeshStateStore) SetMeshDomain(ctx context.Context, domain string) error {
+func (st *MeshStateStore) SetMeshState(ctx context.Context, state types.NetworkState) error {
 	return errors.ErrNotStorageNode
 }
 

@@ -22,8 +22,11 @@ import (
 	"testing"
 	"time"
 
+	v1 "github.com/webmeshproj/api/v1"
+
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // NewMeshStateFunc is a function that creates a new MeshState implementation.
@@ -32,97 +35,70 @@ type NewMeshStateFunc func(t *testing.T) storage.MeshState
 // TestMeshStateStorageConformance tests that a MeshState implementation conforms to the interface.
 func TestMeshStateStorageConformance(t *testing.T, builder NewMeshStateFunc) {
 	ctx := context.Background()
-
 	t.Run("MeshStateConformance", func(t *testing.T) {
 		st := builder(t)
-
-		t.Run("GetSetIPv6Prefix", func(t *testing.T) {
-			// There should be no prefix set.
-			_, err := st.GetIPv6Prefix(ctx)
+		t.Run("GetSetMeshState", func(t *testing.T) {
+			// There should be no state set.
+			_, err := st.GetMeshState(ctx)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			} else if !errors.IsKeyNotFound(err) {
 				t.Fatalf("expected key not found, got %v", err)
 			}
-			// We should be able to set a prefix.
-			prefix := netip.MustParsePrefix("2001:db8::/64")
-			err = st.SetIPv6Prefix(ctx, prefix)
+			// We should be able to set the state
+			err = st.SetMeshState(ctx, types.NetworkState{
+				NetworkState: &v1.NetworkState{
+					NetworkV4: "172.16.0.0/12",
+					NetworkV6: "2001:db8::/64",
+					Domain:    "example.com",
+				},
+			})
 			if err != nil {
-				t.Fatalf("failed to set prefix: %v", err)
+				t.Fatalf("set network state: %v", err)
 			}
-			// We should eventually get the same prefix.
-			ok := Eventually[netip.Prefix](func() netip.Prefix {
-				var got netip.Prefix
-				got, err = st.GetIPv6Prefix(ctx)
-				if err != nil {
-					t.Logf("failed to get prefix: %v", err)
-				} else {
-					t.Logf("got prefix: %s", got)
-				}
-				return got
-			}).ShouldEqual(time.Second*15, time.Second, prefix)
-			if !ok {
-				t.Fatalf("failed to get same prefix back")
-			}
-		})
-
-		t.Run("GetSetIPv4Prefix", func(t *testing.T) {
-			// There should be no prefix set.
-			_, err := st.GetIPv4Prefix(ctx)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			} else if !errors.IsKeyNotFound(err) {
-				t.Fatalf("expected key not found, got %v", err)
-			}
-			// We should be able to set a prefix.
-			prefix := netip.MustParsePrefix("172.16.0.0/16")
-			err = st.SetIPv4Prefix(ctx, prefix)
-			if err != nil {
-				t.Fatalf("failed to set prefix: %v", err)
-			}
-			// We should eventually get the same prefix.
-			ok := Eventually[netip.Prefix](func() netip.Prefix {
-				var got netip.Prefix
-				got, err = st.GetIPv4Prefix(ctx)
-				if err != nil {
-					t.Logf("failed to get prefix: %v", err)
-				} else {
-					t.Logf("got prefix: %s", got)
-				}
-				return got
-			}).ShouldEqual(time.Second*15, time.Second, prefix)
-			if !ok {
-				t.Fatalf("failed to get same prefix back")
-			}
-		})
-
-		t.Run("GetSetMeshDomain", func(t *testing.T) {
-			// There should be no domain set.
-			_, err := st.GetMeshDomain(ctx)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			} else if !errors.IsKeyNotFound(err) {
-				t.Fatalf("expected key not found, got %v", err)
-			}
-			// We should be able to set a domain.
-			domain := "example.com"
-			err = st.SetMeshDomain(ctx, domain)
-			if err != nil {
-				t.Fatalf("failed to set domain: %v", err)
-			}
-			// We should eventually get the same domain.
+			// We should eventually get the same mesh domain back.
+			var got string
 			ok := Eventually[string](func() string {
-				var got string
-				got, err = st.GetMeshDomain(ctx)
+				state, err := st.GetMeshState(ctx)
 				if err != nil {
-					t.Logf("failed to get domain: %v", err)
-				} else {
-					t.Logf("got domain: %s", got)
+					t.Logf("failed to get mesh state: %v", err)
+					return ""
 				}
+				got = state.Domain()
 				return got
-			}).ShouldEqual(time.Second*15, time.Second, domain)
+			}).ShouldEqual(time.Second*15, time.Second, "example.com")
 			if !ok {
-				t.Fatalf("failed to get same domain back")
+				t.Fatalf("expected domain %q, got %q", "example.com", got)
+			}
+			// We should eventually get the same ipv4 back.
+			var gotcidr netip.Prefix
+			expected := netip.MustParsePrefix("172.16.0.0/12")
+			ok = Eventually[netip.Prefix](func() netip.Prefix {
+				state, err := st.GetMeshState(ctx)
+				if err != nil {
+					t.Logf("failed to get mesh state: %v", err)
+					return netip.Prefix{}
+				}
+				gotcidr = state.NetworkV4()
+				return gotcidr
+			}).ShouldEqual(time.Second*15, time.Second, expected)
+			if !ok {
+				t.Fatalf("expected network %s, got %s", expected, gotcidr)
+			}
+			// We should eventually get the same ipv6 back.
+			gotcidr = netip.Prefix{}
+			expected = netip.MustParsePrefix("2001:db8::/64")
+			ok = Eventually[netip.Prefix](func() netip.Prefix {
+				state, err := st.GetMeshState(ctx)
+				if err != nil {
+					t.Logf("failed to get mesh state: %v", err)
+					return netip.Prefix{}
+				}
+				gotcidr = state.NetworkV6()
+				return gotcidr
+			}).ShouldEqual(time.Second*15, time.Second, expected)
+			if !ok {
+				t.Fatalf("expected network %s, got %s", expected, gotcidr)
 			}
 		})
 	})

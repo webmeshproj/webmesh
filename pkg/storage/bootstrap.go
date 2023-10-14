@@ -96,27 +96,14 @@ func Bootstrap(ctx context.Context, db MeshDB, opts BootstrapOptions) (results B
 	}
 
 	// Check if there is data already before we start.
-	_, err = db.MeshState().GetMeshDomain(ctx)
-	if err != nil && !errors.IsKeyNotFound(err) {
+	state, err := db.MeshState().GetMeshState(ctx)
+	if err != nil && !errors.IsNotFound(err) {
 		err = fmt.Errorf("get mesh domain: %w", err)
 		return
 	} else if err == nil {
-		// Try to fetch the current prefixes and mesh domain
-		results.NetworkV4, err = db.MeshState().GetIPv4Prefix(ctx)
-		if err != nil {
-			err = fmt.Errorf("get IPv4 prefix: %w", err)
-			return
-		}
-		results.NetworkV6, err = db.MeshState().GetIPv6Prefix(ctx)
-		if err != nil {
-			err = fmt.Errorf("get IPv6 prefix: %w", err)
-			return
-		}
-		results.MeshDomain, err = db.MeshState().GetMeshDomain(ctx)
-		if err != nil {
-			err = fmt.Errorf("get mesh domain: %w", err)
-			return
-		}
+		results.NetworkV4 = state.NetworkV4()
+		results.NetworkV6 = state.NetworkV6()
+		results.MeshDomain = state.Domain()
 		return results, errors.ErrAlreadyBootstrapped
 	}
 
@@ -144,19 +131,15 @@ func Bootstrap(ctx context.Context, db MeshDB, opts BootstrapOptions) (results B
 	}
 
 	// Initialize the network state
-	err = db.MeshState().SetIPv6Prefix(ctx, results.NetworkV6)
+	err = db.MeshState().SetMeshState(ctx, meshtypes.NetworkState{
+		NetworkState: &v1.NetworkState{
+			NetworkV4: results.NetworkV4.String(),
+			NetworkV6: results.NetworkV6.String(),
+			Domain:    opts.MeshDomain,
+		},
+	})
 	if err != nil {
-		err = fmt.Errorf("set IPv6 prefix to db: %w", err)
-		return
-	}
-	err = db.MeshState().SetIPv4Prefix(ctx, results.NetworkV4)
-	if err != nil {
-		err = fmt.Errorf("set IPv4 prefix to db: %w", err)
-		return
-	}
-	err = db.MeshState().SetMeshDomain(ctx, opts.MeshDomain)
-	if err != nil {
-		err = fmt.Errorf("set mesh domain to db: %w", err)
+		err = fmt.Errorf("set network state to db: %w", err)
 		return
 	}
 

@@ -487,39 +487,7 @@ type StateStore struct {
 	*MeshDataStore
 }
 
-func (st *StateStore) GetIPv6Prefix(ctx context.Context) (netip.Prefix, error) {
-	state, err := st.GetMeshState(ctx)
-	if err != nil {
-		return netip.Prefix{}, err
-	}
-	return state.NetworkV6(), nil
-}
-
-func (st *StateStore) SetIPv6Prefix(ctx context.Context, prefix netip.Prefix) error {
-	return errors.ErrNotStorageNode
-}
-
-func (st *StateStore) GetIPv4Prefix(ctx context.Context) (netip.Prefix, error) {
-	state, err := st.GetMeshState(ctx)
-	if err != nil {
-		return netip.Prefix{}, err
-	}
-	return state.NetworkV4(), nil
-}
-
-func (st *StateStore) SetIPv4Prefix(ctx context.Context, prefix netip.Prefix) error {
-	return errors.ErrNotStorageNode
-}
-
-func (st *StateStore) GetMeshDomain(ctx context.Context) (string, error) {
-	state, err := st.GetMeshState(ctx)
-	if err != nil {
-		return "", err
-	}
-	return state.Domain(), nil
-}
-
-func (st *StateStore) SetMeshDomain(ctx context.Context, domain string) error {
+func (st *StateStore) SetMeshState(_ context.Context, _ types.NetworkState) error {
 	return errors.ErrNotStorageNode
 }
 

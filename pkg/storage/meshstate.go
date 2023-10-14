@@ -18,25 +18,14 @@ package storage
 
 import (
 	"context"
-	"net/netip"
 
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // MeshState is the interface for querying mesh state.
 type MeshState interface {
-	// GetIPv6Prefix returns the IPv6 prefix.
-	GetIPv6Prefix(ctx context.Context) (netip.Prefix, error)
-	// SetIPv6Prefix sets the IPv6 prefix.
-	SetIPv6Prefix(ctx context.Context, prefix netip.Prefix) error
-	// GetIPv4Prefix returns the IPv4 prefix.
-	GetIPv4Prefix(ctx context.Context) (netip.Prefix, error)
-	// SetIPv4Prefix sets the IPv4 prefix.
-	SetIPv4Prefix(ctx context.Context, prefix netip.Prefix) error
-	// GetMeshDomain returns the mesh domain.
-	GetMeshDomain(ctx context.Context) (string, error)
-	// SetMeshDomain sets the mesh domain.
-	SetMeshDomain(ctx context.Context, domain string) error
+	// SetMeshState sets the full mesh state.
+	SetMeshState(ctx context.Context, state types.NetworkState) error
 	// GetMeshState returns the full mesh state.
 	GetMeshState(ctx context.Context) (types.NetworkState, error)
 }
