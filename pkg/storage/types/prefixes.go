@@ -20,44 +20,44 @@ import (
 	"bytes"
 )
 
-// Prefix is a prefix in the storage.
-type Prefix []byte
+// StoragePrefix is a prefix in the storage.
+type StoragePrefix []byte
 
 var (
 	// RegistryPrefix is the prefix for all data stored in the mesh registry.
-	RegistryPrefix Prefix = []byte("/registry")
+	RegistryPrefix StoragePrefix = []byte("/registry")
 
 	// ConsensusPrefix is the prefix for all data stored related to consensus.
-	ConsensusPrefix Prefix = []byte("/raft")
+	ConsensusPrefix StoragePrefix = []byte("/raft")
 )
 
 // String returns the string representation of the prefix.
-func (p Prefix) String() string {
+func (p StoragePrefix) String() string {
 	return string(p)
 }
 
 // Contains returns true if the given key is contained in the prefix.
-func (p Prefix) Contains(key []byte) bool {
+func (p StoragePrefix) Contains(key []byte) bool {
 	return bytes.HasPrefix(key, p)
 }
 
 // For is a helper method for creating a key for the prefix.
-func (p Prefix) For(key []byte) Prefix {
-	return Prefix(bytes.Join([][]byte{p, bytes.TrimPrefix(key, []byte("/"))}, []byte("/")))
+func (p StoragePrefix) For(key []byte) StoragePrefix {
+	return StoragePrefix(bytes.Join([][]byte{p, bytes.TrimPrefix(key, []byte("/"))}, []byte("/")))
 }
 
 // ForString is a helper method for creating a key for the prefix.
-func (p Prefix) ForString(key string) Prefix {
+func (p StoragePrefix) ForString(key string) StoragePrefix {
 	return p.For([]byte(key))
 }
 
 // TrimFrom returns the key without the prefix.
-func (p Prefix) TrimFrom(key []byte) []byte {
+func (p StoragePrefix) TrimFrom(key []byte) []byte {
 	return bytes.TrimPrefix(key, append(p, '/'))
 }
 
 // ReservedPrefixes is a list of all reserved prefixes.
-var ReservedPrefixes = []Prefix{
+var ReservedPrefixes = []StoragePrefix{
 	RegistryPrefix,
 	ConsensusPrefix,
 }
