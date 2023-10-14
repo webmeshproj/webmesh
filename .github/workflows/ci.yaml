@@ -104,7 +104,7 @@ jobs:
 
       - name: Setup Build Cache
         uses: actions/cache@v3
-        if: ${{ vars.BUILD_PLATFORM == '' }}
+        if: ${{ vars.BUILD_PLATFORM != 'self-hosted' }}
         with:
           key: ${{ runner.os }}-binaries-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
           restore-keys: ${{ runner.os }}-binaries-go-${{ env.GO_VERSION }}-
