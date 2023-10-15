@@ -20,6 +20,7 @@ package meshdns
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"sync"
 	"time"
 
@@ -183,6 +184,89 @@ type DomainOptions struct {
 	SubscribeForwarders bool
 }
 
+// ListenPortUDP returns the UDP listen port.
+func (s *Server) ListenPortUDP() int {
+	if s.udpServer == nil {
+		return 0
+	}
+	return s.udpServer.PacketConn.LocalAddr().(*net.UDPAddr).Port
+}
+
+// ListenPortTCP returns the TCP listen port.
+func (s *Server) ListenPortTCP() int {
+	if s.tcpServer == nil {
+		return 0
+	}
+	return s.tcpServer.Listener.Addr().(*net.TCPAddr).Port
+}
+
+// ListenPort returns the UDP or TDP listen port in that order
+// depending on which is available.
+func (s *Server) ListenPort() int {
+	if s.ListenPortUDP() > 0 {
+		return s.ListenPortUDP()
+	}
+	return s.ListenPortTCP()
+}
+
+// ListenAndServe serves the Mesh DNS server.
+func (s *Server) ListenAndServe() error {
+	// Register the default handlers
+	s.mux.HandleFunc(".", s.contextHandler(s.handleDefault))
+	hdlr := s.validateRequest(s.denyZoneTransfers(s.mux.ServeDNS))
+	// Start the servers
+	var g errgroup.Group
+	if s.opts.UDPListenAddr != "" {
+		s.udpServer = &dns.Server{
+			Addr:    s.opts.UDPListenAddr,
+			Net:     "udp",
+			Handler: hdlr,
+		}
+		g.Go(func() error {
+			s.log.Info(fmt.Sprintf("starting meshdns udp server on %s", s.opts.UDPListenAddr))
+			return s.udpServer.ListenAndServe()
+		})
+	}
+	if s.opts.TCPListenAddr != "" {
+		s.tcpServer = &dns.Server{
+			Addr:    s.opts.TCPListenAddr,
+			Net:     "tcp",
+			Handler: hdlr,
+		}
+		g.Go(func() error {
+			s.log.Info(fmt.Sprintf("starting meshdns tcp server on %s", s.opts.UDPListenAddr))
+			return s.tcpServer.ListenAndServe()
+		})
+	}
+	return g.Wait()
+}
+
+// Shutdown shuts down the Mesh DNS server.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var closeErr error
+	for _, mux := range s.meshmuxes {
+		mux.cancel()
+	}
+	s.log.Info("Shutting down meshdns server")
+	if s.udpServer != nil {
+		if err := s.udpServer.Shutdown(); err != nil {
+			closeErr = fmt.Errorf("udp server shutdown: %w", err)
+		}
+	}
+	if s.tcpServer != nil {
+		if err := s.tcpServer.Shutdown(); err != nil {
+			if closeErr != nil {
+				closeErr = fmt.Errorf("tcp server shutdown: %w, %w", err, closeErr)
+			} else {
+				closeErr = fmt.Errorf("tcp server shutdown: %w", err)
+			}
+		}
+	}
+	return closeErr
+}
+
 // DeregisterDomain deregisters a domain from the Mesh DNS server.
 func (s *Server) DeregisterDomain(domain string) {
 	s.mu.Lock()
@@ -282,62 +366,4 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 		mux.cancels = append(mux.cancels, cancel)
 	}
 	return nil
-}
-
-// ListenAndServe serves the Mesh DNS server.
-func (s *Server) ListenAndServe() error {
-	// Register the default handlers
-	s.mux.HandleFunc(".", s.contextHandler(s.handleDefault))
-	hdlr := s.validateRequest(s.denyZoneTransfers(s.mux.ServeDNS))
-	// Start the servers
-	var g errgroup.Group
-	if s.opts.UDPListenAddr != "" {
-		s.udpServer = &dns.Server{
-			Addr:    s.opts.UDPListenAddr,
-			Net:     "udp",
-			Handler: hdlr,
-		}
-		g.Go(func() error {
-			s.log.Info(fmt.Sprintf("starting meshdns udp server on %s", s.opts.UDPListenAddr))
-			return s.udpServer.ListenAndServe()
-		})
-	}
-	if s.opts.TCPListenAddr != "" {
-		s.tcpServer = &dns.Server{
-			Addr:    s.opts.TCPListenAddr,
-			Net:     "tcp",
-			Handler: hdlr,
-		}
-		g.Go(func() error {
-			s.log.Info(fmt.Sprintf("starting meshdns tcp server on %s", s.opts.UDPListenAddr))
-			return s.tcpServer.ListenAndServe()
-		})
-	}
-	return g.Wait()
-}
-
-// Shutdown shuts down the Mesh DNS server.
-func (s *Server) Shutdown(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var closeErr error
-	for _, mux := range s.meshmuxes {
-		mux.cancel()
-	}
-	s.log.Info("Shutting down meshdns server")
-	if s.udpServer != nil {
-		if err := s.udpServer.Shutdown(); err != nil {
-			closeErr = fmt.Errorf("udp server shutdown: %w", err)
-		}
-	}
-	if s.tcpServer != nil {
-		if err := s.tcpServer.Shutdown(); err != nil {
-			if closeErr != nil {
-				closeErr = fmt.Errorf("tcp server shutdown: %w, %w", err, closeErr)
-			} else {
-				closeErr = fmt.Errorf("tcp server shutdown: %w", err)
-			}
-		}
-	}
-	return closeErr
 }
