@@ -223,17 +223,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 		s.meshmuxes = append(s.meshmuxes, mux)
 	}
 	if opts.SubscribeForwarders {
-		cancel, err := dom.storage.MeshDB().Peers().Subscribe(context.Background(), func([]types.MeshNode) {
-			peers, err := dom.storage.MeshDB().Peers().List(context.Background(), storage.FilterByFeature(v1.Feature_FORWARD_MESH_DNS))
-			if err != nil {
-				s.log.Warn("failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
-				return
-			}
-			if len(peers) == 0 {
-				return
-			}
-			s.mu.Lock()
-			defer s.mu.Unlock()
+		updateForwarders := func(peers []types.MeshNode) {
 			// Gather forwarders
 			seen := make(map[string]bool)
 			for _, peer := range peers {
@@ -262,8 +252,29 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 					newForwarders = append(newForwarders, forwarder)
 				}
 			}
-			s.log.Info("updating meshdns forwarders", slog.Any("forwarders", newForwarders))
+			s.log.Info("Updating meshdns forwarders", slog.Any("forwarders", newForwarders))
 			s.meshforwarders = newForwarders
+		}
+		// Do an initial list to pre-populate the forwarders
+		peers, err := dom.storage.MeshDB().Peers().List(context.Background(), storage.FilterByFeature(v1.Feature_FORWARD_MESH_DNS))
+		if err != nil {
+			s.log.Warn("Failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
+		}
+		if len(peers) > 0 {
+			updateForwarders(peers)
+		}
+		cancel, err := dom.storage.MeshDB().Peers().Subscribe(context.Background(), func([]types.MeshNode) {
+			peers, err := dom.storage.MeshDB().Peers().List(context.Background(), storage.FilterByFeature(v1.Feature_FORWARD_MESH_DNS))
+			if err != nil {
+				s.log.Warn("Failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
+				return
+			}
+			if len(peers) == 0 {
+				return
+			}
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			updateForwarders(peers)
 		})
 		if err != nil {
 			return fmt.Errorf("failed to subscribe to storage/meshdb: %w", err)
