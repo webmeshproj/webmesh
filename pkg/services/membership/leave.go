@@ -77,7 +77,7 @@ func (s *Server) Leave(ctx context.Context, req *v1.LeaveRequest) (*v1.LeaveResp
 
 	if leaving.PortFor(v1.Feature_STORAGE_PROVIDER) != 0 {
 		s.log.Info("Removing mesh node from storage consensus", "id", req.GetId())
-		err := s.storage.Consensus().RemovePeer(ctx, &v1.StoragePeer{Id: req.GetId()}, false)
+		err := s.storage.Consensus().RemovePeer(ctx, types.StoragePeer{StoragePeer: &v1.StoragePeer{Id: req.GetId()}}, false)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to remove raft member: %v", err)
 		}

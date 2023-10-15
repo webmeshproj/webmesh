@@ -178,17 +178,34 @@ func (p *Consensus) IsLeader() bool { return false }
 func (p *Consensus) IsMember() bool { return false }
 
 // GetPeer returns the peer with the given ID.
-func (p *Consensus) GetPeer(context.Context, string) (*v1.StoragePeer, error) {
-	return nil, errors.ErrNotStorageNode
+func (p *Consensus) GetPeer(ctx context.Context, peerID string) (types.StoragePeer, error) {
+	peers, err := p.GetPeers(ctx)
+	if err != nil {
+		return types.StoragePeer{}, err
+	}
+	for _, peer := range peers {
+		if peer.GetId() == peerID {
+			return peer, nil
+		}
+	}
+	return types.StoragePeer{}, errors.ErrNodeNotFound
 }
 
 // GetPeers returns the peers of the storage group.
-func (p *Consensus) GetPeers(context.Context) ([]*v1.StoragePeer, error) {
-	return p.Status().GetPeers(), nil
+func (p *Consensus) GetPeers(context.Context) ([]types.StoragePeer, error) {
+	peers := p.Status().GetPeers()
+	if len(peers) == 0 {
+		return nil, nil
+	}
+	out := make([]types.StoragePeer, 0, len(peers))
+	for _, peer := range peers {
+		out = append(out, types.StoragePeer{StoragePeer: peer})
+	}
+	return out, nil
 }
 
 // GetLeader returns the leader of the storage group.
-func (p *Consensus) GetLeader(context.Context) (*v1.StoragePeer, error) {
+func (p *Consensus) GetLeader(context.Context) (types.StoragePeer, error) {
 	status := p.Status()
 	p.log.Debug("Checking peers for leader", "peers", status.GetPeers())
 	var leader *v1.StoragePeer
@@ -201,29 +218,29 @@ func (p *Consensus) GetLeader(context.Context) (*v1.StoragePeer, error) {
 	}
 	if leader == nil {
 		p.log.Warn("No leader found in storage group", "status", status)
-		return nil, errors.ErrNoLeader
+		return types.StoragePeer{}, errors.ErrNoLeader
 	}
-	return leader, nil
+	return types.StoragePeer{StoragePeer: leader}, nil
 }
 
 // AddVoter adds a voter to the consensus group.
-func (p *Consensus) AddVoter(context.Context, *v1.StoragePeer) error {
+func (p *Consensus) AddVoter(context.Context, types.StoragePeer) error {
 	return errors.ErrNotStorageNode
 }
 
 // AddObserver adds an observer to the consensus group.
-func (p *Consensus) AddObserver(context.Context, *v1.StoragePeer) error {
+func (p *Consensus) AddObserver(context.Context, types.StoragePeer) error {
 	return errors.ErrNotStorageNode
 }
 
 // DemoteVoter demotes a voter to an observer.
-func (p *Consensus) DemoteVoter(context.Context, *v1.StoragePeer) error {
+func (p *Consensus) DemoteVoter(context.Context, types.StoragePeer) error {
 	return errors.ErrNotStorageNode
 }
 
 // RemovePeer removes a peer from the consensus group. If wait
 // is true, the function will wait for the peer to be removed.
-func (p *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
+func (p *Consensus) RemovePeer(ctx context.Context, peer types.StoragePeer, wait bool) error {
 	return errors.ErrNotStorageNode
 }
 

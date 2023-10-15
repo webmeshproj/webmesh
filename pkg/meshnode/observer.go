@@ -33,7 +33,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 	failedHeartBeats := make(map[raft.ServerID]int)
 	return func(ctx context.Context, ev raft.Observation) {
 		log := s.log.With("event", "observation")
-		log.Debug("received observation event", slog.String("type", reflect.TypeOf(ev.Data).String()))
+		log.Debug("Received observation event", slog.String("type", reflect.TypeOf(ev.Data).String()))
 		provider := s.Storage().(*raftstorage.Provider)
 		consensus := provider.Consensus()
 		switch data := ev.Data.(type) {
@@ -42,16 +42,16 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 				return
 			}
 			failedHeartBeats[data.PeerID]++
-			log.Debug("failed heartbeat", slog.String("peer", string(data.PeerID)), slog.Int("count", failedHeartBeats[data.PeerID]))
+			log.Debug("Failed heartbeat", slog.String("peer", string(data.PeerID)), slog.Int("count", failedHeartBeats[data.PeerID]))
 			if failedHeartBeats[data.PeerID] >= s.opts.HeartbeatPurgeThreshold && consensus.IsLeader() {
 				// Remove the peer from the cluster
-				log.Info("failed heartbeat threshold reached, removing peer", slog.String("peer", string(data.PeerID)))
-				if err := consensus.RemovePeer(ctx, &v1.StoragePeer{Id: string(data.PeerID)}, true); err != nil {
-					log.Warn("failed to remove peer", slog.String("error", err.Error()))
+				log.Info("Failed heartbeat threshold reached, removing peer", slog.String("peer", string(data.PeerID)))
+				if err := consensus.RemovePeer(ctx, types.StoragePeer{StoragePeer: &v1.StoragePeer{Id: string(data.PeerID)}}, true); err != nil {
+					log.Warn("Failed to remove peer", slog.String("error", err.Error()))
 					return
 				}
 				if err := provider.MeshDB().Peers().Delete(ctx, types.NodeID(data.PeerID)); err != nil {
-					log.Warn("failed to remove peer from database", slog.String("error", err.Error()))
+					log.Warn("Failed to remove peer from database", slog.String("error", err.Error()))
 				}
 				delete(failedHeartBeats, data.PeerID)
 			}
@@ -68,16 +68,16 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 			}
 			wgpeers, err := meshnet.WireGuardPeersFor(ctx, provider.MeshDB(), s.ID())
 			if err != nil {
-				log.Warn("failed to get wireguard peers", slog.String("error", err.Error()))
+				log.Warn("Failed to get wireguard peers", slog.String("error", err.Error()))
 			} else {
 				if err := s.nw.Peers().Refresh(ctx, wgpeers); err != nil {
-					log.Warn("wireguard refresh peers", slog.String("error", err.Error()))
+					log.Warn("Failed to refresh local wireguard peers", slog.String("error", err.Error()))
 				}
 			}
 			if s.plugins.HasWatchers() {
 				node, err := provider.MeshDB().Peers().Get(ctx, types.NodeID(data.Peer.ID))
 				if err != nil {
-					log.Warn("failed to lookup peer, can't emit event", slog.String("error", err.Error()))
+					log.Warn("Failed to lookup peer, can't emit event", slog.String("error", err.Error()))
 					return
 				}
 				err = s.plugins.Emit(ctx, &v1.Event{
@@ -92,14 +92,14 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 					},
 				})
 				if err != nil {
-					log.Warn("error sending node join/leave event", slog.String("error", err.Error()))
+					log.Warn("Error sending node join/leave event", slog.String("error", err.Error()))
 				}
 			}
 		case raft.LeaderObservation:
 			if s.plugins.HasWatchers() {
 				node, err := provider.MeshDB().Peers().Get(ctx, types.NodeID(data.LeaderID))
 				if err != nil {
-					log.Warn("failed to get leader, may be fresh cluster, can't emit event", slog.String("error", err.Error()))
+					log.Warn("Failed to get leader, may be fresh cluster, can't emit event", slog.String("error", err.Error()))
 					return
 				}
 				err = s.plugins.Emit(ctx, &v1.Event{
@@ -109,7 +109,7 @@ func (s *meshStore) newObserver() func(context.Context, raft.Observation) {
 					},
 				})
 				if err != nil {
-					log.Warn("error sending leader change event", slog.String("error", err.Error()))
+					log.Warn("Error sending leader change event", slog.String("error", err.Error()))
 				}
 			}
 		}

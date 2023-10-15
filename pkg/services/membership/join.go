@@ -347,21 +347,21 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 			if req.GetAsVoter() {
 				log.Info("Adding voter to cluster", slog.String("raft_address", storageAddress))
-				if err := s.storage.Consensus().AddVoter(ctx, &v1.StoragePeer{
+				if err := s.storage.Consensus().AddVoter(ctx, types.StoragePeer{StoragePeer: &v1.StoragePeer{
 					Id:        req.GetId(),
 					PublicKey: req.GetPublicKey(),
 					Address:   storageAddress,
-				}); err != nil {
+				}}); err != nil {
 					log.Error("Failed to add voter", slog.String("error", err.Error()))
 					return
 				}
 			} else if req.GetAsObserver() {
 				log.Info("Adding observer to cluster", slog.String("raft_address", storageAddress))
-				if err := s.storage.Consensus().AddObserver(ctx, &v1.StoragePeer{
+				if err := s.storage.Consensus().AddObserver(ctx, types.StoragePeer{StoragePeer: &v1.StoragePeer{
 					Id:        req.GetId(),
 					PublicKey: req.GetPublicKey(),
 					Address:   storageAddress,
-				}); err != nil {
+				}}); err != nil {
 					log.Error("Failed to add observer", slog.String("error", err.Error()))
 					return
 				}

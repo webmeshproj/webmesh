@@ -275,11 +275,11 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 	}
 	// We need to readd ourselves server to the cluster as a voter with the acquired raft address.
 	s.log.Info("Readmitting ourselves to the cluster with the acquired wireguard address")
-	err = s.storage.Consensus().AddVoter(ctx, &v1.StoragePeer{
+	err = s.storage.Consensus().AddVoter(ctx, types.StoragePeer{StoragePeer: &v1.StoragePeer{
 		Id:        s.nodeID,
 		PublicKey: encodedPubKey,
 		Address:   storageAddr,
-	})
+	}})
 	if err != nil {
 		return fmt.Errorf("add voter: %w", err)
 	}

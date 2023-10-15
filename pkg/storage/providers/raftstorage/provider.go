@@ -205,7 +205,7 @@ func (r *Provider) Status() *v1.StorageStatus {
 		r.log.Error("Failed to get leader", "error", err.Error())
 	}
 	status.ClusterStatus = func() v1.ClusterStatus {
-		if leader != nil && leader.GetId() == string(r.nodeID) {
+		if leader.StoragePeer != nil && leader.GetId() == string(r.nodeID) {
 			return v1.ClusterStatus_CLUSTER_LEADER
 		}
 		if r.isVoter() {
@@ -237,7 +237,7 @@ func (r *Provider) Status() *v1.StorageStatus {
 			Id:      string(server.ID),
 			Address: string(server.Address),
 			ClusterStatus: func() v1.ClusterStatus {
-				if leader != nil && server.ID == raft.ServerID(leader.GetId()) {
+				if leader.StoragePeer != nil && server.ID == raft.ServerID(leader.GetId()) {
 					return v1.ClusterStatus_CLUSTER_LEADER
 				}
 				switch server.Suffrage {

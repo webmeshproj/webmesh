@@ -25,6 +25,8 @@ import (
 
 	"github.com/hashicorp/raft"
 	v1 "github.com/webmeshproj/api/v1"
+
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Provider is a provider of MeshStorage.
@@ -88,20 +90,20 @@ type Consensus interface {
 	// StepDown should be called to relinquish leadership of the storage group.
 	StepDown(context.Context) error
 	// GetPeer returns the peer with the given ID.
-	GetPeer(context.Context, string) (*v1.StoragePeer, error)
+	GetPeer(context.Context, string) (types.StoragePeer, error)
 	// GetPeers returns the peers of the storage group.
-	GetPeers(context.Context) ([]*v1.StoragePeer, error)
+	GetPeers(context.Context) ([]types.StoragePeer, error)
 	// GetLeader returns the leader of the storage group.
-	GetLeader(context.Context) (*v1.StoragePeer, error)
+	GetLeader(context.Context) (types.StoragePeer, error)
 	// AddVoter adds a voter to the consensus group.
-	AddVoter(context.Context, *v1.StoragePeer) error
+	AddVoter(context.Context, types.StoragePeer) error
 	// AddObserver adds an observer to the consensus group.
-	AddObserver(context.Context, *v1.StoragePeer) error
+	AddObserver(context.Context, types.StoragePeer) error
 	// DemoteVoter demotes a voter to an observer.
-	DemoteVoter(context.Context, *v1.StoragePeer) error
+	DemoteVoter(context.Context, types.StoragePeer) error
 	// RemovePeer removes a peer from the consensus group. If wait
 	// is true, the function will wait for the peer to be removed.
-	RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error
+	RemovePeer(ctx context.Context, peer types.StoragePeer, wait bool) error
 }
 
 // KVSubscribeFunc is the function signature for subscribing to changes to a key.

@@ -242,7 +242,7 @@ func (ext *Consensus) StepDown(ctx context.Context) error {
 }
 
 // GetPeers returns the peers of the storage group.
-func (ext *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
+func (ext *Consensus) GetPeers(ctx context.Context) ([]types.StoragePeer, error) {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
@@ -252,45 +252,49 @@ func (ext *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get peers: %w", err)
 	}
-	return resp.GetPeers(), nil
+	out := make([]types.StoragePeer, 0, len(resp.GetPeers()))
+	for _, peer := range resp.GetPeers() {
+		out = append(out, types.StoragePeer{StoragePeer: peer})
+	}
+	return out, nil
 }
 
 // GetPeer returns the peer with the given ID.
-func (ext *Consensus) GetPeer(ctx context.Context, id string) (*v1.StoragePeer, error) {
+func (ext *Consensus) GetPeer(ctx context.Context, id string) (types.StoragePeer, error) {
 	peers, err := ext.GetPeers(ctx)
 	if err != nil {
-		return nil, err
+		return types.StoragePeer{}, err
 	}
 	for _, peer := range peers {
 		if peer.GetId() == id {
 			return peer, nil
 		}
 	}
-	return nil, errors.ErrNodeNotFound
+	return types.StoragePeer{}, errors.ErrNodeNotFound
 }
 
 // GetLeader returns the leader of the storage group.
-func (ext *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
+func (ext *Consensus) GetLeader(ctx context.Context) (types.StoragePeer, error) {
 	ext.mu.RLock()
 	defer ext.mu.RUnlock()
 	if ext.cli == nil {
-		return nil, errors.ErrClosed
+		return types.StoragePeer{}, errors.ErrClosed
 	}
 	leader, err := ext.cli.GetLeader(ctx, &v1.GetLeaderRequest{})
 	if err != nil {
-		return nil, fmt.Errorf("get leader: %w", err)
+		return types.StoragePeer{}, fmt.Errorf("get leader: %w", err)
 	}
-	return leader, nil
+	return types.StoragePeer{StoragePeer: leader}, nil
 }
 
 // AddVoter adds a voter to the consensus group.
-func (ext *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
+func (ext *Consensus) AddVoter(ctx context.Context, peer types.StoragePeer) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
 		return errors.ErrClosed
 	}
-	_, err := ext.cli.AddVoter(ctx, peer)
+	_, err := ext.cli.AddVoter(ctx, peer.StoragePeer)
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
 			return errors.ErrNotLeader
@@ -301,13 +305,13 @@ func (ext *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error 
 }
 
 // AddObserver adds an observer to the consensus group.
-func (ext *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error {
+func (ext *Consensus) AddObserver(ctx context.Context, peer types.StoragePeer) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
 		return errors.ErrClosed
 	}
-	_, err := ext.cli.AddObserver(ctx, peer)
+	_, err := ext.cli.AddObserver(ctx, peer.StoragePeer)
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
 			return errors.ErrNotLeader
@@ -318,13 +322,13 @@ func (ext *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) err
 }
 
 // DemoteVoter demotes a voter to an observer.
-func (ext *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error {
+func (ext *Consensus) DemoteVoter(ctx context.Context, peer types.StoragePeer) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
 		return errors.ErrClosed
 	}
-	_, err := ext.cli.DemoteVoter(ctx, peer)
+	_, err := ext.cli.DemoteVoter(ctx, peer.StoragePeer)
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
 			return errors.ErrNotLeader
@@ -336,13 +340,13 @@ func (ext *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) err
 
 // RemovePeer removes a peer from the consensus group. If wait
 // is true, the function will wait for the peer to be removed.
-func (ext *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
+func (ext *Consensus) RemovePeer(ctx context.Context, peer types.StoragePeer, wait bool) error {
 	ext.mu.Lock()
 	defer ext.mu.Unlock()
 	if ext.cli == nil {
 		return errors.ErrClosed
 	}
-	_, err := ext.cli.RemovePeer(ctx, peer)
+	_, err := ext.cli.RemovePeer(ctx, peer.StoragePeer)
 	if err != nil {
 		if status.Code(err) == codes.FailedPrecondition {
 			return errors.ErrNotLeader

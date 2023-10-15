@@ -197,10 +197,10 @@ func (s *Server) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateR
 		}
 		// Promote to voter
 		log.Debug("Promoting peer to voter", slog.String("storage-address", string(currentAddress)))
-		if err := s.storage.Consensus().AddVoter(ctx, &v1.StoragePeer{
+		if err := s.storage.Consensus().AddVoter(ctx, types.StoragePeer{StoragePeer: &v1.StoragePeer{
 			Id:      req.GetId(),
 			Address: currentAddress,
-		}); err != nil {
+		}}); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to promote to voter: %v", err)
 		}
 	}

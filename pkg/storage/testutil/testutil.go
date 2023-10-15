@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // DropStorage is a storage interface that can be dropped entirely.
@@ -78,7 +79,7 @@ func MustAddVoter(ctx context.Context, t *testing.T, leader, voter storage.Provi
 	if len(voterInfo) != 1 {
 		t.Fatalf("Expected voter to have one peer in voter, got %d", len(voterInfo))
 	}
-	err := leader.Consensus().AddVoter(ctx, voterInfo[0])
+	err := leader.Consensus().AddVoter(ctx, types.StoragePeer{StoragePeer: voterInfo[0]})
 	if err != nil {
 		t.Fatalf("Failed to add voter: %v", err)
 	}
@@ -92,7 +93,7 @@ func MustAddObserver(ctx context.Context, t *testing.T, leader, observer storage
 	if len(obsInfo) != 1 {
 		t.Fatalf("Expected observer to have one peer in voter, got %d", len(obsInfo))
 	}
-	err := leader.Consensus().AddObserver(ctx, obsInfo[0])
+	err := leader.Consensus().AddObserver(ctx, types.StoragePeer{StoragePeer: obsInfo[0]})
 	if err != nil {
 		t.Fatalf("Failed to add observer: %v", err)
 	}

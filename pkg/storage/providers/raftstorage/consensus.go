@@ -25,6 +25,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Ensure we satisfy the Consensus interface.
@@ -58,7 +59,7 @@ func (r *Consensus) StepDown(ctx context.Context) error {
 }
 
 // GetPeers returns the peers of the cluster.
-func (r *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
+func (r *Consensus) GetPeers(ctx context.Context) ([]types.StoragePeer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.started.Load() {
@@ -69,9 +70,9 @@ func (r *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 	if err != nil {
 		return nil, err
 	}
-	peers := make([]*v1.StoragePeer, 0, len(cfg.Servers))
+	peers := make([]types.StoragePeer, 0, len(cfg.Servers))
 	for _, srv := range cfg.Servers {
-		peers = append(peers, &v1.StoragePeer{
+		peers = append(peers, types.StoragePeer{StoragePeer: &v1.StoragePeer{
 			Id:      string(srv.ID),
 			Address: string(srv.Address),
 			ClusterStatus: func() v1.ClusterStatus {
@@ -87,54 +88,54 @@ func (r *Consensus) GetPeers(ctx context.Context) ([]*v1.StoragePeer, error) {
 					return v1.ClusterStatus_CLUSTER_NODE
 				}
 			}(),
-		})
+		}})
 	}
 	return peers, nil
 }
 
 // GetPeer returns the peer with the given ID.
-func (r *Consensus) GetPeer(ctx context.Context, id string) (*v1.StoragePeer, error) {
+func (r *Consensus) GetPeer(ctx context.Context, id string) (types.StoragePeer, error) {
 	peers, err := r.GetPeers(ctx)
 	if err != nil {
-		return nil, err
+		return types.StoragePeer{}, err
 	}
 	for _, peer := range peers {
 		if peer.GetId() == id {
 			return peer, nil
 		}
 	}
-	return nil, errors.ErrNodeNotFound
+	return types.StoragePeer{}, errors.ErrNodeNotFound
 }
 
 // GetLeader returns the leader of the cluster.
-func (r *Consensus) GetLeader(ctx context.Context) (*v1.StoragePeer, error) {
+func (r *Consensus) GetLeader(ctx context.Context) (types.StoragePeer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.started.Load() {
-		return nil, errors.ErrClosed
+		return types.StoragePeer{}, errors.ErrClosed
 	}
 	if r.IsLeader() {
 		// Fast path for leader.
-		return &v1.StoragePeer{
+		return types.StoragePeer{StoragePeer: &v1.StoragePeer{
 			Id:            string(r.nodeID),
 			Address:       string(r.Options.Transport.LocalAddr()),
 			ClusterStatus: v1.ClusterStatus_CLUSTER_LEADER,
-		}, nil
+		}}, nil
 	}
 	// Slow path for non-leaders.
 	leaderAddr, leaderID := r.raft.LeaderWithID()
 	if leaderAddr == "" && leaderID == "" {
-		return nil, errors.ErrNoLeader
+		return types.StoragePeer{}, errors.ErrNoLeader
 	}
-	return &v1.StoragePeer{
+	return types.StoragePeer{StoragePeer: &v1.StoragePeer{
 		Id:            string(leaderID),
 		Address:       string(leaderAddr),
 		ClusterStatus: v1.ClusterStatus_CLUSTER_LEADER,
-	}, nil
+	}}, nil
 }
 
 // AddVoter adds a voter to the consensus group.
-func (r *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
+func (r *Consensus) AddVoter(ctx context.Context, peer types.StoragePeer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -162,7 +163,7 @@ func (r *Consensus) AddVoter(ctx context.Context, peer *v1.StoragePeer) error {
 }
 
 // AddObserver adds an observer to the consensus group.
-func (r *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error {
+func (r *Consensus) AddObserver(ctx context.Context, peer types.StoragePeer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -190,7 +191,7 @@ func (r *Consensus) AddObserver(ctx context.Context, peer *v1.StoragePeer) error
 }
 
 // DemoteVoter demotes a voter to an observer.
-func (r *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error {
+func (r *Consensus) DemoteVoter(ctx context.Context, peer types.StoragePeer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {
@@ -218,7 +219,7 @@ func (r *Consensus) DemoteVoter(ctx context.Context, peer *v1.StoragePeer) error
 }
 
 // RemovePeer removes a peer from the consensus group.
-func (r *Consensus) RemovePeer(ctx context.Context, peer *v1.StoragePeer, wait bool) error {
+func (r *Consensus) RemovePeer(ctx context.Context, peer types.StoragePeer, wait bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.started.Load() {

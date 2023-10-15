@@ -255,13 +255,13 @@ func (s *meshStore) LeaderID() (types.NodeID, error) {
 }
 
 // getLeader returns the current network leader.
-func (s *meshStore) getLeader(ctx context.Context) (*v1.StoragePeer, error) {
+func (s *meshStore) getLeader(ctx context.Context) (types.StoragePeer, error) {
 	if s.storage == nil || !s.open.Load() {
-		return nil, ErrNotOpen
+		return types.StoragePeer{}, ErrNotOpen
 	}
 	leader, err := s.storage.Consensus().GetLeader(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get leader: %w", err)
+		return types.StoragePeer{}, fmt.Errorf("get leader: %w", err)
 	}
 	return leader, nil
 }
