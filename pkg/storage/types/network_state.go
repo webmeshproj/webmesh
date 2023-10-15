@@ -24,7 +24,9 @@ import (
 )
 
 // NetworkState wraps a NetworkState.
-type NetworkState struct{ *v1.NetworkState }
+type NetworkState struct {
+	*v1.NetworkState `json:",inline"`
+}
 
 // Proto returns the underlying protobuf.
 func (n NetworkState) Proto() *v1.NetworkState {
