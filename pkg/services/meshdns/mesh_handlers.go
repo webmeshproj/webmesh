@@ -37,7 +37,17 @@ type meshLookupMux struct {
 	domain   string
 	ipv6Only bool
 	meshes   []meshDomain
+	cancels  []context.CancelFunc
 	mu       sync.RWMutex
+}
+
+func (m *meshLookupMux) cancel() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, cancel := range m.cancels {
+		cancel()
+	}
+	m.cancels = nil
 }
 
 type meshDomain struct {

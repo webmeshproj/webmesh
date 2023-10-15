@@ -80,7 +80,6 @@ func NewServer(ctx context.Context, o *Options) *Server {
 		extforwarders:  make([]string, 0),
 		meshforwarders: make([]string, 0),
 		meshmuxes:      make([]*meshLookupMux, 0),
-		subCancels:     make([]func(), 0),
 	}
 	if srv.opts.CacheSize > 0 {
 		var err error
@@ -109,7 +108,6 @@ type Server struct {
 	meshforwarders []string
 	cache          *lru.Cache[cacheKey, cacheValue]
 	log            *slog.Logger
-	subCancels     []func()
 	mu             sync.RWMutex
 }
 
@@ -185,6 +183,19 @@ type DomainOptions struct {
 	SubscribeForwarders bool
 }
 
+// DeregisterDomain deregisters a domain from the Mesh DNS server.
+func (s *Server) DeregisterDomain(domain string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, mux := range s.meshmuxes {
+		if mux.domain == domain {
+			s.meshmuxes = append(s.meshmuxes[:i], s.meshmuxes[i+1:]...)
+			mux.cancel()
+			return
+		}
+	}
+}
+
 // RegisterDomain registers a new domain to be served by the Mesh DNS server.
 func (s *Server) RegisterDomain(opts DomainOptions) error {
 	s.mu.Lock()
@@ -198,15 +209,16 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 	// Check if we have an overlapping domain. This is not a good way to run this,
 	// but we'll support it for test cases. A flag should maybe be exposed to cause
 	// this to error.
-	var found bool
-	for _, mux := range s.meshmuxes {
-		if opts.MeshDomain == mux.domain {
-			mux.appendMesh(dom)
-			found = true
+	var mux *meshLookupMux
+	for _, mu := range s.meshmuxes {
+		if opts.MeshDomain == mu.domain {
+			mu.appendMesh(dom)
+			mux = mu
+			break
 		}
 	}
-	if !found {
-		mux := s.newMeshLookupMux(dom)
+	if mux == nil {
+		mux = s.newMeshLookupMux(dom)
 		s.mux.Handle(dom.domain, mux)
 		s.meshmuxes = append(s.meshmuxes, mux)
 	}
@@ -256,7 +268,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to subscribe to storage/meshdb: %w", err)
 		}
-		s.subCancels = append(s.subCancels, cancel)
+		mux.cancels = append(mux.cancels, cancel)
 	}
 	return nil
 }
@@ -298,8 +310,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var closeErr error
-	for _, cancel := range s.subCancels {
-		cancel()
+	for _, mux := range s.meshmuxes {
+		mux.cancel()
 	}
 	s.log.Info("Shutting down meshdns server")
 	if s.udpServer != nil {
