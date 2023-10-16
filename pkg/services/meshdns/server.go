@@ -79,7 +79,7 @@ func NewServer(ctx context.Context, o *Options) *Server {
 		opts:           o,
 		log:            log,
 		extforwarders:  make([]string, 0),
-		meshforwarders: make([]string, 0),
+		meshforwarders: make(map[string][]string),
 		meshmuxes:      make([]*meshLookupMux, 0),
 	}
 	if srv.opts.CacheSize > 0 {
@@ -106,7 +106,7 @@ type Server struct {
 	udpServer      *dns.Server
 	tcpServer      *dns.Server
 	extforwarders  []string
-	meshforwarders []string
+	meshforwarders map[string][]string
 	cache          *lru.Cache[cacheKey, cacheValue]
 	log            *slog.Logger
 	mu             sync.RWMutex
@@ -313,7 +313,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 			s.log.Warn("Failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
 		}
 		if len(peers) > 0 {
-			s.syncForwarders(peers, opts.IPv6Only)
+			s.syncForwarders(mux.domain, peers, opts.IPv6Only)
 		}
 		cancel, err := dom.storage.MeshDB().Peers().Subscribe(context.Background(), func([]types.MeshNode) {
 			peers, err := dom.storage.MeshDB().Peers().List(context.Background(), storage.FilterByFeature(v1.Feature_FORWARD_MESH_DNS))
@@ -326,7 +326,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 			}
 			s.mu.Lock()
 			defer s.mu.Unlock()
-			s.syncForwarders(peers, opts.IPv6Only)
+			s.syncForwarders(mux.domain, peers, opts.IPv6Only)
 		})
 		if err != nil {
 			return fmt.Errorf("failed to subscribe to storage/meshdb: %w", err)
@@ -336,7 +336,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 	return nil
 }
 
-func (s *Server) syncForwarders(peers []types.MeshNode, ipv6Only bool) {
+func (s *Server) syncForwarders(domain string, peers []types.MeshNode, ipv6Only bool) {
 	// Gather forwarders
 	var newForwarders []string
 	for _, peer := range peers {
@@ -347,20 +347,16 @@ func (s *Server) syncForwarders(peers []types.MeshNode, ipv6Only bool) {
 			newForwarders = append(newForwarders, peer.PrivateDNSAddrV6().String())
 		}
 	}
-	forwarders := appendIfUnique(s.meshforwarders, newForwarders...)
-	s.log.Info("Updating meshdns forwarders", slog.Any("forwarders", forwarders))
-	s.meshforwarders = forwarders
+	s.log.Info("Updating meshdns forwarders", slog.Any("forwarders", newForwarders), slog.String("domain", domain))
+	s.meshforwarders[domain] = newForwarders
 }
 
-func appendIfUnique(ss []string, newss ...string) []string {
-Iter:
-	for _, ns := range newss {
-		for _, s := range ss {
-			if s == ns {
-				continue Iter
-			}
-		}
-		ss = append(ss, ns)
+func (s *Server) allMeshForwarders() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var forwarders []string
+	for _, fwds := range s.meshforwarders {
+		forwarders = append(forwarders, fwds...)
 	}
-	return ss
+	return forwarders
 }

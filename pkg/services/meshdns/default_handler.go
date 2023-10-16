@@ -80,7 +80,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	var forwarders []string
 	if q.Qclass == dns.ClassCHAOS {
 		// If this is a CHAOS query, only use the mesh forwarders
-		forwarders = s.meshforwarders
+		forwarders = s.allMeshForwarders()
 	} else {
 		var isMeshDomain bool
 		for _, mux := range s.meshmuxes {
@@ -94,10 +94,10 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		}
 		if isMeshDomain {
 			// Prioritize mesh forwarders
-			forwarders = append(s.meshforwarders, s.extforwarders...)
+			forwarders = append(s.allMeshForwarders(), s.extforwarders...)
 		} else {
 			// Prioritize external forwarders
-			forwarders = append(s.extforwarders, s.meshforwarders...)
+			forwarders = append(s.extforwarders, s.allMeshForwarders()...)
 		}
 	}
 	cli := new(dns.Client)
