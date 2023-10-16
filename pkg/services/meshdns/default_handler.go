@@ -103,6 +103,12 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	cli := new(dns.Client)
 	cli.Timeout = s.opts.RequestTimeout
 	for _, forwarder := range forwarders {
+		if ctx.Err() != nil {
+			s.log.Error("Failed to forward lookup", slog.String("error", ctx.Err().Error()))
+			m := s.newMsg(meshDomain{}, r)
+			s.writeMsg(w, r, m, dns.RcodeServerFailure)
+			return
+		}
 		s.log.Debug("Forwarding lookup", slog.String("forwarder", forwarder))
 		m, rtt, err := cli.ExchangeContext(ctx, r.Copy(), forwarder)
 		if err != nil {
@@ -140,8 +146,8 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 			s.writeMsg(w, r, m, m.Rcode)
 			return
 		}
-		// If the forwarder returned NXDOMAIN, try the next forwarder
-		s.log.Debug("Received non-ok response from forwarder, trying next forwarder")
+		// If the forwarder returned a non success, try the next forwarder
+		s.log.Debug("Received non-ok response from forwarder, trying next forwarder", "response", m.String())
 	}
 	// If all forwarders returned NXDOMAIN, return NXDOMAIN with our first
 	// registered mesh as the SOA.
