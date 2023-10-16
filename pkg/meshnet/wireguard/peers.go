@@ -97,16 +97,16 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		}
 	}
 	var keepAlive *time.Duration
-	var allowedIPs []net.IPNet
 	if w.opts.PersistentKeepAlive != 0 {
 		keepAlive = &w.opts.PersistentKeepAlive
 	} else {
 		dur := time.Second * 30
 		keepAlive = &dur
 	}
+	var allowedIPs []net.IPNet
 	for _, ip := range peer.AllowedIPs {
 		var ipnet net.IPNet
-		if ip.Addr().IsUnspecified() && w.opts.DisableFullTunnel {
+		if ip.Addr().IsUnspecified() && ip.Bits() == 0 && w.opts.DisableFullTunnel {
 			continue
 		}
 		if w.isIgnoredRoute(ip) {
@@ -134,7 +134,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	var allowedRoutes []net.IPNet
 	for _, ip := range peer.AllowedRoutes {
 		var ipnet net.IPNet
-		if ip.Addr().IsUnspecified() && w.opts.DisableFullTunnel {
+		if ip.Addr().IsUnspecified() && ip.Bits() == 0 && w.opts.DisableFullTunnel {
 			continue
 		}
 		if w.isIgnoredRoute(ip) {
@@ -159,9 +159,10 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		}
 		allowedRoutes = append(allowedRoutes, ipnet)
 	}
+	allIPs := append(allowedIPs, allowedRoutes...)
 	peerCfg := wgtypes.PeerConfig{
 		PublicKey:                   peer.PublicKey.WireGuardKey(),
-		AllowedIPs:                  append(allowedIPs, allowedRoutes...),
+		AllowedIPs:                  allIPs,
 		PersistentKeepaliveInterval: keepAlive,
 		ReplaceAllowedIPs:           true,
 	}
@@ -188,7 +189,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	}
 	w.registerPeer(peer)
 	// Add routes to the allowed IPs
-	for _, ip := range append(allowedIPs, allowedRoutes...) {
+	for _, ip := range allIPs {
 		addr, _ := netip.AddrFromSlice(ip.IP)
 		ones, _ := ip.Mask.Size()
 		prefix := netip.PrefixFrom(addr, ones)
