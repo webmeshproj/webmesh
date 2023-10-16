@@ -109,6 +109,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		if ip.Addr().IsUnspecified() && w.opts.DisableFullTunnel {
 			continue
 		}
+		if w.isIgnoredRoute(ip) {
+			continue
+		}
 		if ip.Addr().Is4() {
 			if w.opts.DisableIPv4 {
 				continue
@@ -132,6 +135,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	for _, ip := range peer.AllowedRoutes {
 		var ipnet net.IPNet
 		if ip.Addr().IsUnspecified() && w.opts.DisableFullTunnel {
+			continue
+		}
+		if w.isIgnoredRoute(ip) {
 			continue
 		}
 		if ip.Addr().Is4() {

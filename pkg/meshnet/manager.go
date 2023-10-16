@@ -81,6 +81,8 @@ type Options struct {
 	DisableIPv6 bool
 	// DisableFullTunnel will ignore routes for a default gateway.
 	DisableFullTunnel bool
+	// IgnoreRoutes are additional routes to ignore.
+	IgnoreRoutes []netip.Prefix
 	// Relays are options for when presented with the need to negotiate
 	// p2p data channels.
 	Relays RelayOptions
@@ -104,6 +106,8 @@ func (o *Options) MarshalJSON() ([]byte, error) {
 		"localDNSAddr":          o.LocalDNSAddr,
 		"disableIPv4":           o.DisableIPv4,
 		"disableIPv6":           o.DisableIPv6,
+		"disableFullTunnel":     o.DisableFullTunnel,
+		"ignoreRoutes":          o.IgnoreRoutes,
 		"relays":                o.Relays,
 	})
 }
@@ -241,6 +245,8 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		return err
 	}
 	var err error
+	// TODO: Getting close (if not already there) to just needing to embed
+	// the wireguard options in the manager options.
 	wgopts := &wireguard.Options{
 		NetNs:               m.opts.NetNs,
 		NodeID:              m.nodeID,
@@ -256,6 +262,7 @@ func (m *manager) Start(ctx context.Context, opts StartOptions) error {
 		AddressV6:           opts.AddressV6,
 		NetworkV4:           opts.NetworkV4,
 		NetworkV6:           opts.NetworkV6,
+		IgnoreRoutes:        m.opts.IgnoreRoutes,
 		DisableIPv4:         m.opts.DisableIPv4,
 		DisableIPv6:         m.opts.DisableIPv6,
 		DisableFullTunnel:   m.opts.DisableFullTunnel,

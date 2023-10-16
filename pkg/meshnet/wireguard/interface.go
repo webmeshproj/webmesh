@@ -117,6 +117,8 @@ type Options struct {
 	DisableIPv6 bool
 	// DisableFullTunnel will ignore routes for a default gateway.
 	DisableFullTunnel bool
+	// IgnoreRoutes are additional routes to ignore.
+	IgnoreRoutes []netip.Prefix
 }
 
 type wginterface struct {
@@ -242,6 +244,15 @@ func (w *wginterface) Peers() map[string]Peer {
 		out[id] = p
 	}
 	return out
+}
+
+func (w *wginterface) isIgnoredRoute(cidr netip.Prefix) bool {
+	for _, r := range w.opts.IgnoreRoutes {
+		if r.Bits() == cidr.Bits() && r.Addr().Compare(cidr.Addr()) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // Close closes the wireguard interface.
