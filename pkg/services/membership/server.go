@@ -78,10 +78,10 @@ func (s *Server) loadMeshState(ctx context.Context) error {
 		return fmt.Errorf("get mesh state: %w", err)
 	}
 	if !s.ipv6Prefix.IsValid() {
-		s.ipv6Prefix = state.NetworkV4()
+		s.ipv6Prefix = state.NetworkV6()
 	}
 	if !s.ipv4Prefix.IsValid() {
-		s.ipv4Prefix = state.NetworkV6()
+		s.ipv4Prefix = state.NetworkV4()
 	}
 	if s.meshDomain == "" {
 		s.meshDomain = state.Domain()
