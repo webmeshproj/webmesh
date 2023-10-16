@@ -85,10 +85,10 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 	s.log.Debug("Handling mesh lookup")
 	for _, mesh := range s.meshes {
 		m := s.newMsg(mesh, r)
-		name := strings.TrimSuffix(r.Question[0].Name, ".")
-		trimDomain := strings.TrimSuffix(mesh.domain, ".")
-		trimName := strings.TrimSuffix(name, trimDomain)
-		parts := strings.Split(trimName, ".")
+		lookup := strings.TrimSuffix(r.Question[0].Name, ".")
+		domain := strings.TrimSuffix(mesh.domain, ".")
+		name := strings.TrimSuffix(strings.TrimSuffix(lookup, domain), ".")
+		parts := strings.Split(name, ".")
 		if len(parts) > 1 {
 			s.log.Debug("Request is not for the root domain", slog.String("domain", mesh.domain), slog.String("name", name))
 			// This is for this domain, but not the root
