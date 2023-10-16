@@ -325,8 +325,8 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 				return
 			}
 			s.mu.Lock()
-			defer s.mu.Unlock()
 			s.syncForwarders(mux.domain, peers, opts.IPv6Only)
+			s.mu.Unlock()
 		})
 		if err != nil {
 			return fmt.Errorf("failed to subscribe to storage/meshdb: %w", err)
