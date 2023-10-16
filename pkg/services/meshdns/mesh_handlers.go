@@ -85,7 +85,16 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 	s.log.Debug("handling mesh lookup")
 	for _, mesh := range s.meshes {
 		m := s.newMsg(mesh, r)
-		nodeID := strings.Split(r.Question[0].Name, ".")[0]
+		name := strings.TrimSuffix(r.Question[0].Name, ".")
+		trimDomain := strings.TrimSuffix(mesh.domain, ".")
+		trimName := strings.TrimSuffix(name, trimDomain)
+		parts := strings.Split(trimName, ".")
+		if len(parts) > 1 {
+			// This is for this domain, but not the root
+			// We pass it to the next or default handler
+			continue
+		}
+		nodeID := parts[0]
 		err := s.appendPeerToMessage(ctx, mesh, r, m, nodeID, s.ipv6Only)
 		if err != nil {
 			if errors.IsNodeNotFound(err) {
