@@ -82,7 +82,7 @@ func (s *meshLookupMux) appendMesh(dom meshDomain) {
 func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	s.log.Debug("handling mesh lookup")
+	s.log.Debug("Handling mesh lookup")
 	for _, mesh := range s.meshes {
 		m := s.newMsg(mesh, r)
 		name := strings.TrimSuffix(r.Question[0].Name, ".")
@@ -90,9 +90,22 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 		trimName := strings.TrimSuffix(name, trimDomain)
 		parts := strings.Split(trimName, ".")
 		if len(parts) > 1 {
+			s.log.Debug("Request is not for the root domain", slog.String("domain", mesh.domain), slog.String("name", name))
 			// This is for this domain, but not the root
 			// We pass it to the next or default handler
 			continue
+		}
+		if len(parts) == 0 {
+			// This is the root, so we return the configured root NS records
+			s.log.Debug("Handling root NS request for domain", slog.String("domain", mesh.domain))
+			for _, mux := range s.meshmuxes {
+				mux.mu.RLock()
+				m.Ns = append(m.Ns, newNSRecord(mesh))
+				m.Answer = append(m.Answer, newNSRecord(mesh))
+				mux.mu.RUnlock()
+			}
+			s.writeMsg(w, r, m, dns.RcodeSuccess)
+			return
 		}
 		nodeID := parts[0]
 		err := s.appendPeerToMessage(ctx, mesh, r, m, nodeID, s.ipv6Only)
