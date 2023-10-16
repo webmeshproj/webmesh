@@ -81,7 +81,6 @@ func (s *meshLookupMux) appendMesh(dom meshDomain) {
 
 func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 	s.log.Debug("Handling mesh lookup")
 	for _, mesh := range s.meshes {
 		m := s.newMsg(mesh, r)
@@ -105,6 +104,7 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 				mux.mu.RUnlock()
 			}
 			s.writeMsg(w, r, m, dns.RcodeSuccess)
+			s.mu.RUnlock()
 			return
 		}
 		nodeID := parts[0]
@@ -115,11 +115,14 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 				continue
 			}
 			s.writeMsg(w, r, m, errToRcode(err))
+			s.mu.RUnlock()
 			return
 		}
 		s.writeMsg(w, r, m, dns.RcodeSuccess)
+		s.mu.RUnlock()
 		return
 	}
+	s.mu.RUnlock()
 	// Fall down to the default handler
 	s.log.Debug("Falling down to default handler")
 	s.handleDefault(ctx, w, r)

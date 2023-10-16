@@ -352,8 +352,6 @@ func (s *Server) syncForwarders(domain string, peers []types.MeshNode, ipv6Only 
 }
 
 func (s *Server) allMeshForwarders() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	var forwarders []string
 	for _, fwds := range s.meshforwarders {
 		forwarders = append(forwarders, fwds...)
