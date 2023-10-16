@@ -94,6 +94,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		}
 		if isMeshDomain {
 			// Prioritize mesh forwarders
+			// TODO: This should filter to mesh forwarders that can match the query
 			forwarders = append(s.allMeshForwarders(), s.extforwarders...)
 		} else {
 			// Prioritize external forwarders
