@@ -25,7 +25,7 @@ import (
 func (s *Server) validateRequest(next dns.HandlerFunc) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		if r == nil || len(r.Question) == 0 {
-			s.log.Warn("received empty DNS request")
+			s.log.Warn("Received empty DNS request")
 			m := new(dns.Msg)
 			m.SetReply(r)
 			s.writeMsg(w, r, m, dns.RcodeFormatError)
@@ -41,7 +41,7 @@ func (s *Server) denyZoneTransfers(next dns.HandlerFunc) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		for _, q := range r.Question {
 			if q.Qtype == dns.TypeAXFR || q.Qtype == dns.TypeIXFR {
-				s.log.Warn("denying zone transfer request")
+				s.log.Warn("Denying zone transfer request")
 				m := new(dns.Msg)
 				m.SetReply(r)
 				s.writeMsg(w, r, m, dns.RcodeRefused)

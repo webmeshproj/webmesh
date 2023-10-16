@@ -422,7 +422,7 @@ type MeshDNSOptions struct {
 	RequestTimeout time.Duration `koanf:"request-timeout,omitempty"`
 	// Forwarders are the DNS forwarders to use. If empty, the system DNS servers will be used.
 	Forwarders []string `koanf:"forwarders,omitempty"`
-	// IncludeSystemResolvers includes the system DNS servers in the forwarders list if it is non-empty.
+	// IncludeSystemResolvers includes the system DNS servers in the forwarders list.
 	IncludeSystemResolvers bool `koanf:"include-system-resolvers,omitempty"`
 	// SubscribeForwarders will subscribe to new nodes that are able to forward requests for other meshes.
 	// These forwarders will be placed at the bottom of the forwarders list.

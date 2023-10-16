@@ -90,7 +90,7 @@ func NewServer(ctx context.Context, o *Options) *Server {
 		}
 	}
 	forwarders := o.Forwarders
-	if (len(forwarders) == 0 || o.IncludeSystemResolvers) && !o.DisableForwarding {
+	if len(forwarders) == 0 && o.IncludeSystemResolvers && !o.DisableForwarding {
 		syscfg := dnsutil.GetSystemConfig()
 		forwarders = append(forwarders, syscfg.Servers...)
 	}
@@ -315,8 +315,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 					// Prefer IPv4
 					seen[peer.PrivateDNSAddrV4().String()] = true
 					continue
-				}
-				if peer.PrivateDNSAddrV6().IsValid() {
+				} else if peer.PrivateDNSAddrV6().IsValid() {
 					seen[peer.PrivateDNSAddrV6().String()] = true
 				}
 			}

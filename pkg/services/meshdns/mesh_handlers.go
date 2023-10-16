@@ -128,14 +128,14 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 func (s *meshLookupMux) handleLeaderLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	s.log.Debug("handling leader lookup")
+	s.log.Debug("Handling leader lookup")
 	// We only serve these for the first registered mesh
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
 	m := s.newMsg(mesh, r)
 	leader, err := mesh.storage.Consensus().GetLeader(ctx)
 	if err != nil {
-		s.log.Error("failed to get leader", slog.String("error", err.Error()))
+		s.log.Error("Failed to get leader", slog.String("error", err.Error()))
 		s.writeMsg(w, r, m, dns.RcodeServerFailure)
 		return
 	}
@@ -155,7 +155,7 @@ func (s *meshLookupMux) handleLeaderLookup(ctx context.Context, w dns.ResponseWr
 func (s *meshLookupMux) handleVotersLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	s.log.Debug("handling voters lookup")
+	s.log.Debug("Handling voters lookup")
 	// We only serve these for the first registered mesh
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
@@ -180,7 +180,7 @@ func (s *meshLookupMux) handleVotersLookup(ctx context.Context, w dns.ResponseWr
 func (s *meshLookupMux) handleObserversLookup(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	s.log.Debug("handling observers lookup")
+	s.log.Debug("Handling observers lookup")
 	// We only serve these for the first registered mesh
 	// TODO: Determine where the request came from
 	mesh := s.meshes[0]
@@ -189,7 +189,7 @@ func (s *meshLookupMux) handleObserversLookup(ctx context.Context, w dns.Respons
 	for _, server := range status.GetPeers() {
 		if server.ClusterStatus == v1.ClusterStatus_CLUSTER_OBSERVER {
 			m.Answer = append(m.Answer, &dns.CNAME{
-				Hdr:    dns.RR_Header{Name: newFQDN(mesh, "voters"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
+				Hdr:    dns.RR_Header{Name: newFQDN(mesh, "observers"), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 1},
 				Target: newFQDN(mesh, server.GetId()),
 			})
 			err := s.appendPeerToMessage(ctx, mesh, r, m, server.GetId(), s.ipv6Only)

@@ -79,11 +79,11 @@ func (s *Server) newMsg(mesh meshDomain, r *dns.Msg) *dns.Msg {
 }
 
 func (s *Server) writeMsg(w dns.ResponseWriter, req, reply *dns.Msg, rcode int) {
-	s.log.Debug("responding to DNS question", slog.String("response", reply.String()), slog.String("rcode", dns.RcodeToString[rcode]))
+	s.log.Debug("Responding to DNS question", slog.String("response", reply.String()), slog.String("rcode", dns.RcodeToString[rcode]))
 	reply.SetRcode(req, rcode)
 	err := w.WriteMsg(reply)
 	if err != nil {
-		s.log.Error("failed to write DNS response", slog.String("error", err.Error()))
+		s.log.Error("Failed to write DNS response", slog.String("error", err.Error()))
 	}
 }
 
