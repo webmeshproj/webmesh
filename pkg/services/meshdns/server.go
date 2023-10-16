@@ -338,32 +338,29 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 
 func (s *Server) syncForwarders(peers []types.MeshNode, ipv6Only bool) {
 	// Gather forwarders
-	seen := make(map[string]bool)
+	var newForwarders []string
 	for _, peer := range peers {
 		if peer.PrivateDNSAddrV4().IsValid() && !ipv6Only {
 			// Prefer IPv4
-			seen[peer.PrivateDNSAddrV4().String()] = true
-			continue
+			newForwarders = append(newForwarders, peer.PrivateDNSAddrV4().String())
 		} else if peer.PrivateDNSAddrV6().IsValid() {
-			seen[peer.PrivateDNSAddrV6().String()] = true
+			newForwarders = append(newForwarders, peer.PrivateDNSAddrV6().String())
 		}
 	}
-	// Update forwarders
-	newForwarders := make([]string, 0)
-	for _, forwarder := range s.meshforwarders {
-		// Already registered mesh forwarder, keep it in the current position
-		if _, ok := seen[forwarder]; ok {
-			newForwarders = append(newForwarders, forwarder)
-			seen[forwarder] = false
-			continue
+	forwarders := appendIfUnique(s.meshforwarders, newForwarders...)
+	s.log.Info("Updating meshdns forwarders", slog.Any("forwarders", forwarders))
+	s.meshforwarders = forwarders
+}
+
+func appendIfUnique(ss []string, newss ...string) []string {
+Iter:
+	for _, ns := range newss {
+		for _, s := range ss {
+			if s == ns {
+				continue Iter
+			}
 		}
+		ss = append(ss, ns)
 	}
-	// Add any forwarders not in the list yet
-	for forwarder, toAdd := range seen {
-		if toAdd {
-			newForwarders = append(newForwarders, forwarder)
-		}
-	}
-	s.log.Info("Updating meshdns forwarders", slog.Any("forwarders", newForwarders))
-	s.meshforwarders = newForwarders
+	return ss
 }
