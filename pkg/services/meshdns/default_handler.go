@@ -125,8 +125,9 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 		s.log.Debug("Forward lookup succeeded", slog.Duration("rtt", rtt))
 		if m.Rcode == dns.RcodeSuccess {
 			// If the forwarder returned a success response, save it in the cache and return it
-			s.log.Debug("Received non-NXDOMAIN response from forwarder, returning", slog.Int("rcode", m.Rcode))
+			s.log.Debug("Received success response from forwarder, returning", slog.Int("rcode", m.Rcode))
 			if s.cache != nil {
+				s.log.Debug("Caching response")
 				cacheValue := cacheValue{
 					msg: m.Copy(),
 					// Use the first TTL in the answer section as the cache TTL
