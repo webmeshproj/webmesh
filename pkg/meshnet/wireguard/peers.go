@@ -106,6 +106,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	}
 	for _, ip := range peer.AllowedIPs {
 		var ipnet net.IPNet
+		if ip.Addr().IsUnspecified() && w.opts.DisableFullTunnel {
+			continue
+		}
 		if ip.Addr().Is4() {
 			if w.opts.DisableIPv4 {
 				continue
@@ -128,6 +131,9 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	var allowedRoutes []net.IPNet
 	for _, ip := range peer.AllowedRoutes {
 		var ipnet net.IPNet
+		if ip.Addr().IsUnspecified() && w.opts.DisableFullTunnel {
+			continue
+		}
 		if ip.Addr().Is4() {
 			if w.opts.DisableIPv4 {
 				continue
@@ -196,6 +202,7 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 		// If this is a default IPv4 gateway route set the system default route
 		if addr.Is4() && addr.IsUnspecified() && ones == 0 {
 			if w.opts.DisableFullTunnel {
+				// We shouldn't have gotten here, but just in case
 				w.log.Debug("Skipping setting default IPv4 gateway", slog.String("prefix", prefix.String()))
 				continue
 			}
