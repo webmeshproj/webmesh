@@ -53,7 +53,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	s.log.Debug("Handling forward lookup")
 	if len(s.extforwarders) == 0 && len(s.meshforwarders) == 0 {
 		// If there are no forwarders, return a NXDOMAIN
-		s.log.Debug("forward request with no forwarders configured")
+		s.log.Debug("Forward request with no forwarders configured")
 		m := s.newMsg(meshDomain{}, r)
 		s.writeMsg(w, r, m, dns.RcodeNameError)
 		return
@@ -62,14 +62,14 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	cachekey := cacheKey{q.Name, q.Qtype}
 	if s.cache != nil {
 		if val, ok := s.cache.Get(cachekey); ok {
-			s.log.Debug("cache hit")
+			s.log.Debug("DNS Cache hit")
 			if val.expires.Before(time.Now()) {
 				// cached response has expired
-				s.log.Debug("cached response has expired")
+				s.log.Debug("Cached response has expired")
 				s.cache.Remove(cachekey)
 			} else {
 				// cached response is still valid
-				s.log.Debug("cached response is still valid")
+				s.log.Debug("Cached response is still valid")
 				m := val.msg.Copy()
 				s.writeMsg(w, r, m, m.Rcode)
 				return
@@ -103,22 +103,24 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 	cli := new(dns.Client)
 	cli.Timeout = time.Second // TODO: Make this configurable
 	for _, forwarder := range forwarders {
+		s.log.Debug("Forwarding lookup", slog.String("forwarder", forwarder))
 		m, rtt, err := cli.ExchangeContext(ctx, r.Copy(), forwarder)
 		if err != nil {
 			if ctx.Err() != nil {
-				s.log.Error("failed to forward lookup", slog.String("error", err.Error()))
+				s.log.Error("Failed to forward lookup", slog.String("error", err.Error()))
 				m := s.newMsg(meshDomain{}, r)
 				s.writeMsg(w, r, m, dns.RcodeServerFailure)
 				return
 			}
 			// Try the next forwarder
-			s.log.Debug("forward lookup failed", slog.String("error", err.Error()))
+			s.log.Debug("Forward lookup failed", slog.String("error", err.Error()))
 			continue
 		}
-		s.log.Debug("forward lookup succeeded", slog.Duration("rtt", rtt))
+		s.log.Debug("Forward lookup succeeded", slog.Duration("rtt", rtt))
 		if m.Rcode != dns.RcodeNameError {
 			// If the forwarder returned a non-NXDOMAIN response, save it in the cache
 			// and return it
+			s.log.Debug("Received non-NXDOMAIN response from forwarder, returning", slog.Int("rcode", m.Rcode))
 			if s.cache != nil {
 				cacheValue := cacheValue{
 					msg: m.Copy(),
@@ -140,6 +142,7 @@ func (s *Server) handleDefault(ctx context.Context, w dns.ResponseWriter, r *dns
 			return
 		}
 		// If the forwarder returned NXDOMAIN, try the next forwarder
+		s.log.Debug("Received NXDOMAIN response from forwarder, trying next forwarder")
 	}
 	// If all forwarders returned NXDOMAIN, return NXDOMAIN with our first
 	// registered mesh as the SOA.

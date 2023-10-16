@@ -18,6 +18,7 @@ package meshdns
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -27,15 +28,17 @@ import (
 )
 
 func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *dns.Msg, peerID string, ipv6Only bool) error {
+	s.log.Debug("Searching for peer in mesh", slog.String("peer-id", peerID), slog.String("domain", dom.domain))
 	peer, err := dom.storage.MeshDB().Peers().Get(ctx, types.NodeID(peerID))
 	if err != nil {
 		return err
 	}
+	s.log.Debug("Found peer in mesh")
 	fqdn := newFQDN(dom, peer.GetId())
 	for i, q := range r.Question {
 		switch q.Qtype {
 		case dns.TypeTXT:
-			s.log.Debug("handling peer TXT question")
+			s.log.Debug("Handling peer TXT question")
 			m.Answer = append(m.Answer, newPeerTXTRecord(fqdn, &peer))
 			if !ipv6Only && peer.PrivateAddrV4().IsValid() {
 				m.Extra = append(m.Extra, &dns.A{
@@ -57,9 +60,9 @@ func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *
 				}
 				return errNoIPv4{}
 			}
-			s.log.Debug("handling peer A question")
+			s.log.Debug("Handling peer A question")
 			if !peer.PrivateAddrV4().IsValid() {
-				s.log.Debug("no private IPv4 address for peer")
+				s.log.Debug("No private IPv4 address for peer")
 				return errNoIPv4{}
 			}
 			m.Answer = append(m.Answer, &dns.A{
@@ -68,9 +71,9 @@ func (s *Server) appendPeerToMessage(ctx context.Context, dom meshDomain, r, m *
 			})
 			m.Extra = append(m.Extra, newPeerTXTRecord(fqdn, &peer))
 		case dns.TypeAAAA:
-			s.log.Debug("handling peer AAAA question")
+			s.log.Debug("Handling peer AAAA question")
 			if !peer.PrivateAddrV6().IsValid() {
-				s.log.Debug("no private IPv6 address for peer")
+				s.log.Debug("No private IPv6 address for peer")
 				return errNoIPv6{}
 			}
 			m.Answer = append(m.Answer, &dns.AAAA{

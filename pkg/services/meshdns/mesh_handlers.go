@@ -121,6 +121,7 @@ func (s *meshLookupMux) handleMeshLookup(ctx context.Context, w dns.ResponseWrit
 		return
 	}
 	// Fall down to the default handler
+	s.log.Debug("Falling down to default handler")
 	s.handleDefault(ctx, w, r)
 }
 
