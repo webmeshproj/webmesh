@@ -105,7 +105,6 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 	}
 	var allowedIPs []net.IPNet
 	for _, ip := range peer.AllowedIPs {
-		var ipnet net.IPNet
 		if ip.Addr().IsUnspecified() && ip.Bits() == 0 && w.opts.DisableFullTunnel {
 			continue
 		}
@@ -116,24 +115,22 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			if w.opts.DisableIPv4 {
 				continue
 			}
-			ipnet = net.IPNet{
+			allowedIPs = append(allowedIPs, net.IPNet{
 				IP:   ip.Addr().AsSlice(),
 				Mask: net.CIDRMask(ip.Bits(), 32),
-			}
+			})
 		} else {
 			if w.opts.DisableIPv6 {
 				continue
 			}
-			ipnet = net.IPNet{
+			allowedIPs = append(allowedIPs, net.IPNet{
 				IP:   ip.Addr().AsSlice(),
 				Mask: net.CIDRMask(ip.Bits(), 128),
-			}
+			})
 		}
-		allowedIPs = append(allowedIPs, ipnet)
 	}
 	var allowedRoutes []net.IPNet
 	for _, ip := range peer.AllowedRoutes {
-		var ipnet net.IPNet
 		if ip.Addr().IsUnspecified() && ip.Bits() == 0 && w.opts.DisableFullTunnel {
 			continue
 		}
@@ -144,20 +141,19 @@ func (w *wginterface) PutPeer(ctx context.Context, peer *Peer) error {
 			if w.opts.DisableIPv4 {
 				continue
 			}
-			ipnet = net.IPNet{
+			allowedRoutes = append(allowedRoutes, net.IPNet{
 				IP:   ip.Addr().AsSlice(),
 				Mask: net.CIDRMask(ip.Bits(), 32),
-			}
+			})
 		} else {
 			if w.opts.DisableIPv6 {
 				continue
 			}
-			ipnet = net.IPNet{
+			allowedRoutes = append(allowedRoutes, net.IPNet{
 				IP:   ip.Addr().AsSlice(),
 				Mask: net.CIDRMask(ip.Bits(), 128),
-			}
+			})
 		}
-		allowedRoutes = append(allowedRoutes, ipnet)
 	}
 	allIPs := append(allowedIPs, allowedRoutes...)
 	peerCfg := wgtypes.PeerConfig{
