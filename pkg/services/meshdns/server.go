@@ -307,44 +307,13 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 		s.meshmuxes = append(s.meshmuxes, mux)
 	}
 	if opts.SubscribeForwarders {
-		updateForwarders := func(peers []types.MeshNode) {
-			// Gather forwarders
-			seen := make(map[string]bool)
-			for _, peer := range peers {
-				if peer.PrivateDNSAddrV4().IsValid() && !opts.IPv6Only {
-					// Prefer IPv4
-					seen[peer.PrivateDNSAddrV4().String()] = true
-					continue
-				} else if peer.PrivateDNSAddrV6().IsValid() {
-					seen[peer.PrivateDNSAddrV6().String()] = true
-				}
-			}
-			// Update forwarders
-			newForwarders := make([]string, 0)
-			for _, forwarder := range s.meshforwarders {
-				// Already registered mesh forwarder, keep it in the current position
-				if _, ok := seen[forwarder]; ok {
-					newForwarders = append(newForwarders, forwarder)
-					seen[forwarder] = false
-					continue
-				}
-			}
-			// Add any forwarders not in the list yet
-			for forwarder, toAdd := range seen {
-				if toAdd {
-					newForwarders = append(newForwarders, forwarder)
-				}
-			}
-			s.log.Info("Updating meshdns forwarders", slog.Any("forwarders", newForwarders))
-			s.meshforwarders = newForwarders
-		}
 		// Do an initial list to pre-populate the forwarders
 		peers, err := dom.storage.MeshDB().Peers().List(context.Background(), storage.FilterByFeature(v1.Feature_FORWARD_MESH_DNS))
 		if err != nil {
 			s.log.Warn("Failed to lookup peers with forward meshdns", slog.String("error", err.Error()))
 		}
 		if len(peers) > 0 {
-			updateForwarders(peers)
+			s.syncForwarders(peers, opts.IPv6Only)
 		}
 		cancel, err := dom.storage.MeshDB().Peers().Subscribe(context.Background(), func([]types.MeshNode) {
 			peers, err := dom.storage.MeshDB().Peers().List(context.Background(), storage.FilterByFeature(v1.Feature_FORWARD_MESH_DNS))
@@ -357,7 +326,7 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 			}
 			s.mu.Lock()
 			defer s.mu.Unlock()
-			updateForwarders(peers)
+			s.syncForwarders(peers, opts.IPv6Only)
 		})
 		if err != nil {
 			return fmt.Errorf("failed to subscribe to storage/meshdb: %w", err)
@@ -365,4 +334,36 @@ func (s *Server) RegisterDomain(opts DomainOptions) error {
 		mux.cancels = append(mux.cancels, cancel)
 	}
 	return nil
+}
+
+func (s *Server) syncForwarders(peers []types.MeshNode, ipv6Only bool) {
+	// Gather forwarders
+	seen := make(map[string]bool)
+	for _, peer := range peers {
+		if peer.PrivateDNSAddrV4().IsValid() && !ipv6Only {
+			// Prefer IPv4
+			seen[peer.PrivateDNSAddrV4().String()] = true
+			continue
+		} else if peer.PrivateDNSAddrV6().IsValid() {
+			seen[peer.PrivateDNSAddrV6().String()] = true
+		}
+	}
+	// Update forwarders
+	newForwarders := make([]string, 0)
+	for _, forwarder := range s.meshforwarders {
+		// Already registered mesh forwarder, keep it in the current position
+		if _, ok := seen[forwarder]; ok {
+			newForwarders = append(newForwarders, forwarder)
+			seen[forwarder] = false
+			continue
+		}
+	}
+	// Add any forwarders not in the list yet
+	for forwarder, toAdd := range seen {
+		if toAdd {
+			newForwarders = append(newForwarders, forwarder)
+		}
+	}
+	s.log.Info("Updating meshdns forwarders", slog.Any("forwarders", newForwarders))
+	s.meshforwarders = newForwarders
 }
