@@ -65,6 +65,10 @@ func removeServers(iface string, servers []netip.AddrPort) error {
 		}
 		current = append(current, addr)
 	}
+	if len(current) == 0 {
+		// Fast path if there are no servers
+		return nil
+	}
 	// Trim current of any servers that are in the list to remove
 	for _, server := range servers {
 		for i, currentServer := range current {
@@ -79,6 +83,9 @@ func removeServers(iface string, servers []netip.AddrPort) error {
 		return err
 	}
 	// Add the remaining servers back
+	if len(current) == 0 {
+		return nil
+	}
 	return addServers(iface, current)
 }
 
