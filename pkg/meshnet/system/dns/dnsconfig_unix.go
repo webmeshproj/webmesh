@@ -29,10 +29,17 @@ import (
 	"time"
 )
 
-var isManagedResolvConf = false
+var (
+	isManagedResolvConf = false
+	resolvConf          = "/etc/resolv.conf"
+	resolvConfHead      = "/etc/resolv.conf.head"
+)
 
 func init() {
-	data, err := readResolvConf()
+	if os.Getenv("RESOLV_CONF") != "" {
+		resolvConf = os.Getenv("RESOLV_CONF")
+	}
+	data, err := os.ReadFile(resolvConf)
 	if err != nil {
 		return
 	}
@@ -43,165 +50,58 @@ func init() {
 
 func addServers(iface string, servers []netip.AddrPort) error {
 	if isManagedResolvConf {
-		return addServersHead(iface, servers)
+		return appendServersToFile(resolvConfHead, servers)
 	}
-	return addServersMain(iface, servers)
+	return appendServersToFile(resolvConf, servers)
 }
 
 func removeServers(iface string, servers []netip.AddrPort) error {
 	if isManagedResolvConf {
-		return removeServersHead(iface, servers)
+		return removeServersFromFile(resolvConfHead, servers)
 	}
-	return removeServersMain(iface, servers)
+	return removeServersFromFile(resolvConf, servers)
 }
 
 func addSearchDomains(iface string, domains []string) error {
 	if isManagedResolvConf {
-		return addSearchDomainsHead(iface, domains)
+		return appendSearchDomainsToFile(resolvConfHead, domains)
 	}
-	return addSearchDomainsMain(iface, domains)
+	return appendSearchDomainsToFile(resolvConf, domains)
 }
 
 func removeSearchDomains(iface string, domains []string) error {
 	if isManagedResolvConf {
-		return removeSearchDomainsHead(iface, domains)
+		return removeSearchDomainsFromFile(resolvConfHead, domains)
 	}
-	return removeSearchDomainsMain(iface, domains)
+	return removeSearchDomainsFromFile(resolvConf, domains)
 }
 
-func addServersMain(_ string, servers []netip.AddrPort) error {
-	current, err := readResolvConf()
+func appendServersToFile(fname string, servers []netip.AddrPort) error {
+	current, err := os.ReadFile(fname)
 	if err != nil {
 		return err
 	}
-	f, err := createResolvConf()
+	f, err := os.Create(fname)
 	if err != nil {
 		return err
 	}
-	// Write the new servers
-	for _, server := range servers {
-		if server.Port() == 53 {
-			_, err = f.WriteString("nameserver " + server.Addr().String() + "\n")
-		} else {
-			// We need to always format as [host]:port
-			serverStr := fmt.Sprintf("[%s]:%d", server.Addr().String(), server.Port())
-			_, err = f.WriteString("nameserver " + serverStr + "\n")
-		}
+	serverAddrs := toServerAddrs(servers)
+	for _, server := range serverAddrs {
+		_, err = f.WriteString("nameserver " + server + "\n")
 		if err != nil {
 			return err
 		}
 	}
-	// Write the rest of the file
-	_, err = f.Write(current)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func addServersHead(_ string, servers []netip.AddrPort) error {
-	current, err := readResolvConfHead()
-	if err != nil {
-		return err
-	}
-	f, err := os.Create("/etc/resolv.conf.head")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	// Write the new servers
-	for _, server := range servers {
-		if server.Port() == 53 {
-			_, err = f.WriteString("nameserver " + server.Addr().String() + "\n")
-		} else {
-			// We need to always format as [host]:port
-			serverStr := fmt.Sprintf("[%s]:%d", server.Addr().String(), server.Port())
-			_, err = f.WriteString("nameserver " + serverStr + "\n")
-		}
-		if err != nil {
-			return err
-		}
-	}
-	// Write the rest of the file
-	_, err = f.Write(current)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func addSearchDomainsMain(_ string, domains []string) error {
-	current, err := readResolvConf()
-	if err != nil {
-		return err
-	}
-	f, err := createResolvConf()
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	// Write the original file to the head
-	_, err = f.Write(current)
-	if err != nil {
-		return err
-	}
-	// Write the new search domains
-	for _, domain := range domains {
-		_, err = f.WriteString("search " + domain + "\n")
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func addSearchDomainsHead(_ string, domains []string) error {
-	current, err := readResolvConfHead()
-	if err != nil {
-		return err
-	}
-	f, err := os.Create("/etc/resolv.conf.head")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	// Write the original file to the head
-	_, err = f.Write(current)
-	if err != nil {
-		return err
-	}
-	// Write the new search domains
-	for _, domain := range domains {
-		_, err = f.WriteString("search " + domain + "\n")
-		if err != nil {
-			return err
-		}
-	}
-	// Allow one ndots (this should be configurable)
-	_, err = f.WriteString("options ndots:1\n")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func removeServersMain(_ string, servers []netip.AddrPort) error {
-	// Create a new resolvconf file, removing the servers
-	// if encountered
-	current, err := readResolvConf()
-	if err != nil {
-		return err
-	}
-	f, err := createResolvConf()
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+	// Iterate the rest of the file and write it if it doesn't include the
+	// added servers
 	scanner := bufio.NewScanner(strings.NewReader(string(current)))
-
 Lines:
 	for scanner.Scan() {
 		line := scanner.Text()
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
 		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
 			// comment.
 			_, err = f.WriteString(line + "\n")
@@ -217,21 +117,121 @@ Lines:
 		switch fields[0] {
 		case "nameserver":
 			if len(fields) > 1 {
-				var addrport netip.AddrPort
-				// Try to parse as a regular address
-				addr, err := netip.ParseAddr(fields[1])
-				if err == nil {
-					// Default to port 53
-					addrport = netip.AddrPortFrom(addr, 53)
-				} else {
-					// Try to parse as an address with port
-					addrport, err = netip.ParseAddrPort(fields[1])
-					if err != nil {
-						continue
+				for _, server := range serverAddrs {
+					if server == fields[1] {
+						continue Lines
 					}
 				}
-				for _, server := range servers {
-					if addrport == server {
+			}
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+		default:
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return f.Close()
+}
+
+func appendSearchDomainsToFile(fname string, domains []string) error {
+	current, err := os.ReadFile(fname)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(fname)
+	if err != nil {
+		return err
+	}
+	for _, dom := range domains {
+		_, err = f.WriteString("search " + dom + "\n")
+		if err != nil {
+			return err
+		}
+	}
+	// Iterate the rest of the file and write it if it doesn't include the
+	// added servers
+	scanner := bufio.NewScanner(strings.NewReader(string(current)))
+Lines:
+	for scanner.Scan() {
+		line := scanner.Text()
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
+			// comment.
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 1 {
+			continue
+		}
+		switch fields[0] {
+		case "search":
+			if len(fields) > 1 {
+				for _, dom := range domains {
+					if dom == fields[1] {
+						continue Lines
+					}
+				}
+			}
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+		default:
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return f.Close()
+}
+
+func removeServersFromFile(fname string, servers []netip.AddrPort) error {
+	current, err := os.ReadFile(fname)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(fname)
+	if err != nil {
+		return err
+	}
+	serverAddrs := toServerAddrs(servers)
+	scanner := bufio.NewScanner(strings.NewReader(string(current)))
+Lines:
+	for scanner.Scan() {
+		line := scanner.Text()
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
+			// comment.
+			_, err = f.WriteString(line + "\n")
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 1 {
+			continue
+		}
+		switch fields[0] {
+		case "nameserver":
+			if len(fields) > 1 {
+				for _, srv := range serverAddrs {
+					if srv == fields[1] {
 						continue Lines
 					}
 				}
@@ -253,23 +253,23 @@ Lines:
 	return nil
 }
 
-func removeServersHead(_ string, servers []netip.AddrPort) error {
-	// Create a new resolvconf file, removing the servers
-	// if encountered
-	current, err := readResolvConfHead()
+func removeSearchDomainsFromFile(fname string, domains []string) error {
+	current, err := os.ReadFile(fname)
 	if err != nil {
 		return err
 	}
-	f, err := os.Create("/etc/resolv.conf.head")
+	f, err := os.Create(fname)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	scanner := bufio.NewScanner(strings.NewReader(string(current)))
-
 Lines:
 	for scanner.Scan() {
 		line := scanner.Text()
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
 		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
 			// comment.
 			_, err = f.WriteString(line + "\n")
@@ -283,23 +283,10 @@ Lines:
 			continue
 		}
 		switch fields[0] {
-		case "nameserver":
+		case "search":
 			if len(fields) > 1 {
-				var addrport netip.AddrPort
-				// Try to parse as a regular address
-				addr, err := netip.ParseAddr(fields[1])
-				if err == nil {
-					// Default to port 53
-					addrport = netip.AddrPortFrom(addr, 53)
-				} else {
-					// Try to parse as an address with port
-					addrport, err = netip.ParseAddrPort(fields[1])
-					if err != nil {
-						continue
-					}
-				}
-				for _, server := range servers {
-					if addrport == server {
+				for _, dom := range domains {
+					if dom == fields[1] {
 						continue Lines
 					}
 				}
@@ -321,118 +308,18 @@ Lines:
 	return nil
 }
 
-func removeSearchDomainsMain(_ string, domains []string) error {
-	// Create a new resolvconf file, removing the domains
-	// if encountered
-	current, err := readResolvConf()
-	if err != nil {
-		return err
-	}
-	f, err := createResolvConf()
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(strings.NewReader(string(current)))
-
-Lines:
-	for scanner.Scan() {
-		line := scanner.Text()
-		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
-			// comment.
-			_, err = f.WriteString(line + "\n")
-			if err != nil {
-				return err
-			}
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 1 {
-			continue
-		}
-		switch fields[0] {
-		case "search":
-			if len(fields) > 1 {
-				for _, domain := range domains {
-					for _, field := range fields[1:] {
-						if domain == field {
-							continue Lines
-						}
-					}
-				}
-				_, err = f.WriteString(line + "\n")
-				if err != nil {
-					return err
-				}
-			}
-		default:
-			_, err = f.WriteString(line + "\n")
-			if err != nil {
-				return err
-			}
+func toServerAddrs(addrs []netip.AddrPort) []string {
+	var serverAddrs []string
+	for _, server := range addrs {
+		if server.Port() == 53 {
+			serverAddrs = append(serverAddrs, server.Addr().String())
+		} else {
+			// We need to always format as [host]:port
+			serverStr := fmt.Sprintf("[%s]:%d", server.Addr().String(), server.Port())
+			serverAddrs = append(serverAddrs, serverStr)
 		}
 	}
-	if err := scanner.Err(); err != nil && err != io.EOF {
-		return err
-	}
-	return nil
-}
-
-func removeSearchDomainsHead(_ string, domains []string) error {
-	// Create a new resolvconf file, removing the domains
-	// if encountered
-	current, err := readResolvConfHead()
-	if err != nil {
-		return err
-	}
-	f, err := os.Create("/etc/resolv.conf.head")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(strings.NewReader(string(current)))
-
-Lines:
-	for scanner.Scan() {
-		line := scanner.Text()
-		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
-			// comment.
-			_, err = f.WriteString(line + "\n")
-			if err != nil {
-				return err
-			}
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 1 {
-			continue
-		}
-		switch fields[0] {
-		case "search":
-			if len(fields) > 1 {
-				for _, domain := range domains {
-					for _, field := range fields[1:] {
-						if domain == field {
-							continue Lines
-						}
-					}
-				}
-				_, err = f.WriteString(line + "\n")
-				if err != nil {
-					return err
-				}
-			}
-		default:
-			_, err = f.WriteString(line + "\n")
-			if err != nil {
-				return err
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil && err != io.EOF {
-		return err
-	}
-	return nil
+	return serverAddrs
 }
 
 func loadSystemConfig() (*DNSConfig, error) {
@@ -526,37 +413,4 @@ func openResolvConf() (*os.File, error) {
 		return nil, err
 	}
 	return f, nil
-}
-
-func createResolvConf() (*os.File, error) {
-	fname := os.Getenv("RESOLV_CONF")
-	if fname == "" {
-		fname = "/etc/resolv.conf"
-	}
-	f, err := os.Create(fname)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
-}
-
-func readResolvConfHead() ([]byte, error) {
-	f, err := os.Open("/etc/resolv.conf.head")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	defer f.Close()
-	return io.ReadAll(f)
-}
-
-func readResolvConf() ([]byte, error) {
-	f, err := openResolvConf()
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return io.ReadAll(f)
 }
