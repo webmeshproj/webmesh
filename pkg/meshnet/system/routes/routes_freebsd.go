@@ -53,11 +53,6 @@ func SetDefaultIPv4Gateway(ctx context.Context, gateway Gateway) error {
 	return errors.New("not implemented")
 }
 
-// SetDefaultIPv6Gateway sets the default IPv6 gateway for the current system.
-func SetDefaultIPv6Gateway(ctx context.Context, gateway Gateway) error {
-	return errors.New("not implemented")
-}
-
 // Add adds a route to the interface with the given name.
 func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
 	out, err := common.ExecOutput(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.Masked().String(), "-interface", ifaceName)
