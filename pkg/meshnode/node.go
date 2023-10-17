@@ -116,6 +116,9 @@ type Config struct {
 	UseMeshDNS bool
 	// LocalMeshDNSAddr is the address MeshDNS is listening on locally.
 	LocalMeshDNSAddr string
+	// LocalDNSOnly will only use the local MeshDNS server for DNS
+	// resolution. This is only applicable when UseMeshDNS is true.
+	LocalDNSOnly bool
 	// DisableIPv4 is true if IPv4 should be disabled.
 	DisableIPv4 bool
 	// DisableIPv6 is true if IPv6 should be disabled.

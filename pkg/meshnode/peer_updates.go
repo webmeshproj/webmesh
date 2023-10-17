@@ -32,7 +32,7 @@ func (s *meshStore) onPeerUpdate(peers []types.MeshNode) {
 	}
 	go s.queuePeersUpdate()
 	go s.queueRouteUpdate()
-	if s.opts.UseMeshDNS {
+	if s.opts.UseMeshDNS && !s.opts.LocalDNSOnly {
 		go s.queueMeshDNSUpdate()
 	}
 }
