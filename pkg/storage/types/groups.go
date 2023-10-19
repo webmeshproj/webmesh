@@ -76,3 +76,13 @@ func (n Group) Validate() error {
 	}
 	return nil
 }
+
+// ContainsNode returns true if the group contains the node.
+func (n Group) ContainsNode(node NodeID) bool {
+	for _, subject := range n.GetSubjects() {
+		if subject.GetName() == "*" || subject.GetName() == node.String() {
+			return true
+		}
+	}
+	return false
+}
