@@ -129,6 +129,11 @@ func (n *MeshNode) UnmarshalProtoJSON(data []byte) error {
 	return nil
 }
 
+// DecodePublicKey decodes the public key of this node.
+func (n MeshNode) DecodePublicKey() (crypto.PublicKey, error) {
+	return crypto.DecodePublicKey(n.GetPublicKey())
+}
+
 // HasFeature returns true if the node has the given feature.
 func (n MeshNode) HasFeature(feature v1.Feature) bool {
 	for _, f := range n.Features {

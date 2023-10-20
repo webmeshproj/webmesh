@@ -86,6 +86,9 @@ type PrivateKey interface {
 	// This changes the type of the key to a ed25519 private key.
 	AsPrivKey() p2pcrypto.PrivKey
 
+	// AsNative returns the private key as a native crypto private key.
+	AsNative() ed25519.PrivateKey
+
 	// PublicKey returns the PublicKey as a PublicKey interface.
 	PublicKey() PublicKey
 }
@@ -94,6 +97,9 @@ type PrivateKey interface {
 type PublicKey interface {
 	Key
 	p2pcrypto.PubKey
+
+	// AsNative returns the public key as a native crypto public key.
+	AsNative() ed25519.PublicKey
 }
 
 // SortedKeys is a slice of public keys that can be sorted.
@@ -227,6 +233,13 @@ func (w *WebmeshPrivateKey) AsPrivKey() p2pcrypto.PrivKey {
 	return ed25519
 }
 
+// AsNative returns the private key as a native crypto private key.
+func (w *WebmeshPrivateKey) AsNative() ed25519.PrivateKey {
+	out := make([]byte, 64)
+	copy(out, w.raw[:])
+	return ed25519.PrivateKey(out)
+}
+
 // Type returns the protobuf key type.
 func (w *WebmeshPrivateKey) Type() cryptopb.KeyType {
 	return w.typ
@@ -328,6 +341,13 @@ func (w *WebmeshPublicKey) Type() cryptopb.KeyType {
 func (w *WebmeshPublicKey) ID() string {
 	id, _ := peer.IDFromPublicKey(w)
 	return id.String()
+}
+
+// AsNative returns the public key as a native crypto public key.
+func (w *WebmeshPublicKey) AsNative() ed25519.PublicKey {
+	out := make([]byte, 32)
+	copy(out, w.raw[:])
+	return ed25519.PublicKey(out)
 }
 
 // Bytes returns the raw bytes of the key. This is the same as Key.Raw
