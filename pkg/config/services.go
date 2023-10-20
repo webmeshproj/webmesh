@@ -590,11 +590,11 @@ type APIRegistrationOptions struct {
 // RegisterAPIs registers the configured APIs to the given server.
 func (o *ServiceOptions) RegisterAPIs(ctx context.Context, opts APIRegistrationOptions) error {
 	log := context.LoggerFrom(ctx)
-	var rbacDisabled bool
+	var rbacEnabled bool
 	var err error
 	maxTries := 5
 	for i := 0; i < maxTries; i++ {
-		rbacDisabled, err = opts.Node.Storage().MeshDB().RBAC().GetEnabled(context.Background())
+		rbacEnabled, err = opts.Node.Storage().MeshDB().RBAC().GetEnabled(ctx)
 		if err != nil {
 			log.Error("Failed to check rbac status", "error", err.Error())
 			if i == maxTries-1 {
@@ -606,8 +606,7 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, opts APIRegistrationO
 		break
 	}
 	var rbacEvaluator rbac.Evaluator
-	insecureServices := !opts.Node.Plugins().HasAuth() || rbacDisabled
-	if insecureServices {
+	if !rbacEnabled {
 		if opts.Node.Plugins().HasAuth() {
 			log.Warn("Running services with authentication but without authorization")
 		} else {
