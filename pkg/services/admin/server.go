@@ -34,7 +34,7 @@ type Server struct {
 }
 
 // New creates a new admin server.
-func New(storage storage.Provider, rbac rbac.Evaluator) *Server {
+func NewServer(storage storage.Provider, rbac rbac.Evaluator) *Server {
 	return &Server{
 		storage:  storage,
 		db:       storage.MeshDB(),

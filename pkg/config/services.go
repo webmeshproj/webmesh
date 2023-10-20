@@ -43,6 +43,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/services"
+	"github.com/webmeshproj/webmesh/pkg/services/admin"
 	"github.com/webmeshproj/webmesh/pkg/services/leaderproxy"
 	"github.com/webmeshproj/webmesh/pkg/services/membership"
 	"github.com/webmeshproj/webmesh/pkg/services/meshapi"
@@ -646,6 +647,10 @@ func (o *ServiceOptions) RegisterAPIs(ctx context.Context, opts APIRegistrationO
 	if o.API.MeshEnabled {
 		log.Debug("Registering mesh api")
 		v1.RegisterMeshServer(opts.Server, meshapi.NewServer(opts.Node.Storage().MeshDB()))
+	}
+	if o.API.AdminEnabled {
+		log.Debug("Registering admin api")
+		v1.RegisterAdminServer(opts.Server, admin.NewServer(opts.Node.Storage(), rbacEvaluator))
 	}
 	if o.WebRTC.Enabled {
 		log.Debug("Registering WebRTC api")
