@@ -67,6 +67,21 @@ type BootstrapOptions struct {
 	DisableRBAC bool
 }
 
+func (b *BootstrapOptions) Default() {
+	if b.IPv4Network == "" {
+		b.IPv4Network = DefaultIPv4Network
+	}
+	if b.MeshDomain == "" {
+		b.MeshDomain = DefaultMeshDomain
+	}
+	if b.Admin == "" {
+		b.Admin = DefaultMeshAdmin
+	}
+	if b.DefaultNetworkPolicy == "" {
+		b.DefaultNetworkPolicy = DefaultNetworkPolicy
+	}
+}
+
 // BoostrapResults are the results of bootstrapping the database.
 type BootstrapResults struct {
 	// NetworkV4 is the IPv4 network.
@@ -80,21 +95,9 @@ type BootstrapResults struct {
 // Bootstrap attempts to bootstrap the given database. If data already exists,
 // ErrAlreadyBootstrapped will be returned, but with results populated with the
 // existing data.
-func Bootstrap(ctx context.Context, db MeshDB, opts BootstrapOptions) (results BootstrapResults, err error) {
-	if opts.IPv4Network == "" {
-		opts.IPv4Network = DefaultIPv4Network
-	}
-	if opts.MeshDomain == "" {
-		opts.MeshDomain = DefaultMeshDomain
-	}
+func Bootstrap(ctx context.Context, db MeshDB, opts *BootstrapOptions) (results BootstrapResults, err error) {
+	opts.Default()
 	results.MeshDomain = opts.MeshDomain
-	if opts.Admin == "" {
-		opts.Admin = DefaultMeshAdmin
-	}
-	if opts.DefaultNetworkPolicy == "" {
-		opts.DefaultNetworkPolicy = DefaultNetworkPolicy
-	}
-
 	// Check if there is data already before we start.
 	state, err := db.MeshState().GetMeshState(ctx)
 	if err != nil && !errors.IsNotFound(err) {

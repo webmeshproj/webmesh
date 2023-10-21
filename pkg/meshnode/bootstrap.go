@@ -93,7 +93,7 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		DisableRBAC:          opts.Bootstrap.DisableRBAC,
 	}
 	s.log.Debug("Bootstrapping mesh database", slog.Any("params", bootstrapOpts))
-	results, err := storage.Bootstrap(ctx, s.Storage().MeshDB(), bootstrapOpts)
+	results, err := storage.Bootstrap(ctx, s.Storage().MeshDB(), &bootstrapOpts)
 	if err != nil {
 		return fmt.Errorf("bootstrap database: %w", err)
 	}
