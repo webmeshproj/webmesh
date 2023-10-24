@@ -4,6 +4,7 @@ import { ConnectRouter } from "@connectrpc/connect";
 import { Plugin, WatchPlugin } from "@buf/webmeshproj_api.connectrpc_es/v1/plugin_connect";
 import { 
     PluginInfo,
+    PluginInfo_PluginCapability as caps,
     PluginConfiguration,
     Event,
 } from "@buf/webmeshproj_api.bufbuild_es/v1/plugin_pb.js";
@@ -13,9 +14,10 @@ function routes(router: ConnectRouter) {
     router.service(Plugin, {
         async getInfo(): Promise<PluginInfo> {
             return new PluginInfo({
-                name: "Example Typescript Plugin",
+                name: "ts-watch-plugin",
                 version: "0.0.1",
-                description: "Example plugin for Webmesh",
+                description: "Example Typescript plugin for Webmesh",
+                capabilities: [caps.WATCH],
             })
         },
 
