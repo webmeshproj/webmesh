@@ -149,16 +149,10 @@ func (s *meshStore) initialBootstrapLeader(ctx context.Context, opts ConnectOpti
 		Features:        opts.Features,
 		JoinedAt:        timestamppb.New(time.Now().UTC()),
 	}}
-	// Allocate addresses
 	var privatev4 netip.Prefix
 	if !s.opts.DisableIPv4 {
-		privatev4, err = s.plugins.AllocateIP(ctx, &v1.AllocateIPRequest{
-			NodeID: s.ID().String(),
-			Subnet: results.NetworkV4.String(),
-		})
-		if err != nil {
-			return fmt.Errorf("allocate IPv4 address: %w", err)
-		}
+		// Take the first IPv4 address from the network
+		privatev4 = netip.PrefixFrom(results.NetworkV4.Addr().Next(), 32)
 		self.PrivateIPv4 = privatev4.String()
 	}
 	s.log.Debug("Creating ourself in the database", slog.Any("params", self))

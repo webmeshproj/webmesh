@@ -167,7 +167,6 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 	s.leaveRTT = opts.LeaveRoundTripper
 	log := s.log
 	log.Debug("Connecting to mesh network", slog.Any("options", opts))
-
 	// If our key is still nil, generate an ephemeral key.
 	if s.key == nil {
 		log.Debug("Generating ephemeral key pair")
@@ -177,45 +176,19 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		}
 		s.key = key
 	}
-
-	// Create the plugin manager
-	pluginopts := plugins.Options{
-		Storage:               s.Storage(),
-		Plugins:               opts.Plugins,
-		DisableDefaultIPAM:    s.opts.DisableDefaultIPAM,
-		DefaultIPAMStaticIPv4: s.opts.DefaultIPAMStaticIPv4,
-	}
-	s.plugins, err = plugins.NewManager(ctx, pluginopts)
-	if err != nil {
-		return fmt.Errorf("failed to load plugins: %w", err)
-	}
-	// If we are using the built-in storage, register the observer
-	if raft, ok := s.storage.(*raftstorage.Provider); ok {
-		raft.OnObservation(s.newObserver())
-	}
-	// Start serving storage queries for plugins.
-	handleErr := func(cause error) error {
-		s.kvSubCancel()
-		log.Error("Failed to open mesh connection", slog.String("error", cause.Error()))
-		perr := s.plugins.Close()
-		if perr != nil {
-			log.Error("Failed to close plugin manager", slog.String("error", perr.Error()))
-		}
-		return cause
-	}
 	// Create the network manager
 	opts.NetworkOptions.StoragePort = int(s.storage.ListenPort())
 	s.nw = meshnet.New(s.Storage().MeshDB(), opts.NetworkOptions, s.ID())
 	if opts.Bootstrap != nil {
 		// Attempt bootstrap.
 		if err = s.bootstrap(ctx, opts); err != nil {
-			return handleErr(fmt.Errorf("bootstrap: %w", err))
+			return fmt.Errorf("bootstrap: %w", err)
 		}
 	} else if opts.JoinRoundTripper != nil {
 		// Attempt to join the cluster.
 		err = s.join(ctx, opts)
 		if err != nil {
-			return handleErr(fmt.Errorf("join: %w", err))
+			return fmt.Errorf("join: %w", err)
 		}
 	} else if opts.StorageProvider.Consensus().IsMember() {
 		// We neither had the bootstrap flag nor any join flags set.
@@ -226,12 +199,57 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 		}
 	} else {
 		// We got nothing, bail out.
-		return handleErr(fmt.Errorf("no bootstrap or join options provided"))
+		return fmt.Errorf("no bootstrap or join options provided")
 	}
 	// At this point we are open for business.
 	s.open.Store(true)
 	if s.testStore {
+		// TODO: This only works for the single node case.
+		// Really the test store needs to be a separate implementation
+		// using the mock interfaces from the various test packages.
 		return nil
+	}
+	cleanFuncs := []func(){
+		func() {
+			if err := s.Close(ctx); err != nil {
+				log.Error("Failed to close store", slog.String("error", err.Error()))
+			}
+		},
+	}
+	handleErr := func(cause error) error {
+		for _, clean := range cleanFuncs {
+			clean()
+		}
+		return cause
+	}
+	// Create the plugin manager
+	pluginopts := plugins.Options{
+		Storage:               s.Storage(),
+		Plugins:               opts.Plugins,
+		DisableDefaultIPAM:    s.opts.DisableDefaultIPAM,
+		DefaultIPAMStaticIPv4: s.opts.DefaultIPAMStaticIPv4,
+		Node: plugins.NodeConfig{
+			NodeID:      s.ID(),
+			NetworkIPv4: s.nw.NetworkV4(),
+			NetworkIPv6: s.nw.NetworkV6(),
+			AddressIPv4: s.nw.WireGuard().AddressV4(),
+			AddressIPv6: s.nw.WireGuard().AddressV6(),
+			Domain:      s.meshDomain,
+			Key:         s.key,
+		},
+	}
+	s.plugins, err = plugins.NewManager(ctx, pluginopts)
+	if err != nil {
+		return handleErr(fmt.Errorf("failed to load plugins: %w", err))
+	}
+	cleanFuncs = append(cleanFuncs, func() {
+		if err := s.plugins.Close(); err != nil {
+			log.Error("Failed to close plugins", slog.String("error", err.Error()))
+		}
+	})
+	// If we are using the built-in raftstorage, register the observer
+	if raft, ok := s.storage.(*raftstorage.Provider); ok {
+		raft.OnObservation(s.newObserver())
 	}
 	// Register an update hook to watch for network changes.
 	if s.storage.Consensus().IsMember() {

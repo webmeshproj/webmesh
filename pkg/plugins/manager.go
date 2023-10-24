@@ -33,9 +33,11 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
 	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 var (
@@ -50,10 +52,30 @@ type Options struct {
 	Storage storage.Provider
 	// Plugins is a map of plugin names to plugin configs.
 	Plugins map[string]Plugin
+	// Node is the node configuration to pass to each plugin.
+	Node NodeConfig
 	// DisableDefaultIPAM disables the default IPAM plugin.
 	DisableDefaultIPAM bool
 	// DefaultIPAMStaticIPv4 is a map of node names to IPv4 addresses.
 	DefaultIPAMStaticIPv4 map[string]string
+}
+
+// NodeConfig is the configuration of the node to pass to each plugin.
+type NodeConfig struct {
+	// NodeID is the ID of the node.
+	NodeID types.NodeID
+	// NetworkIPv4 is the IPv4 network of the mesh
+	NetworkIPv4 netip.Prefix
+	// NetworkIPv6 is the IPv6 network of the mesh
+	NetworkIPv6 netip.Prefix
+	// AddressIPv4 is the IPv4 address of the node
+	AddressIPv4 netip.Prefix
+	// AddressIPv6 is the IPv6 address of the node
+	AddressIPv6 netip.Prefix
+	// Domain is the domain of the mesh
+	Domain string
+	// Key is the node's private key
+	Key crypto.PrivateKey
 }
 
 // Plugin represents a plugin client and its configuration.
@@ -131,6 +153,15 @@ func NewManager(ctx context.Context, opts Options) (Manager, error) {
 		}
 		_, err = plugin.Client.Configure(ctx, &v1.PluginConfiguration{
 			Config: conf,
+			NodeConfig: &v1.NodeConfiguration{
+				Id:          opts.Node.NodeID.String(),
+				NetworkIPv4: opts.Node.NetworkIPv4.String(),
+				NetworkIPv6: opts.Node.NetworkIPv6.String(),
+				AddressIPv4: opts.Node.AddressIPv4.String(),
+				AddressIPv6: opts.Node.AddressIPv6.String(),
+				Domain:      opts.Node.Domain,
+				PrivateKey:  opts.Node.Key.Bytes(),
+			},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("configure plugin: %w", err)
