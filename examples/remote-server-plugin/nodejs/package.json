@@ -1,0 +1,17 @@
+{
+  "name": "webmesh-plugin",
+  "version": "1.0.0",
+  "description": "An example webmesh plugin in Typescript",
+  "main": "index.js",
+  "repository": "https://github.com/webmeshproj/webmesh",
+  "author": "Avi Zimmerman",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@buf/webmeshproj_api.connectrpc_es": "^1.1.2-20231024171646-083590aca074.1",
+    "@connectrpc/connect-fastify": "^1.1.2",
+    "@connectrpc/connect-node": "^1.1.2",
+    "fastify": "^4.24.3",
+    "tsx": "^3.14.0",
+    "typescript": "^5.2.2"
+  }
+}
