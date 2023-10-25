@@ -63,17 +63,12 @@ func TestRPCTransport(t *testing.T) {
 				t.Log("Server error:", err)
 			}
 		}()
-		// Add the server addresses to the peerstore and create
-		// a client transport.
-		err = client.AddAddrs(server.Host().Addrs(), server.Host().ID(), 0)
-		if err != nil {
-			t.Fatal("Client AddAddrs:", err)
-		}
+		// Create a client transport.
 		rt := NewTransport(client, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		// Test the transport for each of the host's addresses.
 		defer client.Close(ctx)
 		for _, addr := range server.Host().Addrs() {
-			c, err := rt.Dial(ctx, addr.String())
+			c, err := rt.Dial(ctx, string(server.ID()), addr.String())
 			if err != nil {
 				t.Fatal("Dial server address:", err)
 			}

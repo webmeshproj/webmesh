@@ -24,6 +24,8 @@ import (
 	"net"
 
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
@@ -94,7 +96,7 @@ type rpcDiscoveryTransport struct {
 	close func()
 }
 
-func (r *rpcDiscoveryTransport) Dial(ctx context.Context, address string) (*grpc.ClientConn, error) {
+func (r *rpcDiscoveryTransport) Dial(ctx context.Context, _, _ string) (*grpc.ClientConn, error) {
 	log := context.LoggerFrom(ctx).With(slog.String("host-id", r.host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
 	rt := NewTransport(r.host, r.Credentials...)
@@ -137,7 +139,7 @@ SearchPeers:
 				} else {
 					connCtx, cancel = context.WithCancel(ctx)
 				}
-				c, err := rt.Dial(connCtx, addr.String())
+				c, err := rt.Dial(connCtx, string(peer.ID), addr.String())
 				cancel()
 				if err == nil {
 					return c, nil
@@ -158,20 +160,44 @@ type rpcTransport struct {
 	creds []grpc.DialOption
 }
 
-func (r *rpcTransport) Dial(ctx context.Context, address string) (*grpc.ClientConn, error) {
+func (r *rpcTransport) Dial(ctx context.Context, id, address string) (*grpc.ClientConn, error) {
+	pid := peer.ID(id)
 	ma, err := multiaddr.NewMultiaddr(address)
 	if err != nil {
 		return nil, fmt.Errorf("parse multiaddr: %w", err)
 	}
-	peers := r.h.Host().Peerstore().Peers()
-	for _, peer := range peers {
-		addrs := r.h.Host().Peerstore().Addrs(peer)
-	Addrs:
+	// Fastpath if we are using an uncertified peer store. We can add the address
+	// to the peerstore and dial directly. This saves the caller some work.
+	if _, ok := r.h.Host().Peerstore().(*UncertifiedPeerstore); ok && id != "" {
+		r.h.Host().Peerstore().AddAddr(pid, ma, peerstore.PermanentAddrTTL)
+		stream, err := r.h.Host().NewStream(ctx, pid, RPCProtocol)
+		if err != nil {
+			return nil, fmt.Errorf("new stream: %w", err)
+		}
+		return grpc.DialContext(ctx, "", append(r.creds, grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
+			return NewConnFromStream(stream), nil
+		}))...)
+	}
+	// Next if we don't have an address but have an id, just dial the peer and
+	// let the peerstore handle the rest.
+	if address == "" && id != "" {
+		stream, err := r.h.Host().NewStream(ctx, pid, RPCProtocol)
+		if err != nil {
+			return nil, fmt.Errorf("new stream: %w", err)
+		}
+		return grpc.DialContext(ctx, "", append(r.creds, grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
+			return NewConnFromStream(stream), nil
+		}))...)
+	}
+	// Try to find the peer with the given address.
+	peers := r.h.Host().Peerstore().PeersWithAddrs()
+	for _, pid := range peers {
+		addrs := r.h.Host().Peerstore().Addrs(pid)
 		for _, addr := range addrs {
 			if !addr.Equal(ma) {
-				continue Addrs
+				continue
 			}
-			stream, err := r.h.Host().NewStream(ctx, peer, RPCProtocol)
+			stream, err := r.h.Host().NewStream(ctx, pid, RPCProtocol)
 			if err != nil {
 				return nil, fmt.Errorf("new stream: %w", err)
 			}
@@ -180,5 +206,5 @@ func (r *rpcTransport) Dial(ctx context.Context, address string) (*grpc.ClientCo
 			}))...)
 		}
 	}
-	return nil, fmt.Errorf("no peer found with address %s", address)
+	return nil, fmt.Errorf("no peer found to dial with id %q and address %q", id, address)
 }

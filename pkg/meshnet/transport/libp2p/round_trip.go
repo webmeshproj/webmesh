@@ -95,7 +95,7 @@ func (rt *discoveryRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *
 	log := context.LoggerFrom(ctx).With("method", rt.RoundTripOptions.Method)
 	ctx = context.WithLogger(ctx, log)
 	log.Debug("Attempting to dial node via libp2p")
-	conn, err := rt.transport.Dial(ctx, "")
+	conn, err := rt.transport.Dial(ctx, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("dial: %w", err)
 	}

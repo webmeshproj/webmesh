@@ -40,7 +40,7 @@ type grpcTransport struct {
 	TransportOptions
 }
 
-func (g *grpcTransport) Dial(ctx context.Context, address string) (conn *grpc.ClientConn, err error) {
+func (g *grpcTransport) Dial(ctx context.Context, _, address string) (conn *grpc.ClientConn, err error) {
 	if g.MaxRetries == 0 {
 		g.MaxRetries = 1
 	}

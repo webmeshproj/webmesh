@@ -29,10 +29,11 @@ import (
 )
 
 // RPCTransport is the interface for opening a gRPC connection to a remote peer.
+// the ID is optional and may be ignored by implementations.
 type RPCTransport interface {
 	// Dial opens a gRPC client connection to the remote address. Implementations
 	// may choose to ignore the address and dial a specific peer.
-	Dial(ctx context.Context, address string) (*grpc.ClientConn, error)
+	Dial(ctx context.Context, id, address string) (*grpc.ClientConn, error)
 }
 
 // BootstrapTransport is the interface for dialing other peers to bootstrap

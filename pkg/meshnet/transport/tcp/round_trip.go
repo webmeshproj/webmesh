@@ -76,7 +76,7 @@ func (rt *grpcRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) 
 			dialCtx = ctx
 		}
 		var conn *grpc.ClientConn
-		conn, err = transport.Dial(dialCtx, addr)
+		conn, err = transport.Dial(dialCtx, "", addr)
 		cancel()
 		if err != nil {
 			log.Debug("Failed to dial node", "error", err)
