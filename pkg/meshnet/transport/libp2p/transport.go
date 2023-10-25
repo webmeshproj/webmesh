@@ -24,9 +24,7 @@ import (
 	"net"
 
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	mnet "github.com/multiformats/go-multiaddr/net"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -145,18 +143,4 @@ SearchPeers:
 func (r *rpcTransport) Close() error {
 	r.close()
 	return nil
-}
-
-type streamConn struct {
-	network.Stream
-}
-
-func (s *streamConn) LocalAddr() net.Addr {
-	addr, _ := mnet.ToNetAddr(s.Stream.Conn().LocalMultiaddr())
-	return addr
-}
-
-func (s *streamConn) RemoteAddr() net.Addr {
-	addr, _ := mnet.ToNetAddr(s.Stream.Conn().RemoteMultiaddr())
-	return addr
 }

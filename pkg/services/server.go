@@ -108,14 +108,14 @@ func (o *Options) GetServer(typ any) (MeshServer, bool) {
 
 // Server is the gRPC server.
 type Server struct {
-	opts   Options
-	host   libp2p.Host
-	lis    *net.TCPListener
-	srv    *grpc.Server
-	websrv *http.Server
-	srvs   []MeshServer
-	log    *slog.Logger
-	mu     sync.Mutex
+	opts    Options
+	hostlis net.Listener
+	lis     *net.TCPListener
+	srv     *grpc.Server
+	websrv  *http.Server
+	srvs    []MeshServer
+	log     *slog.Logger
+	mu      sync.Mutex
 }
 
 // NewServer returns a new Server.
@@ -145,7 +145,7 @@ func NewServer(ctx context.Context, o Options) (*Server, error) {
 			if err != nil {
 				return nil, fmt.Errorf("start libp2p host: %w", err)
 			}
-			server.host = host
+			server.hostlis = host.RPCListener()
 		}
 	}
 	return server, nil
@@ -184,10 +184,13 @@ func (s *Server) ListenAndServe() error {
 			return nil
 		})
 	}
-	if s.host != nil {
+	if s.hostlis != nil {
 		g.Go(func() error {
-			defer s.host.Close(context.Background())
-			// TODO: Wrap host listener and pass to server.
+			defer s.hostlis.Close()
+			s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.hostlis.Addr().String()))
+			if err := s.srv.Serve(s.lis); err != nil {
+				return fmt.Errorf("grpc serve: %w", err)
+			}
 			return nil
 		})
 	}
