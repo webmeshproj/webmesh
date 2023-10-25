@@ -19,16 +19,21 @@ limitations under the License.
 package libp2p
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
+	"time"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 // Host is an interface that provides facilities for connecting to peers over libp2p.
@@ -45,9 +50,39 @@ type Host interface {
 	Close(ctx context.Context) error
 }
 
+// HostOptions are options for creating a new libp2p host.
+type HostOptions struct {
+	// Key is the key to use for identification. If left empty, an ephemeral
+	// key is generated.
+	Key crypto.PrivateKey
+	// BootstrapPeers is a list of bootstrap peers to use for the DHT when
+	// creating a discovery host. If empty or nil, the default bootstrap
+	// peers will be used.
+	BootstrapPeers []multiaddr.Multiaddr
+	// Options are options for configuring the libp2p host.
+	Options []config.Option
+	// LocalAddrs is a list of local addresses to announce the host with.
+	// If empty or nil, the default local addresses will be used.
+	LocalAddrs []multiaddr.Multiaddr
+	// ConnectTimeout is the timeout for connecting to peers when bootstrapping.
+	ConnectTimeout time.Duration
+}
+
+// MarshalJSON implements json.Marshaler.
+func (o HostOptions) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"key":            "redacted",
+		"bootstrapPeers": o.BootstrapPeers,
+		"localAddrs":     o.LocalAddrs,
+		"connectTimeout": o.ConnectTimeout,
+	})
+}
+
 // NewHost creates a new libp2p host with the given options.
 func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
-	SetMaxSystemBuffers()
+	if opts.Key != nil {
+		opts.Options = append(opts.Options, libp2p.Identity(opts.Key.AsPrivKey()))
+	}
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
 	}
@@ -88,7 +123,7 @@ func (h *libp2pHost) RPCListener() net.Listener {
 	ch := make(chan net.Conn, 100)
 	ctx, cancel := context.WithCancel(context.Background())
 	h.host.SetStreamHandler(RPCProtocol, func(stream network.Stream) {
-		ch <- &streamConn{stream}
+		ch <- NewConnFromStream(stream)
 	})
 	h.liscancel = cancel
 	return &hostRPCListener{
@@ -139,19 +174,5 @@ func (h *hostRPCListener) Addr() net.Addr {
 		return nil
 	}
 	addr, _ := mnet.ToNetAddr(addrs[0])
-	return addr
-}
-
-type streamConn struct {
-	network.Stream
-}
-
-func (s *streamConn) LocalAddr() net.Addr {
-	addr, _ := mnet.ToNetAddr(s.Stream.Conn().LocalMultiaddr())
-	return addr
-}
-
-func (s *streamConn) RemoteAddr() net.Addr {
-	addr, _ := mnet.ToNetAddr(s.Stream.Conn().RemoteMultiaddr())
 	return addr
 }

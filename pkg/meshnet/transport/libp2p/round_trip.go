@@ -72,7 +72,7 @@ func NewDiscoveryRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTrip
 		RoundTripOptions: opts,
 		transport:        transport,
 		close: func() {
-			err := transport.(*rpcTransport).Close()
+			err := transport.(*rpcDiscoveryTransport).Close()
 			if err != nil {
 				context.LoggerFrom(ctx).Error("Failed to close transport", "error", err.Error())
 			}

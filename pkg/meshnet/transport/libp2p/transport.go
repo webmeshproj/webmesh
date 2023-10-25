@@ -25,6 +25,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -42,6 +43,13 @@ type TransportOptions struct {
 	Host host.Host
 	// Credentials are the credentials to use for the transport.
 	Credentials []grpc.DialOption
+}
+
+// NewTransport returns a new transport using the underlying host. The passed addresses to Dial
+// are parsed as a multiaddrs. It assumes the host's peerstore has been populated with the
+// addresses before calls to Dial.
+func NewTransport(host Host, credentials []grpc.DialOption) transport.RPCTransport {
+	return &rpcTransport{h: host, creds: credentials}
 }
 
 // NewDiscoveryTransport returns a new RPC transport over libp2p using the IPFS DHT for discovery.
@@ -77,18 +85,19 @@ func NewDiscoveryTransport(ctx context.Context, opts TransportOptions) (transpor
 			}
 		}
 	}
-	return &rpcTransport{TransportOptions: opts, host: h, close: close}, nil
+	return &rpcDiscoveryTransport{TransportOptions: opts, host: h, close: close}, nil
 }
 
-type rpcTransport struct {
+type rpcDiscoveryTransport struct {
 	TransportOptions
 	host  DiscoveryHost
 	close func()
 }
 
-func (r *rpcTransport) Dial(ctx context.Context, address string) (*grpc.ClientConn, error) {
+func (r *rpcDiscoveryTransport) Dial(ctx context.Context, address string) (*grpc.ClientConn, error) {
 	log := context.LoggerFrom(ctx).With(slog.String("host-id", r.host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
+	rt := NewTransport(r.host, r.Credentials)
 	log.Debug("Searching for peers on the DHT with our PSK", slog.String("psk", r.Rendezvous))
 	routingDiscovery := drouting.NewRoutingDiscovery(r.host.DHT())
 	peerChan, err := routingDiscovery.FindPeers(ctx, r.Rendezvous)
@@ -119,27 +128,55 @@ SearchPeers:
 				jlog.Debug("Ignoring peer")
 				continue
 			}
-			jlog.Debug("Dialing peer")
-			var connCtx context.Context
-			var cancel context.CancelFunc
-			if r.HostOptions.ConnectTimeout > 0 {
-				connCtx, cancel = context.WithTimeout(ctx, r.HostOptions.ConnectTimeout)
-			} else {
-				connCtx, cancel = context.WithCancel(ctx)
+			for _, addr := range peer.Addrs {
+				jlog.Debug("Dialing peer", slog.String("address", addr.String()))
+				var connCtx context.Context
+				var cancel context.CancelFunc
+				if r.HostOptions.ConnectTimeout > 0 {
+					connCtx, cancel = context.WithTimeout(ctx, r.HostOptions.ConnectTimeout)
+				} else {
+					connCtx, cancel = context.WithCancel(ctx)
+				}
+				c, err := rt.Dial(connCtx, addr.String())
+				cancel()
+				if err == nil {
+					return c, nil
+				}
+				jlog.Debug("Failed to dial peer", "error", err)
 			}
-			stream, err := r.host.Host().NewStream(connCtx, peer.ID, RPCProtocol)
-			cancel()
-			if err == nil {
-				return grpc.DialContext(ctx, "", append(r.Credentials, grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
-					return &streamConn{stream}, nil
-				}))...)
-			}
-			jlog.Debug("Failed to dial peer", "error", err)
 		}
 	}
 }
 
-func (r *rpcTransport) Close() error {
+func (r *rpcDiscoveryTransport) Close() error {
 	r.close()
 	return nil
+}
+
+type rpcTransport struct {
+	h     Host
+	creds []grpc.DialOption
+}
+
+func (r *rpcTransport) Dial(ctx context.Context, address string) (*grpc.ClientConn, error) {
+	ma, err := multiaddr.NewMultiaddr(address)
+	if err != nil {
+		return nil, fmt.Errorf("parse multiaddr: %w", err)
+	}
+	peers := r.h.Host().Peerstore().PeersWithAddrs()
+	for _, peer := range peers {
+		addrs := r.h.Host().Peerstore().Addrs(peer)
+		for _, addr := range addrs {
+			if addr.Equal(ma) {
+				stream, err := r.h.Host().NewStream(ctx, peer, RPCProtocol)
+				if err != nil {
+					return nil, fmt.Errorf("new stream: %w", err)
+				}
+				return grpc.DialContext(ctx, "", append(r.creds, grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
+					return NewConnFromStream(stream), nil
+				}))...)
+			}
+		}
+	}
+	return nil, fmt.Errorf("no peer found with address %s", address)
 }
