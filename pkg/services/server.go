@@ -198,8 +198,8 @@ func (s *Server) ListenAndServe() error {
 	if s.hostlis != nil {
 		g.Go(func() error {
 			defer s.hostlis.Close()
-			s.log.Info(fmt.Sprintf("Starting gRPC server on %s", s.hostlis.Addr().String()))
-			if err := s.srv.Serve(s.lis); err != nil {
+			s.log.Info(fmt.Sprintf("Starting libp2p gRPC server on %s", s.hostlis.Addr().String()))
+			if err := s.srv.Serve(s.hostlis); err != nil {
 				return fmt.Errorf("grpc serve: %w", err)
 			}
 			return nil
