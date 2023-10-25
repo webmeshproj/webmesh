@@ -127,7 +127,14 @@ func (h *hostRPCListener) Close() error {
 
 // Addr returns the listener's network address.
 func (h *hostRPCListener) Addr() net.Addr {
-	return nil
+	// Just return the first address.
+	addrs := h.h.Host().Addrs()
+	if len(addrs) == 0 {
+		// This should never happen
+		return nil
+	}
+	addr, _ := mnet.ToNetAddr(addrs[0])
+	return addr
 }
 
 type streamConn struct {
