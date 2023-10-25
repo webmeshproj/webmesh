@@ -27,6 +27,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/record"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	"github.com/multiformats/go-multiaddr"
@@ -91,6 +92,14 @@ func (h *discoveryHost) Host() host.Host {
 
 func (h *discoveryHost) DHT() *dht.IpfsDHT {
 	return h.dht
+}
+
+func (h *discoveryHost) AddAddrs(addrs []multiaddr.Multiaddr, id peer.ID, ttl time.Duration) error {
+	return h.h.AddAddrs(addrs, id, ttl)
+}
+
+func (h *discoveryHost) SignAddrs(seq uint64) (*record.Envelope, error) {
+	return h.h.SignAddrs(seq)
 }
 
 func (h *discoveryHost) RPCListener() net.Listener {

@@ -48,7 +48,7 @@ type TransportOptions struct {
 // NewTransport returns a new transport using the underlying host. The passed addresses to Dial
 // are parsed as a multiaddrs. It assumes the host's peerstore has been populated with the
 // addresses before calls to Dial.
-func NewTransport(host Host, credentials []grpc.DialOption) transport.RPCTransport {
+func NewTransport(host Host, credentials ...grpc.DialOption) transport.RPCTransport {
 	return &rpcTransport{h: host, creds: credentials}
 }
 
@@ -97,7 +97,7 @@ type rpcDiscoveryTransport struct {
 func (r *rpcDiscoveryTransport) Dial(ctx context.Context, address string) (*grpc.ClientConn, error) {
 	log := context.LoggerFrom(ctx).With(slog.String("host-id", r.host.ID().String()))
 	ctx = context.WithLogger(ctx, log)
-	rt := NewTransport(r.host, r.Credentials)
+	rt := NewTransport(r.host, r.Credentials...)
 	log.Debug("Searching for peers on the DHT with our PSK", slog.String("psk", r.Rendezvous))
 	routingDiscovery := drouting.NewRoutingDiscovery(r.host.DHT())
 	peerChan, err := routingDiscovery.FindPeers(ctx, r.Rendezvous)
@@ -163,19 +163,21 @@ func (r *rpcTransport) Dial(ctx context.Context, address string) (*grpc.ClientCo
 	if err != nil {
 		return nil, fmt.Errorf("parse multiaddr: %w", err)
 	}
-	peers := r.h.Host().Peerstore().PeersWithAddrs()
+	peers := r.h.Host().Peerstore().Peers()
 	for _, peer := range peers {
 		addrs := r.h.Host().Peerstore().Addrs(peer)
+	Addrs:
 		for _, addr := range addrs {
-			if addr.Equal(ma) {
-				stream, err := r.h.Host().NewStream(ctx, peer, RPCProtocol)
-				if err != nil {
-					return nil, fmt.Errorf("new stream: %w", err)
-				}
-				return grpc.DialContext(ctx, "", append(r.creds, grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
-					return NewConnFromStream(stream), nil
-				}))...)
+			if !addr.Equal(ma) {
+				continue Addrs
 			}
+			stream, err := r.h.Host().NewStream(ctx, peer, RPCProtocol)
+			if err != nil {
+				return nil, fmt.Errorf("new stream: %w", err)
+			}
+			return grpc.DialContext(ctx, "", append(r.creds, grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
+				return NewConnFromStream(stream), nil
+			}))...)
 		}
 	}
 	return nil, fmt.Errorf("no peer found with address %s", address)

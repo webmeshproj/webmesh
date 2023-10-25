@@ -29,6 +29,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 
@@ -42,6 +43,10 @@ type Host interface {
 	ID() peer.ID
 	// Host is the underlying libp2p host.
 	Host() host.Host
+	// AddAddrs adds the given addresses to the host's peerstore.
+	AddAddrs(addrs []multiaddr.Multiaddr, id peer.ID, ttl time.Duration) error
+	// SignAddrs creates an envelope for this host's peer ID and addresses.
+	SignAddrs(seq uint64) (*record.Envelope, error)
 	// RPCListener creates and returns a new net.Listener listening for RPC connections.
 	// This should only ever be called once per host. The host will be closed when the
 	// listener is closed.
@@ -117,6 +122,32 @@ func (h *libp2pHost) Host() host.Host {
 	return h.host
 }
 
+// AddAddrs adds the given addresses to the host's peerstore. It will also
+// attempt to extract the public key from the peer ID and add it to the peerstore.
+func (h *libp2pHost) AddAddrs(addrs []multiaddr.Multiaddr, id peer.ID, ttl time.Duration) error {
+	ps := h.host.Peerstore()
+	pubkey, err := id.ExtractPublicKey()
+	if err != nil {
+		return fmt.Errorf("extract public key: %w", err)
+	}
+	err = ps.AddPubKey(id, pubkey)
+	if err != nil {
+		return fmt.Errorf("add public key: %w", err)
+	}
+	ps.AddAddrs(id, addrs, ttl)
+	return nil
+}
+
+// SignAddrs creates an envelope for this host's peer ID and addresses.
+func (h *libp2pHost) SignAddrs(seq uint64) (*record.Envelope, error) {
+	rec := &peer.PeerRecord{
+		PeerID: h.Host().ID(),
+		Addrs:  h.Host().Addrs(),
+		Seq:    seq,
+	}
+	return record.Seal(rec, h.Host().Peerstore().PrivKey(h.Host().ID()))
+}
+
 // RPCListener creates and returns a new net.Listener listening for RPC connections.
 // This should only ever be called once per host.
 func (h *libp2pHost) RPCListener() net.Listener {
@@ -153,7 +184,7 @@ type hostRPCListener struct {
 func (h *hostRPCListener) Accept() (net.Conn, error) {
 	select {
 	case <-h.closec:
-		return nil, fmt.Errorf("listener closed")
+		return nil, net.ErrClosed
 	case conn := <-h.acceptc:
 		return conn, nil
 	}
