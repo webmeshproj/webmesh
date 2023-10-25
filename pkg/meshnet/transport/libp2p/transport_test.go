@@ -166,7 +166,7 @@ func TestRPCTransport(t *testing.T) {
 				defer c.Close()
 				cli := v1.NewMeshClient(c)
 				_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
-				// We should actually get an unimplemented error here.
+				// We should get an unauthenticated error here.
 				if err == nil {
 					t.Fatal("Expected error, got nil")
 				}
