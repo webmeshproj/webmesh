@@ -42,6 +42,8 @@ type TransportOptions struct {
 	HostOptions HostOptions
 	// Host is a pre-started host to use for the transport.
 	Host host.Host
+	// Credentials are the credentials to use for the transport.
+	Credentials []grpc.DialOption
 }
 
 // NewDiscoveryTransport returns a new RPC transport over libp2p using the IPFS DHT for
@@ -127,9 +129,9 @@ SearchPeers:
 			stream, err := r.host.Host().NewStream(connCtx, peer.ID, RPCProtocol)
 			cancel()
 			if err == nil {
-				return grpc.DialContext(ctx, "", grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
+				return grpc.DialContext(ctx, "", append(r.Credentials, grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
 					return &streamConn{stream}, nil
-				}))
+				}))...)
 			}
 			jlog.Debug("Failed to dial peer", "error", err)
 
