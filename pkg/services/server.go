@@ -227,7 +227,7 @@ func (s *Server) GetServiceInfo() map[string]grpc.ServiceInfo {
 
 // GRPCListenPort returns the port the gRPC server is listening on.
 func (s *Server) GRPCListenPort() int {
-	if s.opts.DisableGRPC {
+	if s.lis == nil {
 		return 0
 	}
 	return s.lis.Addr().(*net.TCPAddr).Port

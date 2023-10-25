@@ -375,9 +375,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 	if err != nil {
 		return
 	}
-
 	// Parse all endpoints and routes
-
 	var primaryEndpoint netip.Addr
 	if o.Mesh.PrimaryEndpoint != "" {
 		primaryEndpoint, err = netip.ParseAddr(o.Mesh.PrimaryEndpoint)
@@ -416,13 +414,11 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 			}
 		}
 	}
-
 	// Create the join transport
 	joinRT, err := o.NewJoinTransport(ctx, nodeid, conn, host)
 	if err != nil {
 		return
 	}
-
 	// Configure any bootstrap options
 	var bootstrap *meshnode.BootstrapOptions
 	if o.Bootstrap.Enabled {
@@ -432,12 +428,6 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 		}
 		var bootstrapServers []string
 		for id := range o.Bootstrap.Transport.TCPServers {
-			if id == nodeid {
-				continue
-			}
-			bootstrapServers = append(bootstrapServers, id)
-		}
-		for _, id := range o.Bootstrap.Transport.RendezvousNodes {
 			if id == nodeid {
 				continue
 			}
@@ -456,13 +446,12 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 			Force:                o.Bootstrap.Force,
 		}
 	}
-
 	// Create our plugins
 	plugins, err := o.Plugins.NewPluginSet(ctx)
 	if err != nil {
 		return
 	}
-
+	// Determine the local DNS address if enabled.
 	var localDNSAddr netip.AddrPort
 	if o.Services.MeshDNS.Enabled {
 		localDNSAddr, err = netip.ParseAddrPort(o.Services.MeshDNS.ListenUDP)
@@ -471,7 +460,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 		}
 		localDNSAddr = netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), localDNSAddr.Port())
 	}
-
+	// Create the options
 	opts = meshnode.ConnectOptions{
 		StorageProvider:      provider,
 		JoinRoundTripper:     joinRT,
@@ -500,17 +489,6 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 		}(),
 		PreferIPv6: o.Mesh.StoragePreferIPv6,
 		Plugins:    plugins,
-		Discovery: func() *libp2p.AnnounceOptions {
-			if !o.Discovery.Announce {
-				return nil
-			}
-			return &libp2p.AnnounceOptions{
-				Host:        host,
-				Rendezvous:  o.Discovery.Rendezvous,
-				AnnounceTTL: o.Discovery.AnnounceTTL,
-				HostOptions: o.Discovery.HostOptions(ctx, conn.Key()),
-			}
-		}(),
 		NetworkOptions: meshnet.Options{
 			Modprobe:              o.WireGuard.Modprobe,
 			InterfaceName:         o.WireGuard.InterfaceName,
@@ -584,10 +562,11 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn meshn
 		}), nil
 	}
 	if o.Discovery.Discover {
-		joinTransport, err := libp2p.NewJoinRoundTripper(ctx, libp2p.RoundTripOptions{
-			Rendezvous:  o.Discovery.Rendezvous,
+		joinTransport, err := libp2p.NewDiscoveryJoinRoundTripper(ctx, libp2p.RoundTripOptions{
 			Host:        host,
+			Rendezvous:  o.Discovery.Rendezvous,
 			HostOptions: o.Discovery.HostOptions(ctx, conn.Key()),
+			Credentials: conn.Credentials(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("create libp2p join transport: %w", err)

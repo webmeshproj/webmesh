@@ -39,22 +39,17 @@ type RoundTripOptions struct {
 	AddressTimeout time.Duration
 }
 
+// NewJoinRoundTripper creates a new gRPC round tripper for issuing a Join Request.
+func NewJoinRoundTripper(opts RoundTripOptions) transport.JoinRoundTripper {
+	return NewRoundTripper[v1.JoinRequest, v1.JoinResponse](opts, v1.Membership_Join_FullMethodName)
+}
+
 // NewRoundTripper creates a new gRPC round tripper for the given method.
 func NewRoundTripper[REQ, RESP any](opts RoundTripOptions, method string) transport.RoundTripper[REQ, RESP] {
 	return &grpcRoundTripper[REQ, RESP]{
 		RoundTripOptions: opts,
 		method:           method,
 	}
-}
-
-// NewJoinRoundTripper creates a new gRPC round tripper for issuing a Join Request.
-func NewJoinRoundTripper(opts RoundTripOptions) transport.JoinRoundTripper {
-	return NewRoundTripper[v1.JoinRequest, v1.JoinResponse](opts, v1.Membership_Join_FullMethodName)
-}
-
-// NewLeaveRoundTripper creates a new gRPC round tripper for issuing a Leave Request.
-func NewLeaveRoundTripper(opts RoundTripOptions) transport.LeaveRoundTripper {
-	return NewRoundTripper[v1.LeaveRequest, v1.LeaveResponse](opts, v1.Membership_Leave_FullMethodName)
 }
 
 type grpcRoundTripper[REQ, RESP any] struct {
@@ -90,9 +85,6 @@ func (rt *grpcRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) 
 		defer conn.Close()
 		log.Debug("Dial successful, invoking request")
 		var resp RESP
-		if len(rt.Credentials) > 0 {
-			log.Debug("Using credentials")
-		}
 		var callOpts []grpc.CallOption
 		for _, cred := range rt.Credentials {
 			if callCred, ok := cred.(grpc.CallOption); ok {

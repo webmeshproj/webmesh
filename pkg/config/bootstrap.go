@@ -26,11 +26,9 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -86,14 +84,6 @@ type BootstrapTransportOptions struct {
 	// advertise address and locally configured gRPC port for every node in bootstrap-servers. Ports should
 	// be in the form of <node-id>=<port>.
 	ServerGRPCPorts map[string]int `koanf:"server-grpc-ports,omitempty"`
-	// Rendezvous is the rendezvous string to use when using libp2p to bootstrap.
-	Rendezvous string `koanf:"rendezvous,omitempty"`
-	// RendezvousNodes is the list of node IDs to use when using libp2p to bootstrap.
-	RendezvousNodes []string `koanf:"rendezvous-nodes,omitempty"`
-	// RendezvousLinger is the amount of time to wait for other nodes to join when using libp2p to bootstrap.
-	RendezvousLinger time.Duration `koanf:"rendezvous-linger,omitempty"`
-	// PSK is the pre-shared key to use when using libp2p to bootstrap.
-	PSK string `koanf:"psk,omitempty"`
 }
 
 // NewBootstrapOptions returns a new BootstrapOptions with the default values.
@@ -122,10 +112,6 @@ func NewBootstrapTransportOptions() BootstrapTransportOptions {
 		TCPConnectionPool:   0,
 		TCPConnectTimeout:   3 * time.Second,
 		ServerGRPCPorts:     map[string]int{},
-		Rendezvous:          "",
-		RendezvousNodes:     []string{},
-		RendezvousLinger:    time.Minute,
-		PSK:                 "",
 	}
 }
 
@@ -152,10 +138,6 @@ func (o *BootstrapTransportOptions) BindFlags(prefix string, fs *pflag.FlagSet) 
 	fs.DurationVar(&o.TCPConnectTimeout, prefix+"tcp-connect-timeout", o.TCPConnectTimeout, "Maximum amount of time to wait for a TCP connection to be established")
 	fs.StringToStringVar(&o.TCPServers, prefix+"tcp-servers", o.TCPServers, "Map of node IDs to raft addresses to bootstrap with")
 	fs.StringToIntVar(&o.ServerGRPCPorts, prefix+"server-grpc-ports", o.ServerGRPCPorts, "Map of node IDs to gRPC ports to bootstrap with")
-	fs.StringVar(&o.Rendezvous, prefix+"rendezvous", o.Rendezvous, "Rendezvous string to use when using libp2p to bootstrap")
-	fs.StringSliceVar(&o.RendezvousNodes, prefix+"rendezvous-nodes", o.RendezvousNodes, "List of node IDs to use when using libp2p to bootstrap")
-	fs.DurationVar(&o.RendezvousLinger, prefix+"rendezvous-linger", o.RendezvousLinger, "Amount of time to wait for other nodes to join when using libp2p to bootstrap")
-	fs.StringVar(&o.PSK, prefix+"psk", o.PSK, "Pre-shared key to use when using libp2p to bootstrap")
 }
 
 // Validate validates the bootstrap options.
@@ -200,25 +182,6 @@ func (o *BootstrapOptions) Validate() error {
 
 // Validate validates the bootstrap transport options.
 func (o BootstrapTransportOptions) Validate() error {
-	if o.Rendezvous != "" || o.PSK != "" {
-		// Validate libp2p options
-		if len(o.RendezvousNodes) == 0 {
-			return fmt.Errorf("rendezvous nodes must be set when using libp2p to bootstrap")
-		}
-		if o.PSK == "" {
-			return fmt.Errorf("psk must be set when using libp2p to bootstrap")
-		}
-		if !crypto.IsValidDefaultPSK(o.PSK) {
-			return fmt.Errorf("psk must be a valid %d character alphanumeric string", crypto.DefaultPSKLength)
-		}
-		if o.Rendezvous == "" {
-			return fmt.Errorf("rendezvous must be set when using libp2p to bootstrap")
-		}
-		if o.RendezvousLinger <= 0 {
-			return fmt.Errorf("rendezvous linger must be greater than 0")
-		}
-		return nil
-	}
 	// Validate TCP options
 	if o.TCPAdvertiseAddress == "" {
 		return fmt.Errorf("advertise address must be set when bootstrapping")
@@ -243,23 +206,8 @@ func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn 
 		return transport.NewNullBootstrapTransport(), nil
 	}
 	t := o.Bootstrap.Transport
-	if len(t.TCPServers) == 0 && len(t.PSK) == 0 && len(t.Rendezvous) == 0 {
+	if len(t.TCPServers) == 0 {
 		return transport.NewNullBootstrapTransport(), nil
-	}
-	if t.PSK != "" && t.Rendezvous != "" {
-		if o.Discovery.ConnectTimeout > o.Bootstrap.ElectionTimeout {
-			return nil, fmt.Errorf("connect timeout must be less than election timeout when using libp2p to bootstrap")
-		}
-		return libp2p.NewBootstrapTransport(ctx, conn.Discovery(), libp2p.BootstrapOptions{
-			Rendezvous:      t.Rendezvous,
-			Signer:          crypto.PSK(t.PSK),
-			HostOptions:     o.Discovery.HostOptions(ctx, conn.Key()),
-			Host:            host,
-			ElectionTimeout: o.Bootstrap.ElectionTimeout,
-			Linger:          t.RendezvousLinger,
-			NodeID:          nodeID,
-			NodeIDs:         t.RendezvousNodes,
-		})
 	}
 	return tcp.NewBootstrapTransport(tcp.BootstrapTransportOptions{
 		NodeID:          nodeID,

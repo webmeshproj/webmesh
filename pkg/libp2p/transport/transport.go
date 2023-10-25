@@ -136,9 +136,6 @@ func (t *WebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 		return addrs
 	}
 	webmeshSec := protocol.WithPeerID(id)
-	if t.conf.Discovery.Announce {
-		webmeshSec = protocol.WithPeerIDAndRendezvous(id, t.conf.Discovery.Rendezvous)
-	}
 	var out []ma.Multiaddr
 	for _, addr := range addrs {
 		out = append(out, ma.Join(addr, webmeshSec))
@@ -481,8 +478,7 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 		rendezvous, err := protocol.RendezvousFromWebmeshAddr(laddr)
 		if err == nil {
 			t.log.Debug("Starting webmesh node in discovery mode", "rendezvous", rendezvous)
-			if conf.Bootstrap.Enabled || conf.Discovery.Announce {
-				conf.Discovery.Announce = true
+			if conf.Bootstrap.Enabled {
 				conf.Discovery.Rendezvous = rendezvous
 			} else {
 				conf.Discovery.Discover = true

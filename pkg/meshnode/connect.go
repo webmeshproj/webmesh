@@ -30,7 +30,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/providers/raftstorage"
@@ -51,9 +50,6 @@ type ConnectOptions struct {
 	LeaveRoundTripper transport.LeaveRoundTripper
 	// NetworkOptions are options for the network manager
 	NetworkOptions meshnet.Options
-	// Discovery are options for broadcasting to others to join the mesh
-	// via this node. It can be turned on later if needed.
-	Discovery *libp2p.AnnounceOptions
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int
 	// GRPCAdvertisePort is the port to advertise for gRPC connections.
@@ -96,7 +92,6 @@ func (c ConnectOptions) MarshalJSON() ([]byte, error) {
 			return plugins
 		}(),
 		"networkOptions":     c.NetworkOptions,
-		"discovery":          c.Discovery,
 		"maxJoinRetries":     c.MaxJoinRetries,
 		"advertisePort":      c.GRPCAdvertisePort,
 		"dnsPort":            c.MeshDNSAdvertisePort,
@@ -314,12 +309,6 @@ func (s *meshStore) Connect(ctx context.Context, opts ConnectOptions) (err error
 				}
 			}
 		}()
-	}
-	if opts.Discovery != nil {
-		err = s.Discovery().AnnounceToDHT(ctx, *opts.Discovery)
-		if err != nil {
-			return handleErr(fmt.Errorf("announce dht: %w", err))
-		}
 	}
 	return nil
 }

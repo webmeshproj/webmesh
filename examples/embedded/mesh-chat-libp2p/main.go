@@ -95,7 +95,7 @@ func runServer(loglevel string) error {
 	conf.Bootstrap.Enabled = true
 	conf.TLS.Insecure = true
 	conf.Mesh.PrimaryEndpoint = eps[0].Addr().String()
-	conf.Discovery.Announce = true
+	// conf.Discovery.Announce = true
 	conf.Discovery.Rendezvous = string(psk)
 	conf.Discovery.LocalAddrs = []string{"ip6/::1/tcp/61820"}
 

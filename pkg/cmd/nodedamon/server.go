@@ -18,6 +18,7 @@ limitations under the License.
 package nodedaemon
 
 import (
+	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -26,14 +27,12 @@ import (
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
-	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
@@ -316,25 +315,7 @@ func (app *AppDaemon) AnnounceDHT(ctx context.Context, req *v1.AnnounceDHTReques
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	var peers []multiaddr.Multiaddr
-	for _, addr := range req.GetBootstrapServers() {
-		maddr, err := multiaddr.NewMultiaddr(addr)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid bootstrap peer address: %v", err)
-		}
-		peers = append(peers, maddr)
-	}
-	err := app.mesh.Discovery().AnnounceToDHT(ctx, libp2p.AnnounceOptions{
-		Rendezvous: req.GetPsk(),
-		HostOptions: libp2p.HostOptions{
-			BootstrapPeers: peers,
-			ConnectTimeout: time.Second * 5,
-		},
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error announcing: %v", err)
-	}
-	return &v1.AnnounceDHTResponse{}, nil
+	return &v1.AnnounceDHTResponse{}, fmt.Errorf("not implemented")
 }
 
 func (app *AppDaemon) LeaveDHT(ctx context.Context, req *v1.LeaveDHTRequest) (*v1.LeaveDHTResponse, error) {
@@ -343,9 +324,5 @@ func (app *AppDaemon) LeaveDHT(ctx context.Context, req *v1.LeaveDHTRequest) (*v
 	if app.mesh == nil {
 		return nil, ErrNotConnected
 	}
-	err := app.mesh.Discovery().LeaveDHT(ctx, req.GetPsk())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error leaving: %v", err)
-	}
-	return &v1.LeaveDHTResponse{}, nil
+	return &v1.LeaveDHTResponse{}, fmt.Errorf("not implemented")
 }

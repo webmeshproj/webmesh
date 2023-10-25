@@ -18,7 +18,6 @@ package config
 
 import (
 	"fmt"
-	"log/slog"
 	"time"
 
 	p2pcore "github.com/libp2p/go-libp2p"
@@ -33,9 +32,6 @@ import (
 
 // DiscoveryOptions are options for discovering peers.
 type DiscoveryOptions struct {
-	// Announce is a flag to announce this peer to the discovery service.
-	// Otherwise this peer will only discover other peers.
-	Announce bool `koanf:"announce,omitempty"`
 	// Discover is a flag to use the libp2p kademlia DHT for discovery.
 	Discover bool `koanf:"discover,omitempty"`
 	// Rendezvous is the pre-shared key string to use as a rendezvous point for peer discovery.
@@ -43,8 +39,6 @@ type DiscoveryOptions struct {
 	// BootstrapServers is a list of bootstrap servers to use for the DHT.
 	// If empty or nil, the default bootstrap servers will be used.
 	BootstrapServers []string `koanf:"bootstrap-servers,omitempty"`
-	// AnnounceTTL is the TTL for the announcement.
-	AnnounceTTL time.Duration `koanf:"announce-ttl,omitempty"`
 	// LocalAddrs is a list of local addresses to announce to the discovery service.
 	// If empty, the default local addresses will be used.
 	LocalAddrs []string `koanf:"local-addrs,omitempty"`
@@ -56,21 +50,17 @@ type DiscoveryOptions struct {
 // Or one ready with sensible defaults if the PSK is empty.
 func NewDiscoveryOptions(psk string, announce bool) DiscoveryOptions {
 	return DiscoveryOptions{
-		Announce:       announce,
 		Rendezvous:     psk,
 		Discover:       psk != "",
-		AnnounceTTL:    time.Minute,
 		ConnectTimeout: 5 * time.Second,
 	}
 }
 
 // BindFlags binds the flags for the discovery options.
 func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
-	fs.BoolVar(&o.Announce, prefix+"announce", o.Announce, "announce this peer to the discovery service")
 	fs.StringVar(&o.Rendezvous, prefix+"rendezvous", o.Rendezvous, "pre-shared key to use as a rendezvous point for peer discovery")
 	fs.BoolVar(&o.Discover, prefix+"discover", o.Discover, "use the libp2p kademlia DHT for discovery")
 	fs.StringSliceVar(&o.BootstrapServers, prefix+"bootstrap-servers", o.BootstrapServers, "list of bootstrap servers to use for the DHT")
-	fs.DurationVar(&o.AnnounceTTL, prefix+"announce-ttl", o.AnnounceTTL, "TTL for the announcement")
 	fs.StringSliceVar(&o.LocalAddrs, prefix+"local-addrs", o.LocalAddrs, "list of local addresses to announce to the discovery service")
 	fs.DurationVar(&o.ConnectTimeout, prefix+"connect-timeout", o.ConnectTimeout, "timeout for connecting to a peer")
 }
@@ -78,31 +68,9 @@ func (o *DiscoveryOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 // NewHostConfig returns a new HostOptions for the discovery config.
 func (o *DiscoveryOptions) HostOptions(ctx context.Context, key crypto.PrivateKey) libp2p.HostOptions {
 	return libp2p.HostOptions{
-		Options: []config.Option{p2pcore.Identity(key.AsPrivKey())},
-		BootstrapPeers: func() []multiaddr.Multiaddr {
-			out := make([]multiaddr.Multiaddr, 0)
-			for _, addr := range o.BootstrapServers {
-				maddr, err := multiaddr.NewMultiaddr(addr)
-				if err != nil {
-					context.LoggerFrom(ctx).Warn("Invalid local multiaddr", slog.String("address", addr))
-					continue
-				}
-				out = append(out, maddr)
-			}
-			return out
-		}(),
-		LocalAddrs: func() []multiaddr.Multiaddr {
-			out := make([]multiaddr.Multiaddr, 0)
-			for _, addr := range o.LocalAddrs {
-				maddr, err := multiaddr.NewMultiaddr(addr)
-				if err != nil {
-					context.LoggerFrom(ctx).Warn("Invalid local multiaddr", slog.String("address", addr))
-					continue
-				}
-				out = append(out, maddr)
-			}
-			return out
-		}(),
+		Options:        []config.Option{p2pcore.Identity(key.AsPrivKey())},
+		BootstrapPeers: libp2p.ToMultiaddrs(o.BootstrapServers),
+		LocalAddrs:     libp2p.ToMultiaddrs(o.LocalAddrs),
 		ConnectTimeout: o.ConnectTimeout,
 	}
 }
@@ -112,14 +80,11 @@ func (o *DiscoveryOptions) Validate() error {
 	if o == nil {
 		return nil
 	}
-	if !o.Discover && !o.Announce {
+	if !o.Discover {
 		return nil
 	}
 	if o.Rendezvous == "" {
 		return fmt.Errorf("rendezvous must be set when using the kademlia DHT")
-	}
-	if o.Announce && o.AnnounceTTL <= 0 {
-		return fmt.Errorf("announce TTL must be greater than zero")
 	}
 	if o.ConnectTimeout <= 0 {
 		return fmt.Errorf("connect timeout must be greater than zero")

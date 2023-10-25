@@ -36,9 +36,6 @@ func (s *meshStore) Close(ctx context.Context) error {
 	defer s.open.Store(false)
 	defer close(s.closec)
 	s.kvSubCancel()
-	if err := s.discovery.Close(); err != nil {
-		s.log.Error("Error stopping discovery service", slog.String("error", err.Error()))
-	}
 	if s.nw != nil {
 		// Do this last so that we don't lose connectivity to the network
 		defer func() {

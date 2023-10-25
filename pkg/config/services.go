@@ -31,6 +31,9 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
+	p2pcore "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/config"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
@@ -40,6 +43,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -149,6 +153,8 @@ type APIOptions struct {
 	// The node will still be able to join a mesh, but will not be able to
 	// serve any APIs or provide proxying services.
 	Disabled bool `koanf:"disabled,omitempty"`
+	// LibP2P are the options for serving the API over libp2p.
+	LibP2P LibP2PAPIOptions `koanf:"libp2p,omitempty"`
 	// ListenAddress is the gRPC address to listen on.
 	ListenAddress string `koanf:"listen-address,omitempty"`
 	// WebEnabled enables serving gRPC over HTTP/1.1.
@@ -174,6 +180,24 @@ type APIOptions struct {
 	MeshEnabled bool `koanf:"mesh-enabled,omitempty"`
 	// AdminEnabled is true if the admin API should be registered.
 	AdminEnabled bool `koanf:"admin-enabled,omitempty"`
+}
+
+// LibP2PAPIOptions are options for serving the API over libp2p.
+type LibP2PAPIOptions struct {
+	// Enabled is true if the libp2p API should be enabled.
+	Enabled bool `koanf:"enabled,omitempty"`
+	// Announce is true if the node should announce itself to the DHT.
+	Announce bool `koanf:"announce,omitempty"`
+	// Rendezvous is the pre-shared key string to use as a rendezvous point for peer discovery.
+	Rendezvous string `koanf:"rendezvous,omitempty"`
+	// BootstrapServers is a list of bootstrap servers to use for the DHT.
+	// If empty or nil, the default bootstrap servers will be used.
+	BootstrapServers []string `koanf:"bootstrap-servers,omitempty"`
+	// LocalAddrs is a list of local addresses to announce to the discovery service.
+	// If empty, the default local addresses will be used.
+	LocalAddrs []string `koanf:"local-addrs,omitempty"`
+	// ConnectTimeout is the timeout for connecting to a peer.
+	ConnectTimeout time.Duration `koanf:"connect-timeout,omitempty"`
 }
 
 // NewAPIOptions returns a new APIOptions with the default values.
@@ -209,6 +233,7 @@ func (a *APIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&a.Insecure, prefix+"insecure", a.Insecure, "Disable TLS.")
 	fl.BoolVar(&a.MeshEnabled, prefix+"mesh-enabled", a.MeshEnabled, "Enable and register the MeshAPI.")
 	fl.BoolVar(&a.AdminEnabled, prefix+"admin-enabled", a.AdminEnabled, "Enable and register the AdminAPI.")
+	a.LibP2P.BindFlags(prefix+"libp2p.", fl)
 }
 
 // Validate validates the options.
@@ -240,7 +265,7 @@ func (a APIOptions) Validate() error {
 			return fmt.Errorf("services.api.tls-key-data must be set when services.api.tls-cert-data is set")
 		}
 	}
-	return nil
+	return a.LibP2P.Validate()
 }
 
 // ListenPort returns the listen port configured by these API options.
@@ -254,6 +279,35 @@ func (a APIOptions) ListenPort() int {
 		return 0
 	}
 	return out
+}
+
+// BindFlags binds the flags.
+func (l *LibP2PAPIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
+	fl.BoolVar(&l.Enabled, prefix+"enabled", l.Enabled, "Enable the libp2p API.")
+	fl.BoolVar(&l.Announce, prefix+"announce", l.Announce, "Announce this peer to the discovery service.")
+	fl.StringVar(&l.Rendezvous, prefix+"rendezvous", l.Rendezvous, "Pre-shared key to use as a rendezvous point for peer discovery.")
+	fl.StringSliceVar(&l.BootstrapServers, prefix+"bootstrap-servers", l.BootstrapServers, "List of bootstrap servers to use for the DHT.")
+	fl.StringSliceVar(&l.LocalAddrs, prefix+"local-addrs", l.LocalAddrs, "List of local addresses to announce to the discovery service.")
+	fl.DurationVar(&l.ConnectTimeout, prefix+"connect-timeout", l.ConnectTimeout, "Timeout for connecting to a peer.")
+}
+
+// Validate validates the options.
+func (l LibP2PAPIOptions) Validate() error {
+	if !l.Enabled {
+		return nil
+	}
+	if l.Announce {
+		if l.Rendezvous == "" {
+			return fmt.Errorf("services.api.libp2p.rendezvous must be set when announcing")
+		}
+		for _, addr := range append(l.BootstrapServers, l.LocalAddrs...) {
+			_, err := multiaddr.NewMultiaddr(addr)
+			if err != nil {
+				return fmt.Errorf("services.api.libp2p.bootstrap-servers or services.api.libp2p.local-addrs is invalid: %w", err)
+			}
+		}
+	}
+	return nil
 }
 
 // RegistrarOptions are options for running a registrar service.
@@ -573,6 +627,184 @@ func (m MetricsOptions) Validate() error {
 	return nil
 }
 
+// NewServiceOptions returns new options for the webmesh services.
+func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.Node) (conf services.Options, err error) {
+	conf.DisableGRPC = o.API.Disabled
+	if !conf.DisableGRPC {
+		conf.ListenAddress = o.API.ListenAddress
+		// Build out the server options
+		if !o.API.Insecure {
+			// Setup TLS
+			tlsOpts, err := o.NewServerTLSOptions(ctx)
+			if err != nil {
+				return conf, err
+			}
+			conf.ServerOptions = append(conf.ServerOptions, tlsOpts)
+		} else {
+			// Append insecure options
+			conf.ServerOptions = append(conf.ServerOptions, grpc.Creds(insecure.NewCredentials()))
+		}
+		if o.API.LibP2P.Enabled {
+			conf.LibP2POptions = &services.LibP2POptions{
+				HostOptions: libp2p.HostOptions{
+					Options:        []config.Option{p2pcore.Identity(conn.Key().AsPrivKey())},
+					BootstrapPeers: libp2p.ToMultiaddrs(o.API.LibP2P.BootstrapServers),
+					LocalAddrs:     libp2p.ToMultiaddrs(o.API.LibP2P.LocalAddrs),
+				},
+				Announce:   conf.LibP2POptions.Announce,
+				Rendezvous: conf.LibP2POptions.Rendezvous,
+			}
+		}
+		// Always append logging middlewares to the server options
+		unarymiddlewares := []grpc.UnaryServerInterceptor{
+			context.LogInjectUnaryServerInterceptor(context.LoggerFrom(ctx)),
+			logging.UnaryServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+		}
+		streammiddlewares := []grpc.StreamServerInterceptor{
+			context.LogInjectStreamServerInterceptor(context.LoggerFrom(ctx)),
+			logging.StreamServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+		}
+		// If metrics are enabled, register the metrics interceptor
+		if o.Metrics.Enabled {
+			unarymiddlewares, streammiddlewares, err = metrics.AppendMetricsMiddlewares(context.LoggerFrom(ctx), unarymiddlewares, streammiddlewares)
+			if err != nil {
+				return conf, err
+			}
+		}
+		// Register any authentication interceptors
+		if conn.Plugins().HasAuth() {
+			unarymiddlewares = append(unarymiddlewares, conn.Plugins().AuthUnaryInterceptor())
+			streammiddlewares = append(streammiddlewares, conn.Plugins().AuthStreamInterceptor())
+		}
+
+		if !o.API.DisableLeaderProxy {
+			leaderProxy := leaderproxy.New(conn.ID(), conn.Storage().Consensus(), conn, conn.Network())
+			unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
+			streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
+		}
+		conf.ServerOptions = append(conf.ServerOptions, grpc.ChainUnaryInterceptor(unarymiddlewares...))
+		conf.ServerOptions = append(conf.ServerOptions, grpc.ChainStreamInterceptor(streammiddlewares...))
+	}
+	// Append the enabled mesh services
+	if o.MeshDNS.Enabled {
+		dnsServer := meshdns.NewServer(ctx, &meshdns.Options{
+			UDPListenAddr:          o.MeshDNS.ListenUDP,
+			TCPListenAddr:          o.MeshDNS.ListenTCP,
+			ReusePort:              o.MeshDNS.ReusePort,
+			Compression:            o.MeshDNS.EnableCompression,
+			RequestTimeout:         o.MeshDNS.RequestTimeout,
+			Forwarders:             o.MeshDNS.Forwarders,
+			IncludeSystemResolvers: o.MeshDNS.IncludeSystemResolvers,
+			DisableForwarding:      o.MeshDNS.DisableForwarding,
+			CacheSize:              o.MeshDNS.CacheSize,
+		})
+		// Automatically register the local domain
+		err := dnsServer.RegisterDomain(meshdns.DomainOptions{
+			NodeID:              conn.ID(),
+			MeshDomain:          conn.Domain(),
+			MeshStorage:         conn.Storage(),
+			IPv6Only:            o.MeshDNS.IPv6Only,
+			SubscribeForwarders: o.MeshDNS.SubscribeForwarders,
+		})
+		if err != nil {
+			return conf, err
+		}
+		conf.Servers = append(conf.Servers, dnsServer)
+	}
+	if o.TURN.Enabled {
+		turnServer := turn.NewServer(ctx, turn.Options{
+			PublicIP:  o.TURN.PublicIP,
+			ListenUDP: o.TURN.ListenAddress,
+			Realm:     o.TURN.Realm,
+			PortRange: o.TURN.TURNPortRange,
+		})
+		conf.Servers = append(conf.Servers, turnServer)
+	}
+	if o.Metrics.Enabled {
+		metricsServer := metrics.New(ctx, metrics.Options{
+			ListenAddress: o.Metrics.ListenAddress,
+			Path:          o.Metrics.Path,
+		})
+		conf.Servers = append(conf.Servers, metricsServer)
+	}
+	return
+}
+
+// NewServerTLSOptions returns new TLS options for the gRPC server.
+func (o *ServiceOptions) NewServerTLSOptions(ctx context.Context) (grpc.ServerOption, error) {
+	if o.API.Insecure {
+		// We shouldn't have gotten here. But as a fail safe, we return an insecure server.
+		return grpc.Creds(insecure.NewCredentials()), nil
+	}
+	tlsConfig := &tls.Config{}
+	if o.API.TLSCertFile != "" && o.API.TLSKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(o.API.TLSCertFile, o.API.TLSKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+	if o.API.TLSCertData != "" && o.API.TLSKeyData != "" {
+		certData, err := base64.StdEncoding.DecodeString(o.API.TLSCertData)
+		if err != nil {
+			return nil, err
+		}
+		keyData, err := base64.StdEncoding.DecodeString(o.API.TLSKeyData)
+		if err != nil {
+			return nil, err
+		}
+		cert, err := tls.X509KeyPair(certData, keyData)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+	// If we got here with no certificates yet, generate a self-signed one.
+	if len(tlsConfig.Certificates) == 0 {
+		context.LoggerFrom(ctx).Info("Generating self-signed certificate for gRPC server")
+		key, cert, err := crypto.GenerateSelfSignedServerCert()
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{{
+			Certificate: [][]byte{cert.Raw},
+			PrivateKey:  key,
+		}}
+	}
+	// If we are using mTLS we need to request a client certificate
+	if o.API.MTLS {
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		tlsConfig.VerifyConnection = crypto.VerifyConnectionChainOnly
+		if o.API.MTLSClientCAFile != "" {
+			// This happens in external cases where the mtls plugin is not being used.
+			pool := x509.NewCertPool()
+			caCert, err := os.ReadFile(o.API.MTLSClientCAFile)
+			if err != nil {
+				return nil, err
+			}
+			if !pool.AppendCertsFromPEM(caCert) {
+				return nil, fmt.Errorf("failed to parse client CA certificate")
+			}
+			tlsConfig.ClientCAs = pool
+		}
+	}
+	return grpc.Creds(credentials.NewTLS(tlsConfig)), nil
+}
+
+// InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.
+func InterceptorLogger() logging.Logger {
+	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
+		log := context.LoggerFrom(ctx)
+		if msg == "started call" {
+			msg = "Started gRPC call"
+		}
+		if msg == "finished call" {
+			msg = "Finished gRPC call"
+		}
+		log.Log(ctx, slog.Level(lvl), msg, fields...)
+	})
+}
+
 // APIRegistrationOptions are options for registering the APIs to a given server.
 type APIRegistrationOptions struct {
 	// Node is the node to register the APIs against.
@@ -764,175 +996,4 @@ func (o *ServiceOptions) NewFeatureSet(storage meshstorage.Provider, grpcPort in
 		})
 	}
 	return features
-}
-
-// NewServiceOptions returns new options for the webmesh services.
-func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.Node) (conf services.Options, err error) {
-	if !o.API.Disabled {
-		conf.ListenAddress = o.API.ListenAddress
-		// Build out the server options
-		if !o.API.Insecure {
-			// Setup TLS
-			tlsOpts, err := o.NewServerTLSOptions(ctx)
-			if err != nil {
-				return conf, err
-			}
-			conf.ServerOptions = append(conf.ServerOptions, tlsOpts)
-		} else {
-			// Append insecure options
-			conf.ServerOptions = append(conf.ServerOptions, grpc.Creds(insecure.NewCredentials()))
-		}
-		// Always append logging middlewares to the server options
-		unarymiddlewares := []grpc.UnaryServerInterceptor{
-			context.LogInjectUnaryServerInterceptor(context.LoggerFrom(ctx)),
-			logging.UnaryServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
-		}
-		streammiddlewares := []grpc.StreamServerInterceptor{
-			context.LogInjectStreamServerInterceptor(context.LoggerFrom(ctx)),
-			logging.StreamServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
-		}
-
-		// If metrics are enabled, register the metrics interceptor
-		if o.Metrics.Enabled {
-			unarymiddlewares, streammiddlewares, err = metrics.AppendMetricsMiddlewares(context.LoggerFrom(ctx), unarymiddlewares, streammiddlewares)
-			if err != nil {
-				return conf, err
-			}
-		}
-
-		// Register any authentication interceptors
-		if conn.Plugins().HasAuth() {
-			unarymiddlewares = append(unarymiddlewares, conn.Plugins().AuthUnaryInterceptor())
-			streammiddlewares = append(streammiddlewares, conn.Plugins().AuthStreamInterceptor())
-		}
-
-		if !o.API.DisableLeaderProxy {
-			leaderProxy := leaderproxy.New(conn.ID(), conn.Storage().Consensus(), conn, conn.Network())
-			unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
-			streammiddlewares = append(streammiddlewares, leaderProxy.StreamInterceptor())
-		}
-
-		conf.ServerOptions = append(conf.ServerOptions, grpc.ChainUnaryInterceptor(unarymiddlewares...))
-		conf.ServerOptions = append(conf.ServerOptions, grpc.ChainStreamInterceptor(streammiddlewares...))
-	} else {
-		conf.DisableGRPC = true
-	}
-	// Append the enabled mesh services
-	if o.MeshDNS.Enabled {
-		dnsServer := meshdns.NewServer(ctx, &meshdns.Options{
-			UDPListenAddr:          o.MeshDNS.ListenUDP,
-			TCPListenAddr:          o.MeshDNS.ListenTCP,
-			ReusePort:              o.MeshDNS.ReusePort,
-			Compression:            o.MeshDNS.EnableCompression,
-			RequestTimeout:         o.MeshDNS.RequestTimeout,
-			Forwarders:             o.MeshDNS.Forwarders,
-			IncludeSystemResolvers: o.MeshDNS.IncludeSystemResolvers,
-			DisableForwarding:      o.MeshDNS.DisableForwarding,
-			CacheSize:              o.MeshDNS.CacheSize,
-		})
-		// Automatically register the local domain
-		err := dnsServer.RegisterDomain(meshdns.DomainOptions{
-			NodeID:              conn.ID(),
-			MeshDomain:          conn.Domain(),
-			MeshStorage:         conn.Storage(),
-			IPv6Only:            o.MeshDNS.IPv6Only,
-			SubscribeForwarders: o.MeshDNS.SubscribeForwarders,
-		})
-		if err != nil {
-			return conf, err
-		}
-		conf.Servers = append(conf.Servers, dnsServer)
-	}
-	if o.TURN.Enabled {
-		turnServer := turn.NewServer(ctx, turn.Options{
-			PublicIP:  o.TURN.PublicIP,
-			ListenUDP: o.TURN.ListenAddress,
-			Realm:     o.TURN.Realm,
-			PortRange: o.TURN.TURNPortRange,
-		})
-		conf.Servers = append(conf.Servers, turnServer)
-	}
-	if o.Metrics.Enabled {
-		metricsServer := metrics.New(ctx, metrics.Options{
-			ListenAddress: o.Metrics.ListenAddress,
-			Path:          o.Metrics.Path,
-		})
-		conf.Servers = append(conf.Servers, metricsServer)
-	}
-	return
-}
-
-// NewServerTLSOptions returns new TLS options for the gRPC server.
-func (o *ServiceOptions) NewServerTLSOptions(ctx context.Context) (grpc.ServerOption, error) {
-	if o.API.Insecure {
-		// We shouldn't have gotten here. But as a fail safe, we return an insecure server.
-		return grpc.Creds(insecure.NewCredentials()), nil
-	}
-	tlsConfig := &tls.Config{}
-	if o.API.TLSCertFile != "" && o.API.TLSKeyFile != "" {
-		cert, err := tls.LoadX509KeyPair(o.API.TLSCertFile, o.API.TLSKeyFile)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	}
-	if o.API.TLSCertData != "" && o.API.TLSKeyData != "" {
-		certData, err := base64.StdEncoding.DecodeString(o.API.TLSCertData)
-		if err != nil {
-			return nil, err
-		}
-		keyData, err := base64.StdEncoding.DecodeString(o.API.TLSKeyData)
-		if err != nil {
-			return nil, err
-		}
-		cert, err := tls.X509KeyPair(certData, keyData)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	}
-	// If we got here with no certificates yet, generate a self-signed one.
-	if len(tlsConfig.Certificates) == 0 {
-		context.LoggerFrom(ctx).Info("Generating self-signed certificate for gRPC server")
-		key, cert, err := crypto.GenerateSelfSignedServerCert()
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig.Certificates = []tls.Certificate{{
-			Certificate: [][]byte{cert.Raw},
-			PrivateKey:  key,
-		}}
-	}
-	// If we are using mTLS we need to request a client certificate
-	if o.API.MTLS {
-		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		tlsConfig.VerifyConnection = crypto.VerifyConnectionChainOnly
-		if o.API.MTLSClientCAFile != "" {
-			// This happens in external cases where the mtls plugin is not being used.
-			pool := x509.NewCertPool()
-			caCert, err := os.ReadFile(o.API.MTLSClientCAFile)
-			if err != nil {
-				return nil, err
-			}
-			if !pool.AppendCertsFromPEM(caCert) {
-				return nil, fmt.Errorf("failed to parse client CA certificate")
-			}
-			tlsConfig.ClientCAs = pool
-		}
-	}
-	return grpc.Creds(credentials.NewTLS(tlsConfig)), nil
-}
-
-// InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.
-func InterceptorLogger() logging.Logger {
-	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
-		log := context.LoggerFrom(ctx)
-		if msg == "started call" {
-			msg = "Started gRPC call"
-		}
-		if msg == "finished call" {
-			msg = "Finished gRPC call"
-		}
-		log.Log(ctx, slog.Level(lvl), msg, fields...)
-	})
 }

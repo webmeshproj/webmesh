@@ -34,7 +34,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -86,9 +85,6 @@ type Node interface {
 	Network() meshnet.Manager
 	// Plugins returns the Plugin manager.
 	Plugins() plugins.Manager
-	// Discovery returns the interface libp2p.Announcer for announcing
-	// the mesh to the discovery service.
-	Discovery() libp2p.Announcer
 }
 
 // Config contains the configurations for a new mesh connection.
@@ -154,7 +150,6 @@ func NewWithLogger(log *slog.Logger, opts Config) Node {
 		kvSubCancel:      func() {},
 		closec:           make(chan struct{}),
 	}
-	st.discovery = newMeshStoreAnnouncer(st)
 	return st
 }
 
@@ -167,7 +162,6 @@ type meshStore struct {
 	storage          storage.Provider
 	plugins          plugins.Manager
 	kvSubCancel      context.CancelFunc
-	discovery        *meshStoreAnnouncer
 	nw               meshnet.Manager
 	peerUpdateGroup  *errgroup.Group
 	routeUpdateGroup *errgroup.Group
@@ -214,12 +208,6 @@ func (s *meshStore) Network() meshnet.Manager {
 // may be nil if the store is not open.
 func (s *meshStore) Plugins() plugins.Manager {
 	return s.plugins
-}
-
-// Discovery returns the interface libp2p.Announcer for announcing
-// the mesh to the discovery service.
-func (s *meshStore) Discovery() libp2p.Announcer {
-	return s.discovery
 }
 
 // Ready returns a channel that will be closed when the mesh is ready.

@@ -44,8 +44,7 @@ type TransportOptions struct {
 	Credentials []grpc.DialOption
 }
 
-// NewDiscoveryTransport returns a new RPC transport over libp2p using the IPFS DHT for
-// discovery.
+// NewDiscoveryTransport returns a new RPC transport over libp2p using the IPFS DHT for discovery.
 func NewDiscoveryTransport(ctx context.Context, opts TransportOptions) (transport.RPCTransport, error) {
 	var h DiscoveryHost
 	var err error

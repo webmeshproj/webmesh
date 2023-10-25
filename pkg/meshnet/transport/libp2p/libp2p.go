@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/buffers"
@@ -78,4 +79,18 @@ func SetSystemBuffers(size int) {
 			slog.Default().Warn("Failed to set maximum write buffer", "error", err.Error())
 		}
 	})
+}
+
+// ToMultiaddrs returns the given strings as multiaddrs. It silently
+// ignores any invalid multiaddrs.
+func ToMultiaddrs(addrs []string) []multiaddr.Multiaddr {
+	out := make([]multiaddr.Multiaddr, 0)
+	for _, addr := range addrs {
+		maddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			continue
+		}
+		out = append(out, maddr)
+	}
+	return out
 }

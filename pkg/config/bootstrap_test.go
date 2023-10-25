@@ -18,11 +18,9 @@ package config
 
 import (
 	"testing"
-	"time"
 
 	"github.com/spf13/pflag"
 
-	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
 )
 
@@ -276,107 +274,6 @@ func TestValidateBootstrapOptions(t *testing.T) {
 				Transport: BootstrapTransportOptions{
 					TCPAdvertiseAddress: "127.0.0.1:8080",
 					TCPListenAddress:    "[::]:8080",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "NoRendezvousNodes",
-			opts: &BootstrapOptions{
-				Enabled:              true,
-				IPv4Network:          "172.16.0.0/12",
-				MeshDomain:           "webmesh.internal",
-				Admin:                "admin",
-				DefaultNetworkPolicy: string(firewall.PolicyAccept),
-				Transport: BootstrapTransportOptions{
-					Rendezvous:       "test",
-					RendezvousNodes:  []string{},
-					RendezvousLinger: time.Second,
-					PSK:              crypto.MustGeneratePSK().String(),
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "NoPSK",
-			opts: &BootstrapOptions{
-				Enabled:              true,
-				IPv4Network:          "172.16.0.0/12",
-				MeshDomain:           "webmesh.internal",
-				Admin:                "admin",
-				DefaultNetworkPolicy: string(firewall.PolicyAccept),
-				Transport: BootstrapTransportOptions{
-					Rendezvous:       "test",
-					RendezvousNodes:  []string{"test"},
-					RendezvousLinger: time.Second,
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "InvalidPSK",
-			opts: &BootstrapOptions{
-				Enabled:              true,
-				IPv4Network:          "172.16.0.0/12",
-				MeshDomain:           "webmesh.internal",
-				Admin:                "admin",
-				DefaultNetworkPolicy: string(firewall.PolicyAccept),
-				Transport: BootstrapTransportOptions{
-					Rendezvous:       "test",
-					RendezvousNodes:  []string{"test"},
-					RendezvousLinger: time.Second,
-					PSK:              "invalid",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "NoRendezvous",
-			opts: &BootstrapOptions{
-				Enabled:              true,
-				IPv4Network:          "172.16.0.0/12",
-				MeshDomain:           "webmesh.internal",
-				Admin:                "admin",
-				DefaultNetworkPolicy: string(firewall.PolicyAccept),
-				Transport: BootstrapTransportOptions{
-					Rendezvous:       "",
-					RendezvousNodes:  []string{"test"},
-					RendezvousLinger: time.Second,
-					PSK:              crypto.MustGeneratePSK().String(),
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "NoRendezvousLinger",
-			opts: &BootstrapOptions{
-				Enabled:              true,
-				IPv4Network:          "172.16.0.0/12",
-				MeshDomain:           "webmesh.internal",
-				Admin:                "admin",
-				DefaultNetworkPolicy: string(firewall.PolicyAccept),
-				Transport: BootstrapTransportOptions{
-					Rendezvous:       "test",
-					RendezvousNodes:  []string{"test"},
-					RendezvousLinger: 0,
-					PSK:              crypto.MustGeneratePSK().String(),
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "ValidRendezvousOptions",
-			opts: &BootstrapOptions{
-				Enabled:              true,
-				IPv4Network:          "172.16.0.0/12",
-				MeshDomain:           "webmesh.internal",
-				Admin:                "admin",
-				DefaultNetworkPolicy: string(firewall.PolicyAccept),
-				Transport: BootstrapTransportOptions{
-					Rendezvous:       "test",
-					RendezvousNodes:  []string{"test"},
-					RendezvousLinger: time.Second,
-					PSK:              crypto.MustGeneratePSK().String(),
 				},
 			},
 			wantErr: false,
