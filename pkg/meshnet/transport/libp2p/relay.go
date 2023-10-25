@@ -64,7 +64,7 @@ func NewUDPRelayWithHost(ctx context.Context, host DiscoveryHost, opts UDPRelayO
 
 func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost, opts UDPRelayOptions, closef func() error) (*UDPRelay, error) {
 	log := context.LoggerFrom(logCtx).With(slog.String("udp-relay", "libp2p"))
-	log = log.With(slog.String("host-id", host.ID().String()))
+	log = log.With(slog.String("host-id", host.Host().ID().String()))
 	logCtx = context.WithLogger(logCtx, log)
 	rendezvous := opts.PrivateKey.Rendezvous(opts.RemotePubKey)
 	log = log.With(slog.String("rendezvous", rendezvous))
@@ -132,7 +132,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost,
 					if !ok {
 						continue FindPeers
 					}
-					if peer.ID == host.ID() {
+					if peer.ID == host.Host().ID() {
 						continue
 					}
 					if peer.ID == "" {

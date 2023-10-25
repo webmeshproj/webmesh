@@ -40,8 +40,8 @@ import (
 
 // Host is an interface that provides facilities for connecting to peers over libp2p.
 type Host interface {
-	// ID returns the peer ID of the host.
-	ID() peer.ID
+	// ID returns the peer ID of the host as a raw string.
+	ID() string
 	// Host is the underlying libp2p host.
 	Host() host.Host
 	// AddAddrs adds the given addresses to the host's peerstore.
@@ -132,8 +132,8 @@ func wrapHost(host host.Host) Host {
 }
 
 // ID returns the peer ID of the host.
-func (h *libp2pHost) ID() peer.ID {
-	return h.host.ID()
+func (h *libp2pHost) ID() string {
+	return string(h.host.ID())
 }
 
 // Host returns the underlying libp2p host.

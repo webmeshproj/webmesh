@@ -113,7 +113,7 @@ func NewJoinAnnouncer(ctx context.Context, opts AnnounceOptions, join transport.
 }
 
 func newAnnouncerWithHostAndCloseFunc[REQ, RESP any](ctx context.Context, host DiscoveryHost, opts AnnounceOptions, rt transport.UnaryServer[REQ, RESP], close func() error) io.Closer {
-	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.ID().String()))
+	log := context.LoggerFrom(ctx).With(slog.String("host-id", host.Host().ID().String()))
 	host.Host().SetStreamHandler(RPCProtocolFor(opts.Method), func(s network.Stream) {
 		log.Debug("Handling join protocol stream", "peer", s.Conn().RemotePeer())
 		go handleIncomingStream(log, rt, s)

@@ -97,7 +97,7 @@ type rpcDiscoveryTransport struct {
 }
 
 func (r *rpcDiscoveryTransport) Dial(ctx context.Context, _, _ string) (*grpc.ClientConn, error) {
-	log := context.LoggerFrom(ctx).With(slog.String("host-id", r.host.ID().String()))
+	log := context.LoggerFrom(ctx).With(slog.String("host-id", r.host.Host().ID().String()))
 	ctx = context.WithLogger(ctx, log)
 	rt := NewTransport(r.host, r.Credentials...)
 	log.Debug("Searching for peers on the DHT with our PSK", slog.String("psk", r.Rendezvous))
@@ -126,7 +126,7 @@ SearchPeers:
 			}
 			// Ignore ourselves and hosts with no addresses.
 			jlog := log.With(slog.String("peer-id", peer.ID.String()), slog.Any("peer-addrs", peer.Addrs))
-			if peer.ID == r.host.ID() || len(peer.Addrs) == 0 {
+			if peer.ID == r.host.Host().ID() || len(peer.Addrs) == 0 {
 				jlog.Debug("Ignoring peer")
 				continue
 			}

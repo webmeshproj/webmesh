@@ -68,7 +68,7 @@ func TestRPCTransport(t *testing.T) {
 		// Test the transport for each of the host's addresses.
 		defer client.Close(ctx)
 		for _, addr := range server.Host().Addrs() {
-			c, err := rt.Dial(ctx, string(server.ID()), addr.String())
+			c, err := rt.Dial(ctx, server.ID(), addr.String())
 			if err != nil {
 				t.Fatal("Dial server address:", err)
 			}

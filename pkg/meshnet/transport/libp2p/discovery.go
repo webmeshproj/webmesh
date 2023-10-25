@@ -82,7 +82,7 @@ type discoveryHost struct {
 	dht *dht.IpfsDHT
 }
 
-func (h *discoveryHost) ID() peer.ID {
+func (h *discoveryHost) ID() string {
 	return h.h.ID()
 }
 
