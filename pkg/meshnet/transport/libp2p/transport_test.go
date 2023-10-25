@@ -29,6 +29,9 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/plugins"
+	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
+	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
 )
 
 func TestRPCTransport(t *testing.T) {
@@ -52,8 +55,7 @@ func TestRPCTransport(t *testing.T) {
 			defer server.Close(ctx)
 			t.Fatal(err)
 		}
-		// Create a dummy gRPC server and register an unimplemented
-		// service.
+		// Create a dummy gRPC server and register an unimplemented service.
 		srv := grpc.NewServer()
 		t.Cleanup(srv.Stop)
 		v1.RegisterMeshServer(srv, v1.UnimplementedMeshServer{})
@@ -64,7 +66,7 @@ func TestRPCTransport(t *testing.T) {
 			}
 		}()
 		// Create a client transport.
-		rt := NewTransport(client, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		rt := NewTransport(client)
 		// Test the transport for each of the host's addresses.
 		defer client.Close(ctx)
 		for _, addr := range server.Host().Addrs() {
@@ -85,26 +87,95 @@ func TestRPCTransport(t *testing.T) {
 		}
 	})
 
-	t.Run("WithCredentials", func(t *testing.T) {
+	t.Run("WithIDCredentials", func(t *testing.T) {
 		// Setup the libp2p hosts
 		serverKey := crypto.MustGenerateKey()
 		clientKey := crypto.MustGenerateKey()
+		unallowedKey := crypto.MustGenerateKey()
 		server, err := NewHost(ctx, HostOptions{
 			Key: serverKey,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer server.Close(ctx)
 		client, err := NewHost(ctx, HostOptions{
-			Key: clientKey,
+			Key:                  clientKey,
+			UncertifiedPeerstore: true,
+		})
+		if err != nil {
+			defer server.Close(ctx)
+			t.Fatal(err)
+		}
+		unallowedClient, err := NewHost(ctx, HostOptions{
+			Key:                  unallowedKey,
+			UncertifiedPeerstore: true,
+		})
+		if err != nil {
+			defer server.Close(ctx)
+			defer client.Close(ctx)
+			t.Fatal(err)
+		}
+		// Create a dummy gRPC server that uses ID authentication
+		// and register an unimplemented service.
+		idauthsrv, err := idauth.NewWithConfig(ctx, idauth.Config{
+			AllowedIDs: []string{clientKey.ID()},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer client.Close(ctx)
-		// TODO:
+		idauthcli := clients.NewInProcessClient(idauthsrv)
+		srv := grpc.NewServer(grpc.ChainUnaryInterceptor(plugins.NewAuthUnaryInterceptor(idauthcli.Auth())))
+		t.Cleanup(srv.Stop)
+		v1.RegisterMeshServer(srv, v1.UnimplementedMeshServer{})
+		go func() {
+			err := srv.Serve(server.RPCListener())
+			if err != nil {
+				t.Log("Server error:", err)
+			}
+		}()
+		// Test that an allowed ID can use the server.
+		t.Run("AllowedID", func(t *testing.T) {
+			defer client.Close(ctx)
+			rt := NewTransport(client, idauth.NewCreds(clientKey), grpc.WithTransportCredentials(insecure.NewCredentials()))
+			for _, addr := range server.Host().Addrs() {
+				c, err := rt.Dial(ctx, server.ID(), addr.String())
+				if err != nil {
+					t.Fatal("Dial server address:", err)
+				}
+				defer c.Close()
+				cli := v1.NewMeshClient(c)
+				_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
+				// We should actually get an unimplemented error here.
+				if err == nil {
+					t.Fatal("Expected error, got nil")
+				}
+				if status.Code(err) != codes.Unimplemented {
+					t.Fatal("Expected unimplemented error, got", err)
+				}
+			}
+		})
+		// Test that an unallowed ID can use the server, but will be rejected.
+		t.Run("UnallowedID", func(t *testing.T) {
+			defer unallowedClient.Close(ctx)
+			rt := NewTransport(unallowedClient, idauth.NewCreds(unallowedKey), grpc.WithTransportCredentials(insecure.NewCredentials()))
+			for _, addr := range server.Host().Addrs() {
+				c, err := rt.Dial(ctx, server.ID(), addr.String())
+				if err != nil {
+					t.Fatal("Dial server address:", err)
+				}
+				defer c.Close()
+				cli := v1.NewMeshClient(c)
+				_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
+				// We should actually get an unimplemented error here.
+				if err == nil {
+					t.Fatal("Expected error, got nil")
+				}
+				if status.Code(err) != codes.Unauthenticated {
+					t.Fatal("Expected unauthenticated error, got", err)
+				}
+			}
+		})
 	})
 
-	t.Run("WithDiscovery", func(t *testing.T) {})
+	t.Run("WithTLSCredentials", func(t *testing.T) {})
 }

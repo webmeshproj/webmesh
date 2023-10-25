@@ -264,11 +264,22 @@ func (m *manager) HasWatchers() bool {
 // AuthUnaryInterceptor returns a unary interceptor for the configured auth plugin.
 // If no plugin is configured, the returned function is a no-op.
 func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	var icep grpc.UnaryServerInterceptor
+	if m.auth != nil {
+		icep = NewAuthUnaryInterceptor(m.auth.Client.Auth())
+	}
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		if m.auth == nil {
 			return handler(ctx, req)
 		}
-		resp, err := m.auth.Client.Auth().Authenticate(ctx, m.newAuthRequest(ctx))
+		return icep(ctx, req, info, handler)
+	}
+}
+
+// NewAuthUnaryInterceptor returns a unary interceptor for the given auth plugin.
+func NewAuthUnaryInterceptor(plugin v1.AuthPluginClient) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		resp, err := plugin.Authenticate(ctx, newAuthRequest(ctx))
 		if err != nil {
 			return nil, status.Errorf(codes.Unauthenticated, "authenticate: %v", err)
 		}
@@ -282,11 +293,22 @@ func (m *manager) AuthUnaryInterceptor() grpc.UnaryServerInterceptor {
 // AuthStreamInterceptor returns a stream interceptor for the configured auth plugin.
 // If no plugin is configured, the returned function is a no-op.
 func (m *manager) AuthStreamInterceptor() grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	var icep grpc.StreamServerInterceptor
+	if m.auth != nil {
+		icep = NewAuthStreamInterceptor(m.auth.Client.Auth())
+	}
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if m.auth == nil {
 			return handler(srv, ss)
 		}
-		resp, err := m.auth.Client.Auth().Authenticate(ss.Context(), m.newAuthRequest(ss.Context()))
+		return icep(srv, ss, info, handler)
+	}
+}
+
+// NewAuthStreamInterceptor returns a stream interceptor for the given auth plugin.
+func NewAuthStreamInterceptor(plugin v1.AuthPluginClient) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		resp, err := plugin.Authenticate(ss.Context(), newAuthRequest(ss.Context()))
 		if err != nil {
 			return status.Errorf(codes.Unauthenticated, "authenticate: %v", err)
 		}
@@ -391,7 +413,7 @@ func (m *manager) handleQueryClient(plugin string, db storage.Provider, queries 
 	}
 }
 
-func (m *manager) newAuthRequest(ctx context.Context) *v1.AuthenticationRequest {
+func newAuthRequest(ctx context.Context) *v1.AuthenticationRequest {
 	var req v1.AuthenticationRequest
 	if md, ok := context.MetadataFrom(ctx); ok {
 		headers := make(map[string]string)

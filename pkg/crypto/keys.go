@@ -56,7 +56,8 @@ func init() {
 type Key interface {
 	p2pcrypto.Key
 
-	// ID returns the peer ID of the key.
+	// ID returns the peer ID of the key as an encoded string.
+	// This will always be the ID of the public key.
 	ID() string
 
 	// Bytes returns the raw bytes of the key. This is the same as Key.Raw

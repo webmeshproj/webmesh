@@ -29,6 +29,7 @@ import (
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
@@ -51,6 +52,10 @@ type TransportOptions struct {
 // are parsed as a multiaddrs. It assumes the host's peerstore has been populated with the
 // addresses before calls to Dial.
 func NewTransport(host Host, credentials ...grpc.DialOption) transport.RPCTransport {
+	// If no credentials are provided, default to insecure credentials.
+	if len(credentials) == 0 {
+		credentials = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	}
 	return &rpcTransport{h: host, creds: credentials}
 }
 
@@ -206,5 +211,5 @@ func (r *rpcTransport) Dial(ctx context.Context, id, address string) (*grpc.Clie
 			}))...)
 		}
 	}
-	return nil, fmt.Errorf("no peer found to dial with id %q and address %q", id, address)
+	return nil, fmt.Errorf("no peer found to dial with id %q and address %q", pid.String(), address)
 }
