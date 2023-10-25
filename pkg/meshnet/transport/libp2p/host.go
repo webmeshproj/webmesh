@@ -29,6 +29,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
@@ -47,6 +48,8 @@ type Host interface {
 	AddAddrs(addrs []multiaddr.Multiaddr, id peer.ID, ttl time.Duration) error
 	// SignAddrs creates an envelope for this host's peer ID and addresses.
 	SignAddrs(seq uint64) (*record.Envelope, error)
+	// ConsumePeerRecord consumes a peer record and adds it to the peerstore.
+	ConsumePeerRecord(rec *record.Envelope, ttl time.Duration) error
 	// RPCListener creates and returns a new net.Listener listening for RPC connections.
 	// This should only ever be called once per host. The host will be closed when the
 	// listener is closed.
@@ -125,6 +128,9 @@ func (h *libp2pHost) Host() host.Host {
 // AddAddrs adds the given addresses to the host's peerstore. It will also
 // attempt to extract the public key from the peer ID and add it to the peerstore.
 func (h *libp2pHost) AddAddrs(addrs []multiaddr.Multiaddr, id peer.ID, ttl time.Duration) error {
+	if ttl == 0 {
+		ttl = peerstore.PermanentAddrTTL
+	}
 	ps := h.host.Peerstore()
 	pubkey, err := id.ExtractPublicKey()
 	if err != nil {
@@ -146,6 +152,25 @@ func (h *libp2pHost) SignAddrs(seq uint64) (*record.Envelope, error) {
 		Seq:    seq,
 	}
 	return record.Seal(rec, h.Host().Peerstore().PrivKey(h.Host().ID()))
+}
+
+// ConsumePeerRecord consumes a peer record and adds it to the peerstore.
+func (h *libp2pHost) ConsumePeerRecord(rec *record.Envelope, ttl time.Duration) error {
+	if ttl == 0 {
+		ttl = peerstore.PermanentAddrTTL
+	}
+	cab, ok := peerstore.GetCertifiedAddrBook(h.host.Peerstore())
+	if !ok {
+		return fmt.Errorf("no certified address book")
+	}
+	ok, err := cab.ConsumePeerRecord(rec, ttl)
+	if err != nil {
+		return fmt.Errorf("consume peer record: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("consume peer record returned false")
+	}
+	return nil
 }
 
 // RPCListener creates and returns a new net.Listener listening for RPC connections.

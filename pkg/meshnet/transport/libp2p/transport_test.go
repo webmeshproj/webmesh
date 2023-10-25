@@ -21,7 +21,6 @@ package libp2p
 import (
 	"testing"
 
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -73,16 +72,9 @@ func TestRPCTransport(t *testing.T) {
 		if err != nil {
 			t.Fatal("Server SignAddrs:", err)
 		}
-		clientcab, ok := peerstore.GetCertifiedAddrBook(client.Host().Peerstore())
-		if !ok {
-			t.Fatal("No certified address book")
-		}
-		ok, err = clientcab.ConsumePeerRecord(envelope, peerstore.PermanentAddrTTL)
+		err = client.ConsumePeerRecord(envelope, 0)
 		if err != nil {
 			t.Fatal("Client ConsumePeerRecord:", err)
-		}
-		if !ok {
-			t.Fatal("ConsumePeerRecord returned false")
 		}
 		rt := NewTransport(client, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		// Test the transport for each of the host's addresses.

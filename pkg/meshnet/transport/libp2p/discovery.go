@@ -102,6 +102,10 @@ func (h *discoveryHost) SignAddrs(seq uint64) (*record.Envelope, error) {
 	return h.h.SignAddrs(seq)
 }
 
+func (h *discoveryHost) ConsumePeerRecord(rec *record.Envelope, ttl time.Duration) error {
+	return h.h.ConsumePeerRecord(rec, ttl)
+}
+
 func (h *discoveryHost) RPCListener() net.Listener {
 	return h.h.RPCListener()
 }
