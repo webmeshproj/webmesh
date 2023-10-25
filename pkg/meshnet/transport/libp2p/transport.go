@@ -53,14 +53,14 @@ func NewDiscoveryTransport(ctx context.Context, opts TransportOptions) (transpor
 	var err error
 	var close func()
 	if opts.Host != nil {
-		dht, err := NewDHT(ctx, opts.Host, opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
+		host := wrapHost(opts.Host)
+		dht, err := NewDHT(ctx, host.Host(), opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
 		if err != nil {
 			return nil, err
 		}
 		h = &discoveryHost{
-			host: opts.Host,
-			dht:  dht,
-			opts: opts.HostOptions,
+			h:   host,
+			dht: dht,
 		}
 		close = func() {
 			err := dht.Close()
@@ -110,6 +110,10 @@ SearchPeers:
 				if ctx.Err() != nil {
 					return nil, fmt.Errorf("no peers found to dial: %w", ctx.Err())
 				}
+				peerChan, err = routingDiscovery.FindPeers(ctx, r.Rendezvous)
+				if err != nil {
+					return nil, fmt.Errorf("libp2p find peers: %w", err)
+				}
 				continue SearchPeers
 			}
 			// Ignore ourselves and hosts with no addresses.
@@ -134,7 +138,6 @@ SearchPeers:
 				}))...)
 			}
 			jlog.Debug("Failed to dial peer", "error", err)
-
 		}
 	}
 }

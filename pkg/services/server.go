@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 )
 
 // DefaultGRPCPort is the default port for the gRPC server.
@@ -84,8 +85,20 @@ type Options struct {
 	// ServerOptions are options for the server. This should include
 	// any registered authentication mechanisms.
 	ServerOptions []grpc.ServerOption
+	// LibP2POptions are options for serving the gRPC server over libp2p.
+	LibP2POptions *LibP2POptions
 	// Servers are additional servers to manage alongside the gRPC server.
 	Servers MeshServers
+}
+
+// LibP2POptions are options for serving the gRPC server over libp2p.
+type LibP2POptions struct {
+	// HostOptions are options for the libp2p host.
+	HostOptions libp2p.HostOptions
+	// Announce will announce the host on the DHT at the given rendezvous if true.
+	Announce bool
+	// Rendezvous is the rendezvous string to use for libp2p.
+	Rendezvous string
 }
 
 // GetServer returns the server of the given type.
@@ -96,6 +109,7 @@ func (o *Options) GetServer(typ any) (MeshServer, bool) {
 // Server is the gRPC server.
 type Server struct {
 	opts   Options
+	host   libp2p.Host
 	lis    *net.TCPListener
 	srv    *grpc.Server
 	websrv *http.Server
@@ -119,11 +133,20 @@ func NewServer(ctx context.Context, o Options) (*Server, error) {
 		log.Debug("Registering reflection service")
 		reflection.Register(server)
 		// Go ahead and start the listener.
-		lis, err := net.Listen("tcp", o.ListenAddress)
-		if err != nil {
-			return nil, fmt.Errorf("start TCP listener: %w", err)
+		if o.ListenAddress != "" {
+			lis, err := net.Listen("tcp", o.ListenAddress)
+			if err != nil {
+				return nil, fmt.Errorf("start TCP listener: %w", err)
+			}
+			server.lis = lis.(*net.TCPListener)
 		}
-		server.lis = lis.(*net.TCPListener)
+		if o.LibP2POptions != nil {
+			host, err := libp2p.NewHost(ctx, o.LibP2POptions.HostOptions)
+			if err != nil {
+				return nil, fmt.Errorf("start libp2p host: %w", err)
+			}
+			server.host = host
+		}
 	}
 	return server, nil
 }
@@ -143,7 +166,7 @@ func (s *Server) ListenAndServe() error {
 			return nil
 		})
 	}
-	if !s.opts.DisableGRPC {
+	if s.lis != nil {
 		g.Go(func() error {
 			defer s.lis.Close()
 			if s.opts.WebEnabled {
@@ -158,6 +181,13 @@ func (s *Server) ListenAndServe() error {
 			if err := s.srv.Serve(s.lis); err != nil {
 				return fmt.Errorf("grpc serve: %w", err)
 			}
+			return nil
+		})
+	}
+	if s.host != nil {
+		g.Go(func() error {
+			defer s.host.Close(context.Background())
+			// TODO: Wrap host listener and pass to server.
 			return nil
 		})
 	}

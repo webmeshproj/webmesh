@@ -83,14 +83,14 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 	var err error
 	var close func() error
 	if opts.Host != nil {
-		dht, err := NewDHT(ctx, opts.Host, opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
+		host := wrapHost(opts.Host)
+		dht, err := NewDHT(ctx, host.Host(), opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
 		if err != nil {
 			return nil, err
 		}
 		h = &discoveryHost{
-			opts: opts.HostOptions,
-			host: opts.Host,
-			dht:  dht,
+			h:   host,
+			dht: dht,
 		}
 		close = func() error {
 			return dht.Close()

@@ -25,8 +25,12 @@ import (
 	"strings"
 	"sync"
 
+	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
+	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/buffers"
 )
@@ -78,4 +82,55 @@ func SetSystemBuffers(size int) {
 			slog.Default().Warn("Failed to set maximum write buffer", "error", err.Error())
 		}
 	})
+}
+
+// Host is an interface that provides facilities for connecting to peers over libp2p.
+type Host interface {
+	// ID returns the peer ID of the host.
+	ID() peer.ID
+	// Host is the underlying libp2p host.
+	Host() host.Host
+	// Close closes the host and its DHT.
+	Close(ctx context.Context) error
+}
+
+// NewHost creates a new libp2p host with the given options.
+func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
+	SetMaxSystemBuffers()
+	if len(opts.LocalAddrs) > 0 {
+		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))
+	}
+	if opts.ConnectTimeout > 0 {
+		opts.Options = append(opts.Options, libp2p.WithDialTimeout(opts.ConnectTimeout))
+	}
+	opts.Options = append(opts.Options, libp2p.FallbackDefaults)
+	host, err := libp2p.New(opts.Options...)
+	if err != nil {
+		return nil, fmt.Errorf("new libp2p host: %w", err)
+	}
+	return wrapHost(host), nil
+}
+
+type libp2pHost struct {
+	host host.Host
+}
+
+// wrapHost wraps a libp2p host.
+func wrapHost(host host.Host) Host {
+	return &libp2pHost{host}
+}
+
+// ID returns the peer ID of the host.
+func (h *libp2pHost) ID() peer.ID {
+	return h.host.ID()
+}
+
+// Host returns the underlying libp2p host.
+func (h *libp2pHost) Host() host.Host {
+	return h.host
+}
+
+// Close closes the host and shuts down all listeners.
+func (h *libp2pHost) Close(ctx context.Context) error {
+	return h.host.Close()
 }

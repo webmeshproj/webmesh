@@ -92,14 +92,14 @@ func NewBootstrapTransport(ctx context.Context, announcer Announcer, opts Bootst
 		return nil, err
 	}
 	if opts.Host != nil {
-		dht, err := NewDHT(ctx, opts.Host, opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
+		host := wrapHost(opts.Host)
+		dht, err := NewDHT(ctx, host.Host(), opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
 		if err != nil {
 			return nil, err
 		}
 		h := &discoveryHost{
-			opts: opts.HostOptions,
-			host: opts.Host,
-			dht:  dht,
+			h:   host,
+			dht: dht,
 		}
 		return newBootstrapTransportWithClose(h, announcer, opts, uu, func() {
 			err := dht.Close()
