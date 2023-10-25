@@ -45,7 +45,8 @@ func TestRPCTransport(t *testing.T) {
 			t.Fatal(err)
 		}
 		client, err := NewHost(ctx, HostOptions{
-			Key: clientKey,
+			Key:                  clientKey,
+			UncertifiedPeerstore: true,
 		})
 		if err != nil {
 			defer server.Close(ctx)
@@ -67,14 +68,6 @@ func TestRPCTransport(t *testing.T) {
 		err = client.AddAddrs(server.Host().Addrs(), server.Host().ID(), 0)
 		if err != nil {
 			t.Fatal("Client AddAddrs:", err)
-		}
-		envelope, err := server.SignAddrs(0)
-		if err != nil {
-			t.Fatal("Server SignAddrs:", err)
-		}
-		err = client.ConsumePeerRecord(envelope, 0)
-		if err != nil {
-			t.Fatal("Client ConsumePeerRecord:", err)
 		}
 		rt := NewTransport(client, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		// Test the transport for each of the host's addresses.

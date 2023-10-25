@@ -31,10 +31,11 @@ func TestUncertifiedPeerstore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Make sure we can't coerce it to a certified peerstore.
+	// Make sure we can coerce it to a certified peerstore.
+	// The certification methods should be no-ops.
 	_, ok := peerstore.GetCertifiedAddrBook(ps)
-	if ok {
-		t.Fatal("expected uncertified peerstore")
+	if !ok {
+		t.Fatal("expected certified addr book")
 	}
 	// Make sure we can add addresses and have them immediately be
 	// available.

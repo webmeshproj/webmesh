@@ -17,9 +17,15 @@ limitations under the License.
 package libp2p
 
 import (
+	"time"
+
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 )
+
+var _ peerstore.Peerstore = (*UncertifiedPeerstore)(nil)
 
 // UncertifiedPeerstore is a peerstore that does not verify peer addresses with
 // signatures.
@@ -33,5 +39,15 @@ func NewUncertifiedPeerstore() (peerstore.Peerstore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &UncertifiedPeerstore{memstore}, nil
+	return &UncertifiedPeerstore{
+		Peerstore: memstore,
+	}, nil
+}
+
+func (ps *UncertifiedPeerstore) ConsumePeerRecord(s *record.Envelope, ttl time.Duration) (accepted bool, err error) {
+	return true, nil
+}
+
+func (ps *UncertifiedPeerstore) GetPeerRecord(p peer.ID) *record.Envelope {
+	return nil
 }

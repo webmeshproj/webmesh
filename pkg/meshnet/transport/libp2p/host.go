@@ -24,7 +24,7 @@ import (
 	"net"
 	"time"
 
-	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -74,6 +74,13 @@ type HostOptions struct {
 	LocalAddrs []multiaddr.Multiaddr
 	// ConnectTimeout is the timeout for connecting to peers when bootstrapping.
 	ConnectTimeout time.Duration
+	// UncertifiedPeerstore uses an uncertified peerstore for the host.
+	// This is useful for testing or when using the host to dial pre-trusted
+	// peers.
+	UncertifiedPeerstore bool
+	// NoFallbackDefaults disables the use of fallback defaults when creating
+	// the host. This is useful for testing.
+	NoFallbackDefaults bool
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -97,7 +104,16 @@ func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
 	if opts.ConnectTimeout > 0 {
 		opts.Options = append(opts.Options, libp2p.WithDialTimeout(opts.ConnectTimeout))
 	}
-	opts.Options = append(opts.Options, libp2p.FallbackDefaults)
+	if opts.UncertifiedPeerstore {
+		ps, err := NewUncertifiedPeerstore()
+		if err != nil {
+			return nil, fmt.Errorf("new uncertified peerstore: %w", err)
+		}
+		opts.Options = append(opts.Options, libp2p.Peerstore(ps))
+	}
+	if !opts.NoFallbackDefaults {
+		opts.Options = append(opts.Options, libp2p.FallbackDefaults)
+	}
 	host, err := libp2p.New(opts.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("new libp2p host: %w", err)
