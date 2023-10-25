@@ -63,12 +63,13 @@ func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
 }
 
 type libp2pHost struct {
-	host host.Host
+	host      host.Host
+	liscancel func()
 }
 
 // wrapHost wraps a libp2p host.
 func wrapHost(host host.Host) Host {
-	return &libp2pHost{host}
+	return &libp2pHost{host: host}
 }
 
 // ID returns the peer ID of the host.
@@ -89,6 +90,7 @@ func (h *libp2pHost) RPCListener() net.Listener {
 	h.host.SetStreamHandler(RPCProtocol, func(stream network.Stream) {
 		ch <- &streamConn{stream}
 	})
+	h.liscancel = cancel
 	return &hostRPCListener{
 		h:       h,
 		close:   cancel,
@@ -99,6 +101,9 @@ func (h *libp2pHost) RPCListener() net.Listener {
 
 // Close closes the host and shuts down all listeners.
 func (h *libp2pHost) Close(ctx context.Context) error {
+	if h.liscancel != nil {
+		h.liscancel()
+	}
 	return h.host.Close()
 }
 
