@@ -134,6 +134,7 @@ func NewServer(ctx context.Context, o Options) (*Server, error) {
 		reflection.Register(server)
 		// Go ahead and start the listener.
 		if o.ListenAddress != "" {
+			log.Debug("Starting TCP listener", "address", o.ListenAddress)
 			lis, err := net.Listen("tcp", o.ListenAddress)
 			if err != nil {
 				return nil, fmt.Errorf("start TCP listener: %w", err)
@@ -141,9 +142,19 @@ func NewServer(ctx context.Context, o Options) (*Server, error) {
 			server.lis = lis.(*net.TCPListener)
 		}
 		if o.LibP2POptions != nil {
-			host, err := libp2p.NewHost(ctx, o.LibP2POptions.HostOptions)
+			log.Debug("Starting libp2p host listener")
+			hostOpts := o.LibP2POptions.HostOptions
+			host, err := libp2p.NewHost(ctx, hostOpts)
 			if err != nil {
 				return nil, fmt.Errorf("start libp2p host: %w", err)
+			}
+			if o.LibP2POptions.Announce {
+				log.Debug("Announcing libp2p host to the DHT")
+				discovery, err := libp2p.WrapHostWithDiscovery(ctx, host, hostOpts.BootstrapPeers, hostOpts.ConnectTimeout)
+				if err != nil {
+					return nil, fmt.Errorf("wrap host with discovery: %w", err)
+				}
+				discovery.Announce(ctx, o.LibP2POptions.Rendezvous, 0)
 			}
 			server.hostlis = host.RPCListener()
 		}

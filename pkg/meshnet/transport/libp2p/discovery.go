@@ -25,8 +25,11 @@ import (
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/config"
+	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -42,6 +45,8 @@ type DiscoveryHost interface {
 	Host() host.Host
 	// DHT is the underlying libp2p DHT.
 	DHT() *dht.IpfsDHT
+	// Announce announces the host to the DHT for the given rendezvous string.
+	Announce(ctx context.Context, rendezvous string, ttl time.Duration)
 	// Close closes the host and its DHT.
 	Close(ctx context.Context) error
 }
@@ -104,18 +109,25 @@ type discoveryHost struct {
 	dht *dht.IpfsDHT
 }
 
-// ID returns the peer ID of the host.
 func (h *discoveryHost) ID() peer.ID {
 	return h.h.ID()
 }
 
-// Host returns the underlying libp2p host.
 func (h *discoveryHost) Host() host.Host {
 	return h.h.Host()
 }
 
 func (h *discoveryHost) DHT() *dht.IpfsDHT {
 	return h.dht
+}
+
+func (h *discoveryHost) Announce(ctx context.Context, rendezvous string, ttl time.Duration) {
+	routingDiscovery := drouting.NewRoutingDiscovery(h.dht)
+	var discoveryOpts []discovery.Option
+	if ttl > 0 {
+		discoveryOpts = append(discoveryOpts, discovery.TTL(ttl))
+	}
+	dutil.Advertise(ctx, routingDiscovery, rendezvous, discoveryOpts...)
 }
 
 func (h *discoveryHost) Close(ctx context.Context) error {
