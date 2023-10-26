@@ -167,13 +167,14 @@ type rpcTransport struct {
 
 func (r *rpcTransport) Dial(ctx context.Context, id, address string) (*grpc.ClientConn, error) {
 	pid := peer.ID(id)
-	ma, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return nil, fmt.Errorf("parse multiaddr: %w", err)
-	}
 	// Fastpath if we are using an uncertified peer store. We can add the address
 	// to the peerstore and dial directly. This saves the caller some work.
 	if _, ok := r.h.Host().Peerstore().(*UncertifiedPeerstore); ok && id != "" {
+		// Try to find the peer with the given address.
+		ma, err := multiaddr.NewMultiaddr(address)
+		if err != nil {
+			return nil, fmt.Errorf("parse multiaddr: %w", err)
+		}
 		r.h.Host().Peerstore().AddAddr(pid, ma, peerstore.PermanentAddrTTL)
 		stream, err := r.h.Host().NewStream(ctx, pid, RPCProtocol)
 		if err != nil {
@@ -195,6 +196,10 @@ func (r *rpcTransport) Dial(ctx context.Context, id, address string) (*grpc.Clie
 		}))...)
 	}
 	// Try to find the peer with the given address.
+	ma, err := multiaddr.NewMultiaddr(address)
+	if err != nil {
+		return nil, fmt.Errorf("parse multiaddr: %w", err)
+	}
 	peers := r.h.Host().Peerstore().PeersWithAddrs()
 	for _, pid := range peers {
 		addrs := r.h.Host().Peerstore().Addrs(pid)

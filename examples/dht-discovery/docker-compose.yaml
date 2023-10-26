@@ -48,9 +48,10 @@ services:
       # Enable an embedded TURN server. You can optionally use a public one.
       - --services.turn.enabled
       - --services.turn.public-ip=10.40.0.1
-      # Announce Peer discovery using KadDHT.
-      - --discovery.announce
-      - --discovery.rendezvous=superkadsecret
+      # Serve and announce the api over libp2p
+      - --services.api.libp2p.enabled
+      - --services.api.libp2p.announce
+      - --services.api.libp2p.rendezvous=superkadsecret
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]
 

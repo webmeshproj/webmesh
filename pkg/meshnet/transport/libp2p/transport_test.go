@@ -24,6 +24,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/record"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -40,6 +43,91 @@ import (
 
 func TestRPCTransport(t *testing.T) {
 	ctx := context.Background()
+
+	t.Run("WithCertifiedPeerstore", func(t *testing.T) {
+		// Setup the libp2p hosts
+		serverKey := crypto.MustGenerateKey()
+		clientKey := crypto.MustGenerateKey()
+		server, err := NewHost(ctx, HostOptions{
+			Key: serverKey,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		client, err := NewHost(ctx, HostOptions{
+			Key: clientKey,
+		})
+		if err != nil {
+			defer server.Close(ctx)
+			t.Fatal(err)
+		}
+		// Sign and consume a signed record of the host addresses.
+		peerrec := peer.NewPeerRecord()
+		peerrec.Addrs = server.Host().Addrs()
+		peerrec.PeerID = peer.ID(server.ID())
+		envelope, err := record.Seal(peerrec, serverKey.AsIdentity())
+		if err != nil {
+			defer server.Close(ctx)
+			defer client.Close(ctx)
+			t.Fatal(err)
+		}
+		client.AddAddrs(server.Host().Addrs(), peer.ID(server.ID()), peerstore.PermanentAddrTTL)
+		err = client.ConsumePeerRecord(envelope, peerstore.PermanentAddrTTL)
+		if err != nil {
+			defer server.Close(ctx)
+			defer client.Close(ctx)
+			t.Fatal(err)
+		}
+		// Create a dummy gRPC server and register an unimplemented service.
+		srv := grpc.NewServer()
+		v1.RegisterMeshServer(srv, v1.UnimplementedMeshServer{})
+		go func() {
+			err := srv.Serve(server.RPCListener())
+			if err != nil {
+				t.Log("Server error:", err)
+			}
+		}()
+		t.Cleanup(srv.Stop)
+		// Create a client transport.
+		rt := NewTransport(client)
+		t.Cleanup(func() { _ = client.Close(ctx) })
+
+		t.Run("DialByID", func(t *testing.T) {
+			c, err := rt.Dial(ctx, server.ID(), "")
+			if err != nil {
+				t.Fatal("Dial server address:", err)
+			}
+			defer c.Close()
+			cli := v1.NewMeshClient(c)
+			_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
+			// We should actually get an unimplemented error here.
+			if err == nil {
+				t.Fatal("Expected error, got nil")
+			}
+			if status.Code(err) != codes.Unimplemented {
+				t.Fatal("Expected unimplemented error, got", err)
+			}
+		})
+
+		t.Run("DialByMultiaddr", func(t *testing.T) {
+			for _, addr := range server.Host().Addrs() {
+				c, err := rt.Dial(ctx, "", addr.String())
+				if err != nil {
+					t.Fatal("Dial server address:", err)
+				}
+				defer c.Close()
+				cli := v1.NewMeshClient(c)
+				_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
+				// We should actually get an unimplemented error here.
+				if err == nil {
+					t.Fatal("Expected error, got nil")
+				}
+				if status.Code(err) != codes.Unimplemented {
+					t.Fatal("Expected unimplemented error, got", err)
+				}
+			}
+		})
+	})
 
 	t.Run("WithoutCredentials", func(t *testing.T) {
 		// Setup the libp2p hosts
