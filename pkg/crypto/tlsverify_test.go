@@ -53,12 +53,7 @@ func TestVerifyConnectionChainOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	certs := []tls.Certificate{servercert}
-	certs = append(certs, tls.Certificate{Certificate: [][]byte{cacert.Raw}})
-	tlsConfig := &tls.Config{
-		// InsecureSkipVerify: true,
-		RootCAs:      roots,
-		Certificates: certs,
-	}
+	tlsConfig := &tls.Config{Certificates: certs}
 	ln, err := tls.Listen("tcp", "localhost:0", tlsConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -71,9 +66,7 @@ func TestVerifyConnectionChainOnly(t *testing.T) {
 				return
 			}
 			defer c.Close()
-			if err := c.(*tls.Conn).Handshake(); err != nil {
-				t.Log(err)
-			}
+			c.(*tls.Conn).Handshake()
 		}
 	}()
 

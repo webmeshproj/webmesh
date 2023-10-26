@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -24,7 +25,6 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
-	"os"
 	"strings"
 	"time"
 
@@ -283,27 +283,27 @@ func (o *Config) NewClientCredentials(ctx context.Context, key crypto.PrivateKey
 		if err != nil {
 			roots = x509.NewCertPool()
 		}
+		var ca *x509.Certificate
 		if o.TLS.CAFile != "" {
 			// Load the CA file
 			log.Debug("Loading CA file", slog.String("file", o.TLS.CAFile))
-			ca, err := os.ReadFile(o.TLS.CAFile)
+			ca, err = crypto.DecodeTLSCertificateFromFile(o.TLS.CAFile)
 			if err != nil {
 				return nil, fmt.Errorf("read CA file: %w", err)
 			}
-			// Add the CA to the roots
-			if !roots.AppendCertsFromPEM(ca) {
-				return nil, fmt.Errorf("add CA to roots")
-			}
+			roots.AddCert(ca)
 		}
 		if o.TLS.CAData != "" {
-			ca, err := base64.StdEncoding.DecodeString(o.TLS.CAData)
+			// Load the CA data
+			pemdata, err := base64.StdEncoding.DecodeString(o.TLS.CAData)
 			if err != nil {
 				return nil, fmt.Errorf("decode CA data: %w", err)
 			}
-			// Add the CA to the roots
-			if !roots.AppendCertsFromPEM(ca) {
-				return nil, fmt.Errorf("add CA to roots")
+			ca, err = crypto.DecodeTLSCertificate(bytes.NewReader(pemdata))
+			if err != nil {
+				return nil, fmt.Errorf("read CA data: %w", err)
 			}
+			roots.AddCert(ca)
 		}
 		tlsconf.RootCAs = roots
 		if o.TLS.InsecureSkipVerify {
@@ -311,9 +311,13 @@ func (o *Config) NewClientCredentials(ctx context.Context, key crypto.PrivateKey
 			tlsconf.InsecureSkipVerify = true
 		}
 		if o.TLS.VerifyChainOnly {
+			if ca == nil {
+				// This shouldn't have happened
+				return nil, fmt.Errorf("verify chain only is enabled but no CA was provided")
+			}
 			log.Warn("VerifyChainOnly is enabled, only verifying the certificate chain")
 			tlsconf.InsecureSkipVerify = true
-			tlsconf.VerifyConnection = crypto.VerifyConnectionChainOnly
+			tlsconf.VerifyPeerCertificate = crypto.VerifyCertificateChainOnly([]*x509.Certificate{ca})
 		}
 		// Check if we are using mutual TLS
 		if !o.Auth.MTLS.IsEmpty() {

@@ -18,6 +18,7 @@ limitations under the License.
 package config
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -355,21 +356,33 @@ func (c *Config) SetCurrentContext(name string) {
 func (c *Config) TLSConfig() (*tls.Config, error) {
 	config := &tls.Config{}
 	cluster := c.GetCurrentCluster()
-	certpool := x509.NewCertPool()
+	var certpool *x509.CertPool
+	var err error
+	certpool, err = x509.SystemCertPool()
+	if err != nil {
+		certpool = x509.NewCertPool()
+	}
+	var ca *x509.Certificate
 	if cluster.CertificateAuthorityData != "" {
-		ca, err := base64.StdEncoding.DecodeString(cluster.CertificateAuthorityData)
+		pemdata, err := base64.StdEncoding.DecodeString(cluster.CertificateAuthorityData)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode CA certificate: %w", err)
+			return nil, fmt.Errorf("decode CA data: %w", err)
 		}
-		if !certpool.AppendCertsFromPEM(ca) {
-			return nil, fmt.Errorf("failed to add CA certificate to cert pool")
+		ca, err = crypto.DecodeTLSCertificate(bytes.NewReader(pemdata))
+		if err != nil {
+			return nil, fmt.Errorf("read CA data: %w", err)
 		}
+		certpool.AddCert(ca)
 	}
 	config.RootCAs = certpool
 	config.InsecureSkipVerify = cluster.TLSSkipVerify
 	if cluster.TLSVerifyChainOnly {
+		if ca == nil {
+			// This shouldn't happen
+			return nil, fmt.Errorf("no CA certificate specified")
+		}
 		config.InsecureSkipVerify = true
-		config.VerifyConnection = crypto.VerifyConnectionChainOnly
+		config.VerifyPeerCertificate = crypto.VerifyCertificateChainOnly([]*x509.Certificate{ca})
 	}
 	currentUser := c.GetCurrentUser()
 	var certs []tls.Certificate

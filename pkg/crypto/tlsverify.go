@@ -17,7 +17,6 @@ limitations under the License.
 package crypto
 
 import (
-	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 )
@@ -25,27 +24,22 @@ import (
 // ErrInvalidPeerCertificate is returned when a TLS connection has invalid peer certificate.
 var ErrInvalidPeerCertificate = fmt.Errorf("invalid peer certificate")
 
-// VerifyConnectionChainOnly is a function that can be used in a TLS configuration
-// to only verify that the certificate chain is valid.
-func VerifyConnectionChainOnly(cs tls.ConnectionState) error {
-	opts := x509.VerifyOptions{
-		Intermediates: x509.NewCertPool(),
-	}
-	for _, cert := range cs.PeerCertificates {
-		opts.Intermediates.AddCert(cert)
-	}
-	_, err := cs.PeerCertificates[0].Verify(opts)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidPeerCertificate, err)
-	}
-	return nil
-}
-
 // VerifyPeerCertificateFunc is a function that can be used in a TLS configuration
 // to verify the peer certificate.
 type VerifyPeerCertificateFunc func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
 
-// VerifyCertificateChainOnly is a function that can be used in a TLS configuration
+// VerifyCertificateChainFromFile returns a function that can be used in a TLS configuration
+// to verify that the certificate chain is valid according to the PEM-encoded data in the
+// given file.
+func VerifyCertificateChainFromFile(filename string) (VerifyPeerCertificateFunc, error) {
+	cert, err := DecodeTLSCertificateFromFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	return VerifyCertificateChainOnly([]*x509.Certificate{cert}), nil
+}
+
+// VerifyCertificateChainOnly returns a function that can be used in a TLS configuration
 // to only verify that the certificate chain is valid.
 func VerifyCertificateChainOnly(rootcerts []*x509.Certificate) VerifyPeerCertificateFunc {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {

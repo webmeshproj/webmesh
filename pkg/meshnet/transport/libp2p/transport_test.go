@@ -20,6 +20,8 @@ package libp2p
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"strings"
 	"testing"
 
 	v1 "github.com/webmeshproj/api/v1"
@@ -237,6 +239,145 @@ func TestRPCTransport(t *testing.T) {
 			}
 		})
 
-		t.Run("WithMTLS", func(t *testing.T) {})
+		t.Run("WithMTLS", func(t *testing.T) {
+			// Generate a CA certificate and key.
+			caPrivKey, caCert, err := crypto.GenerateCA(crypto.CACertConfig{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rootpool := x509.NewCertPool()
+			rootpool.AddCert(caCert)
+			// Generate a server certificate and key.
+			serverKey, serverCert, err := crypto.IssueCertificate(crypto.IssueConfig{
+				CommonName: "test-webmesh-server",
+				// KeyType:    crypto.TLSKeyWebmesh,
+				CACert: caCert,
+				CAKey:  caPrivKey,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Generate a client certificate and key.
+			clientKey, clientCert, err := crypto.IssueCertificate(crypto.IssueConfig{
+				CommonName: "test-webmesh-client",
+				// KeyType:    crypto.TLSKeyWebmesh,
+				CACert: caCert,
+				CAKey:  caPrivKey,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			servertlsconf := &tls.Config{
+				InsecureSkipVerify:    true,
+				VerifyPeerCertificate: crypto.VerifyCertificateChainOnly([]*x509.Certificate{caCert}),
+				ClientAuth:            tls.RequireAndVerifyClientCert,
+				ClientCAs:             rootpool,
+				Certificates: []tls.Certificate{{
+					Certificate: [][]byte{serverCert.Raw},
+					PrivateKey:  serverKey,
+				}}}
+			clienttlsconf := &tls.Config{
+				InsecureSkipVerify:    true,
+				VerifyPeerCertificate: crypto.VerifyCertificateChainOnly([]*x509.Certificate{caCert}),
+				RootCAs:               rootpool,
+				Certificates: []tls.Certificate{{
+					Certificate: [][]byte{clientCert.Raw},
+					PrivateKey:  clientKey,
+				}},
+			}
+			servercreds := grpc.Creds(credentials.NewTLS(servertlsconf))
+			clientcreds := grpc.WithTransportCredentials(credentials.NewTLS(clienttlsconf))
+			// Get started the same as the others above.
+			server, err := NewHost(ctx, HostOptions{
+				Key: crypto.MustGenerateKey(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			srv := grpc.NewServer(servercreds)
+			v1.RegisterMeshServer(srv, v1.UnimplementedMeshServer{})
+			go func() {
+				err := srv.Serve(server.RPCListener())
+				if err != nil {
+					t.Log("Server error:", err)
+				}
+			}()
+			t.Cleanup(srv.Stop)
+
+			t.Run("ValidClientCertificate", func(t *testing.T) {
+				client, err := NewHost(ctx, HostOptions{
+					Key:                  crypto.MustGenerateKey(),
+					UncertifiedPeerstore: true,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Create a client transport.
+				rt := NewTransport(client, clientcreds)
+				// Test the transport for each of the host's addresses.
+				defer client.Close(ctx)
+				for _, addr := range server.Host().Addrs() {
+					c, err := rt.Dial(ctx, server.ID(), addr.String())
+					if err != nil {
+						t.Fatal("Dial server address:", err)
+					}
+					defer c.Close()
+					cli := v1.NewMeshClient(c)
+					_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
+					if err == nil {
+						t.Fatal("Expected error, got nil")
+					}
+					if status.Code(err) != codes.Unimplemented {
+						t.Fatal("Expected unimplemented error, got", err)
+					}
+				}
+			})
+
+			t.Run("InvalidClientCertificate", func(t *testing.T) {
+				key, cert, err := crypto.GenerateSelfSignedServerCert()
+				if err != nil {
+					t.Fatal(err)
+				}
+				creds := grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+					InsecureSkipVerify:    true,
+					VerifyPeerCertificate: crypto.VerifyCertificateChainOnly([]*x509.Certificate{caCert}),
+					RootCAs:               rootpool,
+					Certificates: []tls.Certificate{{
+						Certificate: [][]byte{cert.Raw},
+						PrivateKey:  key,
+					}},
+				}))
+				client, err := NewHost(ctx, HostOptions{
+					Key:                  crypto.MustGenerateKey(),
+					UncertifiedPeerstore: true,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Create a client transport.
+				rt := NewTransport(client, creds)
+				// Test the transport for each of the host's addresses.
+				defer client.Close(ctx)
+				for _, addr := range server.Host().Addrs() {
+					c, err := rt.Dial(ctx, server.ID(), addr.String())
+					if err != nil {
+						t.Fatal("Dial server address:", err)
+					}
+					defer c.Close()
+					cli := v1.NewMeshClient(c)
+					_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
+					if err == nil {
+						t.Fatal("Expected error, got nil")
+					}
+					// We should get an unavailable here due to the TLS error
+					if status.Code(err) != codes.Unavailable {
+						t.Fatal("Expected unavailable error, got", err)
+					}
+					if !strings.Contains(err.Error(), "remote error: tls") {
+						t.Fatal("Expected tls error, got", err)
+					}
+				}
+			})
+		})
 	})
 }
