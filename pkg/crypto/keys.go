@@ -224,7 +224,11 @@ func PubKeyFromID(id string) (PublicKey, error) {
 }
 
 // PrivateKeyFromNative returns a private key from a native crypto private key.
-func PrivateKeyFromNative(in ed25519.PrivateKey) (PrivateKey, error) {
+func PrivateKeyFromNative(inkey crypto.PrivateKey) (PrivateKey, error) {
+	in, ok := inkey.(ed25519.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid private key type: %T", in)
+	}
 	if len(in) != ed25519.PrivateKeySize {
 		return nil, fmt.Errorf("invalid private key length: %d", len(in))
 	}
@@ -236,8 +240,21 @@ func PrivateKeyFromNative(in ed25519.PrivateKey) (PrivateKey, error) {
 	}, nil
 }
 
+// MustPrivateKeyFromNative returns a private key from a native crypto private key or panics.
+func MustPrivateKeyFromNative(in crypto.PublicKey) PrivateKey {
+	key, err := PrivateKeyFromNative(in)
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
 // PublicKeyFromNative returns a public key from a native crypto public key.
-func PublicKeyFromNative(in ed25519.PublicKey) (PublicKey, error) {
+func PublicKeyFromNative(inkey crypto.PublicKey) (PublicKey, error) {
+	in, ok := inkey.(ed25519.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("invalid private key type: %T", in)
+	}
 	if len(in) != ed25519.PublicKeySize {
 		return nil, fmt.Errorf("invalid public key length: %d", len(in))
 	}
@@ -247,6 +264,15 @@ func PublicKeyFromNative(in ed25519.PublicKey) (PublicKey, error) {
 		raw: raw,
 		typ: WebmeshKeyType,
 	}, nil
+}
+
+// MustPublicKeyFromNative returns a public key from a native crypto public key or panics.
+func MustPublicKeyFromNative(in crypto.PublicKey) PublicKey {
+	key, err := PublicKeyFromNative(in)
+	if err != nil {
+		panic(err)
+	}
+	return key
 }
 
 // WebmeshPrivateKey is a private key used for webmesh transport.

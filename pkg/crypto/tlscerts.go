@@ -243,7 +243,7 @@ func NewTLSKey(keyType TLSKeyType, size int) (privkey crypto.PrivateKey, pubkey 
 		if err != nil {
 			return
 		}
-		pubkey = privkey.(*WebmeshPrivateKey).PublicKey().AsNative()
+		pubkey = privkey.(*WebmeshPrivateKey).PublicKey()
 	}
 	return
 }
@@ -289,6 +289,11 @@ func GenerateCA(cfg CACertConfig) (privkey crypto.PrivateKey, cert *x509.Certifi
 		privkey, pubkey, err = NewTLSKey(cfg.KeyType, cfg.KeySize)
 		if err != nil {
 			return
+		}
+		if cfg.KeyType == TLSKeyWebmesh {
+			// Coerce to native formats.
+			privkey = privkey.(*WebmeshPrivateKey).AsNative()
+			pubkey = pubkey.(*WebmeshPublicKey).AsNative()
 		}
 	}
 	r := mrand.New(mrand.NewSource(time.Now().UnixNano()))
@@ -359,6 +364,11 @@ func IssueCertificate(cfg IssueConfig) (privkey crypto.PrivateKey, cert *x509.Ce
 		privkey, pubkey, err = NewTLSKey(cfg.KeyType, cfg.KeySize)
 		if err != nil {
 			return
+		}
+		if cfg.KeyType == TLSKeyWebmesh {
+			// Coerce to native formats.
+			privkey = privkey.(*WebmeshPrivateKey).AsNative()
+			pubkey = pubkey.(*WebmeshPublicKey).AsNative()
 		}
 	}
 	// Generate the certificate.

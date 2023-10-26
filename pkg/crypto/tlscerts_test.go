@@ -253,6 +253,25 @@ func TestCreateCertificates(t *testing.T) {
 			})
 		})
 
+		t.Run("GeneratedED25519Key", func(t *testing.T) {
+			key, _, err := GenerateCA(CACertConfig{
+				KeyType: TLSKeyWebmesh,
+			})
+			if err != nil {
+				t.Fatal("Failed to generate CA with webmesh key", err)
+			}
+			if key == nil {
+				t.Fatal("Generated key is nil")
+			}
+			internalkey, err := PrivateKeyFromNative(key)
+			if err != nil {
+				t.Fatal("Failed to convert key to internal format", err)
+			}
+			if !internalkey.AsNative().Equal(key) {
+				t.Fatal("Generated key does not match internal format")
+			}
+		})
+
 		t.Run("PreExistingKey", func(t *testing.T) {
 			key := MustGenerateKey()
 			privkey, cert, err := GenerateCA(CACertConfig{
@@ -296,7 +315,7 @@ func TestCreateCertificates(t *testing.T) {
 					CAKey:  cakey,
 				})
 				if err != nil {
-					t.Fatal("Failed to generate CA with defaults", err)
+					t.Fatal("Failed to generate cert with defaults", err)
 				}
 				if cert.Issuer.CommonName != cacert.Subject.CommonName {
 					t.Fatal("Generated certificate does not have the correct issuer")
@@ -309,9 +328,30 @@ func TestCreateCertificates(t *testing.T) {
 					CAKey:   cakey,
 				})
 				if err == nil {
-					t.Fatal("Expected error generating CA with invalid key type")
+					t.Fatal("Expected error generating cert with invalid key type")
 				}
 			})
+		})
+
+		t.Run("GeneratedED25519Key", func(t *testing.T) {
+			key, _, err := IssueCertificate(IssueConfig{
+				KeyType: TLSKeyWebmesh,
+				CACert:  cacert,
+				CAKey:   cakey,
+			})
+			if err != nil {
+				t.Fatal("Failed to generate cert with webmesh key", err)
+			}
+			if key == nil {
+				t.Fatal("Generated key is nil")
+			}
+			internalkey, err := PrivateKeyFromNative(key)
+			if err != nil {
+				t.Fatal("Failed to convert key to internal format", err)
+			}
+			if !internalkey.AsNative().Equal(key) {
+				t.Fatal("Generated key does not match internal format")
+			}
 		})
 
 		t.Run("PreExistingKey", func(t *testing.T) {
@@ -322,7 +362,7 @@ func TestCreateCertificates(t *testing.T) {
 				CAKey:  cakey,
 			})
 			if err != nil {
-				t.Fatal("Failed to generate CA with pre-existing key:", err)
+				t.Fatal("Failed to generate cert with pre-existing key:", err)
 			}
 			if !key.AsNative().Equal(privkey) {
 				t.Fatal("Generated key does not match pre-existing key")

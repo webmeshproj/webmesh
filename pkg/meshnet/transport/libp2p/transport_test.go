@@ -274,7 +274,7 @@ func TestRPCTransport(t *testing.T) {
 				ClientCAs:             rootpool,
 				Certificates: []tls.Certificate{{
 					Certificate: [][]byte{serverCert.Raw},
-					PrivateKey:  serverKey.(crypto.PrivateKey).AsNative(),
+					PrivateKey:  serverKey,
 				}}}
 			clienttlsconf := &tls.Config{
 				InsecureSkipVerify:    true,
@@ -282,14 +282,14 @@ func TestRPCTransport(t *testing.T) {
 				RootCAs:               rootpool,
 				Certificates: []tls.Certificate{{
 					Certificate: [][]byte{clientCert.Raw},
-					PrivateKey:  clientKey.(crypto.PrivateKey).AsNative(),
+					PrivateKey:  clientKey,
 				}},
 			}
 			servercreds := grpc.Creds(credentials.NewTLS(servertlsconf))
 			clientcreds := grpc.WithTransportCredentials(credentials.NewTLS(clienttlsconf))
 			// Get started the same as the others above.
 			server, err := NewHost(ctx, HostOptions{
-				Key: serverKey.(crypto.PrivateKey),
+				Key: crypto.MustPrivateKeyFromNative(serverKey),
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -306,7 +306,7 @@ func TestRPCTransport(t *testing.T) {
 
 			t.Run("ValidClientCertificate", func(t *testing.T) {
 				client, err := NewHost(ctx, HostOptions{
-					Key:                  clientKey.(crypto.PrivateKey),
+					Key:                  crypto.MustPrivateKeyFromNative(clientKey),
 					UncertifiedPeerstore: true,
 				})
 				if err != nil {
