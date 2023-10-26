@@ -66,7 +66,7 @@ func TestVerifyConnectionChainOnly(t *testing.T) {
 				return
 			}
 			defer c.Close()
-			c.(*tls.Conn).Handshake()
+			_ = c.(*tls.Conn).Handshake()
 		}
 	}()
 
