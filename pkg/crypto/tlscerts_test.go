@@ -19,6 +19,7 @@ package crypto
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"os"
 	"testing"
@@ -224,5 +225,116 @@ func TestTLSKeyEncoder(t *testing.T) {
 		if !dkey.Equals(key.(*WebmeshPrivateKey)) {
 			t.Fatal("decoded key does not match original")
 		}
+	})
+}
+
+func TestCreateCertificates(t *testing.T) {
+	t.Parallel()
+
+	t.Run("GenerateCA", func(t *testing.T) {
+		t.Run("GeneratedKey", func(t *testing.T) {
+			t.Run("Defaults", func(t *testing.T) {
+				_, _, err := GenerateCA(CACertConfig{})
+				if err != nil {
+					t.Fatal("Failed to generate CA with defaults", err)
+				}
+			})
+			t.Run("InvalidKeyParameters", func(t *testing.T) {
+				_, _, err := GenerateCA(CACertConfig{
+					KeyType: "invalid",
+				})
+				if err == nil {
+					t.Fatal("Expected error generating CA with invalid key type")
+				}
+			})
+		})
+
+		t.Run("PreExistingKey", func(t *testing.T) {
+			key := MustGenerateKey()
+			privkey, cert, err := GenerateCA(CACertConfig{
+				Key: key,
+			})
+			if err != nil {
+				t.Fatal("Failed to generate CA with pre-existing key:", err)
+			}
+			if !key.AsNative().Equal(privkey) {
+				t.Fatal("Generated key does not match pre-existing key")
+			}
+			if cert == nil {
+				t.Fatal("Generated certificate is nil")
+			}
+			if cert.PublicKey == nil {
+				t.Fatal("Generated certificate public key is nil")
+			}
+			if !cert.PublicKey.(ed25519.PublicKey).Equal(key.PublicKey().AsNative()) {
+				t.Fatal("Generated certificate public key does not match pre-existing key")
+			}
+		})
+	})
+
+	t.Run("IssueCertificates", func(t *testing.T) {
+		cakey, cacert, err := GenerateCA(CACertConfig{})
+		if err != nil {
+			t.Fatal("Failed to generate CA:", err)
+		}
+
+		t.Run("NoCA", func(t *testing.T) {
+			_, _, err := IssueCertificate(IssueConfig{})
+			if err == nil {
+				t.Fatal("Expected error issuing certificate with no CA")
+			}
+		})
+
+		t.Run("GeneratedKey", func(t *testing.T) {
+			t.Run("Defaults", func(t *testing.T) {
+				_, cert, err := IssueCertificate(IssueConfig{
+					CACert: cacert,
+					CAKey:  cakey,
+				})
+				if err != nil {
+					t.Fatal("Failed to generate CA with defaults", err)
+				}
+				if cert.Issuer.CommonName != cacert.Subject.CommonName {
+					t.Fatal("Generated certificate does not have the correct issuer")
+				}
+			})
+			t.Run("InvalidKeyParameters", func(t *testing.T) {
+				_, _, err := IssueCertificate(IssueConfig{
+					KeyType: "invalid",
+					CACert:  cacert,
+					CAKey:   cakey,
+				})
+				if err == nil {
+					t.Fatal("Expected error generating CA with invalid key type")
+				}
+			})
+		})
+
+		t.Run("PreExistingKey", func(t *testing.T) {
+			key := MustGenerateKey()
+			privkey, cert, err := IssueCertificate(IssueConfig{
+				Key:    key,
+				CACert: cacert,
+				CAKey:  cakey,
+			})
+			if err != nil {
+				t.Fatal("Failed to generate CA with pre-existing key:", err)
+			}
+			if !key.AsNative().Equal(privkey) {
+				t.Fatal("Generated key does not match pre-existing key")
+			}
+			if cert == nil {
+				t.Fatal("Generated certificate is nil")
+			}
+			if cert.PublicKey == nil {
+				t.Fatal("Generated certificate public key is nil")
+			}
+			if !cert.PublicKey.(ed25519.PublicKey).Equal(key.PublicKey().AsNative()) {
+				t.Fatal("Generated certificate public key does not match pre-existing key")
+			}
+			if cert.Issuer.CommonName != cacert.Subject.CommonName {
+				t.Fatal("Generated certificate does not have the correct issuer")
+			}
+		})
 	})
 }

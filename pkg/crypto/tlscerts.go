@@ -53,6 +53,11 @@ const (
 
 	// DefaultTLSKeyType is the default key type.
 	DefaultTLSKeyType TLSKeyType = TLSKeyECDSA
+
+	// DefaultCAName is the default name of the CA.
+	DefaultCAName = "webmesh-ca"
+	// DefaultCertName is the default name of the certificate.
+	DefaultCertName = "webmesh-cert"
 )
 
 var (
@@ -260,7 +265,7 @@ type CACertConfig struct {
 // Default sets the default values for the configuration.
 func (c *CACertConfig) Default() {
 	if c.CommonName == "" {
-		c.CommonName = "webmesh-ca"
+		c.CommonName = DefaultCAName
 	}
 	if c.ValidFor == 0 {
 		c.ValidFor = 365 * 24 * time.Hour
@@ -277,14 +282,14 @@ func (c *CACertConfig) Default() {
 func GenerateCA(cfg CACertConfig) (privkey crypto.PrivateKey, cert *x509.Certificate, err error) {
 	cfg.Default()
 	var pubkey crypto.PublicKey
-	privkey = cfg.Key
-	if privkey == nil {
+	if cfg.Key != nil {
+		privkey = cfg.Key.AsNative()
+		pubkey = cfg.Key.PublicKey().AsNative()
+	} else {
 		privkey, pubkey, err = NewTLSKey(cfg.KeyType, cfg.KeySize)
 		if err != nil {
 			return
 		}
-	} else {
-		pubkey = cfg.Key.PublicKey()
 	}
 	r := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 	tmpl := &x509.Certificate{
@@ -292,6 +297,7 @@ func GenerateCA(cfg CACertConfig) (privkey crypto.PrivateKey, cert *x509.Certifi
 		Subject: pkix.Name{
 			CommonName: cfg.CommonName,
 		},
+		DNSNames:              []string{cfg.CommonName},
 		NotBefore:             time.Now().UTC(),
 		NotAfter:              time.Now().UTC().Add(cfg.ValidFor),
 		IsCA:                  true,
@@ -328,7 +334,7 @@ type IssueConfig struct {
 // Default sets the default values for the configuration.
 func (c *IssueConfig) Default() {
 	if c.CommonName == "" {
-		c.CommonName = "webmesh-cert"
+		c.CommonName = DefaultCertName
 	}
 	if c.ValidFor == 0 {
 		c.ValidFor = 365 * 24 * time.Hour
@@ -346,14 +352,14 @@ func (c *IssueConfig) Default() {
 func IssueCertificate(cfg IssueConfig) (privkey crypto.PrivateKey, cert *x509.Certificate, err error) {
 	cfg.Default()
 	var pubkey crypto.PublicKey
-	privkey = cfg.Key
-	if privkey == nil {
+	if cfg.Key != nil {
+		privkey = cfg.Key.AsNative()
+		pubkey = cfg.Key.PublicKey().AsNative()
+	} else {
 		privkey, pubkey, err = NewTLSKey(cfg.KeyType, cfg.KeySize)
 		if err != nil {
 			return
 		}
-	} else {
-		pubkey = cfg.Key.PublicKey()
 	}
 	// Generate the certificate.
 	r := mrand.New(mrand.NewSource(time.Now().UnixNano()))
@@ -362,6 +368,7 @@ func IssueCertificate(cfg IssueConfig) (privkey crypto.PrivateKey, cert *x509.Ce
 		Subject: pkix.Name{
 			CommonName: cfg.CommonName,
 		},
+		DNSNames:              []string{cfg.CommonName},
 		NotBefore:             time.Now().UTC(),
 		NotAfter:              time.Now().UTC().Add(cfg.ValidFor),
 		IsCA:                  false,
