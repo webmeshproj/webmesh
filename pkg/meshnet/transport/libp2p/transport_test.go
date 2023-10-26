@@ -71,7 +71,12 @@ func TestRPCTransport(t *testing.T) {
 			defer client.Close(ctx)
 			t.Fatal(err)
 		}
-		client.AddAddrs(server.Host().Addrs(), peer.ID(server.ID()), peerstore.PermanentAddrTTL)
+		err = client.AddAddrs(server.Host().Addrs(), peer.ID(server.ID()), peerstore.PermanentAddrTTL)
+		if err != nil {
+			defer server.Close(ctx)
+			defer client.Close(ctx)
+			t.Fatal(err)
+		}
 		err = client.ConsumePeerRecord(envelope, peerstore.PermanentAddrTTL)
 		if err != nil {
 			defer server.Close(ctx)
