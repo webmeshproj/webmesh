@@ -18,6 +18,7 @@ limitations under the License.
 package crypto
 
 import (
+	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -39,6 +40,10 @@ import (
 
 // WebmeshKeyType is the protobuf key type for Webmesh keys.
 const WebmeshKeyType cryptopb.KeyType = 5
+
+// StdPrivateKey is a type alias to the std crypto private key.
+// It's provided for convenience.
+type StdPrivateKey = crypto.PrivateKey
 
 func init() {
 	cryptopb.KeyType_name[int32(WebmeshKeyType)] = "Webmesh"

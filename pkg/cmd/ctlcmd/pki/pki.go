@@ -18,7 +18,6 @@ limitations under the License.
 package pki
 
 import (
-	stdcrypto "crypto"
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
@@ -355,7 +354,7 @@ func (p *pki) GenerateConfig(opts GenerateConfigOptions) error {
 	return nil
 }
 
-func writeCertChain(path string, ca, cert *x509.Certificate, key stdcrypto.PrivateKey) error {
+func writeCertChain(path string, ca, cert *x509.Certificate, key crypto.StdPrivateKey) error {
 	err := os.MkdirAll(path, 0755)
 	if err != nil {
 		return fmt.Errorf("error creating directory %s: %w", path, err)
