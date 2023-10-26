@@ -20,6 +20,7 @@ package libp2p
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"time"
 
@@ -55,7 +56,7 @@ func NewDiscoveryHost(ctx context.Context, opts HostOptions) (DiscoveryHost, err
 	}
 	dht, err := NewDHT(ctx, host.Host(), opts.BootstrapPeers, opts.ConnectTimeout)
 	if err != nil {
-		defer host.Close(ctx)
+		defer host.Close()
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
 	return &discoveryHost{
@@ -68,7 +69,7 @@ func NewDiscoveryHost(ctx context.Context, opts HostOptions) (DiscoveryHost, err
 func WrapHostWithDiscovery(ctx context.Context, host Host, bootstrapPeers []multiaddr.Multiaddr, connectTimeout time.Duration) (DiscoveryHost, error) {
 	dht, err := NewDHT(ctx, host.Host(), bootstrapPeers, connectTimeout)
 	if err != nil {
-		defer host.Close(ctx)
+		defer host.Close()
 		return nil, fmt.Errorf("new libp2p host: %w", err)
 	}
 	return &discoveryHost{
@@ -119,9 +120,9 @@ func (h *discoveryHost) Announce(ctx context.Context, rendezvous string, ttl tim
 	dutil.Advertise(ctx, routingDiscovery, rendezvous, discoveryOpts...)
 }
 
-func (h *discoveryHost) Close(ctx context.Context) error {
+func (h *discoveryHost) Close() error {
 	if err := h.dht.Close(); err != nil {
-		context.LoggerFrom(ctx).Error("Error shutting down DHT", "error", err.Error())
+		slog.Default().Error("Error shutting down DHT", "error", err.Error())
 	}
-	return h.h.Close(ctx)
+	return h.h.Close()
 }

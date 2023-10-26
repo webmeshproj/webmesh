@@ -22,13 +22,13 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
@@ -201,7 +201,7 @@ func (o BootstrapTransportOptions) Validate() error {
 }
 
 // NewBootstrapTransport returns the bootstrap transport for the configuration.
-func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn meshnode.Node, host host.Host) (transport.BootstrapTransport, error) {
+func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn meshnode.Node, host libp2p.Host) (transport.BootstrapTransport, error) {
 	if !o.Bootstrap.Enabled {
 		return transport.NewNullBootstrapTransport(), nil
 	}

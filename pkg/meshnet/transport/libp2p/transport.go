@@ -23,7 +23,6 @@ import (
 	"log/slog"
 	"net"
 
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
@@ -43,7 +42,7 @@ type TransportOptions struct {
 	// empty if using a pre-created host.
 	HostOptions HostOptions
 	// Host is a pre-started host to use for the transport.
-	Host host.Host
+	Host Host
 	// Credentials are the credentials to use for the transport.
 	Credentials []grpc.DialOption
 }
@@ -65,19 +64,24 @@ func NewDiscoveryTransport(ctx context.Context, opts TransportOptions) (transpor
 	var err error
 	var close func()
 	if opts.Host != nil {
-		host := wrapHost(opts.Host)
-		dht, err := NewDHT(ctx, host.Host(), opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
-		if err != nil {
-			return nil, err
-		}
-		h = &discoveryHost{
-			h:   host,
-			dht: dht,
-		}
-		close = func() {
-			err := dht.Close()
+		// If it's already a discovery host, just use it.
+		if dh, ok := opts.Host.(DiscoveryHost); ok {
+			h = dh
+		} else {
+			host := opts.Host
+			dht, err := NewDHT(ctx, host.Host(), opts.HostOptions.BootstrapPeers, opts.HostOptions.ConnectTimeout)
 			if err != nil {
-				context.LoggerFrom(ctx).Error("Failed to close DHT", "error", err.Error())
+				return nil, err
+			}
+			h = &discoveryHost{
+				h:   host,
+				dht: dht,
+			}
+			close = func() {
+				err := dht.Close()
+				if err != nil {
+					context.LoggerFrom(ctx).Error("Failed to close DHT", "error", err.Error())
+				}
 			}
 		}
 	} else {
@@ -86,7 +90,7 @@ func NewDiscoveryTransport(ctx context.Context, opts TransportOptions) (transpor
 			return nil, err
 		}
 		close = func() {
-			err := h.Close(ctx)
+			err := h.Close()
 			if err != nil {
 				context.LoggerFrom(ctx).Error("Failed to close host", "error", err.Error())
 			}
@@ -117,11 +121,17 @@ SearchPeers:
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("no peers found to dial: %w", ctx.Err())
+			if err != nil {
+				return nil, fmt.Errorf("%w: %w", err, ctx.Err())
+			}
+			return nil, ctx.Err()
 		case peer, ok := <-peerChan:
 			if !ok {
 				if ctx.Err() != nil {
-					return nil, fmt.Errorf("no peers found to dial: %w", ctx.Err())
+					if err != nil {
+						return nil, fmt.Errorf("%w: %w", err, ctx.Err())
+					}
+					return nil, fmt.Errorf("no peers found: %w", ctx.Err())
 				}
 				peerChan, err = routingDiscovery.FindPeers(ctx, r.Rendezvous)
 				if err != nil {
@@ -184,9 +194,9 @@ func (r *rpcTransport) Dial(ctx context.Context, id, address string) (*grpc.Clie
 			return NewConnFromStream(stream), nil
 		}))...)
 	}
-	// Next if we don't have an address but have an id, just dial the peer and
+	// Next if we don't have an address but have an id, or have both, just dial the peer and
 	// let the peerstore handle the rest.
-	if address == "" && id != "" {
+	if (address == "" && id != "") || (address != "" && id != "") {
 		stream, err := r.h.Host().NewStream(ctx, pid, RPCProtocol)
 		if err != nil {
 			return nil, fmt.Errorf("new stream: %w", err)

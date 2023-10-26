@@ -100,7 +100,7 @@ func NewAnnouncer[REQ, RESP any](ctx context.Context, opts AnnounceOptions, rt t
 		if err != nil {
 			return nil, err
 		}
-		close = func() error { return h.Close(ctx) }
+		close = func() error { return h.Close() }
 	}
 	return newAnnouncerWithHostAndCloseFunc[REQ, RESP](ctx, h, opts, rt, close), nil
 }

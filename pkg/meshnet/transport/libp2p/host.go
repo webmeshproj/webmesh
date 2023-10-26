@@ -55,7 +55,7 @@ type Host interface {
 	// listener is closed.
 	RPCListener() net.Listener
 	// Close closes the host and its DHT.
-	Close(ctx context.Context) error
+	Close() error
 }
 
 // HostOptions are options for creating a new libp2p host.
@@ -207,7 +207,7 @@ func (h *libp2pHost) RPCListener() net.Listener {
 }
 
 // Close closes the host and shuts down all listeners.
-func (h *libp2pHost) Close(ctx context.Context) error {
+func (h *libp2pHost) Close() error {
 	if h.liscancel != nil {
 		h.liscancel()
 	}
@@ -234,7 +234,7 @@ func (h *hostRPCListener) Accept() (net.Conn, error) {
 // Close closes the listener and underlying host.
 func (h *hostRPCListener) Close() error {
 	h.close()
-	return h.h.Close(context.Background())
+	return h.h.Close()
 }
 
 // Addr returns the listener's network address.

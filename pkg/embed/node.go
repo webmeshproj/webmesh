@@ -25,7 +25,6 @@ import (
 	"net/netip"
 	"sync"
 
-	"github.com/libp2p/go-libp2p/core/host"
 	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/config"
@@ -33,6 +32,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -75,7 +75,7 @@ type Options struct {
 	// Key is the key for the node.
 	Key crypto.PrivateKey
 	// Host is the libp2p host for the node.
-	Host host.Host
+	Host libp2p.Host
 }
 
 // NewNode creates a new embedded webmesh node.

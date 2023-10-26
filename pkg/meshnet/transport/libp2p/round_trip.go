@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p/core/host"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 
@@ -41,7 +40,7 @@ type RoundTripOptions struct {
 	// Method is the method to try to execute.
 	Method string
 	// Host is a pre-started host to use for the round trip
-	Host host.Host
+	Host Host
 	// Credentials are gRPC DialOptions to use for the gRPC connection.
 	Credentials []grpc.DialOption
 }

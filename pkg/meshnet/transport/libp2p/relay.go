@@ -54,7 +54,7 @@ func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
 	if err != nil {
 		return nil, fmt.Errorf("new host: %w", err)
 	}
-	return newUDPRelayWithHostAndCloseFunc(ctx, host, opts, func() error { return host.Close(ctx) })
+	return newUDPRelayWithHostAndCloseFunc(ctx, host, opts, func() error { return host.Close() })
 }
 
 // NewUDPRelay creates a new UDP relay with the given host.

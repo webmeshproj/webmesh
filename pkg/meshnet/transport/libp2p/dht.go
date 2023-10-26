@@ -21,6 +21,7 @@ package libp2p
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -61,6 +62,7 @@ func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, serv
 		return fmt.Errorf("libp2p dht bootstrap: %w", err)
 	}
 	var wg sync.WaitGroup
+	var errs atomic.Int32
 	for _, peerAddr := range servers {
 		peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
 		if err != nil {
@@ -79,12 +81,16 @@ func bootstrapDHT(ctx context.Context, host host.Host, kaddht *dht.IpfsDHT, serv
 			}
 			defer cancel()
 			if err := host.Connect(connectCtx, *peerinfo); err != nil {
-				log.Debug("Failed to connect to DHT bootstrap peer", "error", err.Error())
+				log.Warn("Failed to connect to DHT bootstrap peer", "error", err.Error())
+				errs.Add(1)
 				return
 			}
-			log.Info("Connection established with bootstrap node", "node", peerinfo.String())
+			log.Debug("Connection established with bootstrap node", "node", peerinfo.String())
 		}()
 	}
 	wg.Wait()
+	if len(servers) == int(errs.Load()) {
+		return fmt.Errorf("libp2p dht bootstrap: failed to connect to any bootstrap peer")
+	}
 	return nil
 }

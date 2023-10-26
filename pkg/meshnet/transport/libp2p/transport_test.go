@@ -23,10 +23,13 @@ import (
 	"crypto/x509"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/record"
+	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -58,7 +61,7 @@ func TestRPCTransport(t *testing.T) {
 			Key: clientKey,
 		})
 		if err != nil {
-			defer server.Close(ctx)
+			defer server.Close()
 			t.Fatal(err)
 		}
 		// Sign and consume a signed record of the host addresses.
@@ -67,20 +70,20 @@ func TestRPCTransport(t *testing.T) {
 		peerrec.PeerID = peer.ID(server.ID())
 		envelope, err := record.Seal(peerrec, serverKey.AsIdentity())
 		if err != nil {
-			defer server.Close(ctx)
-			defer client.Close(ctx)
+			defer server.Close()
+			defer client.Close()
 			t.Fatal(err)
 		}
 		err = client.AddAddrs(server.Host().Addrs(), peer.ID(server.ID()), peerstore.PermanentAddrTTL)
 		if err != nil {
-			defer server.Close(ctx)
-			defer client.Close(ctx)
+			defer server.Close()
+			defer client.Close()
 			t.Fatal(err)
 		}
 		err = client.ConsumePeerRecord(envelope, peerstore.PermanentAddrTTL)
 		if err != nil {
-			defer server.Close(ctx)
-			defer client.Close(ctx)
+			defer server.Close()
+			defer client.Close()
 			t.Fatal(err)
 		}
 		// Create a dummy gRPC server and register an unimplemented service.
@@ -95,7 +98,7 @@ func TestRPCTransport(t *testing.T) {
 		t.Cleanup(srv.Stop)
 		// Create a client transport.
 		rt := NewTransport(client)
-		t.Cleanup(func() { _ = client.Close(ctx) })
+		t.Cleanup(func() { _ = client.Close() })
 
 		t.Run("DialByID", func(t *testing.T) {
 			c, err := rt.Dial(ctx, server.ID(), "")
@@ -149,7 +152,7 @@ func TestRPCTransport(t *testing.T) {
 			UncertifiedPeerstore: true,
 		})
 		if err != nil {
-			defer server.Close(ctx)
+			defer server.Close()
 			t.Fatal(err)
 		}
 		// Create a dummy gRPC server and register an unimplemented service.
@@ -165,7 +168,7 @@ func TestRPCTransport(t *testing.T) {
 		// Create a client transport.
 		rt := NewTransport(client)
 		// Test the transport for each of the host's addresses.
-		defer client.Close(ctx)
+		defer client.Close()
 		for _, addr := range server.Host().Addrs() {
 			c, err := rt.Dial(ctx, server.ID(), addr.String())
 			if err != nil {
@@ -200,7 +203,7 @@ func TestRPCTransport(t *testing.T) {
 			UncertifiedPeerstore: true,
 		})
 		if err != nil {
-			defer server.Close(ctx)
+			defer server.Close()
 			t.Fatal(err)
 		}
 		unallowedClient, err := NewHost(ctx, HostOptions{
@@ -208,8 +211,8 @@ func TestRPCTransport(t *testing.T) {
 			UncertifiedPeerstore: true,
 		})
 		if err != nil {
-			defer server.Close(ctx)
-			defer client.Close(ctx)
+			defer server.Close()
+			defer client.Close()
 			t.Fatal(err)
 		}
 		// Create a dummy gRPC server that uses ID authentication
@@ -232,7 +235,7 @@ func TestRPCTransport(t *testing.T) {
 		}()
 		// Test that an allowed ID can use the server.
 		t.Run("AllowedID", func(t *testing.T) {
-			defer client.Close(ctx)
+			defer client.Close()
 			rt := NewTransport(client, idauth.NewCreds(clientKey), grpc.WithTransportCredentials(insecure.NewCredentials()))
 			for _, addr := range server.Host().Addrs() {
 				c, err := rt.Dial(ctx, server.ID(), addr.String())
@@ -253,7 +256,7 @@ func TestRPCTransport(t *testing.T) {
 		})
 		// Test that an unallowed ID can use the server, but will be rejected.
 		t.Run("UnallowedID", func(t *testing.T) {
-			defer unallowedClient.Close(ctx)
+			defer unallowedClient.Close()
 			rt := NewTransport(unallowedClient, idauth.NewCreds(unallowedKey), grpc.WithTransportCredentials(insecure.NewCredentials()))
 			for _, addr := range server.Host().Addrs() {
 				c, err := rt.Dial(ctx, server.ID(), addr.String())
@@ -285,13 +288,13 @@ func TestRPCTransport(t *testing.T) {
 				UncertifiedPeerstore: true,
 			})
 			if err != nil {
-				defer server.Close(ctx)
+				defer server.Close()
 				t.Fatal(err)
 			}
 			serverKey, serverCert, err := crypto.GenerateSelfSignedServerCert()
 			if err != nil {
-				defer server.Close(ctx)
-				defer client.Close(ctx)
+				defer server.Close()
+				defer client.Close()
 				t.Fatal(err)
 			}
 			tlsconf := &tls.Config{
@@ -313,7 +316,7 @@ func TestRPCTransport(t *testing.T) {
 			// Create a client transport.
 			rt := NewTransport(client, grpc.WithTransportCredentials(credentials.NewTLS(tlsconf)))
 			// Test the transport for each of the host's addresses.
-			defer client.Close(ctx)
+			defer client.Close()
 			for _, addr := range server.Host().Addrs() {
 				c, err := rt.Dial(ctx, server.ID(), addr.String())
 				if err != nil {
@@ -408,7 +411,7 @@ func TestRPCTransport(t *testing.T) {
 				// Create a client transport.
 				rt := NewTransport(client, clientcreds)
 				// Test the transport for each of the host's addresses.
-				defer client.Close(ctx)
+				defer client.Close()
 				for _, addr := range server.Host().Addrs() {
 					c, err := rt.Dial(ctx, server.ID(), addr.String())
 					if err != nil {
@@ -450,7 +453,7 @@ func TestRPCTransport(t *testing.T) {
 				// Create a client transport.
 				rt := NewTransport(client, creds)
 				// Test the transport for each of the host's addresses.
-				defer client.Close(ctx)
+				defer client.Close()
 				for _, addr := range server.Host().Addrs() {
 					c, err := rt.Dial(ctx, server.ID(), addr.String())
 					if err != nil {
@@ -472,5 +475,133 @@ func TestRPCTransport(t *testing.T) {
 				}
 			})
 		})
+	})
+}
+
+func TestDiscoveryRPCTransport(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Defaults", func(t *testing.T) {
+		// Setup the server libp2p host.
+		rendezvous := uuid.NewString()
+		server, err := NewDiscoveryHost(ctx, HostOptions{
+			ConnectTimeout: time.Second * 3,
+			LocalAddrs: []multiaddr.Multiaddr{
+				multiaddr.StringCast("/ip4/0.0.0.0/tcp/0"),
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Announce this host to the DHT and start a dummy server.
+		server.Announce(ctx, rendezvous, time.Minute)
+		t.Cleanup(func() { _ = server.Close() })
+		srv := grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
+		v1.RegisterMeshServer(srv, v1.UnimplementedMeshServer{})
+		go func() {
+			err := srv.Serve(server.RPCListener())
+			if err != nil {
+				t.Log("Server error:", err)
+			}
+		}()
+		t.Cleanup(srv.Stop)
+		// Create a client transport.
+		rt, err := NewDiscoveryTransport(ctx, TransportOptions{
+			Rendezvous: rendezvous,
+			HostOptions: HostOptions{
+				ConnectTimeout: time.Second * 3,
+				LocalAddrs: []multiaddr.Multiaddr{
+					multiaddr.StringCast("/ip4/0.0.0.0/tcp/0"),
+				},
+			},
+			Credentials: []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = rt.(*rpcDiscoveryTransport).Close() })
+		// Test the transport.
+		dialctx, cancel := context.WithTimeout(ctx, time.Second*15)
+		defer cancel()
+		c, err := rt.Dial(dialctx, "", "")
+		if err != nil {
+			t.Fatal("Dial server address:", err)
+		}
+		defer c.Close()
+		cli := v1.NewMeshClient(c)
+		_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
+		if err == nil {
+			t.Fatal("Expected error, got nil")
+		}
+		if status.Code(err) != codes.Unimplemented {
+			t.Fatal("Expected unimplemented error, got", err)
+		}
+	})
+
+	t.Run("PrestartedHosts", func(t *testing.T) {
+		// Setup the libp2p hosts
+		serverKey := crypto.MustGenerateKey()
+		clientKey := crypto.MustGenerateKey()
+		rendezvous := uuid.NewString()
+
+		server, err := NewDiscoveryHost(ctx, HostOptions{
+			Key:            serverKey,
+			ConnectTimeout: time.Second * 3,
+			LocalAddrs: []multiaddr.Multiaddr{
+				multiaddr.StringCast("/ip4/0.0.0.0/tcp/0"),
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Announce this host to the DHT and start a dummy server
+		server.Announce(ctx, rendezvous, time.Minute)
+		t.Cleanup(func() { _ = server.Close() })
+		srv := grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
+		v1.RegisterMeshServer(srv, v1.UnimplementedMeshServer{})
+		go func() {
+			err := srv.Serve(server.RPCListener())
+			if err != nil {
+				t.Log("Server error:", err)
+			}
+		}()
+		t.Cleanup(srv.Stop)
+		// Create a client transport.
+		client, err := NewDiscoveryHost(ctx, HostOptions{
+			Key:            clientKey,
+			ConnectTimeout: time.Second * 3,
+			LocalAddrs: []multiaddr.Multiaddr{
+				multiaddr.StringCast("/ip4/0.0.0.0/tcp/0"),
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = client.Close() })
+		rt, err := NewDiscoveryTransport(ctx, TransportOptions{
+			Host:        client,
+			Rendezvous:  rendezvous,
+			HostOptions: HostOptions{ConnectTimeout: time.Second * 3},
+			Credentials: []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Test the transport.
+		dialctx, cancel := context.WithTimeout(ctx, time.Second*15)
+		defer cancel()
+		c, err := rt.Dial(dialctx, "", "")
+		if err != nil {
+			t.Fatal("Dial server address:", err)
+		}
+		defer c.Close()
+		cli := v1.NewMeshClient(c)
+		_, err = cli.GetNode(ctx, &v1.GetNodeRequest{})
+		if err == nil {
+			t.Fatal("Expected error, got nil")
+		}
+		if status.Code(err) != codes.Unimplemented {
+			t.Fatal("Expected unimplemented error, got", err)
+		}
 	})
 }
