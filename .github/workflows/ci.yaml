@@ -123,7 +123,7 @@ jobs:
           GPG_PASSWORD: ${{ secrets.GPG_PASSWORD }}
         with:
           version: latest
-          args: release --snapshot --clean --fail-fast --parallelism=${{ env.BUILD_PARALLELISM }}
+          args: release --snapshot --clean --fail-fast --skip-sign --parallelism=${{ env.BUILD_PARALLELISM }}
 
       - name: Run Release
         uses: goreleaser/goreleaser-action@v5

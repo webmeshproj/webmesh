@@ -241,12 +241,14 @@ func (a APIOptions) Validate() error {
 	if a.Disabled {
 		return nil
 	}
-	if a.ListenAddress == "" {
-		return fmt.Errorf("services.api.listen-address must be set")
+	if a.ListenAddress == "" && !a.LibP2P.Enabled {
+		return fmt.Errorf("services.api.listen-address or services.api.libp2p.enabled must be be set")
 	}
-	_, err := netip.ParseAddrPort(a.ListenAddress)
-	if err != nil {
-		return fmt.Errorf("listen-address is invalid: %w", err)
+	if a.ListenAddress != "" {
+		_, err := netip.ParseAddrPort(a.ListenAddress)
+		if err != nil {
+			return fmt.Errorf("listen-address is invalid: %w", err)
+		}
 	}
 	if !a.Insecure {
 		// If key file is supplied, make sure we have a cert-file with it.
