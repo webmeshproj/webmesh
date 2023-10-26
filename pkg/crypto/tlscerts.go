@@ -50,6 +50,16 @@ const (
 	TLSKeyECDSA TLSKeyType = "ecdsa"
 	// TLSKeyWebmesh is a Webmesh key. These are ed25519 keys.
 	TLSKeyWebmesh TLSKeyType = "webmesh"
+
+	// DefaultTLSKeyType is the default key type.
+	DefaultTLSKeyType TLSKeyType = TLSKeyECDSA
+)
+
+var (
+	// ErrInvalidKeyType is returned when an invalid key type is used.
+	ErrInvalidKeyType = fmt.Errorf("invalid key type")
+	// ErrInvalidKeySize is returned when an invalid key size is used.
+	ErrInvalidKeySize = fmt.Errorf("invalid key size")
 )
 
 func (t TLSKeyType) String() string {
@@ -157,7 +167,7 @@ func EncodeTLSPrivateKey(o io.Writer, key crypto.PrivateKey) error {
 		keyType = "PRIVATE KEY"
 		keyBytes = key.Bytes()
 	default:
-		return fmt.Errorf("unsupported key type: %T", key)
+		return fmt.Errorf("%w: %T", ErrInvalidKeyType, key)
 	}
 	return pem.Encode(o, &pem.Block{
 		Type:  keyType,
@@ -199,12 +209,17 @@ func DecodeTLSPrivateKey(i io.Reader) (crypto.PrivateKey, error) {
 			typ: WebmeshKeyType,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported key type: %s", block.Type)
+		return nil, fmt.Errorf("%w: %s", ErrInvalidKeyType, block.Type)
 	}
 }
 
 // NewTLSKey creates a new TLS key with the given keytype and size.
+// Size is ignored for Webmesh keys.
 func NewTLSKey(keyType TLSKeyType, size int) (privkey crypto.PrivateKey, pubkey crypto.PublicKey, err error) {
+	if !keyType.IsValid() {
+		err = fmt.Errorf("%w: %s", ErrInvalidKeyType, keyType)
+		return
+	}
 	switch keyType {
 	case TLSKeyRSA:
 		privkey, err = rsa.GenerateKey(rand.Reader, size)
@@ -223,9 +238,7 @@ func NewTLSKey(keyType TLSKeyType, size int) (privkey crypto.PrivateKey, pubkey 
 		if err != nil {
 			return
 		}
-		pubkey = privkey.(*WebmeshPrivateKey).PublicKey()
-	default:
-		err = fmt.Errorf("unsupported key type: %s", keyType)
+		pubkey = privkey.(*WebmeshPrivateKey).PublicKey().AsNative()
 	}
 	return
 }
@@ -244,8 +257,25 @@ type CACertConfig struct {
 	Key PrivateKey
 }
 
+// Default sets the default values for the configuration.
+func (c *CACertConfig) Default() {
+	if c.CommonName == "" {
+		c.CommonName = "webmesh-ca"
+	}
+	if c.ValidFor == 0 {
+		c.ValidFor = 365 * 24 * time.Hour
+	}
+	if c.KeyType == "" {
+		c.KeyType = DefaultTLSKeyType
+	}
+	if c.KeySize == 0 {
+		c.KeySize = 256
+	}
+}
+
 // GenerateCA generates a self-signed CA certificate.
 func GenerateCA(cfg CACertConfig) (privkey crypto.PrivateKey, cert *x509.Certificate, err error) {
+	cfg.Default()
 	var pubkey crypto.PublicKey
 	privkey = cfg.Key
 	if privkey == nil {
@@ -295,9 +325,26 @@ type IssueConfig struct {
 	CAKey crypto.PrivateKey
 }
 
+// Default sets the default values for the configuration.
+func (c *IssueConfig) Default() {
+	if c.CommonName == "" {
+		c.CommonName = "webmesh-cert"
+	}
+	if c.ValidFor == 0 {
+		c.ValidFor = 365 * 24 * time.Hour
+	}
+	if c.KeyType == "" {
+		c.KeyType = DefaultTLSKeyType
+	}
+	if c.KeySize == 0 {
+		c.KeySize = 256
+	}
+}
+
 // IssueCertificate issues a certificate against the given CA with the given configuration.
 // Key usages are assumed to be for client and server authentication.
 func IssueCertificate(cfg IssueConfig) (privkey crypto.PrivateKey, cert *x509.Certificate, err error) {
+	cfg.Default()
 	var pubkey crypto.PublicKey
 	privkey = cfg.Key
 	if privkey == nil {
@@ -336,7 +383,7 @@ func GenerateSelfSignedServerCert() (privKey crypto.PrivateKey, cert *x509.Certi
 	caPriv, caCert, err := GenerateCA(CACertConfig{
 		CommonName: "webmesh-selfsigned-ca",
 		ValidFor:   365 * 24 * time.Hour,
-		KeyType:    TLSKeyECDSA,
+		KeyType:    DefaultTLSKeyType,
 		KeySize:    256,
 	})
 	if err != nil {
@@ -345,7 +392,7 @@ func GenerateSelfSignedServerCert() (privKey crypto.PrivateKey, cert *x509.Certi
 	return IssueCertificate(IssueConfig{
 		CommonName: "webmesh-selfsigned-server",
 		ValidFor:   365 * 24 * time.Hour,
-		KeyType:    TLSKeyECDSA,
+		KeyType:    DefaultTLSKeyType,
 		KeySize:    256,
 		CACert:     caCert,
 		CAKey:      caPriv,
@@ -363,7 +410,7 @@ func GenerateECDSAKey(size int) (*ecdsa.PrivateKey, error) {
 	case 521:
 		curve = elliptic.P521()
 	default:
-		return nil, fmt.Errorf("unsupported key size: %d", size)
+		return nil, fmt.Errorf("%w: %d", ErrInvalidKeySize, size)
 	}
 	return ecdsa.GenerateKey(curve, rand.Reader)
 }
