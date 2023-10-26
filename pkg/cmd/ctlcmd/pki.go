@@ -26,9 +26,9 @@ import (
 
 var (
 	pkiDirectory     string
-	pkiGenOpts       = &pki.GenerateOptions{}
-	pkiIssueOpts     = &pki.IssueOptions{}
-	pkiGenConfigOpts = &pki.GenerateConfigOptions{}
+	pkiGenOpts       = pki.InitOptions{}
+	pkiIssueOpts     = pki.IssueOptions{}
+	pkiGenConfigOpts = pki.GenerateConfigOptions{}
 )
 
 func init() {
@@ -36,7 +36,7 @@ func init() {
 	cobra.CheckErr(pkiCmd.MarkPersistentFlagRequired("pki-directory"))
 
 	initPkiCmd.Flags().StringVar(&pkiGenOpts.CAName, "ca-name", pki.DefaultCAName, "The subject name to assign the CA certificate")
-	initPkiCmd.Flags().StringVar(&pkiGenOpts.KeyType, "key-type", pki.DefaultKeyType, "The key type to use for the CA and Admin certificates")
+	initPkiCmd.Flags().StringVar(&pkiGenOpts.KeyType, "key-type", string(pki.DefaultKeyType), "The key type to use for the CA and Admin certificates")
 	initPkiCmd.Flags().IntVar(&pkiGenOpts.KeySize, "key-size", pki.DefaultKeySize, "The key size to use for the CA and Admin certificates")
 	initPkiCmd.Flags().StringVar(&pkiGenOpts.AdminName, "admin-name", pki.DefaultAdminName, "The subject name to assign the Admin certificate")
 	initPkiCmd.Flags().DurationVar(&pkiGenOpts.CAExpiry, "ca-expiry", pki.DefaultCAExpiry, "The expiry to assign the CA certificate")
@@ -45,7 +45,7 @@ func init() {
 	cobra.CheckErr(initPkiCmd.RegisterFlagCompletionFunc("key-size", completeKeySizes))
 
 	issueCmd.Flags().StringVar(&pkiIssueOpts.Name, "name", "", "The subject name to assign the certificate")
-	issueCmd.Flags().StringVar(&pkiIssueOpts.KeyType, "key-type", pki.DefaultKeyType, "The key type to use for the certificate")
+	issueCmd.Flags().StringVar(&pkiIssueOpts.KeyType, "key-type", string(pki.DefaultKeyType), "The key type to use for the certificate")
 	issueCmd.Flags().IntVar(&pkiIssueOpts.KeySize, "key-size", pki.DefaultKeySize, "The key size to use for the certificate")
 	issueCmd.Flags().DurationVar(&pkiIssueOpts.Expiry, "expiry", pki.DefaultNodeExpiry, "The expiry to assign the certificate")
 	cobra.CheckErr(issueCmd.MarkFlagRequired("name"))
@@ -77,7 +77,7 @@ var initPkiCmd = &cobra.Command{
 	Short: "Initializes the PKI for a cluster using mTLS",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		err := pki.New(pkiDirectory).Generate(pkiGenOpts)
+		err := pki.New(pkiDirectory).Init(pkiGenOpts)
 		if err != nil {
 			return err
 		}

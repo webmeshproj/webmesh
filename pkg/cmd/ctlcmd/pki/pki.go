@@ -18,30 +18,23 @@ limitations under the License.
 package pki
 
 import (
-	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/rsa"
+	stdcrypto "crypto"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/base64"
-	"encoding/pem"
 	"fmt"
-	"math/big"
-	mrand "math/rand"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd/config"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 const (
 	// DefaultCAName is the default CA name.
 	DefaultCAName = "webmesh-ca"
 	// DefaultKeyType is the default key type.
-	DefaultKeyType = "ecdsa"
+	DefaultKeyType = crypto.TLSKeyECDSA
 	// DefaultKeySize is the default key size.
 	DefaultKeySize = 256
 	// DefaultAdminName is the default admin name.
@@ -62,16 +55,16 @@ const (
 
 // PKI is an interface for managing the PKI for a cluster using mTLS.
 type PKI interface {
-	// Generate generates a new PKI.
-	Generate(*GenerateOptions) error
+	// Init generates a new PKI.
+	Init(InitOptions) error
 	// Issue issues a new certificate.
-	Issue(*IssueOptions) error
+	Issue(IssueOptions) error
 	// GenerateConfig generates a new config.
-	GenerateConfig(*GenerateConfigOptions) error
+	GenerateConfig(GenerateConfigOptions) error
 }
 
-// GenerateOptions are options for generating a new PKI.
-type GenerateOptions struct {
+// InitOptions are options for generating a new PKI.
+type InitOptions struct {
 	// CAName is the name of the CA.
 	CAName string
 	// AdminName is the name of the admin user.
@@ -86,7 +79,7 @@ type GenerateOptions struct {
 	AdminExpiry time.Duration
 }
 
-func (o *GenerateOptions) applyDefaults() {
+func (o *InitOptions) applyDefaults() {
 	if o.CAName == "" {
 		o.CAName = DefaultCAName
 	}
@@ -97,7 +90,7 @@ func (o *GenerateOptions) applyDefaults() {
 		o.KeySize = DefaultKeySize
 	}
 	if o.KeyType == "" {
-		o.KeyType = DefaultKeyType
+		o.KeyType = string(DefaultKeyType)
 	}
 	if o.CAExpiry == 0 {
 		o.CAExpiry = DefaultCAExpiry
@@ -107,12 +100,12 @@ func (o *GenerateOptions) applyDefaults() {
 	}
 }
 
-func (o *GenerateOptions) validate() error {
+func (o *InitOptions) validate() error {
 	if o.KeySize < 256 {
 		return fmt.Errorf("key size must be at least 256 bits")
 	}
-	if o.KeyType != "ecdsa" && o.KeyType != "rsa" {
-		return fmt.Errorf("key type must be ecdsa or rsa")
+	if !crypto.TLSKeyType(o.KeyType).IsValid() {
+		return fmt.Errorf("key type must be ecdsa, rsa, or webmesh")
 	}
 	if o.KeyType == "ecdsa" {
 		if o.KeySize != 256 && o.KeySize != 384 && o.KeySize != 521 {
@@ -144,7 +137,7 @@ func (o *IssueOptions) applyDefaults() {
 		o.KeySize = DefaultKeySize
 	}
 	if o.KeyType == "" {
-		o.KeyType = DefaultKeyType
+		o.KeyType = string(DefaultKeyType)
 	}
 	if o.Expiry == 0 {
 		o.Expiry = DefaultNodeExpiry
@@ -158,8 +151,8 @@ func (o *IssueOptions) validate() error {
 	if o.KeySize < 256 {
 		return fmt.Errorf("key size must be at least 256 bits")
 	}
-	if o.KeyType != "ecdsa" && o.KeyType != "rsa" {
-		return fmt.Errorf("key type must be ecdsa or rsa")
+	if !crypto.TLSKeyType(o.KeyType).IsValid() {
+		return fmt.Errorf("key type must be ecdsa, rsa, or webmesh")
 	}
 	if o.KeyType == "ecdsa" {
 		if o.KeySize != 256 && o.KeySize != 384 && o.KeySize != 521 {
@@ -226,7 +219,7 @@ type pki struct {
 	dataDir string
 }
 
-func (p *pki) Generate(opts *GenerateOptions) error {
+func (p *pki) Init(opts InitOptions) error {
 	opts.applyDefaults()
 	if err := opts.validate(); err != nil {
 		return err
@@ -237,86 +230,41 @@ func (p *pki) Generate(opts *GenerateOptions) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	// Generate the CA and admin keys.
-	var caPrivKey, caPubKey, adminPrivKey, adminPubKey any
-	var err error
-	switch opts.KeyType {
-	case "ecdsa":
-		caPrivKey, err = generateECDSAKey(opts.KeySize)
-		if err != nil {
-			return err
-		}
-		caPubKey = &caPrivKey.(*ecdsa.PrivateKey).PublicKey
-		adminPrivKey, err = generateECDSAKey(opts.KeySize)
-		if err != nil {
-			return err
-		}
-		adminPubKey = &adminPrivKey.(*ecdsa.PrivateKey).PublicKey
-	case "rsa":
-		caPrivKey, err = rsa.GenerateKey(rand.Reader, opts.KeySize)
-		if err != nil {
-			return err
-		}
-		caPubKey = &caPrivKey.(*rsa.PrivateKey).PublicKey
-		adminPrivKey, err = rsa.GenerateKey(rand.Reader, opts.KeySize)
-		if err != nil {
-			return err
-		}
-		adminPubKey = &adminPrivKey.(*rsa.PrivateKey).PublicKey
-	default:
-		// Should never happen.
-		return fmt.Errorf("unsupported key type: %s", opts.KeyType)
-	}
-	r := mrand.New(mrand.NewSource(time.Now().UnixNano()))
-	ca := &x509.Certificate{
-		SerialNumber: big.NewInt(r.Int63()),
-		Subject: pkix.Name{
-			CommonName: opts.CAName,
-		},
-		DNSNames:              []string{opts.CAName},
-		NotBefore:             time.Now().UTC(),
-		NotAfter:              time.Now().UTC().Add(opts.CAExpiry),
-		IsCA:                  true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign,
-		BasicConstraintsValid: true,
-	}
-	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, caPubKey, caPrivKey)
+	// Generate CA cert and key.
+	caPrivKey, caCert, err := crypto.GenerateCA(crypto.CACertConfig{
+		CommonName: opts.CAName,
+		ValidFor:   opts.CAExpiry,
+		KeyType:    crypto.TLSKeyType(opts.KeyType),
+		KeySize:    opts.KeySize,
+	})
 	if err != nil {
 		return err
 	}
-	ca, err = x509.ParseCertificate(caBytes)
-	if err != nil {
-		return err
-	}
-	admin := &x509.Certificate{
-		SerialNumber: big.NewInt(r.Int63()),
-		Subject: pkix.Name{
-			CommonName: opts.AdminName,
-		},
-		DNSNames:    []string{opts.AdminName},
-		NotBefore:   time.Now().UTC(),
-		NotAfter:    time.Now().UTC().Add(opts.AdminExpiry),
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-	}
-	adminBytes, err := x509.CreateCertificate(rand.Reader, admin, ca, adminPubKey, caPrivKey)
+	// Issue an admin certificate using the CA.
+	adminPrivKey, adminCert, err := crypto.IssueCertificate(crypto.IssueConfig{
+		CommonName: opts.CAName,
+		ValidFor:   opts.CAExpiry,
+		KeyType:    crypto.TLSKeyType(opts.KeyType),
+		KeySize:    opts.KeySize,
+		CACert:     caCert,
+		CAKey:      caPrivKey,
+	})
 	if err != nil {
 		return err
 	}
 	// Write the CA and admin keys and certs to disk.
-	err = writeCertChain(filepath.Join(p.dataDir, CADirectory), caBytes, caBytes, caPrivKey)
+	err = writeCertChain(filepath.Join(p.dataDir, CADirectory), caCert, caCert, caPrivKey)
 	if err != nil {
 		return err
 	}
-	err = writeCertChain(filepath.Join(p.dataDir, NodesDirectory, opts.AdminName), caBytes, adminBytes, adminPrivKey)
+	err = writeCertChain(filepath.Join(p.dataDir, NodesDirectory, opts.AdminName), caCert, adminCert, adminPrivKey)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *pki) Issue(opts *IssueOptions) error {
+func (p *pki) Issue(opts IssueOptions) error {
 	opts.applyDefaults()
 	if err := opts.validate(); err != nil {
 		return err
@@ -332,59 +280,34 @@ func (p *pki) Issue(opts *IssueOptions) error {
 	}
 	// Load the CA.
 	caPath := filepath.Join(p.dataDir, CADirectory)
-	caCert, err := loadCert(filepath.Join(caPath, caFileName))
+	caCert, err := crypto.DecodeTLSCertificateFromFile(filepath.Join(caPath, caFileName))
 	if err != nil {
 		return err
 	}
-	caPrivKey, err := loadPrivateKey(filepath.Join(caPath, keyFileName))
+	caPrivKey, err := crypto.DecodeTLSPrivateKeyFromFile(filepath.Join(caPath, keyFileName))
 	if err != nil {
 		return err
 	}
-	// Generate the key.
-	var privKey, pubKey any
-	switch opts.KeyType {
-	case "ecdsa":
-		privKey, err = generateECDSAKey(opts.KeySize)
-		if err != nil {
-			return err
-		}
-		pubKey = &privKey.(*ecdsa.PrivateKey).PublicKey
-	case "rsa":
-		privKey, err = rsa.GenerateKey(rand.Reader, opts.KeySize)
-		if err != nil {
-			return err
-		}
-		pubKey = &privKey.(*rsa.PrivateKey).PublicKey
-	default:
-		// Should never happen.
-		return fmt.Errorf("unsupported key type: %s", opts.KeyType)
-	}
-	// Generate the certificate.
-	r := mrand.New(mrand.NewSource(time.Now().UnixNano()))
-	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(r.Int63()),
-		Subject: pkix.Name{
-			CommonName: opts.Name,
-		},
-		DNSNames:    []string{opts.Name},
-		NotBefore:   time.Now().UTC(),
-		NotAfter:    time.Now().UTC().Add(opts.Expiry),
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-	}
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, pubKey, caPrivKey)
+	privkey, cert, err := crypto.IssueCertificate(crypto.IssueConfig{
+		CommonName: opts.Name,
+		ValidFor:   opts.Expiry,
+		KeyType:    crypto.TLSKeyType(opts.KeyType),
+		KeySize:    opts.KeySize,
+		CACert:     caCert,
+		CAKey:      caPrivKey,
+	})
 	if err != nil {
 		return err
 	}
 	// Write the key and cert to disk.
-	err = writeCertChain(filepath.Join(p.dataDir, NodesDirectory, opts.Name), caCert.Raw, certBytes, privKey)
+	err = writeCertChain(filepath.Join(p.dataDir, NodesDirectory, opts.Name), caCert, cert, privkey)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *pki) GenerateConfig(opts *GenerateConfigOptions) error {
+func (p *pki) GenerateConfig(opts GenerateConfigOptions) error {
 	opts.applyDefaults()
 	if err := opts.validate(); err != nil {
 		return err
@@ -432,22 +355,7 @@ func (p *pki) GenerateConfig(opts *GenerateConfigOptions) error {
 	return nil
 }
 
-func generateECDSAKey(size int) (*ecdsa.PrivateKey, error) {
-	var curve elliptic.Curve
-	switch size {
-	case 256:
-		curve = elliptic.P256()
-	case 384:
-		curve = elliptic.P384()
-	case 521:
-		curve = elliptic.P521()
-	default:
-		return nil, fmt.Errorf("unsupported key size: %d", size)
-	}
-	return ecdsa.GenerateKey(curve, rand.Reader)
-}
-
-func writeCertChain(path string, ca, cert []byte, key any) error {
+func writeCertChain(path string, ca, cert *x509.Certificate, key stdcrypto.PrivateKey) error {
 	err := os.MkdirAll(path, 0755)
 	if err != nil {
 		return fmt.Errorf("error creating directory %s: %w", path, err)
@@ -459,12 +367,9 @@ func writeCertChain(path string, ca, cert []byte, key any) error {
 		return fmt.Errorf("error creating file %s: %w", caPath, err)
 	}
 	defer caFile.Close()
-	err = pem.Encode(caFile, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: ca,
-	})
+	err = crypto.EncodeTLSCertificate(caFile, ca)
 	if err != nil {
-		return fmt.Errorf("error encoding certificate to %s: %w", caFile.Name(), err)
+		return fmt.Errorf("error encoding CA certificate to %s: %w", caFile.Name(), err)
 	}
 	certPath := filepath.Join(path, certFileName)
 	certFile, err := os.Create(certPath)
@@ -473,36 +378,14 @@ func writeCertChain(path string, ca, cert []byte, key any) error {
 	}
 	defer certFile.Close()
 	// Encode the certificate.
-	err = pem.Encode(certFile, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert,
-	})
+	err = crypto.EncodeTLSCertificate(certFile, cert)
 	if err != nil {
 		return fmt.Errorf("error encoding certificate to %s: %w", certFile.Name(), err)
 	}
 	// Encode the CA again as the issuer.
-	err = pem.Encode(certFile, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: ca,
-	})
+	err = crypto.EncodeTLSCertificate(certFile, ca)
 	if err != nil {
 		return fmt.Errorf("error encoding certificate to %s: %w", certFile.Name(), err)
-	}
-	// Determine the key type.
-	var keyType string
-	var keyBytes []byte
-	switch key := key.(type) {
-	case *ecdsa.PrivateKey:
-		keyType = "EC PRIVATE KEY"
-		keyBytes, err = x509.MarshalECPrivateKey(key)
-		if err != nil {
-			return fmt.Errorf("error marshaling ECDSA private key: %w", err)
-		}
-	case *rsa.PrivateKey:
-		keyType = "RSA PRIVATE KEY"
-		keyBytes = x509.MarshalPKCS1PrivateKey(key)
-	default:
-		return fmt.Errorf("unsupported key type: %T", key)
 	}
 	// Encode the key.
 	keyPath := filepath.Join(path, keyFileName)
@@ -511,66 +394,9 @@ func writeCertChain(path string, ca, cert []byte, key any) error {
 		return fmt.Errorf("error creating file %s: %w", keyPath, err)
 	}
 	defer keyFile.Close()
-	err = pem.Encode(keyFile, &pem.Block{
-		Type:  keyType,
-		Bytes: keyBytes,
-	})
+	err = crypto.EncodeTLSPrivateKey(keyFile, key)
 	if err != nil {
 		return fmt.Errorf("error encoding key to %s: %w", keyFile.Name(), err)
 	}
 	return nil
-}
-
-func loadCert(path string) (*x509.Certificate, error) {
-	certFile, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("error opening file %s: %w", path, err)
-	}
-	defer certFile.Close()
-	certBytes, err := os.ReadFile(certFile.Name())
-	if err != nil {
-		return nil, fmt.Errorf("error reading file %s: %w", certFile.Name(), err)
-	}
-	// Decode the PEM block.
-	block, extra := pem.Decode(certBytes)
-	if len(bytes.TrimSpace(extra)) != 0 {
-		return nil, fmt.Errorf("unexpected extra data in %s", certFile.Name())
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing certificate from %s: %w", certFile.Name(), err)
-	}
-	return cert, nil
-}
-
-func loadPrivateKey(path string) (any, error) {
-	keyFile, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("error opening file %s: %w", path, err)
-	}
-	defer keyFile.Close()
-	keyBytes, err := os.ReadFile(keyFile.Name())
-	if err != nil {
-		return nil, fmt.Errorf("error reading file %s: %w", keyFile.Name(), err)
-	}
-	key, err := parsePrivateKey(keyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing private key from %s: %w", keyFile.Name(), err)
-	}
-	return key, nil
-}
-
-func parsePrivateKey(keyBytes []byte) (any, error) {
-	block, extra := pem.Decode(keyBytes)
-	if len(bytes.TrimSpace(extra)) != 0 {
-		return nil, fmt.Errorf("unexpected extra data in private key")
-	}
-	switch block.Type {
-	case "EC PRIVATE KEY":
-		return x509.ParseECPrivateKey(block.Bytes)
-	case "RSA PRIVATE KEY":
-		return x509.ParsePKCS1PrivateKey(block.Bytes)
-	default:
-		return nil, fmt.Errorf("unsupported private key type: %s", block.Type)
-	}
 }
