@@ -218,11 +218,15 @@ func TestTLSKeyEncoder(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		dkey, ok := decoded.(*WebmeshPrivateKey)
+		dkey, ok := decoded.(ed25519.PrivateKey)
 		if !ok {
-			t.Fatal("decoded key is not an WebmeshPrivateKey")
+			t.Fatal("decoded key is not an ed25519.PrivateKey")
 		}
-		if !dkey.Equals(key.(*WebmeshPrivateKey)) {
+		privkey, err := PrivateKeyFromNative(dkey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !key.(PrivateKey).Equals(privkey) {
 			t.Fatal("decoded key does not match original")
 		}
 	})

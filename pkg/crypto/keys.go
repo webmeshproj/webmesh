@@ -223,9 +223,35 @@ func PubKeyFromID(id string) (PublicKey, error) {
 	return ParsePublicKey(raw)
 }
 
+// PrivateKeyFromNative returns a private key from a native crypto private key.
+func PrivateKeyFromNative(in ed25519.PrivateKey) (PrivateKey, error) {
+	if len(in) != ed25519.PrivateKeySize {
+		return nil, fmt.Errorf("invalid private key length: %d", len(in))
+	}
+	var raw [ed25519.PrivateKeySize]byte
+	copy(raw[:], in)
+	return &WebmeshPrivateKey{
+		raw: raw,
+		typ: WebmeshKeyType,
+	}, nil
+}
+
+// PublicKeyFromNative returns a public key from a native crypto public key.
+func PublicKeyFromNative(in ed25519.PublicKey) (PublicKey, error) {
+	if len(in) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("invalid public key length: %d", len(in))
+	}
+	var raw [ed25519.PublicKeySize]byte
+	copy(raw[:], in)
+	return &WebmeshPublicKey{
+		raw: raw,
+		typ: WebmeshKeyType,
+	}, nil
+}
+
 // WebmeshPrivateKey is a private key used for webmesh transport.
 type WebmeshPrivateKey struct {
-	raw [64]byte
+	raw [ed25519.PrivateKeySize]byte
 	typ cryptopb.KeyType
 }
 
@@ -241,7 +267,7 @@ func (w *WebmeshPrivateKey) AsPrivKey() p2pcrypto.PrivKey {
 
 // AsNative returns the private key as a native crypto private key.
 func (w *WebmeshPrivateKey) AsNative() ed25519.PrivateKey {
-	out := make([]byte, 64)
+	out := make([]byte, ed25519.PrivateKeySize)
 	copy(out, w.raw[:])
 	return ed25519.PrivateKey(out)
 }
@@ -286,8 +312,8 @@ func (w *WebmeshPrivateKey) Sign(data []byte) ([]byte, error) {
 
 // Return a public key paired with this private key
 func (w *WebmeshPrivateKey) GetPublic() p2pcrypto.PubKey {
-	var out [32]byte
-	copy(out[:], w.raw[32:])
+	var out [ed25519.PublicKeySize]byte
+	copy(out[:], w.raw[ed25519.PublicKeySize:])
 	return &WebmeshPublicKey{raw: out, typ: WebmeshKeyType}
 }
 
@@ -334,7 +360,7 @@ func (w *WebmeshPrivateKey) Marshal() ([]byte, error) {
 
 // WebmeshPublicKey is a public key used for webmesh transport.
 type WebmeshPublicKey struct {
-	raw [32]byte
+	raw [ed25519.PublicKeySize]byte
 	typ cryptopb.KeyType
 }
 
@@ -351,7 +377,7 @@ func (w *WebmeshPublicKey) ID() string {
 
 // AsNative returns the public key as a native crypto public key.
 func (w *WebmeshPublicKey) AsNative() ed25519.PublicKey {
-	out := make([]byte, 32)
+	out := make([]byte, ed25519.PublicKeySize)
 	copy(out, w.raw[:])
 	return ed25519.PublicKey(out)
 }
@@ -363,9 +389,9 @@ func (w *WebmeshPublicKey) Bytes() []byte {
 	return r
 }
 
-// Raw returns the raw bytes of the private key.
+// Raw returns the raw bytes of the public key.
 func (w *WebmeshPublicKey) Raw() ([]byte, error) {
-	out := make([]byte, 32)
+	out := make([]byte, ed25519.PublicKeySize)
 	copy(out, w.raw[:])
 	return out, nil
 }

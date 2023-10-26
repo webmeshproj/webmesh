@@ -207,12 +207,12 @@ func DecodeTLSPrivateKey(i io.Reader) (crypto.PrivateKey, error) {
 	case "RSA PRIVATE KEY":
 		return x509.ParsePKCS1PrivateKey(block.Bytes)
 	case "PRIVATE KEY":
-		var data [64]byte
-		copy(data[:], block.Bytes)
-		return &WebmeshPrivateKey{
-			raw: data,
-			typ: WebmeshKeyType,
-		}, nil
+		data := make([]byte, ed25519.PrivateKeySize)
+		if len(block.Bytes) != ed25519.PrivateKeySize {
+			return nil, fmt.Errorf("invalid ed25519 private key size: %d", len(block.Bytes))
+		}
+		copy(data, block.Bytes)
+		return ed25519.PrivateKey(data), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrInvalidKeyType, block.Type)
 	}
