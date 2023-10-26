@@ -39,6 +39,10 @@ import (
 // TLSKeyType is a type of TLS key.
 type TLSKeyType string
 
+// TLSCertificate is a type alias to x509.Certificate.
+// It's provided for convenience.
+type TLSCertificate = x509.Certificate
+
 const (
 	// TLSKeyRSA is an RSA key.
 	TLSKeyRSA TLSKeyType = "rsa"
