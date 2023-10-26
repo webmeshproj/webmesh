@@ -96,7 +96,7 @@ func (o HostOptions) MarshalJSON() ([]byte, error) {
 // NewHost creates a new libp2p host with the given options.
 func NewHost(ctx context.Context, opts HostOptions) (Host, error) {
 	if opts.Key != nil {
-		opts.Options = append(opts.Options, libp2p.Identity(opts.Key.AsPrivKey()))
+		opts.Options = append(opts.Options, libp2p.Identity(opts.Key.AsIdentity()))
 	}
 	if len(opts.LocalAddrs) > 0 {
 		opts.Options = append(opts.Options, libp2p.ListenAddrs(opts.LocalAddrs...))

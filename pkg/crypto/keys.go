@@ -88,9 +88,9 @@ type PrivateKey interface {
 	Key
 	p2pcrypto.PrivKey
 
-	// AsPrivKey returns the private key as a libp2p crypto private key.
+	// AsIdentity returns the private key as a libp2p crypto private key.
 	// This changes the type of the key to a ed25519 private key.
-	AsPrivKey() p2pcrypto.PrivKey
+	AsIdentity() p2pcrypto.PrivKey
 
 	// AsNative returns the private key as a native crypto private key.
 	AsNative() ed25519.PrivateKey
@@ -281,9 +281,9 @@ type WebmeshPrivateKey struct {
 	typ cryptopb.KeyType
 }
 
-// AsPrivKey returns the private key as a libp2p crypto private key.
+// AsIdentity returns the private key as a libp2p crypto private key.
 // This changes the type of the key to a ed25519 private key.
-func (w *WebmeshPrivateKey) AsPrivKey() p2pcrypto.PrivKey {
+func (w *WebmeshPrivateKey) AsIdentity() p2pcrypto.PrivKey {
 	// We marshal the key back and forth assuming it was
 	// already validated.
 	raw, _ := w.Raw()

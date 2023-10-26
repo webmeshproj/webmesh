@@ -633,21 +633,15 @@ func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.No
 	if !conf.DisableGRPC {
 		conf.ListenAddress = o.API.ListenAddress
 		// Build out the server options
-		if !o.API.Insecure {
-			// Setup TLS
-			tlsOpts, err := o.NewServerTLSOptions(ctx)
-			if err != nil {
-				return conf, err
-			}
-			conf.ServerOptions = append(conf.ServerOptions, tlsOpts)
-		} else {
-			// Append insecure options
-			conf.ServerOptions = append(conf.ServerOptions, grpc.Creds(insecure.NewCredentials()))
+		srvopts, err := o.NewServerOptions(ctx)
+		if err != nil {
+			return conf, err
 		}
+		conf.ServerOptions = append(conf.ServerOptions, srvopts)
 		if o.API.LibP2P.Enabled {
 			conf.LibP2POptions = &services.LibP2POptions{
 				HostOptions: libp2p.HostOptions{
-					Options:        []config.Option{p2pcore.Identity(conn.Key().AsPrivKey())},
+					Options:        []config.Option{p2pcore.Identity(conn.Key().AsIdentity())},
 					BootstrapPeers: libp2p.ToMultiaddrs(o.API.LibP2P.BootstrapServers),
 					LocalAddrs:     libp2p.ToMultiaddrs(o.API.LibP2P.LocalAddrs),
 				},
@@ -730,8 +724,8 @@ func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.No
 	return
 }
 
-// NewServerTLSOptions returns new TLS options for the gRPC server.
-func (o *ServiceOptions) NewServerTLSOptions(ctx context.Context) (grpc.ServerOption, error) {
+// NewServerOptions returns new options for the gRPC server.
+func (o *ServiceOptions) NewServerOptions(ctx context.Context) (grpc.ServerOption, error) {
 	if o.API.Insecure {
 		// We shouldn't have gotten here. But as a fail safe, we return an insecure server.
 		return grpc.Creds(insecure.NewCredentials()), nil
