@@ -24,7 +24,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 
-	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	wmproto "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/protocol"
 )
 
 // Listener wraps a basic listener to be upgraded and injects the transport

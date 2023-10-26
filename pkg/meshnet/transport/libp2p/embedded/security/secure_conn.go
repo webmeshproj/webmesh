@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wgtransport
+package security
 
 import (
 	"encoding/base64"
@@ -28,13 +28,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/core/sec"
+	ma "github.com/multiformats/go-multiaddr"
 	mnet "github.com/multiformats/go-multiaddr/net"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wgcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
-	p2putil "github.com/webmeshproj/webmesh/pkg/libp2p/util"
 	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
+	wmproto "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/protocol"
+	p2putil "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/util"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
 
@@ -44,19 +45,20 @@ var _ sec.SecureConn = (*SecureConn)(nil)
 // SecureConn is a simple wrapper around the underlying connection that
 // holds remote peer information.
 type SecureConn struct {
-	*Conn
-	rpeer peer.ID
-	rkey  wgcrypto.PublicKey
+	mnet.Conn
+	rt     *SecureTransport
+	rpeer  peer.ID
+	rkey   wgcrypto.PublicKey
+	rmaddr ma.Multiaddr
 }
 
 // NewSecureConn upgrades an insecure connection with peer identity.
-func NewSecureConn(ctx context.Context, insecure *Conn, rpeer peer.ID, psk pnet.PSK, dir network.Direction) (*SecureConn, error) {
-	log := context.LoggerFrom(ctx)
+func (c *SecureTransport) NewSecureConn(ctx context.Context, insecure mnet.Conn, rpeer peer.ID, psk pnet.PSK, dir network.Direction, iface wireguard.Interface) (*SecureConn, error) {
 	sc := &SecureConn{
 		Conn: insecure,
+		rt:   c,
 	}
-	log.Debug("Performing security negotiation")
-	err := sc.negotiate(ctx, psk, dir)
+	err := sc.negotiate(ctx, psk, dir, iface)
 	if err != nil {
 		return nil, fmt.Errorf("failed to negotiate wireguard connection: %w", err)
 	}
@@ -64,13 +66,16 @@ func NewSecureConn(ctx context.Context, insecure *Conn, rpeer peer.ID, psk pnet.
 }
 
 // LocalPeer returns our peer ID
-func (c *SecureConn) LocalPeer() peer.ID { return c.Conn.lpeer }
+func (c *SecureConn) LocalPeer() peer.ID { return c.rt.peerID }
 
 // RemotePeer returns the peer ID of the remote peer.
 func (c *SecureConn) RemotePeer() peer.ID { return c.rpeer }
 
 // RemotePublicKey returns the public key of the remote peer.
 func (c *SecureConn) RemotePublicKey() crypto.PubKey { return c.rkey }
+
+// RemotePublicKey returns the public key of the remote peer.
+func (c *SecureConn) RemoteMultiaddr() ma.Multiaddr { return c.rmaddr }
 
 // ConnState returns information about the connection state.
 func (c *SecureConn) ConnState() network.ConnectionState {
@@ -96,7 +101,7 @@ type negotiation struct {
 }
 
 // negotiate handles the initial negotiation of the connection.
-func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Direction) (err error) {
+func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Direction, iface wireguard.Interface) (err error) {
 	var (
 		rula           netip.Prefix
 		raddr          netip.Addr
@@ -105,12 +110,10 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 		securep        int
 	)
 	laddr := &net.TCPAddr{
-		IP:   c.iface.AddressV6().Addr().AsSlice(),
+		IP:   iface.AddressV6().Addr().AsSlice(),
 		Port: 0,
 	}
-	log := context.LoggerFrom(ctx)
 	if dir == network.DirInbound {
-		log.Debug("Starting secure listener")
 		ln, err = net.ListenTCP("tcp6", laddr)
 		if err != nil {
 			err = fmt.Errorf("failed to start signaling server: %w", err)
@@ -118,19 +121,16 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 		}
 		defer ln.Close()
 		securep = ln.Addr().(*net.TCPAddr).Port
-		log.Debug("Secure listener started, handling negotiation", "address", ln.Addr().String())
 	}
 	errs := make(chan error, 1)
 	go func() {
 		defer close(errs)
-		log.Debug("Waiting for negotiation payload")
 		var msg negotiation
 		err := json.NewDecoder(c).Decode(&msg)
 		if err != nil {
 			errs <- fmt.Errorf("failed to decode negotiation payload: %w", err)
 			return
 		}
-		log.Debug("Received negotiation payload, verifying the signature")
 		// Marshal the payload and verify the signature
 		sig, err := base64.RawStdEncoding.DecodeString(msg.Signature)
 		if err != nil {
@@ -140,35 +140,30 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 		msg.Signature = ""
 		data, err := json.Marshal(msg)
 		if err != nil {
-			log.Error("Failed to marshal negotiation payload", "error", err.Error())
 			errs <- fmt.Errorf("failed to marshal negotiation payload: %w", err)
 			return
 		}
 		// Extract the public key from the peer ID
 		key, err := p2putil.ExtractWebmeshPublicKey(ctx, msg.PeerID)
 		if err != nil {
-			log.Error("Failed to extract public key from peer ID", "error", err.Error())
 			errs <- fmt.Errorf("failed to extract public key from peer ID: %w", err)
 			return
 		}
 		c.rkey = key
 		ok, err := c.rkey.Verify(data, sig)
 		if err != nil {
-			log.Error("Failed to verify negotiation signature", "error", err.Error())
 			errs <- fmt.Errorf("failed to verify negotiation signature: %w", err)
 			return
 		}
 		if !ok {
-			log.Error("Negotiation signature is invalid")
 			errs <- fmt.Errorf("negotiation signature is invalid")
 			return
 		}
-		log.Debug("Negotiation signature is valid")
 		if dir == network.DirOutbound {
 			securep = msg.SecurePort
 		}
 		c.rpeer = msg.PeerID
-		c.Conn.rmaddr = wmproto.Encapsulate(c.Conn.Conn.RemoteMultiaddr(), c.rpeer)
+		c.rmaddr = wmproto.Encapsulate(c.Conn.RemoteMultiaddr(), c.rpeer)
 		if len(psk) > 0 {
 			// We seed the ULA with the PSK
 			rula = netutil.GenerateULAWithSeed(psk)
@@ -177,10 +172,6 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 			// The peer will have their own ULA that we'll trust.
 			rula, raddr = netutil.GenerateULAWithKey(c.rkey)
 		}
-		log.Debug("Determined remote network addresses for for peer",
-			"ula", rula.String(),
-			"addr", raddr.String(),
-		)
 		if len(msg.Endpoints) == 0 {
 			// We're done here
 			errs <- nil
@@ -192,8 +183,8 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 		errs <- err
 	}()
 	payload := negotiation{
-		PeerID:     c.Conn.lpeer,
-		Endpoints:  c.Conn.eps,
+		PeerID:     c.rt.peerID,
+		Endpoints:  c.rt.eps,
 		SecurePort: securep,
 	}
 	data, err := json.Marshal(payload)
@@ -202,7 +193,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 		return
 	}
 	// Sign the payload
-	sig, err := c.lkey.Sign(data)
+	sig, err := c.rt.key.Sign(data)
 	if err != nil {
 		err = fmt.Errorf("failed to sign negotiation payload: %w", err)
 		return
@@ -238,20 +229,18 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 		PrivateIPv6: netip.PrefixFrom(raddr, wmproto.PrefixSize),
 		AllowedIPs:  []netip.Prefix{rula},
 	}
-	log.Debug("Adding peer to wireguard interface", "config", peer)
-	err = c.iface.PutPeer(context.WithLogger(ctx, log), &peer)
+	err = iface.PutPeer(ctx, &peer)
 	if err != nil {
 		err = fmt.Errorf("failed to add peer to wireguard interface: %w", err)
 		return
 	}
 	// Create the secure connection
-	log.Debug("Creating secure connection over WireGuard")
 	if dir == network.DirInbound {
 		sc, err := ln.Accept()
 		if err != nil {
 			return fmt.Errorf("failed to accept secure connection: %w", err)
 		}
-		c.Conn.Conn, err = mnet.WrapNetConn(sc)
+		c.Conn, err = mnet.WrapNetConn(sc)
 		if err != nil {
 			return fmt.Errorf("failed to wrap secure connection: %w", err)
 		}
@@ -263,7 +252,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 		if err != nil {
 			return fmt.Errorf("failed to dial secure connection: %w", err)
 		}
-		c.Conn.Conn, err = mnet.WrapNetConn(sc)
+		c.Conn, err = mnet.WrapNetConn(sc)
 		if err != nil {
 			return fmt.Errorf("failed to wrap secure connection: %w", err)
 		}

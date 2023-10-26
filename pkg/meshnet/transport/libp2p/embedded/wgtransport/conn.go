@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	wmproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	wmproto "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/protocol"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
 

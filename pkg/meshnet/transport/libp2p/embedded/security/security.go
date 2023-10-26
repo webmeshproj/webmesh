@@ -14,11 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wgtransport
+package security
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
+	"net/netip"
+	"runtime"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -27,10 +31,17 @@ import (
 	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/sec"
+	mnet "github.com/multiformats/go-multiaddr/net"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	wmcrypto "github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/libp2p/util"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
+	netutil "github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system"
+	wmproto "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/protocol"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/util"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // Ensure we implement the interface
@@ -44,10 +55,12 @@ type SecureTransport struct {
 	psk        pnet.PSK
 	protocolID protocol.ID
 	key        wmcrypto.PrivateKey
+	eps        []string
+	iface      wireguard.Interface
 }
 
 // New is a standalone constructor for SecureTransport.
-func NewSecurity(id protocol.ID, host host.Host, psk pnet.PSK, privkey crypto.PrivKey) (*SecureTransport, error) {
+func New(id protocol.ID, host host.Host, psk pnet.PSK, privkey crypto.PrivKey) (*SecureTransport, error) {
 	peerID, err := peer.IDFromPrivateKey(privkey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract peer ID from private key: %w", err)
@@ -62,6 +75,63 @@ func NewSecurity(id protocol.ID, host host.Host, psk pnet.PSK, privkey crypto.Pr
 		psk:        psk,
 		protocolID: id,
 		key:        key,
+	}
+	ctx := context.Background()
+	// Detect our public endpoints (libp2p probably has mechanisms for this already)
+	eps, err := endpoints.Detect(ctx, endpoints.DetectOpts{
+		DetectPrivate: true,
+		DetectIPv6:    true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect local endpoints: %w", err)
+	}
+	// Determine what our local network will be.
+	var ula netip.Prefix
+	var addr netip.Addr
+	if len(psk) > 0 {
+		// We are going to seed the ULA with the PSK and use it for all connections.
+		ula = netutil.GenerateULAWithSeed(psk)
+		addr = netutil.AssignToPrefix(ula, key.PublicKey()).Addr()
+	} else {
+		// We'll generate our own unique local addresses.
+		ula, addr = netutil.GenerateULAWithKey(key.PublicKey())
+	}
+	// We go ahead and create an interface for ourself. If we can't do this we'll fail to
+	// do pretty much everything.
+	wgopts := wireguard.Options{
+		NodeID: types.NodeID(host.ID().String()),
+		// Will only work on Linux/Windows, needs to be utun+ on macOS.
+		Name: func() string {
+			if runtime.GOOS == "darwin" {
+				return "utun9"
+			}
+			// Pick a random number to append to the interface name
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			return fmt.Sprintf("webmesh%d", r.Intn(1000))
+		}(),
+		ForceName:   true,
+		MTU:         system.DefaultMTU,
+		NetworkV6:   ula,
+		AddressV6:   netip.PrefixFrom(addr, wmproto.PrefixSize),
+		DisableIPv4: true,
+	}
+	iface, err := wireguard.New(ctx, &wgopts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create wireguard interface: %w", err)
+	}
+	err = iface.AddRoute(ctx, ula)
+	if err != nil && !system.IsRouteExists(err) {
+		return nil, fmt.Errorf("failed to add route: %w", err)
+	}
+	err = iface.Configure(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure wireguard interface: %w", err)
+	}
+	sec.iface = iface
+	lport, _ := iface.ListenPort()
+	addrports := eps.AddrPorts(uint16(lport))
+	for _, addrport := range addrports {
+		sec.eps = append(sec.eps, addrport.String())
 	}
 	return sec, nil
 }
@@ -80,23 +150,10 @@ func (st *SecureTransport) SecureOutbound(ctx context.Context, insecure net.Conn
 }
 
 func (st *SecureTransport) secureConn(ctx context.Context, insecure net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, error) {
-	wc, ok := insecure.(*Conn)
-	if !ok {
-		defer insecure.Close()
-		return nil, fmt.Errorf("failed to secure connection: invalid connection type")
-	}
-	// We throw away the initial insecure connection no matter what and move it to wireguard
-	log := context.LoggerFrom(wc.Context())
-	ic := wc.Conn
+	ic := insecure
 	defer ic.Close()
-	if dir == network.DirInbound {
-		log.Debug("Securing inbound connection")
-	} else {
-		log.Debug("Securing outbound connection")
-	}
-	c, err := NewSecureConn(context.WithLogger(ctx, log), wc, p, st.psk, dir)
+	c, err := st.NewSecureConn(ctx, insecure.(mnet.Conn), p, st.psk, dir, st.iface)
 	if err != nil {
-		log.Error("Failed to secure connection", "error", err.Error())
 		return nil, fmt.Errorf("failed to secure connection: %w", err)
 	}
 	return c, nil

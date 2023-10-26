@@ -27,9 +27,9 @@ import (
 
 	wmconfig "github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	p2pproto "github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
-	p2ptransport "github.com/webmeshproj/webmesh/pkg/libp2p/transport"
 	"github.com/webmeshproj/webmesh/pkg/logging"
+	p2pproto "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/protocol"
+	p2ptransport "github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/transport"
 )
 
 // TransportOptions are options for configuring a libp2p transport.

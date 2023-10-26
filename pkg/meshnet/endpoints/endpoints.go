@@ -23,7 +23,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
-	"github.com/webmeshproj/webmesh/pkg/libp2p/protocol"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p/embedded/protocol"
 )
 
 // DetectOpts contains options for endpoint detection.
