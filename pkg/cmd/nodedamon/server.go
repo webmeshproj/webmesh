@@ -18,19 +18,26 @@ limitations under the License.
 package nodedaemon
 
 import (
+	"fmt"
 	"log/slog"
+	"sync"
 
+	"github.com/bufbuild/protovalidate-go"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/embed"
 )
 
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
-	log *slog.Logger
+	conns map[string]embed.Node
+	val   *protovalidate.Validator
+	log   *slog.Logger
+	mu    sync.Mutex
 }
 
 var (
@@ -42,43 +49,106 @@ var (
 
 // NewServer returns a new AppDaemon server.
 func NewServer(log *slog.Logger) *AppDaemon {
-	return &AppDaemon{log: log}
+	v, err := protovalidate.New()
+	if err != nil {
+		panic(fmt.Errorf("failed to create proto validator: %w", err))
+	}
+	return &AppDaemon{
+		conns: make(map[string]embed.Node),
+		val:   v,
+		log:   log,
+	}
 }
 
 func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
+	err := app.val.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 }
 
 func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
+	err := app.val.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 
 }
 
 func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.MetricsResponse, error) {
+	err := app.val.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 
 }
 
 func (app *AppDaemon) Query(ctx context.Context, req *v1.QueryRequest) (*v1.QueryResponse, error) {
+	err := app.val.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 
 }
 
 func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.StatusResponse, error) {
+	err := app.val.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 
 }
 
 func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
+	err := app.val.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 
 }
 
 func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
+	err := app.val.Validate(req)
+	if err != nil {
+		return newInvalidError(err)
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
 	return status.Errorf(codes.Unimplemented, "not implemented")
 
 }
 
 func (app *AppDaemon) Close() error {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	for _, conn := range app.conns {
+		err := conn.Stop(context.WithLogger(context.Background(), app.log))
+		if err != nil {
+			app.log.Error("Error stopping node", "err", err)
+		}
+	}
+	app.conns = nil
 	return nil
+}
+
+func newInvalidError(err error) error {
+	return status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 }
