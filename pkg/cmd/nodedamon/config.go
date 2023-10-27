@@ -18,16 +18,23 @@ package nodedaemon
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 
 	"github.com/spf13/pflag"
+
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 )
 
 // Config is the configuration for the applicaton daeemon.
 type Config struct {
 	// Enabled is true if the daemon is enabled.
 	Enabled bool `koanf:"enabled"`
+	// KeyFile is the path to the WireGuard private key for the node.
+	// If set and it does not exist it will be created, otherwise one
+	// will be generated.
+	KeyFile string `koanf:"key-file,omitempty"`
 	// Bind is the bind address for the daemon.
 	Bind string `koanf:"bind"`
 	// InsecureSocket uses an insecure socket when binding to a unix socket.
@@ -52,6 +59,7 @@ type WebUI struct {
 func NewDefaultConfig() *Config {
 	return &Config{
 		Enabled:        false,
+		KeyFile:        "",
 		Bind:           DefaultDaemonSocket(),
 		InsecureSocket: false,
 		GRPCWeb:        false,
@@ -63,6 +71,7 @@ func NewDefaultConfig() *Config {
 // BindFlags binds the flags to the given flagset.
 func (conf *Config) BindFlags(prefix string, flagset *pflag.FlagSet) *Config {
 	flagset.BoolVar(&conf.Enabled, prefix+"enabled", conf.Enabled, "Run the node as an application daemon")
+	flagset.StringVar(&conf.KeyFile, prefix+"key-file", conf.KeyFile, "Path to the WireGuard private key for the node")
 	flagset.StringVar(&conf.Bind, prefix+"bind", conf.Bind, "Address to bind the application daemon to")
 	flagset.BoolVar(&conf.InsecureSocket, prefix+"insecure-socket", conf.InsecureSocket, "Leave default ownership on the Unix socket")
 	flagset.BoolVar(&conf.GRPCWeb, prefix+"grpc-web", conf.GRPCWeb, "Use gRPC-Web for the application daemon")
@@ -94,6 +103,33 @@ func (conf *Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+// LoadKey loads the wireguard key from the configuration.
+func (conf *Config) LoadKey() (crypto.PrivateKey, error) {
+	if conf.KeyFile == "" {
+		return crypto.GenerateKey()
+	}
+	key, err := crypto.DecodePrivateKeyFromFile(conf.KeyFile)
+	if err == nil {
+		return key, nil
+	}
+	if !os.IsNotExist(err) {
+		return nil, err
+	}
+	key, err = crypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	encoded, err := key.Encode()
+	if err != nil {
+		return nil, err
+	}
+	err = os.WriteFile(conf.KeyFile, []byte(encoded), 0600)
+	if err != nil {
+		return nil, err
+	}
+	return key, nil
 }
 
 // DefaultDaemonSocket returns the default daemon socket path.

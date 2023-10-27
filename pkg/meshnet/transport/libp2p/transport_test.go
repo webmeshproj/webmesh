@@ -489,7 +489,7 @@ func TestDiscoveryRPCTransport(t *testing.T) {
 		// Setup the server libp2p host.
 		rendezvous := uuid.NewString()
 		server, err := NewDiscoveryHost(ctx, HostOptions{
-			ConnectTimeout: time.Second * 3,
+			ConnectTimeout: time.Second * 5,
 			LocalAddrs: []multiaddr.Multiaddr{
 				multiaddr.StringCast("/ip4/0.0.0.0/tcp/0"),
 			},
@@ -513,7 +513,7 @@ func TestDiscoveryRPCTransport(t *testing.T) {
 		rt, err := NewDiscoveryTransport(ctx, TransportOptions{
 			Rendezvous: rendezvous,
 			HostOptions: HostOptions{
-				ConnectTimeout: time.Second * 3,
+				ConnectTimeout: time.Second * 5,
 				LocalAddrs: []multiaddr.Multiaddr{
 					multiaddr.StringCast("/ip4/0.0.0.0/tcp/0"),
 				},

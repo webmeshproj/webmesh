@@ -56,14 +56,17 @@ func Run(ctx context.Context, conf Config) error {
 	}
 	defer listener.Close()
 	// Setup the server
-	srv := NewServer(log)
+	srv, err := NewServer(conf)
+	if err != nil {
+		return err
+	}
 	defer srv.Close()
 	unarymiddlewares := []grpc.UnaryServerInterceptor{
-		context.LogInjectUnaryServerInterceptor(log),
+		context.LogInjectUnaryServerInterceptor(log.With("appdaemon", "grpc")),
 		logging.ContextUnaryServerInterceptor(),
 	}
 	streammiddlewares := []grpc.StreamServerInterceptor{
-		context.LogInjectStreamServerInterceptor(log),
+		context.LogInjectStreamServerInterceptor(log.With("appdaemon", "grpc")),
 		logging.ContextStreamServerInterceptor(),
 	}
 	grpcServer := grpc.NewServer(

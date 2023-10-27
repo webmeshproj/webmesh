@@ -28,13 +28,16 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
 
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
 	conns map[string]embed.Node
+	key   crypto.PrivateKey
 	val   *protovalidate.Validator
 	log   *slog.Logger
 	mu    sync.Mutex
@@ -48,16 +51,21 @@ var (
 )
 
 // NewServer returns a new AppDaemon server.
-func NewServer(log *slog.Logger) *AppDaemon {
+func NewServer(conf Config) (*AppDaemon, error) {
 	v, err := protovalidate.New()
 	if err != nil {
-		panic(fmt.Errorf("failed to create proto validator: %w", err))
+		return nil, fmt.Errorf("failed to create validator: %w", err)
+	}
+	key, err := conf.LoadKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load key: %w", err)
 	}
 	return &AppDaemon{
 		conns: make(map[string]embed.Node),
+		key:   key,
 		val:   v,
-		log:   log,
-	}
+		log:   logging.NewLogger(conf.LogLevel, "text").With("appdaemon", "server"),
+	}, nil
 }
 
 func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {

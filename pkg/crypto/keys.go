@@ -24,7 +24,9 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"fmt"
+	"os"
 	"sort"
+	"strings"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	cryptopb "github.com/libp2p/go-libp2p/core/crypto/pb"
@@ -136,6 +138,15 @@ func MustGenerateKey() PrivateKey {
 		panic(err)
 	}
 	return priv
+}
+
+// DecodePrivateKeyFromFile decodes a private key from a file.
+func DecodePrivateKeyFromFile(path string) (PrivateKey, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return DecodePrivateKey(strings.TrimSpace(string(data)))
 }
 
 // DecodePrivateKey decodes a private key from a base64 string.
