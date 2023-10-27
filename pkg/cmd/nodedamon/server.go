@@ -49,12 +49,12 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 }
 
-func (app *AppDaemon) Disconnect(ctx context.Context, _ *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
+func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 
 }
 
-func (app *AppDaemon) Metrics(ctx context.Context, _ *v1.MetricsRequest) (*v1.MetricsResponse, error) {
+func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.MetricsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 
 }
@@ -64,7 +64,7 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.QueryRequest) (*v1.Quer
 
 }
 
-func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.StatusResponse, error) {
+func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.StatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 
 }
