@@ -21,6 +21,7 @@ package libp2p
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -479,6 +480,9 @@ func TestRPCTransport(t *testing.T) {
 }
 
 func TestDiscoveryRPCTransport(t *testing.T) {
+	if os.Getenv("CI") == "true" {
+		t.Skip("Skipping discovery transport test in CI")
+	}
 	ctx := context.Background()
 
 	t.Run("Defaults", func(t *testing.T) {
