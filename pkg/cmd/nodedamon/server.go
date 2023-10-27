@@ -18,6 +18,8 @@ limitations under the License.
 package nodedaemon
 
 import (
+	"log/slog"
+
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,6 +30,7 @@ import (
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
+	log *slog.Logger
 }
 
 var (
@@ -35,9 +38,12 @@ var (
 	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected")
 	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
 	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected")
-	// ErrAlreadyConnecting is returned when the node is already connecting to the mesh.
-	ErrAlreadyConnecting = status.Errorf(codes.FailedPrecondition, "already connecting")
 )
+
+// NewServer returns a new AppDaemon server.
+func NewServer(log *slog.Logger) *AppDaemon {
+	return &AppDaemon{log: log}
+}
 
 func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
@@ -71,4 +77,8 @@ func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.
 func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "not implemented")
 
+}
+
+func (app *AppDaemon) Close() error {
+	return nil
 }

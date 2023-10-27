@@ -95,6 +95,9 @@ func Execute() error {
 	ctx := context.WithLogger(context.Background(), log)
 	if daemonconf.Enabled {
 		// Start the node as an application daemon
+		if err := daemonconf.Validate(); err != nil {
+			return err
+		}
 		return nodedaemon.Run(context.Background(), *daemonconf)
 	}
 	// Apply globals

@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/netip"
 	"os"
@@ -30,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	p2pcore "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/multiformats/go-multiaddr"
@@ -42,6 +40,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
@@ -654,11 +653,11 @@ func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.No
 		// Always append logging middlewares to the server options
 		unarymiddlewares := []grpc.UnaryServerInterceptor{
 			context.LogInjectUnaryServerInterceptor(context.LoggerFrom(ctx)),
-			logging.UnaryServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+			logging.ContextUnaryServerInterceptor(),
 		}
 		streammiddlewares := []grpc.StreamServerInterceptor{
 			context.LogInjectStreamServerInterceptor(context.LoggerFrom(ctx)),
-			logging.StreamServerInterceptor(InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+			logging.ContextStreamServerInterceptor(),
 		}
 		// If metrics are enabled, register the metrics interceptor
 		if o.Metrics.Enabled {
@@ -672,7 +671,6 @@ func (o *ServiceOptions) NewServiceOptions(ctx context.Context, conn meshnode.No
 			unarymiddlewares = append(unarymiddlewares, conn.Plugins().AuthUnaryInterceptor())
 			streammiddlewares = append(streammiddlewares, conn.Plugins().AuthStreamInterceptor())
 		}
-
 		if !o.API.DisableLeaderProxy {
 			leaderProxy := leaderproxy.New(conn.ID(), conn.Storage().Consensus(), conn, conn.Network())
 			unarymiddlewares = append(unarymiddlewares, leaderProxy.UnaryInterceptor())
@@ -784,20 +782,6 @@ func (o *ServiceOptions) NewServerOptions(ctx context.Context) (grpc.ServerOptio
 		}
 	}
 	return grpc.Creds(credentials.NewTLS(tlsConfig)), nil
-}
-
-// InterceptorLogger returns a logging.Logger that logs to the given slog.Logger.
-func InterceptorLogger() logging.Logger {
-	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
-		log := context.LoggerFrom(ctx)
-		if msg == "started call" {
-			msg = "Started gRPC call"
-		}
-		if msg == "finished call" {
-			msg = "Finished gRPC call"
-		}
-		log.Log(ctx, slog.Level(lvl), msg, fields...)
-	})
 }
 
 // APIRegistrationOptions are options for registering the APIs to a given server.

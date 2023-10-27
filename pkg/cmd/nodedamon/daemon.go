@@ -34,86 +34,21 @@ import (
 	"time"
 
 	"github.com/fullstorydev/grpcui/standalone"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	meshlog "github.com/webmeshproj/webmesh/pkg/logging"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
-
-// Config is the configuration for the applicaton daeemon.
-type Config struct {
-	// Enabled is true if the daemon is enabled.
-	Enabled bool `koanf:"enabled"`
-	// Bind is the bind address for the daemon.
-	Bind string `koanf:"bind"`
-	// InsecureSocket uses an insecure socket when binding to a unix socket.
-	InsecureSocket bool `koanf:"insecure-socket"`
-	// GRPCWeb enables gRPC-Web support.
-	GRPCWeb bool `koanf:"grpc-web"`
-	// UI are options for exposing a gRPC UI.
-	UI WebUI `koanf:"ui"`
-	// LogLevel is the log level for the daemon.
-	LogLevel string `koanf:"log-level"`
-}
-
-// WebUI are options for exposing a gRPC UI.
-type WebUI struct {
-	// Enabled is true if the gRPC UI is enabled.
-	Enabled bool `koanf:"enabled"`
-	// ListenAddress is the address to listen on.
-	ListenAddress string `koanf:"listen-address"`
-}
-
-// NewDefaultConfig returns the default configuration.
-func NewDefaultConfig() *Config {
-	return &Config{
-		Enabled: false,
-		Bind:    DefaultDaemonSocket(),
-		UI: WebUI{
-			Enabled:       false,
-			ListenAddress: "127.0.0.1:8080",
-		},
-		LogLevel: "info",
-	}
-}
-
-// BindFlags binds the flags to the given flagset.
-func (conf *Config) BindFlags(prefix string, flagset *pflag.FlagSet) *Config {
-	flagset.BoolVar(&conf.Enabled, prefix+"enabled", conf.Enabled, "Run the node as an application daemon")
-	flagset.StringVar(&conf.Bind, prefix+"bind", conf.Bind, "Address to bind the application daemon to")
-	flagset.BoolVar(&conf.InsecureSocket, prefix+"insecure-socket", conf.InsecureSocket, "Leave default ownership on the Unix socket")
-	flagset.BoolVar(&conf.GRPCWeb, prefix+"grpc-web", conf.GRPCWeb, "Use gRPC-Web for the application daemon")
-	flagset.StringVar(&conf.LogLevel, prefix+"log-level", conf.LogLevel, "Log level for the application daemon")
-	conf.UI.BindFlags(prefix+"ui.", flagset)
-	return conf
-}
-
-// BindFlags binds the UI flags to the given flagset.
-func (conf *WebUI) BindFlags(prefix string, flagset *pflag.FlagSet) {
-	flagset.BoolVar(&conf.Enabled, prefix+"enabled", conf.Enabled, "Enable the gRPC UI")
-	flagset.StringVar(&conf.ListenAddress, prefix+"listen-address", conf.ListenAddress, "Address to listen on for the gRPC UI")
-}
-
-// DefaultDaemonSocket returns the default daemon socket path.
-func DefaultDaemonSocket() string {
-	if runtime.GOOS == "windows" {
-		return "\\\\.\\pipe\\webmesh.sock"
-	}
-	return "/var/run/webmesh/webmesh.sock"
-}
 
 // Run runs the app daemon with the given configuration. The context
 // can be used to shutdown the server, otherwise it will wait for a
 // SIGINT or SIGTERM.
 func Run(ctx context.Context, conf Config) error {
-	log := meshlog.NewLogger(conf.LogLevel, "text")
+	log := logging.NewLogger(conf.LogLevel, "text")
 	// Setup the listener
 	listener, err := newListener(conf.Bind, conf.InsecureSocket)
 	if err != nil {
@@ -121,14 +56,15 @@ func Run(ctx context.Context, conf Config) error {
 	}
 	defer listener.Close()
 	// Setup the server
-	srv := &AppDaemon{}
+	srv := NewServer(log)
+	defer srv.Close()
 	unarymiddlewares := []grpc.UnaryServerInterceptor{
 		context.LogInjectUnaryServerInterceptor(log),
-		logging.UnaryServerInterceptor(config.InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+		logging.ContextUnaryServerInterceptor(),
 	}
 	streammiddlewares := []grpc.StreamServerInterceptor{
 		context.LogInjectStreamServerInterceptor(log),
-		logging.StreamServerInterceptor(config.InterceptorLogger(), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+		logging.ContextStreamServerInterceptor(),
 	}
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(unarymiddlewares...),
