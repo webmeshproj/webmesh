@@ -50,7 +50,7 @@ func NewUsageFunc(cfg UsageConfig) func() {
 		var sb strings.Builder
 		sb.WriteString(fmt.Sprintf("Usage: %s [options]\n\n", cfg.Name))
 		sb.WriteString(strings.TrimSpace(cfg.Description) + "\n")
-		t := tabwriter.NewWriter(&sb, 2, 2, 2, '\t', 0)
+		t := tabwriter.NewWriter(&sb, 0, 1, 4, ' ', 0)
 		for _, prefix := range cfg.Prefixes {
 			// Capitalize the prefix and write a description of the section.
 			titleBytes := make([]byte, len(prefix))
@@ -75,13 +75,11 @@ func NewUsageFunc(cfg UsageConfig) func() {
 						return
 					}
 				}
-				line := fmt.Sprintf("\t--%s=%s\t\t%s", f.Name, f.DefValue, f.Usage)
+				line := fmt.Sprintf("    --%s=%s \t %s \t\n", f.Name, f.DefValue, f.Usage)
 				_, _ = t.Write([]byte(line))
-				_, _ = t.Write([]byte("\n"))
-				t.Flush()
 			})
 		}
-		sb.WriteString("\nMiscellaneous Options:\n\n")
+		_, _ = t.Write([]byte("\nMiscellaneous Options:\n\n"))
 		cfg.Flagset.VisitAll(func(f *pflag.Flag) {
 			for _, p := range cfg.Prefixes {
 				if strings.HasPrefix(f.Name, p) {
@@ -93,12 +91,10 @@ func NewUsageFunc(cfg UsageConfig) func() {
 					}
 				}
 			}
-			line := fmt.Sprintf("\t--%s\t\t%s", f.Name, f.Usage)
+			line := fmt.Sprintf("    --%s \t %s \t\n", f.Name, f.Usage)
 			_, _ = t.Write([]byte(line))
-			_, _ = t.Write([]byte("\n"))
-			t.Flush()
 		})
-		sb.WriteString("\n")
+		_, _ = t.Write([]byte("\n"))
 		t.Flush()
 		fmt.Fprintln(os.Stderr, sb.String())
 	}

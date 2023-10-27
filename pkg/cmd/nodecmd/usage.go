@@ -39,6 +39,7 @@ var configPrefixes = []string{
 	"wireguard",
 	"discovery",
 	"plugin",
+	"daemon",
 }
 
 // Usage prints the usage string for the nodecmd.

@@ -127,7 +127,6 @@ func NewServer(ctx context.Context, o Options) (*Server, error) {
 		srvs: o.Servers,
 		log:  log,
 	}
-	// Register the reflection service
 	if !o.DisableGRPC {
 		server.srv = grpc.NewServer(o.ServerOptions...)
 		log.Debug("Registering reflection service")
@@ -182,7 +181,17 @@ func (s *Server) ListenAndServe() error {
 			defer s.lis.Close()
 			if s.opts.WebEnabled {
 				s.log.Info(fmt.Sprintf("Starting gRPC-web server on %s", s.lis.Addr().String()))
-				s.websrv = &http.Server{Handler: grpcweb.WrapServer(s.srv)}
+				wrapped := grpcweb.WrapServer(s.srv, grpcweb.WithWebsockets(true))
+				s.websrv = &http.Server{
+					Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+						if wrapped.IsGrpcWebRequest(req) {
+							wrapped.ServeHTTP(resp, req)
+							return
+						}
+						// Fall down to the gRPC server
+						s.srv.ServeHTTP(resp, req)
+					}),
+				}
 				if err := s.websrv.Serve(s.lis); err != nil && err != http.ErrServerClosed {
 					return fmt.Errorf("grpc-web serve: %w", err)
 				}

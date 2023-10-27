@@ -18,38 +18,16 @@ limitations under the License.
 package nodedaemon
 
 import (
-	"fmt"
-	"log/slog"
-	"sync"
-	"sync/atomic"
-	"time"
-
-	"github.com/knadh/koanf/providers/confmap"
-	"github.com/knadh/koanf/providers/structs"
-	"github.com/knadh/koanf/v2"
 	v1 "github.com/webmeshproj/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/meshnode"
-	"github.com/webmeshproj/webmesh/pkg/services"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
-	"github.com/webmeshproj/webmesh/pkg/storage/types"
-	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
-
-	config     Config
-	mesh       meshnode.Node
-	svcs       *services.Server
-	connecting atomic.Bool
-	mu         sync.Mutex
-	log        *slog.Logger
 }
 
 var (
@@ -62,267 +40,35 @@ var (
 )
 
 func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh != nil {
-		return nil, ErrAlreadyConnected
-	} else if app.connecting.Load() {
-		// The lock should keep this from ever happening, but just in case.
-		return nil, ErrAlreadyConnecting
-	}
-	// Take a copy of the base configuration and merge any overrides
-	conf := *app.config.Config
-	overrides := req.GetConfig().AsMap()
-	k := koanf.New(".")
-	err := k.Load(structs.Provider(conf, "koanf"), nil)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "error loading configuration: %v", err)
-	}
-	if len(overrides) > 0 {
-		err = k.Load(confmap.Provider(overrides, "koanf"), nil)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "error loading configuration overrides: %v", err)
-		}
-	}
-	err = k.Unmarshal("", &conf)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "error unmarshalling configuration: %v", err)
-	}
-	if req.GetDisableBootstrap() {
-		conf.Bootstrap.Enabled = false
-	}
-	if req.GetJoinPSK() != "" {
-		conf.Bootstrap.Enabled = false
-		conf.Mesh.JoinAddress = ""
-		conf.Discovery = config.DiscoveryOptions{
-			Rendezvous: req.GetJoinPSK(),
-			Discover:   true,
-		}
-	}
-	err = conf.Validate()
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "error validating configuration: %v", err)
-	}
-	// Time to go to work.
-	log := app.log
-
-	// Use a generic timeout for now
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-	ctx = context.WithLogger(ctx, log)
-
-	log.Info("Starting mesh node")
-	// Create a new mesh connection
-	meshConfig, err := conf.NewMeshConfig(ctx, nil)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create mesh config: %v", err)
-	}
-	meshConn := meshnode.New(meshConfig)
-	storageProvider, err := conf.NewStorageProvider(ctx, meshConn, conf.Bootstrap.Force)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create storage provider: %v", err)
-	}
-	connectOpts, err := conf.NewConnectOptions(ctx, meshConn, storageProvider, nil)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create connect options: %v", err)
-	}
-	// Start the storage provider
-	err = storageProvider.Start(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to start storage provider: %v", err)
-	}
-	// Connect to the mesh
-	err = meshConn.Connect(ctx, connectOpts)
-	if err != nil {
-		defer func() {
-			err := storageProvider.Close()
-			if err != nil {
-				log.Error("failed to shutdown raft node", slog.String("error", err.Error()))
-			}
-		}()
-		return nil, status.Errorf(codes.Internal, "failed to open mesh connection: %v", err)
-	}
-	select {
-	case <-meshConn.Ready():
-	case <-ctx.Done():
-		return nil, status.Errorf(codes.Internal, "failed to start mesh node: %v", ctx.Err())
-	}
-
-	// If anything goes wrong at this point, make sure we close down cleanly.
-	handleErr := func(cause error) error {
-		if err := meshConn.Close(ctx); err != nil {
-			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
-		}
-		return cause
-	}
-	log.Info("Mesh connection is ready, starting services")
-
-	// Start the mesh services
-	srvOpts, err := conf.Services.NewServiceOptions(ctx, meshConn)
-	if err != nil {
-		return nil, handleErr(status.Errorf(codes.Internal, "failed to create service options: %v", err))
-	}
-	srv, err := services.NewServer(ctx, srvOpts)
-	if err != nil {
-		return nil, handleErr(status.Errorf(codes.Internal, "failed to create gRPC server: %v", err))
-	}
-	if !conf.Services.API.Disabled {
-		features := conf.Services.NewFeatureSet(storageProvider, conf.Services.API.ListenPort())
-		err = conf.Services.RegisterAPIs(ctx, config.APIRegistrationOptions{
-			Node:        meshConn,
-			Server:      srv,
-			Features:    features,
-			BuildInfo:   version.GetBuildInfo(),
-			Description: "webmesh-app-daemon",
-		})
-		if err != nil {
-			return nil, handleErr(status.Errorf(codes.Internal, "failed to register APIs: %v", err))
-		}
-	}
-	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			log.Error("Mesh services failed", slog.String("error", err.Error()))
-		}
-	}()
-
-	// Save the current mesh connection
-	app.mesh = meshConn
-	app.svcs = srv
-	return &v1.ConnectResponse{
-		NodeID:     meshConn.ID().String(),
-		MeshDomain: meshConn.Domain(),
-		Ipv4:       meshConn.Network().NetworkV4().String(),
-		Ipv6:       meshConn.Network().NetworkV6().String(),
-	}, nil
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 }
 
 func (app *AppDaemon) Disconnect(ctx context.Context, _ *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	app.svcs.Shutdown(ctx)
-	app.svcs = nil
-	err := app.mesh.Close(ctx)
-	app.mesh = nil
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error while disconnecting from mesh: %v", err)
-	}
-	return &v1.DisconnectResponse{}, nil
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+
 }
 
 func (app *AppDaemon) Metrics(ctx context.Context, _ *v1.MetricsRequest) (*v1.MetricsResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	metrics, err := app.mesh.Network().WireGuard().Metrics()
-	if err != nil {
-		return nil, err
-	}
-	return &v1.MetricsResponse{
-		Interfaces: map[string]*v1.InterfaceMetrics{
-			metrics.DeviceName: metrics,
-		},
-	}, nil
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+
 }
 
 func (app *AppDaemon) Query(ctx context.Context, req *v1.QueryRequest) (*v1.QueryResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	return storageutil.ServeStorageQuery(ctx, app.mesh.Storage(), req)
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+
 }
 
 func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.StatusResponse, error) {
-	var status v1.StatusResponse_ConnectionStatus
-	if app.mesh == nil {
-		return &v1.StatusResponse{
-			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
-		}, nil
-	}
-	if app.connecting.Load() {
-		return &v1.StatusResponse{
-			ConnectionStatus: v1.StatusResponse_CONNECTING,
-		}, nil
-	}
-	// We are connected
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	// Check if we got disconnected before we hit this point
-	if app.mesh == nil {
-		return &v1.StatusResponse{
-			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
-		}, nil
-	}
-	p, err := app.mesh.Storage().MeshDB().Peers().Get(ctx, app.mesh.ID())
-	if err != nil {
-		return nil, err
-	}
-	return &v1.StatusResponse{
-		ConnectionStatus: status,
-		Node:             p.MeshNode,
-	}, nil
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+
 }
 
 func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	if types.IsReservedPrefix(req.GetKey()) {
-		return nil, status.Errorf(codes.InvalidArgument, "key %q is reserved", req.GetKey())
-	}
-	err := app.mesh.Storage().MeshStorage().PutValue(ctx, req.GetKey(), req.GetValue(), req.GetTtl().AsDuration())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error publishing: %v", err)
-	}
-	return &v1.PublishResponse{}, nil
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+
 }
 
 func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
-	app.mu.Lock()
-	if app.mesh == nil {
-		app.mu.Unlock()
-		return ErrNotConnected
-	}
-	cancel, err := app.mesh.Storage().MeshStorage().Subscribe(srv.Context(), req.GetPrefix(), func(key, value []byte) {
-		err := srv.Send(&v1.SubscriptionEvent{
-			Key:   key,
-			Value: value,
-		})
-		if err != nil {
-			app.log.Error("error sending subscription event", "error", err.Error())
-		}
-	})
-	app.mu.Unlock()
-	if err != nil {
-		return status.Errorf(codes.Internal, "error subscribing: %v", err)
-	}
-	defer cancel()
-	<-srv.Context().Done()
-	return nil
-}
+	return status.Errorf(codes.Unimplemented, "not implemented")
 
-func (app *AppDaemon) AnnounceDHT(ctx context.Context, req *v1.AnnounceDHTRequest) (*v1.AnnounceDHTResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	return &v1.AnnounceDHTResponse{}, fmt.Errorf("not implemented")
-}
-
-func (app *AppDaemon) LeaveDHT(ctx context.Context, req *v1.LeaveDHTRequest) (*v1.LeaveDHTResponse, error) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	if app.mesh == nil {
-		return nil, ErrNotConnected
-	}
-	return &v1.LeaveDHTResponse{}, fmt.Errorf("not implemented")
 }

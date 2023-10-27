@@ -40,18 +40,15 @@ import (
 var (
 	flagset = pflag.NewFlagSet("webmesh-node", pflag.ContinueOnError)
 
-	helpFlag                = flagset.Bool("help", false, "Print usage information and exit")
-	versionFlag             = flagset.Bool("version", false, "Print version information and exit")
-	configFlag              = flagset.String("config", "", "Path to a configuration file")
-	printConfig             = flagset.Bool("print-config", false, "Print the configuration and exit")
-	startTimeout            = flagset.Duration("start-timeout", 0, "Timeout for starting the node (default: no timeout)")
-	shutdownTimeout         = flagset.Duration("shutdown-timeout", 0, "Timeout for shutting down the node (default: no timeout)")
-	appDaemon               = flagset.Bool("app-daemon", false, "Run the node as an application daemon (default: false)")
-	appDaemonBind           = flagset.String("app-daemon-bind", "", "Address to bind the application daemon to (default: unix:///var/run/webmesh-node.sock)")
-	appDaemonGrpcWeb        = flagset.Bool("app-daemon-grpc-web", false, "Use gRPC-Web for the application daemon (default: false)")
-	appDaemonInsecureSocket = flagset.Bool("app-daemon-insecure-socket", false, "Leave default ownership on the Unix socket (default: false)")
+	helpFlag        = flagset.Bool("help", false, "Print usage information and exit")
+	versionFlag     = flagset.Bool("version", false, "Print version information and exit")
+	configFlag      = flagset.String("config", "", "Path to a configuration file")
+	printConfig     = flagset.Bool("print-config", false, "Print the configuration and exit")
+	startTimeout    = flagset.Duration("start-timeout", 0, "Timeout for starting the node (default: no timeout)")
+	shutdownTimeout = flagset.Duration("shutdown-timeout", 0, "Timeout for shutting down the node (default: no timeout)")
 
-	conf = config.NewDefaultConfig("").BindFlags("", flagset)
+	conf       = config.NewDefaultConfig("").BindFlags("", flagset)
+	daemonconf = nodedaemon.NewDefaultConfig().BindFlags("daemon.", flagset)
 )
 
 func Execute() error {
@@ -63,12 +60,10 @@ func Execute() error {
 		}
 		return err
 	}
-
 	if *helpFlag {
 		Usage()
 		return nil
 	}
-
 	// Dump the version and exit
 	if *versionFlag {
 		fmt.Println("Webmesh Node")
@@ -77,7 +72,6 @@ func Execute() error {
 		fmt.Println("  Build Date:", version.BuildDate)
 		return nil
 	}
-
 	// Load the configuration
 	var configs []string
 	if *configFlag != "" {
@@ -87,7 +81,6 @@ func Execute() error {
 	if err != nil {
 		return err
 	}
-
 	// Dump the config and exit
 	if *printConfig {
 		out, err := json.MarshalIndent(conf, "", "  ")
@@ -97,63 +90,47 @@ func Execute() error {
 		fmt.Println(string(out))
 		return nil
 	}
-
 	// Setup logging and a base context
 	log := logging.SetupLogging(conf.Global.LogLevel, conf.Global.LogFormat)
 	ctx := context.WithLogger(context.Background(), log)
-
+	if daemonconf.Enabled {
+		// Start the node as an application daemon
+		return nodedaemon.Run(context.Background(), *daemonconf)
+	}
 	// Apply globals
 	conf, err = conf.Global.ApplyGlobals(ctx, conf)
 	if err != nil {
 		return err
 	}
-
 	// Validate the configuration if we are not running in daemon mode.
-	if !*appDaemon {
-		err = conf.Validate()
-		if err != nil {
-			if errors.Is(err, config.ErrNoMesh) {
-				// Display usage if no mesh is configured
-				Usage()
-				fmt.Fprintln(os.Stderr, "No mesh configured")
-				os.Exit(1)
-			}
-			return err
+	err = conf.Validate()
+	if err != nil {
+		if errors.Is(err, config.ErrNoMesh) {
+			// Display usage if no mesh is configured
+			Usage()
+			fmt.Fprintln(os.Stderr, "No mesh configured")
+			os.Exit(1)
 		}
+		return err
 	}
 
 	// Time to get going
-
 	log.Info("Starting webmesh node",
 		slog.String("version", version.Version),
 		slog.String("commit", version.Commit),
 		slog.String("buildDate", version.BuildDate),
 	)
-
 	// Log all options at debug level
 	log.Debug("Current configuration", slog.Any("options", conf.ToMapStructure()))
-
 	if *startTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *startTimeout)
 		defer cancel()
 	}
-
-	if *appDaemon {
-		// Start the node as an application daemon
-		return nodedaemon.Run(context.Background(), nodedaemon.Config{
-			Bind:           *appDaemonBind,
-			InsecureSocket: *appDaemonInsecureSocket,
-			GRPCWeb:        *appDaemonGrpcWeb,
-			Config:         conf,
-		})
-	}
-
 	if len(conf.Bridge.Meshes) > 0 {
 		// Start a bridged connection
 		return bridgecmd.RunBridgeConnection(ctx, conf.Bridge)
 	}
-
 	// We run in "embedded mode"
 	node, err := embed.NewNode(ctx, embed.Options{
 		Config: conf,
@@ -161,21 +138,17 @@ func Execute() error {
 	if err != nil {
 		return err
 	}
-
 	err = node.Start(ctx)
 	if err != nil {
 		return err
 	}
-
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
 	select {
 	case err = <-node.Errors():
 		return err
 	case <-sig:
 	}
-
 	if *shutdownTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(context.WithLogger(context.Background(), log), *shutdownTimeout)
