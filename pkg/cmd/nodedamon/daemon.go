@@ -31,6 +31,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/fullstorydev/grpcui/standalone"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -199,15 +200,18 @@ func runWebUI(ctx context.Context, log *slog.Logger, srvln net.Listener, laddr s
 	var handler http.Handler
 	var err error
 	for i := 0; i < 10; i++ {
-		c, err := grpc.DialContext(ctx, srvln.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		var c *grpc.ClientConn
+		c, err = grpc.DialContext(ctx, srvln.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			log.Debug("Error dialing gRPC server", "err", err)
+			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 		defer c.Close()
 		handler, err = standalone.HandlerViaReflection(ctx, c, srvln.Addr().String())
 		if err != nil {
 			log.Debug("Error creating gRPC UI handler", "err", err)
+			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 		break
