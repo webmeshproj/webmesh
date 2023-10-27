@@ -60,11 +60,11 @@ func WithWebmeshTransport(topts TransportOptions) config.Option {
 	opts := []config.Option{
 		libp2p.ProtocolVersion(p2pproto.SecurityID),
 		libp2p.Transport(rtBuilder),
-		libp2p.Identity(key),
+		libp2p.Identity(key.AsIdentity()),
 		libp2p.AddrsFactory(rt.BroadcastAddrs),
 	}
 	if len(topts.Laddrs) > 0 {
-		id, err := peer.IDFromPrivateKey(key)
+		id, err := peer.IDFromPrivateKey(key.AsIdentity())
 		if err != nil {
 			panic(fmt.Errorf("failed to get peer ID from private key: %w", err))
 		}

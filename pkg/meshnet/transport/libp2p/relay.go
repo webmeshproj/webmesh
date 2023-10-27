@@ -47,7 +47,7 @@ type UDPRelayOptions struct {
 // NewUDPRelay creates a new UDP relay.
 func NewUDPRelay(ctx context.Context, opts UDPRelayOptions) (*UDPRelay, error) {
 	// Make sure we use the correct key.
-	opts.Host.Options = append(opts.Host.Options, libp2p.Identity(opts.PrivateKey))
+	opts.Host.Options = append(opts.Host.Options, libp2p.Identity(opts.PrivateKey.AsIdentity()))
 	// Parse the arguments to their native types.
 	var err error
 	host, err := NewDiscoveryHost(ctx, opts.Host)
@@ -89,7 +89,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost,
 			log.Error("Failed to extract public key from peer", "peer", info, "error", err.Error())
 			return
 		}
-		if !key.Equals(opts.RemotePubKey) {
+		if !key.Equals(opts.RemotePubKey.AsIdentity()) {
 			log.Error("Peer public key does not match expected public key")
 			return
 		}
@@ -149,7 +149,7 @@ func newUDPRelayWithHostAndCloseFunc(logCtx context.Context, host DiscoveryHost,
 						log.Error("Failed to extract public key from peer", "peer", peer.ID.String(), "error", err.Error())
 						continue
 					}
-					if !peerKey.Equals(opts.RemotePubKey) {
+					if !peerKey.Equals(opts.RemotePubKey.AsIdentity()) {
 						log.Error("Peer public key does not match expected public key")
 						continue
 					}

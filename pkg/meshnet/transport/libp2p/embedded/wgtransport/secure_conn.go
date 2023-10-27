@@ -70,7 +70,7 @@ func (c *SecureConn) LocalPeer() peer.ID { return c.Conn.lpeer }
 func (c *SecureConn) RemotePeer() peer.ID { return c.rpeer }
 
 // RemotePublicKey returns the public key of the remote peer.
-func (c *SecureConn) RemotePublicKey() crypto.PubKey { return c.rkey }
+func (c *SecureConn) RemotePublicKey() crypto.PubKey { return c.rkey.AsIdentity() }
 
 // ConnState returns information about the connection state.
 func (c *SecureConn) ConnState() network.ConnectionState {
@@ -152,7 +152,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 			return
 		}
 		c.rkey = key
-		ok, err := c.rkey.Verify(data, sig)
+		ok, err := c.rkey.AsIdentity().Verify(data, sig)
 		if err != nil {
 			log.Error("Failed to verify negotiation signature", "error", err.Error())
 			errs <- fmt.Errorf("failed to verify negotiation signature: %w", err)
@@ -202,7 +202,7 @@ func (c *SecureConn) negotiate(ctx context.Context, psk pnet.PSK, dir network.Di
 		return
 	}
 	// Sign the payload
-	sig, err := c.lkey.Sign(data)
+	sig, err := c.lkey.AsIdentity().Sign(data)
 	if err != nil {
 		err = fmt.Errorf("failed to sign negotiation payload: %w", err)
 		return

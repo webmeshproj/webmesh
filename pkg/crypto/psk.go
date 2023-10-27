@@ -23,6 +23,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"hash"
+	"strings"
 )
 
 // DefaultPSKLength is the default length of a PSK.
@@ -33,9 +34,6 @@ var ErrInvalidSignature = fmt.Errorf("invalid signature")
 
 // ValidPSKChars is the set of valid characters for a PSK.
 var ValidPSKChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
-// PSK is a pre-shared key.
-type PSK []byte
 
 // IsValidDefaultPSK returns true if the given string is a valid PSK.
 func IsValidDefaultPSK(s string) bool {
@@ -58,6 +56,15 @@ func IsValidPSKBytes(b []byte, length int) bool {
 		}
 	}
 	return true
+}
+
+// NewRandomID returns a new random ID.
+func NewRandomID() (string, error) {
+	id, err := GeneratePSKWithLength(16)
+	if err != nil {
+		return "", err
+	}
+	return strings.ToLower(id.String()), nil
 }
 
 // GeneratePSK generates a PSK.
@@ -85,6 +92,9 @@ func MustGeneratePSK() PSK {
 	}
 	return psk
 }
+
+// PSK is a pre-shared key.
+type PSK []byte
 
 func (p PSK) String() string {
 	return string(p)

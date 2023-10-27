@@ -130,7 +130,7 @@ type WebmeshTransport struct {
 func (t *WebmeshTransport) BroadcastAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	id, err := peer.IDFromPrivateKey(t.key)
+	id, err := peer.IDFromPrivateKey(t.key.AsIdentity())
 	if err != nil {
 		t.log.Error("Failed to get peer ID from private key", "error", err.Error())
 		return addrs
@@ -405,8 +405,8 @@ func (t *WebmeshTransport) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]m
 		t.log.Error("Failed to extract public key from id", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to extract public key: %w", err)
 	}
-	wgkey, ok := pubkey.(*wmcrypto.WebmeshPublicKey)
-	if !ok {
+	wgkey, err := wmcrypto.PublicKeyFromIdentity(pubkey)
+	if err != nil {
 		t.log.Error("Failed to cast public key to wireguard public key", "error", err.Error(), "id", string(id))
 		return nil, fmt.Errorf("failed to cast public key to wireguard public key")
 	}
@@ -592,13 +592,13 @@ func (t *WebmeshTransport) startNode(ctx context.Context, laddr ma.Multiaddr) (m
 	// Automatically add our direct peers
 	t.log.Debug("Adding direct peers to peerstore")
 	for _, wgpeer := range node.Network().WireGuard().Peers() {
-		id, err := peer.IDFromPublicKey(wgpeer.PublicKey)
+		id, err := peer.IDFromPublicKey(wgpeer.PublicKey.AsIdentity())
 		if err != nil {
 			return nil, handleErr(fmt.Errorf("failed to get peer ID from public key: %w", err))
 		}
 		t.log.Debug("Adding peer to peerstore", "peer", id, "multiaddrs", wgpeer.Multiaddrs)
 		t.host.Peerstore().AddAddrs(id, wgpeer.Multiaddrs, peerstore.PermanentAddrTTL)
-		err = t.host.Peerstore().AddPubKey(id, wgpeer.PublicKey)
+		err = t.host.Peerstore().AddPubKey(id, wgpeer.PublicKey.AsIdentity())
 		if err != nil {
 			return nil, handleErr(fmt.Errorf("failed to add public key to peerstore: %w", err))
 		}
@@ -701,7 +701,7 @@ func (t *WebmeshTransport) registerNode(ctx context.Context, node types.MeshNode
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
 	}
-	id, err := peer.IDFromPublicKey(pubkey)
+	id, err := peer.IDFromPublicKey(pubkey.AsIdentity())
 	if err != nil {
 		return fmt.Errorf("failed to get peer ID from public key: %w", err)
 	}
@@ -713,7 +713,7 @@ func (t *WebmeshTransport) registerNode(ctx context.Context, node types.MeshNode
 		}
 		ps.AddAddr(id, a, peerstore.PermanentAddrTTL)
 	}
-	err = t.host.Peerstore().AddPubKey(id, pubkey)
+	err = t.host.Peerstore().AddPubKey(id, pubkey.AsIdentity())
 	if err != nil {
 		return fmt.Errorf("failed to add public key to peerstore: %w", err)
 	}

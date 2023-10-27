@@ -311,7 +311,7 @@ func (p *Plugin) Authenticate(ctx context.Context, req *v1.AuthenticationRequest
 	}
 	var valid bool
 	for _, data := range p.config.CurrentSigData(id) {
-		valid, err = pubKey.Verify(data, sig)
+		valid, err = pubKey.AsIdentity().Verify(data, sig)
 		if err != nil {
 			log.Debug("Failed to verify signature", "error", err.Error())
 			continue

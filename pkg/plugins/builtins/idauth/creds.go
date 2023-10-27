@@ -59,7 +59,7 @@ func mustNewAuthSignatureWithTime(key crypto.PrivateKey, t time.Time) string {
 
 func newAuthSignatureWithTime(key crypto.PrivateKey, t time.Time) (string, error) {
 	ts := t.Truncate(time.Second * 30).Unix()
-	sig, err := key.Sign([]byte(fmt.Sprintf("%s:%d", key.ID(), ts)))
+	sig, err := key.AsIdentity().Sign([]byte(fmt.Sprintf("%s:%d", key.ID(), ts)))
 	if err != nil {
 		return "", fmt.Errorf("failed to sign ID: %w", err)
 	}

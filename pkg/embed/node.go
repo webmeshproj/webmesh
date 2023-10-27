@@ -159,7 +159,8 @@ func (n *node) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create connect options: %w", err)
 	}
-	// Start the raft node
+	// Start the storage provider
+	log.Info("Starting storage and mesh connection")
 	err = n.Storage().Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start raft node: %w", err)
@@ -175,7 +176,6 @@ func (n *node) Start(ctx context.Context) error {
 		}()
 		return fmt.Errorf("failed to open mesh connection: %w", err)
 	}
-
 	// If anything goes wrong at this point, make sure we close down cleanly.
 	handleErr := func(cause error) error {
 		if err := n.Mesh().Close(ctx); err != nil {
@@ -183,14 +183,22 @@ func (n *node) Start(ctx context.Context) error {
 		}
 		return fmt.Errorf("failed to start mesh node: %w", cause)
 	}
-
-	log.Info("Connected to mesh, starting services")
-
+	select {
+	case <-n.Mesh().Ready():
+	case <-ctx.Done():
+		return handleErr(fmt.Errorf("failed to start webmesh node: %w", ctx.Err()))
+	}
+	log.Info("Webmesh connection is ready")
 	// Start the mesh services
 	srvOpts, err := n.conf.Services.NewServiceOptions(ctx, n.Mesh())
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create service options: %w", err))
 	}
+	if len(srvOpts.Servers) == 0 && n.conf.Services.API.Disabled {
+		// We're done here
+		return nil
+	}
+	log.Info("Starting Webmesh services")
 	n.services, err = services.NewServer(ctx, srvOpts)
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create webmesh server: %w", err))
@@ -208,13 +216,6 @@ func (n *node) Start(ctx context.Context) error {
 			return handleErr(fmt.Errorf("failed to register APIs: %w", err))
 		}
 	}
-	select {
-	case <-n.Mesh().Ready():
-	case <-ctx.Done():
-		return handleErr(fmt.Errorf("failed to start webmesh node: %w", ctx.Err()))
-	}
-
-	log.Info("Webmesh is ready")
 	go func() {
 		if err := n.services.ListenAndServe(); err != nil {
 			n.errs <- fmt.Errorf("failed to start webmesh services: %w", err)

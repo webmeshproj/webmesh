@@ -31,6 +31,9 @@ import (
 type Config struct {
 	// Enabled is true if the daemon is enabled.
 	Enabled bool `koanf:"enabled"`
+	// NodeID is the ID to use for mesh connections from this server.
+	// If not provided, one will be generated from the key.
+	NodeID string `koanf:"node-id"`
 	// KeyFile is the path to the WireGuard private key for the node.
 	// If set and it does not exist it will be created, otherwise one
 	// will be generated.
@@ -59,6 +62,7 @@ type WebUI struct {
 func NewDefaultConfig() *Config {
 	return &Config{
 		Enabled:        false,
+		NodeID:         "",
 		KeyFile:        "",
 		Bind:           DefaultDaemonSocket(),
 		InsecureSocket: false,
@@ -71,6 +75,7 @@ func NewDefaultConfig() *Config {
 // BindFlags binds the flags to the given flagset.
 func (conf *Config) BindFlags(prefix string, flagset *pflag.FlagSet) *Config {
 	flagset.BoolVar(&conf.Enabled, prefix+"enabled", conf.Enabled, "Run the node as an application daemon")
+	flagset.StringVar(&conf.NodeID, prefix+"node-id", conf.NodeID, "ID to use for mesh connections from this server")
 	flagset.StringVar(&conf.KeyFile, prefix+"key-file", conf.KeyFile, "Path to the WireGuard private key for the node")
 	flagset.StringVar(&conf.Bind, prefix+"bind", conf.Bind, "Address to bind the application daemon to")
 	flagset.BoolVar(&conf.InsecureSocket, prefix+"insecure-socket", conf.InsecureSocket, "Leave default ownership on the Unix socket")

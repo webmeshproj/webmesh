@@ -48,21 +48,32 @@ const WebmeshKeyType cryptopb.KeyType = 5
 type StdPrivateKey = crypto.PrivateKey
 
 func init() {
+	// Make sure the random source is initialized.
+	if _, err := rand.Read(make([]byte, 1)); err != nil {
+		panic(err)
+	}
+	// Register key type with libp2p
 	cryptopb.KeyType_name[int32(WebmeshKeyType)] = "Webmesh"
 	cryptopb.KeyType_value["Webmesh"] = int32(WebmeshKeyType)
 	p2pcrypto.KeyTypes = append(p2pcrypto.KeyTypes, int(WebmeshKeyType))
 	p2pcrypto.PrivKeyUnmarshallers[WebmeshKeyType] = func(data []byte) (p2pcrypto.PrivKey, error) {
-		return ParsePrivateKey(data)
+		key, err := ParsePrivateKey(data)
+		if err != nil {
+			return nil, err
+		}
+		return key.AsIdentity(), nil
 	}
 	p2pcrypto.PubKeyUnmarshallers[WebmeshKeyType] = func(data []byte) (p2pcrypto.PubKey, error) {
-		return ParsePublicKey(data)
+		key, err := ParsePublicKey(data)
+		if err != nil {
+			return nil, err
+		}
+		return key.AsIdentity(), nil
 	}
 }
 
 // Key is the interface that all keys satisfy.
 type Key interface {
-	p2pcrypto.Key
-
 	// ID returns the peer ID of the key as an encoded string.
 	// This will always be the ID of the public key.
 	ID() string
@@ -83,12 +94,14 @@ type Key interface {
 	// Rendezvous generates a rendezvous string for discovering the peers at the given
 	// public wireguard keys.
 	Rendezvous(keys ...PublicKey) string
+
+	// Equals returns true if the given key is equal to this key.
+	Equals(Key) bool
 }
 
 // PrivateKey is a private key used for encryption and identity over webmesh.
 type PrivateKey interface {
 	Key
-	p2pcrypto.PrivKey
 
 	// AsIdentity returns the private key as a libp2p crypto private key.
 	// This changes the type of the key to a ed25519 private key.
@@ -104,7 +117,10 @@ type PrivateKey interface {
 // PublicKey is a public key used for encryption and identity over webmesh.
 type PublicKey interface {
 	Key
-	p2pcrypto.PubKey
+
+	// AsIdentity returns the public key as a libp2p crypto public key.
+	// This changes the type of the key to a ed25519 public key.
+	AsIdentity() p2pcrypto.PubKey
 
 	// AsNative returns the public key as a native crypto public key.
 	AsNative() ed25519.PublicKey
@@ -286,6 +302,24 @@ func MustPublicKeyFromNative(in crypto.PublicKey) PublicKey {
 	return key
 }
 
+// PrivateKeyFromIdentity returns a private key from a libp2p crypto private key.
+func PrivateKeyFromIdentity(inkey p2pcrypto.PrivKey) (PrivateKey, error) {
+	data, err := inkey.Raw()
+	if err != nil {
+		return nil, fmt.Errorf("get raw private key: %w", err)
+	}
+	return ParsePrivateKey(data)
+}
+
+// PublicKeyFromIdentity returns a public key from a libp2p crypto public key.
+func PublicKeyFromIdentity(inkey p2pcrypto.PubKey) (PublicKey, error) {
+	data, err := inkey.Raw()
+	if err != nil {
+		return nil, fmt.Errorf("get raw public key: %w", err)
+	}
+	return ParsePublicKey(data)
+}
+
 // WebmeshPrivateKey is a private key used for webmesh transport.
 type WebmeshPrivateKey struct {
 	raw [ed25519.PrivateKeySize]byte
@@ -297,8 +331,7 @@ type WebmeshPrivateKey struct {
 func (w *WebmeshPrivateKey) AsIdentity() p2pcrypto.PrivKey {
 	// We marshal the key back and forth assuming it was
 	// already validated.
-	raw, _ := w.Raw()
-	ed25519, _ := p2pcrypto.UnmarshalEd25519PrivateKey(raw)
+	ed25519, _ := p2pcrypto.UnmarshalEd25519PrivateKey(w.Bytes())
 	return ed25519
 }
 
@@ -322,46 +355,35 @@ func (w *WebmeshPrivateKey) ID() string {
 // Bytes returns the raw bytes of the key. This is the same as Key.Raw
 // without needing to do an error check.
 func (w *WebmeshPrivateKey) Bytes() []byte {
-	r, _ := w.Raw()
-	return r
-}
-
-// Raw returns the raw bytes of the private key.
-func (w *WebmeshPrivateKey) Raw() ([]byte, error) {
 	out := make([]byte, 64)
 	copy(out, w.raw[:])
-	return out, nil
+	return out
 }
 
 // Equals returns true if the given key is equal to this key.
-func (w *WebmeshPrivateKey) Equals(inKey p2pcrypto.Key) bool {
+func (w *WebmeshPrivateKey) Equals(inKey Key) bool {
 	in, ok := inKey.(*WebmeshPrivateKey)
 	if !ok {
 		return false
 	}
-	return subtle.ConstantTimeCompare(w.raw[:], in.raw[:]) == 1
+	return subtle.ConstantTimeCompare(w.Bytes(), in.Bytes()) == 1
 }
 
 // Sign cryptographically signs the given bytes.
 func (w *WebmeshPrivateKey) Sign(data []byte) ([]byte, error) {
-	return ed25519.Sign(w.raw[:], data), nil
+	return ed25519.Sign(w.Bytes(), data), nil
 }
 
-// Return a public key paired with this private key
-func (w *WebmeshPrivateKey) GetPublic() p2pcrypto.PubKey {
+// PublicKey returns the public key.
+func (w *WebmeshPrivateKey) PublicKey() PublicKey {
 	var out [ed25519.PublicKeySize]byte
 	copy(out[:], w.raw[ed25519.PublicKeySize:])
 	return &WebmeshPublicKey{raw: out, typ: WebmeshKeyType}
 }
 
-// PublicKey returns the public key.
-func (w *WebmeshPrivateKey) PublicKey() PublicKey {
-	return w.GetPublic().(PublicKey)
-}
-
 // WireGuardKey computes the private key's wireguard key.
 func (w *WebmeshPrivateKey) WireGuardKey() wgtypes.Key {
-	key := oed25519.PrivateKey(w.raw[:])
+	key := oed25519.PrivateKey(w.Bytes())
 	wgkey := x25519.EdPrivateKeyToX25519(key)
 	return wgtypes.Key(wgkey)
 }
@@ -383,10 +405,9 @@ func (w *WebmeshPrivateKey) Encode() (string, error) {
 
 // Marshal returns the protobuf marshaled key.
 func (w *WebmeshPrivateKey) Marshal() ([]byte, error) {
-	raw, _ := w.Raw()
 	pb := cryptopb.PrivateKey{
 		Type: common.Pointer(WebmeshKeyType),
-		Data: raw,
+		Data: w.Bytes(),
 	}
 	marshaled, err := proto.Marshal(&pb)
 	if err != nil {
@@ -408,32 +429,34 @@ func (w *WebmeshPublicKey) Type() cryptopb.KeyType {
 
 // ID returns the peer ID of the key.
 func (w *WebmeshPublicKey) ID() string {
-	id, _ := peer.IDFromPublicKey(w)
+	id, _ := peer.IDFromPublicKey(w.AsIdentity())
 	return id.String()
+}
+
+// AsIdentity returns the public key as a libp2p crypto public key.
+// This changes the type of the key to a ed25519 public key.
+func (w *WebmeshPublicKey) AsIdentity() p2pcrypto.PubKey {
+	// We marshal the key back and forth assuming it was
+	// already validated.
+	ed25519, _ := p2pcrypto.UnmarshalEd25519PublicKey(w.Bytes())
+	return ed25519
 }
 
 // AsNative returns the public key as a native crypto public key.
 func (w *WebmeshPublicKey) AsNative() ed25519.PublicKey {
-	out := make([]byte, ed25519.PublicKeySize)
-	copy(out, w.raw[:])
-	return ed25519.PublicKey(out)
+	return ed25519.PublicKey(w.Bytes())
 }
 
 // Bytes returns the raw bytes of the key. This is the same as Key.Raw
 // without needing to do an error check.
 func (w *WebmeshPublicKey) Bytes() []byte {
-	r, _ := w.Raw()
-	return r
-}
-
-// Raw returns the raw bytes of the public key.
-func (w *WebmeshPublicKey) Raw() ([]byte, error) {
 	out := make([]byte, ed25519.PublicKeySize)
 	copy(out, w.raw[:])
-	return out, nil
+	return out
 }
 
-func (w *WebmeshPublicKey) Equals(in p2pcrypto.Key) bool {
+// Equals returns true if the given key is equal to this key.
+func (w *WebmeshPublicKey) Equals(in Key) bool {
 	inKey, ok := in.(*WebmeshPublicKey)
 	if !ok {
 		return false
@@ -443,12 +466,12 @@ func (w *WebmeshPublicKey) Equals(in p2pcrypto.Key) bool {
 
 // Verify compares a signature against the input data
 func (w *WebmeshPublicKey) Verify(data []byte, sig []byte) (success bool, err error) {
-	return ed25519.Verify(w.raw[:], data, sig), nil
+	return ed25519.Verify(w.Bytes(), data, sig), nil
 }
 
 // WireGuardKey computes the private key's wireguard key.
 func (w *WebmeshPublicKey) WireGuardKey() wgtypes.Key {
-	key := oed25519.PublicKey(w.raw[:])
+	key := oed25519.PublicKey(w.Bytes())
 	wgkey, ok := x25519.EdPublicKeyToX25519(key)
 	if !ok {
 		panic("WireGuardKey called on invalid ed25519 public key")
@@ -474,10 +497,9 @@ func (w *WebmeshPublicKey) Encode() (string, error) {
 
 // Marshal returns the protobuf marshaled key.
 func (w *WebmeshPublicKey) Marshal() ([]byte, error) {
-	raw, _ := w.Raw()
 	pb := cryptopb.PublicKey{
 		Type: common.Pointer(WebmeshKeyType),
-		Data: raw,
+		Data: w.Bytes(),
 	}
 	marshaled, err := proto.Marshal(&pb)
 	if err != nil {

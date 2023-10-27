@@ -52,9 +52,6 @@ func ExtractWebmeshPublicKey(ctx context.Context, p peer.ID) (wmcrypto.PublicKey
 
 // ToWebmeshPublicKey converts a libp2p public key to a webmesh public key.
 func ToWebmeshPublicKey(in crypto.PubKey) (wmcrypto.PublicKey, error) {
-	if v, ok := in.(wmcrypto.PublicKey); ok {
-		return v, nil
-	}
 	var raw []byte
 	pubKey, ok := in.(*crypto.Ed25519PublicKey)
 	if !ok {
@@ -71,9 +68,6 @@ func ToWebmeshPublicKey(in crypto.PubKey) (wmcrypto.PublicKey, error) {
 
 // ToWebmeshPrivateKey converts a libp2p private key to a webmesh private key.
 func ToWebmeshPrivateKey(in crypto.PrivKey) (wmcrypto.PrivateKey, error) {
-	if v, ok := in.(wmcrypto.PrivateKey); ok {
-		return v, nil
-	}
 	var raw []byte
 	privkey, ok := in.(*crypto.Ed25519PrivateKey)
 	if !ok {

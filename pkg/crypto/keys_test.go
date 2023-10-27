@@ -25,13 +25,6 @@ func TestWireGuardKeys(t *testing.T) {
 	if wgprivkey.PublicKey() != wgpubkey {
 		t.Fatal("private key wireguard key does not match public key wireguard key")
 	}
-
-	if privkey.Type() != WebmeshKeyType {
-		t.Fatal("private key type is not WireGuardKeyType")
-	}
-	if pubkey.Type() != WebmeshKeyType {
-		t.Fatal("public key type is not WireGuardKeyType")
-	}
 }
 
 func TestEncodeWireGuardKeys(t *testing.T) {
@@ -52,14 +45,10 @@ func TestEncodeWireGuardKeys(t *testing.T) {
 	if !decodedPriv.Equals(privkey) {
 		t.Fatal("decoded private key not equal to original private key")
 	}
-	if decodedPriv.Type() != WebmeshKeyType {
-		t.Fatal("decoded private key type is not WireGuardKeyType")
-	}
 	decodedWg := decodedPriv.WireGuardKey()
 	if !bytes.Equal(decodedWg[:], wgprivkey[:]) {
 		t.Fatal("decoded private key wireguard key not equal to original private key wireguard key")
 	}
-
 	encodedPub, err := pubkey.Encode()
 	if err != nil {
 		t.Fatal(err)
@@ -70,9 +59,6 @@ func TestEncodeWireGuardKeys(t *testing.T) {
 	}
 	if !decodedPub.Equals(pubkey) {
 		t.Fatal("decoded public key not equal to original public key")
-	}
-	if decodedPub.Type() != WebmeshKeyType {
-		t.Fatal("decoded public key type is not WireGuardKeyType")
 	}
 	decodedWg = decodedPub.WireGuardKey()
 	if !bytes.Equal(decodedWg[:], wgpubkey[:]) {
@@ -85,7 +71,6 @@ func TestNativeUnmarshalers(t *testing.T) {
 	// wireguard unmarshalers can decode.
 	privkey := MustGenerateKey()
 	pubkey := privkey.PublicKey()
-
 	rawPriv, err := privkey.Marshal()
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +79,6 @@ func TestNativeUnmarshalers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	decodedPriv, err := p2pcrypto.UnmarshalPrivateKey([]byte(rawPriv))
 	if err != nil {
 		t.Fatal(err)
@@ -103,11 +87,10 @@ func TestNativeUnmarshalers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if !decodedPriv.Equals(privkey) {
+	if !decodedPriv.Equals(privkey.AsIdentity()) {
 		t.Fatal("decoded private key not equal to original private key")
 	}
-	if !decodedPub.Equals(pubkey) {
+	if !decodedPub.Equals(pubkey.AsIdentity()) {
 		t.Fatal("decoded public key not equal to original public key")
 	}
 }
@@ -116,13 +99,13 @@ func TestWireGuardKeySignatures(t *testing.T) {
 	key := MustGenerateKey()
 	data := []byte("hello world")
 
-	sig, err := key.Sign(data)
+	sig, err := key.AsIdentity().Sign(data)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	pubkey := key.PublicKey()
-	if ok, err := pubkey.Verify(data, sig); err != nil {
+	if ok, err := pubkey.AsIdentity().Verify(data, sig); err != nil {
 		t.Fatal("signature verification failed:", err)
 	} else if !ok {
 		t.Fatal("signature verification failed: signature was not valid")
@@ -131,7 +114,7 @@ func TestWireGuardKeySignatures(t *testing.T) {
 
 func TestWireGuardKeyIDs(t *testing.T) {
 	key := MustGenerateKey()
-	id, err := peer.IDFromPrivateKey(key)
+	id, err := peer.IDFromPrivateKey(key.AsIdentity())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +122,7 @@ func TestWireGuardKeyIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !extracted.Equals(key.PublicKey()) {
+	if !extracted.Equals(key.AsIdentity().GetPublic()) {
 		t.Fatal("extracted public key does not match original public key")
 	}
 	// Check that the builtin methods work the same.
@@ -147,11 +130,11 @@ func TestWireGuardKeyIDs(t *testing.T) {
 	if keyID != id.String() {
 		t.Fatalf("key ID does not match peer ID, keyID: %s, peerID: %s", keyID, id.String())
 	}
-	extracted, err = PubKeyFromID(keyID)
+	extractedNative, err := PubKeyFromID(keyID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !extracted.Equals(key.PublicKey()) {
+	if !extractedNative.Equals(key.PublicKey()) {
 		t.Fatal("extracted public key does not match original public key")
 	}
 }

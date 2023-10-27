@@ -27,27 +27,30 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
 	"github.com/webmeshproj/webmesh/pkg/logging"
+	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
-	conns map[string]embed.Node
-	key   crypto.PrivateKey
-	val   *protovalidate.Validator
-	log   *slog.Logger
-	mu    sync.Mutex
+	conns  map[string]embed.Node
+	nodeID types.NodeID
+	key    crypto.PrivateKey
+	val    *protovalidate.Validator
+	log    *slog.Logger
+	mu     sync.Mutex
 }
 
 var (
 	// ErrNotConnected is returned when the node is not connected to the mesh.
-	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected")
+	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected to network")
 	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
-	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected")
+	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected to network")
 )
 
 // NewServer returns a new AppDaemon server.
@@ -60,11 +63,18 @@ func NewServer(conf Config) (*AppDaemon, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load key: %w", err)
 	}
+	var nodeID types.NodeID
+	if conf.NodeID != "" {
+		nodeID = types.NodeID(conf.NodeID)
+	} else {
+		nodeID = types.NodeID(key.ID())
+	}
 	return &AppDaemon{
-		conns: make(map[string]embed.Node),
-		key:   key,
-		val:   v,
-		log:   logging.NewLogger(conf.LogLevel, "text").With("appdaemon", "server"),
+		conns:  make(map[string]embed.Node),
+		nodeID: nodeID,
+		key:    key,
+		val:    v,
+		log:    logging.NewLogger(conf.LogLevel, "text").With("appdaemon", "server"),
 	}, nil
 }
 
@@ -75,6 +85,27 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	}
 	app.mu.Lock()
 	defer app.mu.Unlock()
+	connID := req.GetId()
+	if _, ok := app.conns[connID]; ok {
+		return nil, ErrAlreadyConnected
+	}
+	if connID == "" {
+		var err error
+		connID, err = crypto.NewRandomID()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to generate connection ID: %v", err)
+		}
+		// Double check that the ID is unique.
+		if _, ok := app.conns[connID]; ok {
+			return nil, status.Errorf(codes.Internal, "connection ID collision")
+		}
+	}
+	conf := config.NewDefaultConfig(app.nodeID.String())
+	// Assume services are disabled for now.
+	conf.Services.API.Disabled = true
+	// Assume a random wireguard port
+	conf.WireGuard.ListenPort = 0
+	// Set overrides from the request.
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 }
 
