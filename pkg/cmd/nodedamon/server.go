@@ -18,6 +18,7 @@ limitations under the License.
 package nodedaemon
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -31,7 +32,6 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
-	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -48,9 +48,9 @@ type AppDaemon struct {
 
 var (
 	// ErrNotConnected is returned when the node is not connected to the mesh.
-	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected to network")
+	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected to the specified network")
 	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
-	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected to network")
+	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected to the specified network")
 )
 
 // NewServer returns a new AppDaemon server.
@@ -74,7 +74,7 @@ func NewServer(conf Config) (*AppDaemon, error) {
 		nodeID: nodeID,
 		key:    key,
 		val:    v,
-		log:    logging.NewLogger(conf.LogLevel, "text").With("appdaemon", "server"),
+		log:    conf.NewLogger().With("appdaemon", "server"),
 	}, nil
 }
 
@@ -103,10 +103,30 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	conf := config.NewDefaultConfig(app.nodeID.String())
 	// Assume services are disabled for now.
 	conf.Services.API.Disabled = true
-	// Assume a random wireguard port
+	// Assume a random wireguard port.
 	conf.WireGuard.ListenPort = 0
-	// Set overrides from the request.
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+	// Append connection credentials.
+	app.appendConnCredentials(ctx, req, conf)
+	return &v1.ConnectResponse{
+		Id: connID,
+	}, nil
+}
+
+func (app *AppDaemon) appendConnCredentials(ctx context.Context, req *v1.ConnectRequest, conf *config.Config) {
+	switch req.GetAuthMethod() {
+	case v1.ConnectRequest_BASIC:
+		conf.Auth.Basic.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_USERNAME.String()])
+		conf.Auth.Basic.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_PASSWORD.String()])
+	case v1.ConnectRequest_LDAP:
+		conf.Auth.LDAP.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()])
+		conf.Auth.LDAP.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()])
+	case v1.ConnectRequest_ID:
+		conf.Auth.IDAuth.Enabled = true
+	case v1.ConnectRequest_MTLS:
+		conf.Auth.MTLS.CertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
+		conf.Auth.MTLS.KeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
+	case v1.ConnectRequest_NO_AUTH:
+	}
 }
 
 func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
@@ -116,8 +136,16 @@ func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest)
 	}
 	app.mu.Lock()
 	defer app.mu.Unlock()
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
-
+	conn, ok := app.conns[req.GetId()]
+	if !ok {
+		return nil, ErrNotConnected
+	}
+	delete(app.conns, req.GetId())
+	err = conn.Stop(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to stop node: %v", err)
+	}
+	return &v1.DisconnectResponse{}, nil
 }
 
 func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.MetricsResponse, error) {
@@ -127,19 +155,15 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 	}
 	app.mu.Lock()
 	defer app.mu.Unlock()
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
-
-}
-
-func (app *AppDaemon) Query(ctx context.Context, req *v1.QueryRequest) (*v1.QueryResponse, error) {
-	err := app.val.Validate(req)
-	if err != nil {
-		return nil, newInvalidError(err)
+	if len(req.GetIds()) > 0 {
+		for _, id := range req.GetIds() {
+			_, ok := app.conns[id]
+			if !ok {
+				return nil, ErrNotConnected
+			}
+		}
 	}
-	app.mu.Lock()
-	defer app.mu.Unlock()
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
-
 }
 
 func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.StatusResponse, error) {
@@ -149,30 +173,53 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 	}
 	app.mu.Lock()
 	defer app.mu.Unlock()
+	_, ok := app.conns[req.GetId()]
+	if !ok {
+		return nil, ErrNotConnected
+	}
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
-
 }
 
-func (app *AppDaemon) Publish(ctx context.Context, req *v1.PublishRequest) (*v1.PublishResponse, error) {
+func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.QueryResponse, error) {
 	err := app.val.Validate(req)
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
 	app.mu.Lock()
 	defer app.mu.Unlock()
+	_, ok := app.conns[req.GetId()]
+	if !ok {
+		return nil, ErrNotConnected
+	}
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
-
 }
 
-func (app *AppDaemon) Subscribe(req *v1.SubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
+func (app *AppDaemon) Publish(ctx context.Context, req *v1.AppPublishRequest) (*v1.PublishResponse, error) {
+	err := app.val.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	_, ok := app.conns[req.GetId()]
+	if !ok {
+		return nil, ErrNotConnected
+	}
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+}
+
+func (app *AppDaemon) Subscribe(req *v1.AppSubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
 	err := app.val.Validate(req)
 	if err != nil {
 		return newInvalidError(err)
 	}
 	app.mu.Lock()
 	defer app.mu.Unlock()
+	_, ok := app.conns[req.GetId()]
+	if !ok {
+		return ErrNotConnected
+	}
 	return status.Errorf(codes.Unimplemented, "not implemented")
-
 }
 
 func (app *AppDaemon) Close() error {
@@ -189,5 +236,5 @@ func (app *AppDaemon) Close() error {
 }
 
 func newInvalidError(err error) error {
-	return status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	return status.Errorf(codes.InvalidArgument, err.Error())
 }

@@ -18,6 +18,7 @@ package nodedaemon
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
 
 // Config is the configuration for the applicaton daeemon.
@@ -48,6 +50,8 @@ type Config struct {
 	UI WebUI `koanf:"ui"`
 	// LogLevel is the log level for the daemon.
 	LogLevel string `koanf:"log-level"`
+	// LogFormat is the log format for the daemon.
+	LogFormat string `koanf:"log-format"`
 }
 
 // WebUI are options for exposing a gRPC UI.
@@ -69,7 +73,13 @@ func NewDefaultConfig() *Config {
 		GRPCWeb:        false,
 		UI:             WebUI{Enabled: false, ListenAddress: "127.0.0.1:8080"},
 		LogLevel:       "info",
+		LogFormat:      "json",
 	}
+}
+
+// NewLogger returns a logger with the given configuration.
+func (conf *Config) NewLogger() *slog.Logger {
+	return logging.NewLogger(conf.LogLevel, conf.LogFormat)
 }
 
 // BindFlags binds the flags to the given flagset.
@@ -81,6 +91,7 @@ func (conf *Config) BindFlags(prefix string, flagset *pflag.FlagSet) *Config {
 	flagset.BoolVar(&conf.InsecureSocket, prefix+"insecure-socket", conf.InsecureSocket, "Leave default ownership on the Unix socket")
 	flagset.BoolVar(&conf.GRPCWeb, prefix+"grpc-web", conf.GRPCWeb, "Use gRPC-Web for the application daemon")
 	flagset.StringVar(&conf.LogLevel, prefix+"log-level", conf.LogLevel, "Log level for the application daemon")
+	flagset.StringVar(&conf.LogFormat, prefix+"log-format", conf.LogFormat, "Log format for the application daemon")
 	conf.UI.BindFlags(prefix+"ui.", flagset)
 	return conf
 }

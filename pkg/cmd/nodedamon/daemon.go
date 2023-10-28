@@ -48,7 +48,7 @@ import (
 // can be used to shutdown the server, otherwise it will wait for a
 // SIGINT or SIGTERM.
 func Run(ctx context.Context, conf Config) error {
-	log := logging.NewLogger(conf.LogLevel, "text")
+	log := conf.NewLogger()
 	// Setup the listener
 	listener, err := newListener(conf.Bind, conf.InsecureSocket)
 	if err != nil {
