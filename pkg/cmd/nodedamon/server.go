@@ -34,6 +34,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/embed"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -46,7 +47,7 @@ type AppDaemon struct {
 	key    crypto.PrivateKey
 	val    *protovalidate.Validator
 	log    *slog.Logger
-	mu     sync.Mutex
+	mu     sync.RWMutex
 }
 
 var (
@@ -151,8 +152,8 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.Lock()
-	defer app.mu.Unlock()
+	app.mu.RLock()
+	defer app.mu.RUnlock()
 	if len(req.GetIds()) > 0 {
 		for _, id := range req.GetIds() {
 			_, ok := app.conns[id]
@@ -161,7 +162,26 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 			}
 		}
 	}
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+	ids := req.GetIds()
+	if len(ids) == 0 {
+		ids = make([]string, 0, len(app.conns))
+		for id := range app.conns {
+			ids = append(ids, id)
+		}
+	}
+	res := &v1.MetricsResponse{
+		Interfaces: make(map[string]*v1.InterfaceMetrics),
+	}
+	for _, id := range ids {
+		conn := app.conns[id]
+		metrics, err := conn.MeshNode().Network().WireGuard().Metrics()
+		if err != nil {
+			app.log.Error("Error getting metrics for connection", "id", id, "error", err.Error())
+			continue
+		}
+		res.Interfaces[id] = metrics
+	}
+	return res, nil
 }
 
 func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.StatusResponse, error) {
@@ -169,13 +189,32 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	_, ok := app.conns[req.GetId()]
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+	c, ok := app.conns[req.GetId()]
 	if !ok {
 		return nil, ErrNotConnected
 	}
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+	out := &v1.StatusResponse{
+		ConnectionStatus: func() v1.StatusResponse_ConnectionStatus {
+			if c.MeshNode().Started() {
+				return v1.StatusResponse_CONNECTED
+			}
+			return v1.StatusResponse_DISCONNECTED
+		}(),
+		Node: func() *v1.MeshNode {
+			if !c.MeshNode().Started() {
+				return nil
+			}
+			node, err := c.MeshNode().Storage().MeshDB().Peers().Get(ctx, c.MeshNode().ID())
+			if err != nil {
+				app.log.Error("Error getting node from storage", "id", c.MeshNode().ID(), "error", err.Error())
+				return nil
+			}
+			return node.MeshNode
+		}(),
+	}
+	return out, nil
 }
 
 func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.QueryResponse, error) {
@@ -183,13 +222,13 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	_, ok := app.conns[req.GetId()]
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+	conn, ok := app.conns[req.GetId()]
 	if !ok {
 		return nil, ErrNotConnected
 	}
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+	return storageutil.ServeStorageQuery(ctx, conn.MeshNode().Storage(), req.GetQuery())
 }
 
 func (app *AppDaemon) Publish(ctx context.Context, req *v1.AppPublishRequest) (*v1.PublishResponse, error) {
@@ -197,8 +236,8 @@ func (app *AppDaemon) Publish(ctx context.Context, req *v1.AppPublishRequest) (*
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.Lock()
-	defer app.mu.Unlock()
+	app.mu.RLock()
+	defer app.mu.RUnlock()
 	_, ok := app.conns[req.GetId()]
 	if !ok {
 		return nil, ErrNotConnected
@@ -211,8 +250,8 @@ func (app *AppDaemon) Subscribe(req *v1.AppSubscribeRequest, srv v1.AppDaemon_Su
 	if err != nil {
 		return newInvalidError(err)
 	}
-	app.mu.Lock()
-	defer app.mu.Unlock()
+	app.mu.RLock()
+	defer app.mu.RUnlock()
 	_, ok := app.conns[req.GetId()]
 	if !ok {
 		return ErrNotConnected
