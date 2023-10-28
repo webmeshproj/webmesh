@@ -88,23 +88,28 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.Lock()
-	defer app.mu.Unlock()
 	connID := req.GetId()
-	if _, ok := app.conns[connID]; ok {
+	app.mu.RLock()
+	_, ok := app.conns[connID]
+	if ok {
+		app.mu.RUnlock()
 		return nil, ErrAlreadyConnected
 	}
 	if connID == "" {
 		var err error
 		connID, err = crypto.NewRandomID()
 		if err != nil {
+			app.mu.RUnlock()
 			return nil, status.Errorf(codes.Internal, "failed to generate connection ID: %v", err)
 		}
 		// Double check that the ID is unique.
-		if _, ok := app.conns[connID]; ok {
+		_, ok := app.conns[connID]
+		if ok {
+			app.mu.RUnlock()
 			return nil, status.Errorf(codes.Internal, "connection ID collision")
 		}
 	}
+	app.mu.RUnlock()
 	node, err := embed.NewNode(ctx, embed.Options{
 		Config: app.buildConnConfig(ctx, req),
 		Key:    app.key,
@@ -112,11 +117,13 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create node: %v", err)
 	}
+	app.mu.Lock()
+	app.conns[connID] = node
+	app.mu.Unlock()
 	err = node.Start(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to start node: %v", err)
 	}
-	app.conns[connID] = node
 	return &v1.ConnectResponse{
 		Id:          connID,
 		NodeID:      string(node.MeshNode().ID()),
@@ -193,14 +200,16 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 	defer app.mu.RUnlock()
 	c, ok := app.conns[req.GetId()]
 	if !ok {
-		return nil, ErrNotConnected
+		return &v1.StatusResponse{
+			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
+		}, nil
 	}
-	out := &v1.StatusResponse{
+	return &v1.StatusResponse{
 		ConnectionStatus: func() v1.StatusResponse_ConnectionStatus {
 			if c.MeshNode().Started() {
 				return v1.StatusResponse_CONNECTED
 			}
-			return v1.StatusResponse_DISCONNECTED
+			return v1.StatusResponse_CONNECTING
 		}(),
 		Node: func() *v1.MeshNode {
 			if !c.MeshNode().Started() {
@@ -213,8 +222,7 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 			}
 			return node.MeshNode
 		}(),
-	}
-	return out, nil
+	}, nil
 }
 
 func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.QueryResponse, error) {
