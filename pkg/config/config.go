@@ -153,7 +153,7 @@ var ErrNoMesh = fmt.Errorf("no mesh configured")
 // Validate validates the configuration.
 func (o *Config) Validate() error {
 	// Make sure we are either bootstrapping or joining a mesh
-	if !o.Bootstrap.Enabled && o.Mesh.JoinAddress == "" && (!o.Discovery.Discover || o.Discovery.Rendezvous == "") && len(o.Bridge.Meshes) == 0 {
+	if !o.Bootstrap.Enabled && len(o.Mesh.JoinAddresses) == 0 && (!o.Discovery.Discover || o.Discovery.Rendezvous == "") && len(o.Bridge.Meshes) == 0 {
 		return ErrNoMesh
 	}
 	var err error

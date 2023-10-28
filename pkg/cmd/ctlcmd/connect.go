@@ -158,7 +158,7 @@ func newEmbedOptions(user *cmdconfig.UserConfig, cluster *cmdconfig.ClusterConfi
 				},
 			},
 			Mesh: config.MeshOptions{
-				JoinAddress:                 cluster.Server,
+				JoinAddresses:               []string{cluster.Server},
 				MaxJoinRetries:              5,
 				UseMeshDNS:                  connectUseDNS,
 				DisableIPv4:                 connectDisableIPv4,

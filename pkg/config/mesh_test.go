@@ -82,7 +82,7 @@ func TestMeshConfigValidation(t *testing.T) {
 			name: "InvalidJoinAddress",
 			cfg: &MeshOptions{
 				NodeID:               "test-node",
-				JoinAddress:          "invalid",
+				JoinAddresses:        []string{"invalid"},
 				MaxJoinRetries:       10,
 				GRPCAdvertisePort:    services.DefaultGRPCPort,
 				MeshDNSAdvertisePort: meshdns.DefaultAdvertisePort,
@@ -93,7 +93,7 @@ func TestMeshConfigValidation(t *testing.T) {
 			name: "ValidJoinAddress",
 			cfg: &MeshOptions{
 				NodeID:               "test-node",
-				JoinAddress:          "localhost:8080",
+				JoinAddresses:        []string{"localhost:8080"},
 				MaxJoinRetries:       10,
 				GRPCAdvertisePort:    services.DefaultGRPCPort,
 				MeshDNSAdvertisePort: meshdns.DefaultAdvertisePort,
@@ -104,7 +104,7 @@ func TestMeshConfigValidation(t *testing.T) {
 			name: "InvalidRetryCount",
 			cfg: &MeshOptions{
 				NodeID:               "test-node",
-				JoinAddress:          "localhost:8080",
+				JoinAddresses:        []string{"localhost:8080"},
 				MaxJoinRetries:       0,
 				GRPCAdvertisePort:    services.DefaultGRPCPort,
 				MeshDNSAdvertisePort: meshdns.DefaultAdvertisePort,

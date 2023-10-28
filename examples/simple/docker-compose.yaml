@@ -49,7 +49,7 @@ services:
       - /webmesh-node
       # The bootstrap-node will run with a self-signed certificate by default.
       - --global.insecure-skip-verify
-      - --mesh.join-address=bootstrap-node:8443
+      - --mesh.join-addresses=bootstrap-node:8443
     restart: on-failure
     volumes:
       - /dev/net/tun:/dev/net/tun

@@ -49,7 +49,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure
-      - --mesh.join-address=bootstrap-node:8443
+      - --mesh.join-addresses=bootstrap-node:8443
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
     sysctls:

@@ -89,7 +89,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure-skip-verify
-      - --mesh.join-address=10.1.0.5:8443
+      - --mesh.join-addresses=10.1.0.5:8443
       - --wireguard.key-file=/wireguard.key
       - --wireguard.key-rotation-interval=0
       - --wireguard.modprobe
@@ -113,7 +113,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --global.insecure-skip-verify
-      - --mesh.join-address=10.1.0.5:8443
+      - --mesh.join-addresses=10.1.0.5:8443
       - --wireguard.key-file=/wireguard.key
       - --wireguard.key-rotation-interval=0
       - --wireguard.modprobe

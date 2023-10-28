@@ -141,7 +141,7 @@ func runClient(loglevel string, join string) error {
 	conf.Services.API.Insecure = true
 	conf.WireGuard.ListenPort = 61821
 	conf.WireGuard.InterfaceName = "meshclient0"
-	conf.Mesh.JoinAddress = join
+	conf.Mesh.JoinAddresses = []string{join}
 	conf.TLS.Insecure = true
 
 	conn, err := embed.NewNode(context.Background(), embed.Options{Config: conf})

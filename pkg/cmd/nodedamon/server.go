@@ -32,6 +32,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
+	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -39,6 +41,7 @@ import (
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
 	conns  map[string]embed.Node
+	conf   Config
 	nodeID types.NodeID
 	key    crypto.PrivateKey
 	val    *protovalidate.Validator
@@ -71,6 +74,7 @@ func NewServer(conf Config) (*AppDaemon, error) {
 	}
 	return &AppDaemon{
 		conns:  make(map[string]embed.Node),
+		conf:   conf,
 		nodeID: nodeID,
 		key:    key,
 		val:    v,
@@ -100,33 +104,27 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 			return nil, status.Errorf(codes.Internal, "connection ID collision")
 		}
 	}
-	conf := config.NewDefaultConfig(app.nodeID.String())
-	// Assume services are disabled for now.
-	conf.Services.API.Disabled = true
-	// Assume a random wireguard port.
-	conf.WireGuard.ListenPort = 0
-	// Append connection credentials.
-	app.appendConnCredentials(ctx, req, conf)
-	return &v1.ConnectResponse{
-		Id: connID,
-	}, nil
-}
-
-func (app *AppDaemon) appendConnCredentials(ctx context.Context, req *v1.ConnectRequest, conf *config.Config) {
-	switch req.GetAuthMethod() {
-	case v1.ConnectRequest_BASIC:
-		conf.Auth.Basic.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_USERNAME.String()])
-		conf.Auth.Basic.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_PASSWORD.String()])
-	case v1.ConnectRequest_LDAP:
-		conf.Auth.LDAP.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()])
-		conf.Auth.LDAP.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()])
-	case v1.ConnectRequest_ID:
-		conf.Auth.IDAuth.Enabled = true
-	case v1.ConnectRequest_MTLS:
-		conf.Auth.MTLS.CertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
-		conf.Auth.MTLS.KeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
-	case v1.ConnectRequest_NO_AUTH:
+	node, err := embed.NewNode(ctx, embed.Options{
+		Config: app.buildConnConfig(ctx, req),
+		Key:    app.key,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create node: %v", err)
 	}
+	err = node.Start(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to start node: %v", err)
+	}
+	app.conns[connID] = node
+	return &v1.ConnectResponse{
+		Id:          connID,
+		NodeID:      string(node.MeshNode().ID()),
+		MeshDomain:  node.MeshNode().Domain(),
+		Ipv4Address: node.MeshNode().Network().WireGuard().AddressV4().String(),
+		Ipv6Address: node.MeshNode().Network().WireGuard().AddressV6().String(),
+		Ipv4Network: node.MeshNode().Network().NetworkV4().String(),
+		Ipv6Network: node.MeshNode().Network().NetworkV6().String(),
+	}, nil
 }
 
 func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
@@ -233,6 +231,68 @@ func (app *AppDaemon) Close() error {
 	}
 	app.conns = nil
 	return nil
+}
+
+func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectRequest) *config.Config {
+	conf := config.NewDefaultConfig(app.nodeID.String())
+	conf.Storage.InMemory = true
+	conf.WireGuard.ListenPort = 0
+	conf.Global.LogLevel = app.conf.LogLevel
+	conf.Global.LogFormat = app.conf.LogFormat
+	conf.Services.API.Disabled = req.GetServices().GetEnabled()
+	conf.Bootstrap.Enabled = req.GetBootstrap().GetEnabled()
+	if conf.Bootstrap.Enabled {
+		conf.Bootstrap.Admin = app.nodeID.String()
+		conf.Bootstrap.DisableRBAC = !req.GetBootstrap().GetRbacEnabled()
+		conf.Bootstrap.IPv4Network = storage.DefaultIPv4Network
+		conf.Bootstrap.MeshDomain = storage.DefaultMeshDomain
+		if req.GetBootstrap().GetIpv4Network() != "" {
+			conf.Bootstrap.IPv4Network = req.GetBootstrap().GetIpv4Network()
+		}
+		if req.GetBootstrap().GetDomain() != "" {
+			conf.Bootstrap.MeshDomain = req.GetBootstrap().GetDomain()
+		}
+		switch req.GetBootstrap().GetDefaultNetworkACL() {
+		case v1.MeshConnBootstrap_ACCEPT:
+			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyAccept)
+		case v1.MeshConnBootstrap_DROP:
+			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyDrop)
+		}
+	}
+	conf.TLS.Insecure = !req.GetTls().GetEnabled()
+	if !conf.TLS.Insecure {
+		if len(req.GetTls().GetCaCertData()) != 0 {
+			conf.TLS.CAData = base64.StdEncoding.EncodeToString(req.GetTls().GetCaCertData())
+		}
+		conf.TLS.VerifyChainOnly = req.GetTls().GetVerifyChainOnly()
+		conf.TLS.InsecureSkipVerify = req.GetTls().GetSkipVerify()
+	}
+	switch req.GetAddrType() {
+	case v1.ConnectRequest_ADDR:
+		conf.Mesh.JoinAddresses = req.GetAddrs()
+	case v1.ConnectRequest_RENDEZVOUS:
+		conf.Discovery.Discover = true
+		conf.Discovery.Rendezvous = req.GetAddrs()[0]
+	case v1.ConnectRequest_MULTIADDR:
+		// TODO: Support regular multiaddrs.
+		// This will probably involve the daemon automatically running
+		// a libp2p host and using it for all mesh connections.
+	}
+	switch req.GetAuthMethod() {
+	case v1.ConnectRequest_NO_AUTH:
+	case v1.ConnectRequest_BASIC:
+		conf.Auth.Basic.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_USERNAME.String()])
+		conf.Auth.Basic.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_PASSWORD.String()])
+	case v1.ConnectRequest_LDAP:
+		conf.Auth.LDAP.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()])
+		conf.Auth.LDAP.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()])
+	case v1.ConnectRequest_MTLS:
+		conf.Auth.MTLS.CertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
+		conf.Auth.MTLS.KeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
+	case v1.ConnectRequest_ID:
+		conf.Auth.IDAuth.Enabled = true
+	}
+	return conf
 }
 
 func newInvalidError(err error) error {

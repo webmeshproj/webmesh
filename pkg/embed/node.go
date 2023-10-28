@@ -54,8 +54,8 @@ type Node interface {
 	// Errors returns a channel of errors that occur during the lifetime of the node.
 	// At the moment, any error is fatal and will cause the node to stop.
 	Errors() <-chan error
-	// Mesh returns the underlying mesh instance.
-	Mesh() meshnode.Node
+	// MeshNode returns the underlying meshnode instance.
+	MeshNode() meshnode.Node
 	// Storage is the underlying storage instance.
 	Storage() storage.Provider
 	// Services returns the underlying services instance if it is running.
@@ -122,7 +122,7 @@ type node struct {
 	mu       sync.Mutex
 }
 
-func (n *node) Mesh() meshnode.Node {
+func (n *node) MeshNode() meshnode.Node {
 	return n.mesh
 }
 
@@ -155,7 +155,7 @@ func (n *node) Start(ctx context.Context) error {
 	defer n.mu.Unlock()
 	log := n.log
 	ctx = context.WithLogger(ctx, log)
-	connectOpts, err := n.conf.NewConnectOptions(ctx, n.Mesh(), n.Storage(), n.opts.Host)
+	connectOpts, err := n.conf.NewConnectOptions(ctx, n.MeshNode(), n.Storage(), n.opts.Host)
 	if err != nil {
 		return fmt.Errorf("failed to create connect options: %w", err)
 	}
@@ -166,7 +166,7 @@ func (n *node) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start raft node: %w", err)
 	}
 	// Connect to the mesh
-	err = n.Mesh().Connect(ctx, connectOpts)
+	err = n.MeshNode().Connect(ctx, connectOpts)
 	if err != nil {
 		defer func() {
 			err := n.Storage().Close()
@@ -178,19 +178,19 @@ func (n *node) Start(ctx context.Context) error {
 	}
 	// If anything goes wrong at this point, make sure we close down cleanly.
 	handleErr := func(cause error) error {
-		if err := n.Mesh().Close(ctx); err != nil {
+		if err := n.MeshNode().Close(ctx); err != nil {
 			log.Error("failed to shutdown mesh", slog.String("error", err.Error()))
 		}
 		return fmt.Errorf("failed to start mesh node: %w", cause)
 	}
 	select {
-	case <-n.Mesh().Ready():
+	case <-n.MeshNode().Ready():
 	case <-ctx.Done():
 		return handleErr(fmt.Errorf("failed to start webmesh node: %w", ctx.Err()))
 	}
 	log.Info("Webmesh connection is ready")
 	// Start the mesh services
-	srvOpts, err := n.conf.Services.NewServiceOptions(ctx, n.Mesh())
+	srvOpts, err := n.conf.Services.NewServiceOptions(ctx, n.MeshNode())
 	if err != nil {
 		return handleErr(fmt.Errorf("failed to create service options: %w", err))
 	}
@@ -206,7 +206,7 @@ func (n *node) Start(ctx context.Context) error {
 	if !n.conf.Services.API.Disabled {
 		features := n.conf.Services.NewFeatureSet(n.Storage(), n.conf.Services.API.ListenPort())
 		err = n.conf.Services.RegisterAPIs(ctx, config.APIRegistrationOptions{
-			Node:        n.Mesh(),
+			Node:        n.MeshNode(),
 			Server:      n.services,
 			Features:    features,
 			BuildInfo:   version.GetBuildInfo(),
@@ -242,7 +242,7 @@ func (n *node) Stop(ctx context.Context) error {
 	// Shutdown the mesh connection last
 	defer func() {
 		n.log.Info("Shutting down mesh connection")
-		if err := n.Mesh().Close(ctx); err != nil {
+		if err := n.MeshNode().Close(ctx); err != nil {
 			n.log.Error("failed to shutdown mesh connection", slog.String("error", err.Error()))
 		}
 	}()

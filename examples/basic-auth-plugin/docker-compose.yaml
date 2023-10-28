@@ -41,7 +41,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=10.1.0.5:8443
+      - --mesh.join-addresses=10.1.0.5:8443
       - --auth.basic.username=join-node
       - --auth.basic.password=dobad
     restart: on-failure

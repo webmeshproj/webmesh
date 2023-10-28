@@ -59,8 +59,8 @@ type MeshOptions struct {
 	PrimaryEndpoint string `koanf:"primary-endpoint,omitempty"`
 	// ZoneAwarenessID is the zone awareness ID.
 	ZoneAwarenessID string `koanf:"zone-awareness-id,omitempty"`
-	// JoinAddress is the address of a node to join.
-	JoinAddress string `koanf:"join-address,omitempty"`
+	// JoinAddresses are addresses of nodes to attempt to join.
+	JoinAddresses []string `koanf:"join-addresses,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int `koanf:"max-join-retries,omitempty"`
 	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
@@ -103,7 +103,7 @@ func NewMeshOptions(nodeID string) MeshOptions {
 		NodeID:                      nodeID,
 		PrimaryEndpoint:             "",
 		ZoneAwarenessID:             "",
-		JoinAddress:                 "",
+		JoinAddresses:               nil,
 		MaxJoinRetries:              15,
 		Routes:                      nil,
 		ICEPeers:                    []string{},
@@ -127,7 +127,7 @@ func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.NodeID, prefix+"node-id", o.NodeID, "Node ID. One will be chosen automatically if left unset.")
 	fs.StringVar(&o.PrimaryEndpoint, prefix+"primary-endpoint", o.PrimaryEndpoint, "Primary endpoint to advertise when joining.")
 	fs.StringVar(&o.ZoneAwarenessID, prefix+"zone-awareness-id", o.ZoneAwarenessID, "Zone awareness ID.")
-	fs.StringVar(&o.JoinAddress, prefix+"join-address", o.JoinAddress, "Address of a node to join.")
+	fs.StringSliceVar(&o.JoinAddresses, prefix+"join-addresses", o.JoinAddresses, "Addresses of nodes to join.")
 	fs.IntVar(&o.MaxJoinRetries, prefix+"max-join-retries", o.MaxJoinRetries, "Maximum number of join retries.")
 	fs.StringSliceVar(&o.Routes, prefix+"routes", o.Routes, "Additional routes to advertise to the mesh.")
 	fs.StringSliceVar(&o.ICEPeers, prefix+"ice-peers", o.ICEPeers, "Peers to request direct edges to over ICE.")
@@ -158,11 +158,11 @@ func (o *MeshOptions) Validate() error {
 	if o.DisableIPv4 && o.DisableIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
-	if o.JoinAddress != "" && o.MaxJoinRetries <= 0 {
+	if len(o.JoinAddresses) > 0 && o.MaxJoinRetries <= 0 {
 		return fmt.Errorf("max join retries must be >= 0")
 	}
-	if o.JoinAddress != "" {
-		if _, _, err := net.SplitHostPort(o.JoinAddress); err != nil {
+	for _, addr := range o.JoinAddresses {
+		if _, _, err := net.SplitHostPort(addr); err != nil {
 			return fmt.Errorf("invalid join address: %w", err)
 		}
 	}
@@ -557,9 +557,9 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn meshn
 			AddressTimeout: time.Second * 3,
 		}), nil
 	}
-	if o.Mesh.JoinAddress != "" {
+	if len(o.Mesh.JoinAddresses) > 0 {
 		return tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
-			Addrs:          []string{o.Mesh.JoinAddress},
+			Addrs:          o.Mesh.JoinAddresses,
 			Credentials:    conn.Credentials(),
 			AddressTimeout: time.Second * 3,
 		}), nil

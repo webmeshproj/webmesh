@@ -109,7 +109,7 @@ services:
       - --global.detect-endpoints
       - --global.detect-private-endpoints
       # Site 1 Options
-      - --bridge.site-1.mesh.join-address=site-1-node:8443
+      - --bridge.site-1.mesh.join-addresses=site-1-node:8443
       - --bridge.site-1.wireguard.listen-port=51821
       - --bridge.site-1.wireguard.interface-name=wgsite1
       - --bridge.site-1.services.api.listen-address=:8443
@@ -117,7 +117,7 @@ services:
       - --bridge.site-1.storage.raft.listen-address=:9443
       - --bridge.site-2.storage.raft.request-observer
       # Site 2 Options
-      - --bridge.site-2.mesh.join-address=site-2-node:8443
+      - --bridge.site-2.mesh.join-addresses=site-2-node:8443
       - --bridge.site-2.wireguard.listen-port=51822
       - --bridge.site-2.wireguard.interface-name=wgsite2
       - --bridge.site-2.services.api.listen-address=:8444

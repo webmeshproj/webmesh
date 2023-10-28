@@ -42,8 +42,9 @@ services:
       - --global.primary-endpoint=10.250.0.1
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.advertise-address=site-1-leader:9001
-      - --bootstrap.servers=site-2-leader=site-2-leader:9001,site-3-leader=site-3-leader:9001
+      - --bootstrap.transport-tcp-advertise-address=site-1-leader:9001
+      - --bootstrap.transport.tcp-servers=site-2-leader=site-2-leader:9001
+      - --bootstrap.transport.tcp-servers=site-3-leader=site-3-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --storage.in-memory
       - --mesh.zone-awareness-id=site-1
@@ -60,7 +61,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-1-leader:8443
+      - --mesh.join-addresses=site-1-leader:8443
       - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -74,7 +75,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-1-leader:8443
+      - --mesh.join-addresses=site-1-leader:8443
       - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -88,7 +89,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-1-leader:8443
+      - --mesh.join-addresses=site-1-leader:8443
       - --mesh.zone-awareness-id=site-1
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -109,8 +110,9 @@ services:
       - --global.primary-endpoint=10.250.0.2
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.advertise-address=site-2-leader:9001
-      - --bootstrap.servers=site-1-leader=site-1-leader:9001,site-3-leader=site-3-leader:9001
+      - --bootstrap.transport.tcp-advertise-address=site-2-leader:9001
+      - --bootstrap.transport.tcp-servers=site-1-leader=site-1-leader:9001
+      - --bootstrap.transport.tcp-servers=site-3-leader=site-3-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --storage.in-memory
       - --mesh.zone-awareness-id=site-2
@@ -125,7 +127,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-2-leader:8443
+      - --mesh.join-addresses=site-2-leader:8443
       - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -139,7 +141,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-2-leader:8443
+      - --mesh.join-addresses=site-2-leader:8443
       - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -153,7 +155,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-2-leader:8443
+      - --mesh.join-addresses=site-2-leader:8443
       - --mesh.zone-awareness-id=site-2
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -174,8 +176,9 @@ services:
       - --global.primary-endpoint=10.250.0.3
       - --global.detect-private-endpoints
       - --bootstrap.enabled
-      - --bootstrap.advertise-address=site-3-leader:9001
-      - --bootstrap.servers=site-1-leader=site-1-leader:9001,site-2-leader=site-2-leader:9001
+      - --bootstrap.transport.tcp-advertise-address=site-3-leader:9001
+      - --bootstrap.transport.tcp-servers=site-1-leader=site-1-leader:9001
+      - --bootstrap.transport.tcp-servers=site-2-leader=site-2-leader:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
       - --storage.in-memory
       - --mesh.zone-awareness-id=site-3
@@ -190,7 +193,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-3-leader:8443
+      - --mesh.join-addresses=site-3-leader:8443
       - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -204,7 +207,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-3-leader:8443
+      - --mesh.join-addresses=site-3-leader:8443
       - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
@@ -218,7 +221,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=site-3-leader:8443
+      - --mesh.join-addresses=site-3-leader:8443
       - --mesh.zone-awareness-id=site-3
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

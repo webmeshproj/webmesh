@@ -56,7 +56,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=10.30.0.1:8443
+      - --mesh.join-addresses=10.30.0.1:8443
       - --mesh.ice-peers=site-2-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]
@@ -72,7 +72,7 @@ services:
       - /webmesh-node
       - --global.insecure
       - --global.disable-ipv6
-      - --mesh.join-address=10.30.0.1:8443
+      - --mesh.join-addresses=10.30.0.1:8443
       - --mesh.ice-peers=site-1-peer
     restart: on-failure
     cap_add: ["NET_ADMIN", "NET_RAW"]
