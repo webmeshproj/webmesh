@@ -28,6 +28,7 @@ services:
       - --bootstrap.transport.tcp-servers=bootstrap-node-2=10.1.0.2:9001
       - --bootstrap.transport.tcp-servers=bootstrap-node-3=10.1.0.3:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
+      - --bootstrap.disable-rbac
       - --storage.in-memory
       - --services.meshdns.enabled
     ports:
@@ -51,6 +52,7 @@ services:
       - --bootstrap.transport.tcp-servers=bootstrap-node-1=10.1.0.1:9001
       - --bootstrap.transport.tcp-servers=bootstrap-node-3=10.1.0.3:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
+      - --bootstrap.disable-rbac
       - --storage.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
 
@@ -70,5 +72,6 @@ services:
       - --bootstrap.transport.tcp-servers=bootstrap-node-1=10.1.0.1:9001
       - --bootstrap.transport.tcp-servers=bootstrap-node-2=10.1.0.2:9001
       - --bootstrap.ipv4-network=10.10.10.0/24
+      - --bootstrap.disable-rbac
       - --storage.in-memory
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]
