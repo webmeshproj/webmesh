@@ -65,9 +65,11 @@ func Execute() error {
 		Usage()
 		return nil
 	}
+	version := version.GetBuildInfo()
+
 	// Dump the version and exit
 	if *versionFlag || len(os.Args) > 1 && os.Args[1] == "version" {
-		version := version.GetBuildInfo()
+
 		if *versionJSONFlag {
 			fmt.Println(version.PrettyJSON("webmesh-node"))
 			return nil
@@ -126,7 +128,7 @@ func Execute() error {
 	// Time to get going
 	log.Info("Starting webmesh node",
 		slog.String("version", version.Version),
-		slog.String("commit", version.Commit),
+		slog.String("commit", version.GitCommit),
 		slog.String("buildDate", version.BuildDate),
 	)
 	// Log all options at debug level

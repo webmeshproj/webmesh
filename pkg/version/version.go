@@ -22,8 +22,8 @@ import "encoding/json"
 var (
 	// Version is the version of the binary.
 	Version = "unknown"
-	// Commit is the git commit of the binary.
-	Commit = "unknown"
+	// GitCommit is the git commit of the binary.
+	GitCommit = "unknown"
 	// BuildDate is the date the binary was built.
 	BuildDate = "unknown"
 )
@@ -39,7 +39,7 @@ type BuildInfo struct {
 func GetBuildInfo() BuildInfo {
 	return BuildInfo{
 		Version:   Version,
-		GitCommit: Commit,
+		GitCommit: GitCommit,
 		BuildDate: BuildDate,
 	}
 }
