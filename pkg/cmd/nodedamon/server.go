@@ -41,13 +41,13 @@ import (
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
-	conns  map[string]embed.Node
-	conf   Config
-	nodeID types.NodeID
-	key    crypto.PrivateKey
-	val    *protovalidate.Validator
-	log    *slog.Logger
-	mu     sync.RWMutex
+	conns     map[string]embed.Node
+	conf      Config
+	nodeID    types.NodeID
+	key       crypto.PrivateKey
+	validator *protovalidate.Validator
+	log       *slog.Logger
+	mu        sync.RWMutex
 }
 
 var (
@@ -74,17 +74,17 @@ func NewServer(conf Config) (*AppDaemon, error) {
 		nodeID = types.NodeID(key.ID())
 	}
 	return &AppDaemon{
-		conns:  make(map[string]embed.Node),
-		conf:   conf,
-		nodeID: nodeID,
-		key:    key,
-		val:    v,
-		log:    conf.NewLogger().With("appdaemon", "server"),
+		conns:     make(map[string]embed.Node),
+		conf:      conf,
+		nodeID:    nodeID,
+		key:       key,
+		validator: v,
+		log:       conf.NewLogger().With("appdaemon", "server"),
 	}, nil
 }
 
 func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
-	err := app.val.Validate(req)
+	err := app.validator.Validate(req)
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
@@ -136,7 +136,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 }
 
 func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest) (*v1.DisconnectResponse, error) {
-	err := app.val.Validate(req)
+	err := app.validator.Validate(req)
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
@@ -155,7 +155,7 @@ func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest)
 }
 
 func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.MetricsResponse, error) {
-	err := app.val.Validate(req)
+	err := app.validator.Validate(req)
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
@@ -192,7 +192,7 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 }
 
 func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.StatusResponse, error) {
-	err := app.val.Validate(req)
+	err := app.validator.Validate(req)
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
@@ -226,7 +226,7 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 }
 
 func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.QueryResponse, error) {
-	err := app.val.Validate(req)
+	err := app.validator.Validate(req)
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
