@@ -101,6 +101,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 			app.mu.RUnlock()
 			return nil, status.Errorf(codes.Internal, "failed to generate connection ID: %v", err)
 		}
+		app.log.Info("Generated new connection ID", "id", connID)
 		// Double check that the ID is unique.
 		_, ok := app.conns[connID]
 		if ok {
@@ -109,8 +110,11 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 		}
 	}
 	app.mu.RUnlock()
+	app.log.Info("Creating new node with ID", "id", connID)
+	cfg := app.buildConnConfig(ctx, req)
+	app.log.Debug("Node configuration", "config", cfg, "id", connID)
 	node, err := embed.NewNode(ctx, embed.Options{
-		Config: app.buildConnConfig(ctx, req),
+		Config: cfg,
 		Key:    app.key,
 	})
 	if err != nil {
@@ -119,6 +123,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	app.mu.Lock()
 	app.conns[connID] = node
 	app.mu.Unlock()
+	app.log.Info("Starting node", "id", connID)
 	err = node.Start(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to start node: %v", err)
@@ -145,6 +150,7 @@ func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest)
 	if !ok {
 		return nil, ErrNotConnected
 	}
+	app.log.Info("Stopping node", "id", req.GetId())
 	delete(app.conns, req.GetId())
 	err = conn.Stop(ctx)
 	if err != nil {
@@ -175,10 +181,12 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 			ids = append(ids, id)
 		}
 	}
+	app.log.Info("Getting metrics for connections", "ids", ids)
 	res := &v1.MetricsResponse{
 		Interfaces: make(map[string]*v1.InterfaceMetrics),
 	}
-	for _, id := range ids {
+	for _, i := range ids {
+		id := i
 		conn := app.conns[id]
 		metrics, err := conn.MeshNode().Network().WireGuard().Metrics()
 		if err != nil {
@@ -199,10 +207,12 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 	defer app.mu.RUnlock()
 	c, ok := app.conns[req.GetId()]
 	if !ok {
+		app.log.Info("Status requested for unknown connection", "id", req.GetId())
 		return &v1.StatusResponse{
 			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
 		}, nil
 	}
+	app.log.Info("Retrieving status for connection", "id", req.GetId())
 	return &v1.StatusResponse{
 		ConnectionStatus: func() v1.StatusResponse_ConnectionStatus {
 			if c.MeshNode().Started() {
@@ -235,13 +245,15 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 	if !ok {
 		return nil, ErrNotConnected
 	}
+	app.log.Info("Querying storage for connection", "id", req.GetId())
 	return storageutil.ServeStorageQuery(ctx, conn.MeshNode().Storage(), req.GetQuery())
 }
 
 func (app *AppDaemon) Close() error {
 	app.mu.Lock()
 	defer app.mu.Unlock()
-	for _, conn := range app.conns {
+	for id, conn := range app.conns {
+		app.log.Info("Stopping node", "id", id)
 		err := conn.Stop(context.WithLogger(context.Background(), app.log))
 		if err != nil {
 			app.log.Error("Error stopping node", "err", err)
