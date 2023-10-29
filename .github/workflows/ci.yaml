@@ -11,7 +11,7 @@ env:
   ALPINE_IMAGE_NAME: ghcr.io/webmeshproj/node
   DISTROLESS_IMAGE_NAME: ghcr.io/webmeshproj/node-distroless
   GO_VERSION: "1.21"
-  GOLANGCI_LINT_VERSION: v1.53.3
+  GOLANGCI_LINT_VERSION: v1.55.1
   DOCKER_PLATFORMS: linux/amd64,linux/arm64,linux/arm,linux/386,linux/ppc64le,linux/s390x
   CACHE_DEP_PATH: go.sum
   LINT_TIMEOUT: 10m
