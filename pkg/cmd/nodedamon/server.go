@@ -286,7 +286,7 @@ func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 	conf.WireGuard.ListenPort = 0
 	conf.Global.LogLevel = app.conf.LogLevel
 	conf.Global.LogFormat = app.conf.LogFormat
-	conf.Services.API.Disabled = req.GetServices().GetEnabled()
+	conf.Services.API.Disabled = !req.GetServices().GetEnabled()
 	conf.Bootstrap.Enabled = req.GetBootstrap().GetEnabled()
 	if conf.Bootstrap.Enabled {
 		conf.Bootstrap.Admin = app.nodeID.String()
