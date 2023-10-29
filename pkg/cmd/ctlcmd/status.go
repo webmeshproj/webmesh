@@ -18,7 +18,7 @@ package ctlcmd
 
 import (
 	"github.com/spf13/cobra"
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 )
 
 func init() {

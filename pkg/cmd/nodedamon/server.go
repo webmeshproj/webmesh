@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"github.com/bufbuild/protovalidate-go"
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -237,34 +237,6 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 		return nil, ErrNotConnected
 	}
 	return storageutil.ServeStorageQuery(ctx, conn.MeshNode().Storage(), req.GetQuery())
-}
-
-func (app *AppDaemon) Publish(ctx context.Context, req *v1.AppPublishRequest) (*v1.PublishResponse, error) {
-	err := app.val.Validate(req)
-	if err != nil {
-		return nil, newInvalidError(err)
-	}
-	app.mu.RLock()
-	defer app.mu.RUnlock()
-	_, ok := app.conns[req.GetId()]
-	if !ok {
-		return nil, ErrNotConnected
-	}
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
-}
-
-func (app *AppDaemon) Subscribe(req *v1.AppSubscribeRequest, srv v1.AppDaemon_SubscribeServer) error {
-	err := app.val.Validate(req)
-	if err != nil {
-		return newInvalidError(err)
-	}
-	app.mu.RLock()
-	defer app.mu.RUnlock()
-	_, ok := app.conns[req.GetId()]
-	if !ok {
-		return ErrNotConnected
-	}
-	return status.Errorf(codes.Unimplemented, "not implemented")
 }
 
 func (app *AppDaemon) Close() error {

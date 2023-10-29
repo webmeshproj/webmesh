@@ -17,7 +17,7 @@ limitations under the License.
 package leaderproxy
 
 import (
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 )
 
 // MethodPolicy defines the policy for routing requests to the leader.

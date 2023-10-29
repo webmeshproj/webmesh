@@ -31,7 +31,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/multiformats/go-multiaddr"
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -544,13 +544,16 @@ func TestDiscoveryRPCTransport(t *testing.T) {
 
 	t.Run("PrestartedHosts", func(t *testing.T) {
 		// Setup the libp2p hosts
+		const connectTimeout = time.Second * 5
+		const dialTimeout = time.Second * 15
+
 		serverKey := crypto.MustGenerateKey()
 		clientKey := crypto.MustGenerateKey()
 		rendezvous := uuid.NewString()
 
 		server, err := NewDiscoveryHost(ctx, HostOptions{
 			Key:            serverKey,
-			ConnectTimeout: time.Second * 3,
+			ConnectTimeout: connectTimeout,
 			LocalAddrs: []multiaddr.Multiaddr{
 				multiaddr.StringCast("/ip4/0.0.0.0/tcp/0"),
 			},
@@ -573,7 +576,7 @@ func TestDiscoveryRPCTransport(t *testing.T) {
 		// Create a client transport.
 		client, err := NewDiscoveryHost(ctx, HostOptions{
 			Key:            clientKey,
-			ConnectTimeout: time.Second * 3,
+			ConnectTimeout: connectTimeout,
 			LocalAddrs: []multiaddr.Multiaddr{
 				multiaddr.StringCast("/ip4/0.0.0.0/tcp/0"),
 			},
@@ -585,14 +588,14 @@ func TestDiscoveryRPCTransport(t *testing.T) {
 		rt, err := NewDiscoveryTransport(ctx, TransportOptions{
 			Host:        client,
 			Rendezvous:  rendezvous,
-			HostOptions: HostOptions{ConnectTimeout: time.Second * 3},
+			HostOptions: HostOptions{ConnectTimeout: connectTimeout},
 			Credentials: []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Test the transport.
-		dialctx, cancel := context.WithTimeout(ctx, time.Second*15)
+		dialctx, cancel := context.WithTimeout(ctx, dialTimeout)
 		defer cancel()
 		c, err := rt.Dial(dialctx, "", "")
 		if err != nil {

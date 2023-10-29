@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/webmeshproj/webmesh/pkg/storage"

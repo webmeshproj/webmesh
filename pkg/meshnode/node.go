@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 

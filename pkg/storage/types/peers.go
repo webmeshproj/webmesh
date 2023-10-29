@@ -19,7 +19,7 @@ package types
 import (
 	"sort"
 
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"golang.org/x/exp/slices"
 )
 

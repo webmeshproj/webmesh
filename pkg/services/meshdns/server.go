@@ -26,7 +26,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/miekg/dns"
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webmeshproj/webmesh/pkg/context"

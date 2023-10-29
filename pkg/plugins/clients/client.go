@@ -18,7 +18,7 @@ limitations under the License.
 package clients
 
 import (
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 )
 
 // PluginClient is an extension of the interface for a plugin client.

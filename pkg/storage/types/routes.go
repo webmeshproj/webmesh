@@ -22,7 +22,7 @@ import (
 	"net/netip"
 	"sort"
 
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

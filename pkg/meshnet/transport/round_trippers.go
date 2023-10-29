@@ -20,7 +20,7 @@ import (
 	"context"
 	"io"
 
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 )
 
 // RoundTripper is a generic interface for executing a request and returning

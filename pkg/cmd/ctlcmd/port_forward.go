@@ -27,7 +27,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/ctlcmd/portforward"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"

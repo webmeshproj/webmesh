@@ -35,7 +35,7 @@ import (
 
 	"github.com/fullstorydev/grpcui/standalone"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"

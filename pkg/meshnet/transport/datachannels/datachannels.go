@@ -29,7 +29,7 @@ import (
 
 	"github.com/pion/datachannel"
 	"github.com/pion/webrtc/v3"
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/common"
 	"github.com/webmeshproj/webmesh/pkg/context"

@@ -20,7 +20,7 @@ import (
 	"net/netip"
 	"testing"
 
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 )
 
 func TestMeshNodeWrapper(t *testing.T) {

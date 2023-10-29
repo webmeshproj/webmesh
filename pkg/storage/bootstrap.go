@@ -22,7 +22,7 @@ import (
 	"math"
 	"net/netip"
 
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 
 	"github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"

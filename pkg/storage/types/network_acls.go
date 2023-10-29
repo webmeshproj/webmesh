@@ -24,7 +24,7 @@ import (
 	"sort"
 	"strings"
 
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/context"

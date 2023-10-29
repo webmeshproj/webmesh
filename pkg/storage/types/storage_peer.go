@@ -17,7 +17,7 @@ limitations under the License.
 package types
 
 import (
-	v1 "github.com/webmeshproj/api/v1"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

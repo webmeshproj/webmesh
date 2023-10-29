@@ -19,9 +19,10 @@ package admin
 import (
 	"testing"
 
-	v1 "github.com/webmeshproj/api/v1"
-	"github.com/webmeshproj/webmesh/pkg/storage"
+	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc/codes"
+
+	"github.com/webmeshproj/webmesh/pkg/storage"
 )
 
 func TestDeleteRoleBinding(t *testing.T) {
