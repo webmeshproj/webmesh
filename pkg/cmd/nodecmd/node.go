@@ -42,6 +42,7 @@ var (
 
 	helpFlag        = flagset.Bool("help", false, "Print usage information and exit")
 	versionFlag     = flagset.Bool("version", false, "Print version information and exit")
+	versionJSONFlag = flagset.Bool("json", false, "Print version information in JSON format")
 	configFlag      = flagset.String("config", "", "Path to a configuration file")
 	printConfig     = flagset.Bool("print-config", false, "Print the configuration and exit")
 	startTimeout    = flagset.Duration("start-timeout", 0, "Timeout for starting the node (default: no timeout)")
@@ -65,11 +66,16 @@ func Execute() error {
 		return nil
 	}
 	// Dump the version and exit
-	if *versionFlag {
+	if *versionFlag || len(os.Args) > 1 && os.Args[1] == "version" {
+		version := version.GetBuildInfo()
+		if *versionJSONFlag {
+			fmt.Println(version.PrettyJSON("webmesh-node"))
+			return nil
+		}
 		fmt.Println("Webmesh Node")
-		fmt.Println("  Version:   ", version.Version)
-		fmt.Println("  Commit:    ", version.Commit)
-		fmt.Println("  Build Date:", version.BuildDate)
+		fmt.Println("    Version:    ", version.Version)
+		fmt.Println("    Git Commit: ", version.GitCommit)
+		fmt.Println("    Build Date: ", version.BuildDate)
 		return nil
 	}
 	// Load the configuration

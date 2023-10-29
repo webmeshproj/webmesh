@@ -49,7 +49,7 @@ func (s *Server) GetStatus(ctx context.Context, req *v1.GetStatusRequest) (*v1.S
 		Id:               s.NodeID.String(),
 		Description:      s.Description,
 		Version:          s.Version.Version,
-		Commit:           s.Version.Commit,
+		Commit:           s.Version.GitCommit,
 		BuildDate:        s.Version.BuildDate,
 		Uptime:           time.Since(s.startedAt).String(),
 		StartedAt:        timestamppb.New(s.startedAt),

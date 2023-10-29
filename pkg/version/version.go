@@ -17,6 +17,8 @@ limitations under the License.
 // Package version contains compile-time version information.
 package version
 
+import "encoding/json"
+
 var (
 	// Version is the version of the binary.
 	Version = "unknown"
@@ -29,7 +31,7 @@ var (
 // BuildInfo is the current build information.
 type BuildInfo struct {
 	Version   string `json:"version"`
-	Commit    string `json:"commit"`
+	GitCommit string `json:"gitCommit"`
 	BuildDate string `json:"buildDate"`
 }
 
@@ -37,7 +39,27 @@ type BuildInfo struct {
 func GetBuildInfo() BuildInfo {
 	return BuildInfo{
 		Version:   Version,
-		Commit:    Commit,
+		GitCommit: Commit,
 		BuildDate: BuildDate,
 	}
+}
+
+// MarshalJSON implements json.Marshaler.
+func (b BuildInfo) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]string{
+		"version":   b.Version,
+		"gitCommit": b.GitCommit,
+		"buildDate": b.BuildDate,
+	})
+}
+
+// PrettyJSON returns the current build information as a pretty-printed JSON string.
+func (b BuildInfo) PrettyJSON(component string) string {
+	out, _ := json.MarshalIndent(map[string]string{
+		"component": component,
+		"version":   b.Version,
+		"gitCommit": b.GitCommit,
+		"buildDate": b.BuildDate,
+	}, "", "    ")
+	return string(out)
 }

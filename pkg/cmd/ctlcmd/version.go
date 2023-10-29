@@ -22,7 +22,12 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
+var (
+	versionJSON bool
+)
+
 func init() {
+	versionCmd.Flags().BoolVar(&versionJSON, "json", false, "Print version information in JSON format")
 	rootCmd.AddCommand(versionCmd)
 }
 
@@ -31,9 +36,15 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version number of the CLI",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		cmd.Println("Version:", version.Version)
-		cmd.Println("Git Commit:", version.Commit)
-		cmd.Println("Build Date:", version.BuildDate)
+		version := version.GetBuildInfo()
+		if versionJSON {
+			cmd.Println(version.PrettyJSON("webmesh-cli"))
+			return nil
+		}
+		cmd.Println("Webmesh CLI")
+		cmd.Println("    Version:    ", version.Version)
+		cmd.Println("    Git Commit: ", version.GitCommit)
+		cmd.Println("    Build Date: ", version.BuildDate)
 		return nil
 	},
 }
