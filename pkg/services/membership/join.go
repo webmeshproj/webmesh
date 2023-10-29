@@ -283,7 +283,7 @@ func (s *Server) Join(ctx context.Context, req *v1.JoinRequest) (*v1.JoinRespons
 			}
 			_, err := p.Get(ctx, types.NodeID(peer))
 			if err != nil {
-				if errors.IsNodeNotFound(err) {
+				if !errors.IsNodeNotFound(err) {
 					return nil, handleErr(status.Errorf(codes.Internal, "failed to get peer: %v", err))
 				}
 				// The peer doesn't exist, so create a placeholder for it
