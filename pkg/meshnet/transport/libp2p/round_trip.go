@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/multiformats/go-multiaddr"
 	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc"
 
@@ -29,10 +30,12 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
-// RoundTripOptions are options for performing a round trip against
-// a libp2p host.
+// RoundTripOptions are options for performing a round trip against a discovery node.
 type RoundTripOptions struct {
-	// Rendezvous is the pre-shared key to use as a rendezvous point for the DHT.
+	// Multiaddrs are the multiaddrs to dial. These are mutually exclusive with
+	// Rendezvous.
+	Multiaddrs []multiaddr.Multiaddr
+	// Rendezvous is a rendezvous point on the DHT.
 	Rendezvous string
 	// HostOptions are options for configuring the host. These can be left
 	// empty if using a pre-created host.
@@ -45,6 +48,13 @@ type RoundTripOptions struct {
 	Credentials []grpc.DialOption
 }
 
+// NewJoinRoundTripper returns a round tripper that dials the given multiaddrs directly
+// using an uncertified peerstore.
+func NewJoinRoundTripper(ctx context.Context, opts RoundTripOptions) (transport.JoinRoundTripper, error) {
+	opts.Method = v1.Membership_Join_FullMethodName
+	return NewRoundTripper[v1.JoinRequest, v1.JoinResponse](ctx, opts)
+}
+
 // NewDiscoveryJoinRoundTripper returns a round tripper that uses the libp2p kademlia DHT to join a cluster.
 // The created host is closed when the round tripper is closed.
 func NewDiscoveryJoinRoundTripper(ctx context.Context, opts RoundTripOptions) (transport.JoinRoundTripper, error) {
@@ -52,7 +62,36 @@ func NewDiscoveryJoinRoundTripper(ctx context.Context, opts RoundTripOptions) (t
 	return NewDiscoveryRoundTripper[v1.JoinRequest, v1.JoinResponse](ctx, opts)
 }
 
-// NewRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
+// NewRoundTripper returns a round tripper that dials the given multiaddrs directly
+// using an uncertified peerstore.
+func NewRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) (transport.RoundTripper[REQ, RESP], error) {
+	if opts.Method == "" {
+		return nil, errors.New("method must be specified")
+	}
+	host := opts.Host
+	close := func() {}
+	if host == nil {
+		var err error
+		opts.HostOptions.UncertifiedPeerstore = true
+		host, err = NewHost(ctx, opts.HostOptions)
+		if err != nil {
+			return nil, err
+		}
+		close = func() {
+			err := host.Close()
+			if err != nil {
+				context.LoggerFrom(ctx).Error("Failed to close host", "error", err.Error())
+			}
+		}
+	}
+	return &roundTripper[REQ, RESP]{
+		RoundTripOptions: opts,
+		transport:        NewTransport(host, opts.Credentials...),
+		close:            close,
+	}, nil
+}
+
+// NewDiscoveryRoundTripper returns a round tripper that uses the libp2p kademlia DHT.
 // The created host is closed when the round tripper is closed.
 func NewDiscoveryRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTripOptions) (transport.RoundTripper[REQ, RESP], error) {
 	if opts.Method == "" {
@@ -79,6 +118,47 @@ func NewDiscoveryRoundTripper[REQ, RESP any](ctx context.Context, opts RoundTrip
 	}, nil
 }
 
+type roundTripper[REQ, RESP any] struct {
+	RoundTripOptions
+	transport transport.RPCTransport
+	close     func()
+}
+
+func (rt *roundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
+	log := context.LoggerFrom(ctx).With("method", rt.Method)
+	ctx = context.WithLogger(ctx, log)
+	for _, addr := range rt.Multiaddrs {
+		log.Debug("Attempting to dial node via libp2p")
+		conn, err := rt.transport.Dial(ctx, "", addr.String())
+		if err != nil {
+			log.Warn("Dial failed", "error", err.Error())
+			continue
+		}
+		defer conn.Close()
+		log.Debug("Dial successful, invoking request")
+		var resp RESP
+		var callOpts []grpc.CallOption
+		for _, cred := range rt.Credentials {
+			if callCred, ok := cred.(grpc.CallOption); ok {
+				log.Debug("Adding call option", "option", callCred)
+				callOpts = append(callOpts, callCred)
+			}
+		}
+		err = conn.Invoke(ctx, rt.Method, req, &resp, callOpts...)
+		if err != nil {
+			log.Debug("Invoke request failed", "error", err)
+			return nil, err
+		}
+		return &resp, nil
+	}
+	return nil, fmt.Errorf("no more addresses to dial")
+}
+
+func (rt *roundTripper[REQ, RESP]) Close() error {
+	rt.close()
+	return nil
+}
+
 type discoveryRoundTripper[REQ, RESP any] struct {
 	RoundTripOptions
 	transport transport.RPCTransport
@@ -91,7 +171,7 @@ func (rt *discoveryRoundTripper[REQ, RESP]) Close() error {
 }
 
 func (rt *discoveryRoundTripper[REQ, RESP]) RoundTrip(ctx context.Context, req *REQ) (*RESP, error) {
-	log := context.LoggerFrom(ctx).With("method", rt.RoundTripOptions.Method)
+	log := context.LoggerFrom(ctx).With("method", rt.Method)
 	ctx = context.WithLogger(ctx, log)
 	log.Debug("Attempting to dial node via libp2p")
 	conn, err := rt.transport.Dial(ctx, "", "")

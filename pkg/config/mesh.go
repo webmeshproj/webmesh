@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc"
@@ -61,6 +62,9 @@ type MeshOptions struct {
 	ZoneAwarenessID string `koanf:"zone-awareness-id,omitempty"`
 	// JoinAddresses are addresses of nodes to attempt to join.
 	JoinAddresses []string `koanf:"join-addresses,omitempty"`
+	// JoinMultiaddrs are multiaddresses to attempt to join over libp2p.
+	// These cannot be used with JoinAddresses.
+	JoinMultiaddrs []string `koanf:"join-multiaddrs,omitempty"`
 	// MaxJoinRetries is the maximum number of join retries.
 	MaxJoinRetries int `koanf:"max-join-retries,omitempty"`
 	// Routes are additional routes to advertise to the mesh. These routes are advertised to all peers.
@@ -128,6 +132,7 @@ func (o *MeshOptions) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.PrimaryEndpoint, prefix+"primary-endpoint", o.PrimaryEndpoint, "Primary endpoint to advertise when joining.")
 	fs.StringVar(&o.ZoneAwarenessID, prefix+"zone-awareness-id", o.ZoneAwarenessID, "Zone awareness ID.")
 	fs.StringSliceVar(&o.JoinAddresses, prefix+"join-addresses", o.JoinAddresses, "Addresses of nodes to join.")
+	fs.StringSliceVar(&o.JoinMultiaddrs, prefix+"join-multiaddrs", o.JoinMultiaddrs, "Multiaddresses of nodes to join.")
 	fs.IntVar(&o.MaxJoinRetries, prefix+"max-join-retries", o.MaxJoinRetries, "Maximum number of join retries.")
 	fs.StringSliceVar(&o.Routes, prefix+"routes", o.Routes, "Additional routes to advertise to the mesh.")
 	fs.StringSliceVar(&o.ICEPeers, prefix+"ice-peers", o.ICEPeers, "Peers to request direct edges to over ICE.")
@@ -158,12 +163,18 @@ func (o *MeshOptions) Validate() error {
 	if o.DisableIPv4 && o.DisableIPv6 {
 		return fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
-	if len(o.JoinAddresses) > 0 && o.MaxJoinRetries <= 0 {
+	if (len(o.JoinAddresses) > 0 || len(o.JoinMultiaddrs) > 0) && o.MaxJoinRetries <= 0 {
 		return fmt.Errorf("max join retries must be >= 0")
 	}
 	for _, addr := range o.JoinAddresses {
 		if _, _, err := net.SplitHostPort(addr); err != nil {
 			return fmt.Errorf("invalid join address: %w", err)
+		}
+	}
+	for _, addr := range o.JoinMultiaddrs {
+		_, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return fmt.Errorf("invalid join multiaddress: %w", err)
 		}
 	}
 	if o.RequestVote && o.RequestObserver {
@@ -563,6 +574,18 @@ func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn meshn
 			Credentials:    conn.Credentials(),
 			AddressTimeout: time.Second * 3,
 		}), nil
+	}
+	if len(o.Mesh.JoinMultiaddrs) > 0 {
+		joinTransport, err := libp2p.NewJoinRoundTripper(ctx, libp2p.RoundTripOptions{
+			Host:        host,
+			Multiaddrs:  libp2p.ToMultiaddrs(o.Mesh.JoinMultiaddrs),
+			HostOptions: o.Discovery.HostOptions(ctx, conn.Key()),
+			Credentials: conn.Credentials(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create libp2p join transport: %w", err)
+		}
+		return joinTransport, nil
 	}
 	if o.Discovery.Discover {
 		joinTransport, err := libp2p.NewDiscoveryJoinRoundTripper(ctx, libp2p.RoundTripOptions{

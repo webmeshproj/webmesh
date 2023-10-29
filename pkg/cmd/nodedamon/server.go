@@ -293,9 +293,7 @@ func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		conf.Discovery.Discover = true
 		conf.Discovery.Rendezvous = req.GetAddrs()[0]
 	case v1.ConnectRequest_MULTIADDR:
-		// TODO: Support regular multiaddrs.
-		// This will probably involve the daemon automatically running
-		// a libp2p host and using it for all mesh connections.
+		conf.Mesh.JoinMultiaddrs = req.GetAddrs()
 	}
 	switch req.GetAuthMethod() {
 	case v1.ConnectRequest_NO_AUTH:
