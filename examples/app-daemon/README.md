@@ -14,3 +14,10 @@ To start the daemon process, run the following command:
 ```bash
 docker-compose up
 ```
+
+This will start the daemon process with the following ports exposed.
+
+| Port | Description |
+| ---- | ----------- |
+| 8080 | gRPC UI     |
+| 8081 | gRPC API    |
