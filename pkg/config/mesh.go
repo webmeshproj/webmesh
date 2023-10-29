@@ -447,6 +447,11 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 			}
 			bootstrapServers = append(bootstrapServers, id)
 		}
+		disableRBAC := o.Bootstrap.DisableRBAC
+		if o.Auth.IsEmpty() {
+			// If we have no auth, we must disable RBAC when bootstrapping
+			disableRBAC = true
+		}
 		bootstrap = &meshnode.BootstrapOptions{
 			Transport:            rt,
 			IPv4Network:          o.Bootstrap.IPv4Network,
@@ -455,7 +460,7 @@ func (o *Config) NewConnectOptions(ctx context.Context, conn meshnode.Node, prov
 			Admin:                o.Bootstrap.Admin,
 			Servers:              bootstrapServers,
 			Voters:               o.Bootstrap.Voters,
-			DisableRBAC:          o.Bootstrap.DisableRBAC,
+			DisableRBAC:          disableRBAC,
 			DefaultNetworkPolicy: o.Bootstrap.DefaultNetworkPolicy,
 			Force:                o.Bootstrap.Force,
 		}

@@ -76,10 +76,7 @@ type IDAuthOptions struct {
 
 // IsEmpty returns true if the options are empty.
 func (o *IDAuthOptions) IsEmpty() bool {
-	if !o.Enabled {
-		return true
-	}
-	return o.Alias == ""
+	return !o.Enabled
 }
 
 // MTLSOptions are options for mutual TLS.
