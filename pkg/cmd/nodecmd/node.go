@@ -29,7 +29,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/bridgecmd"
-	nodedaemon "github.com/webmeshproj/webmesh/pkg/cmd/nodedamon"
+	"github.com/webmeshproj/webmesh/pkg/cmd/daemoncmd"
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/embed"
@@ -48,7 +48,7 @@ var (
 	shutdownTimeout = flagset.Duration("shutdown-timeout", 0, "Timeout for shutting down the node (default: no timeout)")
 
 	conf       = config.NewDefaultConfig("").BindFlags("", flagset)
-	daemonconf = nodedaemon.NewDefaultConfig().BindFlags("daemon.", flagset)
+	daemonconf = daemoncmd.NewDefaultConfig().BindFlags("daemon.", flagset)
 )
 
 func Execute() error {
@@ -98,7 +98,7 @@ func Execute() error {
 		if err := daemonconf.Validate(); err != nil {
 			return err
 		}
-		return nodedaemon.Run(context.Background(), *daemonconf)
+		return daemoncmd.Run(context.Background(), *daemonconf)
 	}
 	// Apply globals
 	conf, err = conf.Global.ApplyGlobals(ctx, conf)

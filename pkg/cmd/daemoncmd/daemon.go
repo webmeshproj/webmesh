@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package nodedaemon contains the entrypoint for webmesh nodes running as an application daemon.
-package nodedaemon
+// Package daemoncmd contains the entrypoint for webmesh nodes running as an application daemon.
+package daemoncmd
 
 import (
 	"fmt"

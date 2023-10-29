@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package nodecmd contains the entrypoint for webmesh nodes.
-package nodedaemon
+package daemoncmd
 
 import (
 	"encoding/base64"
