@@ -18,9 +18,6 @@ volumes:
 services:
   bootstrap-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       simple:
         ipv4_address: 10.1.0.2

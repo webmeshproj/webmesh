@@ -25,9 +25,6 @@ networks:
 services:
   site-1-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site1:
         ipv4_address: 10.1.0.2
@@ -57,9 +54,6 @@ services:
 
   site-2-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site2:
         ipv4_address: 10.2.0.2
@@ -85,9 +79,6 @@ services:
 
   bridge-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       site1:
         ipv4_address: 10.1.0.3

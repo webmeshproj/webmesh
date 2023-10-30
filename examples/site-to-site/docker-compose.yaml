@@ -28,8 +28,6 @@ services:
 
   site-1-leader:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
     networks:
       public-net:
         ipv4_address: 10.250.0.1

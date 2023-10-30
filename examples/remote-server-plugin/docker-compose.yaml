@@ -12,9 +12,6 @@ networks:
 services:
   bootstrap-node:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       simple:
     hostname: bootstrap-node

@@ -11,9 +11,6 @@ networks:
 services:
   bootstrap-node-1:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
     networks:
       bootstrap:
         ipv4_address: 10.1.0.1
