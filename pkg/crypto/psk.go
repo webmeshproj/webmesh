@@ -60,7 +60,7 @@ func IsValidPSKBytes(b []byte, length int) bool {
 
 // NewRandomID returns a new random ID.
 func NewRandomID() (string, error) {
-	id, err := GeneratePSKWithLength(16)
+	id, err := GeneratePSKWithLength(14)
 	if err != nil {
 		return "", err
 	}

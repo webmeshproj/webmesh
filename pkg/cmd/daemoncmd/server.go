@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"sync"
 
 	"github.com/bufbuild/protovalidate-go"
@@ -111,7 +112,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	}
 	app.mu.RUnlock()
 	app.log.Info("Creating new node with ID", "id", connID)
-	cfg := app.buildConnConfig(ctx, req)
+	cfg := app.buildConnConfig(ctx, req, connID)
 	app.log.Debug("Node configuration", "config", cfg, "id", connID)
 	node, err := embed.NewNode(ctx, embed.Options{
 		Config: cfg,
@@ -263,10 +264,14 @@ func (app *AppDaemon) Close() error {
 	return nil
 }
 
-func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectRequest) *config.Config {
+func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectRequest, connID string) *config.Config {
 	conf := config.NewDefaultConfig(app.nodeID.String())
 	conf.Storage.InMemory = true
 	conf.WireGuard.ListenPort = 0
+	if runtime.GOOS != "darwin" {
+		// Set a unique interface name on non-darwin systems.
+		conf.WireGuard.InterfaceName = connID + "0"
+	}
 	conf.Global.LogLevel = app.conf.LogLevel
 	conf.Global.LogFormat = app.conf.LogFormat
 	conf.Storage.LogLevel = app.conf.LogLevel
