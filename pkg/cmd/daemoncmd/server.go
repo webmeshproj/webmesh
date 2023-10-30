@@ -294,6 +294,8 @@ func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyAccept)
 		case v1.MeshConnBootstrap_DROP:
 			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyDrop)
+		default:
+			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyAccept)
 		}
 	}
 	conf.TLS.Insecure = !req.GetTls().GetEnabled()
