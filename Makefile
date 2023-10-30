@@ -95,10 +95,11 @@ TEST_PARALLELISM := $(WIN_TEST_PARALLELISM)
 endif
 
 COVERAGE_FILE ?= coverage.out
-TEST_ARGS ?= -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLELISM)
+TEST_ARGS     ?= -v -cover -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic -parallel=$(TEST_PARALLELISM)
+CGO_ENABLED   ?= 0
 
 test: ## Run unit tests.
-	$(GO) run github.com/kyoh86/richgo@v0.3.12 test $(TEST_ARGS) ./...
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) run github.com/kyoh86/richgo@v0.3.12 test $(TEST_ARGS) ./...
 	$(GO) tool cover -func=$(COVERAGE_FILE)
 
 LINT_TIMEOUT := 10m

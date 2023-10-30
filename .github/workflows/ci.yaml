@@ -86,6 +86,8 @@ jobs:
             ~/.cache/go-build
 
       - name: Run Unit Tests
+        env:
+          CGO_ENABLED: ${{ matrix.os == 'windows-latest' && '1' || '0' }}
         run: make ci-test
 
   build-binaries:
