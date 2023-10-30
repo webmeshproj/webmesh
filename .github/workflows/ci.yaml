@@ -87,7 +87,7 @@ jobs:
 
       - name: Run Unit Tests
         env:
-          CGO_ENABLED: ${{ matrix.os == 'windows-latest' && '1' || '0' }}
+          CGO_ENABLED: 1
         run: make ci-test
 
   build-binaries:
