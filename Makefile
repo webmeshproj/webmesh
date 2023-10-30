@@ -1,5 +1,3 @@
-SHELL := /bin/bash
-
 NAME  ?= node
 CTL   ?= wmctl
 REPO  ?= ghcr.io/webmeshproj

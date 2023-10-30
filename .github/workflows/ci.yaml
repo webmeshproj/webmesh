@@ -19,7 +19,7 @@ env:
   BUILD_PLATFORM: self-hosted
   BUILD_PARALLELISM: 8
   TEST_PARALLELISM: 8
-  WIN_TEST_PARALLELISM: 2
+  WIN_TEST_PARALLELISM: 4
   COSIGN_EXPERIMENTAL: 1
   RICHGO_FORCE_COLOR: 1
 
@@ -45,7 +45,7 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout ${{ env.LINT_TIMEOUT }}
-          skip-cache: ${{ vars.LINUX_TEST_PLATFORM == 'self-hosted' }}
+          skip-cache: ${{ startswith(vars.LINUX_TEST_PLATFORM, 'self-hosted') }}
 
   tests:
     name: Unit Tests
@@ -53,7 +53,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && vars.LINUX_TEST_PLATFORM || matrix.os }}
+        include:
+          - os: ubuntu-latest
+            test-platform: ${{ vars.LINUX_TEST_PLATFORM == '' && 'ubuntu-latest' || vars.LINUX_TEST_PLATFORM }}
+          - os: macos-latest
+            test-platform: macos-latest
+          - os: windows-latest
+            test-platform: ${{ vars.WINDOWS_TEST_PLATFORM == '' && 'windows-latest' || vars.WINDOWS_TEST_PLATFORM }}
+    runs-on: ${{ matrix.test-platform }}
     permissions:
       contents: "read"
     steps:
@@ -69,17 +76,16 @@ jobs:
 
       - name: Setup Test Cache
         uses: actions/cache@v3
-        if: ${{ vars.LINUX_TEST_PLATFORM != 'self-hosted' || matrix.os != 'ubuntu-latest' }}
+        if: ${{ !startswith(matrix.test-platform, 'self-hosted') }}
         with:
-          key: ${{ runner.os }}-ci-tests-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
-          restore-keys: ${{ runner.os }}-ci-tests-go-${{ env.GO_VERSION }}-
+          key: ${{ matrix.os }}-ci-tests-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
+          restore-keys: ${{ matrix.os }}-ci-tests-go-${{ env.GO_VERSION }}-
           path: |
             ~/go/pkg
             ~/go/bin
             ~/.cache/go-build
 
       - name: Run Unit Tests
-        shell: bash
         run: make ci-test
 
   build-binaries:
@@ -105,7 +111,7 @@ jobs:
 
       - name: Setup Build Cache
         uses: actions/cache@v3
-        if: ${{ vars.BUILD_PLATFORM != 'self-hosted' }}
+        if: ${{ !startswith(vars.BUILD_PLATFORM, 'self-hosted') }}
         with:
           key: ${{ runner.os }}-binaries-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
           restore-keys: ${{ runner.os }}-binaries-go-${{ env.GO_VERSION }}-
@@ -175,7 +181,7 @@ jobs:
 
       - name: Setup Build Cache
         uses: actions/cache@v3
-        if: ${{ vars.BUILD_PLATFORM == '' }}
+        if: ${{ !startswith(vars.BUILD_PLATFORM, 'self-hosted') }}
         with:
           key: ${{ runner.os }}-containers-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
           restore-keys: ${{ runner.os }}-containers-go-${{ env.GO_VERSION }}-
