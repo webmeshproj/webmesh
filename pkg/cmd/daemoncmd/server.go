@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"runtime"
 	"sync"
 
@@ -267,6 +268,10 @@ func (app *AppDaemon) Close() error {
 func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectRequest, connID string) *config.Config {
 	conf := config.NewDefaultConfig(app.nodeID.String())
 	conf.Storage.InMemory = true
+	if app.conf.Persistence.Path != "" {
+		conf.Storage.InMemory = false
+		conf.Storage.Path = filepath.Join(app.conf.Persistence.Path, connID)
+	}
 	conf.WireGuard.ListenPort = 0
 	if runtime.GOOS != "darwin" {
 		// Set a unique interface name on non-darwin systems.

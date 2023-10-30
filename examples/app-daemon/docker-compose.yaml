@@ -12,6 +12,9 @@ networks:
         - subnet: 2001:db8:3200::/64
           gateway: 2001:db8:3200::1
 
+volumes:
+  webmesh-data:
+
 services:
   daemon:
     image: ${IMAGE:-ghcr.io/webmeshproj/node:latest}
@@ -25,7 +28,9 @@ services:
       - --daemon.bind=[::]:8081
       - --daemon.ui.enabled=true
       - --daemon.ui.listen-address=[::]:8080
+      - --daemon.persistence.path=/data
     volumes:
+      - webmesh-data:/data
       - /dev/net/tun:/dev/net/tun
       - /lib/modules:/lib/modules
     cap_add: ["NET_ADMIN", "NET_RAW", "SYS_MODULE"]

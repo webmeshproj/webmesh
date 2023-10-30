@@ -48,6 +48,8 @@ type Config struct {
 	GRPCWeb bool `koanf:"grpc-web"`
 	// UI are options for exposing a gRPC UI.
 	UI WebUI `koanf:"ui"`
+	// Persistence are options for persisting mesh data.
+	Persistence Persistence `koanf:"persistence"`
 	// LogLevel is the log level for the daemon.
 	LogLevel string `koanf:"log-level"`
 	// LogFormat is the log format for the daemon.
@@ -60,6 +62,13 @@ type WebUI struct {
 	Enabled bool `koanf:"enabled"`
 	// ListenAddress is the address to listen on.
 	ListenAddress string `koanf:"listen-address"`
+}
+
+// Persistence is configuration for persistence of mesh connection storage.
+type Persistence struct {
+	// Path is the root path to store mesh connection data.
+	// Each connection will receive its own subdirectory.
+	Path string `koanf:"path"`
 }
 
 // NewDefaultConfig returns the default configuration.
@@ -93,6 +102,7 @@ func (conf *Config) BindFlags(prefix string, flagset *pflag.FlagSet) *Config {
 	flagset.StringVar(&conf.LogLevel, prefix+"log-level", conf.LogLevel, "Log level for the application daemon")
 	flagset.StringVar(&conf.LogFormat, prefix+"log-format", conf.LogFormat, "Log format for the application daemon")
 	conf.UI.BindFlags(prefix+"ui.", flagset)
+	conf.Persistence.BindFlags(prefix+"persistence.", flagset)
 	return conf
 }
 
@@ -100,6 +110,11 @@ func (conf *Config) BindFlags(prefix string, flagset *pflag.FlagSet) *Config {
 func (conf *WebUI) BindFlags(prefix string, flagset *pflag.FlagSet) {
 	flagset.BoolVar(&conf.Enabled, prefix+"enabled", conf.Enabled, "Enable the gRPC UI")
 	flagset.StringVar(&conf.ListenAddress, prefix+"listen-address", conf.ListenAddress, "Address to listen on for the gRPC UI")
+}
+
+// BindFlags binds the persistence flags to the given flagset.
+func (conf *Persistence) BindFlags(prefix string, flagset *pflag.FlagSet) {
+	flagset.StringVar(&conf.Path, prefix+"path", conf.Path, "Root path to store mesh connection data")
 }
 
 // Validate validates the configuration.
