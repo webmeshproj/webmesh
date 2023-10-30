@@ -115,7 +115,7 @@ Connect:
 	}
 	// Send the initial request over the wire
 	err = neg.Send(&v1.StartDataChannelRequest{
-		NodeId: rt.NodeID,
+		NodeID: rt.NodeID,
 		Proto:  rt.TargetProto,
 		Dst:    rt.TargetAddr.Addr().String(),
 		Port:   uint32(rt.TargetAddr.Port()),
@@ -179,7 +179,7 @@ func (rt *webrtcSignalTransport) SendDescription(ctx context.Context, desc webrt
 	}
 	context.LoggerFrom(ctx).Debug("Sending SDP description", "description", string(b))
 	err = rt.stream.Send(&v1.StartDataChannelRequest{
-		NodeId: rt.NodeID,
+		NodeID: rt.NodeID,
 		Proto:  rt.TargetProto,
 		Dst:    rt.TargetAddr.Addr().String(),
 		Port:   uint32(rt.TargetAddr.Port()),
@@ -205,7 +205,7 @@ func (rt *webrtcSignalTransport) SendCandidate(ctx context.Context, candidate we
 	}
 	context.LoggerFrom(ctx).Debug("Sending ICE candidate", "candidate", string(b))
 	err = rt.stream.Send(&v1.StartDataChannelRequest{
-		NodeId:    rt.NodeID,
+		NodeID:    rt.NodeID,
 		Proto:     rt.TargetProto,
 		Dst:       rt.TargetAddr.Addr().String(),
 		Port:      uint32(rt.TargetAddr.Port()),

@@ -76,11 +76,11 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 	}
 	log = log.With(slog.Any("request", r))
 	log.Info("Received data channel request")
-	if r.GetNodeId() == "" {
+	if r.GetNodeID() == "" {
 		log.Error("Request has empty node ID")
 		return status.Error(codes.InvalidArgument, "node ID must be provided in request")
 	}
-	allowed, err := s.rbacEval.Evaluate(stream.Context(), canNegDataChannelAction.For(r.GetNodeId()))
+	allowed, err := s.rbacEval.Evaluate(stream.Context(), canNegDataChannelAction.For(r.GetNodeID()))
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to evaluate data channel permissions: %v", err)
 	}
@@ -103,7 +103,7 @@ func (s *Server) StartDataChannel(stream v1.WebRTC_StartDataChannelServer) error
 		log.Error("Request has invalid port")
 		return status.Error(codes.InvalidArgument, "invalid port provided in request")
 	}
-	if r.GetNodeId() == s.opts.ID.String() {
+	if r.GetNodeID() == s.opts.ID.String() {
 		// We are the destination node.
 		return s.handleLocalNegotiation(log, stream, r, remoteAddr)
 	}
@@ -227,7 +227,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	var conn *grpc.ClientConn
 	var err error
 	for tries < maxRetries {
-		conn, err = s.opts.NodeDialer.DialNode(clientStream.Context(), types.NodeID(r.GetNodeId()))
+		conn, err = s.opts.NodeDialer.DialNode(clientStream.Context(), types.NodeID(r.GetNodeID()))
 		if err == nil {
 			break
 		}
