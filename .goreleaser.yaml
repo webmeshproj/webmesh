@@ -71,34 +71,8 @@ builds:
       - mipsle
       - mips
 
-  - id: node-docker-linux
-    main: cmd/webmesh-node/main.go
-    binary: webmesh-node
-    env:
-      - CGO_ENABLED=0
-    tags:
-      - osusergo
-      - netgo
-    flags:
-      - -trimpath
-    ldflags:
-      - -s 
-      - -w 
-      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
-      - -X github.com/webmeshproj/webmesh/pkg/version.GitCommit={{.Commit}}
-      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
-    goos:
-      - linux
-    goarch:
-      - amd64
-      - arm64
-      - arm
-      - '386'
-      - ppc64le
-      - s390x
-
 upx:
-  - ids: [node, node-docker-linux]
+  - ids: [node]
     enabled: true
     compress: best
     lzma: true

@@ -90,8 +90,8 @@ jobs:
           CGO_ENABLED: 1
         run: make ci-test
 
-  build-binaries:
-    name: Build Binary Artifacts
+  build:
+    name: Build Artifacts
     runs-on: ${{ vars.BUILD_PLATFORM == '' && 'ubuntu-latest' || vars.BUILD_PLATFORM }}
     needs: [lint, tests]
     permissions:
@@ -111,6 +111,15 @@ jobs:
           check-latest: true
           cache: false
 
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@main
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Setup Build Cache
         uses: actions/cache@v3
         if: ${{ !startswith(vars.BUILD_PLATFORM, 'self-hosted') }}
@@ -121,8 +130,18 @@ jobs:
             ~/go/pkg
             ~/.cache/go-build
 
-      - name: Setup Cosign
-        uses: sigstore/cosign-installer@main
+      - name: Compute Image Tags
+        shell: bash
+        id: image-tags
+        run: |
+          ALPINE_IMAGES="${{ env.ALPINE_IMAGE_NAME }}:latest,${{ env.ALPINE_IMAGE_NAME }}:${{ github.sha }}"
+          DISTROLESS_IMAGES="${{ env.DISTROLESS_IMAGE_NAME }}:latest,${{ env.DISTROLESS_IMAGE_NAME }}:${{ github.sha }}"
+          if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
+              ALPINE_IMAGES+=",${{ env.ALPINE_IMAGE_NAME }}:${{ github.ref_name }}"
+              DISTROLESS_IMAGES+=",${{ env.DISTROLESS_IMAGE_NAME }}:${{ github.ref_name }}"
+          fi
+          echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
+          echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
 
       - name: Run Snapshot Release
         uses: goreleaser/goreleaser-action@v5
@@ -146,87 +165,6 @@ jobs:
           version: latest
           args: release --clean --fail-fast --parallelism=${{ env.BUILD_PARALLELISM }}
 
-      - name: Update AUR Packages
-        shell: bash
-        if: ${{ vars.BUILD_PLATFORM == 'self-hosted' && startsWith(github.ref, 'refs/tags/v') }}
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: |
-          set -ex
-          git clone ssh://aur@aur.archlinux.org/webmesh-git.git
-          git clone ssh://aur@aur.archlinux.org/webmesh-bin.git
-          cd webmesh-git
-          make all publish
-          cd ../webmesh-bin
-          make all publish
-
-  build-containers:
-    name: Build Containers
-    runs-on: ${{ vars.BUILD_PLATFORM == '' && 'ubuntu-latest' || vars.BUILD_PLATFORM }}
-    needs: [lint, tests]
-    permissions:
-      contents: "write"
-      id-token: "write"
-      packages: "write"
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          check-latest: true
-          cache: false
-
-      - name: Setup Build Cache
-        uses: actions/cache@v3
-        if: ${{ !startswith(vars.BUILD_PLATFORM, 'self-hosted') }}
-        with:
-          key: ${{ runner.os }}-containers-go-${{ env.GO_VERSION }}-${{ hashFiles(env.CACHE_DEP_PATH) }}
-          restore-keys: ${{ runner.os }}-containers-go-${{ env.GO_VERSION }}-
-          path: |
-            ~/go/pkg
-            ~/.cache/go-build
-
-      - name: Setup Cosign
-        uses: sigstore/cosign-installer@main
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Setup Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Compute Image Tags
-        shell: bash
-        id: image-tags
-        run: |
-          ALPINE_IMAGES="${{ env.ALPINE_IMAGE_NAME }}:latest,${{ env.ALPINE_IMAGE_NAME }}:${{ github.sha }}"
-          DISTROLESS_IMAGES="${{ env.DISTROLESS_IMAGE_NAME }}:latest,${{ env.DISTROLESS_IMAGE_NAME }}:${{ github.sha }}"
-          if [[ ${{ github.ref }} =~ ^refs/tags/v.* ]] ; then
-              ALPINE_IMAGES+=",${{ env.ALPINE_IMAGE_NAME }}:${{ github.ref_name }}"
-              DISTROLESS_IMAGES+=",${{ env.DISTROLESS_IMAGE_NAME }}:${{ github.ref_name }}"
-          fi
-          echo "alpine-images=${ALPINE_IMAGES}" >> "${GITHUB_OUTPUT}"
-          echo "distroless-images=${DISTROLESS_IMAGES}" >> "${GITHUB_OUTPUT}"
-
-      - name: Run Snapshot Container Release
-        uses: goreleaser/goreleaser-action@v5
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        with:
-          version: latest
-          args: build --snapshot --clean --id node-docker-linux --parallelism=${{ env.BUILD_PARALLELISM }}
-
-      - name: Run Container Release
-        uses: goreleaser/goreleaser-action@v5
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        with:
-          version: latest
-          args: build --clean --id node-docker-linux --parallelism=${{ env.BUILD_PARALLELISM }}
-
       - name: Login to GHCR
         uses: docker/login-action@v3
         if: ${{ github.event_name != 'pull_request' }}
@@ -243,7 +181,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.image-tags.outputs.alpine-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
-          build-args: PREFIX=node-docker-linux
 
       - name: Build Distroless Container Images
         uses: docker/build-push-action@v5
@@ -254,10 +191,23 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.image-tags.outputs.distroless-images }}
           platforms: ${{ env.DOCKER_PLATFORMS }}
-          build-args: PREFIX=node-docker-linux
 
       - name: Sign Container Images
         if: ${{ github.event_name != 'pull_request' }}
         run: |
           cosign sign --yes --recursive ${{ env.ALPINE_IMAGE_NAME }}@${{ steps.alpine-build.outputs.digest }}
           cosign sign --yes --recursive ${{ env.DISTROLESS_IMAGE_NAME }}@${{ steps.distroless-build.outputs.digest }}
+
+      - name: Update AUR Packages
+        shell: bash
+        if: ${{ vars.BUILD_PLATFORM == 'self-hosted' && startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -ex
+          git clone ssh://aur@aur.archlinux.org/webmesh-git.git
+          git clone ssh://aur@aur.archlinux.org/webmesh-bin.git
+          cd webmesh-git
+          make all publish
+          cd ../webmesh-bin
+          make all publish

@@ -44,7 +44,6 @@ DOCKER ?= docker
 docker-build: docker-build-bin ## Build the node docker image for the current architecture.
 	$(DOCKER) build \
 		-f Dockerfile \
-		--build-arg PREFIX=node-docker-linux \
 		--build-arg TARGETOS=linux \
 		--build-arg TARGETARCH=$(ARCH) \
 		-t $(IMAGE) .
@@ -52,13 +51,12 @@ docker-build: docker-build-bin ## Build the node docker image for the current ar
 docker-build-distroless: docker-build-bin ## Build the distroless node docker image for the current architecture.
 	$(DOCKER) build \
 		-f Dockerfile.distroless \
-		--build-arg PREFIX=node-docker-linux \
 		--build-arg TARGETOS=linux \
 		--build-arg TARGETARCH=$(ARCH) \
 		-t $(DISTROLESS_IMAGE) .
 
 docker-build-bin:
-	$(GORELEASER) build $(BUILD_ARGS) --id node-docker-linux --single-target
+	$(GORELEASER) build $(BUILD_ARGS) --id node --single-target
 
 docker-push: docker-build ## Push the node docker image
 	$(DOCKER) push $(IMAGE)
