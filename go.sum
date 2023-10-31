@@ -1574,6 +1574,10 @@ github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSD
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
 github.com/webmeshproj/api v0.10.2 h1:3LQPB9A1s1o3NSQX2JlAzY1stncIcrOWa4q/QjaaU6I=
 github.com/webmeshproj/api v0.10.2/go.mod h1:lFGd4eyG9wr0mQiAJxQDBJ6VwEe5EC0AXKZjTv6ZA3U=
+github.com/webmeshproj/api v0.10.3-0.20231031205806-7856e0fd9bc9 h1:zqY0m6KmnkvQMQyufYdAcr+8sKhW1VU7x1UhKB+X2Hs=
+github.com/webmeshproj/api v0.10.3-0.20231031205806-7856e0fd9bc9/go.mod h1:lFGd4eyG9wr0mQiAJxQDBJ6VwEe5EC0AXKZjTv6ZA3U=
+github.com/webmeshproj/api v0.10.3-0.20231031221208-c2360b23a13f h1:jsa1nuNob2JZLo1CyseSZ84O3+I2NbPu7Z1jy8PiPrE=
+github.com/webmeshproj/api v0.10.3-0.20231031221208-c2360b23a13f/go.mod h1:lFGd4eyG9wr0mQiAJxQDBJ6VwEe5EC0AXKZjTv6ZA3U=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1/go.mod h1:8UvriyWtv5Q5EOgjHaSseUEdkQfvwFv1I/In/O2M9gc=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=

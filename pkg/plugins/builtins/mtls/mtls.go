@@ -20,6 +20,7 @@ package mtls
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"os"
 
@@ -46,16 +47,22 @@ type Config struct {
 	// If not provided, the system pool and any intermediate chains provided
 	// in the authentication request will be used.
 	CAFile string `koanf:"ca-file" mapstructure:"ca-file"`
+	// CAData is the base64 encoded PEM CA data to use to verify client certificates.
+	// If not provided, the system pool and any intermediate chains provided
+	// in the authentication request will be used.
+	CAData string `koanf:"ca-data" mapstructure:"ca-data"`
 }
 
 // BindFlags binds the plugin flags to the given flag set.
 func (c *Config) BindFlags(prefix string, fs *pflag.FlagSet) {
 	fs.StringVar(&c.CAFile, prefix+"ca-file", "", "Path to a CA file to use to verify client certificates.")
+	fs.StringVar(&c.CAData, prefix+"ca-data", "", "Base64 encoded PEM CA data to use to verify client certificates.")
 }
 
 func (c *Config) AsMapStructure() map[string]any {
 	return map[string]any{
 		"ca-file": c.CAFile,
+		"ca-data": c.CAData,
 	}
 }
 
@@ -85,7 +92,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		return nil, err
 	}
-	if config.CAFile == "" {
+	if config.CAFile == "" && config.CAData == "" {
 		return nil, fmt.Errorf("ca-file is required")
 	}
 	p.config = &tls.Config{}
@@ -93,13 +100,25 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 	if err != nil {
 		roots = x509.NewCertPool()
 	}
-	data, err := os.ReadFile(config.CAFile)
-	if err != nil {
-		return nil, err
+	if config.CAFile != "" {
+		data, err := os.ReadFile(config.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		ok := roots.AppendCertsFromPEM(data)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse CA file %q", config.CAFile)
+		}
 	}
-	ok := roots.AppendCertsFromPEM(data)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse CA file %q", config.CAFile)
+	if config.CAData != "" {
+		data, err := base64.StdEncoding.DecodeString(config.CAData)
+		if err != nil {
+			return nil, err
+		}
+		ok := roots.AppendCertsFromPEM(data)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse CA data")
+		}
 	}
 	p.config.ClientCAs = roots
 	return &emptypb.Empty{}, nil

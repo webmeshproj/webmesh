@@ -281,7 +281,6 @@ func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 	conf.Global.LogFormat = app.conf.LogFormat
 	conf.Storage.LogLevel = app.conf.LogLevel
 	conf.Storage.LogFormat = app.conf.LogFormat
-	conf.Services.API.Disabled = !req.GetServices().GetEnabled()
 	conf.Bootstrap.Enabled = req.GetBootstrap().GetEnabled()
 	if conf.Bootstrap.Enabled {
 		conf.Bootstrap.Admin = app.nodeID.String()
@@ -321,18 +320,67 @@ func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		conf.Mesh.JoinMultiaddrs = req.GetAddrs()
 	}
 	switch req.GetAuthMethod() {
-	case v1.ConnectRequest_NO_AUTH:
-	case v1.ConnectRequest_BASIC:
+	case v1.NetworkAuthMethod_NO_AUTH:
+	case v1.NetworkAuthMethod_BASIC:
 		conf.Auth.Basic.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_USERNAME.String()])
 		conf.Auth.Basic.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_PASSWORD.String()])
-	case v1.ConnectRequest_LDAP:
+	case v1.NetworkAuthMethod_LDAP:
 		conf.Auth.LDAP.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()])
 		conf.Auth.LDAP.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()])
-	case v1.ConnectRequest_MTLS:
+	case v1.NetworkAuthMethod_MTLS:
 		conf.Auth.MTLS.CertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
 		conf.Auth.MTLS.KeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
-	case v1.ConnectRequest_ID:
+	case v1.NetworkAuthMethod_ID:
 		conf.Auth.IDAuth.Enabled = true
+	}
+	conf.Services.API.Disabled = !req.GetServices().GetEnabled()
+	if !conf.Services.API.Disabled {
+		conf.Services.API.DisableLeaderProxy = true
+		conf.Services.API.ListenAddress = req.GetServices().GetListenAddress()
+		conf.Services.API.LibP2P.Enabled = req.GetServices().GetEnableLibP2P()
+		conf.Services.API.LibP2P.LocalAddrs = req.GetServices().GetListenMultiaddrs()
+		conf.Services.API.LibP2P.Rendezvous = req.GetServices().GetRendezvous()
+		if len(conf.Services.API.LibP2P.Rendezvous) > 0 {
+			conf.Services.API.LibP2P.Announce = true
+		}
+		conf.Services.API.Insecure = !req.GetServices().GetEnableTLS()
+		if len(req.GetTls().GetCertData()) != 0 {
+			conf.Services.API.TLSCertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
+		}
+		if len(req.GetTls().GetKeyData()) != 0 {
+			conf.Services.API.TLSKeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
+		}
+		conf.Plugins.Configs = make(map[string]config.PluginConfig)
+		switch req.GetServices().GetAuthMethod() {
+		case v1.NetworkAuthMethod_NO_AUTH:
+		case v1.NetworkAuthMethod_ID:
+			conf.Plugins.Configs["id-auth"] = config.PluginConfig{
+				Config: map[string]any{}, // TODO: Support ID auth configurations.
+			}
+		case v1.NetworkAuthMethod_MTLS:
+			conf.Plugins.Configs["mtls"] = config.PluginConfig{
+				Config: map[string]any{
+					"ca-data": base64.StdEncoding.EncodeToString(req.GetTls().GetCaCertData()),
+				},
+			}
+		}
+		for _, feature := range req.GetServices().GetFeatures() {
+			switch feature {
+			case v1.Feature_LEADER_PROXY:
+				conf.Services.API.DisableLeaderProxy = false
+			case v1.Feature_MESH_API:
+				conf.Services.API.MeshEnabled = true
+			case v1.Feature_ADMIN_API:
+				conf.Services.API.AdminEnabled = true
+			case v1.Feature_MEMBERSHIP:
+				conf.Mesh.RequestVote = true
+			case v1.Feature_ICE_NEGOTIATION:
+				conf.Services.WebRTC.Enabled = true
+				// TODO: Support custom STUN servers
+			case v1.Feature_STORAGE_QUERIER:
+				conf.Mesh.RequestObserver = true
+			}
+		}
 	}
 	return conf
 }
