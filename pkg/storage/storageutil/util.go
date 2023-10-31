@@ -46,16 +46,21 @@ func ServeStorageQuery(ctx context.Context, db storage.Provider, req *v1.QueryRe
 	}
 	switch req.GetCommand() {
 	case v1.QueryRequest_GET:
-		return doGetQuery(ctx, db, query)
+		return doGetQuery(ctx, db, query), nil
 	case v1.QueryRequest_LIST:
-		return doListQuery(ctx, db, query)
+		return doListQuery(ctx, db, query), nil
+	case v1.QueryRequest_PUT:
+		return doPutQuery(ctx, db, query), nil
+	case v1.QueryRequest_DELETE:
+		return doDeleteQuery(ctx, db, query), nil
 	default:
 		return nil, fmt.Errorf("%w: unknown query command %s", ErrInvalidQuery, req.GetCommand().String())
 	}
 }
 
-func doGetQuery(ctx context.Context, db storage.Provider, req types.StorageQuery) (res *v1.QueryResponse, err error) {
+func doGetQuery(ctx context.Context, db storage.Provider, req types.StorageQuery) (res *v1.QueryResponse) {
 	res = &v1.QueryResponse{}
+	var err error
 	switch req.GetType() {
 	case v1.QueryRequest_VALUE:
 		// Legacy requests need to be handled here.
@@ -104,7 +109,7 @@ func doGetQuery(ctx context.Context, db storage.Provider, req types.StorageQuery
 			peer, err = db.MeshDB().Peers().Get(ctx, types.NodeID(id))
 			if err != nil {
 				res.Error = err.Error()
-				return res, err
+				return
 			}
 			out, err = peer.MarshalProtoJSON()
 			if err != nil {
@@ -285,13 +290,13 @@ func doGetQuery(ctx context.Context, db storage.Provider, req types.StorageQuery
 	// Fallthrough not found for multi-select queries.
 	if len(res.Items) == 0 {
 		res.Error = errors.ErrNotFound.Error()
-		return res, errors.ErrNotFound
 	}
 	return
 }
 
-func doListQuery(ctx context.Context, db storage.Provider, req types.StorageQuery) (res *v1.QueryResponse, err error) {
+func doListQuery(ctx context.Context, db storage.Provider, req types.StorageQuery) (res *v1.QueryResponse) {
 	res = &v1.QueryResponse{}
+	var err error
 	switch req.GetType() {
 	case v1.QueryRequest_VALUE:
 		// Support legacy iter queries.
@@ -504,6 +509,143 @@ func doListQuery(ctx context.Context, db storage.Provider, req types.StorageQuer
 		res.Error = err.Error()
 		return
 	}
+	return
+}
 
+func doPutQuery(ctx context.Context, db storage.Provider, req types.StorageQuery) (res *v1.QueryResponse) {
+	res = &v1.QueryResponse{}
+	switch req.GetType() {
+	case v1.QueryRequest_VALUE:
+
+	case v1.QueryRequest_PEERS:
+
+	case v1.QueryRequest_EDGES:
+
+	case v1.QueryRequest_ROUTES:
+
+	case v1.QueryRequest_ACLS:
+
+	case v1.QueryRequest_ROLES:
+
+	case v1.QueryRequest_ROLEBINDINGS:
+
+	case v1.QueryRequest_GROUPS:
+
+	case v1.QueryRequest_NETWORK_STATE:
+
+	case v1.QueryRequest_RBAC_STATE:
+
+	default:
+	}
+	return
+}
+
+func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQuery) (res *v1.QueryResponse) {
+	res = &v1.QueryResponse{}
+	switch req.GetType() {
+	case v1.QueryRequest_VALUE:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing id", ErrInvalidArgument).Error()
+			return
+		}
+		err := db.MeshStorage().Delete(ctx, []byte(id))
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	case v1.QueryRequest_PEERS:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing id", ErrInvalidArgument).Error()
+			return
+		}
+		err := db.MeshDB().Peers().Delete(ctx, types.NodeID(id))
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	case v1.QueryRequest_EDGES:
+		source, ok := req.Filters().GetSourceNodeID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing source id", ErrInvalidArgument).Error()
+			return
+		}
+		target, ok := req.Filters().GetTargetNodeID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing target id", ErrInvalidArgument).Error()
+			return
+		}
+		err := db.MeshDB().Peers().RemoveEdge(ctx, source, target)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	case v1.QueryRequest_ROUTES:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing id", ErrInvalidArgument).Error()
+			return
+		}
+		err := db.MeshDB().Networking().DeleteRoute(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	case v1.QueryRequest_ACLS:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing id", ErrInvalidArgument).Error()
+			return
+		}
+		err := db.MeshDB().Networking().DeleteNetworkACL(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	case v1.QueryRequest_ROLES:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing id", ErrInvalidArgument).Error()
+			return
+		}
+		err := db.MeshDB().RBAC().DeleteRole(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	case v1.QueryRequest_ROLEBINDINGS:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing id", ErrInvalidArgument).Error()
+			return
+		}
+		err := db.MeshDB().RBAC().DeleteRoleBinding(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	case v1.QueryRequest_GROUPS:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing id", ErrInvalidArgument).Error()
+			return
+		}
+		err := db.MeshDB().RBAC().DeleteGroup(ctx, id)
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+
+	default:
+		res.Error = fmt.Errorf("%w: unsupported DELETE query type %s", ErrInvalidQuery, req.GetType().String()).Error()
+	}
 	return
 }

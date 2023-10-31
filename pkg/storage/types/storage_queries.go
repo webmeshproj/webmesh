@@ -31,71 +31,27 @@ type StorageQuery struct {
 	filters QueryFilters
 }
 
-// ParseStorageQuery parses a storage query.
-func ParseStorageQuery(query *v1.QueryRequest) (StorageQuery, error) {
-	filters := ParseQueryFilters(query)
-	if query.GetCommand() == v1.QueryRequest_GET {
-		// The filter should always contain an ID or pub key
-		// unless its for raw network or rbac state.
-		if query.GetType() == v1.QueryRequest_NETWORK_STATE || query.GetType() == v1.QueryRequest_RBAC_STATE {
-			return StorageQuery{QueryRequest: query, filters: filters}, nil
-		}
-		if len(filters) == 0 {
-			return StorageQuery{}, errors.ErrInvalidQuery
-		}
-		if query.GetType() == v1.QueryRequest_EDGES {
-			// The query should have a source and target id
-			if len(filters) != 2 {
-				return StorageQuery{}, errors.ErrInvalidQuery
-			}
-			source, ok := filters.GetByType(FilterTypeSourceID)
-			if !ok || source.Value == "" {
-				return StorageQuery{}, errors.ErrInvalidQuery
-			}
-			if !IsValidID(source.Value) {
-				return StorageQuery{}, errors.ErrInvalidQuery
-			}
-			target, ok := filters.GetByType(FilterTypeTargetID)
-			if !ok || target.Value == "" {
-				return StorageQuery{}, errors.ErrInvalidQuery
-			}
-			if !IsValidID(target.Value) {
-				return StorageQuery{}, errors.ErrInvalidQuery
-			}
-			return StorageQuery{QueryRequest: query, filters: filters}, nil
-		}
-		if query.GetType() == v1.QueryRequest_PEERS {
-			// We support either an ID or pubkey filter for peers.
-			if len(filters) > 1 {
-				return StorageQuery{}, errors.ErrInvalidQuery
-			}
-			id, ok := filters.GetByType(FilterTypeID)
-			if !ok || id.Value == "" {
-				pubkey, ok := filters.GetByType(FilterTypePubKey)
-				if !ok || pubkey.Value == "" {
-					return StorageQuery{}, errors.ErrInvalidQuery
-				}
-			} else if !IsValidID(id.Value) {
-				return StorageQuery{}, errors.ErrInvalidQuery
-			}
-			return StorageQuery{QueryRequest: query, filters: filters}, nil
-		}
-		id, ok := filters.GetByType(FilterTypeID)
-		if !ok || id.Value == "" {
-			return StorageQuery{}, errors.ErrInvalidQuery
-		}
-		if !IsValidID(id.Value) {
-			return StorageQuery{}, errors.ErrInvalidQuery
-		}
-		return StorageQuery{QueryRequest: query, filters: filters}, nil
-	}
-	// List queries don't require a filter.
-	return StorageQuery{QueryRequest: query, filters: filters}, nil
-}
-
 // Filters returns the parsed filters for the query.
 func (q StorageQuery) Filters() QueryFilters {
 	return q.filters
+}
+
+// ParseStorageQuery parses a storage query.
+func ParseStorageQuery(query *v1.QueryRequest) (StorageQuery, error) {
+	filters := ParseQueryFilters(query)
+	switch query.GetCommand() {
+	case v1.QueryRequest_GET:
+		return parseGetQuery(query, filters)
+	case v1.QueryRequest_PUT:
+		return parsePutQuery(query, filters)
+	case v1.QueryRequest_DELETE:
+		return parseDeleteQuery(query, filters)
+	case v1.QueryRequest_LIST:
+		// List queries don't require any filters.
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	default:
+		return StorageQuery{}, errors.ErrInvalidQuery
+	}
 }
 
 // FilterType is the type of filter.
@@ -279,4 +235,134 @@ func (q QueryFilters) GetByType(ftype FilterType) (QueryFilter, bool) {
 		}
 	}
 	return QueryFilter{}, false
+}
+
+func parsePutQuery(query *v1.QueryRequest, filters QueryFilters) (StorageQuery, error) {
+	// All queries require an ID except for edges which require a source and target ID.
+	// RBAC and network state are not supported.
+	switch query.GetType() {
+	case v1.QueryRequest_NETWORK_STATE, v1.QueryRequest_RBAC_STATE:
+		return StorageQuery{}, errors.ErrInvalidQuery
+	case v1.QueryRequest_EDGES:
+		if len(filters) != 2 {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		source, ok := filters.GetByType(FilterTypeSourceID)
+		if !ok || source.Value == "" {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		if !IsValidID(source.Value) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		target, ok := filters.GetByType(FilterTypeTargetID)
+		if !ok || target.Value == "" {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		if !IsValidID(target.Value) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	default:
+		id, ok := filters.GetID()
+		if !ok || id == "" {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		if !IsValidID(id) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	}
+}
+
+func parseDeleteQuery(query *v1.QueryRequest, filters QueryFilters) (StorageQuery, error) {
+	// All queries require an ID except for edges which require a source and target ID.
+	// RBAC and network state are not supported.
+	switch query.GetType() {
+	case v1.QueryRequest_NETWORK_STATE, v1.QueryRequest_RBAC_STATE:
+		return StorageQuery{}, errors.ErrInvalidQuery
+	case v1.QueryRequest_EDGES:
+		if len(filters) != 2 {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		source, ok := filters.GetByType(FilterTypeSourceID)
+		if !ok || source.Value == "" {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		if !IsValidID(source.Value) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		target, ok := filters.GetByType(FilterTypeTargetID)
+		if !ok || target.Value == "" {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		if !IsValidID(target.Value) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	default:
+		id, ok := filters.GetID()
+		if !ok || id == "" {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		if !IsValidID(id) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	}
+}
+
+func parseGetQuery(query *v1.QueryRequest, filters QueryFilters) (StorageQuery, error) {
+	// Network State and RBAC state don't require any additional filters.
+	if query.GetType() == v1.QueryRequest_NETWORK_STATE || query.GetType() == v1.QueryRequest_RBAC_STATE {
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	}
+	if len(filters) == 0 {
+		return StorageQuery{}, errors.ErrInvalidQuery
+	}
+	if query.GetType() == v1.QueryRequest_EDGES {
+		// The query should have a source and target id
+		if len(filters) != 2 {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		source, ok := filters.GetByType(FilterTypeSourceID)
+		if !ok || source.Value == "" {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		if !IsValidID(source.Value) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		target, ok := filters.GetByType(FilterTypeTargetID)
+		if !ok || target.Value == "" {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		if !IsValidID(target.Value) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	}
+	if query.GetType() == v1.QueryRequest_PEERS {
+		// We support either an ID or pubkey filter for peers.
+		if len(filters) > 1 {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		id, ok := filters.GetByType(FilterTypeID)
+		if !ok || id.Value == "" {
+			pubkey, ok := filters.GetByType(FilterTypePubKey)
+			if !ok || pubkey.Value == "" {
+				return StorageQuery{}, errors.ErrInvalidQuery
+			}
+		} else if !IsValidID(id.Value) {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	}
+	// All other queries require an ID.
+	id, ok := filters.GetByType(FilterTypeID)
+	if !ok || id.Value == "" {
+		return StorageQuery{}, errors.ErrInvalidQuery
+	}
+	if !IsValidID(id.Value) {
+		return StorageQuery{}, errors.ErrInvalidQuery
+	}
+	return StorageQuery{QueryRequest: query, filters: filters}, nil
 }
