@@ -516,26 +516,103 @@ func doPutQuery(ctx context.Context, db storage.Provider, req types.StorageQuery
 	res = &v1.QueryResponse{}
 	switch req.GetType() {
 	case v1.QueryRequest_VALUE:
+		id, ok := req.Filters().GetID()
+		if !ok {
+			res.Error = fmt.Errorf("%w: missing id", ErrInvalidArgument).Error()
+			return
+		}
+		// TODO: Support TTLs? This is a legacy format anyway and should be removed.
+		err := db.MeshStorage().PutValue(ctx, []byte(id), req.GetItem(), 0)
+		if err != nil {
+			res.Error = err.Error()
+		}
 
 	case v1.QueryRequest_PEERS:
+		var peer types.MeshNode
+		err := peer.UnmarshalProtoJSON(req.GetItem())
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		err = db.MeshDB().Peers().Put(ctx, peer)
+		if err != nil {
+			res.Error = err.Error()
+		}
 
 	case v1.QueryRequest_EDGES:
+		var edge types.MeshEdge
+		err := edge.UnmarshalProtoJSON(req.GetItem())
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		err = db.MeshDB().Peers().PutEdge(ctx, edge)
+		if err != nil {
+			res.Error = err.Error()
+		}
 
 	case v1.QueryRequest_ROUTES:
+		var route types.Route
+		err := route.UnmarshalProtoJSON(req.GetItem())
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		err = db.MeshDB().Networking().PutRoute(ctx, route)
+		if err != nil {
+			res.Error = err.Error()
+		}
 
 	case v1.QueryRequest_ACLS:
+		var acl types.NetworkACL
+		err := acl.UnmarshalProtoJSON(req.GetItem())
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		err = db.MeshDB().Networking().PutNetworkACL(ctx, acl)
+		if err != nil {
+			res.Error = err.Error()
+		}
 
 	case v1.QueryRequest_ROLES:
+		var role types.Role
+		err := role.UnmarshalProtoJSON(req.GetItem())
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		err = db.MeshDB().RBAC().PutRole(ctx, role)
+		if err != nil {
+			res.Error = err.Error()
+		}
 
 	case v1.QueryRequest_ROLEBINDINGS:
+		var rb types.RoleBinding
+		err := rb.UnmarshalProtoJSON(req.GetItem())
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		err = db.MeshDB().RBAC().PutRoleBinding(ctx, rb)
+		if err != nil {
+			res.Error = err.Error()
+		}
 
 	case v1.QueryRequest_GROUPS:
-
-	case v1.QueryRequest_NETWORK_STATE:
-
-	case v1.QueryRequest_RBAC_STATE:
+		var group types.Group
+		err := group.UnmarshalProtoJSON(req.GetItem())
+		if err != nil {
+			res.Error = err.Error()
+			return
+		}
+		err = db.MeshDB().RBAC().PutGroup(ctx, group)
+		if err != nil {
+			res.Error = err.Error()
+		}
 
 	default:
+		res.Error = fmt.Errorf("%w: unsupported PUT query type %s", ErrInvalidQuery, req.GetType().String()).Error()
 	}
 	return
 }
@@ -552,7 +629,6 @@ func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQu
 		err := db.MeshStorage().Delete(ctx, []byte(id))
 		if err != nil {
 			res.Error = err.Error()
-			return
 		}
 
 	case v1.QueryRequest_PEERS:
@@ -564,7 +640,6 @@ func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQu
 		err := db.MeshDB().Peers().Delete(ctx, types.NodeID(id))
 		if err != nil {
 			res.Error = err.Error()
-			return
 		}
 
 	case v1.QueryRequest_EDGES:
@@ -581,7 +656,6 @@ func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQu
 		err := db.MeshDB().Peers().RemoveEdge(ctx, source, target)
 		if err != nil {
 			res.Error = err.Error()
-			return
 		}
 
 	case v1.QueryRequest_ROUTES:
@@ -593,7 +667,6 @@ func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQu
 		err := db.MeshDB().Networking().DeleteRoute(ctx, id)
 		if err != nil {
 			res.Error = err.Error()
-			return
 		}
 
 	case v1.QueryRequest_ACLS:
@@ -605,7 +678,6 @@ func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQu
 		err := db.MeshDB().Networking().DeleteNetworkACL(ctx, id)
 		if err != nil {
 			res.Error = err.Error()
-			return
 		}
 
 	case v1.QueryRequest_ROLES:
@@ -617,7 +689,6 @@ func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQu
 		err := db.MeshDB().RBAC().DeleteRole(ctx, id)
 		if err != nil {
 			res.Error = err.Error()
-			return
 		}
 
 	case v1.QueryRequest_ROLEBINDINGS:
@@ -629,7 +700,6 @@ func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQu
 		err := db.MeshDB().RBAC().DeleteRoleBinding(ctx, id)
 		if err != nil {
 			res.Error = err.Error()
-			return
 		}
 
 	case v1.QueryRequest_GROUPS:
@@ -641,7 +711,6 @@ func doDeleteQuery(ctx context.Context, db storage.Provider, req types.StorageQu
 		err := db.MeshDB().RBAC().DeleteGroup(ctx, id)
 		if err != nil {
 			res.Error = err.Error()
-			return
 		}
 
 	default:

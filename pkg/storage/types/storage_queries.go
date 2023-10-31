@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"encoding/json"
 	"net/netip"
 	"strings"
 
@@ -238,31 +239,18 @@ func (q QueryFilters) GetByType(ftype FilterType) (QueryFilter, bool) {
 }
 
 func parsePutQuery(query *v1.QueryRequest, filters QueryFilters) (StorageQuery, error) {
-	// All queries require an ID except for edges which require a source and target ID.
-	// RBAC and network state are not supported.
+	// Everything needs valid JSON data.
+	var data map[string]any
+	err := json.Unmarshal([]byte(query.GetItem()), &data)
+	if err != nil {
+		return StorageQuery{}, errors.ErrInvalidQuery
+	}
 	switch query.GetType() {
 	case v1.QueryRequest_NETWORK_STATE, v1.QueryRequest_RBAC_STATE:
+		// Not supported yet, but should be in the future.
 		return StorageQuery{}, errors.ErrInvalidQuery
-	case v1.QueryRequest_EDGES:
-		if len(filters) != 2 {
-			return StorageQuery{}, errors.ErrInvalidQuery
-		}
-		source, ok := filters.GetByType(FilterTypeSourceID)
-		if !ok || source.Value == "" {
-			return StorageQuery{}, errors.ErrInvalidQuery
-		}
-		if !IsValidID(source.Value) {
-			return StorageQuery{}, errors.ErrInvalidQuery
-		}
-		target, ok := filters.GetByType(FilterTypeTargetID)
-		if !ok || target.Value == "" {
-			return StorageQuery{}, errors.ErrInvalidQuery
-		}
-		if !IsValidID(target.Value) {
-			return StorageQuery{}, errors.ErrInvalidQuery
-		}
-		return StorageQuery{QueryRequest: query, filters: filters}, nil
-	default:
+	case v1.QueryRequest_VALUE:
+		// Requires an ID
 		id, ok := filters.GetID()
 		if !ok || id == "" {
 			return StorageQuery{}, errors.ErrInvalidQuery
@@ -270,6 +258,8 @@ func parsePutQuery(query *v1.QueryRequest, filters QueryFilters) (StorageQuery, 
 		if !IsValidID(id) {
 			return StorageQuery{}, errors.ErrInvalidQuery
 		}
+		return StorageQuery{QueryRequest: query, filters: filters}, nil
+	default:
 		return StorageQuery{QueryRequest: query, filters: filters}, nil
 	}
 }
