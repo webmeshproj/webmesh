@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package plugindb contains an interface for performing storage queries
-// over the storage APIs.
 package plugindb
 
 import (

@@ -33,7 +33,7 @@ type StorageQuery struct {
 
 // ParseStorageQuery parses a storage query.
 func ParseStorageQuery(query *v1.QueryRequest) (StorageQuery, error) {
-	filters := parseFilters(query)
+	filters := ParseQueryFilters(query)
 	if query.GetCommand() == v1.QueryRequest_GET {
 		// The filter should always contain an ID or pub key
 		// unless its for raw network or rbac state.
@@ -113,7 +113,7 @@ const (
 // IsValid returns true if the filter type is valid.
 func (f FilterType) IsValid() bool {
 	switch f {
-	case FilterTypeID, FilterTypePubKey:
+	case FilterTypeID, FilterTypePubKey, FilterTypeSourceID, FilterTypeTargetID, FilterTypeNodeID, FilterTypeCIDR:
 		return true
 	default:
 		return false
@@ -123,8 +123,38 @@ func (f FilterType) IsValid() bool {
 // QueryFilters is a list of parsed filters for a storage query.
 type QueryFilters []QueryFilter
 
+// QueryFilter is a parsed filter for a storage query.
+type QueryFilter struct {
+	// The type of filter.
+	Type FilterType
+	// Value is the value of the filter.
+	Value string
+}
+
 // NewQueryFilters returns a new list of query filters.
 func NewQueryFilters(filters ...QueryFilter) QueryFilters {
+	return filters
+}
+
+// ParseQueryFilters parses the query filters from a query request.
+func ParseQueryFilters(req *v1.QueryRequest) QueryFilters {
+	query := req.GetQuery()
+	fields := strings.Split(query, ",")
+	filters := make(QueryFilters, 0, len(fields))
+	for _, field := range fields {
+		parts := strings.Split(field, "=")
+		if len(parts) != 2 {
+			continue
+		}
+		ftype := FilterType(parts[0])
+		if !ftype.IsValid() {
+			continue
+		}
+		filters = append(filters, QueryFilter{
+			Type:  ftype,
+			Value: parts[1],
+		})
+	}
 	return filters
 }
 
@@ -249,33 +279,4 @@ func (q QueryFilters) GetByType(ftype FilterType) (QueryFilter, bool) {
 		}
 	}
 	return QueryFilter{}, false
-}
-
-// QueryFilter is a parsed filter for a storage query.
-type QueryFilter struct {
-	// The type of filter.
-	Type FilterType
-	// Value is the value of the filter.
-	Value string
-}
-
-func parseFilters(req *v1.QueryRequest) QueryFilters {
-	query := req.GetQuery()
-	fields := strings.Split(query, ",")
-	filters := make(QueryFilters, 0, len(fields))
-	for _, field := range fields {
-		parts := strings.Split(field, "=")
-		if len(parts) != 2 {
-			continue
-		}
-		ftype := FilterType(parts[0])
-		if !ftype.IsValid() {
-			continue
-		}
-		filters = append(filters, QueryFilter{
-			Type:  ftype,
-			Value: parts[1],
-		})
-	}
-	return filters
 }

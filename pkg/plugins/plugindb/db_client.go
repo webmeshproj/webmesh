@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package plugindb contains an interface for performing storage queries
-// over the storage APIs.
 package plugindb
 
 import (
@@ -24,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/go/v1"
@@ -50,99 +47,6 @@ type QueryServer interface {
 // Open opens a new database connection to a plugin query stream.
 func OpenDB(srv QueryServer) storage.MeshDB {
 	return meshdb.New(&PluginDataStore{QueryServer: srv})
-}
-
-// OpenKeyVal opens a new key-value store connection to a plugin query stream.
-func OpenKeyVal(srv QueryServer) storage.MeshStorage {
-	return &PluginMeshStorage{QueryServer: srv}
-}
-
-// PluginMeshStorage implements a mesh key-value store over a plugin query stream.
-type PluginMeshStorage struct {
-	QueryServer
-	mu sync.Mutex
-}
-
-// GetValue returns the value of a key.
-func (p *PluginMeshStorage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if !types.IsValidPathID(string(key)) {
-		return nil, errors.ErrInvalidKey
-	}
-	err := p.Send(&v1.QueryRequest{
-		Command: v1.QueryRequest_GET,
-		Type:    v1.QueryRequest_VALUE,
-		Query:   types.NewQueryFilters().WithID(string(key)).Encode(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	resp, err := p.Recv()
-	if err != nil {
-		return nil, err
-	}
-	if resp.GetError() != "" {
-		if strings.Contains(err.Error(), "not found") {
-			return nil, errors.ErrKeyNotFound
-		}
-		return nil, fmt.Errorf(resp.GetError())
-	}
-	if len(resp.GetItems()) == 0 {
-		return nil, errors.ErrKeyNotFound
-	}
-	return resp.GetItems()[0], nil
-}
-
-func (p *PluginMeshStorage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
-	return errors.ErrNotStorageNode
-}
-
-func (p *PluginMeshStorage) Delete(ctx context.Context, key []byte) error {
-	return errors.ErrNotStorageNode
-}
-
-func (p *PluginMeshStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	err := p.Send(&v1.QueryRequest{
-		Command: v1.QueryRequest_LIST,
-		Type:    v1.QueryRequest_KEYS,
-		Query:   types.NewQueryFilters().WithID(string(prefix)).Encode(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	resp, err := p.Recv()
-	if err != nil {
-		return nil, err
-	}
-	return resp.GetItems(), nil
-}
-
-func (p *PluginMeshStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
-	keys, err := p.ListKeys(ctx, prefix)
-	if err != nil {
-		return err
-	}
-	for _, key := range keys {
-		value, err := p.GetValue(ctx, key)
-		if err != nil {
-			return err
-		}
-		if err := fn(key, value); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *PluginMeshStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
-	return func() {}, errors.ErrNotStorageNode
-}
-
-func (p *PluginMeshStorage) Close() error {
-	return nil
 }
 
 // PluginDataStore implements a mesh data store over a plugin query stream.
