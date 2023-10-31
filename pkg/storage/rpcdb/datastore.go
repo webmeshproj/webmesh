@@ -14,91 +14,179 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugindb
+// Package rpcdb provides a meshdb that operates over RPC.
+package rpcdb
 
 import (
+	"context"
 	"fmt"
 	"net/netip"
 	"strconv"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/dominikbraun/graph"
 	v1 "github.com/webmeshproj/api/go/v1"
-	"google.golang.org/grpc"
 
-	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/meshdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
-// QueryServer is the query server interface.
-type QueryServer interface {
-	// The underlying gRPC stream.
-	grpc.ServerStream
-	// Send sends a query request to the plugin.
-	Send(*v1.QueryRequest) error
-	// Recv receives a query result from the plugin.
-	Recv() (*v1.QueryResponse, error)
+// RPCDataStore is a MeshDataStore that operates over RPC.
+type RPCDataStore struct {
+	Querier
 }
 
-// Open opens a new database connection to a plugin query stream.
-func OpenDB(srv QueryServer) storage.MeshDB {
-	return meshdb.New(&PluginDataStore{QueryServer: srv})
-}
-
-// PluginDataStore implements a mesh data store over a plugin query stream.
-type PluginDataStore struct {
-	QueryServer
-	mu sync.Mutex
-}
-
-// GraphStore returns the interface for managing network topology and data
-// about peers.
-func (pdb *PluginDataStore) GraphStore() storage.GraphStore {
+// GraphStore returns the interface for managing network topology and data about peers.
+func (pdb *RPCDataStore) GraphStore() storage.GraphStore {
 	return &GraphStore{pdb}
 }
 
 // RBAC returns the interface for managing RBAC policies in the mesh.
-func (pdb *PluginDataStore) RBAC() storage.RBAC {
+func (pdb *RPCDataStore) RBAC() storage.RBAC {
 	return &RBACStore{pdb}
 }
 
 // MeshState returns the interface for querying mesh state.
-func (pdb *PluginDataStore) MeshState() storage.MeshState {
+func (pdb *RPCDataStore) MeshState() storage.MeshState {
 	return &MeshStateStore{pdb}
 }
 
 // Networking returns the interface for managing networking in the mesh.
-func (pdb *PluginDataStore) Networking() storage.Networking {
+func (pdb *RPCDataStore) Networking() storage.Networking {
 	return &NetworkingStore{pdb}
+}
+
+// KVStorage implements a mesh key-value store over a plugin query stream.
+type KVStorage struct {
+	Querier
+}
+
+// GetValue returns the value of a key.
+func (p *KVStorage) GetValue(ctx context.Context, key []byte) ([]byte, error) {
+	if !types.IsValidPathID(string(key)) {
+		return nil, errors.ErrInvalidKey
+	}
+	resp, err := p.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_GET,
+		Type:    v1.QueryRequest_VALUE,
+		Query:   types.NewQueryFilters().WithID(string(key)).Encode(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetError() != "" {
+		if strings.Contains(err.Error(), "not found") {
+			return nil, errors.ErrKeyNotFound
+		}
+		return nil, fmt.Errorf(resp.GetError())
+	}
+	if len(resp.GetItems()) == 0 {
+		return nil, errors.ErrKeyNotFound
+	}
+	return resp.GetItems()[0], nil
+}
+
+func (p *KVStorage) PutValue(ctx context.Context, key, value []byte, ttl time.Duration) error {
+	resp, err := p.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_PUT,
+		Type:    v1.QueryRequest_VALUE,
+		Query:   types.NewQueryFilters().WithID(string(key)).Encode(),
+		Item:    value,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
+}
+
+func (p *KVStorage) Delete(ctx context.Context, key []byte) error {
+	resp, err := p.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_DELETE,
+		Type:    v1.QueryRequest_VALUE,
+		Query:   types.NewQueryFilters().WithID(string(key)).Encode(),
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
+}
+
+func (p *KVStorage) ListKeys(ctx context.Context, prefix []byte) ([][]byte, error) {
+	resp, err := p.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_LIST,
+		Type:    v1.QueryRequest_KEYS,
+		Query:   types.NewQueryFilters().WithID(string(prefix)).Encode(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetItems(), nil
+}
+
+func (p *KVStorage) IterPrefix(ctx context.Context, prefix []byte, fn storage.PrefixIterator) error {
+	keys, err := p.ListKeys(ctx, prefix)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		value, err := p.GetValue(ctx, key)
+		if err != nil {
+			return err
+		}
+		if err := fn(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *KVStorage) Subscribe(ctx context.Context, prefix []byte, fn storage.KVSubscribeFunc) (context.CancelFunc, error) {
+	return func() {}, errors.ErrNotStorageNode
+}
+
+func (p *KVStorage) Close() error {
+	return nil
 }
 
 // GraphStore implements a mesh graph store over a plugin query stream.
 type GraphStore struct {
-	*PluginDataStore
+	*RPCDataStore
 }
 
 func (g *GraphStore) AddVertex(nodeID types.NodeID, node types.MeshNode, props graph.VertexProperties) error {
-	return errors.ErrNotStorageNode
+	data, err := node.MarshalProtoJSON()
+	if err != nil {
+		return err
+	}
+	resp, err := g.Query(context.Background(), &v1.QueryRequest{
+		Command: v1.QueryRequest_PUT,
+		Type:    v1.QueryRequest_PEERS,
+		Item:    data,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (g *GraphStore) Vertex(nodeID types.NodeID) (node types.MeshNode, props graph.VertexProperties, err error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_PEERS,
 		Query:   types.NewQueryFilters().WithID(nodeID.String()).Encode(),
 	}
-	err = g.Send(req)
-	if err != nil {
-		return node, props, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = g.Recv()
+	resp, err := g.Query(context.Background(), req)
 	if err != nil {
 		return node, props, err
 	}
@@ -116,22 +204,26 @@ func (g *GraphStore) Vertex(nodeID types.NodeID) (node types.MeshNode, props gra
 }
 
 func (g *GraphStore) RemoveVertex(nodeID types.NodeID) error {
-	return errors.ErrNotStorageNode
+	resp, err := g.Query(context.Background(), &v1.QueryRequest{
+		Command: v1.QueryRequest_DELETE,
+		Type:    v1.QueryRequest_PEERS,
+		Query:   types.NewQueryFilters().WithID(nodeID.String()).Encode(),
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (g *GraphStore) ListVertices() ([]types.NodeID, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_PEERS,
 	}
-	err := g.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = g.Recv()
+	resp, err := g.Query(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
@@ -153,34 +245,50 @@ func (g *GraphStore) VertexCount() (int, error) {
 }
 
 func (g *GraphStore) AddEdge(sourceNode, targetNode types.NodeID, edge graph.Edge[types.NodeID]) error {
-	return errors.ErrNotStorageNode
+	data, err := types.Edge(edge).ToMeshEdge(sourceNode, targetNode).MarshalProtoJSON()
+	if err != nil {
+		return err
+	}
+	resp, err := g.Query(context.Background(), &v1.QueryRequest{
+		Command: v1.QueryRequest_PUT,
+		Type:    v1.QueryRequest_EDGES,
+		Item:    data,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (g *GraphStore) UpdateEdge(sourceNode, targetNode types.NodeID, edge graph.Edge[types.NodeID]) error {
-	return errors.ErrNotStorageNode
+	return g.AddEdge(sourceNode, targetNode, edge)
 }
 
 func (g *GraphStore) RemoveEdge(sourceNode, targetNode types.NodeID) error {
-	return errors.ErrNotStorageNode
+	resp, err := g.Query(context.Background(), &v1.QueryRequest{
+		Command: v1.QueryRequest_DELETE,
+		Type:    v1.QueryRequest_EDGES,
+		Query:   types.NewQueryFilters().WithSourceNodeID(sourceNode).WithTargetNodeID(targetNode).Encode(),
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (g *GraphStore) Edge(sourceNode, targetNode types.NodeID) (edge graph.Edge[types.NodeID], err error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_EDGES,
 		Query:   types.NewQueryFilters().WithSourceNodeID(sourceNode).WithTargetNodeID(targetNode).Encode(),
 	}
-	err = g.Send(req)
-	if err != nil {
-		return edge, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = g.Recv()
-	if err != nil {
-		return edge, err
-	}
+	resp, err := g.Query(context.Background(), req)
 	if resp.GetError() != "" {
 		if strings.Contains(err.Error(), "not found") {
 			return edge, graph.ErrEdgeNotFound
@@ -200,18 +308,11 @@ func (g *GraphStore) Edge(sourceNode, targetNode types.NodeID) (edge graph.Edge[
 }
 
 func (g *GraphStore) ListEdges() ([]graph.Edge[types.NodeID], error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_EDGES,
 	}
-	err := g.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = g.Recv()
+	resp, err := g.Query(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
@@ -228,13 +329,13 @@ func (g *GraphStore) ListEdges() ([]graph.Edge[types.NodeID], error) {
 }
 
 func (g *GraphStore) Subscribe(ctx context.Context, fn storage.PeerSubscribeFunc) (context.CancelFunc, error) {
-	// Currently not used by any users of passthrough storage. They instead use the SubscribePeers API.
+	// Currently not used by any users of plugin storage. They instead use the SubscribePeers API.
 	return func() {}, errors.ErrNotStorageNode
 }
 
 // RBACStore implements a mesh rbac store over a plugin query stream.
 type RBACStore struct {
-	*PluginDataStore
+	*RPCDataStore
 }
 
 func (r *RBACStore) SetEnabled(ctx context.Context, enabled bool) error {
@@ -246,12 +347,7 @@ func (r *RBACStore) GetEnabled(ctx context.Context) (bool, error) {
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_RBAC_STATE,
 	}
-	err := r.Send(req)
-	if err != nil {
-		return false, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = r.Recv()
+	resp, err := r.Query(ctx, req)
 	if err != nil {
 		return false, err
 	}
@@ -263,43 +359,114 @@ func (r *RBACStore) GetEnabled(ctx context.Context) (bool, error) {
 }
 
 func (r *RBACStore) PutRole(ctx context.Context, role types.Role) error {
-	return errors.ErrNotStorageNode
+	data, err := role.MarshalProtoJSON()
+	if err != nil {
+		return err
+	}
+	resp, err := r.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_PUT,
+		Type:    v1.QueryRequest_ROLES,
+		Item:    data,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (r *RBACStore) DeleteRole(ctx context.Context, name string) error {
-	return errors.ErrNotStorageNode
+	resp, err := r.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_DELETE,
+		Type:    v1.QueryRequest_ROLES,
+		Query:   types.NewQueryFilters().WithID(name).Encode(),
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (r *RBACStore) PutRoleBinding(ctx context.Context, rolebinding types.RoleBinding) error {
-	return errors.ErrNotStorageNode
+	data, err := rolebinding.MarshalProtoJSON()
+	if err != nil {
+		return err
+	}
+	resp, err := r.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_PUT,
+		Type:    v1.QueryRequest_ROLEBINDINGS,
+		Item:    data,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (r *RBACStore) DeleteRoleBinding(ctx context.Context, name string) error {
-	return errors.ErrNotStorageNode
+	resp, err := r.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_DELETE,
+		Type:    v1.QueryRequest_ROLEBINDINGS,
+		Query:   types.NewQueryFilters().WithID(name).Encode(),
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (r *RBACStore) PutGroup(ctx context.Context, group types.Group) error {
-	return errors.ErrNotStorageNode
+	data, err := group.MarshalProtoJSON()
+	if err != nil {
+		return err
+	}
+	resp, err := r.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_PUT,
+		Type:    v1.QueryRequest_GROUPS,
+		Item:    data,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 func (r *RBACStore) DeleteGroup(ctx context.Context, name string) error {
-	return errors.ErrNotStorageNode
+	resp, err := r.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_DELETE,
+		Type:    v1.QueryRequest_GROUPS,
+		Query:   types.NewQueryFilters().WithID(name).Encode(),
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (r *RBACStore) GetRole(ctx context.Context, name string) (types.Role, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	var meshrole types.Role
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_ROLES,
 		Query:   types.NewQueryFilters().WithID(name).Encode(),
 	}
-	err := r.Send(req)
-	if err != nil {
-		return meshrole, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = r.Recv()
+	resp, err := r.Query(ctx, req)
 	if err != nil {
 		return meshrole, err
 	}
@@ -317,18 +484,11 @@ func (r *RBACStore) GetRole(ctx context.Context, name string) (types.Role, error
 }
 
 func (r *RBACStore) ListRoles(ctx context.Context) (types.RolesList, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_ROLES,
 	}
-	err := r.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = r.Recv()
+	resp, err := r.Query(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -345,20 +505,13 @@ func (r *RBACStore) ListRoles(ctx context.Context) (types.RolesList, error) {
 }
 
 func (r *RBACStore) GetRoleBinding(ctx context.Context, name string) (types.RoleBinding, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	var rb types.RoleBinding
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_ROLEBINDINGS,
 		Query:   types.NewQueryFilters().WithID(name).Encode(),
 	}
-	err := r.Send(req)
-	if err != nil {
-		return rb, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = r.Recv()
+	resp, err := r.Query(ctx, req)
 	if err != nil {
 		return rb, err
 	}
@@ -376,18 +529,11 @@ func (r *RBACStore) GetRoleBinding(ctx context.Context, name string) (types.Role
 }
 
 func (r *RBACStore) ListRoleBindings(ctx context.Context) ([]types.RoleBinding, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_ROLEBINDINGS,
 	}
-	err := r.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = r.Recv()
+	resp, err := r.Query(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -404,20 +550,13 @@ func (r *RBACStore) ListRoleBindings(ctx context.Context) ([]types.RoleBinding, 
 }
 
 func (r *RBACStore) GetGroup(ctx context.Context, name string) (types.Group, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	var group types.Group
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_GROUPS,
 		Query:   types.NewQueryFilters().WithID(name).Encode(),
 	}
-	err := r.Send(req)
-	if err != nil {
-		return group, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = r.Recv()
+	resp, err := r.Query(ctx, req)
 	if err != nil {
 		return group, err
 	}
@@ -435,18 +574,11 @@ func (r *RBACStore) GetGroup(ctx context.Context, name string) (types.Group, err
 }
 
 func (r *RBACStore) ListGroups(ctx context.Context) ([]types.Group, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_GROUPS,
 	}
-	err := r.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = r.Recv()
+	resp, err := r.Query(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -463,19 +595,12 @@ func (r *RBACStore) ListGroups(ctx context.Context) ([]types.Group, error) {
 }
 
 func (r *RBACStore) ListNodeRoles(ctx context.Context, nodeID types.NodeID) (types.RolesList, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_ROLES,
 		Query:   types.NewQueryFilters().WithNodeID(nodeID).Encode(),
 	}
-	err := r.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = r.Recv()
+	resp, err := r.Query(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -497,7 +622,7 @@ func (r *RBACStore) ListUserRoles(ctx context.Context, user types.NodeID) (types
 
 // MeshStateStore implements a mesh state store over a plugin query stream.
 type MeshStateStore struct {
-	*PluginDataStore
+	*RPCDataStore
 }
 
 func (st *MeshStateStore) SetMeshState(ctx context.Context, state types.NetworkState) error {
@@ -505,19 +630,12 @@ func (st *MeshStateStore) SetMeshState(ctx context.Context, state types.NetworkS
 }
 
 func (st *MeshStateStore) GetMeshState(ctx context.Context) (types.NetworkState, error) {
-	st.mu.Lock()
-	defer st.mu.Unlock()
 	var state types.NetworkState
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_NETWORK_STATE,
 	}
-	err := st.Send(req)
-	if err != nil {
-		return state, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = st.Recv()
+	resp, err := st.Query(ctx, req)
 	if err != nil {
 		return state, err
 	}
@@ -532,28 +650,36 @@ func (st *MeshStateStore) GetMeshState(ctx context.Context) (types.NetworkState,
 
 // NetworkingStore implements a mesh networking store over a plugin query stream.
 type NetworkingStore struct {
-	*PluginDataStore
+	*RPCDataStore
 }
 
 func (nw *NetworkingStore) PutNetworkACL(ctx context.Context, acl types.NetworkACL) error {
-	return errors.ErrNotStorageNode
+	data, err := acl.MarshalProtoJSON()
+	if err != nil {
+		return err
+	}
+	resp, err := nw.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_PUT,
+		Type:    v1.QueryRequest_ACLS,
+		Item:    data,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (nw *NetworkingStore) GetNetworkACL(ctx context.Context, name string) (types.NetworkACL, error) {
-	nw.mu.Lock()
-	defer nw.mu.Unlock()
 	var acl types.NetworkACL
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_ACLS,
 		Query:   types.NewQueryFilters().WithID(name).Encode(),
 	}
-	err := nw.Send(req)
-	if err != nil {
-		return acl, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = nw.Recv()
+	resp, err := nw.Query(ctx, req)
 	if err != nil {
 		return acl, err
 	}
@@ -571,22 +697,26 @@ func (nw *NetworkingStore) GetNetworkACL(ctx context.Context, name string) (type
 }
 
 func (nw *NetworkingStore) DeleteNetworkACL(ctx context.Context, name string) error {
-	return errors.ErrNotStorageNode
+	resp, err := nw.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_DELETE,
+		Type:    v1.QueryRequest_ACLS,
+		Query:   types.NewQueryFilters().WithID(name).Encode(),
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (nw *NetworkingStore) ListNetworkACLs(ctx context.Context) (types.NetworkACLs, error) {
-	nw.mu.Lock()
-	defer nw.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_ACLS,
 	}
-	err := nw.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = nw.Recv()
+	resp, err := nw.Query(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -603,24 +733,32 @@ func (nw *NetworkingStore) ListNetworkACLs(ctx context.Context) (types.NetworkAC
 }
 
 func (nw *NetworkingStore) PutRoute(ctx context.Context, route types.Route) error {
-	return errors.ErrNotStorageNode
+	data, err := route.MarshalProtoJSON()
+	if err != nil {
+		return err
+	}
+	resp, err := nw.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_PUT,
+		Type:    v1.QueryRequest_ROUTES,
+		Item:    data,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (nw *NetworkingStore) GetRoute(ctx context.Context, name string) (types.Route, error) {
-	nw.mu.Lock()
-	defer nw.mu.Unlock()
 	var route types.Route
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_GET,
 		Type:    v1.QueryRequest_ROUTES,
 		Query:   types.NewQueryFilters().WithID(name).Encode(),
 	}
-	err := nw.Send(req)
-	if err != nil {
-		return route, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = nw.Recv()
+	resp, err := nw.Query(ctx, req)
 	if err != nil {
 		return route, err
 	}
@@ -638,19 +776,12 @@ func (nw *NetworkingStore) GetRoute(ctx context.Context, name string) (types.Rou
 }
 
 func (nw *NetworkingStore) GetRoutesByNode(ctx context.Context, nodeID types.NodeID) (types.Routes, error) {
-	nw.mu.Lock()
-	defer nw.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_ROUTES,
 		Query:   types.NewQueryFilters().WithNodeID(nodeID).Encode(),
 	}
-	err := nw.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = nw.Recv()
+	resp, err := nw.Query(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -667,19 +798,12 @@ func (nw *NetworkingStore) GetRoutesByNode(ctx context.Context, nodeID types.Nod
 }
 
 func (nw *NetworkingStore) GetRoutesByCIDR(ctx context.Context, cidr netip.Prefix) (types.Routes, error) {
-	nw.mu.Lock()
-	defer nw.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_ROUTES,
 		Query:   types.NewQueryFilters().WithCIDR(cidr).Encode(),
 	}
-	err := nw.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = nw.Recv()
+	resp, err := nw.Query(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -696,22 +820,26 @@ func (nw *NetworkingStore) GetRoutesByCIDR(ctx context.Context, cidr netip.Prefi
 }
 
 func (nw *NetworkingStore) DeleteRoute(ctx context.Context, name string) error {
-	return errors.ErrNotStorageNode
+	resp, err := nw.Query(ctx, &v1.QueryRequest{
+		Command: v1.QueryRequest_DELETE,
+		Type:    v1.QueryRequest_ROUTES,
+		Query:   types.NewQueryFilters().WithID(name).Encode(),
+	})
+	if err != nil {
+		return err
+	}
+	if resp.GetError() != "" {
+		return fmt.Errorf(resp.GetError())
+	}
+	return nil
 }
 
 func (nw *NetworkingStore) ListRoutes(ctx context.Context) (types.Routes, error) {
-	nw.mu.Lock()
-	defer nw.mu.Unlock()
 	req := &v1.QueryRequest{
 		Command: v1.QueryRequest_LIST,
 		Type:    v1.QueryRequest_ROUTES,
 	}
-	err := nw.Send(req)
-	if err != nil {
-		return nil, err
-	}
-	var resp *v1.QueryResponse
-	resp, err = nw.Recv()
+	resp, err := nw.Query(ctx, req)
 	if err != nil {
 		return nil, err
 	}

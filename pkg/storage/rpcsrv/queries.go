@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package storageutil contains utility functions for mesh database interactions.
-package storageutil
+package rpcsrv
 
 import (
 	"context"
@@ -37,8 +36,8 @@ var (
 	ErrInvalidArgument = fmt.Errorf("invalid argument")
 )
 
-// ServeStorageQuery serves a storage query given a database and a query request.
-func ServeStorageQuery(ctx context.Context, db storage.Provider, req *v1.QueryRequest) (*v1.QueryResponse, error) {
+// ServeQuery serves a storage query given a database and a query request.
+func ServeQuery(ctx context.Context, db storage.Provider, req *v1.QueryRequest) (*v1.QueryResponse, error) {
 	// Parse the request
 	query, err := types.ParseStorageQuery(req)
 	if err != nil {

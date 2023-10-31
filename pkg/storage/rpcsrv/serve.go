@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugindb
+// Package rpcsrv contains utilities for serving mesh databases over RPC.
+package rpcsrv
 
 import (
 	"io"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
 )
 
 // QueryClient is the interface for a storage query client.
@@ -62,7 +62,7 @@ func Serve(ctx context.Context, db storage.Provider, cli QueryClient) error {
 			"type", query.GetType().String(),
 			"query", query.GetQuery(),
 		)
-		resp, err := storageutil.ServeStorageQuery(ctx, db, query)
+		resp, err := ServeQuery(ctx, db, query)
 		if err != nil {
 			log.Error("Error handling query", "error", err)
 		}

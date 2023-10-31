@@ -25,7 +25,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/rpcsrv"
 )
 
 func (s *Server) Query(ctx context.Context, req *v1.QueryRequest) (*v1.QueryResponse, error) {
@@ -38,7 +38,7 @@ func (s *Server) Query(ctx context.Context, req *v1.QueryRequest) (*v1.QueryResp
 		// In theory - non-storage members shouldn't even expose the Node service.
 		return nil, status.Error(codes.Unavailable, "node not available to query")
 	}
-	resp, err := storageutil.ServeStorageQuery(ctx, s.storage, req)
+	resp, err := rpcsrv.ServeQuery(ctx, s.storage, req)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, err.Error())

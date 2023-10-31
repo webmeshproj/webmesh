@@ -35,7 +35,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/embed"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/storage"
-	"github.com/webmeshproj/webmesh/pkg/storage/storageutil"
+	"github.com/webmeshproj/webmesh/pkg/storage/rpcsrv"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -248,7 +248,7 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 		return nil, ErrNotConnected
 	}
 	app.log.Info("Querying storage for connection", "id", req.GetId())
-	return storageutil.ServeStorageQuery(ctx, conn.MeshNode().Storage(), req.GetQuery())
+	return rpcsrv.ServeQuery(ctx, conn.MeshNode().Storage(), req.GetQuery())
 }
 
 func (app *AppDaemon) Close() error {

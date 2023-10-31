@@ -34,8 +34,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/rpcdb"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
@@ -140,7 +140,7 @@ func (p *Plugin) Configure(ctx context.Context, req *v1.PluginConfiguration) (*e
 // InjectQuerier injects the querier.
 func (p *Plugin) InjectQuerier(srv v1.StorageQuerierPlugin_InjectQuerierServer) error {
 	p.datamux.Lock()
-	p.data = plugindb.OpenKeyVal(srv)
+	p.data = rpcdb.OpenKVServer(srv)
 	p.datamux.Unlock()
 	select {
 	case <-p.closec:

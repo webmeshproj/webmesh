@@ -239,12 +239,6 @@ func (q QueryFilters) GetByType(ftype FilterType) (QueryFilter, bool) {
 }
 
 func parsePutQuery(query *v1.QueryRequest, filters QueryFilters) (StorageQuery, error) {
-	// Everything needs valid JSON data.
-	var data map[string]any
-	err := json.Unmarshal([]byte(query.GetItem()), &data)
-	if err != nil {
-		return StorageQuery{}, errors.ErrInvalidQuery
-	}
 	switch query.GetType() {
 	case v1.QueryRequest_NETWORK_STATE, v1.QueryRequest_RBAC_STATE:
 		// Not supported yet, but should be in the future.
@@ -260,6 +254,12 @@ func parsePutQuery(query *v1.QueryRequest, filters QueryFilters) (StorageQuery, 
 		}
 		return StorageQuery{QueryRequest: query, filters: filters}, nil
 	default:
+		// Everything needs valid JSON data.
+		var data map[string]any
+		err := json.Unmarshal([]byte(query.GetItem()), &data)
+		if err != nil {
+			return StorageQuery{}, errors.ErrInvalidQuery
+		}
 		return StorageQuery{QueryRequest: query, filters: filters}, nil
 	}
 }

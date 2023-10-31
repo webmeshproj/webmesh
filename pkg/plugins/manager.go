@@ -35,8 +35,8 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
-	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/rpcsrv"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -407,7 +407,7 @@ func (m *manager) handleQueries(db storage.Provider) {
 
 // handleQueryClient handles a query client.
 func (m *manager) handleQueryClient(plugin string, db storage.Provider, queries v1.StorageQuerierPlugin_InjectQuerierClient) {
-	err := plugindb.Serve(context.WithLogger(context.Background(), m.log), db, queries)
+	err := rpcsrv.Serve(context.WithLogger(context.Background(), m.log), db, queries)
 	if err != nil {
 		m.log.Error("Error handling query stream", "plugin", plugin, "error", err)
 	}

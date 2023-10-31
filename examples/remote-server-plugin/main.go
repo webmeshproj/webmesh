@@ -10,8 +10,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/webmeshproj/webmesh/pkg/plugins"
-	"github.com/webmeshproj/webmesh/pkg/plugins/plugindb"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/rpcdb"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
@@ -72,7 +72,7 @@ func (p *Plugin) Emit(ctx context.Context, ev *v1.Event) (*emptypb.Empty, error)
 // It is called after Configure and before any other methods are called. The stream
 // can be used with the plugindb package to open a database connection.
 func (p *Plugin) InjectQuerier(srv v1.StorageQuerierPlugin_InjectQuerierServer) error {
-	p.data = plugindb.OpenDB(srv)
+	p.data = rpcdb.OpenServer(srv)
 	select {
 	case <-p.closec:
 	case <-srv.Context().Done():
