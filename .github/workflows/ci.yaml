@@ -200,7 +200,7 @@ jobs:
 
       - name: Update AUR Packages
         shell: bash
-        if: ${{ vars.BUILD_PLATFORM == 'self-hosted' && startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ startsWith(vars.BUILD_PLATFORM, 'self-hosted') && startsWith(github.ref, 'refs/tags/v') }}
         env:
           VERSION: ${{ github.ref_name }}
         run: |
