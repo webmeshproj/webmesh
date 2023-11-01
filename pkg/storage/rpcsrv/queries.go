@@ -37,23 +37,26 @@ var (
 )
 
 // ServeQuery serves a storage query given a database and a query request.
-func ServeQuery(ctx context.Context, db storage.Provider, req *v1.QueryRequest) (*v1.QueryResponse, error) {
-	// Parse the request
+func ServeQuery(ctx context.Context, db storage.Provider, req *v1.QueryRequest) *v1.QueryResponse {
 	query, err := types.ParseStorageQuery(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidQuery, err)
+		return &v1.QueryResponse{
+			Error: fmt.Errorf("%w: %w", ErrInvalidQuery, err).Error(),
+		}
 	}
 	switch req.GetCommand() {
 	case v1.QueryRequest_GET:
-		return doGetQuery(ctx, db, query), nil
+		return doGetQuery(ctx, db, query)
 	case v1.QueryRequest_LIST:
-		return doListQuery(ctx, db, query), nil
+		return doListQuery(ctx, db, query)
 	case v1.QueryRequest_PUT:
-		return doPutQuery(ctx, db, query), nil
+		return doPutQuery(ctx, db, query)
 	case v1.QueryRequest_DELETE:
-		return doDeleteQuery(ctx, db, query), nil
+		return doDeleteQuery(ctx, db, query)
 	default:
-		return nil, fmt.Errorf("%w: unknown query command %s", ErrInvalidQuery, req.GetCommand().String())
+		return &v1.QueryResponse{
+			Error: fmt.Errorf("%w: unknown query command %s", ErrInvalidQuery, req.GetCommand().String()).Error(),
+		}
 	}
 }
 

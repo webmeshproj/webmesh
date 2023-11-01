@@ -62,12 +62,7 @@ func Serve(ctx context.Context, db storage.Provider, cli QueryClient) error {
 			"type", query.GetType().String(),
 			"query", query.GetQuery(),
 		)
-		resp, err := ServeQuery(ctx, db, query)
-		if err != nil {
-			log.Error("Error handling query", "error", err)
-		}
-		// We send the response back no matter what.
-		err = cli.Send(resp)
+		err = cli.Send(ServeQuery(ctx, db, query))
 		if err != nil {
 			log.Error("Error sending query response", "error", err)
 			return err

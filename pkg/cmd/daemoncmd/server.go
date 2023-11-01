@@ -248,7 +248,7 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 		return nil, ErrNotConnected
 	}
 	app.log.Info("Querying storage for connection", "id", req.GetId())
-	return rpcsrv.ServeQuery(ctx, conn.MeshNode().Storage(), req.GetQuery())
+	return rpcsrv.ServeQuery(ctx, conn.MeshNode().Storage(), req.GetQuery()), nil
 }
 
 func (app *AppDaemon) Close() error {

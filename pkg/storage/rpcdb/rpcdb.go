@@ -78,12 +78,12 @@ func QuerierFromServer(s QueryServer) Querier {
 	return QuerierFunc(func(ctx context.Context, query *v1.QueryRequest) (*v1.QueryResponse, error) {
 		mu.Lock()
 		defer mu.Unlock()
+		resp := make(chan *v1.QueryResponse, 1)
+		errs := make(chan error, 1)
 		err := s.Send(query)
 		if err != nil {
 			return nil, err
 		}
-		resp := make(chan *v1.QueryResponse, 1)
-		errs := make(chan error, 1)
 		go func() {
 			r, err := s.Recv()
 			if err != nil {
