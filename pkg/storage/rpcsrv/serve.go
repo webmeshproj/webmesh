@@ -43,7 +43,7 @@ func Serve(ctx context.Context, db storage.Provider, cli QueryClient) error {
 	defer func() {
 		err := cli.CloseSend()
 		if err != nil {
-			log.Error("Error closing query stream", "error", err)
+			log.Warn("Error closing query stream", "error", err)
 		}
 	}()
 	for {
