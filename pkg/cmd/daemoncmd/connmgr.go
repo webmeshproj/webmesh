@@ -18,6 +18,7 @@ package daemoncmd
 
 import (
 	"encoding/base64"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"runtime"
@@ -58,7 +59,17 @@ type ConnManager struct {
 }
 
 // NewConnManager creates a new connection manager.
-func NewConnManager(nodeID types.NodeID, conf Config, key crypto.PrivateKey) *ConnManager {
+func NewConnManager(conf Config) (*ConnManager, error) {
+	key, err := conf.LoadKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load key: %w", err)
+	}
+	var nodeID types.NodeID
+	if conf.NodeID != "" {
+		nodeID = types.NodeID(conf.NodeID)
+	} else {
+		nodeID = types.NodeID(key.ID())
+	}
 	return &ConnManager{
 		conns:  make(map[string]embed.Node),
 		ports:  make(map[uint16]string),
@@ -66,7 +77,7 @@ func NewConnManager(nodeID types.NodeID, conf Config, key crypto.PrivateKey) *Co
 		key:    key,
 		conf:   conf,
 		log:    logging.NewLogger(conf.LogLevel, conf.LogFormat).With("appdaemon", "connmgr"),
-	}
+	}, nil
 }
 
 // Close closes the connection manager and all connections.

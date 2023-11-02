@@ -26,18 +26,13 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
-	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage/rpcsrv"
-	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
 	connmgr   *ConnManager
-	conf      Config
-	nodeID    types.NodeID
-	key       crypto.PrivateKey
 	validator *protovalidate.Validator
 	log       *slog.Logger
 }
@@ -48,21 +43,12 @@ func NewServer(conf Config) (*AppDaemon, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator: %w", err)
 	}
-	key, err := conf.LoadKey()
+	connmgr, err := NewConnManager(conf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load key: %w", err)
-	}
-	var nodeID types.NodeID
-	if conf.NodeID != "" {
-		nodeID = types.NodeID(conf.NodeID)
-	} else {
-		nodeID = types.NodeID(key.ID())
+		return nil, fmt.Errorf("failed to create connection manager: %w", err)
 	}
 	return &AppDaemon{
-		connmgr:   NewConnManager(nodeID, conf, key),
-		conf:      conf,
-		nodeID:    nodeID,
-		key:       key,
+		connmgr:   connmgr,
 		validator: v,
 		log:       conf.NewLogger().With("appdaemon", "server"),
 	}, nil
