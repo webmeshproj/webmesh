@@ -31,7 +31,7 @@ func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) er
 	if addr.Addr().Is6() {
 		family = "ipv6"
 	}
-	err = common.Exec(ctx, "netsh", "interface", family, "set", "address",
+	err := common.Exec(ctx, "netsh", "interface", family, "set", "address",
 		fmt.Sprintf("%q", name),
 		addr.Addr().String(),
 		"store=active",
