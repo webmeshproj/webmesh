@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -33,6 +34,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
 	"github.com/webmeshproj/webmesh/pkg/logging"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
@@ -100,11 +102,7 @@ func (m *ConnManager) Close() error {
 func (m *ConnManager) ConnIDs() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	ids := make([]string, 0, len(m.conns))
-	for id := range m.conns {
-		ids = append(ids, id)
-	}
-	return ids
+	return m.listConnIDs()
 }
 
 // Get gets the connection for the given ID.
@@ -164,7 +162,10 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 		return "", nil, err
 	}
 	m.log.Info("Creating new webmesh node", "id", connID, "port", port)
-	cfg := m.buildConnConfig(ctx, req, connID, port)
+	cfg, err := m.buildConnConfig(ctx, req, connID, port)
+	if err != nil {
+		return "", nil, err
+	}
 	m.log.Debug("Generated webmesh node configuration", "id", connID, "config", cfg.ToMapStructure())
 	node, err = embed.NewNode(ctx, embed.Options{
 		Config: cfg,
@@ -175,6 +176,25 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 	}
 	m.conns[connID] = node
 	return connID, node, nil
+}
+
+func (m *ConnManager) listConnIDs() []string {
+	ids := make([]string, 0, len(m.conns))
+	for id := range m.conns {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (m *ConnManager) listInterfaceNames() []string {
+	names := make([]string, 0)
+	for _, conn := range m.conns {
+		if !conn.MeshNode().Started() {
+			continue
+		}
+		names = append(names, conn.MeshNode().Network().WireGuard().Name())
+	}
+	return names
 }
 
 func (m *ConnManager) assignListenPort(connID string) (uint16, error) {
@@ -192,7 +212,7 @@ func (m *ConnManager) assignListenPort(connID string) (uint16, error) {
 	}
 }
 
-func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectRequest, connID string, listenPort uint16) *config.Config {
+func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectRequest, connID string, listenPort uint16) (*config.Config, error) {
 	conf := config.NewDefaultConfig(m.nodeID.String())
 	conf.Storage.InMemory = true
 	if m.conf.Persistence.Path != "" {
@@ -200,6 +220,42 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		conf.Storage.Path = filepath.Join(m.conf.Persistence.Path, connID)
 	}
 	conf.WireGuard.ListenPort = int(listenPort)
+	var eps endpoints.PrefixList
+	if len(req.GetNetworking().GetEndpoints()) > 0 {
+		for _, addrstr := range req.GetNetworking().GetEndpoints() {
+			addr, err := netip.ParseAddr(addrstr)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid endpoint address: %v", err)
+			}
+			var prefix int
+			if addr.Is4() {
+				prefix = 32
+			} else {
+				prefix = 128
+			}
+			eps = append(eps, netip.PrefixFrom(addr, prefix))
+		}
+	}
+	if req.GetNetworking().GetDetectEndpoints() {
+		detected, err := endpoints.Detect(ctx, endpoints.DetectOpts{
+			DetectIPv6:     true,
+			DetectPrivate:  true,
+			SkipInterfaces: m.listInterfaceNames(),
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to detect endpoints: %v", err)
+		}
+		eps = append(eps, detected...)
+	}
+	// Set the primary endpoint to any public addresses.
+	// TODO: Make this configurable.
+	if eps.FirstPublicAddr().IsValid() {
+		conf.Mesh.PrimaryEndpoint = eps.FirstPublicAddr().String()
+	}
+	// Set all endpoints as wireguard endpoints.
+	for _, addrport := range eps.AddrPorts(listenPort) {
+		conf.WireGuard.Endpoints = append(conf.WireGuard.Endpoints, addrport.String())
+	}
 	if runtime.GOOS != "darwin" {
 		// Set a unique interface name on non-darwin systems.
 		conf.WireGuard.InterfaceName = connID + "0"
@@ -309,5 +365,5 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 			}
 		}
 	}
-	return conf
+	return conf, nil
 }
