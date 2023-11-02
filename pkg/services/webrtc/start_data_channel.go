@@ -25,12 +25,12 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/go/v1"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/services/rbac"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
@@ -224,7 +224,7 @@ func (s *Server) handleRemoteNegotiation(log *slog.Logger, clientStream v1.WebRT
 	var tries int
 	maxRetries := 5
 	log.Info("Negotiating data channel with remote peer")
-	var conn *grpc.ClientConn
+	var conn transport.RPCClientConn
 	var err error
 	for tries < maxRetries {
 		conn, err = s.opts.NodeDialer.DialNode(clientStream.Context(), types.NodeID(r.GetNodeID()))

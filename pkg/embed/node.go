@@ -25,8 +25,6 @@ import (
 	"net/netip"
 	"sync"
 
-	"google.golang.org/grpc"
-
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
@@ -228,11 +226,11 @@ func (s *node) Dial(ctx context.Context, network, address string) (net.Conn, err
 	return s.mesh.Dial(ctx, network, address)
 }
 
-func (s *node) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
+func (s *node) DialLeader(ctx context.Context) (transport.RPCClientConn, error) {
 	return s.mesh.DialLeader(ctx)
 }
 
-func (s *node) DialNode(ctx context.Context, nodeID types.NodeID) (*grpc.ClientConn, error) {
+func (s *node) DialNode(ctx context.Context, nodeID types.NodeID) (transport.RPCClientConn, error) {
 	return s.mesh.DialNode(ctx, nodeID)
 }
 

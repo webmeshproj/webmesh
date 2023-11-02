@@ -32,11 +32,11 @@ import (
 	"time"
 
 	v1 "github.com/webmeshproj/api/go/v1"
-	"google.golang.org/grpc"
 
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/dns"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnode"
 	"github.com/webmeshproj/webmesh/pkg/services"
 	"github.com/webmeshproj/webmesh/pkg/services/meshdns"
@@ -264,7 +264,7 @@ func RunBridgeConnection(ctx context.Context, conf config.BridgeOptions) error {
 				if ctx.Err() != nil {
 					return handleErr(fmt.Errorf("timed out starting up mesh bridge: %w", ctx.Err()))
 				}
-				var c *grpc.ClientConn
+				var c transport.RPCClientConn
 				c, err = meshConn.DialLeader(ctx)
 				if err != nil {
 					tries++

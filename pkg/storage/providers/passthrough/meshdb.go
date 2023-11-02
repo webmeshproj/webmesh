@@ -18,6 +18,7 @@ package passthrough
 
 import (
 	"context"
+	"fmt"
 	"net/netip"
 	"strconv"
 	"sync"
@@ -76,9 +77,15 @@ func (mdb *MeshDataStore) dial(ctx context.Context) error {
 		defer cancel()
 	}
 	var err error
-	mdb.conn, err = mdb.dialer.DialNode(ctx, "")
+	conn, err := mdb.dialer.DialNode(ctx, "")
 	if err != nil {
 		return err
+	}
+	if c, ok := conn.(*grpc.ClientConn); ok {
+		mdb.conn = c
+	} else {
+		defer conn.Close()
+		return fmt.Errorf("invalid connection type: %T", conn)
 	}
 	mdb.cli = v1.NewStorageQueryServiceClient(mdb.conn)
 	return nil

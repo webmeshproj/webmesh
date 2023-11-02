@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"net"
 
-	"google.golang.org/grpc"
-
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -35,20 +33,20 @@ type Dialer interface {
 // LeaderDialer is the interface for dialing the current leader.
 type LeaderDialer interface {
 	// DialLeader opens a gRPC connection to the current leader.
-	DialLeader(ctx context.Context) (*grpc.ClientConn, error)
+	DialLeader(ctx context.Context) (RPCClientConn, error)
 }
 
 // LeaderDialerFunc is a function that implements LeaderDialer.
-type LeaderDialerFunc func(ctx context.Context) (*grpc.ClientConn, error)
+type LeaderDialerFunc func(ctx context.Context) (RPCClientConn, error)
 
 // DialLeader implements LeaderDialer.
-func (f LeaderDialerFunc) DialLeader(ctx context.Context) (*grpc.ClientConn, error) {
+func (f LeaderDialerFunc) DialLeader(ctx context.Context) (RPCClientConn, error) {
 	return f(ctx)
 }
 
 // NewNoOpLeaderDialer returns a dialer that always returns an error.
 func NewNoOpLeaderDialer() LeaderDialer {
-	return LeaderDialerFunc(func(ctx context.Context) (*grpc.ClientConn, error) {
+	return LeaderDialerFunc(func(ctx context.Context) (RPCClientConn, error) {
 		return nil, fmt.Errorf("no-op leader dialer")
 	})
 }
@@ -56,22 +54,22 @@ func NewNoOpLeaderDialer() LeaderDialer {
 // NodeDialer is an interface for dialing an arbitrary node. The node ID
 // is optional and if empty, implementations can choose the node to dial.
 type NodeDialer interface {
-	DialNode(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error)
+	DialNode(ctx context.Context, id types.NodeID) (RPCClientConn, error)
 }
 
 // NodeDialerFunc is the function signature for dialing an arbitrary node.
 // It is supplied by the mesh during startup. It can be used as an
 // alternative to the NodeDialer interface.
-type NodeDialerFunc func(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error)
+type NodeDialerFunc func(ctx context.Context, id types.NodeID) (RPCClientConn, error)
 
 // Dial implements NodeDialer.
-func (f NodeDialerFunc) DialNode(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error) {
+func (f NodeDialerFunc) DialNode(ctx context.Context, id types.NodeID) (RPCClientConn, error) {
 	return f(ctx, id)
 }
 
 // NewNoOpNodeDialer returns a dialer that always returns an error.
 func NewNoOpNodeDialer() NodeDialer {
-	return NodeDialerFunc(func(ctx context.Context, id types.NodeID) (*grpc.ClientConn, error) {
+	return NodeDialerFunc(func(ctx context.Context, id types.NodeID) (RPCClientConn, error) {
 		return nil, fmt.Errorf("no-op node dialer")
 	})
 }
