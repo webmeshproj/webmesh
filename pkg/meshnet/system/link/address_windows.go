@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 
 	"github.com/webmeshproj/webmesh/pkg/common"
@@ -27,19 +28,37 @@ import (
 
 // SetInterfaceAddress sets the address of the interface with the given name.
 func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
-	family := "ipv4"
-	if addr.Addr().Is6() {
-		family = "ipv6"
+	if addr.Addr().Is4() {
+		return setIPv4Address(ctx, name, addr)
 	}
-	err := common.Exec(ctx, "netsh", "interface", family, "set", "address",
-		fmt.Sprintf("%q", name),
+	return setIPv6Address(ctx, name, addr)
+}
+
+func setIPv6Address(ctx context.Context, name string, addr netip.Prefix) error {
+	err := common.Exec(ctx,
+		"netsh", "interface", "ipv6",
+		"set", "address", fmt.Sprintf("%q", name),
 		addr.Addr().String(),
 		"store=active",
 	)
+	return err
+}
+
+func setIPv4Address(ctx context.Context, name string, addr netip.Prefix) error {
+	_, ipnet, err := net.ParseCIDR(addr.String())
 	if err != nil {
 		return err
 	}
-	return nil
+	err = common.Exec(ctx,
+		"netsh", "interface", "ipv4",
+		"set", "address", fmt.Sprintf("%q", name),
+		"static",
+		addr.Addr().String(),        // Address
+		net.IP(ipnet.Mask).String(), // Subnet mask
+		addr.Addr().String(),        // Gateway as address
+		"store=active",
+	)
+	return err
 }
 
 // RemoveInterfaceAddress removes the address of the interface with the given name.

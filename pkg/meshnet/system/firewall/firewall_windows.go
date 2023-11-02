@@ -17,11 +17,11 @@ limitations under the License.
 package firewall
 
 import (
-	"context"
 	"fmt"
 	"net"
 
 	"github.com/webmeshproj/webmesh/pkg/common"
+	"github.com/webmeshproj/webmesh/pkg/context"
 )
 
 func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
@@ -37,13 +37,22 @@ func (wf *winFirewall) AddWireguardForwarding(ctx context.Context, ifaceName str
 	if err != nil {
 		return err
 	}
-	index := iface.Index
-	err = common.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
-		`name="WireGuard Forwarding"`, "dir=in", "action=allow",
-		fmt.Sprintf("interface=%d", index),
-	)
+	addrs, err := iface.Addrs()
 	if err != nil {
 		return err
+	}
+	for _, addrnet := range addrs {
+		addr, ok := addrnet.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		err = common.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
+			`name="webmesh-forward-inbound"`, "dir=in", "action=allow",
+			fmt.Sprintf("localip=%s", addr.IP.String()),
+		)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -54,25 +63,39 @@ func (wf *winFirewall) AddMasquerade(ctx context.Context, ifaceName string) erro
 	if err != nil {
 		return err
 	}
-	index := iface.Index
-	err = common.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
-		`name="WireGuard Masquerade"`, "dir=out", "action=allow",
-		fmt.Sprintf("interface=%d", index),
-	)
+	addrs, err := iface.Addrs()
 	if err != nil {
 		return err
+	}
+	for _, addrnet := range addrs {
+		addr, ok := addrnet.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		err = common.Exec(ctx, "netsh", "advfirewall", "firewall", "add", "rule",
+			`name="webmesh-forward-outbound"`, "dir=out", "action=allow",
+			fmt.Sprintf("localip=%s", addr.IP.String()),
+		)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // Clear should clear any changes made to the firewall.
 func (wf *winFirewall) Clear(ctx context.Context) error {
-	// No-op for now, but we may want to add a way to remove the rules we added.
+	for _, name := range []string{"webmesh-forward-inbound", "webmesh-forward-outbound"} {
+		err := common.Exec(ctx, "netsh", "advfirewall", "firewall", "delete", "rule", fmt.Sprintf(`name="%s"`, name))
+		if err != nil {
+			context.LoggerFrom(ctx).Debug("Failed to delete firewall rule", "error", err.Error())
+		}
+	}
 	return nil
 }
 
 // Close should close any resources used by the firewall. It should also perform a Clear.
 func (wf *winFirewall) Close(ctx context.Context) error {
 	// No-op for now, but we may want to add a way to remove the rules we added.
-	return nil
+	return wf.Clear(ctx)
 }

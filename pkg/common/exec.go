@@ -31,7 +31,7 @@ func Exec(ctx context.Context, command string, args ...string) error {
 	cmd := exec.CommandContext(ctx, command, args...)
 	log.Debug(command, slog.String("args", strings.Join(args, " ")))
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s %v: %w: %s", command, args, err, out)
+		return procError(command, args, err, out)
 	}
 	return nil
 }
@@ -41,5 +41,13 @@ func ExecOutput(ctx context.Context, command string, args ...string) ([]byte, er
 	log := context.LoggerFrom(ctx)
 	cmd := exec.CommandContext(ctx, command, args...)
 	log.Debug(command, slog.String("args", strings.Join(args, " ")))
-	return cmd.CombinedOutput()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, procError(command, args, err, out)
+	}
+	return out, nil
+}
+
+func procError(command string, args []string, err error, out []byte) error {
+	return fmt.Errorf("%s %s: %w: %s", command, strings.Join(args, " "), err, out)
 }
