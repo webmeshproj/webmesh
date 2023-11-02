@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/netip"
 
 	"github.com/webmeshproj/webmesh/pkg/common"
@@ -28,10 +27,6 @@ import (
 
 // SetInterfaceAddress sets the address of the interface with the given name.
 func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
-	_, ipnet, err := net.ParseCIDR(addr.String())
-	if err != nil {
-		return err
-	}
 	family := "ipv4"
 	if addr.Addr().Is6() {
 		family = "ipv6"
