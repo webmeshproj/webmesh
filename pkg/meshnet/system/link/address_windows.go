@@ -33,10 +33,8 @@ func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) er
 		return err
 	}
 	family := "ipv4"
-	mask := net.IP(ipnet.Mask).String()
 	if addr.Addr().Is6() {
 		family = "ipv6"
-		mask = fmt.Sprintf("%d", addr.Bits())
 	}
 	err = common.Exec(ctx, "netsh", "interface", family, "set", "address",
 		fmt.Sprintf("%q", name),
