@@ -33,6 +33,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/webrtc"
 )
 
 var (
@@ -66,7 +67,7 @@ func portForward(cmd *cobra.Command, nodeID string, portForwardSpec string) erro
 	if err != nil {
 		return fmt.Errorf("failed to get dial options: %w", err)
 	}
-	pc, err := datachannels.NewPeerConnectionClient(cmd.Context(), portForwardProtocol, tcp.NewSignalTransport(tcp.WebRTCSignalOptions{
+	pc, err := datachannels.NewPeerConnectionClient(cmd.Context(), portForwardProtocol, webrtc.NewSignalTransport(webrtc.SignalOptions{
 		Resolver: transport.FeatureResolverFunc(func(ctx context.Context, lookup v1.Feature) ([]netip.AddrPort, error) {
 			// Return the server address from our config
 			addrport, err := netip.ParseAddrPort(cliConfig.GetCurrentCluster().Server)
@@ -75,7 +76,10 @@ func portForward(cmd *cobra.Command, nodeID string, portForwardSpec string) erro
 			}
 			return []netip.AddrPort{addrport}, nil
 		}),
-		Credentials: creds,
+		Transport: tcp.NewGRPCTransport(tcp.TransportOptions{
+			MaxRetries:  3,
+			Credentials: creds,
+		}),
 		NodeID:      nodeID,
 		TargetProto: portForwardProtocol,
 		TargetAddr:  netip.MustParseAddrPort(net.JoinHostPort(portForwardAddress, strconv.Itoa(int(spec.RemotePort)))),

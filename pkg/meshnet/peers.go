@@ -39,6 +39,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/datachannels"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/libp2p"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/tcp"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport/webrtc"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
@@ -507,9 +508,12 @@ func (m *peerManager) getSignalingTransport(ctx context.Context, peer *v1.WireGu
 			return mn.GetId() != peer.GetNode().GetId()
 		})
 	}
-	return tcp.NewSignalTransport(tcp.WebRTCSignalOptions{
-		Resolver:    resolver,
-		Credentials: m.net.opts.DialOptions,
+	return webrtc.NewSignalTransport(webrtc.SignalOptions{
+		Resolver: resolver,
+		Transport: tcp.NewGRPCTransport(tcp.TransportOptions{
+			MaxRetries:  5,
+			Credentials: m.net.opts.Credentials,
+		}),
 		NodeID:      peer.GetNode().GetId(),
 		TargetProto: "udp",
 		TargetAddr:  netip.AddrPortFrom(netip.IPv4Unspecified(), 0),

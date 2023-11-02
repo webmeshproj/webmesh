@@ -71,8 +71,8 @@ type Options struct {
 	GRPCPort int
 	// ZoneAwarenessID is the zone awareness ID.
 	ZoneAwarenessID string
-	// DialOptions are the dial options to use when calling peer nodes.
-	DialOptions []grpc.DialOption
+	// Credentials are the dial options to use when calling peer nodes.
+	Credentials []grpc.DialOption
 	// LocalDNSAddr is a local network address service MeshDNS.
 	LocalDNSAddr netip.AddrPort
 	// DisableIPv4 disables IPv4 on the interface.

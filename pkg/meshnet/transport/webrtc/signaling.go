@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tcp
+// Package webrtc contains transports for WebRTC.
+package webrtc
 
 import (
 	"encoding/json"
@@ -35,12 +36,12 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 )
 
-// WebRTCSignalOptions are options for configuring the WebRTC transport.
-type WebRTCSignalOptions struct {
-	// Resolver is a resolver for looking up nodes with the ICE negotiation feature
+// SignalOptions are options for configuring the WebRTC transport.
+type SignalOptions struct {
+	// Resolver is a resolver for looking up nodes with the ICE negotiation feature.
 	Resolver transport.FeatureResolver
-	// Credentials are credentials to use for the gRPC connection.
-	Credentials []grpc.DialOption
+	// Transport is the transport for creating gRPC connections.
+	Transport transport.RPCTransport
 	// NodeID is the id of the remote node to signal to.
 	NodeID string
 	// TargetProto is the target protocol to request from the remote node.
@@ -49,21 +50,21 @@ type WebRTCSignalOptions struct {
 	TargetAddr netip.AddrPort
 }
 
-// NewExternalSignalTransport returns a new WebRTC signaling transport that attempts
-// to negotiate a WebRTC connection using the Webmesh WebRTC signaling server. This is
-// typically used by clients trying to create a proxy connection to a server.
-func NewSignalTransport(opts WebRTCSignalOptions) transport.WebRTCSignalTransport {
+// NewSignalTransport returns a new WebRTC signaling transport that attempts
+// to negotiate a WebRTC connection using the Webmesh WebRTC signaling server.
+// This is typically used by clients trying to create a proxy connection to a server.
+func NewSignalTransport(opts SignalOptions) transport.WebRTCSignalTransport {
 	return &webrtcSignalTransport{
-		WebRTCSignalOptions: opts,
-		candidatec:          make(chan webrtc.ICECandidateInit, 16),
-		errc:                make(chan error, 1),
-		cancel:              func() {},
-		closec:              make(chan struct{}),
+		SignalOptions: opts,
+		candidatec:    make(chan webrtc.ICECandidateInit, 16),
+		errc:          make(chan error, 1),
+		cancel:        func() {},
+		closec:        make(chan struct{}),
 	}
 }
 
 type webrtcSignalTransport struct {
-	WebRTCSignalOptions
+	SignalOptions
 
 	stream            v1.WebRTC_StartDataChannelClient
 	turnServers       []webrtc.ICEServer
@@ -94,7 +95,7 @@ Connect:
 		var tries int
 		maxRetries := 5
 		for tries < maxRetries {
-			conn, err = grpc.Dial(addr.String(), rt.Credentials...)
+			conn, err = rt.Transport.Dial(ctx, rt.NodeID, addr.String())
 			if err == nil {
 				break Connect
 			}
