@@ -113,24 +113,8 @@ func (m *ConnManager) Get(connID string) (embed.Node, bool) {
 	return n, ok
 }
 
-// Disconnect disconnects the connection for the given ID.
-func (m *ConnManager) Disconnect(ctx context.Context, connID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	conn, ok := m.conns[connID]
-	if !ok {
-		return ErrNotConnected
-	}
-	wgport, err := conn.MeshNode().Network().WireGuard().ListenPort()
-	if err != nil {
-		return err
-	}
-	delete(m.conns, connID)
-	delete(m.ports, uint16(wgport))
-	return conn.Stop(ctx)
-}
-
-// NewConn creates a new connection for the given request.
+// NewConn creates a new connection for the given request. Start must be called
+// opn the returned node to start the connection.
 func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id string, node embed.Node, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -171,6 +155,30 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 	}
 	m.conns[connID] = node
 	return connID, node, nil
+}
+
+// Disconnect disconnects the connection for the given ID.
+func (m *ConnManager) Disconnect(ctx context.Context, connID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	conn, ok := m.conns[connID]
+	if !ok {
+		return ErrNotConnected
+	}
+	if !conn.MeshNode().Started() {
+		// This means disconnect was called before the node
+		// was started, very likely by the client. We'll end
+		// up with a stale port assignment for now.
+		delete(m.conns, connID)
+		return ErrNotConnected
+	}
+	wgport, err := conn.MeshNode().Network().WireGuard().ListenPort()
+	if err != nil {
+		return err
+	}
+	delete(m.conns, connID)
+	delete(m.ports, uint16(wgport))
+	return conn.Stop(ctx)
 }
 
 func (m *ConnManager) listConnIDs() []string {

@@ -115,6 +115,10 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 			// Disconnect was called on a connection before we got here.
 			continue
 		}
+		if !conn.MeshNode().Started() {
+			res.Interfaces[id] = &v1.InterfaceMetrics{}
+			continue
+		}
 		metrics, err := conn.MeshNode().Network().WireGuard().Metrics()
 		if err != nil {
 			app.log.Error("Error getting metrics for connection", "id", id, "error", err.Error())
@@ -166,6 +170,9 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 	}
 	conn, ok := app.connmgr.Get(req.GetId())
 	if !ok {
+		return nil, ErrNotConnected
+	}
+	if !conn.MeshNode().Started() {
 		return nil, ErrNotConnected
 	}
 	app.log.Info("Querying storage for connection", "id", req.GetId())
