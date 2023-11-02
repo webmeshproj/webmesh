@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/netip"
 
 	"github.com/hashicorp/raft"
@@ -28,12 +29,18 @@ import (
 	"google.golang.org/grpc"
 )
 
+// RPCClientConn is a grpc.ClientConnInterface that can be closed.
+type RPCClientConn interface {
+	grpc.ClientConnInterface
+	io.Closer
+}
+
 // RPCTransport is the interface for opening a gRPC connection to a remote peer.
 // the ID is optional and may be ignored by implementations.
 type RPCTransport interface {
 	// Dial opens a gRPC client connection to the remote address. Implementations
-	// may choose to ignore the address and dial a specific peer.
-	Dial(ctx context.Context, id, address string) (*grpc.ClientConn, error)
+	// may choose to ignore the id or address.
+	Dial(ctx context.Context, id, address string) (RPCClientConn, error)
 }
 
 // BootstrapTransport is the interface for dialing other peers to bootstrap

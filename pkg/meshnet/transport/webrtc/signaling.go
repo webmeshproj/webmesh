@@ -28,7 +28,6 @@ import (
 
 	"github.com/pion/webrtc/v3"
 	v1 "github.com/webmeshproj/api/go/v1"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -89,7 +88,7 @@ func (rt *webrtcSignalTransport) Start(ctx context.Context) error {
 	if len(addrs) == 0 {
 		return errors.New("no signaling servers found")
 	}
-	var conn *grpc.ClientConn
+	var conn transport.RPCClientConn
 Connect:
 	for _, addr := range addrs {
 		var tries int
@@ -239,7 +238,7 @@ func (rt *webrtcSignalTransport) Close() error {
 	return rt.stream.CloseSend()
 }
 
-func (rt *webrtcSignalTransport) handleNegotiateStream(ctx context.Context, conn *grpc.ClientConn, stream v1.WebRTC_StartDataChannelClient) {
+func (rt *webrtcSignalTransport) handleNegotiateStream(ctx context.Context, conn transport.RPCClientConn, stream v1.WebRTC_StartDataChannelClient) {
 	log := context.LoggerFrom(ctx)
 	defer close(rt.errc)
 	defer conn.Close()

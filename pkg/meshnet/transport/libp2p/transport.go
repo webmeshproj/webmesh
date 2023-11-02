@@ -106,7 +106,7 @@ type rpcDiscoveryTransport struct {
 	close func()
 }
 
-func (r *rpcDiscoveryTransport) Dial(ctx context.Context, _, _ string) (*grpc.ClientConn, error) {
+func (r *rpcDiscoveryTransport) Dial(ctx context.Context, _, _ string) (transport.RPCClientConn, error) {
 	log := context.LoggerFrom(ctx).With(slog.String("host-id", r.host.Host().ID().String()))
 	ctx = context.WithLogger(ctx, log)
 	rt := NewTransport(r.host, r.Credentials...)
@@ -176,7 +176,7 @@ type rpcTransport struct {
 	creds []grpc.DialOption
 }
 
-func (r *rpcTransport) Dial(ctx context.Context, id, address string) (*grpc.ClientConn, error) {
+func (r *rpcTransport) Dial(ctx context.Context, id, address string) (transport.RPCClientConn, error) {
 	pid := peer.ID(id)
 	// Fastpath if we are using an uncertified peer store. We can add the address
 	// to the peerstore and dial directly. This saves the caller some work.

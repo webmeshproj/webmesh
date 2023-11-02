@@ -41,6 +41,7 @@ import (
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
+	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/plugins"
 	"github.com/webmeshproj/webmesh/pkg/plugins/builtins/idauth"
 	"github.com/webmeshproj/webmesh/pkg/plugins/clients"
@@ -78,7 +79,7 @@ func (*TestMeshAPI) ListNodes(context.Context, *emptypb.Empty) (*v1.NodeList, er
 	return nil, status.Errorf(codes.Internal, "something went wrong")
 }
 
-func RunClientConnTests(ctx context.Context, t *testing.T, c *grpc.ClientConn) {
+func RunClientConnTests(ctx context.Context, t *testing.T, c transport.RPCClientConn) {
 	t.Helper()
 	cli := v1.NewMeshClient(c)
 	_, err := cli.GetMeshGraph(ctx, &emptypb.Empty{})
