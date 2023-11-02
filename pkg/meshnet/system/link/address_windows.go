@@ -39,8 +39,8 @@ func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) er
 		mask = fmt.Sprintf("%d", addr.Bits())
 	}
 	err = common.Exec(ctx, "netsh", "interface", family, "set", "address",
-		fmt.Sprintf("%q", name), "static",
-		addr.Addr().String(), mask,
+		fmt.Sprintf("%q", name),
+		addr.Addr().String(),
 		"store=active",
 	)
 	if err != nil {
