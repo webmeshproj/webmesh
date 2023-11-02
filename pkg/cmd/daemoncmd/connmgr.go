@@ -132,31 +132,26 @@ func (m *ConnManager) Disconnect(ctx context.Context, connID string) error {
 
 // NewConn creates a new connection for the given request.
 func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id string, node embed.Node, err error) {
-	m.mu.RLock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	connID := req.GetId()
 	_, ok := m.conns[connID]
 	if ok {
-		m.mu.RUnlock()
 		return "", nil, ErrAlreadyConnected
 	}
 	if connID == "" {
 		var err error
 		connID, err = crypto.NewRandomID()
 		if err != nil {
-			m.mu.RUnlock()
 			return "", nil, status.Errorf(codes.Internal, "failed to generate connection ID: %v", err)
 		}
 		m.log.Info("Generated new connection ID", "id", connID)
 		// Double check that the ID is unique.
 		_, ok := m.conns[connID]
 		if ok {
-			m.mu.RUnlock()
 			return "", nil, status.Errorf(codes.Internal, "connection ID collision")
 		}
 	}
-	m.mu.RUnlock()
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	port, err := m.assignListenPort(connID)
 	if err != nil {
 		return "", nil, err
