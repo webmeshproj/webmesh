@@ -17,24 +17,16 @@ limitations under the License.
 package daemoncmd
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log/slog"
-	"path/filepath"
-	"runtime"
-	"sync"
 
 	"github.com/bufbuild/protovalidate-go"
 	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
-	"github.com/webmeshproj/webmesh/pkg/embed"
-	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
-	"github.com/webmeshproj/webmesh/pkg/storage"
 	"github.com/webmeshproj/webmesh/pkg/storage/rpcsrv"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
@@ -42,21 +34,13 @@ import (
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
-	conns     map[string]embed.Node
+	connmgr   *ConnManager
 	conf      Config
 	nodeID    types.NodeID
 	key       crypto.PrivateKey
 	validator *protovalidate.Validator
 	log       *slog.Logger
-	mu        sync.RWMutex
 }
-
-var (
-	// ErrNotConnected is returned when the node is not connected to the mesh.
-	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected to the specified network")
-	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
-	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected to the specified network")
-)
 
 // NewServer returns a new AppDaemon server.
 func NewServer(conf Config) (*AppDaemon, error) {
@@ -75,7 +59,7 @@ func NewServer(conf Config) (*AppDaemon, error) {
 		nodeID = types.NodeID(key.ID())
 	}
 	return &AppDaemon{
-		conns:     make(map[string]embed.Node),
+		connmgr:   NewConnManager(nodeID, conf, key),
 		conf:      conf,
 		nodeID:    nodeID,
 		key:       key,
@@ -89,42 +73,10 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	connID := req.GetId()
-	app.mu.RLock()
-	_, ok := app.conns[connID]
-	if ok {
-		app.mu.RUnlock()
-		return nil, ErrAlreadyConnected
-	}
-	if connID == "" {
-		var err error
-		connID, err = crypto.NewRandomID()
-		if err != nil {
-			app.mu.RUnlock()
-			return nil, status.Errorf(codes.Internal, "failed to generate connection ID: %v", err)
-		}
-		app.log.Info("Generated new connection ID", "id", connID)
-		// Double check that the ID is unique.
-		_, ok := app.conns[connID]
-		if ok {
-			app.mu.RUnlock()
-			return nil, status.Errorf(codes.Internal, "connection ID collision")
-		}
-	}
-	app.mu.RUnlock()
-	app.log.Info("Creating new node with ID", "id", connID)
-	cfg := app.buildConnConfig(ctx, req, connID)
-	app.log.Debug("Node configuration", "config", cfg, "id", connID)
-	node, err := embed.NewNode(ctx, embed.Options{
-		Config: cfg,
-		Key:    app.key,
-	})
+	connID, node, err := app.connmgr.NewConn(ctx, req)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create node: %v", err)
+		return nil, err
 	}
-	app.mu.Lock()
-	app.conns[connID] = node
-	app.mu.Unlock()
 	app.log.Info("Starting node", "id", connID)
 	err = node.Start(ctx)
 	if err != nil {
@@ -146,19 +98,7 @@ func (app *AppDaemon) Disconnect(ctx context.Context, req *v1.DisconnectRequest)
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	conn, ok := app.conns[req.GetId()]
-	if !ok {
-		return nil, ErrNotConnected
-	}
-	app.log.Info("Stopping node", "id", req.GetId())
-	delete(app.conns, req.GetId())
-	err = conn.Stop(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to stop node: %v", err)
-	}
-	return &v1.DisconnectResponse{}, nil
+	return &v1.DisconnectResponse{}, app.connmgr.Disconnect(ctx, req.GetId())
 }
 
 func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.MetricsResponse, error) {
@@ -166,22 +106,17 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.RLock()
-	defer app.mu.RUnlock()
-	if len(req.GetIds()) > 0 {
+	ids := req.GetIds()
+	if len(ids) > 0 {
 		for _, id := range req.GetIds() {
-			_, ok := app.conns[id]
+			_, ok := app.connmgr.Get(id)
 			if !ok {
 				return nil, ErrNotConnected
 			}
 		}
 	}
-	ids := req.GetIds()
 	if len(ids) == 0 {
-		ids = make([]string, 0, len(app.conns))
-		for id := range app.conns {
-			ids = append(ids, id)
-		}
+		ids = app.connmgr.ConnIDs()
 	}
 	app.log.Info("Getting metrics for connections", "ids", ids)
 	res := &v1.MetricsResponse{
@@ -189,7 +124,11 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 	}
 	for _, i := range ids {
 		id := i
-		conn := app.conns[id]
+		conn, ok := app.connmgr.Get(id)
+		if !ok {
+			// Disconnect was called on a connection before we got here.
+			continue
+		}
 		metrics, err := conn.MeshNode().Network().WireGuard().Metrics()
 		if err != nil {
 			app.log.Error("Error getting metrics for connection", "id", id, "error", err.Error())
@@ -205,9 +144,7 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.RLock()
-	defer app.mu.RUnlock()
-	c, ok := app.conns[req.GetId()]
+	c, ok := app.connmgr.Get(req.GetId())
 	if !ok {
 		app.log.Info("Status requested for unknown connection", "id", req.GetId())
 		return &v1.StatusResponse{
@@ -241,9 +178,7 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	app.mu.RLock()
-	defer app.mu.RUnlock()
-	conn, ok := app.conns[req.GetId()]
+	conn, ok := app.connmgr.Get(req.GetId())
 	if !ok {
 		return nil, ErrNotConnected
 	}
@@ -252,137 +187,7 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 }
 
 func (app *AppDaemon) Close() error {
-	app.mu.Lock()
-	defer app.mu.Unlock()
-	for id, conn := range app.conns {
-		app.log.Info("Stopping node", "id", id)
-		err := conn.Stop(context.WithLogger(context.Background(), app.log))
-		if err != nil {
-			app.log.Error("Error stopping node", "err", err)
-		}
-	}
-	app.conns = nil
-	return nil
-}
-
-func (app *AppDaemon) buildConnConfig(ctx context.Context, req *v1.ConnectRequest, connID string) *config.Config {
-	conf := config.NewDefaultConfig(app.nodeID.String())
-	conf.Storage.InMemory = true
-	if app.conf.Persistence.Path != "" {
-		conf.Storage.InMemory = false
-		conf.Storage.Path = filepath.Join(app.conf.Persistence.Path, connID)
-	}
-	conf.WireGuard.ListenPort = 0
-	if runtime.GOOS != "darwin" {
-		// Set a unique interface name on non-darwin systems.
-		conf.WireGuard.InterfaceName = connID + "0"
-	}
-	conf.Global.LogLevel = app.conf.LogLevel
-	conf.Global.LogFormat = app.conf.LogFormat
-	conf.Storage.LogLevel = app.conf.LogLevel
-	conf.Storage.LogFormat = app.conf.LogFormat
-	conf.Bootstrap.Enabled = req.GetBootstrap().GetEnabled()
-	if conf.Bootstrap.Enabled {
-		conf.Bootstrap.Admin = app.nodeID.String()
-		conf.Bootstrap.DisableRBAC = !req.GetBootstrap().GetRbacEnabled()
-		conf.Bootstrap.IPv4Network = storage.DefaultIPv4Network
-		conf.Bootstrap.MeshDomain = storage.DefaultMeshDomain
-		if req.GetBootstrap().GetIpv4Network() != "" {
-			conf.Bootstrap.IPv4Network = req.GetBootstrap().GetIpv4Network()
-		}
-		if req.GetBootstrap().GetDomain() != "" {
-			conf.Bootstrap.MeshDomain = req.GetBootstrap().GetDomain()
-		}
-		switch req.GetBootstrap().GetDefaultNetworkACL() {
-		case v1.MeshConnBootstrap_ACCEPT:
-			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyAccept)
-		case v1.MeshConnBootstrap_DROP:
-			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyDrop)
-		default:
-			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyAccept)
-		}
-	}
-	conf.TLS.Insecure = !req.GetTls().GetEnabled()
-	if !conf.TLS.Insecure {
-		if len(req.GetTls().GetCaCertData()) != 0 {
-			conf.TLS.CAData = base64.StdEncoding.EncodeToString(req.GetTls().GetCaCertData())
-		}
-		conf.TLS.VerifyChainOnly = req.GetTls().GetVerifyChainOnly()
-		conf.TLS.InsecureSkipVerify = req.GetTls().GetSkipVerify()
-	}
-	switch req.GetAddrType() {
-	case v1.ConnectRequest_ADDR:
-		conf.Mesh.JoinAddresses = req.GetAddrs()
-	case v1.ConnectRequest_RENDEZVOUS:
-		conf.Discovery.Discover = true
-		conf.Discovery.Rendezvous = req.GetAddrs()[0]
-	case v1.ConnectRequest_MULTIADDR:
-		conf.Mesh.JoinMultiaddrs = req.GetAddrs()
-	}
-	switch req.GetAuthMethod() {
-	case v1.NetworkAuthMethod_NO_AUTH:
-	case v1.NetworkAuthMethod_BASIC:
-		conf.Auth.Basic.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_USERNAME.String()])
-		conf.Auth.Basic.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_PASSWORD.String()])
-	case v1.NetworkAuthMethod_LDAP:
-		conf.Auth.LDAP.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()])
-		conf.Auth.LDAP.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()])
-	case v1.NetworkAuthMethod_MTLS:
-		conf.Auth.MTLS.CertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
-		conf.Auth.MTLS.KeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
-	case v1.NetworkAuthMethod_ID:
-		conf.Auth.IDAuth.Enabled = true
-	}
-	conf.Services.API.Disabled = !req.GetServices().GetEnabled()
-	if !conf.Services.API.Disabled {
-		conf.Services.API.DisableLeaderProxy = true
-		conf.Services.API.ListenAddress = req.GetServices().GetListenAddress()
-		conf.Services.API.LibP2P.Enabled = req.GetServices().GetEnableLibP2P()
-		conf.Services.API.LibP2P.LocalAddrs = req.GetServices().GetListenMultiaddrs()
-		conf.Services.API.LibP2P.Rendezvous = req.GetServices().GetRendezvous()
-		if len(conf.Services.API.LibP2P.Rendezvous) > 0 {
-			conf.Services.API.LibP2P.Announce = true
-		}
-		conf.Services.API.Insecure = !req.GetServices().GetEnableTLS()
-		if len(req.GetTls().GetCertData()) != 0 {
-			conf.Services.API.TLSCertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
-		}
-		if len(req.GetTls().GetKeyData()) != 0 {
-			conf.Services.API.TLSKeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
-		}
-		conf.Plugins.Configs = make(map[string]config.PluginConfig)
-		switch req.GetServices().GetAuthMethod() {
-		case v1.NetworkAuthMethod_NO_AUTH:
-		case v1.NetworkAuthMethod_ID:
-			conf.Plugins.Configs["id-auth"] = config.PluginConfig{
-				Config: map[string]any{}, // TODO: Support ID auth configurations.
-			}
-		case v1.NetworkAuthMethod_MTLS:
-			conf.Plugins.Configs["mtls"] = config.PluginConfig{
-				Config: map[string]any{
-					"ca-data": base64.StdEncoding.EncodeToString(req.GetTls().GetCaCertData()),
-				},
-			}
-		}
-		for _, feature := range req.GetServices().GetFeatures() {
-			switch feature {
-			case v1.Feature_LEADER_PROXY:
-				conf.Services.API.DisableLeaderProxy = false
-			case v1.Feature_MESH_API:
-				conf.Services.API.MeshEnabled = true
-			case v1.Feature_ADMIN_API:
-				conf.Services.API.AdminEnabled = true
-			case v1.Feature_MEMBERSHIP:
-				conf.Mesh.RequestVote = true
-			case v1.Feature_ICE_NEGOTIATION:
-				conf.Services.WebRTC.Enabled = true
-				// TODO: Support custom STUN servers
-			case v1.Feature_STORAGE_QUERIER:
-				conf.Mesh.RequestObserver = true
-			}
-		}
-	}
-	return conf
+	return app.connmgr.Close()
 }
 
 func newInvalidError(err error) error {
