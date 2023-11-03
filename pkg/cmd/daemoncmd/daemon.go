@@ -36,6 +36,8 @@ import (
 	"github.com/fullstorydev/grpcui/standalone"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	v1 "github.com/webmeshproj/api/go/v1"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -107,15 +109,16 @@ func runGRPCServer(ctx context.Context, log *slog.Logger, srv *grpc.Server, ln n
 
 func runGRPCWebServer(ctx context.Context, log *slog.Logger, srv *grpc.Server, ln net.Listener) error {
 	wrapped := grpcweb.WrapServer(srv, grpcweb.WithWebsockets(true))
+	handler := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		if wrapped.IsGrpcWebRequest(req) {
+			wrapped.ServeHTTP(resp, req)
+			return
+		}
+		// Fall down to the gRPC server
+		srv.ServeHTTP(resp, req)
+	})
 	httpSrv := &http.Server{
-		Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			if wrapped.IsGrpcWebRequest(req) {
-				wrapped.ServeHTTP(resp, req)
-				return
-			}
-			// Fall down to the gRPC server
-			srv.ServeHTTP(resp, req)
-		}),
+		Handler: h2c.NewHandler(handler, &http2.Server{}),
 	}
 	go func() {
 		<-ctx.Done()

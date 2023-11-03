@@ -26,6 +26,8 @@ import (
 	"sync"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -182,15 +184,16 @@ func (s *Server) ListenAndServe() error {
 			if s.opts.WebEnabled {
 				s.log.Info(fmt.Sprintf("Starting gRPC-web server on %s", s.lis.Addr().String()))
 				wrapped := grpcweb.WrapServer(s.srv, grpcweb.WithWebsockets(true))
+				handler := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+					if wrapped.IsGrpcWebRequest(req) {
+						wrapped.ServeHTTP(resp, req)
+						return
+					}
+					// Fall down to the gRPC server
+					s.srv.ServeHTTP(resp, req)
+				})
 				s.websrv = &http.Server{
-					Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-						if wrapped.IsGrpcWebRequest(req) {
-							wrapped.ServeHTTP(resp, req)
-							return
-						}
-						// Fall down to the gRPC server
-						s.srv.ServeHTTP(resp, req)
-					}),
+					Handler: h2c.NewHandler(handler, &http2.Server{}),
 				}
 				if err := s.websrv.Serve(s.lis); err != nil && err != http.ErrServerClosed {
 					return fmt.Errorf("grpc-web serve: %w", err)

@@ -25,6 +25,7 @@ services:
     entrypoint:
       - /webmesh-node
       - --daemon.enabled=true
+      - --daemon.grpc-web=true
       - --daemon.bind=[::]:8081
       - --daemon.ui.enabled=true
       - --daemon.ui.listen-address=[::]:8080
