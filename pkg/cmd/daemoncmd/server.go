@@ -134,33 +134,45 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	c, ok := app.connmgr.Get(req.GetId())
-	if !ok {
-		app.log.Info("Status requested for unknown connection", "id", req.GetId())
-		return &v1.StatusResponse{
-			ConnectionStatus: v1.StatusResponse_DISCONNECTED,
-		}, nil
+	ids := req.GetIds()
+	if len(ids) == 0 {
+		ids = app.connmgr.ConnIDs()
 	}
-	app.log.Info("Retrieving status for connection", "id", req.GetId())
-	return &v1.StatusResponse{
-		ConnectionStatus: func() v1.StatusResponse_ConnectionStatus {
-			if c.MeshNode().Started() {
-				return v1.StatusResponse_CONNECTED
+	res := &v1.StatusResponse{
+		Statuses: make(map[string]*v1.ConnectionStatus),
+	}
+	for _, connid := range ids {
+		id := connid
+		app.log.Info("Retrieving status for connection", "id", id)
+		c, ok := app.connmgr.Get(id)
+		if !ok {
+			app.log.Info("Status requested for unknown connection", "id", id)
+			res.Statuses[id] = &v1.ConnectionStatus{
+				ConnectionStatus: v1.ConnectionStatus_DISCONNECTED,
 			}
-			return v1.StatusResponse_CONNECTING
-		}(),
-		Node: func() *v1.MeshNode {
-			if !c.MeshNode().Started() {
-				return nil
+		} else {
+			res.Statuses[id] = &v1.ConnectionStatus{
+				ConnectionStatus: func() v1.ConnectionStatus_Status {
+					if c.MeshNode().Started() {
+						return v1.ConnectionStatus_CONNECTED
+					}
+					return v1.ConnectionStatus_CONNECTING
+				}(),
+				Node: func() *v1.MeshNode {
+					if !c.MeshNode().Started() {
+						return nil
+					}
+					node, err := c.MeshNode().Storage().MeshDB().Peers().Get(ctx, c.MeshNode().ID())
+					if err != nil {
+						app.log.Error("Error getting node from storage", "id", c.MeshNode().ID(), "error", err.Error())
+						return nil
+					}
+					return node.MeshNode
+				}(),
 			}
-			node, err := c.MeshNode().Storage().MeshDB().Peers().Get(ctx, c.MeshNode().ID())
-			if err != nil {
-				app.log.Error("Error getting node from storage", "id", c.MeshNode().ID(), "error", err.Error())
-				return nil
-			}
-			return node.MeshNode
-		}(),
-	}, nil
+		}
+	}
+	return res, nil
 }
 
 func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.QueryResponse, error) {
