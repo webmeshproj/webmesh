@@ -242,7 +242,7 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 	if req.GetNetworking().GetDetectEndpoints() {
 		detected, err := endpoints.Detect(ctx, endpoints.DetectOpts{
 			DetectIPv6:     true,
-			DetectPrivate:  true,
+			DetectPrivate:  req.GetNetworking().GetDetectPrivateEndpoints(),
 			SkipInterfaces: m.listInterfaceNames(),
 		})
 		if err != nil {
