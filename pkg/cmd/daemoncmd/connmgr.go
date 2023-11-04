@@ -46,6 +46,8 @@ var (
 	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected to the specified network")
 	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
 	ErrAlreadyConnected = status.Errorf(codes.FailedPrecondition, "already connected to the specified network")
+	// ErrConnected is returned when the node is connected to the mesh.
+	ErrConnected = status.Errorf(codes.FailedPrecondition, "connected to the specified network")
 )
 
 // ConnManager manages the connections for the daemon.
@@ -110,6 +112,11 @@ func (m *ConnManager) Get(connID string) (embed.Node, bool) {
 	defer m.mu.RUnlock()
 	n, ok := m.conns[connID]
 	return n, ok
+}
+
+// DataDir returns the data directory for the given connection ID.
+func (m *ConnManager) DataDir(connID string) string {
+	return filepath.Join(m.conf.Persistence.Path, connID)
 }
 
 // NewConn creates a new connection for the given request. Start must be called
@@ -223,7 +230,7 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 	conf.Storage.InMemory = true
 	if m.conf.Persistence.Path != "" {
 		conf.Storage.InMemory = false
-		conf.Storage.Path = filepath.Join(m.conf.Persistence.Path, connID)
+		conf.Storage.Path = m.DataDir(connID)
 	}
 	conf.WireGuard.ListenPort = int(listenPort)
 	var eps endpoints.PrefixList

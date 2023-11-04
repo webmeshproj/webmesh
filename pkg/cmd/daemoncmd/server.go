@@ -19,6 +19,7 @@ package daemoncmd
 import (
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/bufbuild/protovalidate-go"
 	v1 "github.com/webmeshproj/api/go/v1"
@@ -189,6 +190,20 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 	}
 	app.log.Info("Querying storage for connection", "id", req.GetId())
 	return rpcsrv.ServeQuery(ctx, conn.MeshNode().Storage(), req.GetQuery()), nil
+}
+
+func (app *AppDaemon) Drop(ctx context.Context, req *v1.AppDropRequest) (*v1.AppDropResponse, error) {
+	_, ok := app.connmgr.Get(req.GetId())
+	if ok {
+		return nil, ErrConnected
+	}
+	datadir := app.connmgr.DataDir(req.GetId())
+	app.log.Info("Dropping storage for connection", "id", req.GetId(), "datadir", datadir)
+	err := os.RemoveAll(datadir)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to drop storage: %v", err)
+	}
+	return &v1.AppDropResponse{}, nil
 }
 
 func (app *AppDaemon) Close() error {

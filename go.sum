@@ -1572,8 +1572,8 @@ github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1Y
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSDJfjId/PEGEShv6ugrt4kYsC5UIDaQ=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
-github.com/webmeshproj/api v0.10.8 h1:xE8lfiMHlZxxGlr1Zhj+uKRtfTyNgl8muXvImXXQZHg=
-github.com/webmeshproj/api v0.10.8/go.mod h1:St5+xO5NSaqVcTDMk9x8bl+WA5yWX3uuPwao3rofrDw=
+github.com/webmeshproj/api v0.10.9 h1:timeGSKyRULX3WhW7a//MdG0CtDGZN6AcP00GqfSrQI=
+github.com/webmeshproj/api v0.10.9/go.mod h1:St5+xO5NSaqVcTDMk9x8bl+WA5yWX3uuPwao3rofrDw=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1/go.mod h1:8UvriyWtv5Q5EOgjHaSseUEdkQfvwFv1I/In/O2M9gc=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
