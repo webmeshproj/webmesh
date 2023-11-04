@@ -47,6 +47,9 @@ type Config struct {
 	InsecureSocket bool `koanf:"insecure-socket"`
 	// GRPCWeb enables gRPC-Web support.
 	GRPCWeb bool `koanf:"grpc-web"`
+	// CORS are options for configuring CORS. These are only applicable when
+	// grpc-web is enabled.
+	CORS CORS `koanf:"cors"`
 	// UI are options for exposing a gRPC UI.
 	UI WebUI `koanf:"ui"`
 	// Persistence are options for persisting mesh data.
@@ -57,6 +60,15 @@ type Config struct {
 	LogLevel string `koanf:"log-level"`
 	// LogFormat is the log format for the daemon.
 	LogFormat string `koanf:"log-format"`
+}
+
+// CORS are options for configuring CORS. These are only applicable when
+// grpc-web is enabled.
+type CORS struct {
+	// Enabled is true if CORS is enabled.
+	Enabled bool `koanf:"enabled"`
+	// AllowedOrigins is a list of allowed origins.
+	AllowedOrigins []string `koanf:"allowed-origins"`
 }
 
 // WebUI are options for exposing a gRPC UI.
@@ -83,6 +95,7 @@ func NewDefaultConfig() *Config {
 		Bind:               DefaultDaemonSocket(),
 		InsecureSocket:     false,
 		GRPCWeb:            false,
+		CORS:               CORS{AllowedOrigins: []string{"*"}},
 		UI:                 WebUI{Enabled: false, ListenAddress: "127.0.0.1:8080"},
 		WireGuardStartPort: wireguard.DefaultListenPort,
 		LogLevel:           "info",
@@ -106,9 +119,16 @@ func (conf *Config) BindFlags(prefix string, flagset *pflag.FlagSet) *Config {
 	flagset.Uint16Var(&conf.WireGuardStartPort, prefix+"wireguard-start-port", conf.WireGuardStartPort, "Starting port for WireGuard connections")
 	flagset.StringVar(&conf.LogLevel, prefix+"log-level", conf.LogLevel, "Log level for the application daemon")
 	flagset.StringVar(&conf.LogFormat, prefix+"log-format", conf.LogFormat, "Log format for the application daemon")
+	conf.CORS.BindFlags(prefix+"cors.", flagset)
 	conf.UI.BindFlags(prefix+"ui.", flagset)
 	conf.Persistence.BindFlags(prefix+"persistence.", flagset)
 	return conf
+}
+
+// BindFlags binds the CORS flags to the given flagset.
+func (conf *CORS) BindFlags(prefix string, flagset *pflag.FlagSet) {
+	flagset.BoolVar(&conf.Enabled, prefix+"enabled", conf.Enabled, "Enable CORS")
+	flagset.StringSliceVar(&conf.AllowedOrigins, prefix+"allowed-origins", conf.AllowedOrigins, "Allowed origins")
 }
 
 // BindFlags binds the UI flags to the given flagset.

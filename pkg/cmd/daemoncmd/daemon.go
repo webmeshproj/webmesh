@@ -92,7 +92,7 @@ func Run(ctx context.Context, conf Config) error {
 		go runWebUI(ctx, log, listener, conf.UI.ListenAddress)
 	}
 	if conf.GRPCWeb {
-		return runGRPCWebServer(ctx, log, grpcServer, listener)
+		return runGRPCWebServer(ctx, log, grpcServer, listener, conf.CORS)
 	}
 	return runGRPCServer(ctx, log, grpcServer, listener)
 }
@@ -107,9 +107,19 @@ func runGRPCServer(ctx context.Context, log *slog.Logger, srv *grpc.Server, ln n
 	return srv.Serve(ln)
 }
 
-func runGRPCWebServer(ctx context.Context, log *slog.Logger, srv *grpc.Server, ln net.Listener) error {
+func runGRPCWebServer(ctx context.Context, log *slog.Logger, srv *grpc.Server, ln net.Listener, cors CORS) error {
 	wrapped := grpcweb.WrapServer(srv, grpcweb.WithWebsockets(true))
 	handler := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		if cors.Enabled {
+			resp.Header().Set("Access-Control-Allow-Origin", strings.Join(cors.AllowedOrigins, ", "))
+			resp.Header().Set("Access-Control-Allow-Credentials", "true")
+			resp.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Grpc-Web, X-User-Agent")
+			resp.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			if req.Method == http.MethodOptions {
+				resp.WriteHeader(http.StatusOK)
+				return
+			}
+		}
 		if wrapped.IsGrpcWebRequest(req) {
 			wrapped.ServeHTTP(resp, req)
 			return

@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -82,6 +83,10 @@ type Options struct {
 	DisableGRPC bool
 	// WebEnabled is true if the grpc-web server should be enabled.
 	WebEnabled bool
+	// EnableCORS is true if CORS should be enabled with grpc-web.
+	EnableCORS bool
+	// AllowedOrigins is a list of allowed origins for CORS.
+	AllowedOrigins []string
 	// ListenAddress is the address to start the gRPC server on.
 	ListenAddress string
 	// ServerOptions are options for the server. This should include
@@ -185,6 +190,16 @@ func (s *Server) ListenAndServe() error {
 				s.log.Info(fmt.Sprintf("Starting gRPC-web server on %s", s.lis.Addr().String()))
 				wrapped := grpcweb.WrapServer(s.srv, grpcweb.WithWebsockets(true))
 				handler := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+					if s.opts.EnableCORS {
+						resp.Header().Set("Access-Control-Allow-Origin", strings.Join(s.opts.AllowedOrigins, ", "))
+						resp.Header().Set("Access-Control-Allow-Credentials", "true")
+						resp.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Grpc-Web, X-User-Agent")
+						resp.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+						if req.Method == http.MethodOptions {
+							resp.WriteHeader(http.StatusOK)
+							return
+						}
+					}
 					if wrapped.IsGrpcWebRequest(req) {
 						wrapped.ServeHTTP(resp, req)
 						return

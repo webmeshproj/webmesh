@@ -158,6 +158,10 @@ type APIOptions struct {
 	ListenAddress string `koanf:"listen-address,omitempty"`
 	// WebEnabled enables serving gRPC over HTTP/1.1.
 	WebEnabled bool `koanf:"web-enabled,omitempty"`
+	// CORSEnabled enables CORS for the gRPC web server.
+	CORSEnabled bool `koanf:"cors-enabled,omitempty"`
+	// AllowedOrigins is a list of allowed origins for CORS.
+	AllowedOrigins []string `koanf:"allowed-origins,omitempty"`
 	// TLSCertFile is the path to the TLS certificate file.
 	TLSCertFile string `koanf:"tls-cert-file,omitempty"`
 	// TLSCertData is the TLS certificate data.
@@ -202,8 +206,9 @@ type LibP2PAPIOptions struct {
 // NewAPIOptions returns a new APIOptions with the default values.
 func NewAPIOptions(disabled bool) APIOptions {
 	return APIOptions{
-		Disabled:      disabled,
-		ListenAddress: services.DefaultGRPCListenAddress,
+		Disabled:       disabled,
+		ListenAddress:  services.DefaultGRPCListenAddress,
+		AllowedOrigins: []string{"*"},
 	}
 }
 
@@ -222,6 +227,8 @@ func (a *APIOptions) BindFlags(prefix string, fl *pflag.FlagSet) {
 	fl.BoolVar(&a.Disabled, prefix+"disabled", a.Disabled, "Disable the API. This is ignored when joining as a Raft member.")
 	fl.StringVar(&a.ListenAddress, prefix+"listen-address", a.ListenAddress, "gRPC listen address.")
 	fl.BoolVar(&a.WebEnabled, prefix+"web-enabled", a.WebEnabled, "Enable gRPC over HTTP/1.1.")
+	fl.BoolVar(&a.CORSEnabled, prefix+"cors-enabled", a.CORSEnabled, "Enable CORS for the gRPC web server.")
+	fl.StringSliceVar(&a.AllowedOrigins, prefix+"allowed-origins", a.AllowedOrigins, "Allowed origins for CORS.")
 	fl.BoolVar(&a.DisableLeaderProxy, prefix+"disable-leader-proxy", a.DisableLeaderProxy, "Disable the leader proxy.")
 	fl.StringVar(&a.TLSCertFile, prefix+"tls-cert-file", a.TLSCertFile, "TLS certificate file.")
 	fl.StringVar(&a.TLSCertData, prefix+"tls-cert-data", a.TLSCertData, "TLS certificate data.")
