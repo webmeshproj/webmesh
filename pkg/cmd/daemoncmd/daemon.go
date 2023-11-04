@@ -111,6 +111,7 @@ func runGRPCWebServer(ctx context.Context, log *slog.Logger, srv *grpc.Server, l
 	wrapped := grpcweb.WrapServer(srv, grpcweb.WithWebsockets(true))
 	handler := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		if cors.Enabled {
+			log.Debug("Handling CORS options for request", "origin", req.Header.Get("Origin"))
 			resp.Header().Set("Access-Control-Allow-Origin", strings.Join(cors.AllowedOrigins, ", "))
 			resp.Header().Set("Access-Control-Allow-Credentials", "true")
 			resp.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Grpc-Web, X-User-Agent")
@@ -121,10 +122,12 @@ func runGRPCWebServer(ctx context.Context, log *slog.Logger, srv *grpc.Server, l
 			}
 		}
 		if wrapped.IsGrpcWebRequest(req) {
+			log.Debug("Handling gRPC-Web request")
 			wrapped.ServeHTTP(resp, req)
 			return
 		}
 		// Fall down to the gRPC server
+		log.Debug("Handling gRPC request")
 		srv.ServeHTTP(resp, req)
 	})
 	httpSrv := &http.Server{

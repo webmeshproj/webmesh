@@ -191,6 +191,7 @@ func (s *Server) ListenAndServe() error {
 				wrapped := grpcweb.WrapServer(s.srv, grpcweb.WithWebsockets(true))
 				handler := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 					if s.opts.EnableCORS {
+						s.log.Debug("Handling CORS options for request", "origin", req.Header.Get("Origin"))
 						resp.Header().Set("Access-Control-Allow-Origin", strings.Join(s.opts.AllowedOrigins, ", "))
 						resp.Header().Set("Access-Control-Allow-Credentials", "true")
 						resp.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Grpc-Web, X-User-Agent")
@@ -201,10 +202,12 @@ func (s *Server) ListenAndServe() error {
 						}
 					}
 					if wrapped.IsGrpcWebRequest(req) {
+						s.log.Debug("Handling gRPC-Web request")
 						wrapped.ServeHTTP(resp, req)
 						return
 					}
 					// Fall down to the gRPC server
+					s.log.Debug("Handling gRPC request")
 					s.srv.ServeHTTP(resp, req)
 				})
 				s.websrv = &http.Server{
