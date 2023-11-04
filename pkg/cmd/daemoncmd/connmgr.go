@@ -17,7 +17,6 @@ limitations under the License.
 package daemoncmd
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/netip"
@@ -291,7 +290,7 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 	conf.TLS.Insecure = !req.GetTls().GetEnabled()
 	if !conf.TLS.Insecure {
 		if len(req.GetTls().GetCaCertData()) != 0 {
-			conf.TLS.CAData = base64.StdEncoding.EncodeToString(req.GetTls().GetCaCertData())
+			conf.TLS.CAData = req.GetTls().GetCaCertData()
 		}
 		conf.TLS.VerifyChainOnly = req.GetTls().GetVerifyChainOnly()
 		conf.TLS.InsecureSkipVerify = req.GetTls().GetSkipVerify()
@@ -314,8 +313,8 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		conf.Auth.LDAP.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()])
 		conf.Auth.LDAP.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()])
 	case v1.NetworkAuthMethod_MTLS:
-		conf.Auth.MTLS.CertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
-		conf.Auth.MTLS.KeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
+		conf.Auth.MTLS.CertData = req.GetTls().GetCertData()
+		conf.Auth.MTLS.KeyData = req.GetTls().GetKeyData()
 	case v1.NetworkAuthMethod_ID:
 		conf.Auth.IDAuth.Enabled = true
 	}
@@ -331,10 +330,10 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		}
 		conf.Services.API.Insecure = !req.GetServices().GetEnableTLS()
 		if len(req.GetTls().GetCertData()) != 0 {
-			conf.Services.API.TLSCertData = base64.StdEncoding.EncodeToString(req.GetTls().GetCertData())
+			conf.Services.API.TLSCertData = req.GetTls().GetCertData()
 		}
 		if len(req.GetTls().GetKeyData()) != 0 {
-			conf.Services.API.TLSKeyData = base64.StdEncoding.EncodeToString(req.GetTls().GetKeyData())
+			conf.Services.API.TLSKeyData = req.GetTls().GetKeyData()
 		}
 		conf.Plugins.Configs = make(map[string]config.PluginConfig)
 		switch req.GetServices().GetAuthMethod() {
@@ -346,7 +345,7 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		case v1.NetworkAuthMethod_MTLS:
 			conf.Plugins.Configs["mtls"] = config.PluginConfig{
 				Config: map[string]any{
-					"ca-data": base64.StdEncoding.EncodeToString(req.GetTls().GetCaCertData()),
+					"ca-data": req.GetTls().GetCaCertData(),
 				},
 			}
 		}
