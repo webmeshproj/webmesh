@@ -216,6 +216,10 @@ func (m *ConnManager) assignListenPort(connID string) (uint16, error) {
 
 func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectRequest, connID string, listenPort uint16) (*config.Config, error) {
 	conf := config.NewDefaultConfig(m.nodeID.String())
+	conf.Global.LogLevel = m.conf.LogLevel
+	conf.Global.LogFormat = m.conf.LogFormat
+	conf.Storage.LogLevel = m.conf.LogLevel
+	conf.Storage.LogFormat = m.conf.LogFormat
 	conf.Storage.InMemory = true
 	if m.conf.Persistence.Path != "" {
 		conf.Storage.InMemory = false
@@ -262,10 +266,7 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		// Set a unique interface name on non-darwin systems.
 		conf.WireGuard.InterfaceName = connID + "0"
 	}
-	conf.Global.LogLevel = m.conf.LogLevel
-	conf.Global.LogFormat = m.conf.LogFormat
-	conf.Storage.LogLevel = m.conf.LogLevel
-	conf.Storage.LogFormat = m.conf.LogFormat
+	conf.Mesh.UseMeshDNS = req.GetNetworking().GetUseDNS()
 	conf.Bootstrap.Enabled = req.GetBootstrap().GetEnabled()
 	if conf.Bootstrap.Enabled {
 		conf.Bootstrap.Admin = m.nodeID.String()
@@ -307,11 +308,11 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 	switch req.GetAuthMethod() {
 	case v1.NetworkAuthMethod_NO_AUTH:
 	case v1.NetworkAuthMethod_BASIC:
-		conf.Auth.Basic.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_USERNAME.String()])
-		conf.Auth.Basic.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_BASIC_PASSWORD.String()])
+		conf.Auth.Basic.Username = req.GetAuthCredentials()[v1.ConnectRequest_BASIC_USERNAME.String()]
+		conf.Auth.Basic.Password = req.GetAuthCredentials()[v1.ConnectRequest_BASIC_PASSWORD.String()]
 	case v1.NetworkAuthMethod_LDAP:
-		conf.Auth.LDAP.Username = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()])
-		conf.Auth.LDAP.Password = string(req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()])
+		conf.Auth.LDAP.Username = req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()]
+		conf.Auth.LDAP.Password = req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()]
 	case v1.NetworkAuthMethod_MTLS:
 		conf.Auth.MTLS.CertData = req.GetTls().GetCertData()
 		conf.Auth.MTLS.KeyData = req.GetTls().GetKeyData()
@@ -347,6 +348,15 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 				Config: map[string]any{
 					"ca-data": req.GetTls().GetCaCertData(),
 				},
+			}
+		}
+		if req.GetServices().GetDns().GetEnabled() {
+			conf.Services.MeshDNS.Enabled = true
+			if req.GetServices().GetDns().GetListenUDP() != "" {
+				conf.Services.MeshDNS.ListenUDP = req.GetServices().GetDns().GetListenUDP()
+			}
+			if req.GetServices().GetDns().GetListenTCP() != "" {
+				conf.Services.MeshDNS.ListenTCP = req.GetServices().GetDns().GetListenTCP()
 			}
 		}
 		for _, feature := range req.GetServices().GetFeatures() {
