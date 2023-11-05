@@ -96,12 +96,16 @@ builds:
       - arm64
 
 upx:
-  - ids: [node, webmeshd]
+  - ids: [node]
     enabled: true
     compress: best
     lzma: true
     goos: [linux]
     goarch: [amd64, arm64, arm, '386', ppc64le, mipsle, mips]
+  - ids: [webmeshd]
+    enabled: true
+    compress: best
+    lzma: true
 
 checksum:
   name_template: 'checksums.txt'
