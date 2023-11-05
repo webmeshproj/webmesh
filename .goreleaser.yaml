@@ -71,8 +71,32 @@ builds:
       - mipsle
       - mips
 
+  - id: webmeshd
+    main: cmd/webmesh-node/main.go
+    binary: webmeshd
+    env:
+      - CGO_ENABLED=0
+    tags:
+      - osusergo
+      - netgo
+    flags:
+      - -trimpath
+    ldflags:
+      - -s 
+      - -w 
+      - -X github.com/webmeshproj/webmesh/pkg/version.Version={{.Version}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.GitCommit={{.Commit}}
+      - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
 upx:
-  - ids: [node]
+  - ids: [node, webmeshd]
     enabled: true
     compress: best
     lzma: true

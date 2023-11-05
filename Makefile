@@ -32,6 +32,12 @@ PARALLEL   ?= $(shell nproc)
 build: ## Build node and wmctl binaries for the current architecture.
 	$(GORELEASER) build --single-target --id node --id wmctl $(BUILD_ARGS)
 
+build-webmeshd: ## Build webmeshd binary for the current architecture. This is used for app releases.
+	$(GORELEASER) build --single-target --id webmeshd $(BUILD_ARGS)
+
+dist-webmeshd: ## Build webmeshd binary for all platforms. This is used for app releases.
+	$(GORELEASER) build --id webmeshd $(BUILD_ARGS)
+
 # build-wasm: fmt vet ## Build node wasm binary for the current architecture.
 # 	$(GORELEASER) build $(BUILD_ARGS) --id node-wasm --parallelism=$(PARALLEL)
 
