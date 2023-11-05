@@ -1,0 +1,17 @@
+[Unit]
+Description=Webmesh Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/webmesh-node \
+    --daemon.enabled=true \
+    --daemon.grpc-web=true \
+    --daemon.cors.enabled=true \
+    --daemon.bind=127.0.0.1:58080 \
+    --daemon.persistence.path=/var/lib/webmeshd
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

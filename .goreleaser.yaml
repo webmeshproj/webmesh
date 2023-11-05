@@ -114,6 +114,9 @@ archives:
     builds:
       - node
       - wmctl
+    files:
+      - src: contrib/systemd/webmeshd.service
+        strip_parent: false
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -131,6 +134,9 @@ nfpms:
     description: Webmesh is a service mesh for the web
     homepage: https://webmeshproj.github.io
     license: Apache 2.0
+    contents:
+      - src: contrib/systemd/webmeshd.service
+        dst: /usr/lib/systemd/system/webmeshd.service
     builds:
       - node
       - wmctl
@@ -152,6 +158,9 @@ nfpms:
     description: Webmesh is a service mesh for the web
     homepage: https://webmeshproj.github.io
     license: Apache 2.0
+    contents:
+      - src: contrib/systemd/webmeshd.service
+        dst: /usr/lib/systemd/system/webmeshd.service
     builds:
       - node
       - wmctl
