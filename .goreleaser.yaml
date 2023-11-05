@@ -115,6 +115,7 @@ archives:
       - node
       - wmctl
     files:
+      - src: LICENSE
       - src: contrib/systemd/webmeshd.service
         strip_parent: false
     name_template: >-
@@ -135,6 +136,8 @@ nfpms:
     homepage: https://webmeshproj.github.io
     license: Apache 2.0
     contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/webmesh/LICENSE
       - src: contrib/systemd/webmeshd.service
         dst: /usr/lib/systemd/system/webmeshd.service
     builds:
@@ -159,6 +162,8 @@ nfpms:
     homepage: https://webmeshproj.github.io
     license: Apache 2.0
     contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/webmesh/LICENSE
       - src: contrib/systemd/webmeshd.service
         dst: /usr/lib/systemd/system/webmeshd.service
     builds:
