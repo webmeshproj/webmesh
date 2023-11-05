@@ -357,15 +357,6 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 				},
 			}
 		}
-		if req.GetServices().GetDns().GetEnabled() {
-			conf.Services.MeshDNS.Enabled = true
-			if req.GetServices().GetDns().GetListenUDP() != "" {
-				conf.Services.MeshDNS.ListenUDP = req.GetServices().GetDns().GetListenUDP()
-			}
-			if req.GetServices().GetDns().GetListenTCP() != "" {
-				conf.Services.MeshDNS.ListenTCP = req.GetServices().GetDns().GetListenTCP()
-			}
-		}
 		for _, feature := range req.GetServices().GetFeatures() {
 			switch feature {
 			case v1.Feature_LEADER_PROXY:
@@ -382,6 +373,15 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 			case v1.Feature_STORAGE_QUERIER:
 				conf.Mesh.RequestObserver = true
 			}
+		}
+	}
+	if req.GetServices().GetDns().GetEnabled() {
+		conf.Services.MeshDNS.Enabled = true
+		if req.GetServices().GetDns().GetListenUDP() != "" {
+			conf.Services.MeshDNS.ListenUDP = req.GetServices().GetDns().GetListenUDP()
+		}
+		if req.GetServices().GetDns().GetListenTCP() != "" {
+			conf.Services.MeshDNS.ListenTCP = req.GetServices().GetDns().GetListenTCP()
 		}
 	}
 	return conf, nil
