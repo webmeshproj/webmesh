@@ -204,6 +204,33 @@ func (e MeshEdge) PutInto(ctx context.Context, g PeerGraph) error {
 	if !errors.IsEdgeNotFound(err) {
 		return fmt.Errorf("get edge: %w", err)
 	}
+	// If either vertex does not exist, create an empty one.
+	_, err = g.Vertex(e.SourceID())
+	if err != nil {
+		if errors.Is(err, graph.ErrVertexNotFound) {
+			err = g.AddVertex(MeshNode{
+				MeshNode: &v1.MeshNode{Id: e.SourceID().String()},
+			})
+			if err != nil {
+				return fmt.Errorf("add source vertex: %w", err)
+			}
+		} else {
+			return fmt.Errorf("get source vertex: %w", err)
+		}
+	}
+	_, err = g.Vertex(e.TargetID())
+	if err != nil {
+		if errors.Is(err, graph.ErrVertexNotFound) {
+			err = g.AddVertex(MeshNode{
+				MeshNode: &v1.MeshNode{Id: e.TargetID().String()},
+			})
+			if err != nil {
+				return fmt.Errorf("add target vertex: %w", err)
+			}
+		} else {
+			return fmt.Errorf("get target vertex: %w", err)
+		}
+	}
 	err = g.AddEdge(e.SourceID(), e.TargetID(), opts...)
 	if err != nil && !errors.Is(err, graph.ErrEdgeAlreadyExists) {
 		return fmt.Errorf("add edge: %w", err)
