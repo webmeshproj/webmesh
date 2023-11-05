@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc/codes"
@@ -294,6 +295,9 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		default:
 			conf.Bootstrap.DefaultNetworkPolicy = string(firewall.PolicyAccept)
 		}
+		// We only support single node bootstrap for now, so set the initial leader election
+		// timeouts to a very low value
+		conf.Bootstrap.ElectionTimeout = time.Millisecond * 500
 	}
 	conf.TLS.Insecure = !req.GetTls().GetEnabled()
 	if !conf.TLS.Insecure {

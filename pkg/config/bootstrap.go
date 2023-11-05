@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -217,6 +218,12 @@ func (o *Config) NewBootstrapTransport(ctx context.Context, nodeID string, conn 
 		Timeout:         t.TCPConnectTimeout,
 		ElectionTimeout: o.Bootstrap.ElectionTimeout,
 		Credentials:     conn.Credentials(),
+		DataDirectory: func() string {
+			if o.Storage.InMemory {
+				return ""
+			}
+			return filepath.Join(o.Storage.Path, "bootstrap")
+		}(),
 		Peers: func() map[string]tcp.BootstrapPeer {
 			if t.TCPServers == nil {
 				return nil

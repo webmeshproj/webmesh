@@ -17,6 +17,7 @@ limitations under the License.
 package tcp
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/netutil"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/transport"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
+	"github.com/webmeshproj/webmesh/pkg/storage/providers/backends/badgerdb"
 )
 
 // BootstrapTransportOptions are options for the TCP transport.
@@ -49,6 +51,10 @@ type BootstrapTransportOptions struct {
 	ElectionTimeout time.Duration
 	// Credentials are the credentials to use when dialing peers.
 	Credentials []grpc.DialOption
+	// DataDirectory is the directory to use for the bootstrap transport.
+	// This is where the results of an initial bootstrap are stored. If not provided,
+	// an in-memory directory is used.
+	DataDirectory string
 }
 
 // BootstrapPeer is a TCP bootstrap peer.
@@ -82,7 +88,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		Timeout: t.Timeout,
 	})
 	if err != nil {
-		return false, nil, err
+		return false, nil, fmt.Errorf("new raft transport: %w", err)
 	}
 	defer raftTransport.Close()
 
@@ -102,7 +108,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 	// Resolve our advertise address
 	addr, err := netutil.ResolveTCPAddr(ctx, t.Advertise, 15)
 	if err != nil {
-		return false, nil, err
+		return false, nil, fmt.Errorf("resolve advertise address: %w", err)
 	}
 
 	// Build the bootstrap configuration
@@ -119,7 +125,7 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		// Resolve the peer address
 		addr, err := netutil.ResolveTCPAddr(ctx, peer.AdvertiseAddr, 15)
 		if err != nil {
-			return false, nil, err
+			return false, nil, fmt.Errorf("resolve peer advertise address: %w", err)
 		}
 		// Append the peer to the configuration
 		bootstrapConfig.Servers = append(bootstrapConfig.Servers, raft.Server{
@@ -129,7 +135,22 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		})
 	}
 	log.Debug("Starting bootstrap transport raft instance", slog.String("local-id", string(rftOpts.LocalID)), slog.Any("config", bootstrapConfig))
-	rft, err := raft.NewRaft(rftOpts, &raft.MockFSM{}, raft.NewInmemStore(), raft.NewInmemStore(), raft.NewInmemSnapshotStore(), raftTransport)
+	var logStore raft.LogStore
+	var stableStore raft.StableStore
+	if t.DataDirectory == "" {
+		logStore = raft.NewInmemStore()
+		stableStore = raft.NewInmemStore()
+	} else {
+		db, err := badgerdb.NewInMemory(badgerdb.Options{
+			DiskPath: t.DataDirectory,
+		})
+		if err != nil {
+			return false, nil, err
+		}
+		logStore = db
+		stableStore = db
+	}
+	rft, err := raft.NewRaft(rftOpts, &raft.MockFSM{}, logStore, stableStore, raft.NewInmemSnapshotStore(), raftTransport)
 	if err != nil {
 		return false, nil, err
 	}
@@ -140,6 +161,9 @@ func (t *bootstrapTransport) LeaderElect(ctx context.Context) (isLeader bool, rt
 		if err == raft.ErrCantBootstrap {
 			// The cluster was already bootstrapped (basically we took too long to get there)
 			log.Debug("Bootstrap transport cluster already bootstrapped")
+			if len(t.Peers) == 0 {
+				return false, nil, errors.ErrAlreadyBootstrapped
+			}
 			// Build a transport that tries to join the other peers
 			var opts RoundTripOptions
 			for _, peer := range t.Peers {
