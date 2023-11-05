@@ -548,30 +548,8 @@ func (o *Config) NewLeaveTransport(ctx context.Context, conn meshnode.Node) tran
 
 func (o *Config) NewJoinTransport(ctx context.Context, nodeID string, conn meshnode.Node, host libp2p.Host) (transport.JoinRoundTripper, error) {
 	if o.Bootstrap.Enabled {
-		// Our join transport is the gRPC transport to other bootstrap nodes
-		var addrs []string
-		for id, addr := range o.Bootstrap.Transport.TCPServers {
-			if id == nodeID {
-				continue
-			}
-			host, _, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid bootstrap server address: %w", err)
-			}
-			var addr string
-			if len(o.Bootstrap.Transport.ServerGRPCPorts) > 0 && o.Bootstrap.Transport.ServerGRPCPorts[host] != 0 {
-				addr = net.JoinHostPort(host, fmt.Sprintf("%d", o.Bootstrap.Transport.ServerGRPCPorts[host]))
-			} else {
-				// Assume the default port
-				addr = net.JoinHostPort(host, fmt.Sprintf("%d", services.DefaultGRPCPort))
-			}
-			addrs = append(addrs, addr)
-		}
-		return tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
-			Addrs:          addrs,
-			Credentials:    conn.Credentials(),
-			AddressTimeout: time.Second * 3,
-		}), nil
+		// Our join transport is nil and we either bootstrap or recover from storage.
+		return nil, nil
 	}
 	if len(o.Mesh.JoinAddresses) > 0 {
 		return tcp.NewJoinRoundTripper(tcp.RoundTripOptions{
