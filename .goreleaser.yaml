@@ -88,7 +88,6 @@ builds:
       - -X github.com/webmeshproj/webmesh/pkg/version.GitCommit={{.Commit}}
       - -X github.com/webmeshproj/webmesh/pkg/version.BuildDate={{.Date}}
     goos:
-      - linux
       - windows
       - darwin
     goarch:
@@ -102,10 +101,6 @@ upx:
     lzma: true
     goos: [linux]
     goarch: [amd64, arm64, arm, '386', ppc64le, mipsle, mips]
-  - ids: [webmeshd]
-    enabled: true
-    compress: best
-    lzma: true
 
 checksum:
   name_template: 'checksums.txt'
