@@ -50,11 +50,11 @@ func (s *meshStore) bootstrap(ctx context.Context, opts ConnectOptions) error {
 	opts.RequestVote = true
 	if bootstrapped {
 		// We have data, so the cluster is already bootstrapped.
-		s.log.Info("Cluster already bootstrapped, attempting to rejoin as voter")
 		if opts.JoinRoundTripper == nil {
 			s.log.Info("Cluster already bootstrapped, but we have no join transport. Recovering from storage.")
 			return s.recoverWireguard(ctx)
 		}
+		s.log.Info("Cluster already bootstrapped, attempting to rejoin as voter")
 		return s.join(ctx, opts)
 	}
 	s.log.Debug("Cluster not yet bootstrapped, attempting to bootstrap")
