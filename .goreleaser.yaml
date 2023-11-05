@@ -72,7 +72,7 @@ builds:
       - mips
 
   - id: webmeshd
-    main: cmd/webmesh-node/main.go
+    main: ./cmd/webmeshd
     binary: webmeshd
     env:
       - CGO_ENABLED=0
