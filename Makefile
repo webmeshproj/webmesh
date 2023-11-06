@@ -27,7 +27,7 @@ help: ## Display this help.
 
 GORELEASER ?= $(GO) run github.com/goreleaser/goreleaser@latest
 BUILD_ARGS ?= --snapshot --clean --parallelism=$(PARALLEL)
-ifneq ($(OS),windows)
+ifeq ($(OS),linux)
 PARALLEL   ?= $(shell nproc)
 else
 PARALLEL   ?= 4
