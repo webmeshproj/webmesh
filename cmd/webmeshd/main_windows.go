@@ -32,9 +32,9 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/cmd/daemoncmd"
 )
 
-var elog debug.Log
-
 const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
+
+var elog debug.Log
 
 func run() {
 	var err error
@@ -44,14 +44,28 @@ func run() {
 		return
 	}
 	defer elog.Close()
-	elog.Info(1, "Starting webmesh daemon helper")
+	logInfo("Starting webmesh daemon helper")
 	err = svc.Run("webmeshd", &helperDaemon{})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to start helper daemon:", err)
-		elog.Error(1, fmt.Sprintf("Webmesh daemon helper failed: %v", err))
+		logError("Failed to start helper daemon", err)
 		return
 	}
-	elog.Info(1, "Webmesh daemon helper stopped")
+	logInfo("Webmesh daemon helper stopped")
+}
+
+func logError(msg string, err error) {
+	msg = fmt.Sprintf("%s: %v", msg, err)
+	fmt.Fprintln(os.Stderr, msg)
+	if elog != nil {
+		elog.Error(1, msg)
+	}
+}
+
+func logInfo(msg string) {
+	fmt.Fprintln(os.Stdout, msg)
+	if elog != nil {
+		elog.Info(1, msg)
+	}
 }
 
 type helperDaemon struct{}
@@ -64,7 +78,7 @@ func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, change
 	config := daemoncmd.NewDefaultConfig().BindFlags("daemon.", flagset)
 	err = flagset.Parse(args)
 	if err != nil {
-		elog.Error(1, err.Error())
+		logError("Failed to parse service arguments", err)
 		return false, 1
 	}
 
@@ -75,6 +89,7 @@ func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, change
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		logInfo("Starting webmesh daemon")
 		if err := daemoncmd.Run(ctx, *config); err != nil {
 			errs <- err
 		}
@@ -85,18 +100,18 @@ EventLoop:
 	for {
 		select {
 		case err := <-errs:
-			elog.Error(1, err.Error())
+			logError("Daemon exited with error", err)
 			return false, 1
 		case c := <-r:
 			switch c.Cmd {
 			case svc.Interrogate:
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				elog.Info(1, "Received stop request, shutting down")
+				logInfo("Received stop request, shutting down")
 				cancel()
 				break EventLoop
 			default:
-				elog.Error(1, fmt.Sprintf("Unexpected control request #%d", c))
+				logError("Unexpected service control request", fmt.Errorf("cmd=%d", c.Cmd))
 			}
 		}
 	}
