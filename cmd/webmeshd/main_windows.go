@@ -79,6 +79,7 @@ func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, change
 	err = flagset.Parse(args[1:])
 	if err != nil {
 		logError("Failed to parse service arguments", err)
+		errno = 1
 		return
 	}
 
@@ -101,6 +102,7 @@ EventLoop:
 		select {
 		case err := <-errs:
 			logError("Daemon exited with error", err)
+			errno = 2
 			return
 		case c := <-r:
 			switch c.Cmd {
