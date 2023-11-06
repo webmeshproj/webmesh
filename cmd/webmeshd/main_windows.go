@@ -76,10 +76,10 @@ func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, change
 
 	flagset := pflag.NewFlagSet("webmeshd", pflag.ContinueOnError)
 	config := daemoncmd.NewDefaultConfig().BindFlags("daemon.", flagset)
-	err = flagset.Parse(args)
+	err = flagset.Parse(args[1:])
 	if err != nil {
 		logError("Failed to parse service arguments", err)
-		return false, 1
+		return
 	}
 
 	var wg sync.WaitGroup
@@ -101,7 +101,7 @@ EventLoop:
 		select {
 		case err := <-errs:
 			logError("Daemon exited with error", err)
-			return false, 1
+			return
 		case c := <-r:
 			switch c.Cmd {
 			case svc.Interrogate:
