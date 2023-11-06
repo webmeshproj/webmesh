@@ -21,6 +21,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/spf13/pflag"
@@ -39,12 +40,14 @@ func run() {
 	var err error
 	elog, err = eventlog.Open("webmeshd")
 	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to open event log:", err)
 		return
 	}
 	defer elog.Close()
 	elog.Info(1, "Starting webmesh daemon helper")
 	err = svc.Run("webmeshd", &helperDaemon{})
 	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to start helper daemon:", err)
 		elog.Error(1, fmt.Sprintf("Webmesh daemon helper failed: %v", err))
 		return
 	}
