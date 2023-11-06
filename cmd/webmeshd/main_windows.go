@@ -82,6 +82,7 @@ func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, change
 		errno = 1
 		return
 	}
+	elog.Info(1, fmt.Sprintf("Starting webmesh daemon with config: %+v", config))
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
