@@ -27,7 +27,11 @@ help: ## Display this help.
 
 GORELEASER ?= $(GO) run github.com/goreleaser/goreleaser@latest
 BUILD_ARGS ?= --snapshot --clean --parallelism=$(PARALLEL)
+ifneq ($(OS),windows)
 PARALLEL   ?= $(shell nproc)
+else
+PARALLEL   ?= 4
+endif
 
 build: ## Build node and wmctl binaries for the current architecture.
 	$(GORELEASER) build --single-target --id node --id wmctl $(BUILD_ARGS)
