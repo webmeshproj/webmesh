@@ -1,5 +1,11 @@
 project_name: webmesh
 
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-rc"
+
 before:
   hooks:
     - go mod tidy
@@ -101,12 +107,10 @@ upx:
     lzma: true
     goos: [linux]
     goarch: [amd64, arm64, arm, '386', ppc64le, mipsle, mips]
-
-checksum:
-  name_template: 'checksums.txt'
-
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  - ids: [webmeshd]
+    enabled: true
+    compress: best
+    lzma: true
 
 archives:
   - id: webmesh
