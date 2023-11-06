@@ -24,7 +24,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/spf13/pflag"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
@@ -71,19 +70,14 @@ func logInfo(msg string) {
 type helperDaemon struct{}
 
 func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
-	var err error
 	changes <- svc.Status{State: svc.StartPending}
-
-	flagset := pflag.NewFlagSet("webmeshd", pflag.ContinueOnError)
-	config := daemoncmd.NewDefaultConfig().BindFlags("daemon.", flagset)
-	err = flagset.Parse(args[1:])
-	if err != nil {
-		logError("Failed to parse service arguments", err)
-		errno = 1
-		return
-	}
+	config := daemoncmd.NewDefaultConfig()
+	config.Enabled = true
+	config.GRPCWeb = true
+	config.CORS.Enabled = true
+	config.Bind = "127.0.0.1:58080"
+	config.Persistence.Path = `C:\ProgramData\Webmesh`
 	elog.Info(1, fmt.Sprintf("Starting webmesh daemon with config: %+v", config))
-
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
