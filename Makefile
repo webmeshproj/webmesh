@@ -4,7 +4,7 @@ REPO  ?= ghcr.io/webmeshproj
 IMAGE ?= $(REPO)/$(NAME):latest
 DISTROLESS_IMAGE ?= $(REPO)/$(NAME)-distroless:latest
 
-GO    ?= go
+GO    ?= "$(shell go env GOROOT)/bin/go"
 ARCH  ?= $(shell $(GO) env GOARCH)
 OS    ?= $(shell $(GO) env GOOS)
 
