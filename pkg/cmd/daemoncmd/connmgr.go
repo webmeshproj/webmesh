@@ -86,6 +86,17 @@ func NewConnManager(conf Config) (*ConnManager, error) {
 	}, nil
 }
 
+// NodeID returns the node ID used for connections.
+func (m *ConnManager) NodeID() string {
+	return m.nodeID.String()
+}
+
+// PublicKey returns the encoded public key used for connections.
+func (m *ConnManager) PublicKey() string {
+	encoded, _ := m.key.PublicKey().Encode()
+	return encoded
+}
+
 // Close closes the connection manager and all connections.
 func (m *ConnManager) Close() error {
 	m.mu.Lock()

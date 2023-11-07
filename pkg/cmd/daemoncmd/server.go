@@ -65,7 +65,8 @@ func NewServer(conf Config) (*AppDaemon, error) {
 
 func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.DaemonStatus, error) {
 	return &v1.DaemonStatus{
-		NodeID:      app.connmgr.nodeID.String(),
+		NodeID:      app.connmgr.NodeID(),
+		PublicKey:   app.connmgr.PublicKey(),
 		Description: fmt.Sprintf("Webmesh App Daemon (%s)", runtime.Version()),
 		Version:     app.version.Version,
 		GitCommit:   app.version.GitCommit,
