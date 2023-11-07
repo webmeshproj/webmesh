@@ -257,10 +257,6 @@ func (m *ConnManager) Disconnect(ctx context.Context, connID string) error {
 	if !ok {
 		return ErrNotConnected
 	}
-	if !conn.MeshNode().Started() {
-		m.RemoveConn(connID)
-		return ErrNotConnected
-	}
 	defer m.RemoveConn(connID)
 	return conn.Stop(ctx)
 }
