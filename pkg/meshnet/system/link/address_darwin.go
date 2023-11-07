@@ -36,6 +36,7 @@ func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) er
 			}
 			return err
 		}
+		return nil
 	}
 	out, err := common.ExecOutput(ctx, "ifconfig", name, "inet6", addr.String(), "prefixlen", fmt.Sprintf("%d", addr.Bits()), "alias")
 	if err != nil {
