@@ -44,6 +44,8 @@ import (
 var (
 	// ErrNoPortsAvailable is returned when no ports are available.
 	ErrNoPortsAvailable = status.Errorf(codes.FailedPrecondition, "no ports available")
+	// ErrNoIndexAvailable is returned when no utun index is available.
+	ErrNoIndexAvailable = status.Errorf(codes.FailedPrecondition, "no utun index available")
 	// ErrNotConnected is returned when the node is not connected to the mesh.
 	ErrNotConnected = status.Errorf(codes.FailedPrecondition, "not connected to the specified network")
 	// ErrAlreadyConnected is returned when the node is already connected to the mesh.
@@ -336,7 +338,7 @@ func (m *ConnManager) assignUTUNIndex(connID string) (uint16, error) {
 		}
 		index++
 		if index > maxIndex {
-			return 0, ErrNoPortsAvailable
+			return 0, ErrNoIndexAvailable
 		}
 	}
 }
