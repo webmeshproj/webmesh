@@ -185,7 +185,7 @@ func (m *ConnManager) DropStorage(ctx context.Context, connID string) error {
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove all: %w", err)
 	}
-	err = os.Remove(filepath.Join(m.conf.Persistence.Path, ParamsDir, ParamsFile(connID)))
+	err = os.Remove(filepath.Join(m.conf.Persistence.Path, ParamsFile(connID)))
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove params: %w", err)
 	}
@@ -225,7 +225,7 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 		if err != nil {
 			return "", nil, status.Errorf(codes.Internal, "failed to marshal connection parameters: %v", err)
 		}
-		paramsPath := filepath.Join(m.conf.Persistence.Path, ParamsDir, ParamsFile(connID))
+		paramsPath := filepath.Join(m.conf.Persistence.Path, ParamsFile(connID))
 		err = os.WriteFile(paramsPath, paramsJSON, 0600)
 		if err != nil {
 			return "", nil, status.Errorf(codes.Internal, "failed to write connection parameters: %v", err)
