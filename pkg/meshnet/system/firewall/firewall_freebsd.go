@@ -40,7 +40,7 @@ func newFirewall(ctx context.Context, opts *Options) (Firewall, error) {
 	// Enable the packet filter
 	out, err := common.ExecOutput(context.Background(), "pfctl", "-e")
 	if err != nil {
-		if strings.Contains(string(out), "pf already enabled") {
+		if strings.Contains(err.Error(), "pf already enabled") {
 			return &pfctlFirewall{
 				enabledAtStart: true,
 				anchorFile:     afile,
