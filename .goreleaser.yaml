@@ -111,6 +111,7 @@ upx:
     enabled: true
     compress: best
     lzma: true
+    goos: [windows]
 
 archives:
   - id: webmesh
