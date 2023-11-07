@@ -251,26 +251,35 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 
 // Disconnect disconnects the connection for the given ID.
 func (m *ConnManager) Disconnect(ctx context.Context, connID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
 	conn, ok := m.conns[connID]
+	m.mu.RUnlock()
 	if !ok {
 		return ErrNotConnected
 	}
 	if !conn.MeshNode().Started() {
-		// This means disconnect was called before the node
-		// was started, very likely by the client. We'll end
-		// up with a stale port assignment for now.
-		delete(m.conns, connID)
+		m.RemoveConn(connID)
 		return ErrNotConnected
 	}
-	wgport, err := conn.MeshNode().Network().WireGuard().ListenPort()
-	if err != nil {
-		return err
-	}
-	delete(m.conns, connID)
-	delete(m.ports, uint16(wgport))
+	defer m.RemoveConn(connID)
 	return conn.Stop(ctx)
+}
+
+// RemoveConn removes the connection for the given ID.
+func (m *ConnManager) RemoveConn(connID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.conns, connID)
+	delete(m.ports, m.portByConnID(connID))
+}
+
+func (m *ConnManager) portByConnID(connID string) uint16 {
+	for port, id := range m.ports {
+		if id == connID {
+			return port
+		}
+	}
+	return 0
 }
 
 func (m *ConnManager) listConnIDs() []string {

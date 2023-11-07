@@ -115,6 +115,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	app.log.Info("Starting node", "id", connID)
 	err = node.Start(ctx)
 	if err != nil {
+		defer app.connmgr.RemoveConn(connID)
 		return nil, status.Errorf(codes.Internal, "failed to start node: %v", err)
 	}
 	return &v1.ConnectResponse{
