@@ -20,19 +20,25 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
+	"time"
 
 	"github.com/bufbuild/protovalidate-go"
 	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/storage/rpcsrv"
+	"github.com/webmeshproj/webmesh/pkg/version"
 )
 
 // AppDaemon is the app daemon RPC server.
 type AppDaemon struct {
 	v1.UnimplementedAppDaemonServer
+	started   time.Time
+	version   version.BuildInfo
 	connmgr   *ConnManager
 	validator *protovalidate.Validator
 	log       *slog.Logger
@@ -49,9 +55,51 @@ func NewServer(conf Config) (*AppDaemon, error) {
 		return nil, fmt.Errorf("failed to create connection manager: %w", err)
 	}
 	return &AppDaemon{
+		started:   time.Now(),
+		version:   version.GetBuildInfo(),
 		connmgr:   connmgr,
 		validator: v,
 		log:       conf.NewLogger().With("appdaemon", "server"),
+	}, nil
+}
+
+func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.DaemonStatus, error) {
+	return &v1.DaemonStatus{
+		NodeID:      app.connmgr.nodeID.String(),
+		Description: fmt.Sprintf("Webmesh App Daemon (%s)", runtime.Version()),
+		Version:     app.version.Version,
+		GitCommit:   app.version.GitCommit,
+		BuildDate:   app.version.BuildDate,
+		Uptime:      time.Since(app.started).String(),
+		StartedAt:   timestamppb.New(app.started),
+		Connections: func() map[string]v1.DaemonConnStatus {
+			out := make(map[string]v1.DaemonConnStatus)
+			for _, connid := range app.connmgr.ConnIDs() {
+				id := connid
+				c, ok := app.connmgr.Get(id)
+				if !ok {
+					// Disconnect was called on a connection before we got here.
+					continue
+				}
+				if c.MeshNode().Started() {
+					out[id] = v1.DaemonConnStatus_CONNECTED
+				} else {
+					out[id] = v1.DaemonConnStatus_CONNECTING
+				}
+			}
+			storedConns, err := app.connmgr.StoredConns()
+			if err != nil {
+				app.log.Error("Error getting stored connections", "error", err.Error())
+				return out
+			}
+			for _, connid := range storedConns {
+				id := connid
+				if _, ok := out[id]; !ok {
+					out[id] = v1.DaemonConnStatus_DISCONNECTED
+				}
+			}
+			return out
+		}(),
 	}, nil
 }
 
@@ -130,7 +178,7 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 	return res, nil
 }
 
-func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.StatusResponse, error) {
+func (app *AppDaemon) ConnectionStatus(ctx context.Context, req *v1.ConnectionStatusRequest) (*v1.ConnectionStatusResponse, error) {
 	err := app.validator.Validate(req)
 	if err != nil {
 		return nil, newInvalidError(err)
@@ -139,7 +187,7 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 	if len(ids) == 0 {
 		ids = app.connmgr.ConnIDs()
 	}
-	res := &v1.StatusResponse{
+	res := &v1.ConnectionStatusResponse{
 		Statuses: make(map[string]*v1.ConnectionStatus),
 	}
 	for _, connid := range ids {
@@ -149,15 +197,15 @@ func (app *AppDaemon) Status(ctx context.Context, req *v1.StatusRequest) (*v1.St
 		if !ok {
 			app.log.Info("Status requested for unknown connection", "id", id)
 			res.Statuses[id] = &v1.ConnectionStatus{
-				ConnectionStatus: v1.ConnectionStatus_DISCONNECTED,
+				ConnectionStatus: v1.DaemonConnStatus_DISCONNECTED,
 			}
 		} else {
 			res.Statuses[id] = &v1.ConnectionStatus{
-				ConnectionStatus: func() v1.ConnectionStatus_Status {
+				ConnectionStatus: func() v1.DaemonConnStatus {
 					if c.MeshNode().Started() {
-						return v1.ConnectionStatus_CONNECTED
+						return v1.DaemonConnStatus_CONNECTED
 					}
-					return v1.ConnectionStatus_CONNECTING
+					return v1.DaemonConnStatus_CONNECTING
 				}(),
 				Node: func() *v1.MeshNode {
 					if !c.MeshNode().Started() {

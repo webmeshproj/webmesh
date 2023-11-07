@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/netip"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -119,6 +120,26 @@ func (m *ConnManager) Get(connID string) (embed.Node, bool) {
 // DataDir returns the data directory for the given connection ID.
 func (m *ConnManager) DataDir(connID string) string {
 	return filepath.Join(m.conf.Persistence.Path, connID)
+}
+
+// StoredConns returns all connection IDs known to the persistence layer.
+func (m *ConnManager) StoredConns() ([]string, error) {
+	if m.conf.Persistence.Path == "" {
+		return nil, nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	contents, err := os.ReadDir(m.conf.Persistence.Path)
+	if err != nil {
+		return nil, fmt.Errorf("read dir: %w", err)
+	}
+	var ids []string
+	for _, entry := range contents {
+		if entry.IsDir() {
+			ids = append(ids, entry.Name())
+		}
+	}
+	return ids, nil
 }
 
 // NewConn creates a new connection for the given request. Start must be called
