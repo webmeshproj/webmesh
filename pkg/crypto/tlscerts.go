@@ -306,7 +306,7 @@ func GenerateCA(cfg CACertConfig) (privkey crypto.PrivateKey, cert *x509.Certifi
 		NotBefore:             time.Now().UTC(),
 		NotAfter:              time.Now().UTC().Add(cfg.ValidFor),
 		IsCA:                  true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageCodeSigning},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 	}
@@ -382,7 +382,7 @@ func IssueCertificate(cfg IssueConfig) (privkey crypto.PrivateKey, cert *x509.Ce
 		NotBefore:             time.Now().UTC(),
 		NotAfter:              time.Now().UTC().Add(cfg.ValidFor),
 		IsCA:                  false,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageCodeSigning},
 		KeyUsage:              x509.KeyUsageDigitalSignature,
 		BasicConstraintsValid: true,
 	}
