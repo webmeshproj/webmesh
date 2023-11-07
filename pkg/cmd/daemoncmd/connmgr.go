@@ -29,12 +29,12 @@ import (
 	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
 	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/embed"
-	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/storage"
@@ -52,6 +52,15 @@ var (
 	ErrConnected = status.Errorf(codes.FailedPrecondition, "connected to the specified network")
 )
 
+// ParamsDir is the relative path where connection request parameters are stored
+// for each connection ID.
+const ParamsDir = "params"
+
+// ParamsFile returns the relative path to the parameters file for the given connection ID.
+func ParamsFile(connID string) string {
+	return filepath.Join(ParamsDir, fmt.Sprintf("%s.json", connID))
+}
+
 // ConnManager manages the connections for the daemon.
 type ConnManager struct {
 	conns  map[string]embed.Node
@@ -65,10 +74,18 @@ type ConnManager struct {
 
 // NewConnManager creates a new connection manager.
 func NewConnManager(conf Config) (*ConnManager, error) {
-	log := logging.NewLogger(conf.LogLevel, conf.LogFormat).With("appdaemon", "connmgr")
+	log := conf.NewLogger().With("appdaemon", "connmgr")
 	key, err := conf.LoadKey(log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load key: %w", err)
+	}
+	if conf.Persistence.Path != "" {
+		err := os.MkdirAll(filepath.Join(conf.Persistence.Path, ParamsDir), 0700)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create params directory: %w", err)
+		}
+		// TODO: Store connection status in this directory and restart connections
+		// that were running when the daemon was stopped.
 	}
 	var nodeID types.NodeID
 	if conf.NodeID != "" {
@@ -153,6 +170,28 @@ func (m *ConnManager) StoredConns() ([]string, error) {
 	return ids, nil
 }
 
+// DropStorage drops storage for the connection with the given ID.
+func (m *ConnManager) DropStorage(ctx context.Context, connID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.conns[connID]
+	if ok {
+		return status.Errorf(codes.FailedPrecondition, "cannot drop storage for running connection")
+	}
+	if m.conf.Persistence.Path == "" {
+		return nil
+	}
+	err := os.RemoveAll(m.DataDir(connID))
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove all: %w", err)
+	}
+	err = os.Remove(filepath.Join(m.conf.Persistence.Path, ParamsDir, ParamsFile(connID)))
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove params: %w", err)
+	}
+	return nil
+}
+
 // NewConn creates a new connection for the given request. Start must be called
 // opn the returned node to start the connection.
 func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id string, node embed.Node, err error) {
@@ -179,6 +218,18 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 	port, err := m.assignListenPort(connID)
 	if err != nil {
 		return "", nil, err
+	}
+	if m.conf.Persistence.Path != "" {
+		m.log.Info("Saving connection parameters in case of restart", "id", connID)
+		paramsJSON, err := protojson.Marshal(req)
+		if err != nil {
+			return "", nil, status.Errorf(codes.Internal, "failed to marshal connection parameters: %v", err)
+		}
+		paramsPath := filepath.Join(m.conf.Persistence.Path, ParamsDir, ParamsFile(connID))
+		err = os.WriteFile(paramsPath, paramsJSON, 0600)
+		if err != nil {
+			return "", nil, status.Errorf(codes.Internal, "failed to write connection parameters: %v", err)
+		}
 	}
 	m.log.Info("Creating new webmesh node", "id", connID, "port", port)
 	cfg, err := m.buildConnConfig(ctx, req, connID, port)

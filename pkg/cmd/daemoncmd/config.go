@@ -79,6 +79,9 @@ type Config struct {
 	LogLevel string `koanf:"log-level"`
 	// LogFormat is the log format for the daemon.
 	LogFormat string `koanf:"log-format"`
+
+	// Logger is a pre-configured logger.
+	Logger *slog.Logger `koanf:"-"`
 }
 
 // CORS are options for configuring CORS. These are only applicable when
@@ -125,6 +128,9 @@ func NewDefaultConfig() *Config {
 
 // NewLogger returns a logger with the given configuration.
 func (conf *Config) NewLogger() *slog.Logger {
+	if conf.Logger != nil {
+		return conf.Logger
+	}
 	return logging.NewLogger(conf.LogLevel, conf.LogFormat)
 }
 

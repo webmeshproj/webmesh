@@ -19,7 +19,6 @@ package daemoncmd
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"runtime"
 	"time"
 
@@ -242,15 +241,13 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 }
 
 func (app *AppDaemon) Drop(ctx context.Context, req *v1.AppDropRequest) (*v1.AppDropResponse, error) {
-	_, ok := app.connmgr.Get(req.GetId())
-	if ok {
-		return nil, ErrConnected
-	}
-	datadir := app.connmgr.DataDir(req.GetId())
-	app.log.Info("Dropping storage for connection", "id", req.GetId(), "datadir", datadir)
-	err := os.RemoveAll(datadir)
+	err := app.validator.Validate(req)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to drop storage: %v", err)
+		return nil, newInvalidError(err)
+	}
+	err = app.connmgr.DropStorage(ctx, req.GetId())
+	if err != nil {
+		return nil, err
 	}
 	return &v1.AppDropResponse{}, nil
 }
