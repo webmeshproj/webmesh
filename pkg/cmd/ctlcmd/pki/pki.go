@@ -240,8 +240,8 @@ func (p *pki) Init(opts InitOptions) error {
 	}
 	// Issue an admin certificate using the CA.
 	adminPrivKey, adminCert, err := crypto.IssueCertificate(crypto.IssueConfig{
-		CommonName: opts.CAName,
-		ValidFor:   opts.CAExpiry,
+		CommonName: opts.AdminName,
+		ValidFor:   opts.AdminExpiry,
 		KeyType:    crypto.TLSKeyType(opts.KeyType),
 		KeySize:    opts.KeySize,
 		CACert:     caCert,
