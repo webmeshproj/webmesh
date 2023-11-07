@@ -63,11 +63,12 @@ func ParamsFile(connID string) string {
 
 // ConnManager manages the connections for the daemon.
 type ConnManager struct {
-	conns  map[string]embed.Node
-	ports  map[uint16]string
 	nodeID types.NodeID
 	key    crypto.PrivateKey
 	conf   Config
+	conns  map[string]embed.Node
+	ports  map[uint16]string
+	utuns  map[uint16]string
 	log    *slog.Logger
 	mu     sync.RWMutex
 }
@@ -94,11 +95,12 @@ func NewConnManager(conf Config) (*ConnManager, error) {
 		nodeID = types.NodeID(key.ID())
 	}
 	return &ConnManager{
-		conns:  make(map[string]embed.Node),
-		ports:  make(map[uint16]string),
 		nodeID: nodeID,
 		key:    key,
 		conf:   conf,
+		conns:  make(map[string]embed.Node),
+		ports:  make(map[uint16]string),
+		utuns:  make(map[uint16]string),
 		log:    log,
 	}, nil
 }
@@ -267,12 +269,24 @@ func (m *ConnManager) RemoveConn(connID string) {
 	defer m.mu.Unlock()
 	delete(m.conns, connID)
 	delete(m.ports, m.portByConnID(connID))
+	if runtime.GOOS == "darwin" {
+		delete(m.utuns, m.utunByConnID(connID))
+	}
 }
 
 func (m *ConnManager) portByConnID(connID string) uint16 {
 	for port, id := range m.ports {
 		if id == connID {
 			return port
+		}
+	}
+	return 0
+}
+
+func (m *ConnManager) utunByConnID(connID string) uint16 {
+	for index, id := range m.utuns {
+		if id == connID {
+			return index
 		}
 	}
 	return 0
@@ -307,6 +321,21 @@ func (m *ConnManager) assignListenPort(connID string) (uint16, error) {
 		}
 		port++
 		if port > maxPort {
+			return 0, ErrNoPortsAvailable
+		}
+	}
+}
+
+func (m *ConnManager) assignUTUNIndex(connID string) (uint16, error) {
+	const maxIndex = 255
+	index := uint16(10)
+	for {
+		if _, ok := m.utuns[index]; !ok {
+			m.utuns[index] = connID
+			return index, nil
+		}
+		index++
+		if index > maxIndex {
 			return 0, ErrNoPortsAvailable
 		}
 	}
@@ -363,6 +392,12 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 	if runtime.GOOS != "darwin" {
 		// Set a unique interface name on non-darwin systems.
 		conf.WireGuard.InterfaceName = connID + "0"
+	} else {
+		tunindex, err := m.assignUTUNIndex(connID)
+		if err != nil {
+			return nil, err
+		}
+		conf.WireGuard.InterfaceName = fmt.Sprintf("utun%d", tunindex)
 	}
 	conf.Mesh.UseMeshDNS = req.GetNetworking().GetUseDNS()
 	conf.Bootstrap.Enabled = req.GetBootstrap().GetEnabled()
