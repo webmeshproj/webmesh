@@ -165,12 +165,9 @@ func (o *WireGuardOptions) LoadKey(ctx context.Context) (crypto.PrivateKey, erro
 		if err != nil {
 			return nil, fmt.Errorf("generate new key: %w", err)
 		}
-		encoded, err := key.Encode()
+		err = crypto.EncodeKeyToFile(key, o.KeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("encode key: %w", err)
-		}
-		if err := os.WriteFile(o.KeyFile, []byte(encoded), 0600); err != nil {
-			return nil, fmt.Errorf("write key file: %w", err)
+			return nil, fmt.Errorf("save key: %w", err)
 		}
 		o.loaded = key
 		return key, nil
@@ -192,12 +189,9 @@ func (o *WireGuardOptions) LoadKey(ctx context.Context) (crypto.PrivateKey, erro
 			if err != nil {
 				return nil, fmt.Errorf("generate new key: %w", err)
 			}
-			encoded, err := key.Encode()
+			err = crypto.EncodeKeyToFile(key, o.KeyFile)
 			if err != nil {
-				return nil, fmt.Errorf("encode key: %w", err)
-			}
-			if err := os.WriteFile(o.KeyFile, []byte(encoded), 0600); err != nil {
-				return nil, fmt.Errorf("write key file: %w", err)
+				return nil, fmt.Errorf("save key: %w", err)
 			}
 			o.loaded = key
 			return key, nil

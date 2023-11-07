@@ -76,6 +76,7 @@ func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, change
 	config.GRPCWeb = true
 	config.CORS.Enabled = true
 	config.Bind = "127.0.0.1:58080"
+	config.KeyFile = `C:\ProgramData\Webmesh\key`
 	config.Persistence.Path = `C:\ProgramData\Webmesh`
 	elog.Info(1, fmt.Sprintf("Starting webmesh daemon with config: %+v", config))
 	var wg sync.WaitGroup

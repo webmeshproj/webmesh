@@ -64,7 +64,8 @@ type ConnManager struct {
 
 // NewConnManager creates a new connection manager.
 func NewConnManager(conf Config) (*ConnManager, error) {
-	key, err := conf.LoadKey()
+	log := logging.NewLogger(conf.LogLevel, conf.LogFormat).With("appdaemon", "connmgr")
+	key, err := conf.LoadKey(log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load key: %w", err)
 	}
@@ -80,7 +81,7 @@ func NewConnManager(conf Config) (*ConnManager, error) {
 		nodeID: nodeID,
 		key:    key,
 		conf:   conf,
-		log:    logging.NewLogger(conf.LogLevel, conf.LogFormat).With("appdaemon", "connmgr"),
+		log:    log,
 	}, nil
 }
 

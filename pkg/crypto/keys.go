@@ -156,6 +156,15 @@ func MustGenerateKey() PrivateKey {
 	return priv
 }
 
+// EncodeKeyToFile encodes a key to a file.
+func EncodeKeyToFile(key Key, file string) error {
+	encoded, err := key.Encode()
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, []byte(encoded), 0600)
+}
+
 // DecodePrivateKeyFromFile decodes a private key from a file.
 func DecodePrivateKeyFromFile(path string) (PrivateKey, error) {
 	data, err := os.ReadFile(path)

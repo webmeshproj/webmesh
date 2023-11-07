@@ -22,6 +22,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -29,6 +30,22 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/logging"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/wireguard"
 )
+
+// DefaultDaemonSocket returns the default daemon socket path.
+func DefaultDaemonSocket() string {
+	if runtime.GOOS == "windows" {
+		return "\\\\.\\pipe\\webmesh.sock"
+	}
+	return "/var/run/webmesh/webmesh.sock"
+}
+
+// isLocalSocket returns if the address is for a UNIX socket or windows pipe.
+func isLocalSocket(addr string) bool {
+	if runtime.GOOS == "windows" {
+		return strings.HasPrefix(addr, "\\\\")
+	}
+	return strings.HasPrefix(addr, "/") || strings.HasPrefix(addr, "unix://")
+}
 
 // Config is the configuration for the applicaton daeemon.
 type Config struct {
@@ -41,6 +58,8 @@ type Config struct {
 	// If set and it does not exist it will be created, otherwise one
 	// will be generated.
 	KeyFile string `koanf:"key-file,omitempty"`
+	// KeyRotation is the duration between key rotations.
+	KeyRotation time.Duration `koanf:"key-rotation"`
 	// Bind is the bind address for the daemon.
 	Bind string `koanf:"bind"`
 	// InsecureSocket uses an insecure socket when binding to a unix socket.
@@ -92,6 +111,7 @@ func NewDefaultConfig() *Config {
 		Enabled:            false,
 		NodeID:             "",
 		KeyFile:            "",
+		KeyRotation:        0,
 		Bind:               DefaultDaemonSocket(),
 		InsecureSocket:     false,
 		GRPCWeb:            false,
@@ -113,6 +133,7 @@ func (conf *Config) BindFlags(prefix string, flagset *pflag.FlagSet) *Config {
 	flagset.BoolVar(&conf.Enabled, prefix+"enabled", conf.Enabled, "Run the node as an application daemon")
 	flagset.StringVar(&conf.NodeID, prefix+"node-id", conf.NodeID, "ID to use for mesh connections from this server")
 	flagset.StringVar(&conf.KeyFile, prefix+"key-file", conf.KeyFile, "Path to the WireGuard private key for the node")
+	flagset.DurationVar(&conf.KeyRotation, prefix+"key-rotation", conf.KeyRotation, "Duration between key rotations")
 	flagset.StringVar(&conf.Bind, prefix+"bind", conf.Bind, "Address to bind the application daemon to")
 	flagset.BoolVar(&conf.InsecureSocket, prefix+"insecure-socket", conf.InsecureSocket, "Leave default ownership on the Unix socket")
 	flagset.BoolVar(&conf.GRPCWeb, prefix+"grpc-web", conf.GRPCWeb, "Use gRPC-Web for the application daemon")
@@ -162,44 +183,46 @@ func (conf *Config) Validate() error {
 }
 
 // LoadKey loads the wireguard key from the configuration.
-func (conf *Config) LoadKey() (crypto.PrivateKey, error) {
+func (conf *Config) LoadKey(log *slog.Logger) (crypto.PrivateKey, error) {
 	if conf.KeyFile == "" {
+		log.Info("Generating ephemeral WireGuard key")
 		return crypto.GenerateKey()
 	}
-	key, err := crypto.DecodePrivateKeyFromFile(conf.KeyFile)
-	if err == nil {
+	stat, err := os.Stat(conf.KeyFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Info("Generating new WireGuard key and saving to file", "file", conf.KeyFile)
+			key, err := crypto.GenerateKey()
+			if err != nil {
+				return nil, fmt.Errorf("generate new key: %w", err)
+			}
+			err = crypto.EncodeKeyToFile(key, conf.KeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("save key: %w", err)
+			}
+			return key, nil
+		}
+		return nil, fmt.Errorf("stat key file: %w", err)
+	}
+	if stat.IsDir() {
+		return nil, fmt.Errorf("key file is a directory")
+	}
+	if conf.KeyRotation > 0 && stat.ModTime().Add(conf.KeyRotation).Before(time.Now()) {
+		log.Info("Removing expired WireGuard key file", "file", conf.KeyFile)
+		if err := os.Remove(conf.KeyFile); err != nil {
+			return nil, fmt.Errorf("remove expired wireguard key file: %w", err)
+		}
+		log.Info("Generating new WireGuard key and saving to file", "file", conf.KeyFile)
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			return nil, fmt.Errorf("generate new key: %w", err)
+		}
+		err = crypto.EncodeKeyToFile(key, conf.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("save key: %w", err)
+		}
 		return key, nil
 	}
-	if !os.IsNotExist(err) {
-		return nil, err
-	}
-	key, err = crypto.GenerateKey()
-	if err != nil {
-		return nil, err
-	}
-	encoded, err := key.Encode()
-	if err != nil {
-		return nil, err
-	}
-	err = os.WriteFile(conf.KeyFile, []byte(encoded), 0600)
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
-}
-
-// DefaultDaemonSocket returns the default daemon socket path.
-func DefaultDaemonSocket() string {
-	if runtime.GOOS == "windows" {
-		return "\\\\.\\pipe\\webmesh.sock"
-	}
-	return "/var/run/webmesh/webmesh.sock"
-}
-
-// isLocalSocket returns if the address is for a UNIX socket or windows pipe.
-func isLocalSocket(addr string) bool {
-	if runtime.GOOS == "windows" {
-		return strings.HasPrefix(addr, "\\\\")
-	}
-	return strings.HasPrefix(addr, "/") || strings.HasPrefix(addr, "unix://")
+	log.Info("Loading WireGuard key from file", "file", conf.KeyFile)
+	return crypto.DecodePrivateKeyFromFile(conf.KeyFile)
 }
