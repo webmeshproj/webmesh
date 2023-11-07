@@ -29,30 +29,26 @@ import (
 	"golang.org/x/sys/windows/svc/eventlog"
 
 	"github.com/webmeshproj/webmesh/pkg/cmd/daemoncmd"
+	"github.com/webmeshproj/webmesh/pkg/logging"
 )
 
-const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
-
-var elog debug.Log
-
 func run() {
-	var err error
-	elog, err = eventlog.Open("webmeshd")
+	elog, err := eventlog.Open("webmeshd")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to open event log:", err)
 		return
 	}
 	defer elog.Close()
-	logInfo("Starting webmesh daemon helper")
-	err = svc.Run("webmeshd", &helperDaemon{})
+	logInfo(elog, "Starting webmesh daemon helper")
+	err = svc.Run("webmeshd", &helperDaemon{elog})
 	if err != nil {
-		logError("Failed to start helper daemon", err)
+		logError(elog, "Failed to start helper daemon", err)
 		return
 	}
-	logInfo("Webmesh daemon helper stopped")
+	logInfo(elog, "Webmesh daemon helper stopped")
 }
 
-func logError(msg string, err error) {
+func logError(elog debug.Log, msg string, err error) {
 	msg = fmt.Sprintf("%s: %v", msg, err)
 	fmt.Fprintln(os.Stderr, msg)
 	if elog != nil {
@@ -60,16 +56,20 @@ func logError(msg string, err error) {
 	}
 }
 
-func logInfo(msg string) {
+func logInfo(elog debug.Log, msg string) {
 	fmt.Fprintln(os.Stdout, msg)
 	if elog != nil {
 		elog.Info(1, msg)
 	}
 }
 
-type helperDaemon struct{}
+type helperDaemon struct {
+	elog debug.Log
+}
 
 func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
+
 	changes <- svc.Status{State: svc.StartPending}
 	config := daemoncmd.NewDefaultConfig()
 	config.Enabled = true
@@ -78,7 +78,8 @@ func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, change
 	config.Bind = "127.0.0.1:58080"
 	config.KeyFile = `C:\ProgramData\Webmesh\key`
 	config.Persistence.Path = `C:\ProgramData\Webmesh`
-	elog.Info(1, fmt.Sprintf("Starting webmesh daemon with config: %+v", config))
+	config.Logger = logging.NewServiceLogAdapter(d.elog, "info")
+	logInfo(d.elog, fmt.Sprintf("Starting webmesh daemon with config: %+v", config))
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -86,7 +87,7 @@ func (d *helperDaemon) Execute(args []string, r <-chan svc.ChangeRequest, change
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logInfo("Starting webmesh daemon")
+		logInfo(d.elog, "Starting webmesh daemon")
 		if err := daemoncmd.Run(ctx, *config); err != nil {
 			errs <- err
 		}
@@ -97,7 +98,7 @@ EventLoop:
 	for {
 		select {
 		case err := <-errs:
-			logError("Daemon exited with error", err)
+			logError(d.elog, "Daemon exited with error", err)
 			errno = 2
 			return
 		case c := <-r:
@@ -105,11 +106,11 @@ EventLoop:
 			case svc.Interrogate:
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				logInfo("Received stop request, shutting down")
+				logInfo(d.elog, "Received stop request, shutting down")
 				cancel()
 				break EventLoop
 			default:
-				logError("Unexpected service control request", fmt.Errorf("cmd=%d", c.Cmd))
+				logError(d.elog, "Unexpected service control request", fmt.Errorf("cmd=%d", c.Cmd))
 			}
 		}
 	}

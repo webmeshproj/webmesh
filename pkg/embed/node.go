@@ -74,6 +74,8 @@ type Options struct {
 	Key crypto.PrivateKey
 	// Host is the libp2p host for the node.
 	Host libp2p.Host
+	// Logger is the logger for the node.
+	Logger *slog.Logger
 }
 
 // NewNode creates a new embedded webmesh node.
@@ -82,11 +84,14 @@ func NewNode(ctx context.Context, opts Options) (Node, error) {
 	if config.Mesh.DisableIPv4 && config.Mesh.DisableIPv6 {
 		return nil, fmt.Errorf("cannot disable both IPv4 and IPv6")
 	}
-	log := logging.SetupLogging(config.Global.LogLevel, config.Global.LogFormat)
-	if config.Global.LogLevel == "" || config.Global.LogLevel == "silent" {
-		log = slog.New(slog.NewTextHandler(io.Discard, nil))
-		ctx = context.WithLogger(ctx, log)
+	log := opts.Logger
+	if log == nil {
+		log = logging.SetupLogging(config.Global.LogLevel, config.Global.LogFormat)
+		if config.Global.LogLevel == "" || config.Global.LogLevel == "silent" {
+			log = slog.New(slog.NewTextHandler(io.Discard, nil))
+		}
 	}
+	ctx = context.WithLogger(ctx, log)
 	// Create a new mesh connection
 	meshConfig, err := config.NewMeshConfig(ctx, opts.Key)
 	if err != nil {

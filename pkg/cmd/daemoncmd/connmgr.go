@@ -240,6 +240,7 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 	node, err = embed.NewNode(ctx, embed.Options{
 		Config: cfg,
 		Key:    m.key,
+		Logger: m.log.With("connection-id", connID),
 	})
 	if err != nil {
 		return "", nil, status.Errorf(codes.Internal, "failed to create node: %v", err)
