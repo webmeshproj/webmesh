@@ -54,9 +54,9 @@ func SetDefaultIPv4Gateway(ctx context.Context, gateway Gateway) error {
 
 // Add adds a route to the interface with the given name.
 func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	out, err := common.ExecOutput(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.Masked().String(), "-interface", ifaceName)
+	_, err := common.ExecOutput(ctx, "route", "-n", "add", "-"+getFamily(addr.Addr()), addr.Masked().String(), "-interface", ifaceName)
 	if err != nil {
-		if strings.Contains(string(out), "already in table") || strings.Contains(string(out), "exists") {
+		if strings.Contains(err.Error(), "already in table") || strings.Contains(err.Error(), "exists") {
 			return ErrRouteExists
 		}
 		return err
