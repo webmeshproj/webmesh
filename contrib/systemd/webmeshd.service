@@ -9,7 +9,8 @@ ExecStart=/usr/bin/webmesh-node \
     --daemon.grpc-web=true \
     --daemon.cors.enabled=true \
     --daemon.bind=127.0.0.1:58080 \
-    --daemon.persistence.path=/var/lib/webmeshd
+    --daemon.persistence.path=/var/lib/webmeshd \
+    --daemon.key-file=/var/lib/webmeshd/key
 Restart=always
 RestartSec=5
 
