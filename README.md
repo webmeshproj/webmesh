@@ -23,6 +23,8 @@ It differs from other WireGuard™ management solutions in that:
 
 ## Getting Started
 
+If you are looking for the GUI application, you can find it in the [webmesh-app](https://github.com/webmeshproj/webmesh-app) repository.
+
 Detailed instructions can be found in the [Getting Started](https://webmeshproj.github.io/documentation/getting-started/) guide on the project website.
 For examples of different topologies and the various features available, see the [examples](examples/) directory.
 
