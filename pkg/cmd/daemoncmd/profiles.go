@@ -49,6 +49,11 @@ func (id ProfileID) Bytes() []byte {
 	return []byte(id)
 }
 
+// IsEmpty returns whether the profile ID is empty.
+func (id ProfileID) IsEmpty() bool {
+	return id == ""
+}
+
 var profilesPrefix = []byte("profiles")
 
 // StorageKey returns the storage key for the profile ID.

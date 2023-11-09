@@ -29,6 +29,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/crypto"
 	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/rpcsrv"
 	"github.com/webmeshproj/webmesh/pkg/version"
@@ -164,11 +165,19 @@ func (app *AppDaemon) PutConnection(ctx context.Context, req *v1.PutConnectionRe
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	err = app.connmgr.Profiles().Put(ctx, ProfileID(req.GetId()), Profile{req.GetParameters()})
+	profileID := ProfileID(req.GetId())
+	if profileID.IsEmpty() {
+		id, err := crypto.NewRandomID()
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to generate connection ID: %v", err)
+		}
+		profileID = ProfileID(id)
+	}
+	err = app.connmgr.Profiles().Put(ctx, profileID, Profile{req.GetParameters()})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to store connection: %v", err)
 	}
-	return &v1.PutConnectionResponse{}, nil
+	return &v1.PutConnectionResponse{Id: profileID.String()}, nil
 }
 
 func (app *AppDaemon) GetConnection(ctx context.Context, req *v1.GetConnectionRequest) (*v1.GetConnectionResponse, error) {
