@@ -192,7 +192,7 @@ func (m *ConnManager) DropStorage(ctx context.Context, connID string) error {
 }
 
 // NewConn creates a new connection for the given request. Start must be called
-// opn the returned node to start the connection.
+// on the returned node to start the connection.
 func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id string, node embed.Node, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
