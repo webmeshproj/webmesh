@@ -74,7 +74,12 @@ func NewConnManager(conf Config) (*ConnManager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load key: %w", err)
 	}
-	profiles, err := NewProfileStore(conf.Persistence.Path)
+	profiles, err := NewProfileStore(func() string {
+		if conf.Persistence.Path == "" {
+			return ""
+		}
+		return filepath.Join(conf.Persistence.Path, "profiles")
+	}())
 	if err != nil {
 		return nil, fmt.Errorf("create profile store: %w", err)
 	}
