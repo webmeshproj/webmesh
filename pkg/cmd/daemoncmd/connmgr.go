@@ -228,7 +228,7 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 		}
 		return "", nil, status.Errorf(codes.Internal, "failed to get profile: %v", err)
 	}
-	cfg, err := m.buildConnConfig(ctx, profile.ConnectionParameters, connID, port)
+	cfg, err := m.buildConnConfig(ctx, profile.GetParameters(), connID, port)
 	if err != nil {
 		return "", nil, err
 	}

@@ -173,7 +173,7 @@ func (app *AppDaemon) PutConnection(ctx context.Context, req *v1.PutConnectionRe
 		}
 		profileID = ProfileID(id)
 	}
-	err = app.connmgr.Profiles().Put(ctx, profileID, Profile{req.GetParameters()})
+	err = app.connmgr.Profiles().Put(ctx, profileID, Profile{req})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to store connection: %v", err)
 	}
@@ -202,7 +202,8 @@ func (app *AppDaemon) GetConnection(ctx context.Context, req *v1.GetConnectionRe
 		node = meshNode.MeshNode
 	}
 	return &v1.GetConnectionResponse{
-		Parameters: conn.ConnectionParameters,
+		Parameters: conn.GetParameters(),
+		Metadata:   conn.GetMetadata(),
 		Status:     connStatus,
 		Node:       node,
 	}, nil
@@ -255,7 +256,8 @@ func (app *AppDaemon) ListConnections(ctx context.Context, req *v1.ListConnectio
 	for id, profile := range profiles {
 		connStatus := app.connmgr.GetStatus(ctx, id.String())
 		resp.Connections[id.String()] = &v1.GetConnectionResponse{
-			Parameters: profile.ConnectionParameters,
+			Parameters: profile.GetParameters(),
+			Metadata:   profile.GetMetadata(),
 			Status:     connStatus,
 			Node: func() *v1.MeshNode {
 				if connStatus == v1.DaemonConnStatus_CONNECTED {

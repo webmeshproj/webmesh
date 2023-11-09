@@ -115,33 +115,35 @@ func (p Profiles) IDs() []ProfileID {
 	return ids
 }
 
-// Profile contains the details of a connection profile
+// Profile contains the details of a connection profile. It is semantically
+// equivalent to a PutConnectionRequest at the moment and is therefore functionally
+// an alias.
 type Profile struct {
-	*v1.ConnectionParameters
+	*v1.PutConnectionRequest
 }
 
 // MarshalJSON marshals the profile to JSON.
 func (p Profile) MarshalJSON() ([]byte, error) {
-	return protojson.Marshal(p.ConnectionParameters)
+	return protojson.Marshal(p.PutConnectionRequest)
 }
 
 // UnmarshalJSON unmarshals the profile from JSON.
 func (p *Profile) UnmarshalJSON(data []byte) error {
-	if p.ConnectionParameters == nil {
-		p.ConnectionParameters = &v1.ConnectionParameters{}
+	if p.PutConnectionRequest == nil {
+		p.PutConnectionRequest = &v1.PutConnectionRequest{}
 	}
-	return protojson.Unmarshal(data, p.ConnectionParameters)
+	return protojson.Unmarshal(data, p.PutConnectionRequest)
 }
 
 // MarshalProto marshals the profile to proto.
 func (p Profile) MarshalProto() ([]byte, error) {
-	return proto.Marshal(p.ConnectionParameters)
+	return proto.Marshal(p.PutConnectionRequest)
 }
 
 // UnmarshalProto unmarshals the profile from proto.
 func (p *Profile) UnmarshalProto(data []byte) error {
-	if p.ConnectionParameters == nil {
-		p.ConnectionParameters = &v1.ConnectionParameters{}
+	if p.PutConnectionRequest == nil {
+		p.PutConnectionRequest = &v1.PutConnectionRequest{}
 	}
-	return proto.Unmarshal(data, p.ConnectionParameters)
+	return proto.Unmarshal(data, p.PutConnectionRequest)
 }
