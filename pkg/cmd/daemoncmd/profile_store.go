@@ -28,7 +28,7 @@ import (
 // ProfileStore manages the storage of connection profiles.
 type ProfileStore interface {
 	// Put stores or updates a profile.
-	Put(ctx context.Context, id ProfileID, details Profile) error
+	Put(ctx context.Context, id ProfileID, profile Profile) error
 	// Get retrieves a profile.
 	Get(ctx context.Context, id ProfileID) (Profile, error)
 	// List lists all profiles.
@@ -62,10 +62,10 @@ type profileStore struct {
 	mu sync.RWMutex
 }
 
-func (s *profileStore) Put(ctx context.Context, id ProfileID, details Profile) error {
+func (s *profileStore) Put(ctx context.Context, id ProfileID, profile Profile) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	data, err := details.MarshalProto()
+	data, err := profile.MarshalProto()
 	if err != nil {
 		return fmt.Errorf("marshal profile: %w", err)
 	}
