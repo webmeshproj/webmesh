@@ -1574,6 +1574,8 @@ github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSD
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
 github.com/webmeshproj/api v0.11.2 h1:121MlNlwWNU2II3gF2v9I/x342s/yBKvDs+JqmjKDfY=
 github.com/webmeshproj/api v0.11.2/go.mod h1:xuYk93HM4aZWWlTh96Z2nIg1YhqcRG36nOfcifzHeM4=
+github.com/webmeshproj/api v0.11.4-0.20231109201546-44726ffeea69 h1:lnpiABZ5U10GCRacgmvUK9tCuBLTJqQg0vWmm4r8N6c=
+github.com/webmeshproj/api v0.11.4-0.20231109201546-44726ffeea69/go.mod h1:xuYk93HM4aZWWlTh96Z2nIg1YhqcRG36nOfcifzHeM4=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1/go.mod h1:8UvriyWtv5Q5EOgjHaSseUEdkQfvwFv1I/In/O2M9gc=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=

@@ -29,6 +29,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/webmeshproj/webmesh/pkg/context"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/rpcsrv"
 	"github.com/webmeshproj/webmesh/pkg/version"
 )
@@ -62,45 +63,8 @@ func NewServer(conf Config) (*AppDaemon, error) {
 	}, nil
 }
 
-func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.DaemonStatus, error) {
-	return &v1.DaemonStatus{
-		NodeID:      app.connmgr.NodeID(),
-		PublicKey:   app.connmgr.PublicKey(),
-		Description: fmt.Sprintf("Webmesh App Daemon (%s)", runtime.Version()),
-		Version:     app.version.Version,
-		GitCommit:   app.version.GitCommit,
-		BuildDate:   app.version.BuildDate,
-		Uptime:      time.Since(app.started).String(),
-		StartedAt:   timestamppb.New(app.started),
-		Connections: func() map[string]v1.DaemonConnStatus {
-			out := make(map[string]v1.DaemonConnStatus)
-			for _, connid := range app.connmgr.ConnIDs() {
-				id := connid
-				c, ok := app.connmgr.Get(id)
-				if !ok {
-					// Disconnect was called on a connection before we got here.
-					continue
-				}
-				if c.MeshNode().Started() {
-					out[id] = v1.DaemonConnStatus_CONNECTED
-				} else {
-					out[id] = v1.DaemonConnStatus_CONNECTING
-				}
-			}
-			storedConns, err := app.connmgr.StoredConns()
-			if err != nil {
-				app.log.Error("Error getting stored connections", "error", err.Error())
-				return out
-			}
-			for _, connid := range storedConns {
-				id := connid
-				if _, ok := out[id]; !ok {
-					out[id] = v1.DaemonConnStatus_DISCONNECTED
-				}
-			}
-			return out
-		}(),
-	}, nil
+func (app *AppDaemon) Close() error {
+	return app.connmgr.Close()
 }
 
 func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.ConnectResponse, error) {
@@ -179,52 +143,6 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 	return res, nil
 }
 
-func (app *AppDaemon) ConnectionStatus(ctx context.Context, req *v1.ConnectionStatusRequest) (*v1.ConnectionStatusResponse, error) {
-	err := app.validator.Validate(req)
-	if err != nil {
-		return nil, newInvalidError(err)
-	}
-	ids := req.GetIds()
-	if len(ids) == 0 {
-		ids = app.connmgr.ConnIDs()
-	}
-	res := &v1.ConnectionStatusResponse{
-		Statuses: make(map[string]*v1.ConnectionStatus),
-	}
-	for _, connid := range ids {
-		id := connid
-		app.log.Info("Retrieving status for connection", "id", id)
-		c, ok := app.connmgr.Get(id)
-		if !ok {
-			app.log.Info("Status requested for unknown connection", "id", id)
-			res.Statuses[id] = &v1.ConnectionStatus{
-				ConnectionStatus: v1.DaemonConnStatus_DISCONNECTED,
-			}
-		} else {
-			res.Statuses[id] = &v1.ConnectionStatus{
-				ConnectionStatus: func() v1.DaemonConnStatus {
-					if c.MeshNode().Started() {
-						return v1.DaemonConnStatus_CONNECTED
-					}
-					return v1.DaemonConnStatus_CONNECTING
-				}(),
-				Node: func() *v1.MeshNode {
-					if !c.MeshNode().Started() {
-						return nil
-					}
-					node, err := c.MeshNode().Storage().MeshDB().Peers().Get(ctx, c.MeshNode().ID())
-					if err != nil {
-						app.log.Error("Error getting node from storage", "id", c.MeshNode().ID(), "error", err.Error())
-						return nil
-					}
-					return node.MeshNode
-				}(),
-			}
-		}
-	}
-	return res, nil
-}
-
 func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.QueryResponse, error) {
 	err := app.validator.Validate(req)
 	if err != nil {
@@ -241,7 +159,47 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 	return rpcsrv.ServeQuery(ctx, conn.MeshNode().Storage(), req.GetQuery()), nil
 }
 
-func (app *AppDaemon) Drop(ctx context.Context, req *v1.AppDropRequest) (*v1.AppDropResponse, error) {
+func (app *AppDaemon) PutConnection(ctx context.Context, req *v1.PutConnectionRequest) (*v1.PutConnectionResponse, error) {
+	err := app.validator.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	err = app.connmgr.Profiles().Put(ctx, ProfileID(req.GetId()), Profile{req.GetParameters()})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to store connection: %v", err)
+	}
+	return &v1.PutConnectionResponse{}, nil
+}
+
+func (app *AppDaemon) GetConnection(ctx context.Context, req *v1.GetConnectionRequest) (*v1.GetConnectionResponse, error) {
+	err := app.validator.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	conn, err := app.connmgr.Profiles().Get(ctx, ProfileID(req.GetId()))
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, status.Errorf(codes.NotFound, "connection not found: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get connection: %v", err)
+	}
+	connStatus := app.connmgr.GetStatus(req.GetId())
+	var node *v1.MeshNode
+	if connStatus == v1.DaemonConnStatus_CONNECTED {
+		meshNode, err := app.connmgr.GetMeshNode(ctx, req.GetId())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get mesh node: %v", err)
+		}
+		node = meshNode.MeshNode
+	}
+	return &v1.GetConnectionResponse{
+		Parameters: conn.ConnectionParameters,
+		Status:     connStatus,
+		Node:       node,
+	}, nil
+}
+
+func (app *AppDaemon) DropConnection(ctx context.Context, req *v1.DropConnectionRequest) (*v1.DropConnectionResponse, error) {
 	err := app.validator.Validate(req)
 	if err != nil {
 		return nil, newInvalidError(err)
@@ -250,11 +208,84 @@ func (app *AppDaemon) Drop(ctx context.Context, req *v1.AppDropRequest) (*v1.App
 	if err != nil {
 		return nil, err
 	}
-	return &v1.AppDropResponse{}, nil
+	err = app.connmgr.Profiles().Delete(ctx, ProfileID(req.GetId()))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete connection: %v", err)
+	}
+	return &v1.DropConnectionResponse{}, nil
 }
 
-func (app *AppDaemon) Close() error {
-	return app.connmgr.Close()
+func (app *AppDaemon) ListConnections(ctx context.Context, req *v1.ListConnectionsRequest) (*v1.ListConnectionsResponse, error) {
+	err := app.validator.Validate(req)
+	if err != nil {
+		return nil, newInvalidError(err)
+	}
+	ids := req.GetIds()
+	var profiles map[ProfileID]Profile
+	if len(ids) == 0 {
+		profiles, err = app.connmgr.Profiles().List(ctx)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to list connections: %v", err)
+		}
+	} else {
+		profiles = make(map[ProfileID]Profile)
+		for _, id := range ids {
+			profile, err := app.connmgr.Profiles().Get(ctx, ProfileID(id))
+			if err != nil {
+				if errors.IsNotFound(err) {
+					continue
+				}
+				return nil, status.Errorf(codes.Internal, "failed to get connection: %v", err)
+			}
+			profiles[ProfileID(id)] = profile
+		}
+	}
+	resp := &v1.ListConnectionsResponse{
+		Connections: make(map[string]*v1.GetConnectionResponse),
+	}
+	for id, profile := range profiles {
+		connStatus := app.connmgr.GetStatus(id.String())
+		resp.Connections[id.String()] = &v1.GetConnectionResponse{
+			Parameters: profile.ConnectionParameters,
+			Status:     connStatus,
+			Node: func() *v1.MeshNode {
+				if connStatus == v1.DaemonConnStatus_CONNECTED {
+					meshNode, err := app.connmgr.GetMeshNode(ctx, id.String())
+					if err != nil {
+						app.log.Error("Error getting mesh node", "id", id, "error", err.Error())
+						return nil
+					}
+					return meshNode.MeshNode
+				}
+				return nil
+			}(),
+		}
+	}
+	return resp, nil
+}
+
+func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.DaemonStatus, error) {
+	connIDs, err := app.connmgr.Profiles().ListProfileIDs(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list connections: %v", err)
+	}
+	return &v1.DaemonStatus{
+		NodeID:      app.connmgr.NodeID(),
+		PublicKey:   app.connmgr.PublicKey(),
+		Description: fmt.Sprintf("Webmesh App Daemon (%s)", runtime.Version()),
+		Version:     app.version.Version,
+		GitCommit:   app.version.GitCommit,
+		BuildDate:   app.version.BuildDate,
+		Uptime:      time.Since(app.started).String(),
+		StartedAt:   timestamppb.New(app.started),
+		Connections: func() map[string]v1.DaemonConnStatus {
+			out := make(map[string]v1.DaemonConnStatus)
+			for _, id := range connIDs {
+				out[id.String()] = app.connmgr.GetStatus(id.String())
+			}
+			return out
+		}(),
+	}, nil
 }
 
 func newInvalidError(err error) error {

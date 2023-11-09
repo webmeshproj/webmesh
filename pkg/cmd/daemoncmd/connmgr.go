@@ -29,7 +29,6 @@ import (
 	v1 "github.com/webmeshproj/api/go/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/webmeshproj/webmesh/pkg/config"
 	"github.com/webmeshproj/webmesh/pkg/context"
@@ -38,6 +37,7 @@ import (
 	"github.com/webmeshproj/webmesh/pkg/meshnet/endpoints"
 	"github.com/webmeshproj/webmesh/pkg/meshnet/system/firewall"
 	"github.com/webmeshproj/webmesh/pkg/storage"
+	"github.com/webmeshproj/webmesh/pkg/storage/errors"
 	"github.com/webmeshproj/webmesh/pkg/storage/types"
 )
 
@@ -54,25 +54,17 @@ var (
 	ErrConnected = status.Errorf(codes.FailedPrecondition, "connected to the specified network")
 )
 
-// ParamsDir is the relative path where connection request parameters are stored
-// for each connection ID.
-const ParamsDir = "params"
-
-// ParamsFile returns the relative path to the parameters file for the given connection ID.
-func ParamsFile(connID string) string {
-	return filepath.Join(ParamsDir, fmt.Sprintf("%s.json", connID))
-}
-
 // ConnManager manages the connections for the daemon.
 type ConnManager struct {
-	nodeID types.NodeID
-	key    crypto.PrivateKey
-	conf   Config
-	conns  map[string]embed.Node
-	ports  map[uint16]string
-	utuns  map[uint16]string
-	log    *slog.Logger
-	mu     sync.RWMutex
+	nodeID   types.NodeID
+	key      crypto.PrivateKey
+	conf     Config
+	profiles ProfileStore
+	conns    map[string]embed.Node
+	ports    map[uint16]string
+	utuns    map[uint16]string
+	log      *slog.Logger
+	mu       sync.RWMutex
 }
 
 // NewConnManager creates a new connection manager.
@@ -80,15 +72,11 @@ func NewConnManager(conf Config) (*ConnManager, error) {
 	log := conf.NewLogger().With("appdaemon", "connmgr")
 	key, err := conf.LoadKey(log)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load key: %w", err)
+		return nil, fmt.Errorf("load key: %w", err)
 	}
-	if conf.Persistence.Path != "" {
-		err := os.MkdirAll(filepath.Join(conf.Persistence.Path, ParamsDir), 0700)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create params directory: %w", err)
-		}
-		// TODO: Store connection status in this directory and restart connections
-		// that were running when the daemon was stopped.
+	profiles, err := NewProfileStore(conf.Persistence.Path)
+	if err != nil {
+		return nil, fmt.Errorf("create profile store: %w", err)
 	}
 	var nodeID types.NodeID
 	if conf.NodeID != "" {
@@ -97,13 +85,14 @@ func NewConnManager(conf Config) (*ConnManager, error) {
 		nodeID = types.NodeID(key.ID())
 	}
 	return &ConnManager{
-		nodeID: nodeID,
-		key:    key,
-		conf:   conf,
-		conns:  make(map[string]embed.Node),
-		ports:  make(map[uint16]string),
-		utuns:  make(map[uint16]string),
-		log:    log,
+		nodeID:   nodeID,
+		key:      key,
+		conf:     conf,
+		profiles: profiles,
+		conns:    make(map[string]embed.Node),
+		ports:    make(map[uint16]string),
+		utuns:    make(map[uint16]string),
+		log:      log,
 	}, nil
 }
 
@@ -118,10 +107,17 @@ func (m *ConnManager) PublicKey() string {
 	return encoded
 }
 
-// Close closes the connection manager and all connections.
+// Profiles returns the profiles store.
+func (m *ConnManager) Profiles() ProfileStore {
+	return m.profiles
+}
+
+// Close closes the connection manager and all connections. It is not
+// safe to use the connection manager after calling Close.
 func (m *ConnManager) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	defer m.profiles.Close()
 	for id, conn := range m.conns {
 		m.log.Info("Stopping connection", "id", id)
 		err := conn.Stop(context.WithLogger(context.Background(), m.log))
@@ -129,12 +125,10 @@ func (m *ConnManager) Close() error {
 			m.log.Error("Failed to stop connection", "error", err.Error())
 		}
 	}
-	m.conns = nil
-	m.ports = nil
 	return nil
 }
 
-// ConnIDs returns the IDs of the connections.
+// ConnIDs returns the IDs of all currently active connections.
 func (m *ConnManager) ConnIDs() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -149,29 +143,34 @@ func (m *ConnManager) Get(connID string) (embed.Node, bool) {
 	return n, ok
 }
 
+// GetStatus returns the status of the connection for the given ID.
+func (m *ConnManager) GetStatus(connID string) v1.DaemonConnStatus {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	c, ok := m.conns[connID]
+	if !ok {
+		return v1.DaemonConnStatus_DISCONNECTED
+	}
+	if c.MeshNode().Started() {
+		return v1.DaemonConnStatus_CONNECTED
+	}
+	return v1.DaemonConnStatus_CONNECTING
+}
+
+// GetMeshNode returns the full mesh node for the given ID.
+func (m *ConnManager) GetMeshNode(ctx context.Context, connID string) (types.MeshNode, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	conn, ok := m.conns[connID]
+	if !ok {
+		return types.MeshNode{}, ErrNotConnected
+	}
+	return conn.Storage().MeshDB().Peers().Get(ctx, conn.MeshNode().ID())
+}
+
 // DataDir returns the data directory for the given connection ID.
 func (m *ConnManager) DataDir(connID string) string {
 	return filepath.Join(m.conf.Persistence.Path, connID)
-}
-
-// StoredConns returns all connection IDs known to the persistence layer.
-func (m *ConnManager) StoredConns() ([]string, error) {
-	if m.conf.Persistence.Path == "" {
-		return nil, nil
-	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	contents, err := os.ReadDir(m.conf.Persistence.Path)
-	if err != nil {
-		return nil, fmt.Errorf("read dir: %w", err)
-	}
-	var ids []string
-	for _, entry := range contents {
-		if entry.IsDir() {
-			ids = append(ids, entry.Name())
-		}
-	}
-	return ids, nil
 }
 
 // DropStorage drops storage for the connection with the given ID.
@@ -188,10 +187,6 @@ func (m *ConnManager) DropStorage(ctx context.Context, connID string) error {
 	err := os.RemoveAll(m.DataDir(connID))
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove all: %w", err)
-	}
-	err = os.Remove(filepath.Join(m.conf.Persistence.Path, ParamsFile(connID)))
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove params: %w", err)
 	}
 	return nil
 }
@@ -223,20 +218,15 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 	if err != nil {
 		return "", nil, err
 	}
-	if m.conf.Persistence.Path != "" {
-		m.log.Info("Saving connection parameters in case of restart", "id", connID)
-		paramsJSON, err := protojson.Marshal(req)
-		if err != nil {
-			return "", nil, status.Errorf(codes.Internal, "failed to marshal connection parameters: %v", err)
-		}
-		paramsPath := filepath.Join(m.conf.Persistence.Path, ParamsFile(connID))
-		err = os.WriteFile(paramsPath, paramsJSON, 0600)
-		if err != nil {
-			return "", nil, status.Errorf(codes.Internal, "failed to write connection parameters: %v", err)
-		}
-	}
 	m.log.Info("Creating new webmesh node", "id", connID, "port", port)
-	cfg, err := m.buildConnConfig(ctx, req, connID, port)
+	profile, err := m.profiles.Get(ctx, ProfileID(connID))
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return "", nil, status.Errorf(codes.NotFound, "profile not found")
+		}
+		return "", nil, status.Errorf(codes.Internal, "failed to get profile: %v", err)
+	}
+	cfg, err := m.buildConnConfig(ctx, profile.ConnectionParameters, connID, port)
 	if err != nil {
 		return "", nil, err
 	}
@@ -343,7 +333,7 @@ func (m *ConnManager) assignUTUNIndex(connID string) (uint16, error) {
 	}
 }
 
-func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectRequest, connID string, listenPort uint16) (*config.Config, error) {
+func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectionParameters, connID string, listenPort uint16) (*config.Config, error) {
 	conf := config.NewDefaultConfig(m.nodeID.String())
 	conf.Global.LogLevel = m.conf.LogLevel
 	conf.Global.LogFormat = m.conf.LogFormat
@@ -435,22 +425,22 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectReques
 		conf.TLS.InsecureSkipVerify = req.GetTls().GetSkipVerify()
 	}
 	switch req.GetAddrType() {
-	case v1.ConnectRequest_ADDR:
+	case v1.ConnectionParameters_ADDR:
 		conf.Mesh.JoinAddresses = req.GetAddrs()
-	case v1.ConnectRequest_RENDEZVOUS:
+	case v1.ConnectionParameters_RENDEZVOUS:
 		conf.Discovery.Discover = true
 		conf.Discovery.Rendezvous = req.GetAddrs()[0]
-	case v1.ConnectRequest_MULTIADDR:
+	case v1.ConnectionParameters_MULTIADDR:
 		conf.Mesh.JoinMultiaddrs = req.GetAddrs()
 	}
 	switch req.GetAuthMethod() {
 	case v1.NetworkAuthMethod_NO_AUTH:
 	case v1.NetworkAuthMethod_BASIC:
-		conf.Auth.Basic.Username = req.GetAuthCredentials()[v1.ConnectRequest_BASIC_USERNAME.String()]
-		conf.Auth.Basic.Password = req.GetAuthCredentials()[v1.ConnectRequest_BASIC_PASSWORD.String()]
+		conf.Auth.Basic.Username = req.GetAuthCredentials()[v1.ConnectionParameters_BASIC_USERNAME.String()]
+		conf.Auth.Basic.Password = req.GetAuthCredentials()[v1.ConnectionParameters_BASIC_PASSWORD.String()]
 	case v1.NetworkAuthMethod_LDAP:
-		conf.Auth.LDAP.Username = req.GetAuthCredentials()[v1.ConnectRequest_LDAP_USERNAME.String()]
-		conf.Auth.LDAP.Password = req.GetAuthCredentials()[v1.ConnectRequest_LDAP_PASSWORD.String()]
+		conf.Auth.LDAP.Username = req.GetAuthCredentials()[v1.ConnectionParameters_LDAP_USERNAME.String()]
+		conf.Auth.LDAP.Password = req.GetAuthCredentials()[v1.ConnectionParameters_LDAP_PASSWORD.String()]
 	case v1.NetworkAuthMethod_MTLS:
 		conf.Auth.MTLS.CertData = req.GetTls().GetCertData()
 		conf.Auth.MTLS.KeyData = req.GetTls().GetKeyData()
