@@ -80,7 +80,7 @@ func (app *AppDaemon) Connect(ctx context.Context, req *v1.ConnectRequest) (*v1.
 	app.log.Info("Starting node", "id", connID)
 	err = node.Start(ctx)
 	if err != nil {
-		defer app.connmgr.RemoveConn(connID)
+		defer app.connmgr.RemoveConn(ctx, connID)
 		return nil, status.Errorf(codes.Internal, "failed to start node: %v", err)
 	}
 	return &v1.ConnectResponse{
@@ -110,14 +110,14 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 	ids := req.GetIds()
 	if len(ids) > 0 {
 		for _, id := range req.GetIds() {
-			_, ok := app.connmgr.Get(id)
+			_, ok := app.connmgr.Get(ctx, id)
 			if !ok {
 				return nil, ErrNotConnected
 			}
 		}
 	}
 	if len(ids) == 0 {
-		ids = app.connmgr.ConnIDs()
+		ids = app.connmgr.ConnIDs(ctx)
 	}
 	app.log.Info("Getting metrics for connections", "ids", ids)
 	res := &v1.MetricsResponse{
@@ -125,7 +125,7 @@ func (app *AppDaemon) Metrics(ctx context.Context, req *v1.MetricsRequest) (*v1.
 	}
 	for _, i := range ids {
 		id := i
-		conn, ok := app.connmgr.Get(id)
+		conn, ok := app.connmgr.Get(ctx, id)
 		if !ok {
 			// Disconnect was called on a connection before we got here.
 			continue
@@ -149,7 +149,7 @@ func (app *AppDaemon) Query(ctx context.Context, req *v1.AppQueryRequest) (*v1.Q
 	if err != nil {
 		return nil, newInvalidError(err)
 	}
-	conn, ok := app.connmgr.Get(req.GetId())
+	conn, ok := app.connmgr.Get(ctx, req.GetId())
 	if !ok {
 		return nil, ErrNotConnected
 	}
@@ -192,7 +192,7 @@ func (app *AppDaemon) GetConnection(ctx context.Context, req *v1.GetConnectionRe
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get connection: %v", err)
 	}
-	connStatus := app.connmgr.GetStatus(req.GetId())
+	connStatus := app.connmgr.GetStatus(ctx, req.GetId())
 	var node *v1.MeshNode
 	if connStatus == v1.DaemonConnStatus_CONNECTED {
 		meshNode, err := app.connmgr.GetMeshNode(ctx, req.GetId())
@@ -253,7 +253,7 @@ func (app *AppDaemon) ListConnections(ctx context.Context, req *v1.ListConnectio
 		Connections: make(map[string]*v1.GetConnectionResponse),
 	}
 	for id, profile := range profiles {
-		connStatus := app.connmgr.GetStatus(id.String())
+		connStatus := app.connmgr.GetStatus(ctx, id.String())
 		resp.Connections[id.String()] = &v1.GetConnectionResponse{
 			Parameters: profile.ConnectionParameters,
 			Status:     connStatus,
@@ -290,7 +290,7 @@ func (app *AppDaemon) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.Daem
 		Connections: func() map[string]v1.DaemonConnStatus {
 			out := make(map[string]v1.DaemonConnStatus)
 			for _, id := range connIDs {
-				out[id.String()] = app.connmgr.GetStatus(id.String())
+				out[id.String()] = app.connmgr.GetStatus(ctx, id.String())
 			}
 			return out
 		}(),

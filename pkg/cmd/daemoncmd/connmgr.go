@@ -60,11 +60,26 @@ type ConnManager struct {
 	key      crypto.PrivateKey
 	conf     Config
 	profiles ProfileStore
-	conns    map[string]embed.Node
-	ports    map[uint16]string
-	utuns    map[uint16]string
+	conns    map[NamespacedConn]embed.Node
+	ports    map[uint16]NamespacedConn
+	utuns    map[uint16]NamespacedConn
 	log      *slog.Logger
 	mu       sync.RWMutex
+}
+
+// NamespacedConn is a namespaced connection.
+type NamespacedConn struct {
+	ConnID    string
+	Namespace string
+}
+
+// NamespacedConnFromContext returns a namespaced connection from
+// the given context and connection ID.
+func NamespacedConnFromContext(ctx context.Context, connID string) NamespacedConn {
+	return NamespacedConn{
+		ConnID:    connID,
+		Namespace: NamespaceFromContext(ctx),
+	}
 }
 
 // NewConnManager creates a new connection manager.
@@ -94,9 +109,9 @@ func NewConnManager(conf Config) (*ConnManager, error) {
 		key:      key,
 		conf:     conf,
 		profiles: profiles,
-		conns:    make(map[string]embed.Node),
-		ports:    make(map[uint16]string),
-		utuns:    make(map[uint16]string),
+		conns:    make(map[NamespacedConn]embed.Node),
+		ports:    make(map[uint16]NamespacedConn),
+		utuns:    make(map[uint16]NamespacedConn),
 		log:      log,
 	}, nil
 }
@@ -134,25 +149,24 @@ func (m *ConnManager) Close() error {
 }
 
 // ConnIDs returns the IDs of all currently active connections.
-func (m *ConnManager) ConnIDs() []string {
+func (m *ConnManager) ConnIDs(ctx context.Context) []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.listConnIDs()
+	return m.listConnIDs(ctx)
 }
 
 // Get gets the connection for the given ID.
-func (m *ConnManager) Get(connID string) (embed.Node, bool) {
+func (m *ConnManager) Get(ctx context.Context, connID string) (embed.Node, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	n, ok := m.conns[connID]
-	return n, ok
+	return m.getConn(ctx, connID)
 }
 
 // GetStatus returns the status of the connection for the given ID.
-func (m *ConnManager) GetStatus(connID string) v1.DaemonConnStatus {
+func (m *ConnManager) GetStatus(ctx context.Context, connID string) v1.DaemonConnStatus {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	c, ok := m.conns[connID]
+	c, ok := m.getConn(ctx, connID)
 	if !ok {
 		return v1.DaemonConnStatus_DISCONNECTED
 	}
@@ -166,7 +180,7 @@ func (m *ConnManager) GetStatus(connID string) v1.DaemonConnStatus {
 func (m *ConnManager) GetMeshNode(ctx context.Context, connID string) (types.MeshNode, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	conn, ok := m.conns[connID]
+	conn, ok := m.getConn(ctx, connID)
 	if !ok {
 		return types.MeshNode{}, ErrNotConnected
 	}
@@ -182,7 +196,7 @@ func (m *ConnManager) DataDir(connID string) string {
 func (m *ConnManager) DropStorage(ctx context.Context, connID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	_, ok := m.conns[connID]
+	_, ok := m.getConn(ctx, connID)
 	if ok {
 		return status.Errorf(codes.FailedPrecondition, "cannot drop storage for running connection")
 	}
@@ -202,24 +216,7 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	connID := req.GetId()
-	_, ok := m.conns[connID]
-	if ok {
-		return "", nil, ErrAlreadyConnected
-	}
-	if connID == "" {
-		var err error
-		connID, err = crypto.NewRandomID()
-		if err != nil {
-			return "", nil, status.Errorf(codes.Internal, "failed to generate connection ID: %v", err)
-		}
-		m.log.Info("Generated new connection ID", "id", connID)
-		// Double check that the ID is unique.
-		_, ok := m.conns[connID]
-		if ok {
-			return "", nil, status.Errorf(codes.Internal, "connection ID collision")
-		}
-	}
-	port, err := m.assignListenPort(connID)
+	port, err := m.assignListenPort(ctx, connID)
 	if err != nil {
 		return "", nil, err
 	}
@@ -244,55 +241,66 @@ func (m *ConnManager) NewConn(ctx context.Context, req *v1.ConnectRequest) (id s
 	if err != nil {
 		return "", nil, status.Errorf(codes.Internal, "failed to create node: %v", err)
 	}
-	m.conns[connID] = node
+	m.conns[NamespacedConnFromContext(ctx, connID)] = node
 	return connID, node, nil
 }
 
 // Disconnect disconnects the connection for the given ID.
 func (m *ConnManager) Disconnect(ctx context.Context, connID string) error {
 	m.mu.RLock()
-	conn, ok := m.conns[connID]
+	conn, ok := m.getConn(ctx, connID)
 	m.mu.RUnlock()
 	if !ok {
 		return ErrNotConnected
 	}
-	defer m.RemoveConn(connID)
+	defer m.RemoveConn(ctx, connID)
 	return conn.Stop(ctx)
 }
 
 // RemoveConn removes the connection for the given ID.
-func (m *ConnManager) RemoveConn(connID string) {
+func (m *ConnManager) RemoveConn(ctx context.Context, connID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.conns, connID)
-	delete(m.ports, m.portByConnID(connID))
+	delete(m.conns, NamespacedConnFromContext(ctx, connID))
+	delete(m.ports, m.portByConnID(ctx, connID))
 	if runtime.GOOS == "darwin" {
-		delete(m.utuns, m.utunByConnID(connID))
+		delete(m.utuns, m.utunByConnID(ctx, connID))
 	}
 }
 
-func (m *ConnManager) portByConnID(connID string) uint16 {
+func (m *ConnManager) getConn(ctx context.Context, connID string) (embed.Node, bool) {
+	conn, ok := m.conns[NamespacedConnFromContext(ctx, connID)]
+	if !ok {
+		return nil, false
+	}
+	return conn, true
+}
+
+func (m *ConnManager) portByConnID(ctx context.Context, connID string) uint16 {
 	for port, id := range m.ports {
-		if id == connID {
+		if id == NamespacedConnFromContext(ctx, connID) {
 			return port
 		}
 	}
 	return 0
 }
 
-func (m *ConnManager) utunByConnID(connID string) uint16 {
+func (m *ConnManager) utunByConnID(ctx context.Context, connID string) uint16 {
 	for index, id := range m.utuns {
-		if id == connID {
+		if id == NamespacedConnFromContext(ctx, connID) {
 			return index
 		}
 	}
 	return 0
 }
 
-func (m *ConnManager) listConnIDs() []string {
+func (m *ConnManager) listConnIDs(ctx context.Context) []string {
 	ids := make([]string, 0, len(m.conns))
+	namespace := NamespaceFromContext(ctx)
 	for id := range m.conns {
-		ids = append(ids, id)
+		if id.Namespace == namespace {
+			ids = append(ids, id.ConnID)
+		}
 	}
 	return ids
 }
@@ -308,12 +316,12 @@ func (m *ConnManager) listInterfaceNames() []string {
 	return names
 }
 
-func (m *ConnManager) assignListenPort(connID string) (uint16, error) {
+func (m *ConnManager) assignListenPort(ctx context.Context, connID string) (uint16, error) {
 	const maxPort = 65535
 	port := m.conf.WireGuardStartPort
 	for {
 		if _, ok := m.ports[port]; !ok {
-			m.ports[port] = connID
+			m.ports[port] = NamespacedConnFromContext(ctx, connID)
 			return port, nil
 		}
 		port++
@@ -323,12 +331,12 @@ func (m *ConnManager) assignListenPort(connID string) (uint16, error) {
 	}
 }
 
-func (m *ConnManager) assignUTUNIndex(connID string) (uint16, error) {
+func (m *ConnManager) assignUTUNIndex(ctx context.Context, connID string) (uint16, error) {
 	const maxIndex = 255
 	index := uint16(10)
 	for {
 		if _, ok := m.utuns[index]; !ok {
-			m.utuns[index] = connID
+			m.utuns[index] = NamespacedConnFromContext(ctx, connID)
 			return index, nil
 		}
 		index++
@@ -390,7 +398,7 @@ func (m *ConnManager) buildConnConfig(ctx context.Context, req *v1.ConnectionPar
 		// Set a unique interface name on non-darwin systems.
 		conf.WireGuard.InterfaceName = connID + "0"
 	} else {
-		tunindex, err := m.assignUTUNIndex(connID)
+		tunindex, err := m.assignUTUNIndex(ctx, connID)
 		if err != nil {
 			return nil, err
 		}

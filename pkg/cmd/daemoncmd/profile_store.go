@@ -69,7 +69,7 @@ func (s *profileStore) Put(ctx context.Context, id ProfileID, details Profile) e
 	if err != nil {
 		return fmt.Errorf("marshal profile: %w", err)
 	}
-	err = s.st.PutValue(ctx, id.StorageKey(), data, 0)
+	err = s.st.PutValue(ctx, id.StorageKey(ctx), data, 0)
 	if err != nil {
 		return fmt.Errorf("write profile to storage: %w", err)
 	}
@@ -80,7 +80,7 @@ func (s *profileStore) Get(ctx context.Context, id ProfileID) (Profile, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var profile Profile
-	data, err := s.st.GetValue(ctx, id.StorageKey())
+	data, err := s.st.GetValue(ctx, id.StorageKey(ctx))
 	if err != nil {
 		return profile, fmt.Errorf("read profile from storage: %w", err)
 	}
@@ -95,7 +95,7 @@ func (s *profileStore) List(ctx context.Context) (Profiles, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var profiles Profiles
-	err := s.st.IterPrefix(ctx, profilesPrefix, func(key, value []byte) error {
+	err := s.st.IterPrefix(ctx, NamespacedPrefixFromContext(ctx), func(key, value []byte) error {
 		var profile Profile
 		err := profile.UnmarshalProto(value)
 		if err != nil {
@@ -112,7 +112,7 @@ func (s *profileStore) List(ctx context.Context) (Profiles, error) {
 
 func (s *profileStore) ListProfileIDs(ctx context.Context) (ProfileIDs, error) {
 	var ids ProfileIDs
-	keys, err := s.st.ListKeys(ctx, profilesPrefix)
+	keys, err := s.st.ListKeys(ctx, NamespacedPrefixFromContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("list profile keys: %w", err)
 	}
@@ -125,7 +125,7 @@ func (s *profileStore) ListProfileIDs(ctx context.Context) (ProfileIDs, error) {
 func (s *profileStore) Delete(ctx context.Context, id ProfileID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	err := s.st.Delete(ctx, id.StorageKey())
+	err := s.st.Delete(ctx, id.StorageKey(ctx))
 	if err != nil {
 		return fmt.Errorf("delete profile from storage: %w", err)
 	}
