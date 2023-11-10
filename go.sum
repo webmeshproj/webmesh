@@ -1580,6 +1580,10 @@ github.com/webmeshproj/api v0.11.4-0.20231109225108-67650c62010a h1:uCOjrwdx5/0T
 github.com/webmeshproj/api v0.11.4-0.20231109225108-67650c62010a/go.mod h1:xuYk93HM4aZWWlTh96Z2nIg1YhqcRG36nOfcifzHeM4=
 github.com/webmeshproj/api v0.11.4-0.20231109232550-26b325076bc2 h1:98lTfjlJdgGcOfbzg6XpOqtR7ijF/qIG8jyHxoSE2l8=
 github.com/webmeshproj/api v0.11.4-0.20231109232550-26b325076bc2/go.mod h1:xuYk93HM4aZWWlTh96Z2nIg1YhqcRG36nOfcifzHeM4=
+github.com/webmeshproj/api v0.12.2-0.20231110001025-47cc4d4fe62d h1:2BSPsjRZ4iH0LMQbMYNMXmspdvhcv18ktgT/oksdWH0=
+github.com/webmeshproj/api v0.12.2-0.20231110001025-47cc4d4fe62d/go.mod h1:xuYk93HM4aZWWlTh96Z2nIg1YhqcRG36nOfcifzHeM4=
+github.com/webmeshproj/api v0.12.2-0.20231110162455-5a090ce8d43e h1:/Dtu5Qf3Qc/JqeLpy5QybhDE36VS4Dd7nuuMrqaJO+s=
+github.com/webmeshproj/api v0.12.2-0.20231110162455-5a090ce8d43e/go.mod h1:xuYk93HM4aZWWlTh96Z2nIg1YhqcRG36nOfcifzHeM4=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 h1:EKhdznlJHPMoKr0XTrX+IlJs1LH3lyx2nfr1dOlZ79k=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1/go.mod h1:8UvriyWtv5Q5EOgjHaSseUEdkQfvwFv1I/In/O2M9gc=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=

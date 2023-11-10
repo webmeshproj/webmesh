@@ -192,21 +192,24 @@ func (app *AppDaemon) GetConnection(ctx context.Context, req *v1.GetConnectionRe
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get connection: %v", err)
 	}
-	connStatus := app.connmgr.GetStatus(ctx, req.GetId())
-	var node *v1.MeshNode
-	if connStatus == v1.DaemonConnStatus_CONNECTED {
-		meshNode, err := app.connmgr.GetMeshNode(ctx, req.GetId())
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get mesh node: %v", err)
-		}
-		node = meshNode.MeshNode
-	}
-	return &v1.GetConnectionResponse{
+	resp := &v1.GetConnectionResponse{
+		Status:     app.connmgr.GetStatus(ctx, req.GetId()),
 		Parameters: conn.GetParameters(),
 		Metadata:   conn.GetMetadata(),
-		Status:     connStatus,
-		Node:       node,
-	}, nil
+	}
+	if resp.Status == v1.DaemonConnStatus_CONNECTED {
+		if c, ok := app.connmgr.Get(ctx, req.GetId()); ok {
+			resp.Domain = c.MeshNode().Domain()
+			resp.Ipv4Network = c.MeshNode().Network().NetworkV4().String()
+			resp.Ipv6Network = c.MeshNode().Network().NetworkV6().String()
+			meshNode, err := app.connmgr.GetMeshNode(ctx, req.GetId())
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to get mesh node: %v", err)
+			}
+			resp.Node = meshNode.MeshNode
+		}
+	}
+	return resp, nil
 }
 
 func (app *AppDaemon) DropConnection(ctx context.Context, req *v1.DropConnectionRequest) (*v1.DropConnectionResponse, error) {
@@ -254,22 +257,23 @@ func (app *AppDaemon) ListConnections(ctx context.Context, req *v1.ListConnectio
 		Connections: make(map[string]*v1.GetConnectionResponse),
 	}
 	for id, profile := range profiles {
-		connStatus := app.connmgr.GetStatus(ctx, id.String())
-		resp.Connections[id.String()] = &v1.GetConnectionResponse{
+		conndetails := &v1.GetConnectionResponse{
+			Status:     app.connmgr.GetStatus(ctx, id.String()),
 			Parameters: profile.GetParameters(),
 			Metadata:   profile.GetMetadata(),
-			Status:     connStatus,
-			Node: func() *v1.MeshNode {
-				if connStatus == v1.DaemonConnStatus_CONNECTED {
-					meshNode, err := app.connmgr.GetMeshNode(ctx, id.String())
-					if err != nil {
-						app.log.Error("Error getting mesh node", "id", id, "error", err.Error())
-						return nil
-					}
-					return meshNode.MeshNode
+		}
+		if conndetails.Status == v1.DaemonConnStatus_CONNECTED {
+			if c, ok := app.connmgr.Get(ctx, id.String()); ok {
+				conndetails.Domain = c.MeshNode().Domain()
+				conndetails.Ipv4Network = c.MeshNode().Network().NetworkV4().String()
+				conndetails.Ipv6Network = c.MeshNode().Network().NetworkV6().String()
+				meshNode, err := app.connmgr.GetMeshNode(ctx, id.String())
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to get mesh node: %v", err)
 				}
-				return nil
-			}(),
+				conndetails.Node = meshNode.MeshNode
+			}
+			resp.Connections[id.String()] = conndetails
 		}
 	}
 	return resp, nil
