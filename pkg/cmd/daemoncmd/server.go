@@ -172,6 +172,10 @@ func (app *AppDaemon) PutConnection(ctx context.Context, req *v1.PutConnectionRe
 			return nil, status.Errorf(codes.Internal, "failed to generate connection ID: %v", err)
 		}
 		profileID = ProfileID(id)
+		// Double check that the generated ID is unique
+		if _, err := app.connmgr.Profiles().Get(ctx, profileID); err == nil {
+			return nil, status.Errorf(codes.Internal, "generated connection ID is not unique: %v", profileID)
+		}
 	}
 	err = app.connmgr.Profiles().Put(ctx, profileID, Profile{req})
 	if err != nil {
