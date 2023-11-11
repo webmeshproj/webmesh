@@ -94,7 +94,7 @@ func (s *profileStore) Get(ctx context.Context, id ProfileID) (Profile, error) {
 func (s *profileStore) List(ctx context.Context) (Profiles, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	var profiles Profiles
+	profiles := make(Profiles)
 	err := s.st.IterPrefix(ctx, NamespacedPrefixFromContext(ctx), func(key, value []byte) error {
 		var profile Profile
 		err := profile.UnmarshalProto(value)
