@@ -277,8 +277,8 @@ func (app *AppDaemon) ListConnections(ctx context.Context, req *v1.ListConnectio
 				}
 				conndetails.Node = meshNode.MeshNode
 			}
-			resp.Connections[id.String()] = conndetails
 		}
+		resp.Connections[id.String()] = conndetails
 	}
 	return resp, nil
 }
