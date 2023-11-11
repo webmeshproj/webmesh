@@ -47,7 +47,10 @@ func NewProfileStore(diskPath string) (ProfileStore, error) {
 	var st storage.MeshStorage
 	var err error
 	if diskPath != "" {
-		st, err = badgerdb.New(badgerdb.Options{DiskPath: diskPath})
+		st, err = badgerdb.New(badgerdb.Options{
+			DiskPath:   diskPath,
+			SyncWrites: true,
+		})
 	} else {
 		st, err = badgerdb.NewInMemory(badgerdb.Options{})
 	}
