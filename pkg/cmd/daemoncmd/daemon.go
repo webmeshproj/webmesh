@@ -114,7 +114,7 @@ func runGRPCWebServer(ctx context.Context, log *slog.Logger, srv *grpc.Server, l
 			log.Debug("Handling CORS options for request", "origin", req.Header.Get("Origin"))
 			resp.Header().Set("Access-Control-Allow-Origin", strings.Join(cors.AllowedOrigins, ", "))
 			resp.Header().Set("Access-Control-Allow-Credentials", "true")
-			resp.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Grpc-Web, X-User-Agent")
+			resp.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Grpc-Web, X-User-Agent, X-Webmesh-Namespace")
 			resp.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 			if req.Method == http.MethodOptions {
 				resp.WriteHeader(http.StatusOK)
