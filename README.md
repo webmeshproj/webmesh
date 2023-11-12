@@ -35,7 +35,8 @@ For examples of different topologies and the various features available, see the
 ### Developers
 
 Integrating your project with Webmesh networks is easy.
-All APIs are written in protobuf in the [api](https://github.com/webmeshproj/api) repository.
+All APIs are written in protobuf in the [API](https://github.com/webmeshproj/api) repository.
+Applications can integrate either via the `webmeshd` process or by embedding this package directly.
 
 Libraries and other integrations are available for the following languages and environments:
 
@@ -47,9 +48,9 @@ Libraries and other integrations are available for the following languages and e
   - [Webmesh CNI](https://github.com/webmeshproj/webmesh-cni)
   - [Webmesh Operator](https://github.com/webmeshproj/operator) (Work in Progress)
 
-You may also embed this library directly in your applications that have access to managing network interfaces.
-More documentation will be provided later on how to do this.
+More documentation on direct embedding will be provided later.
 For now, you can find examples in the [examples/embedded](examples/embedded) directory.
+The godoc for the [embed](https://pkg.go.dev/github.com/webmeshproj/webmesh/pkg/embed) package is also a good place to start.
 
 ## Building
 
