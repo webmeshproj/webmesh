@@ -23,13 +23,33 @@ It differs from other WireGuard™ management solutions in that:
 
 ## Getting Started
 
-If you are looking for the GUI application, you can find it in the [webmesh-app](https://github.com/webmeshproj/webmesh-app) repository.
+### Install Webmesh
+
+- [GUI Application](https://github.com/webmeshproj/webmesh-app#installation)
+  - On Linux, the GUI application relies on the `webmeshd` service from the CLI installations below.
+- [CLI and Docker Packages](https://webmeshproj.github.io/documentation/installation-instructions)
 
 Detailed instructions can be found in the [Getting Started](https://webmeshproj.github.io/documentation/getting-started/) guide on the project website.
 For examples of different topologies and the various features available, see the [examples](examples/) directory.
 
-If you'd like to play with the project on Kubernetes, there is a work-in-progress Operator in the [operator](https://github.com/webmeshproj/operator/) repository.
-It works fine on most clusters, including ephemeral docker-based ones, but is not yet ready for production use.
+### Developers
+
+Integrating your project with Webmesh networks is easy.
+All APIs are written in protobuf in the [api](https://github.com/webmeshproj/api) repository.
+
+Libraries and other integrations are available for the following languages and environments:
+
+- [Go](https://pkg.go.dev/github.com/webmeshproj/api/go/v1)
+- Js
+  - React (Comming soon)
+  - [Vue](https://github.com/webmeshproj/webmesh-vue)
+- Kubernetes
+  - [Webmesh CNI](https://github.com/webmeshproj/webmesh-cni)
+  - [Webmesh Operator](https://github.com/webmeshproj/operator) (Work in Progress)
+
+You may also embed this library directly in your applications that have access to managing network interfaces.
+More documentation will be provided later on how to do this.
+For now, you can find examples in the [examples/embedded](examples/embedded) directory.
 
 ## Building
 
