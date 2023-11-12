@@ -41,7 +41,7 @@ Applications can integrate either via the `webmeshd` process or by embedding thi
 Libraries and other integrations are available for the following languages and environments:
 
 - [Go](https://pkg.go.dev/github.com/webmeshproj/api/go/v1)
-- Js
+- [Js/Typescript](https://webmeshproj.github.io/api/)
   - React (Comming soon)
   - [Vue](https://github.com/webmeshproj/webmesh-vue)
 - Kubernetes
