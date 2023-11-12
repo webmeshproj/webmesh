@@ -42,7 +42,7 @@ Libraries and other integrations are available for the following languages and e
 
 - [Go](https://pkg.go.dev/github.com/webmeshproj/api/go/v1)
 - [Js/Typescript](https://webmeshproj.github.io/api/)
-  - React (Comming soon)
+  - React (Coming soon)
   - [Vue](https://github.com/webmeshproj/webmesh-vue)
 - Kubernetes
   - [Webmesh CNI](https://github.com/webmeshproj/webmesh-cni)
