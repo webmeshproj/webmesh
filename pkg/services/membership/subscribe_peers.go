@@ -18,11 +18,11 @@ package membership
 
 import (
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
 	v1 "github.com/webmeshproj/api/go/v1"
-	"golang.org/x/exp/slices"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 

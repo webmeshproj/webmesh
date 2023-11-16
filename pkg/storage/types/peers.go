@@ -17,10 +17,10 @@ limitations under the License.
 package types
 
 import (
+	"slices"
 	"sort"
 
 	v1 "github.com/webmeshproj/api/go/v1"
-	"golang.org/x/exp/slices"
 )
 
 // SortedWireGuardPeers implements a sort.Interface for []*v1.WireGuardPeer.

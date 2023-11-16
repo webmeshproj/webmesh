@@ -23,12 +23,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
 	v1 "github.com/webmeshproj/api/go/v1"
-	"golang.org/x/exp/slices"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/webmeshproj/webmesh/pkg/crypto"
