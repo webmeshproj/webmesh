@@ -18,50 +18,43 @@ package link
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/netip"
 
-	"github.com/webmeshproj/webmesh/pkg/common"
+	"golang.zx2c4.com/wireguard/windows/tunnel/winipcfg"
 )
 
 // SetInterfaceAddress sets the address of the interface with the given name.
 func SetInterfaceAddress(ctx context.Context, name string, addr netip.Prefix) error {
-	if addr.Addr().Is4() {
-		return setIPv4Address(ctx, name, addr)
-	}
-	return setIPv6Address(ctx, name, addr)
-}
-
-func setIPv6Address(ctx context.Context, name string, addr netip.Prefix) error {
-	err := common.Exec(ctx,
-		"netsh", "interface", "ipv6",
-		"set", "address", fmt.Sprintf("%q", name),
-		addr.Addr().String(),
-		"store=active",
-	)
-	return err
-}
-
-func setIPv4Address(ctx context.Context, name string, addr netip.Prefix) error {
-	_, ipnet, err := net.ParseCIDR(addr.String())
+	link, err := net.InterfaceByName(name)
 	if err != nil {
-		return err
+		return fmt.Errorf("net link by name: %w", err)
 	}
-	err = common.Exec(ctx,
-		"netsh", "interface", "ipv4",
-		"set", "address", fmt.Sprintf("%q", name),
-		"static",
-		addr.Addr().String(),        // Address
-		net.IP(ipnet.Mask).String(), // Subnet mask
-		addr.Addr().String(),        // Gateway as address
-		"store=active",
-	)
-	return err
+	luid, err := winipcfg.LUIDFromIndex(uint32(link.Index))
+	if err != nil {
+		return fmt.Errorf("winipcfg luid from index: %w", err)
+	}
+	err = luid.AddIPAddress(addr)
+	if err != nil {
+		return fmt.Errorf("winipcfg add ip address: %w", err)
+	}
+	return nil
 }
 
 // RemoveInterfaceAddress removes the address of the interface with the given name.
 func RemoveInterfaceAddress(_ context.Context, name string, addr netip.Prefix) error {
-	return errors.New("not implemented")
+	link, err := net.InterfaceByName(name)
+	if err != nil {
+		return fmt.Errorf("net link by name: %w", err)
+	}
+	luid, err := winipcfg.LUIDFromIndex(uint32(link.Index))
+	if err != nil {
+		return fmt.Errorf("winipcfg luid from index: %w", err)
+	}
+	err = luid.DeleteIPAddress(addr)
+	if err != nil {
+		return fmt.Errorf("winipcfg delete ip address: %w", err)
+	}
+	return nil
 }

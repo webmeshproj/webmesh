@@ -21,8 +21,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/netip"
 	"strings"
+
+	"golang.org/x/sys/windows"
+	"golang.zx2c4.com/wireguard/windows/tunnel/winipcfg"
 
 	"github.com/webmeshproj/webmesh/pkg/common"
 )
@@ -38,32 +43,64 @@ func SetDefaultIPv4Gateway(ctx context.Context, gateway Gateway) error {
 }
 
 // Add adds a route to the interface with the given name.
-func Add(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	family := "ipv4"
-	if addr.Addr().Is6() {
-		family = "ipv6"
-	}
-	out, err := common.ExecOutput(ctx, "netsh", "interface", family, "add", "route", addr.Masked().String(), ifaceName, "metric=0", "store=active")
+func Add(ctx context.Context, name string, addr netip.Prefix) error {
+	link, err := net.InterfaceByName(name)
 	if err != nil {
-		if strings.Contains(string(out), "already in table") || strings.Contains(string(out), "exists") {
-			return ErrRouteExists
-		}
-		return err
+		return fmt.Errorf("net link by name: %w", err)
+	}
+	luid, err := winipcfg.LUIDFromIndex(uint32(link.Index))
+	if err != nil {
+		return fmt.Errorf("winipcfg luid from index: %w", err)
+	}
+	nextHop, err := getNextHopForLink(luid, addr)
+	if err != nil {
+		return fmt.Errorf("get next hop for link: %w", err)
+	}
+	err = luid.AddRoute(addr, nextHop, 0)
+	if err != nil {
+		return fmt.Errorf("winipcfg add route: %w", err)
 	}
 	return nil
 }
 
 // Remove removes a route from the interface with the given name.
-func Remove(ctx context.Context, ifaceName string, addr netip.Prefix) error {
-	family := "ipv4"
-	if addr.Addr().Is6() {
-		family = "ipv6"
-	}
-	err := common.Exec(ctx, "netsh", "interface", family, "delete", "route", addr.Masked().String(), ifaceName, "metric=0", "store=active")
+func Remove(ctx context.Context, name string, addr netip.Prefix) error {
+	link, err := net.InterfaceByName(name)
 	if err != nil {
-		return err
+		return fmt.Errorf("net link by name: %w", err)
+	}
+	luid, err := winipcfg.LUIDFromIndex(uint32(link.Index))
+	if err != nil {
+		return fmt.Errorf("winipcfg luid from index: %w", err)
+	}
+	nextHop, err := getNextHopForLink(luid, addr)
+	if err != nil {
+		return fmt.Errorf("get next hop for link: %w", err)
+	}
+	err = luid.DeleteRoute(addr, nextHop)
+	if err != nil {
+		return fmt.Errorf("winipcfg delete route: %w", err)
 	}
 	return nil
+}
+
+func getNextHopForLink(luid winipcfg.LUID, route netip.Prefix) (netip.Addr, error) {
+	var family winipcfg.AddressFamily
+	if route.Addr().Is4() {
+		family = windows.AF_INET
+	} else {
+		family = windows.AF_INET6
+	}
+	addrs, err := winipcfg.GetUnicastIPAddressTable(family)
+	if err != nil {
+		return netip.Addr{}, err
+	}
+	for _, addr := range addrs {
+		if addr.InterfaceLUID == luid {
+			return addr.Address.Addr(), nil
+		}
+	}
+	return netip.Addr{}, errors.New("no address found for interface")
 }
 
 func defaultGatewayIPConfig(ctx context.Context) (Gateway, error) {
